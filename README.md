@@ -25,6 +25,18 @@ A collection of Claude Code plugins that make Claude better at specific developm
 | [pypi-readme-creator](./plugins/pypi-readme-creator)     | READMEs that render correctly on PyPI                                                |
 | [toml-python](./plugins/toml-python)                     | Edit TOML files without breaking comments and formatting                             |
 
+### Shell Development
+
+| Plugin                                           | What It Does                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [bash-development](./plugins/bash-development)   | Comprehensive Bash scripting with testing, linting, portability, and logging  |
+
+### Perl Development
+
+| Plugin                                           | What It Does                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [perl-development](./plugins/perl-development)   | Modern Perl 5.30+ development with CPAN ecosystem, testing, and validation    |
+
 ### Code Quality
 
 | Plugin                                         | What It Does                                                |
@@ -64,6 +76,13 @@ A collection of Claude Code plugins that make Claude better at specific developm
 | [brainstorming-skill](./plugins/brainstorming-skill) | Structured brainstorming with proven prompt patterns     |
 | [story-based-framing](./plugins/story-based-framing) | Better pattern recognition through narrative structure   |
 | [verification-gate](./plugins/verification-gate)     | Claude verifies work before claiming "done"              |
+
+### Plugin Development
+
+| Plugin                                         | What It Does                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| [plugin-creator](./plugins/plugin-creator)     | Step-by-step guidance for creating new Claude Code plugins           |
+| [plugin-refactor](./plugins/plugin-refactor)   | Systematic toolkit for refactoring and improving existing plugins    |
 
 ### System
 
