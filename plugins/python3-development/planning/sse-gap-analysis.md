@@ -25,7 +25,7 @@ The python3-development plugin shows **strong partial alignment** with the State
 | **Stage 2: Planning** | RT-ICA assessment, solution design, produce ARTIFACT:PLAN | `planner-rt-ica` skill, `swarm-task-planner` agent | **PARTIAL** - RT-ICA exists but runs as pre-pass, not integrated stage; planning produces PLAN.md |
 | **Stage 3: Context Integration** | Ground design in codebase reality, produce contextualized plan | `context-gathering` agent | **PARTIAL** - Adds Context Manifest to task file, not separate contextualized plan artifact |
 | **Stage 4: Task Decomposition** | Create atomic self-contained task files | `generate-task` skill, `swarm-task-planner` agent | **ALIGNED** - Uses CLEAR+CoVe standard, produces TASK/ files with embedded context |
-| **Stage 5: Execution** | Execute single task with embedded verification | `python-cli-architect`, `python-pytest-architect`, `python-code-reviewer` agents | **PARTIAL** - Agents execute but not always with fresh context; verification embedded but not mandatory |
+| **Stage 5: Execution** | Execute single task with embedded verification | `python-cli-architect`, `python-pytest-architect`, `python-code-reviewer` agents | **PARTIAL** - Agents execute with fresh context; verification embedded but not mandatory |
 | **Stage 6: Forensic Review** | Independent verification of task completion | `feature-verifier` agent | **ALIGNED** - Goal-backward verification, 3-level checks (exists, substantive, wired) |
 | **Stage 7: Final Verification** | Verify feature against original goals | `plan-validator` agent (before execution), `feature-verifier` (after) | **PARTIAL** - Separate roles but no final certification artifact |
 
@@ -51,23 +51,21 @@ The python3-development plugin shows **strong partial alignment** with the State
 
 **Current State in Plugin**:
 
-- Agents are defined with `model:`, `tools:`, `skills:` frontmatter but do not enforce fresh context
-- Sub-agents spawned via Task tool receive conversation context by default
-- File: `./plugins/python3-development/agents/context-gathering.md`: Agent receives task file path as input, but context includes orchestrator conversation
+- Agents are defined with `model:`, `tools:`, `skills:` frontmatter
+- Sub-agents spawned via Task tool start with fresh context (no orchestrator conversation inherited)
+- File: `./plugins/python3-development/agents/context-gathering.md`: Agent receives task file path as input in a fresh context
 
-**Gap Status**: **PARTIAL**
+**Gap Status**: **ALIGNED**
 
-**Specific Issues**:
+**Evidence** (verified via experiment 2026-01-29):
 
-1. No mechanism enforces context isolation between agent invocations
-2. Agents can access accumulated conversation state
-3. Task files may reference external context not embedded in the task
+- Sub-agents do NOT receive orchestrator conversation context
+- Sub-agents start fresh with only their prompt + tool access
+- Context isolation is enforced by the Task tool architecture itself
 
-**Improvement Opportunities**:
+**Minor Issues**:
 
-- Implement strict "task file IS the complete prompt" pattern (SSE 3.5)
-- Add context isolation verification to agent frontmatter
-- Create wrapper that strips conversation history before agent invocation
+- Task files may reference external files without embedding content (but this is "No Recall Required", not statelessness)
 
 ---
 
@@ -323,18 +321,7 @@ The python3-development plugin shows **strong partial alignment** with the State
 - Create artifact schema documentation
 - Update existing templates to use standard tokens
 
-#### 2.2 Implement Stateless Agent Enforcement
-
-**Impact**: Eliminates context pressure and accumulated errors
-**Current Gap**: Agents receive orchestrator conversation context
-
-**Action**:
-
-- Add agent invocation wrapper that strips conversation history
-- Require task file to be the complete prompt
-- Add context size verification before execution
-
-#### 2.3 Add Final Certification Artifact
+#### 2.2 Add Final Certification Artifact
 
 **Impact**: Completes the pipeline, provides audit trail
 **Current Gap**: No ARTIFACT:VERIFICATION for feature completion
@@ -386,7 +373,7 @@ The python3-development plugin shows **strong partial alignment** with the State
 
 | SSE Principle | Plugin Status | Gap Level | Priority |
 |--------------|---------------|-----------|----------|
-| Stateless agents | Fresh context not enforced | PARTIAL | P2 |
+| Stateless agents | Task tool enforces fresh context | ALIGNED | - |
 | Externalized memory | Task files used, execution artifacts missing | PARTIAL | P1 |
 | Single responsibility | Agents well-separated | ALIGNED | - |
 | Message passing | Artifacts used, tokens not standardized | PARTIAL | P2 |
@@ -400,11 +387,10 @@ The python3-development plugin shows **strong partial alignment** with the State
 
 ## Conclusion
 
-The python3-development plugin has organically evolved toward many SSE principles, particularly in task design (CLEAR+CoVe), agent specialization, and quality gates. The primary gaps are in:
+The python3-development plugin has organically evolved toward many SSE principles, particularly in task design (CLEAR+CoVe), agent specialization, quality gates, and stateless agent architecture (Task tool enforces fresh context by default). The primary gaps are in:
 
 1. **Artifact persistence**: Execution and review results not captured as artifacts
 2. **Boundary enforcement**: Stage verification is optional rather than mandatory
-3. **Stateless enforcement**: Agent context isolation not enforced
 
 Implementing the Priority 1 recommendations would significantly improve SSE alignment while maintaining backward compatibility with existing workflows. The plugin's existing `implementation-manager`, `feature-verifier`, and `swarm-task-planner` components provide a strong foundation for SSE-style artifact-driven development.
 

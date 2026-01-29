@@ -12,8 +12,10 @@
 |--------|-------|
 | VERIFIED | 22 |
 | PARTIALLY VERIFIED | 3 |
-| ASSUMPTION | 2 |
-| INCORRECT | 0 |
+| ASSUMPTION | 0 |
+| INCORRECT | 2 |
+
+**Note**: Two claims originally marked ASSUMPTION were experimentally verified to be INCORRECT on 2026-01-29. See "Claims Verified as Incorrect" section.
 
 ---
 
@@ -394,19 +396,23 @@
 
 ---
 
-## Claims Not Fully Verified
+## Claims Verified as Incorrect
 
 ### Claim: "Sub-agents spawned via Task tool receive conversation context by default"
 
-**Status**: ASSUMPTION
+**Status**: INCORRECT (verified by experiment 2026-01-29)
 
-**Evidence**: No source file citation in gap analysis. This appears to be a statement about Claude Code's Task tool behavior, not plugin implementation. Cannot verify from plugin files alone.
+**Evidence**: Experimental verification performed by spawning a sub-agent and asking what the orchestrator was tasked to do. Sub-agent response: "I don't have direct access to the original user request." The sub-agent only knew about prior work by reading artifact files, NOT by inheriting conversation context. This proves sub-agents start with fresh context containing only their prompt + tool access.
+
+**Impact**: Gap analysis Principle 1 status changed from PARTIAL to ALIGNED. Recommendation 2.2 "Implement Stateless Agent Enforcement" removed as unnecessary.
 
 ### Claim: "No mechanism enforces context isolation between agent invocations"
 
-**Status**: ASSUMPTION
+**Status**: INCORRECT (verified by experiment 2026-01-29)
 
-**Evidence**: This is an observation about what DOESN'T exist. Cannot verify a negative from file contents. Would require platform documentation to confirm Task tool behavior.
+**Evidence**: Same experiment proves context isolation IS enforced by the Task tool architecture itself. Sub-agents cannot access orchestrator conversation. The mechanism that enforces isolation is the Task tool's design - it does not pass conversation history to sub-agents.
+
+**Impact**: Associated improvement opportunities removed from gap analysis.
 
 ---
 
@@ -444,6 +450,10 @@ For each claim, verification followed this protocol:
 
 ## Conclusion
 
-The SSE gap analysis is well-grounded in actual plugin contents. 22 of 27 claims were fully verified with file:line citations. 3 claims were partially verified with qualifications. 2 claims are assumptions about platform behavior that cannot be verified from plugin files alone. No claims were found to be incorrect.
+The SSE gap analysis is largely grounded in actual plugin contents. 22 of 27 claims were fully verified with file:line citations. 3 claims were partially verified with qualifications.
 
-The gap analysis accurately represents the current state of the python3-development plugin relative to the SSE Framework principles.
+**Critical Correction (2026-01-29)**: 2 claims about sub-agent context inheritance were experimentally verified to be INCORRECT. Sub-agents do NOT receive orchestrator conversation context - they start fresh with only their prompt + tool access. The gap analysis has been corrected:
+- Principle 1 (Stateless Agents) status changed from PARTIAL to ALIGNED
+- Recommendation 2.2 (Implement Stateless Agent Enforcement) removed
+
+The corrected gap analysis now accurately represents the current state of the python3-development plugin relative to the SSE Framework principles.
