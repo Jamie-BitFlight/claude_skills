@@ -10,12 +10,13 @@
 
 | Time | Topic |
 |------|-------|
-| 0:00-0:10 | Introduction: Why AI Assistants Need Domain Expertise |
-| 0:10-0:20 | Skills: Extending Claude with Specialized Knowledge |
-| 0:20-0:30 | Agents: Creating Focused AI Workers |
-| 0:30-0:40 | Hands-On: Build a Firmware Code Review Skill |
-| 0:40-0:50 | Hands-On: Build an Embedded Debugging Agent |
-| 0:50-0:55 | Installing Community Skills |
+| 0:00-0:08 | Introduction: Why AI Assistants Need Domain Expertise |
+| 0:08-0:16 | Skills: Extending Claude with Specialized Knowledge |
+| 0:16-0:24 | Agents: Creating Focused AI Workers |
+| 0:24-0:32 | Orchestration: Skills as Commands with Agent Delegation |
+| 0:32-0:40 | Hands-On: Build a Firmware Code Review Skill |
+| 0:40-0:48 | Hands-On: Build an Embedded Debugging Agent |
+| 0:48-0:55 | Installing Community Skills |
 | 0:55-1:00 | Resources and Next Steps |
 
 ---
@@ -321,7 +322,222 @@ skills: misra-c-rules, stm32-hal, freertos-patterns
 
 ---
 
-## Part 4: Hands-On - Build a Firmware Code Review Skill (10 minutes)
+## Part 4: Orchestration - Skills as Commands with Agent Delegation (8 minutes)
+
+### The Power Pattern: Skill → Agent → Skills
+
+The most powerful Claude Code pattern combines all three concepts:
+
+1. **User-invocable skill** acts as a command (e.g., `/firmware-release`)
+2. Skill instructions **delegate to specialized agents**
+3. Each agent **loads its own skills** for domain knowledge
+
+```
+User invokes /firmware-release
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│  firmware-release SKILL.md                      │
+│  (Orchestrator - coordinates workflow)          │
+│                                                 │
+│  1. Delegate to @build-validator agent          │
+│  2. Delegate to @test-runner agent              │
+│  3. Delegate to @release-packager agent         │
+└─────────────────────────────────────────────────┘
+         │
+         ├──► build-validator agent
+         │         └── loads: cmake-cross-compile skill
+         │
+         ├──► test-runner agent
+         │         └── loads: pytest-embedded, hardware-test skills
+         │
+         └──► release-packager agent
+                   └── loads: binary-packaging skill
+```
+
+### Skill Frontmatter for Orchestration
+
+Skills can specify which agent should run them and how:
+
+```yaml
+---
+description: 'Research topic and create presentation. Use when asked to research and present findings.'
+argument-hint: <topic>
+user-invocable: true
+context: fork          # Run in isolated subagent context
+agent: general-purpose # Which agent type to use
+---
+
+# Research and Present
+
+Task: Research $ARGUMENTS
+
+## Workflow
+
+1. Use /web-research skill to gather sources and findings
+2. Synthesize into 5-7 key takeaways and 3 recommendations
+3. Use /deck-builder skill to create a 10-slide presentation
+
+## Agent Delegation
+
+For step 1, delegate to researcher agent:
+Task(agent="Explore", prompt="Research $ARGUMENTS using web sources...")
+
+For step 3, delegate to presentation agent:
+Task(agent="general-purpose", prompt="Create slides based on findings...")
+```
+
+### Key Orchestration Fields
+
+| Field | Purpose | Example |
+|-------|---------|---------|
+| `context: fork` | Run in isolated subagent | Prevents context pollution |
+| `agent` | Which agent type for forked context | `Explore`, `Plan`, `general-purpose` |
+| `argument-hint` | Show expected arguments in `/` menu | `<target-mcu> <output-format>` |
+
+### Example: Firmware Release Orchestrator
+
+Create `.claude/skills/firmware-release/SKILL.md`:
+
+```yaml
+---
+description: 'Execute complete firmware release workflow: build validation, test execution, binary packaging, and release notes generation. Use when preparing a firmware release, creating release candidates, or packaging binaries for production.'
+argument-hint: <version> [--target <mcu>]
+user-invocable: true
+---
+
+# Firmware Release Orchestrator
+
+Execute the complete firmware release workflow for version $ARGUMENTS.
+
+## Orchestration Rules
+
+<orchestration_rules>
+You are an orchestrator. You coordinate work across specialized agents.
+You MUST delegate, not execute directly.
+
+| Task | Delegate To | Never Do Directly |
+|------|-------------|-------------------|
+| Build validation | @build-validator | Run cmake yourself |
+| Test execution | @test-runner | Run pytest yourself |
+| Binary packaging | release scripts | Package binaries yourself |
+| Release notes | @doc-generator | Write notes yourself |
+</orchestration_rules>
+
+## Phase 1: Build Validation
+
+Delegate to build-validator agent:
+
+Task(agent="build-validator", prompt="Validate firmware build for $ARGUMENTS:
+- Cross-compile for all target MCUs
+- Verify binary sizes within flash constraints
+- Check no undefined symbols
+- Validate linker script memory layout")
+
+## Phase 2: Test Execution
+
+Delegate to test-runner agent:
+
+Task(agent="test-runner", prompt="Execute firmware test suite:
+- Unit tests (host simulation)
+- Integration tests (hardware-in-loop if available)
+- Static analysis (MISRA compliance)
+- Report coverage metrics")
+
+## Phase 3: Binary Packaging
+
+Run packaging script:
+Bash(command="./scripts/package-release.sh $ARGUMENTS")
+
+## Phase 4: Release Notes
+
+Delegate to doc-generator agent:
+
+Task(agent="general-purpose", prompt="Generate release notes for $ARGUMENTS:
+- Parse git log since last tag
+- Categorize: features, fixes, breaking changes
+- Include binary checksums
+- Format as CHANGELOG.md entry")
+
+## Success Output
+
+When all phases complete, provide:
+- Build status for each target
+- Test results summary
+- Binary locations and checksums
+- Release notes preview
+```
+
+### Calling Other Skills from Within a Skill
+
+Skills can reference other skills in their instructions:
+
+```markdown
+## Workflow
+
+1. First, invoke /misra-review to check code compliance
+2. Then, invoke /stack-analyzer to verify memory usage
+3. Finally, run /test-coverage to ensure adequate testing
+
+Each skill activation loads specialized knowledge for that domain.
+```
+
+Or use the programmatic syntax:
+
+```markdown
+Skill(skill="misra-review", args="./src/drivers/")
+Skill(skill="stack-analyzer", args="--max-depth 2048")
+```
+
+### Embedded Engineering Orchestration Ideas
+
+| Orchestrator Skill | Delegates To | Purpose |
+|--------------------|--------------|---------|
+| `/firmware-audit` | @misra-reviewer, @security-scanner, @stack-analyzer | Complete firmware quality audit |
+| `/driver-review` | @peripheral-expert, @dma-validator, @timing-analyzer | Hardware driver code review |
+| `/release-prep` | @build-validator, @test-runner, @packager | Release preparation workflow |
+| `/debug-session` | @crash-analyzer, @memory-debugger, @trace-decoder | Structured debugging workflow |
+
+### Best Practices for Orchestration
+
+**1. Orchestrators delegate, never execute**
+
+```markdown
+# GOOD - Orchestrator delegates
+Task(agent="test-runner", prompt="Run the test suite...")
+
+# BAD - Orchestrator does work directly
+Bash(command="pytest tests/")
+```
+
+**2. Each agent has focused responsibility**
+
+```yaml
+# Build agent - only builds
+tools: Bash(make*), Bash(cmake*), Read, Glob
+
+# Test agent - only tests
+tools: Bash(pytest*), Read, Grep
+skills: pytest-patterns
+```
+
+**3. Agents load domain-specific skills**
+
+```yaml
+# firmware-reviewer agent loads relevant skills
+skills: misra-c-rules, embedded-patterns, interrupt-safety
+```
+
+**4. Use artifacts for handoff between phases**
+
+```markdown
+Phase 1 output: plan/build-report.md
+Phase 2 input: Read plan/build-report.md for context
+```
+
+---
+
+## Part 5: Hands-On - Build a Firmware Code Review Skill (8 minutes)
 
 ### Exercise: Create a MISRA-C Review Skill
 
@@ -480,7 +696,7 @@ Create `.claude/skills/firmware-review/references/misra-rules.md`:
 
 ---
 
-## Part 5: Hands-On - Build an Embedded Debugging Agent (10 minutes)
+## Part 6: Hands-On - Build an Embedded Debugging Agent (8 minutes)
 
 ### Exercise: Create a Debug Analysis Agent
 
@@ -647,7 +863,7 @@ SP: 0x20001ff0"
 
 ---
 
-## Part 6: Installing Community Skills (5 minutes)
+## Part 7: Installing Community Skills (7 minutes)
 
 ### The Awesome Agent Skills Repository
 
@@ -710,7 +926,7 @@ curl -o ~/.claude/skills/static-analysis/SKILL.md \
 
 ---
 
-## Part 7: Resources and Next Steps (5 minutes)
+## Part 8: Resources and Next Steps (5 minutes)
 
 ### Official Documentation
 
@@ -777,7 +993,7 @@ skill-name/
 └── assets/               # Optional: templates
 ```
 
-### Skill Frontmatter
+### Skill Frontmatter (Basic)
 
 ```yaml
 ---
@@ -785,6 +1001,18 @@ description: 'What + when. Include trigger keywords.'
 allowed-tools: Read, Grep, Glob
 model: sonnet
 user-invocable: true
+---
+```
+
+### Skill Frontmatter (Orchestrator)
+
+```yaml
+---
+description: 'Orchestrate workflow with multiple agents.'
+argument-hint: <version> [--target <mcu>]
+user-invocable: true
+context: fork         # Run in isolated context
+agent: general-purpose # Agent type for forked context
 ---
 ```
 
@@ -822,6 +1050,25 @@ skills: skill1, skill2
 | `acceptEdits` | Auto | Prompt | Code generation |
 | `plan` | Disabled | Disabled | Research only |
 
+### Orchestration Patterns
+
+| Pattern | Syntax | Use |
+|---------|--------|-----|
+| Skill calls skill | `Skill(skill="name", args="...")` | Chain workflows |
+| Skill delegates to agent | `Task(agent="name", prompt="...")` | Focused execution |
+| Agent loads skills | `skills: skill1, skill2` in frontmatter | Domain knowledge |
+| Forked context | `context: fork` + `agent: type` | Isolated execution |
+
+### Delegation Syntax
+
+```markdown
+# In skill instructions:
+Task(agent="firmware-reviewer", prompt="Review code for MISRA compliance...")
+
+# Call another skill:
+Skill(skill="misra-review", args="./src/drivers/")
+```
+
 ---
 
 ## Workshop Complete
@@ -829,6 +1076,7 @@ skills: skill1, skill2
 You now know how to:
 - Create skills to extend Claude with domain expertise
 - Build agents for focused task execution
+- **Orchestrate multi-agent workflows using skills as commands**
 - Install community skills from awesome-agent-skills
 - Apply best practices for descriptions, tool access, and model selection
 
