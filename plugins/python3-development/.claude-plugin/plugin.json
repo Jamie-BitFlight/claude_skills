@@ -34,15 +34,7 @@
     "./skills/validation-protocol/SKILL.md",
     "./skills/async-python-patterns/SKILL.md",
     "./skills/mkdocs/SKILL.md",
-    "./skills/mkdocs/assets/example_asset.txt",
-    "./skills/mkdocs/references/cli_reference.md",
-    "./skills/mkdocs/references/configuration_reference.md",
-    "./skills/mkdocs/references/material_theme_reference.md",
-    "./skills/mkdocs/references/plugins_reference.md",
-    "./skills/mkdocs/references/real_world_examples.md",
-    "./skills/mkdocs/scripts/example.py",
     "./skills/pre-commit/SKILL.md",
-    "./skills/pre-commit/references/pre-commit-official-docs.md",
     "./skills/toml-python/SKILL.md"
   ],
   "agents": [

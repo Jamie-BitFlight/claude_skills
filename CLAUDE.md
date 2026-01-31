@@ -23,7 +23,7 @@ The model MUST activate the skill-creator skill from the <available_skills> list
 **Activation Syntax**:
 
 ```claude
-Skill(command: "example-skills:skill-creator")
+Skill(command: "plugin-creator:skill-creator")
 ```
 
 **Negative Conditions** (MUST NOT activate):

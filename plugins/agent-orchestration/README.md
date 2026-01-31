@@ -46,6 +46,12 @@ With this plugin installed, Claude will:
 - Update documentation to reflect changes
 - Meet clear completion criteria before reporting success
 
+## Skills
+
+| Skill                 | Purpose                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `agent-orchestration` | Scientific delegation framework for coordinating sub-agents with observation-based context patterns |
+
 ## Installation
 
 First, add the marketplace (one-time setup):

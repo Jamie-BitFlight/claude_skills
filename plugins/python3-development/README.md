@@ -65,16 +65,37 @@ Run these commands directly to trigger specific workflows:
 | `test-failure-mindset`             | Set balanced investigative approach                                  |
 | `create-feature-task`              | Structure feature development                                        |
 | `use-command-template`             | Create new skills from templates                                     |
+| `async-python-patterns`            | Master asyncio and async/await patterns for high-performance apps    |
+| `clear-cove-task-design`           | Write and lint agent task files with CLEAR + CoVe methodology        |
+| `generate-task`                    | Generate single worker task prompts using CLEAR + CoVe standards     |
+| `hatchling`                        | Comprehensive Hatchling build backend documentation                  |
+| `implementation-manager`           | Query and manage feature implementation task status                  |
+| `mkdocs`                           | MkDocs documentation project creation and management                 |
+| `planner-rt-ica`                   | Planning-phase input completeness analysis for safe planning         |
+| `pre-commit`                       | Configure git hooks using pre-commit or prek frameworks              |
+| `pypi-readme-creator`              | Generate PyPI-compliant README files in Markdown or RST              |
+| `toml-python`                      | Work with TOML files using tomlkit (preserves comments/formatting)   |
+| `uv`                               | Astral uv package and project manager expert guidance                |
+| `validation-protocol`              | Scientific validation protocol for verifying fixes work              |
 
 ## Agents
 
-| Agent                     | Purpose                                         |
-| ------------------------- | ----------------------------------------------- |
-| `python-cli-architect`    | Build CLIs with Typer and Rich                  |
-| `python-pytest-architect` | Create and modernize test suites                |
-| `python-code-reviewer`    | Review code for quality and best practices      |
-| `python-cli-design-spec`  | Design CLI architecture (WHAT, not HOW)         |
-| `swarm-task-planner`      | Break down complex tasks for parallel execution |
+| Agent                     | Purpose                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `python-cli-architect`    | Build CLIs with Typer and Rich                           |
+| `python-pytest-architect` | Create and modernize test suites                         |
+| `python-code-reviewer`    | Review code for quality and best practices               |
+| `python-cli-design-spec`  | Design CLI architecture (WHAT, not HOW)                  |
+| `swarm-task-planner`      | Break down complex tasks for parallel execution          |
+| `codebase-analyzer`       | Explore codebase patterns and write structured analysis  |
+| `context-gathering`       | Gather comprehensive context for task implementation     |
+| `context-refinement`      | Update task context with discoveries from implementation |
+| `doc-drift-auditor`       | Audit documentation accuracy against implementation      |
+| `feature-researcher`      | Research feature requests and produce discovery context  |
+| `feature-verifier`        | Goal-backward verification after feature implementation  |
+| `integration-checker`     | Verify cross-module integration and end-to-end flows     |
+| `plan-validator`          | Validate implementation plans before execution           |
+| `service-documentation`   | Update CLAUDE.md and module documentation                |
 
 ## Installation
 

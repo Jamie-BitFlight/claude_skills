@@ -26,6 +26,7 @@ research/
 │   └── tinybird.md                    # Managed ClickHouse platform with MCP and analytics agents
 ├── developer-tools/                   # Developer productivity and workflow tools
 │   ├── animejs.md                     # Lightweight JavaScript animation engine (66K+ stars)
+│   ├── copier-astral.md               # Python project template with Astral toolchain (uv, ruff, ty)
 │   ├── git-cliff.md                   # Customizable changelog generator from Git history
 │   ├── jscpd.md                       # Copy/paste detector for 150+ languages (5K+ stars)
 │   ├── orbstack.md                    # Fast Docker Desktop and Linux VM alternative for macOS
@@ -215,13 +216,14 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 
 Developer productivity tools and workflow automation for software engineering with AI assistance.
 
-| Document                                       | Description                                                                                                                  | Last Updated |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| [animejs.md](./developer-tools/animejs.md)     | Lightweight JavaScript animation engine with declarative API, timelines, staggering, and 30+ easing functions                | 2026-01-31   |
-| [git-cliff.md](./developer-tools/git-cliff.md) | Customizable changelog generator using conventional commits and regex parsers with GitHub/GitLab remote integration          | 2026-01-26   |
-| [jscpd.md](./developer-tools/jscpd.md)         | Copy/paste detector for 150+ programming languages using Rabin-Karp algorithm with CI/CD integration                         | 2026-01-31   |
-| [orbstack.md](./developer-tools/orbstack.md)   | Fast, lightweight Docker Desktop and Linux VM alternative for macOS with 2-second startup and dynamic memory                 | 2026-01-31   |
-| [repomix.md](./developer-tools/repomix.md)     | Pack codebase into single AI-friendly file with token counting, Tree-sitter compression, MCP server, and Claude Code plugins | 2026-01-31   |
+| Document                                               | Description                                                                                                                  | Last Updated |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| [animejs.md](./developer-tools/animejs.md)             | Lightweight JavaScript animation engine with declarative API, timelines, staggering, and 30+ easing functions                | 2026-01-31   |
+| [copier-astral.md](./developer-tools/copier-astral.md) | Copier template for Python projects with Astral toolchain (uv, ruff, ty), pytest, MkDocs, Typer, GitHub Actions, Docker      | 2026-01-31   |
+| [git-cliff.md](./developer-tools/git-cliff.md)         | Customizable changelog generator using conventional commits and regex parsers with GitHub/GitLab remote integration          | 2026-01-26   |
+| [jscpd.md](./developer-tools/jscpd.md)                 | Copy/paste detector for 150+ programming languages using Rabin-Karp algorithm with CI/CD integration                         | 2026-01-31   |
+| [orbstack.md](./developer-tools/orbstack.md)           | Fast, lightweight Docker Desktop and Linux VM alternative for macOS with 2-second startup and dynamic memory                 | 2026-01-31   |
+| [repomix.md](./developer-tools/repomix.md)             | Pack codebase into single AI-friendly file with token counting, Tree-sitter compression, MCP server, and Claude Code plugins | 2026-01-31   |
 
 **Key Topics**:
 
@@ -255,6 +257,12 @@ Developer productivity tools and workflow automation for software engineering wi
 - Multiple output formats (XML optimized for Claude, Markdown, JSON, Plain)
 - Remote repository processing without local cloning
 - Split output for large codebases exceeding context limits
+- Copier template engine for Python project scaffolding
+- Astral toolchain integration (uv, ruff, ty) for modern Python development
+- Feature toggles for conditional file generation
+- Copier update mechanism for propagating template improvements
+- Hatch envs for multi-Python version matrix testing
+- Makefile abstraction for complex uv/hatch commands
 
 ---
 
