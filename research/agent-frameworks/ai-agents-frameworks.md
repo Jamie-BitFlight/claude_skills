@@ -1,9 +1,9 @@
 # AI Agents Frameworks - Comparative Learning Repository
 
-**Research Date**: 2026-01-26
+**Research Date**: 2026-01-31
 **Source URL**: <https://github.com/martimfasantos/ai-agents-frameworks>
 **GitHub Repository**: <https://github.com/martimfasantos/ai-agents-frameworks>
-**Version at Research**: Main branch (commit 1fba6c9, 2026-01-02)
+**Version at Research**: Main branch (pushed 2026-01-24)
 **License**: Not specified (no LICENSE file)
 
 ---
@@ -28,19 +28,19 @@ AI Agents Frameworks is a hands-on learning repository that provides practical i
 
 ---
 
-## Key Statistics (as of 2026-01-26)
+## Key Statistics (as of 2026-01-31)
 
 | Metric             | Value            |
 | ------------------ | ---------------- |
-| GitHub Stars       | 348              |
+| GitHub Stars       | 354              |
 | Forks              | 43               |
 | Contributors       | 1                |
-| Open Issues        | 2                |
-| Open Pull Requests | 2                |
+| Open Issues        | 4                |
+| Open Pull Requests | 0                |
 | Primary Language   | Jupyter Notebook |
 | Frameworks Covered | 10               |
 | Created            | 2025-01-21       |
-| Last Updated       | 2026-01-21       |
+| Last Updated       | 2026-01-31       |
 
 ---
 
@@ -284,7 +284,7 @@ streamlit run agent-ui.py
 
 ## References
 
-1. **GitHub Repository**: <https://github.com/martimfasantos/ai-agents-frameworks> (accessed 2026-01-26)
+1. **GitHub Repository**: <https://github.com/martimfasantos/ai-agents-frameworks> (accessed 2026-01-31)
 2. **Study Methodology**: study-agents-differences/README.md (accessed 2026-01-26)
 3. **Author Profile**: Martim Santos, daredata.ai - <https://martimfasantos.github.io>
 
@@ -305,13 +305,13 @@ streamlit run agent-ui.py
 
 ## Freshness Tracking
 
-| Field                        | Value                                        |
-| ---------------------------- | -------------------------------------------- |
-| Last Verified                | 2026-01-26                                   |
-| Commit at Verification       | 1fba6c9 (refactor: added UV package manager) |
-| GitHub Stars at Verification | 348                                          |
-| Forks at Verification        | 43                                           |
-| Next Review Recommended      | 2026-04-26 (3 months)                        |
+| Field                        | Value                 |
+| ---------------------------- | --------------------- |
+| Last Verified                | 2026-01-31            |
+| Last Push at Verification    | 2026-01-24            |
+| GitHub Stars at Verification | 354                   |
+| Forks at Verification        | 43                    |
+| Next Review Recommended      | 2026-04-30 (3 months) |
 
 **Change Detection Indicators**:
 

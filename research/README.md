@@ -20,6 +20,7 @@ research/
 ├── coding-agents/                     # Autonomous AI coding agent platforms
 │   └── openhands.md                   # Open platform for cloud coding agents (67K+ stars)
 ├── developer-tools/                   # Developer productivity and workflow tools
+│   ├── animejs.md                     # Lightweight JavaScript animation engine (66K+ stars)
 │   └── git-cliff.md                   # Customizable changelog generator from Git history
 ├── mcp-ecosystem/                     # MCP servers and integrations
 │   ├── docs-mcp-server.md             # Local documentation index (Grounded Docs)
@@ -152,7 +153,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 
 | Document                                                              | Description                                                                                                                            | Last Updated |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| [ai-agents-frameworks.md](./agent-frameworks/ai-agents-frameworks.md) | Comparative learning repository for 10 AI agent frameworks with benchmarks for response time, memory, tokens, RAG, and API integration | 2026-01-26   |
+| [ai-agents-frameworks.md](./agent-frameworks/ai-agents-frameworks.md) | Comparative learning repository for 10 AI agent frameworks with benchmarks for response time, memory, tokens, RAG, and API integration | 2026-01-31   |
 
 **Key Topics**:
 
@@ -194,10 +195,13 @@ Developer productivity tools and workflow automation for software engineering wi
 
 | Document                                       | Description                                                                                                         | Last Updated |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| [animejs.md](./developer-tools/animejs.md)     | Lightweight JavaScript animation engine with declarative API, timelines, staggering, and 30+ easing functions       | 2026-01-31   |
 | [git-cliff.md](./developer-tools/git-cliff.md) | Customizable changelog generator using conventional commits and regex parsers with GitHub/GitLab remote integration | 2026-01-26   |
 
 **Key Topics**:
 
+- Declarative animation APIs for frontend code generation
+- Composable building blocks pattern (animate, stagger, timeline)
 - Conventional commits specification and parsing
 - Customizable Tera templates for changelog output
 - GitHub/GitLab/Gitea/Bitbucket remote metadata integration
