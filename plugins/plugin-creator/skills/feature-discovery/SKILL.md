@@ -81,6 +81,58 @@ For either input type, identify:
 
 Do NOT answer HOW - that's implementation.
 
+### Step 2a: Problem Statement (Evidence-Based)
+
+<problem_statement_requirements>
+
+Capture a 2-3 sentence problem statement with evidence grounding:
+
+**Required Elements**:
+
+1. **User Pain**: What specific frustration or inefficiency exists?
+2. **Frequency**: How often does this problem occur?
+3. **Evidence**: What data supports this is a real problem?
+
+**Evidence Sources** (at least one required):
+
+- User feedback or requests (issues, conversations, support tickets)
+- Observed workflow inefficiencies
+- Error logs or failure patterns
+- Competitive gap analysis
+- Performance metrics
+
+**Example**:
+
+> Users manually run 3 separate commands to update packages, then must remember to schedule a reboot. This occurs weekly for each managed host. Evidence: 15 support tickets in the last month about "forgot to reboot after update."
+
+</problem_statement_requirements>
+
+### Step 2b: Define Non-Goals (Explicit Scope Boundaries)
+
+<non_goals_requirements>
+
+Document 2-4 items explicitly OUT of scope:
+
+**Purpose**: Prevent scope creep and align expectations early.
+
+**Format**:
+
+| Non-Goal                       | Rationale                            |
+| ------------------------------ | ------------------------------------ |
+| {Adjacent capability excluded} | {Why: complexity, timing, or impact} |
+
+**Example**:
+
+| Non-Goal                            | Rationale                                         |
+| ----------------------------------- | ------------------------------------------------- |
+| Automatic rollback on failed update | Adds complexity; can be v2 enhancement            |
+| Multi-host orchestration            | Requires infrastructure changes; separate feature |
+| Email notifications                 | Integration dependency; out of current scope      |
+
+**Rule**: If a capability is "obviously" part of the feature but NOT being built, it MUST be listed as a non-goal.
+
+</non_goals_requirements>
+
 ### Step 3: Explore Codebase Patterns
 
 Search for similar patterns in the codebase:
@@ -146,7 +198,43 @@ For each gap, create a SPECIFIC question:
 - Prefer multiple-choice format when possible
 - Limit to 3-5 highest-impact questions
 - Do NOT ask technical implementation questions
-  </question_rules>
+- Assign ownership to each question (see below)
+- Distinguish blocking vs. non-blocking questions
+
+</question_rules>
+
+<question_ownership>
+
+Assign each question an OWNER who can resolve it:
+
+| Owner                | Question Types                                  |
+| -------------------- | ----------------------------------------------- |
+| **User/Stakeholder** | Scope decisions, priority, business rules       |
+| **Engineering**      | Technical feasibility, performance constraints  |
+| **Design**           | UX patterns, interaction flows, accessibility   |
+| **Data**             | Metrics definitions, data availability, privacy |
+| **Legal/Compliance** | Regulatory requirements, data handling          |
+
+**Blocking Status**:
+
+- **Blocking**: Cannot proceed to architecture without answer
+- **Non-blocking**: Can proceed with assumption, refine later
+
+</question_ownership>
+
+<question_anti_patterns>
+
+**Avoid These Question Mistakes**:
+
+| Anti-Pattern           | Problem                         | Better Alternative                                                          |
+| ---------------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| Too vague              | "What should this do?"          | "Should failed updates retry automatically or require manual intervention?" |
+| Implementation-focused | "Should we use async or sync?"  | "Is immediate feedback required, or can processing happen in background?"   |
+| Compound questions     | "Should X and also Y?"          | Split into separate questions                                               |
+| Leading questions      | "Don't you think we should...?" | "What are the options for...?"                                              |
+| Assumptive             | "When we add feature X..."      | "If feature X is in scope..."                                               |
+
+</question_anti_patterns>
 
 ### Step 6: Generate Slug
 
@@ -162,6 +250,38 @@ def generate_slug(input_text: str) -> str:
 ### Step 7: Write Output Document
 
 Write findings to an appropriate location in the project's planning directory (e.g., `plan/feature-context-{slug}.md` or `.claude/plan/feature-context-{slug}.md`)
+
+## Scope Creep Recognition
+
+<scope_creep_indicators>
+
+Flag these patterns during discovery - they indicate scope may expand:
+
+**Red Flags**:
+
+- "While we're at it, we could also..."
+- "It would be nice if..."
+- "Users might also want..."
+- "In the future, we'll need..."
+- Vague requirements that could expand infinitely
+- Features described as "simple" but touching multiple systems
+
+**Prevention Strategy**:
+
+1. Document in Non-Goals section immediately
+2. Create "Parking Lot" for deferred ideas
+3. Ask: "Is this required for v1, or can it be a fast-follow?"
+
+**Parking Lot Format**:
+
+```markdown
+## Parking Lot (Deferred Ideas)
+| Idea | Source | Priority for Future |
+|------|--------|---------------------|
+| {idea} | {who suggested} | {High/Medium/Low} |
+```
+
+</scope_creep_indicators>
 
 ## Output Document Structure
 
@@ -182,6 +302,16 @@ Write findings to an appropriate location in the project's planning directory (e
 
 ---
 
+## Problem Statement
+
+{2-3 sentences describing the user problem with evidence}
+
+**Evidence**: {Source of evidence - user feedback, metrics, observations}
+**Frequency**: {How often this problem occurs}
+**Impact**: {Business cost or user pain if unaddressed}
+
+---
+
 ## Core Intent Analysis
 
 ### WHO (Target Users)
@@ -195,6 +325,15 @@ Write findings to an appropriate location in the project's planning directory (e
 
 ### WHY (Problem Being Solved)
 {The pain point this addresses}
+
+---
+
+## Non-Goals (Explicit Exclusions)
+
+| Non-Goal | Rationale |
+|----------|-----------|
+| {Excluded capability 1} | {Why excluded} |
+| {Excluded capability 2} | {Why excluded} |
 
 ---
 
@@ -247,6 +386,8 @@ Write findings to an appropriate location in the project's planning directory (e
 
 ### Q1: {Short question title}
 - **Category**: {Scope|Behavior|User|Integration}
+- **Owner**: {User|Engineering|Design|Data|Legal}
+- **Blocking**: {Yes|No}
 - **Gap**: {What's unclear}
 - **Question**: {Full question}
 - **Options** (if applicable):
@@ -258,6 +399,14 @@ Write findings to an appropriate location in the project's planning directory (e
 
 ### Q2: {Short question title}
 ...
+
+---
+
+## Parking Lot (Deferred Ideas)
+
+| Idea | Source | Priority for Future |
+|------|--------|---------------------|
+| {Deferred idea 1} | {Discovery/User} | {High/Medium/Low} |
 
 ---
 
@@ -336,13 +485,17 @@ Add to the output document:
 Your output is successful if:
 
 1. [ ] Feature context document created at correct path
-2. [ ] Core intent (WHO/WHAT/WHEN/WHY) is captured
-3. [ ] At least 2 similar patterns identified with file references
-4. [ ] At least 2 use scenarios documented
-5. [ ] All gaps categorized (Scope/Behavior/User/Integration)
-6. [ ] Questions are specific and answerable by user
-7. [ ] No technical implementation decisions made
-8. [ ] Document status is DISCOVERY_COMPLETE
+2. [ ] Problem statement includes evidence and impact
+3. [ ] Core intent (WHO/WHAT/WHEN/WHY) is captured
+4. [ ] At least 2 non-goals documented with rationale
+5. [ ] At least 2 similar patterns identified with file references
+6. [ ] At least 2 use scenarios documented
+7. [ ] All gaps categorized (Scope/Behavior/User/Integration)
+8. [ ] Questions have ownership assigned and blocking status
+9. [ ] Questions are specific and answerable by user
+10. [ ] No technical implementation decisions made
+11. [ ] Scope creep indicators flagged if present
+12. [ ] Document status is DISCOVERY_COMPLETE
 
 ## Return Format
 

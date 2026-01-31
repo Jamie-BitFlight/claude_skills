@@ -73,6 +73,88 @@ Create a clear specification:
 - External: [new packages if any]
 ```
 
+### MoSCoW Prioritization
+
+<moscow_framework>
+
+Categorize all requirements using MoSCoW:
+
+| Priority             | Meaning                        | Criteria                            |
+| -------------------- | ------------------------------ | ----------------------------------- |
+| **P0 (Must Have)**   | Non-negotiable for v1          | Feature is broken without this      |
+| **P1 (Should Have)** | Important, committed follow-up | High value, but v1 works without it |
+| **P2 (Could Have)**  | Desirable if time permits      | Nice-to-have enhancements           |
+| **Won't Have**       | Explicitly deferred            | Out of scope for this release       |
+
+**Discipline Check**: If everything is P0, nothing is P0. Re-evaluate.
+
+**Example**:
+
+```markdown
+### Requirements by Priority
+
+**P0 (Must Have)**:
+- [ ] Parse CSV input with header detection
+- [ ] Output formatted report to stdout
+- [ ] Handle malformed rows with error message
+
+**P1 (Should Have)**:
+- [ ] Support custom delimiter (--delimiter)
+- [ ] Progress indicator for large files
+
+**P2 (Could Have)**:
+- [ ] JSON output format option
+- [ ] Column filtering
+
+**Won't Have (This Release)**:
+- Excel format support (separate feature)
+- Database export (requires new dependency)
+```
+
+</moscow_framework>
+
+### Acceptance Criteria Formats
+
+<acceptance_criteria_patterns>
+
+Use ONE of these formats for testable acceptance criteria:
+
+**Format 1: Given/When/Then (BDD)**
+
+```gherkin
+Given [precondition]
+When [user action]
+Then [expected outcome]
+```
+
+**Example**:
+
+```gherkin
+Given a CSV file with 1000 rows
+When the user runs `parse report.csv`
+Then the output shows all rows within 2 seconds
+And no memory warnings are logged
+```
+
+**Format 2: Checklist with Specifics**
+
+```markdown
+- [ ] Command `parse --help` shows usage with examples
+- [ ] Empty file input returns exit code 1 with message "Empty file"
+- [ ] Unicode characters in data are preserved in output
+- [ ] Ctrl+C during processing exits cleanly (no stack trace)
+```
+
+**Anti-Patterns to Avoid**:
+
+| Anti-Pattern               | Problem      | Better                                                       |
+| -------------------------- | ------------ | ------------------------------------------------------------ |
+| "Should be fast"           | Unmeasurable | "Completes in <2s for 10K rows"                              |
+| "Handle errors gracefully" | Vague        | "Invalid input returns exit code 1 with descriptive message" |
+| "User-friendly output"     | Subjective   | "Output uses Rich table formatting with headers"             |
+
+</acceptance_criteria_patterns>
+
 ### Design Interface First
 
 Define the public API before implementation:
@@ -205,6 +287,43 @@ uv run pytest tests/ --cov=src --cov-report=term-missing
 - New feature code: 100% coverage
 - Integration points: Covered by integration tests
 - Overall project: Maintain or improve existing coverage
+
+### Success Metrics
+
+<success_metrics_framework>
+
+Define measurable success criteria before implementation:
+
+**Leading Indicators** (Observable in days-weeks):
+
+| Metric          | Target        | How to Measure             |
+| --------------- | ------------- | -------------------------- |
+| Test pass rate  | 100%          | `pytest --tb=short`        |
+| Type coverage   | 100%          | `mypy --strict`            |
+| Code coverage   | ≥80% new code | `pytest --cov`             |
+| Command startup | <500ms        | `time uv run <cmd> --help` |
+
+**Lagging Indicators** (Observable in weeks-months):
+
+| Metric          | Target                  | How to Measure         |
+| --------------- | ----------------------- | ---------------------- |
+| User adoption   | N users/week            | Usage logs or feedback |
+| Error rate      | <1% of invocations      | Error logs             |
+| Support tickets | Reduction from baseline | Issue tracker          |
+
+**For CLI Features**:
+
+```bash
+# Performance baseline
+hyperfine 'uv run <command> <args>' --warmup 3
+
+# Memory usage
+/usr/bin/time -v uv run <command> <args> 2>&1 | grep "Maximum resident"
+```
+
+**Evaluation Window**: Specify when metrics will be reviewed (e.g., "1 week post-merge", "after 100 invocations").
+
+</success_metrics_framework>
 
 ### Documentation
 
