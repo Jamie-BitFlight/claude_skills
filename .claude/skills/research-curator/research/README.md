@@ -6,17 +6,18 @@ Resources researched for future reference in Claude Code development.
 
 ## Categories
 
-| Category            | Directory              | Description                                  |
-| ------------------- | ---------------------- | -------------------------------------------- |
-| Agent Frameworks    | `agent-frameworks/`    | Agent SDKs, multi-agent orchestration        |
-| AI Design Tools     | `ai-design-tools/`     | AI-powered UI/UX generation tools            |
-| AI Research Tools   | `ai-research-tools/`   | Document synthesis, research assistants      |
-| AI Writing Tools    | `ai-writing-tools/`    | AI-powered writing and document editors      |
-| Context Management  | `context-management/`  | Memory, RAG, context window tools            |
-| Developer Tooling   | `developer-tooling/`   | Build systems, developer tools, automation   |
-| Documentation Tools | `documentation-tools/` | AI documentation generators, README tools    |
-| LLM Infrastructure  | `llm-infrastructure/`  | LLM gateways, observability, optimization    |
-| Low-Code Platforms  | `low-code-platforms/`  | Visual app builders, internal tool platforms |
+| Category              | Directory                | Description                                  |
+| --------------------- | ------------------------ | -------------------------------------------- |
+| Agent Frameworks      | `agent-frameworks/`      | Agent SDKs, multi-agent orchestration        |
+| AI Design Tools       | `ai-design-tools/`       | AI-powered UI/UX generation tools            |
+| AI Research Tools     | `ai-research-tools/`     | Document synthesis, research assistants      |
+| AI Writing Tools      | `ai-writing-tools/`      | AI-powered writing and document editors      |
+| Context Management    | `context-management/`    | Memory, RAG, context window tools            |
+| Developer Tooling     | `developer-tooling/`     | Build systems, developer tools, automation   |
+| Documentation Tools   | `documentation-tools/`   | AI documentation generators, README tools    |
+| LLM Infrastructure    | `llm-infrastructure/`    | LLM gateways, observability, optimization    |
+| Low-Code Platforms    | `low-code-platforms/`    | Visual app builders, internal tool platforms |
+| Skill Generation Tools| `skill-generation-tools/`| Tools that create or package AI agent skills |
 
 ---
 
@@ -63,9 +64,10 @@ Resources researched for future reference in Claude Code development.
 
 ## Developer Tooling
 
-| Resource                                                      | Description                                             | Stars | Research Date |
-| ------------------------------------------------------------- | ------------------------------------------------------- | ----- | ------------- |
-| [Makefile Tutorial](./developer-tooling/makefile-tutorial.md) | Comprehensive GNU Make tutorial with practical examples | 93    | 2026-01-31    |
+| Resource                                                      | Description                                                        | Stars | Research Date |
+| ------------------------------------------------------------- | ------------------------------------------------------------------ | ----- | ------------- |
+| [Makefile Tutorial](./developer-tooling/makefile-tutorial.md) | Comprehensive GNU Make tutorial with practical examples            | 93    | 2026-01-31    |
+| [Plannotator](./developer-tooling/plannotator.md)             | Interactive plan review UI for Claude Code and OpenCode with annotations | 1,538 | 2026-01-31    |
 
 ---
 
@@ -90,6 +92,16 @@ Resources researched for future reference in Claude Code development.
 | Resource                                   | Description                                                    | Stars  | Research Date |
 | ------------------------------------------ | -------------------------------------------------------------- | ------ | ------------- |
 | [ToolJet](./low-code-platforms/tooljet.md) | Open-source low-code platform for internal tools and AI agents | 37,363 | 2026-01-31    |
+
+---
+
+## Skill Generation Tools
+
+| Resource                                                                     | Description                                                              | Stars | Research Date |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----- | ------------- |
+| [Claude Night Market](./skill-generation-tools/claude-night-market.md)       | 16-plugin marketplace with 126 skills, multi-LLM delegation, TDD hooks   | 158   | 2026-01-31    |
+| [hmohamed01/claude-code-plugins](./skill-generation-tools/hmohamed-claude-code-plugins.md) | Swift and Rust development plugins with agents, skills, and safety hooks | 4     | 2026-01-31    |
+| [Softaworks Agent Toolkit](./skill-generation-tools/softaworks-agent-toolkit.md) | Curated collection of 40+ skills for AI coding agents (Claude Code, Codex) | 378   | 2026-01-31    |
 
 ---
 
