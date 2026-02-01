@@ -3,15 +3,15 @@
 // Windows UTF-8 stdout fix
 // Windows uses cp1252 by default, which can't encode Unicode block characters (█, ░)
 // Force UTF-8 encoding for stdout to prevent encoding errors
-if (process.platform === "win32") {
-  process.stdout.setDefaultEncoding("utf8");
+if (process.platform === 'win32') {
+  process.stdout.setDefaultEncoding('utf8');
 }
 
-const fs = require("fs");
-const path = require("path");
-const { execSync } = require("child_process");
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 const { loadState, editState, loadConfig, Mode, Model, IconStyle, PROJECT_ROOT } = require(
-  path.join(process.env.CLAUDE_PROJECT_DIR, "sessions", "hooks", "shared_state.js"),
+  path.join(process.env.CLAUDE_PROJECT_DIR, 'sessions', 'hooks', 'shared_state.js'),
 );
 
 // ANSI color detection for Windows
@@ -21,7 +21,7 @@ function supportsAnsi() {
    * @returns {boolean} True if ANSI is supported
    */
   // Windows detection
-  if (process.platform === "win32") {
+  if (process.platform === 'win32') {
     // Windows Terminal and PowerShell 7+ support ANSI
     const wtSession = process.env.WT_SESSION;
     const pwshVersion = process.env.POWERSHELL_DISTRIBUTION_CHANNEL;
@@ -32,7 +32,7 @@ function supportsAnsi() {
     }
 
     // PowerShell 7+ supports ANSI
-    if (pwshVersion && pwshVersion.includes("PSCore")) {
+    if (pwshVersion?.includes('PSCore')) {
       return true;
     }
 
@@ -40,8 +40,8 @@ function supportsAnsi() {
     // Try to enable it, if it fails, no ANSI support
     try {
       // On Windows 10+, ANSI is typically supported
-      const winVer = require("os").release();
-      const majorVer = parseInt(winVer.split(".")[0]);
+      const winVer = require('node:os').release();
+      const majorVer = parseInt(winVer.split('.')[0]);
       if (majorVer >= 10) {
         // Windows 10+ has built-in ANSI support
         return true;
@@ -64,23 +64,23 @@ const ansiSupported = supportsAnsi();
 // Colors/styles - conditional based on ANSI support
 let green, orange, red, gray, lGray, cyan, purple, reset;
 if (ansiSupported) {
-  green = "\033[38;5;114m";
-  orange = "\033[38;5;215m";
-  red = "\033[38;5;203m";
-  gray = "\033[38;5;242m";
-  lGray = "\033[38;5;250m";
-  cyan = "\033[38;5;111m";
-  purple = "\033[38;5;183m";
-  reset = "\033[0m";
+  green = '\x1b[38;5;114m';
+  orange = '\x1b[38;5;215m';
+  red = '\x1b[38;5;203m';
+  gray = '\x1b[38;5;242m';
+  lGray = '\x1b[38;5;250m';
+  cyan = '\x1b[38;5;111m';
+  purple = '\x1b[38;5;183m';
+  reset = '\x1b[0m';
 } else {
   // No color support - use empty strings
-  green = orange = red = gray = lGray = cyan = purple = reset = "";
+  green = orange = red = gray = lGray = cyan = purple = reset = '';
 }
 
 function findGitRepo(startPath) {
   let current = startPath;
   while (current !== path.dirname(current)) {
-    const gitPath = path.join(current, ".git");
+    const gitPath = path.join(current, '.git');
     if (fs.existsSync(gitPath)) {
       return gitPath;
     }
@@ -105,8 +105,8 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
   try {
     // Read last line of transcript to get last message timestamp
     const lines = fs
-      .readFileSync(transcriptPath, "utf-8")
-      .split("\n")
+      .readFileSync(transcriptPath, 'utf-8')
+      .split('\n')
       .filter((line) => line.trim());
     if (!lines.length) {
       return transcriptPath;
@@ -134,7 +134,7 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
     const transcriptDir = path.dirname(transcriptPath);
     const allFiles = fs
       .readdirSync(transcriptDir)
-      .filter((f) => f.endsWith(".jsonl"))
+      .filter((f) => f.endsWith('.jsonl'))
       .map((f) => path.join(transcriptDir, f))
       .sort((a, b) => fs.statSync(b).mtime - fs.statSync(a).mtime)
       .slice(0, 5); // Top 5 most recent
@@ -143,8 +143,8 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
     for (const candidate of allFiles) {
       try {
         const candidateLines = fs
-          .readFileSync(candidate, "utf-8")
-          .split("\n")
+          .readFileSync(candidate, 'utf-8')
+          .split('\n')
           .filter((line) => line.trim());
         if (!candidateLines.length) {
           continue;
@@ -166,9 +166,7 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
             }
           }
         }
-      } catch {
-        continue;
-      }
+      } catch {}
     }
 
     // No fresh transcript found, return original
@@ -181,12 +179,12 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
 
 function main() {
   // Read JSON input from stdin
-  let inputData = "";
+  let inputData = '';
   try {
-    inputData = fs.readFileSync(0, "utf-8");
+    inputData = fs.readFileSync(0, 'utf-8');
   } catch {
     // No stdin, use defaults
-    inputData = "{}";
+    inputData = '{}';
   }
 
   let data = {};
@@ -196,23 +194,23 @@ function main() {
     data = {};
   }
 
-  const cwd = data.cwd || ".";
-  const modelName = data.model?.display_name || "unknown";
-  const sessionId = data.session_id || "unknown";
+  const cwd = data.cwd || '.';
+  const modelName = data.model?.display_name || 'unknown';
+  const sessionId = data.session_id || 'unknown';
   const transcriptPath = data.transcript_path || null;
 
-  const taskDir = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const taskDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
 
   // Determine model and context limit
   let currModel = Model.UNKNOWN;
   let contextLimit = 160000;
 
-  if (modelName.toLowerCase().includes("[1m]")) {
+  if (modelName.toLowerCase().includes('[1m]')) {
     contextLimit = 800000;
   }
-  if (modelName.toLowerCase().includes("sonnet")) {
+  if (modelName.toLowerCase().includes('sonnet')) {
     currModel = Model.SONNET;
-  } else if (modelName.toLowerCase().includes("opus")) {
+  } else if (modelName.toLowerCase().includes('opus')) {
     currModel = Model.OPUS;
   }
 
@@ -239,7 +237,7 @@ function main() {
 
   if (currentTranscriptPath && fs.existsSync(currentTranscriptPath)) {
     try {
-      const lines = fs.readFileSync(currentTranscriptPath, "utf-8").split("\n");
+      const lines = fs.readFileSync(currentTranscriptPath, 'utf-8').split('\n');
       let mostRecentUsage = null;
       let mostRecentTimestamp = null;
 
@@ -258,9 +256,7 @@ function main() {
               mostRecentUsage = lineData.message.usage;
             }
           }
-        } catch {
-          continue;
-        }
+        } catch {}
       }
 
       // Calculate context length (input + cache tokens only, NOT output)
@@ -280,7 +276,7 @@ function main() {
     contextLength = 17000;
   }
 
-  let progressPct = "0.0";
+  let progressPct = '0.0';
   let progressPctInt = 0;
 
   if (contextLength && contextLimit) {
@@ -288,14 +284,14 @@ function main() {
     progressPct = pct.toFixed(1);
     progressPctInt = Math.floor(pct);
     if (progressPctInt > 100) {
-      progressPct = "100.0";
+      progressPct = '100.0';
       progressPctInt = 100;
     }
   }
 
   // Format token counts in 'k'
-  const formattedTokens = contextLength ? `${Math.floor(contextLength / 1000)}k` : "17k";
-  const formattedLimit = contextLimit ? `${Math.floor(contextLimit / 1000)}k` : "160k";
+  const formattedTokens = contextLength ? `${Math.floor(contextLength / 1000)}k` : '17k';
+  const formattedLimit = contextLimit ? `${Math.floor(contextLimit / 1000)}k` : '160k';
 
   // Progress bar blocks (0-10)
   const filledBlocks = Math.min(Math.floor(progressPctInt / 10), 10);
@@ -310,21 +306,21 @@ function main() {
   }
 
   // Build progress bar string
-  let contextIcon = "";
+  let contextIcon = '';
   if (iconStyle === IconStyle.NERD_FONTS) {
-    contextIcon = "󱃖 ";
+    contextIcon = '󱃖 ';
   } else if (iconStyle === IconStyle.EMOJI) {
-    contextIcon = "";
+    contextIcon = '';
   } else {
     // ASCII
-    contextIcon = "";
+    contextIcon = '';
   }
   const progressBar =
     `${reset}${lGray}${contextIcon} ` +
     barColor +
-    "█".repeat(filledBlocks) +
+    '█'.repeat(filledBlocks) +
     gray +
-    "░".repeat(emptyBlocks) +
+    '░'.repeat(emptyBlocks) +
     reset +
     ` ${lGray}${progressPct}% (${formattedTokens}/${formattedLimit})${reset}`;
 
@@ -337,17 +333,17 @@ function main() {
   if (gitPath) {
     try {
       const branch = execSync(`git -C "${cwd}" branch --show-current`, {
-        encoding: "utf-8",
+        encoding: 'utf-8',
       }).trim();
       if (branch) {
         let branchIcon;
         if (iconStyle === IconStyle.NERD_FONTS) {
-          branchIcon = "󰘬 ";
+          branchIcon = '󰘬 ';
         } else if (iconStyle === IconStyle.EMOJI) {
-          branchIcon = "Branch: ";
+          branchIcon = 'Branch: ';
         } else {
           // ASCII
-          branchIcon = "Branch: ";
+          branchIcon = 'Branch: ';
         }
         gitBranchInfo = `${lGray}${branchIcon}${branch}${reset}`;
 
@@ -355,12 +351,12 @@ function main() {
         try {
           const ahead = parseInt(
             execSync(`git -C "${cwd}" rev-list --count @{u}..HEAD`, {
-              encoding: "utf-8",
+              encoding: 'utf-8',
             }).trim(),
           );
           const behind = parseInt(
             execSync(`git -C "${cwd}" rev-list --count HEAD..@{u}`, {
-              encoding: "utf-8",
+              encoding: 'utf-8',
             }).trim(),
           );
 
@@ -368,7 +364,7 @@ function main() {
           if (ahead > 0) upstreamParts.push(`↑${ahead}`);
           if (behind > 0) upstreamParts.push(`↓${behind}`);
           if (upstreamParts.length > 0) {
-            upstreamInfo = `${orange}${upstreamParts.join("")}${reset}`;
+            upstreamInfo = `${orange}${upstreamParts.join('')}${reset}`;
           }
         } catch {
           // No upstream or error getting upstream status
@@ -377,7 +373,7 @@ function main() {
       } else {
         // Detached HEAD - show commit hash with detached indicator
         const commit = execSync(`git -C "${cwd}" rev-parse --short HEAD`, {
-          encoding: "utf-8",
+          encoding: 'utf-8',
         }).trim();
         if (commit) {
           if (iconStyle === IconStyle.NERD_FONTS) {
@@ -398,15 +394,15 @@ function main() {
   const currTask = state?.current_task?.name || null;
 
   // Current mode
-  const currMode = state?.mode === Mode.GO ? "Implementation" : "Discussion";
+  const currMode = state?.mode === Mode.GO ? 'Implementation' : 'Discussion';
   let modeIcon;
   if (iconStyle === IconStyle.NERD_FONTS) {
-    modeIcon = state?.mode === Mode.GO ? "󰷫 " : "󰭹 ";
+    modeIcon = state?.mode === Mode.GO ? '󰷫 ' : '󰭹 ';
   } else if (iconStyle === IconStyle.EMOJI) {
-    modeIcon = state?.mode === Mode.GO ? "🛠️: " : "💬:";
+    modeIcon = state?.mode === Mode.GO ? '🛠️: ' : '💬:';
   } else {
     // ASCII
-    modeIcon = "Mode:";
+    modeIcon = 'Mode:';
   }
 
   // Count edited & uncommitted files
@@ -416,15 +412,15 @@ function main() {
     try {
       // Count unstaged changes
       const unstaged = execSync(`git -C "${cwd}" diff --name-only`, {
-        encoding: "utf-8",
+        encoding: 'utf-8',
       }).trim();
-      const unstagedCount = unstaged ? unstaged.split("\n").length : 0;
+      const unstagedCount = unstaged ? unstaged.split('\n').length : 0;
 
       // Count staged changes
       const staged = execSync(`git -C "${cwd}" diff --cached --name-only`, {
-        encoding: "utf-8",
+        encoding: 'utf-8',
       }).trim();
-      const stagedCount = staged ? staged.split("\n").length : 0;
+      const stagedCount = staged ? staged.split('\n').length : 0;
 
       totalEdited = unstagedCount + stagedCount;
     } catch {
@@ -441,10 +437,10 @@ function main() {
     for (const item of items) {
       const itemPath = path.join(taskDir, item);
       const stat = fs.statSync(itemPath);
-      if (stat.isFile() && item !== "TEMPLATE.md" && item.endsWith(".md")) {
+      if (stat.isFile() && item !== 'TEMPLATE.md' && item.endsWith('.md')) {
         openTaskCount++;
       }
-      if (stat.isDirectory() && item !== "done" && item !== "indexes") {
+      if (stat.isDirectory() && item !== 'done' && item !== 'indexes') {
         openTaskDirCount++;
       }
     }
@@ -455,32 +451,34 @@ function main() {
   const contextPart = progressBar || `${gray}No context usage data${reset}`;
   let taskIcon;
   if (iconStyle === IconStyle.NERD_FONTS) {
-    taskIcon = "󰒓 ";
+    taskIcon = '󰒓 ';
   } else if (iconStyle === IconStyle.EMOJI) {
-    taskIcon = "⚙️ ";
+    taskIcon = '⚙️ ';
   } else {
     // ASCII
-    taskIcon = "Task: ";
+    taskIcon = 'Task: ';
   }
-  const taskPart = currTask ? `${cyan}${taskIcon}${currTask}${reset}` : `${cyan}${taskIcon}${gray}No Task${reset}`;
-  console.log(contextPart + " | " + taskPart);
+  const taskPart = currTask
+    ? `${cyan}${taskIcon}${currTask}${reset}`
+    : `${cyan}${taskIcon}${gray}No Task${reset}`;
+  console.log(`${contextPart} | ${taskPart}`);
 
   // Line 2 - Mode | Edited & Uncommitted with upstream | Open Tasks | Git branch
   let tasksIcon;
   if (iconStyle === IconStyle.NERD_FONTS) {
-    tasksIcon = "󰈙 ";
+    tasksIcon = '󰈙 ';
   } else if (iconStyle === IconStyle.EMOJI) {
-    tasksIcon = "💼 ";
+    tasksIcon = '💼 ';
   } else {
     // ASCII
-    tasksIcon = "";
+    tasksIcon = '';
   }
   // Build uncommitted section with optional upstream indicators
   const uncommittedParts = [`${orange}✎ ${totalEdited}${reset}`];
   if (upstreamInfo) {
     uncommittedParts.push(upstreamInfo);
   }
-  const uncommittedStr = uncommittedParts.join(" ");
+  const uncommittedStr = uncommittedParts.join(' ');
 
   const line2Parts = [
     `${purple}${modeIcon}${currMode}${reset}`,
@@ -490,7 +488,7 @@ function main() {
   if (gitBranchInfo) {
     line2Parts.push(gitBranchInfo);
   }
-  console.log(line2Parts.join(" | "));
+  console.log(line2Parts.join(' | '));
 }
 
 if (require.main === module) {

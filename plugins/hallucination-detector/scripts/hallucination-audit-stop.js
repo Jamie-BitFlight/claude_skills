@@ -15,13 +15,13 @@
  * - Does not attempt to infer truth; it enforces language discipline and evidence signaling.
  */
 
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 function readStdinJson() {
   try {
-    const stdin = fs.readFileSync(0, "utf-8");
+    const stdin = fs.readFileSync(0, 'utf-8');
     return JSON.parse(stdin);
   } catch {
     return {};
@@ -30,15 +30,15 @@ function readStdinJson() {
 
 function safeReadFileText(filePath) {
   try {
-    return fs.readFileSync(filePath, "utf-8");
+    return fs.readFileSync(filePath, 'utf-8');
   } catch {
-    return "";
+    return '';
   }
 }
 
 function parseJsonl(text) {
   const entries = [];
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
@@ -51,56 +51,55 @@ function parseJsonl(text) {
 }
 
 function isSidechainEntry(entry) {
-  return Boolean(entry && entry.isSidechain);
+  return Boolean(entry?.isSidechain);
 }
 
 function extractTextFromMessageContent(content) {
   // Claude transcripts commonly store content as an array of blocks.
   // We only extract human-readable text; we ignore tool_use blocks.
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
 
   const parts = [];
   for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-    if (block.type === "tool_use") continue;
+    if (!block || typeof block !== 'object') continue;
+    if (block.type === 'tool_use') continue;
 
     // Common block shapes:
     // - { type: "text", text: "..." }
     // - { type: "output_text", text: "..." } (future-proof)
     // - { ... , content: "..." }
-    if (typeof block.text === "string" && block.text.trim()) {
+    if (typeof block.text === 'string' && block.text.trim()) {
       parts.push(block.text);
       continue;
     }
-    if (typeof block.content === "string" && block.content.trim()) {
+    if (typeof block.content === 'string' && block.content.trim()) {
       parts.push(block.content);
-      continue;
     }
   }
-  return parts.join("\n").trim();
+  return parts.join('\n').trim();
 }
 
 function getLastAssistantText(transcriptEntries) {
   // Find last main-chain assistant entry with message content.
   for (let i = transcriptEntries.length - 1; i >= 0; i--) {
     const entry = transcriptEntries[i];
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== 'object') continue;
     if (isSidechainEntry(entry)) continue;
 
     const type = entry.type;
     const message = entry.message;
-    if (type !== "assistant" || !message) continue;
+    if (type !== 'assistant' || !message) continue;
 
     const content = message.content;
     const text = extractTextFromMessageContent(content);
     if (text) return text;
   }
-  return "";
+  return '';
 }
 
 function normalizeForScan(text) {
-  return text.replace(/\r\n/g, "\n");
+  return text.replace(/\r\n/g, '\n');
 }
 
 function stripLowSignalRegions(text) {
@@ -109,16 +108,16 @@ function stripLowSignalRegions(text) {
   let out = text;
 
   // Remove fenced code blocks.
-  out = out.replace(/```[\s\S]*?```/g, "");
+  out = out.replace(/```[\s\S]*?```/g, '');
 
   // Remove inline code spans.
-  out = out.replace(/`[^`\n]*`/g, "");
+  out = out.replace(/`[^`\n]*`/g, '');
 
   // Remove blockquote lines (often used for quoting user text or external sources).
   out = out
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith(">"))
-    .join("\n");
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('>'))
+    .join('\n');
 
   return out;
 }
@@ -127,23 +126,23 @@ function isIndexWithinQuestion(text, idx) {
   // Heuristic: treat the containing "sentence" as a question if it includes a '?'
   // between the nearest prior sentence boundary and the next sentence boundary.
   const startBoundary = Math.max(
-    text.lastIndexOf("\n", idx),
-    text.lastIndexOf(".", idx),
-    text.lastIndexOf("!", idx),
-    text.lastIndexOf("?", idx),
+    text.lastIndexOf('\n', idx),
+    text.lastIndexOf('.', idx),
+    text.lastIndexOf('!', idx),
+    text.lastIndexOf('?', idx),
   );
   const start = startBoundary === -1 ? 0 : startBoundary + 1;
 
-  const nextNewline = text.indexOf("\n", idx);
-  const nextDot = text.indexOf(".", idx);
-  const nextBang = text.indexOf("!", idx);
-  const nextQ = text.indexOf("?", idx);
+  const nextNewline = text.indexOf('\n', idx);
+  const nextDot = text.indexOf('.', idx);
+  const nextBang = text.indexOf('!', idx);
+  const nextQ = text.indexOf('?', idx);
 
   const candidates = [nextNewline, nextDot, nextBang, nextQ].filter((n) => n !== -1);
   const end = candidates.length ? Math.min(...candidates) + 1 : text.length;
 
   const segment = text.slice(start, end);
-  return segment.includes("?");
+  return segment.includes('?');
 }
 
 function findTriggerMatches(text) {
@@ -153,38 +152,45 @@ function findTriggerMatches(text) {
 
   // 1) Assumption/speculation language (explicitly discouraged by repo policy)
   const speculationPhrases = [
-    "i think",
-    "i believe",
-    "probably",
-    "likely",
-    "it seems",
-    "seems like",
-    "should be",
-    "i assume",
-    "assume",
-    "maybe",
-    "might be",
-    "could be",
-    "presumably",
+    'i think',
+    'i believe',
+    'probably',
+    'likely',
+    'it seems',
+    'seems like',
+    'should be',
+    'i assume',
+    'assume',
+    'maybe',
+    'might be',
+    'could be',
+    'presumably',
   ];
   for (const phrase of speculationPhrases) {
     const idx = lower.indexOf(phrase);
     if (idx !== -1) {
       // Questions like "Should I do that now?" are desirable—don't flag.
       if (isIndexWithinQuestion(haystack, idx)) continue;
-      matches.push({ kind: "speculation_language", evidence: phrase });
+      matches.push({ kind: 'speculation_language', evidence: phrase });
     }
   }
 
   // 2) Hard causality claims (heuristic trigger): "X because Y" / "due to" / "caused by"
   // We don't try to prove they're wrong; we require evidence wording when asserting causality.
-  const causalityPhrases = ["caused by", "due to", "because", "as a result", "therefore", "this means"];
+  const causalityPhrases = [
+    'caused by',
+    'due to',
+    'because',
+    'as a result',
+    'therefore',
+    'this means',
+  ];
   for (const phrase of causalityPhrases) {
     const idx = lower.indexOf(phrase);
     if (idx !== -1) {
       // Allow question-form hypotheses; only gate declarative causality.
       if (isIndexWithinQuestion(haystack, idx)) continue;
-      matches.push({ kind: "causality_language", evidence: phrase });
+      matches.push({ kind: 'causality_language', evidence: phrase });
     }
   }
 
@@ -193,21 +199,21 @@ function findTriggerMatches(text) {
   for (const re of fakeRigorRegexes) {
     const m = haystack.match(re);
     if (m) {
-      matches.push({ kind: "pseudo_quantification", evidence: m[0] });
+      matches.push({ kind: 'pseudo_quantification', evidence: m[0] });
     }
   }
 
   // 4) Over-claiming completeness (must be backed by explicit actions/observations)
   const completenessPhrases = [
-    "all files checked",
-    "comprehensive analysis",
-    "everything is fixed",
-    "fully resolved",
-    "complete solution",
+    'all files checked',
+    'comprehensive analysis',
+    'everything is fixed',
+    'fully resolved',
+    'complete solution',
   ];
   for (const phrase of completenessPhrases) {
     if (lower.includes(phrase)) {
-      matches.push({ kind: "completeness_claim", evidence: phrase });
+      matches.push({ kind: 'completeness_claim', evidence: phrase });
     }
   }
 
@@ -215,11 +221,14 @@ function findTriggerMatches(text) {
 }
 
 function loadLoopState(sessionId) {
-  const statePath = path.join(os.tmpdir(), `claude-hallucination-audit-${sessionId || "unknown"}.json`);
+  const statePath = path.join(
+    os.tmpdir(),
+    `claude-hallucination-audit-${sessionId || 'unknown'}.json`,
+  );
   try {
-    const raw = fs.readFileSync(statePath, "utf-8");
+    const raw = fs.readFileSync(statePath, 'utf-8');
     const data = JSON.parse(raw);
-    if (typeof data === "object" && data) return { statePath, data };
+    if (typeof data === 'object' && data) return { statePath, data };
   } catch {
     // ignore
   }
@@ -228,7 +237,7 @@ function loadLoopState(sessionId) {
 
 function saveLoopState(statePath, data) {
   try {
-    fs.writeFileSync(statePath, JSON.stringify(data), "utf-8");
+    fs.writeFileSync(statePath, JSON.stringify(data), 'utf-8');
   } catch {
     // ignore
   }
@@ -240,8 +249,8 @@ function emitJson(obj) {
 
 function main() {
   const input = readStdinJson();
-  const transcriptPath = input.transcript_path || "";
-  const sessionId = input.session_id || "";
+  const transcriptPath = input.transcript_path || '';
+  const sessionId = input.session_id || '';
   const stopHookActive = Boolean(input.stop_hook_active);
 
   if (!transcriptPath || !fs.existsSync(transcriptPath)) {
@@ -282,24 +291,24 @@ function main() {
   const evidenceSnippets = matches
     .slice(0, 6)
     .map((m) => `- ${m.kind}: "${m.evidence}"`)
-    .join("\n");
+    .join('\n');
 
   const reason = [
-    "Hallucination-detector STOP HOOK blocked this response.",
-    "",
-    "Detected trigger language in your last assistant message:",
-    evidenceSnippets || "- (no snippets available)",
-    "",
-    "Rewrite the response to follow these rules:",
-    "- Only state actions you actually took and what you actually observed.",
-    "- If information is missing, say \"I don't know yet\" / \"I don't have that information\" / \"I can check using my tools\".",
-    "- Do not assert causality unless you explicitly cite the observed evidence that supports it.",
-    "- Remove speculative hedging (e.g., \"probably\", \"likely\", \"seems\"). Replace with verification steps or uncertainty statements.",
-    "",
-    `Kinds flagged: ${uniqueKinds.join(", ")}`,
-  ].join("\n");
+    'Hallucination-detector STOP HOOK blocked this response.',
+    '',
+    'Detected trigger language in your last assistant message:',
+    evidenceSnippets || '- (no snippets available)',
+    '',
+    'Rewrite the response to follow these rules:',
+    '- Only state actions you actually took and what you actually observed.',
+    '- If information is missing, say "I don\'t know yet" / "I don\'t have that information" / "I can check using my tools".',
+    '- Do not assert causality unless you explicitly cite the observed evidence that supports it.',
+    '- Remove speculative hedging (e.g., "probably", "likely", "seems"). Replace with verification steps or uncertainty statements.',
+    '',
+    `Kinds flagged: ${uniqueKinds.join(', ')}`,
+  ].join('\n');
 
-  emitJson({ decision: "block", reason });
+  emitJson({ decision: 'block', reason });
   process.exit(0);
 }
 
