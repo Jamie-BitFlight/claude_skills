@@ -3,7 +3,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { execSync } = require('node:child_process');
 
 // ==== EXCEPTIONS ===== //
 class StateError extends Error {
@@ -631,10 +630,7 @@ class SessionsState {
     if (typeof x === 'string') {
       return new CCTodo(x);
     }
-    let status = x.status || TodoStatus.PENDING;
-    if (typeof status === 'string') {
-      status = status; // Already a string, use as-is
-    }
+    const status = x.status || TodoStatus.PENDING;
     return new CCTodo({
       content: x.content || '',
       status: status,

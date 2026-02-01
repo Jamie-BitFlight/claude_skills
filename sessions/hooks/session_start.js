@@ -12,14 +12,7 @@ const https = require('node:https');
 ///-///
 
 /// ===== LOCAL ===== ///
-const {
-  editState,
-  PROJECT_ROOT,
-  loadConfig,
-  SessionsProtocol,
-  getTaskFilePath,
-  isDirectoryTask,
-} = require('./shared_state.js');
+const { editState, PROJECT_ROOT, loadConfig } = require('./shared_state.js');
 ///-///
 
 //-//
@@ -76,7 +69,9 @@ async function readStdin() {
   return new Promise((resolve) => {
     let data = '';
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => (data += chunk));
+    process.stdin.on('data', (chunk) => {
+      data += chunk;
+    });
     process.stdin.on('end', () => {
       try {
         resolve(JSON.parse(data));
@@ -498,7 +493,9 @@ After completion of the last task in any todo list:
             },
             (res) => {
               let data = '';
-              res.on('data', (chunk) => (data += chunk));
+              res.on('data', (chunk) => {
+                data += chunk;
+              });
               res.on('end', () => {
                 try {
                   const registryData = JSON.parse(data);

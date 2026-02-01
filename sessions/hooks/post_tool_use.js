@@ -5,7 +5,6 @@
 /// ===== STDLIB ===== ///
 const fs = require('node:fs');
 const path = require('node:path');
-const { execSync } = require('node:child_process');
 ///-///
 
 /// ===== 3RD-PARTY ===== ///
@@ -20,7 +19,6 @@ const {
   SessionsProtocol,
   listOpenTasks,
   TaskState,
-  StateError,
 } = require('./shared_state.js');
 ///-///
 

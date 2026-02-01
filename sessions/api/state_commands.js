@@ -11,15 +11,7 @@ const path = require('node:path');
 //--//
 
 // ===== LOCAL ===== //
-const {
-  loadState,
-  editState,
-  loadConfig,
-  Mode,
-  TaskState,
-  PROJECT_ROOT,
-  STATE_FILE,
-} = require('../hooks/shared_state.js');
+const { loadState, editState, Mode, TaskState, PROJECT_ROOT } = require('../hooks/shared_state.js');
 //--//
 
 //-#

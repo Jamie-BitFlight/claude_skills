@@ -19,7 +19,6 @@ const {
   PROJECT_ROOT,
   loadConfig,
   findGitRepo,
-  CCTools,
 } = require('./shared_state.js');
 ///-///
 
@@ -453,9 +452,10 @@ function isBashReadOnly(command, _extrasafe = CONFIG.blocked_actions.extrasafe |
     try {
       // Simple shlex-like splitting for JavaScript
       const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
-      let match;
-      while ((match = regex.exec(segment)) !== null) {
+      let match = regex.exec(segment);
+      while (match !== null) {
         parts.push(match[1] || match[2] || match[0]);
+        match = regex.exec(segment);
       }
     } catch (_error) {
       return !CONFIG.blocked_actions.extrasafe;
