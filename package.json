@@ -1,64 +1,67 @@
 {
-	"name": "claude_skills",
-	"version": "1.0.0",
-	"description": "Professional development workflow extensions for Claude Code.",
-	"private": true,
-	"devDependencies": {
-		"@biomejs/biome": "^2.1.1"
-	},
-	"biome": {
-		"$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
-		"vcs": {
-			"enabled": true,
-			"clientKind": "git",
-			"useIgnoreFile": true
-		},
-		"files": {
-			"ignoreUnknown": false,
-			"includes": [
-				"**/*.js",
-				"**/*.ts",
-				"**/*.jsx",
-				"**/*.tsx"
-			]
-		},
-		"formatter": {
-			"enabled": true,
-			"indentStyle": "space",
-			"indentWidth": 2,
-			"lineWidth": 100
-		},
-		"linter": {
-			"enabled": true,
-			"rules": {
-				"recommended": true,
-				"correctness": {
-					"noUnusedVariables": "warn",
-					"noUnusedImports": "warn",
-					"noSelfAssign": "warn"
-				},
-				"suspicious": {
-					"noAssignInExpressions": "warn"
-				},
-				"style": {
-					"useConst": "error"
-				}
-			}
-		},
-		"javascript": {
-			"formatter": {
-				"quoteStyle": "single",
-				"semicolons": "always",
-				"trailingCommas": "all"
-			}
-		},
-		"assist": {
-			"enabled": true,
-			"actions": {
-				"source": {
-					"organizeImports": "on"
-				}
-			}
-		}
-	}
+  "name": "claude_skills",
+  "version": "1.0.0",
+  "description": "Professional development workflow extensions for Claude Code.",
+  "private": true,
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.1"
+  },
+  "biome": {
+    "$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
+    "vcs": {
+      "enabled": true,
+      "clientKind": "git",
+      "useIgnoreFile": true
+    },
+    "files": {
+      "ignoreUnknown": false,
+      "includes": [
+        "**/*.js",
+        "**/*.ts",
+        "**/*.jsx",
+        "**/*.tsx"
+      ],
+      "ignore": [
+        "**/*.json"
+      ]
+    },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 100
+    },
+    "linter": {
+      "enabled": true,
+      "rules": {
+        "recommended": true,
+        "correctness": {
+          "noUnusedVariables": "warn",
+          "noUnusedImports": "warn",
+          "noSelfAssign": "warn"
+        },
+        "suspicious": {
+          "noAssignInExpressions": "warn"
+        },
+        "style": {
+          "useConst": "error"
+        }
+      }
+    },
+    "javascript": {
+      "formatter": {
+        "quoteStyle": "single",
+        "semicolons": "always",
+        "trailingCommas": "all"
+      }
+    },
+    "assist": {
+      "enabled": true,
+      "actions": {
+        "source": {
+          "organizeImports": "on"
+        }
+      }
+    }
+  }
 }
