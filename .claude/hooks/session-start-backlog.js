@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * SessionStart hook that shows backlog summary.
- * Reads .claude/BACKLOG.md and extracts item counts by priority.
+ * Reads .claude/BACKLOG.md frontmatter and extracts item counts by priority.
  */
 
 const fs = require("fs");
@@ -12,20 +12,41 @@ const backlogPath = path.join(projectDir, ".claude", "BACKLOG.md");
 
 let summary = "Backlog not found";
 
+/**
+ * Parse YAML frontmatter from markdown content.
+ * @param {string} content - File content
+ * @returns {Object} Parsed frontmatter key-value pairs
+ */
+function parseFrontmatter(content) {
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!frontmatterMatch) return {};
+
+  const frontmatter = {};
+  const lines = frontmatterMatch[1].split("\n");
+  for (const line of lines) {
+    const match = line.match(/^([a-z0-9-]+):\s*(.+)$/i);
+    if (match) {
+      const key = match[1].trim();
+      let value = match[2].trim();
+      // Parse numbers
+      if (/^\d+$/.test(value)) {
+        value = parseInt(value, 10);
+      }
+      frontmatter[key] = value;
+    }
+  }
+  return frontmatter;
+}
+
 try {
   if (fs.existsSync(backlogPath)) {
     const content = fs.readFileSync(backlogPath, "utf8");
+    const fm = parseFrontmatter(content);
 
-    // Extract counts from summary table
-    const p0Match = content.match(/\| P0\s*\|\s*(\d+)\s*\|/);
-    const p1Match = content.match(/\| P1\s*\|\s*(\d+)\s*\|/);
-    const p2Match = content.match(/\| P2\s*\|\s*(\d+)\s*\|/);
-    const ideasMatch = content.match(/\| Ideas\s*\|\s*(\d+)\s*\|/);
-
-    const p0 = p0Match ? parseInt(p0Match[1]) : 0;
-    const p1 = p1Match ? parseInt(p1Match[1]) : 0;
-    const p2 = p2Match ? parseInt(p2Match[1]) : 0;
-    const ideas = ideasMatch ? parseInt(ideasMatch[1]) : 0;
+    const p0 = fm["p0-count"] || 0;
+    const p1 = fm["p1-count"] || 0;
+    const p2 = fm["p2-count"] || 0;
+    const ideas = fm["ideas-count"] || 0;
     const total = p0 + p1 + p2 + ideas;
 
     if (total > 0) {

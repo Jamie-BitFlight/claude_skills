@@ -1,15 +1,14 @@
+---
+last-updated: 2026-02-01
+p0-count: 0
+p1-count: 1
+p2-count: 2
+ideas-count: 0
+---
+
 # Backlog
 
 Tracked features, ideas, and deferred work for grooming and future sessions.
-
-## Summary
-
-| Priority | Count |
-| -------- | ----- |
-| P0       | 0     |
-| P1       | 1     |
-| P2       | 2     |
-| Ideas    | 0     |
 
 ---
 
