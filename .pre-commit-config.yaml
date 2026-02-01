@@ -65,21 +65,21 @@ repos:
     hooks:
       - id: biome-check
         additional_dependencies: ["@biomejs/biome@2.1.1"]
-        exclude: package\.json
+        exclude: \.json$
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.19.1
     hooks:
       - id: markdownlint-cli2
 
-  # YAML/JSON formatting
+  # JSON formatting
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
       - id: prettier
-        name: Format YAML, JSON, and Markdown files
-        types_or: [yaml, json, markdown]
-        exclude: (\.lock$|mkdocs\.yml|docs/generated/)
+        name: Format JSON files
+        types: [json]
+        exclude: \.lock$
 
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
     rev: 1.34.0
