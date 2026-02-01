@@ -64,7 +64,7 @@ repos:
     rev: "v2.0.6"
     hooks:
       - id: biome-check
-        additional_dependencies: ["@biomejs/biome@2.1.1"]
+        additional_dependencies: ["@biomejs/biome@2.3.13"]
         exclude: \.json$
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
