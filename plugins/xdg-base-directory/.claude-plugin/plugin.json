@@ -3,7 +3,7 @@
   "description": "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live. When code writes to ~/.appname or hardcoded home paths. When implementing cross-platform file storage with platformdirs.",
   "version": "1.0.7",
   "author": {
-    "name": "Jamie Hoover",
+    "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "skills": ["./skills/xdg-base-directory"]

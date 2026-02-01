@@ -594,7 +594,7 @@ Plugins can provide Language Server Protocol (LSP) servers for real-time code in
 
 ## Author
 
-Jamie Hoover (<https://github.com/bitflight-devops>)
+Jamie Nelson (<https://github.com/bitflight-devops>)
 
 ## Attributions
 

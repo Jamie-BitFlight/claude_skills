@@ -3,7 +3,7 @@
   "description": "The model must invoke this skill when any trigger occurs - (1) user mentions \"clang-format\" or \".clang-format\", (2) user requests analyzing code style/formatting patterns/conventions, (3) user requests creating/modifying/generating formatting configuration, (4) user troubleshoots formatting behavior or unexpected results, (5) user asks about brace styles/indentation/spacing/alignment/line breaking/pointer alignment, (6) user wants to preserve existing style/minimize whitespace changes/reduce formatting diffs/codify dominant conventions.",
   "version": "1.0.7",
   "author": {
-    "name": "Jamie Hoover",
+    "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "skills": ["./skills/clang-format"]

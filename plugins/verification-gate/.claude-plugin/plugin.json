@@ -3,7 +3,7 @@
   "description": "Enforce mandatory pre-action verification checkpoints to prevent pattern-matching from overriding explicit reasoning. Use this skill when about to execute implementation actions (Bash, Write, Edit) to verify hypothesis-action alignment. Blocks execution when hypothesis unverified or action targets different system than hypothesis identified. Critical for preventing cognitive dissonance where correct diagnosis leads to wrong implementation.",
   "version": "1.0.7",
   "author": {
-    "name": "Jamie Hoover",
+    "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "skills": ["./skills/verification-gate"]

@@ -3,7 +3,7 @@
   "description": "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches to problems. Use when users request help with ideation, content planning, product features, marketing campaigns, strategic planning, creative writing, or any task requiring structured idea generation. The skill provides 30+ research-validated prompt patterns across 14 categories with exact templates, success metrics, and domain-specific applications.",
   "version": "1.0.7",
   "author": {
-    "name": "Jamie Hoover",
+    "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "skills": ["./skills/brainstorming-skill"]

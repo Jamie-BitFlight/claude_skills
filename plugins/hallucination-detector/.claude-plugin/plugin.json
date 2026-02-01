@@ -3,7 +3,7 @@
   "description": "Stop-hook hallucination and speculation-as-diagnosis detector. Audits the last assistant message for speculation, ungrounded causality, pseudo-quantification, and completeness overclaims; blocks stopping to force evidence-first rewrites.",
   "version": "1.0.2",
   "author": {
-    "name": "Jamie Hoover",
+    "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "commands": ["./commands"],
