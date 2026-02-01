@@ -1,9 +1,7 @@
 ---
+name: backlog-item-groomer
 description: Groom a single backlog item by discovering related research, skills, plugins, and prior work. Returns a context manifest for working on the item. Use when preparing to work on a backlog item or when grooming the backlog.
-tools:
-  - Glob
-  - Grep
-  - Read
+tools: Glob, Grep, Read
 model: haiku
 ---
 

@@ -112,7 +112,7 @@ repos:
         language: system
         stages: [pre-commit]
         pass_filenames: false
-        files: ^plugins/.*(SKILL\.md|agents/.*\.md|commands/.*\.md)$
+        files: ^(plugins|\.claude)/.*(SKILL\.md|agents/.*\.md|commands/.*\.md)$
 
       - id: mypy
         name: mypy
