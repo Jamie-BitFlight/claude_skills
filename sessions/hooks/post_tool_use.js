@@ -3,9 +3,9 @@
 // ===== IMPORTS ===== //
 
 /// ===== STDLIB ===== ///
-const fs = require("fs");
-const path = require("path");
-const { execSync } = require("child_process");
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 ///-///
 
 /// ===== 3RD-PARTY ===== ///
@@ -21,7 +21,7 @@ const {
   listOpenTasks,
   TaskState,
   StateError,
-} = require("./shared_state.js");
+} = require('./shared_state.js');
 ///-///
 
 //-//
@@ -32,10 +32,10 @@ const {
 function isCIEnvironment() {
   // Check if running in a CI environment (GitHub Actions)
   const ciIndicators = [
-    "GITHUB_ACTIONS", // GitHub Actions
-    "GITHUB_WORKFLOW", // GitHub Actions workflow
-    "CI", // Generic CI indicator (set by GitHub Actions)
-    "CONTINUOUS_INTEGRATION", // Generic CI (alternative)
+    'GITHUB_ACTIONS', // GitHub Actions
+    'GITHUB_WORKFLOW', // GitHub Actions workflow
+    'CI', // Generic CI indicator (set by GitHub Actions)
+    'CONTINUOUS_INTEGRATION', // Generic CI (alternative)
   ];
   return ciIndicators.some((indicator) => process.env[indicator]);
 }
@@ -49,16 +49,16 @@ if (isCIEnvironment()) {
 // Read stdin synchronously
 let inputData = {};
 try {
-  const stdin = fs.readFileSync(0, "utf-8");
+  const stdin = fs.readFileSync(0, 'utf-8');
   inputData = JSON.parse(stdin);
-} catch (e) {
+} catch (_e) {
   // If no stdin or invalid JSON, use empty
   inputData = {};
 }
 
-const toolName = inputData.tool_name || "";
+const toolName = inputData.tool_name || '';
 const toolInput = inputData.tool_input || {};
-const cwd = inputData.cwd || "";
+const cwd = inputData.cwd || '';
 let mod = false;
 
 const STATE = loadState();
@@ -83,9 +83,9 @@ Handles post-tool execution cleanup and state management:
 // ===== EXECUTION ===== //
 
 //!> Claude compass (directory position reminder)
-if (toolName === "Bash") {
-  const command = toolInput.command || "";
-  if (command.includes("cd ")) {
+if (toolName === 'Bash') {
+  const command = toolInput.command || '';
+  if (command.includes('cd ')) {
     console.error(`[You are in: ${cwd}]`);
     mod = true;
   }
@@ -93,17 +93,17 @@ if (toolName === "Bash") {
 //!<
 
 //!> Subagent cleanup
-if (toolName === "Task" && STATE.flags.subagent) {
+if (toolName === 'Task' && STATE.flags.subagent) {
   editState((s) => {
     s.flags.subagent = false;
   });
   // Clean up agent transcript directory
-  const subagentType = toolInput.subagent_type || "shared";
-  const agentDir = path.join(PROJECT_ROOT, "sessions", "transcripts", subagentType);
+  const subagentType = toolInput.subagent_type || 'shared';
+  const agentDir = path.join(PROJECT_ROOT, 'sessions', 'transcripts', subagentType);
   if (fs.existsSync(agentDir)) {
     try {
       fs.rmSync(agentDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch (_error) {
       // Ignore errors
     }
   }
@@ -112,9 +112,9 @@ if (toolName === "Task" && STATE.flags.subagent) {
 //!<
 
 //!> Todo completion
-if (STATE.mode === Mode.GO && toolName === "TodoWrite" && STATE.todos.allComplete()) {
+if (STATE.mode === Mode.GO && toolName === 'TodoWrite' && STATE.todos.allComplete()) {
   // Check if all complete (names already verified to match if active_todos existed)
-  console.error("[DAIC: Todos Complete] All todos completed.\n\n");
+  console.error('[DAIC: Todos Complete] All todos completed.\n\n');
 
   if (STATE.active_protocol === SessionsProtocol.COMPLETE) {
     editState((s) => {
@@ -145,8 +145,8 @@ if (STATE.mode === Mode.GO && toolName === "TodoWrite" && STATE.todos.allComplet
     mod = true;
     if (numRestored > 0) {
       // Detect OS for correct sessions command
-      const isWindows = process.platform === "win32";
-      const sessionsCmd = isWindows ? "sessions/bin/sessions.bat" : "sessions/bin/sessions";
+      const isWindows = process.platform === 'win32';
+      const sessionsCmd = isWindows ? 'sessions/bin/sessions.bat' : 'sessions/bin/sessions';
 
       console.error(
         `Your previous ${numRestored} todos have been restored:\n\n${JSON.stringify(restored, null, 2)}\n\nIf these todos are no longer relevant, you should clear them using: ${sessionsCmd} todos clear\nNote: You can only use this command immediately - it will be disabled after any other tool use.\n\n`,
@@ -157,7 +157,9 @@ if (STATE.mode === Mode.GO && toolName === "TodoWrite" && STATE.todos.allComplet
       s.todos.active = [];
       s.mode = Mode.NO;
     });
-    console.error("You have returned to discussion mode. You may now discuss next steps with the user.\n\n");
+    console.error(
+      'You have returned to discussion mode. You may now discuss next steps with the user.\n\n',
+    );
     mod = true;
   }
 }
@@ -173,7 +175,7 @@ if (
   // In implementation mode but no todos - show reminder only during task-based work
   console.error(
     "[Reminder] You're in implementation mode without approved todos. " +
-      "If you proposed todos that were approved, add them. " +
+      'If you proposed todos that were approved, add them. ' +
       "If the user asked you to do something without todo proposal/approval that is **reasonably complex or multi-step**, translate *only the remaining work* to todos and add them (all 'pending'). ",
   );
   mod = true;
@@ -181,12 +183,14 @@ if (
 //!<
 
 //!> Task file auto-update detection
-if (["Edit", "Write"].includes(toolName) && STATE.current_task.name && STATE.current_task.file) {
+if (['Edit', 'Write'].includes(toolName) && STATE.current_task.name && STATE.current_task.file) {
   // Extract file path from tool input
   const filePathStr = toolInput.file_path;
   if (filePathStr) {
     const filePath = path.resolve(filePathStr);
-    const taskPath = path.resolve(path.join(PROJECT_ROOT, "sessions", "tasks", STATE.current_task.file));
+    const taskPath = path.resolve(
+      path.join(PROJECT_ROOT, 'sessions', 'tasks', STATE.current_task.file),
+    );
 
     // Check if the edited file is the current task file
     if (filePath === taskPath) {
@@ -219,7 +223,7 @@ if (["Edit", "Write"].includes(toolName) && STATE.current_task.name && STATE.cur
             }
           });
         }
-      } catch (error) {
+      } catch (_error) {
         // File might be temporarily invalid during editing
         // or frontmatter might be malformed - silently skip
       }
@@ -229,13 +233,13 @@ if (["Edit", "Write"].includes(toolName) && STATE.current_task.name && STATE.cur
 //!<
 
 //!> Disable windowed API permissions after any tool use (except the windowed command itself)
-if (STATE.api.todos_clear && toolName === "Bash") {
+if (STATE.api.todos_clear && toolName === 'Bash') {
   // Check if this is the todos clear command
-  const command = toolInput.command || "";
+  const command = toolInput.command || '';
   // Check for either Unix or Windows version of the command
   if (
-    !command.includes("sessions/bin/sessions todos clear") &&
-    !command.includes("sessions/bin/sessions.bat todos clear")
+    !command.includes('sessions/bin/sessions todos clear') &&
+    !command.includes('sessions/bin/sessions.bat todos clear')
   ) {
     // Not the todos clear command, disable the permission
     editState((s) => {

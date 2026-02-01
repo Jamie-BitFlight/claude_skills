@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { execSync } = require("child_process");
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execSync } = require('node:child_process');
 
 // ==== EXCEPTIONS ===== //
 class StateError extends Error {
   constructor(message) {
     super(message);
-    this.name = "StateError";
+    this.name = 'StateError';
   }
 }
 
 class StashOccupiedError extends Error {
   constructor(message) {
     super(message);
-    this.name = "StashOccupiedError";
+    this.name = 'StashOccupiedError';
   }
 }
 
@@ -28,120 +28,120 @@ function findProjectRoot() {
   }
   let cur = process.cwd();
   while (cur !== path.dirname(cur)) {
-    if (fs.existsSync(path.join(cur, ".claude"))) {
+    if (fs.existsSync(path.join(cur, '.claude'))) {
       return cur;
     }
     cur = path.dirname(cur);
   }
-  console.error("Error: Could not find project root (no .claude directory).");
+  console.error('Error: Could not find project root (no .claude directory).');
   process.exit(2);
 }
 
 const PROJECT_ROOT = findProjectRoot();
-const STATE_FILE = path.join(PROJECT_ROOT, "sessions", "sessions-state.json");
-const LOCK_DIR = STATE_FILE.replace(".json", ".lock");
-const CONFIG_FILE = path.join(PROJECT_ROOT, "sessions", "sessions-config.json");
+const STATE_FILE = path.join(PROJECT_ROOT, 'sessions', 'sessions-state.json');
+const LOCK_DIR = STATE_FILE.replace('.json', '.lock');
+const CONFIG_FILE = path.join(PROJECT_ROOT, 'sessions', 'sessions-config.json');
 
 // Mode description strings
 const DISCUSSION_MODE_MSG =
-  "You are now in Discussion Mode and should focus on discussing and investigating with the user (no edit-based tools)";
+  'You are now in Discussion Mode and should focus on discussing and investigating with the user (no edit-based tools)';
 const IMPLEMENTATION_MODE_MSG =
-  "You are now in Implementation Mode and may use tools to execute the agreed upon actions - when you are done return immediately to Discussion Mode";
+  'You are now in Implementation Mode and may use tools to execute the agreed upon actions - when you are done return immediately to Discussion Mode';
 
 // ==== ENUMS ===== //
 
 const TriggerCategory = {
-  IMPLEMENTATION_MODE: "implementation_mode",
-  DISCUSSION_MODE: "discussion_mode",
-  TASK_CREATION: "task_creation",
-  TASK_STARTUP: "task_startup",
-  TASK_COMPLETION: "task_completion",
-  CONTEXT_COMPACTION: "context_compaction",
+  IMPLEMENTATION_MODE: 'implementation_mode',
+  DISCUSSION_MODE: 'discussion_mode',
+  TASK_CREATION: 'task_creation',
+  TASK_STARTUP: 'task_startup',
+  TASK_COMPLETION: 'task_completion',
+  CONTEXT_COMPACTION: 'context_compaction',
 };
 
 const GitAddPattern = {
-  ASK: "ask",
-  ALL: "all",
+  ASK: 'ask',
+  ALL: 'all',
 };
 
 const GitCommitStyle = {
-  REG: "conventional",
-  SIMP: "simple",
-  OP: "detailed",
+  REG: 'conventional',
+  SIMP: 'simple',
+  OP: 'detailed',
 };
 
 const UserOS = {
-  LINUX: "linux",
-  MACOS: "macos",
-  WINDOWS: "windows",
+  LINUX: 'linux',
+  MACOS: 'macos',
+  WINDOWS: 'windows',
 };
 
 const UserShell = {
-  BASH: "bash",
-  ZSH: "zsh",
-  FISH: "fish",
-  POWERSHELL: "powershell",
-  CMD: "cmd",
+  BASH: 'bash',
+  ZSH: 'zsh',
+  FISH: 'fish',
+  POWERSHELL: 'powershell',
+  CMD: 'cmd',
 };
 
 const IconStyle = {
-  NERD_FONTS: "nerd_fonts",
-  EMOJI: "emoji",
-  ASCII: "ascii",
+  NERD_FONTS: 'nerd_fonts',
+  EMOJI: 'emoji',
+  ASCII: 'ascii',
 };
 
 const CCTools = {
-  READ: "Read",
-  WRITE: "Write",
-  EDIT: "Edit",
-  NOTEBOOKEDIT: "NotebookEdit",
-  GREP: "Grep",
-  GLOB: "Glob",
-  LS: "LS",
-  BASH: "Bash",
-  BASHOUTPUT: "BashOutput",
-  KILLBASH: "KillBash",
-  WEBSEARCH: "WebSearch",
-  WEBFETCH: "WebFetch",
-  TASK: "Task",
-  TODOWRITE: "TodoWrite",
-  EXITPLANMODE: "ExitPlanMode",
+  READ: 'Read',
+  WRITE: 'Write',
+  EDIT: 'Edit',
+  NOTEBOOKEDIT: 'NotebookEdit',
+  GREP: 'Grep',
+  GLOB: 'Glob',
+  LS: 'LS',
+  BASH: 'Bash',
+  BASHOUTPUT: 'BashOutput',
+  KILLBASH: 'KillBash',
+  WEBSEARCH: 'WebSearch',
+  WEBFETCH: 'WebFetch',
+  TASK: 'Task',
+  TODOWRITE: 'TodoWrite',
+  EXITPLANMODE: 'ExitPlanMode',
 };
 
 const SessionsProtocol = {
-  COMPACT: "context-compaction",
-  CREATE: "task-creation",
-  START: "task-startup",
-  COMPLETE: "task-completion",
+  COMPACT: 'context-compaction',
+  CREATE: 'task-creation',
+  START: 'task-startup',
+  COMPLETE: 'task-completion',
 };
 
 const Mode = {
-  NO: "discussion",
-  GO: "implementation",
+  NO: 'discussion',
+  GO: 'implementation',
 };
 
 const TodoStatus = {
-  PENDING: "pending",
-  IN_PROGRESS: "in_progress",
-  COMPLETED: "completed",
+  PENDING: 'pending',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
 };
 
 const Model = {
-  OPUS: "opus",
-  SONNET: "sonnet",
-  UNKNOWN: "unknown",
+  OPUS: 'opus',
+  SONNET: 'sonnet',
+  UNKNOWN: 'unknown',
 };
 
 // ==== CLASSES ===== //
 
 class TriggerPhrases {
   constructor(data = {}) {
-    this.implementation_mode = data.implementation_mode || ["yert"];
-    this.discussion_mode = data.discussion_mode || ["SILENCE"];
-    this.task_creation = data.task_creation || ["mek:"];
-    this.task_startup = data.task_startup || ["start^"];
-    this.task_completion = data.task_completion || ["finito"];
-    this.context_compaction = data.context_compaction || ["squish"];
+    this.implementation_mode = data.implementation_mode || ['yert'];
+    this.discussion_mode = data.discussion_mode || ['SILENCE'];
+    this.task_creation = data.task_creation || ['mek:'];
+    this.task_startup = data.task_startup || ['start^'];
+    this.task_completion = data.task_completion || ['finito'];
+    this.context_compaction = data.context_compaction || ['squish'];
   }
 
   _coaxPhraseType(phraseType) {
@@ -164,7 +164,7 @@ class TriggerPhrases {
   }
 
   addPhrase(category, phrase) {
-    if (typeof category === "string") category = this._coaxPhraseType(category);
+    if (typeof category === 'string') category = this._coaxPhraseType(category);
     const list = this[category];
     if (!list || !Array.isArray(list)) throw new Error(`Unknown trigger category: ${category}`);
     if (list.includes(phrase)) return false;
@@ -173,7 +173,7 @@ class TriggerPhrases {
   }
 
   removePhrase(category, phrase) {
-    if (typeof category === "string") category = this._coaxPhraseType(category);
+    if (typeof category === 'string') category = this._coaxPhraseType(category);
     const list = this[category];
     if (!list || !Array.isArray(list)) throw new Error(`Unknown trigger category: ${category}`);
     const index = list.indexOf(phrase);
@@ -188,14 +188,14 @@ class TriggerPhrases {
     for (const key of Object.keys(TriggerCategory)) {
       const category = TriggerCategory[key];
       const list = this[category];
-      if (list && list.includes(phrase)) return category;
+      if (list?.includes(phrase)) return category;
     }
     return null;
   }
 
   listPhrases(category = null) {
     if (category) {
-      if (typeof category === "string") category = this._coaxPhraseType(category);
+      if (typeof category === 'string') category = this._coaxPhraseType(category);
       const list = this[category];
       if (!list || !Array.isArray(list)) throw new Error(`Unknown trigger category: ${category}`);
       return { [category]: list };
@@ -212,7 +212,7 @@ class TriggerPhrases {
 class GitPreferences {
   constructor(data = {}) {
     this.add_pattern = data.add_pattern || GitAddPattern.ASK;
-    this.default_branch = data.default_branch || "main";
+    this.default_branch = data.default_branch || 'main';
     this.commit_style = data.commit_style || GitCommitStyle.REG;
     this.auto_merge = data.auto_merge || false;
     this.auto_push = data.auto_push || false;
@@ -224,7 +224,7 @@ class SessionsEnv {
   constructor(data = {}) {
     this.os = data.os || UserOS.LINUX;
     this.shell = data.shell || UserShell.BASH;
-    this.developer_name = data.developer_name || "developer";
+    this.developer_name = data.developer_name || 'developer';
   }
 
   isWindows() {
@@ -260,19 +260,19 @@ class BlockingPatterns {
   }
 
   isToolBlocked(tool) {
-    if (typeof tool === "string") tool = this._coaxCCTool(tool);
+    if (typeof tool === 'string') tool = this._coaxCCTool(tool);
     return this.implementation_only_tools.includes(tool);
   }
 
   addBlockedTool(tool) {
-    if (typeof tool === "string") tool = this._coaxCCTool(tool);
+    if (typeof tool === 'string') tool = this._coaxCCTool(tool);
     if (this.implementation_only_tools.includes(tool)) return false;
     this.implementation_only_tools.push(tool);
     return true;
   }
 
   removeBlockedTool(tool) {
-    if (typeof tool === "string") tool = this._coaxCCTool(tool);
+    if (typeof tool === 'string') tool = this._coaxCCTool(tool);
     const index = this.implementation_only_tools.indexOf(tool);
     if (index > -1) {
       this.implementation_only_tools.splice(index, 1);
@@ -320,7 +320,8 @@ class ContextWarnings {
 
 class EnabledFeatures {
   constructor(data = {}) {
-    this.branch_enforcement = data.branch_enforcement !== undefined ? data.branch_enforcement : true;
+    this.branch_enforcement =
+      data.branch_enforcement !== undefined ? data.branch_enforcement : true;
     this.task_detection = data.task_detection !== undefined ? data.task_detection : true;
     this.auto_ultrathink = data.auto_ultrathink !== undefined ? data.auto_ultrathink : true;
 
@@ -336,7 +337,7 @@ class EnabledFeatures {
         // No old or new field, use default
         iconStyleValue = IconStyle.NERD_FONTS;
       }
-    } else if (typeof iconStyleValue === "string") {
+    } else if (typeof iconStyleValue === 'string') {
       // Validate the string is a valid IconStyle value
       const validValues = Object.values(IconStyle);
       if (!validValues.includes(iconStyleValue)) {
@@ -404,7 +405,7 @@ class TaskState {
 
   get filePath() {
     if (!this.file) return null;
-    const filePath = path.join(PROJECT_ROOT, "sessions", "tasks", this.file);
+    const filePath = path.join(PROJECT_ROOT, 'sessions', 'tasks', this.file);
     if (fs.existsSync(filePath)) return filePath;
     return null;
   }
@@ -415,36 +416,36 @@ class TaskState {
 
   static loadTask(options = {}) {
     const { path: taskPath, file } = options;
-    if (!file && !taskPath) throw new Error("Either file or path must be provided.");
+    if (!file && !taskPath) throw new Error('Either file or path must be provided.');
 
-    const tasksRoot = path.join(PROJECT_ROOT, "sessions", "tasks");
+    const tasksRoot = path.join(PROJECT_ROOT, 'sessions', 'tasks');
     let fullPath = taskPath;
     if (file && !taskPath) fullPath = path.join(tasksRoot, file);
     if (!fs.existsSync(fullPath)) throw new Error(`Task file ${fullPath} does not exist.`);
 
-    const content = fs.readFileSync(fullPath, "utf8");
-    const fmStart = content.indexOf("---");
+    const content = fs.readFileSync(fullPath, 'utf8');
+    const fmStart = content.indexOf('---');
     if (fmStart !== 0) throw new StateError(`Task file ${fullPath} missing frontmatter.`);
 
-    const fmEnd = content.indexOf("---", fmStart + 3);
+    const fmEnd = content.indexOf('---', fmStart + 3);
     if (fmEnd === -1) throw new StateError(`Task file ${fullPath} missing frontmatter end.`);
 
     const fmContent = content.substring(fmStart + 3, fmEnd).trim();
     const data = {};
 
-    for (const line of fmContent.split("\n")) {
-      if (!line.includes(":")) continue;
-      const [key, ...valueParts] = line.split(":");
+    for (const line of fmContent.split('\n')) {
+      if (!line.includes(':')) continue;
+      const [key, ...valueParts] = line.split(':');
       const cleanKey = key.trim();
-      const value = valueParts.join(":").trim();
+      const value = valueParts.join(':').trim();
 
-      if (cleanKey === "submodules" || cleanKey === "modules") {
-        const cleanValue = value.replace(/[\[\]]/g, "");
+      if (cleanKey === 'submodules' || cleanKey === 'modules') {
+        const cleanValue = value.replace(/[[\]]/g, '');
         data.submodules = cleanValue
-          .split(",")
+          .split(',')
           .map((s) => s.trim())
           .filter((s) => s);
-      } else if (cleanKey === "task") {
+      } else if (cleanKey === 'task') {
         // Handle legacy "task:" field by mapping to "name"
         data.name = value || null;
       } else {
@@ -480,12 +481,12 @@ class TaskState {
 
 class CCTodo {
   constructor(data = {}) {
-    if (typeof data === "string") {
+    if (typeof data === 'string') {
       this.content = data;
       this.status = TodoStatus.PENDING;
       this.activeForm = null;
     } else {
-      this.content = data.content || "";
+      this.content = data.content || '';
       this.status = data.status || TodoStatus.PENDING;
       this.activeForm = data.activeForm || null;
     }
@@ -542,7 +543,7 @@ class SessionsTodos {
       this.active = [];
       return n;
     }
-    throw new StashOccupiedError("Stash already occupied. Use force=true to overwrite.");
+    throw new StashOccupiedError('Stash already occupied. Use force=true to overwrite.');
   }
 
   clearActive() {
@@ -568,7 +569,7 @@ class SessionsTodos {
   }
 
   toList(which) {
-    const todos = which === "active" ? this.active : this.stashed;
+    const todos = which === 'active' ? this.active : this.stashed;
     return todos.map((t) => ({
       content: t.content,
       status: t.status,
@@ -577,15 +578,15 @@ class SessionsTodos {
   }
 
   listContent(which) {
-    const todos = which === "active" ? this.active : this.stashed;
+    const todos = which === 'active' ? this.active : this.stashed;
     return todos.map((t) => t.content);
   }
 
   toDict() {
     /**Return complete todos structure with both active and stashed.*/
-    const result = { active: this.toList("active") };
+    const result = { active: this.toList('active') };
     if (this.stashed && this.stashed.length > 0) {
-      result.stashed = this.toList("stashed");
+      result.stashed = this.toList('stashed');
     }
     return result;
   }
@@ -602,15 +603,15 @@ class APIPerms {
 function _getPackageVersion() {
   /**Get the installed cc-sessions package version.*/
   try {
-    const packagePath = require("path").join(__dirname, "..", "..", "package.json");
-    if (require("fs").existsSync(packagePath)) {
+    const packagePath = require('node:path').join(__dirname, '..', '..', 'package.json');
+    if (require('node:fs').existsSync(packagePath)) {
       const packageData = require(packagePath);
-      return packageData.version || "unknown";
+      return packageData.version || 'unknown';
     }
   } catch {
-    return "unknown";
+    return 'unknown';
   }
-  return "unknown";
+  return 'unknown';
 }
 
 class SessionsState {
@@ -627,15 +628,15 @@ class SessionsState {
   }
 
   static _coerceTodo(x) {
-    if (typeof x === "string") {
+    if (typeof x === 'string') {
       return new CCTodo(x);
     }
     let status = x.status || TodoStatus.PENDING;
-    if (typeof status === "string") {
+    if (typeof status === 'string') {
       status = status; // Already a string, use as-is
     }
     return new CCTodo({
-      content: x.content || "",
+      content: x.content || '',
       status: status,
       activeForm: x.activeForm || null,
     });
@@ -643,20 +644,20 @@ class SessionsState {
 
   static fromDict(data) {
     // Try to get package version
-    let pkgVersion = "unknown";
+    let pkgVersion = 'unknown';
     try {
-      const packagePath = require("path").join(__dirname, "..", "..", "..", "package.json");
-      if (require("fs").existsSync(packagePath)) {
+      const packagePath = require('node:path').join(__dirname, '..', '..', '..', 'package.json');
+      if (require('node:fs').existsSync(packagePath)) {
         const packageData = require(packagePath);
-        pkgVersion = packageData.version || "unknown";
+        pkgVersion = packageData.version || 'unknown';
       }
     } catch {
-      pkgVersion = "unknown";
+      pkgVersion = 'unknown';
     }
 
     // Handle active_protocol enum conversion
     let activeProtocol = data.active_protocol;
-    if (activeProtocol && typeof activeProtocol === "string") {
+    if (activeProtocol && typeof activeProtocol === 'string') {
       // Validate it's a valid protocol value
       const validProtocols = Object.values(SessionsProtocol);
       if (!validProtocols.includes(activeProtocol)) {
@@ -676,10 +677,8 @@ class SessionsState {
     // Handle flags with legacy format support
 
     const flagsData = data.flags || {};
-    const context85 =
-      flagsData.context_85 || (flagsData.context_warnings && flagsData.context_warnings["85%"]) || false;
-    const context90 =
-      flagsData.context_90 || (flagsData.context_warnings && flagsData.context_warnings["90%"]) || false;
+    const context85 = flagsData.context_85 || flagsData.context_warnings?.['85%'] || false;
+    const context90 = flagsData.context_90 || flagsData.context_warnings?.['90%'] || false;
 
     const state = new SessionsState();
     state.version = data.version || pkgVersion;
@@ -711,8 +710,8 @@ class SessionsState {
       api: { ...this.api },
       mode: this.mode,
       todos: {
-        active: this.todos.toList("active"),
-        stashed: this.todos.toList("stashed"),
+        active: this.todos.toList('active'),
+        stashed: this.todos.toList('stashed'),
       },
       model: this.model,
       flags: { ...this.flags },
@@ -733,7 +732,7 @@ function findGitRepo(dirPath) {
   let current = path.resolve(dirPath);
 
   while (true) {
-    if (fs.existsSync(path.join(current, ".git"))) {
+    if (fs.existsSync(path.join(current, '.git'))) {
       return current;
     }
     if (current === PROJECT_ROOT || current === path.dirname(current)) {
@@ -744,7 +743,7 @@ function findGitRepo(dirPath) {
   return null;
 }
 
-function sleep(ms) {
+function _sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -764,9 +763,9 @@ function atomicWrite(filePath, obj) {
 
   const tempFile = `${filePath}.tmp.${process.pid}`;
   try {
-    fs.writeFileSync(tempFile, JSON.stringify(obj, null, 2), "utf-8");
+    fs.writeFileSync(tempFile, JSON.stringify(obj, null, 2), 'utf-8');
     // Force flush to disk
-    const fd = fs.openSync(tempFile, "r+");
+    const fd = fs.openSync(tempFile, 'r+');
     fs.fsyncSync(fd);
     fs.closeSync(fd);
     // Atomic rename
@@ -781,7 +780,7 @@ function atomicWrite(filePath, obj) {
 }
 
 function acquireLock(timeout = 1.0, pollMs = 50, staleTimeout = 30.0) {
-  const lockInfoFile = path.join(LOCK_DIR, "lock_info.json");
+  const lockInfoFile = path.join(LOCK_DIR, 'lock_info.json');
   const start = Date.now() / 1000;
 
   while (true) {
@@ -790,7 +789,7 @@ function acquireLock(timeout = 1.0, pollMs = 50, staleTimeout = 30.0) {
       try {
         // Try to read lock info
         if (fs.existsSync(lockInfoFile)) {
-          const lockInfo = JSON.parse(fs.readFileSync(lockInfoFile, "utf8"));
+          const lockInfo = JSON.parse(fs.readFileSync(lockInfoFile, 'utf8'));
           const lockPid = lockInfo.pid;
           const lockTime = lockInfo.timestamp || 0;
 
@@ -819,7 +818,7 @@ function acquireLock(timeout = 1.0, pollMs = 50, staleTimeout = 30.0) {
       } catch {
         // Malformed lock info, try to remove after timeout
         if (Date.now() / 1000 - start > timeout) {
-          console.error("Removing malformed lock");
+          console.error('Removing malformed lock');
           try {
             fs.rmSync(LOCK_DIR, { recursive: true, force: true });
           } catch {}
@@ -836,7 +835,7 @@ function acquireLock(timeout = 1.0, pollMs = 50, staleTimeout = 30.0) {
         timestamp: Date.now() / 1000,
         host: os.hostname(),
       };
-      fs.writeFileSync(lockInfoFile, JSON.stringify(lockInfo), "utf-8");
+      fs.writeFileSync(lockInfoFile, JSON.stringify(lockInfo), 'utf-8');
       return true;
     } catch {
       if (Date.now() / 1000 - start > timeout) {
@@ -853,7 +852,7 @@ function acquireLock(timeout = 1.0, pollMs = 50, staleTimeout = 30.0) {
             timestamp: Date.now() / 1000,
             host: os.hostname(),
           };
-          fs.writeFileSync(lockInfoFile, JSON.stringify(lockInfo), "utf-8");
+          fs.writeFileSync(lockInfoFile, JSON.stringify(lockInfo), 'utf-8');
           return true;
         } catch {
           // Someone else grabbed it in the meantime
@@ -882,11 +881,11 @@ function loadState() {
   }
 
   try {
-    const data = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     return SessionsState.fromDict(data);
-  } catch (e) {
+  } catch (_e) {
     // Corrupt file: back it up once and start fresh
-    const backup = STATE_FILE.replace(".json", ".bad.json");
+    const backup = STATE_FILE.replace('.json', '.bad.json');
     try {
       fs.renameSync(STATE_FILE, backup);
     } catch {}
@@ -904,11 +903,11 @@ function loadConfig() {
   }
 
   try {
-    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
 
     // Check if migration is needed from use_nerd_fonts to icon_style
     let needsMigration = false;
-    if (data.features && "use_nerd_fonts" in data.features && !("icon_style" in data.features)) {
+    if (data.features && 'use_nerd_fonts' in data.features && !('icon_style' in data.features)) {
       needsMigration = true;
     }
 
@@ -920,9 +919,9 @@ function loadConfig() {
     }
 
     return config;
-  } catch (e) {
+  } catch (_e) {
     // Corrupt file: back it up once and start fresh
-    const backup = CONFIG_FILE.replace(".json", ".bad.json");
+    const backup = CONFIG_FILE.replace('.json', '.bad.json');
     try {
       fs.renameSync(CONFIG_FILE, backup);
     } catch {}
@@ -938,7 +937,7 @@ function editState(callback) {
   try {
     acquired = acquireLock();
     if (!acquired) {
-      throw new Error("Failed to acquire lock for state edit");
+      throw new Error('Failed to acquire lock for state edit');
     }
 
     const state = loadState();
@@ -960,7 +959,7 @@ function editConfig(callback) {
   try {
     acquired = acquireLock();
     if (!acquired) {
-      throw new Error("Failed to acquire lock for config edit");
+      throw new Error('Failed to acquire lock for config edit');
     }
 
     const config = loadConfig();
@@ -991,22 +990,22 @@ function _normalizeTaskPath(taskPath) {
    * Strips absolute path prefix if present.
    */
   let pathStr = String(taskPath);
-  const tasksRoot = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const tasksRoot = path.join(PROJECT_ROOT, 'sessions', 'tasks');
 
   // If path is absolute, make it relative to tasks root
   if (pathStr.startsWith(tasksRoot)) {
     try {
       pathStr = path.relative(tasksRoot, pathStr);
-    } catch (e) {
+    } catch (_e) {
       // Keep original if error
     }
   }
   // Also handle paths starting with 'sessions/tasks/'
-  if (pathStr.startsWith("sessions/tasks/")) {
-    pathStr = pathStr.slice("sessions/tasks/".length);
+  if (pathStr.startsWith('sessions/tasks/')) {
+    pathStr = pathStr.slice('sessions/tasks/'.length);
   }
   // Normalize path separators to forward slashes for consistency
-  return pathStr.replace(/\\/g, "/");
+  return pathStr.replace(/\\/g, '/');
 }
 
 function isDirectoryTask(taskPath) {
@@ -1023,19 +1022,19 @@ function isDirectoryTask(taskPath) {
    */
   const pathStr = _normalizeTaskPath(taskPath);
   // If the string contains a slash, it's a directory task or subtask
-  if (pathStr.includes("/")) {
+  if (pathStr.includes('/')) {
     return true;
   }
   // Otherwise check if it's a directory with README.md
-  const tasksRoot = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const tasksRoot = path.join(PROJECT_ROOT, 'sessions', 'tasks');
   const taskDir = path.join(tasksRoot, pathStr);
   try {
     const stat = fs.statSync(taskDir);
     if (stat.isDirectory()) {
-      const readmePath = path.join(taskDir, "README.md");
+      const readmePath = path.join(taskDir, 'README.md');
       return fs.existsSync(readmePath);
     }
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
   return false;
@@ -1055,11 +1054,11 @@ function isSubtask(taskPath) {
    * 'simple-task.md' → false
    */
   const pathStr = _normalizeTaskPath(taskPath);
-  if (!pathStr.includes("/")) {
+  if (!pathStr.includes('/')) {
     return false;
   }
   // It's a subtask if it has a slash but isn't the README.md
-  return !pathStr.endsWith("README.md") && !pathStr.endsWith("/");
+  return !pathStr.endsWith('README.md') && !pathStr.endsWith('/');
 }
 
 function isParentTask(taskPath) {
@@ -1078,14 +1077,14 @@ function getTaskFilePath(taskPath) {
    * Get the actual .md file path for a task (handles both directory and file tasks).
    */
   if (isDirectoryTask(taskPath)) {
-    return path.join(taskPath, "README.md");
+    return path.join(taskPath, 'README.md');
   }
   return taskPath;
 }
 
 function listOpenTasks() {
   // No active task - list available tasks
-  const tasksDir = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const tasksDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
   const taskFiles = [];
 
   if (fs.existsSync(tasksDir)) {
@@ -1095,7 +1094,7 @@ function listOpenTasks() {
       const fullPath = path.join(tasksDir, entry);
       const stat = fs.statSync(fullPath);
 
-      if (stat.isFile() && entry.endsWith(".md") && entry !== "TEMPLATE.md") {
+      if (stat.isFile() && entry.endsWith('.md') && entry !== 'TEMPLATE.md') {
         taskFiles.push(fullPath);
       }
     }
@@ -1105,8 +1104,8 @@ function listOpenTasks() {
       const fullPath = path.join(tasksDir, entry);
       const stat = fs.statSync(fullPath);
 
-      if (stat.isDirectory() && entry !== "done") {
-        const readmePath = path.join(fullPath, "README.md");
+      if (stat.isDirectory() && entry !== 'done') {
+        const readmePath = path.join(fullPath, 'README.md');
         if (fs.existsSync(readmePath)) {
           taskFiles.push(fullPath);
         }
@@ -1114,7 +1113,7 @@ function listOpenTasks() {
         // Get subtask files
         const subEntries = fs.readdirSync(fullPath);
         for (const subEntry of subEntries) {
-          if (subEntry.endsWith(".md") && subEntry !== "TEMPLATE.md" && subEntry !== "README.md") {
+          if (subEntry.endsWith('.md') && subEntry !== 'TEMPLATE.md' && subEntry !== 'README.md') {
             taskFiles.push(path.join(fullPath, subEntry));
           }
         }
@@ -1122,26 +1121,28 @@ function listOpenTasks() {
     }
   }
 
-  let taskStartupHelp = "";
+  let taskStartupHelp = '';
   const config = loadConfig();
 
   if (taskFiles.length > 0) {
-    taskStartupHelp += "No active task set. Available tasks:\n";
+    taskStartupHelp += 'No active task set. Available tasks:\n';
     for (const taskFile of taskFiles.sort()) {
       const filePath = getTaskFilePath(taskFile);
 
       if (!fs.existsSync(filePath)) continue;
 
       // Read first few lines to get task info
-      const content = fs.readFileSync(filePath, "utf8");
-      const lines = content.split("\n").slice(0, 10);
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split('\n').slice(0, 10);
 
-      const taskName = isDirectoryTask(taskFile) ? `${path.basename(taskFile)}/` : path.basename(taskFile);
+      const taskName = isDirectoryTask(taskFile)
+        ? `${path.basename(taskFile)}/`
+        : path.basename(taskFile);
 
       let status = null;
       for (const line of lines) {
-        if (line.startsWith("status:")) {
-          status = line.split(":")[1].trim();
+        if (line.startsWith('status:')) {
+          status = line.split(':')[1].trim();
           break;
         }
       }
@@ -1155,14 +1156,14 @@ function listOpenTasks() {
     taskStartupHelp += `- Include the task file you would like to start using '@'\n`;
     taskStartupHelp += `- Hit Enter to activate task startup\n`;
   } else {
-    taskStartupHelp += "No tasks found.\n\n";
+    taskStartupHelp += 'No tasks found.\n\n';
     taskStartupHelp += `To create your first task:\n`;
     taskStartupHelp += `- Type one of your task creation commands: ${JSON.stringify(config.trigger_phrases.task_creation)}\n`;
     taskStartupHelp += `- Write a brief explanation of the task you need to complete\n`;
     taskStartupHelp += `- Answer any questions Claude has for you\n`;
   }
 
-  return taskStartupHelp + "\n";
+  return `${taskStartupHelp}\n`;
 }
 
 // Export everything

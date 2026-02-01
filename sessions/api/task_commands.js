@@ -3,8 +3,8 @@
 // ==== IMPORTS ===== //
 
 // ===== STDLIB ===== //
-const fs = require("fs");
-const path = require("path");
+const fs = require('node:fs');
+const path = require('node:path');
 //--//
 
 // ===== 3RD-PARTY ===== //
@@ -21,7 +21,7 @@ const {
   PROJECT_ROOT,
   getTaskFilePath,
   isDirectoryTask,
-} = require("../hooks/shared_state.js");
+} = require('../hooks/shared_state.js');
 //--//
 
 //-#
@@ -40,11 +40,11 @@ const {
 //!> Protocol loading helper
 function loadProtocolFile(relativePath) {
   /**Load a protocol file from sessions/protocols/ directory.*/
-  const protocolPath = path.join(PROJECT_ROOT, "sessions", "protocols", relativePath);
+  const protocolPath = path.join(PROJECT_ROOT, 'sessions', 'protocols', relativePath);
   if (fs.existsSync(protocolPath)) {
     try {
-      return fs.readFileSync(protocolPath, "utf8");
-    } catch (error) {
+      return fs.readFileSync(protocolPath, 'utf8');
+    } catch (_error) {
       return null;
     }
   }
@@ -61,23 +61,23 @@ function parseIndexFile(indexPath) {
 
   let content;
   try {
-    content = fs.readFileSync(indexPath, "utf8");
-  } catch (error) {
+    content = fs.readFileSync(indexPath, 'utf8');
+  } catch (_error) {
     return null;
   }
 
-  const lines = content.split("\n");
+  const lines = content.split('\n');
 
   // Extract frontmatter using simple string parsing
   const metadata = {};
-  if (lines.length > 0 && lines[0] === "---") {
+  if (lines.length > 0 && lines[0] === '---') {
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
-      if (line === "---") {
+      if (line === '---') {
         break;
       }
-      if (line.includes(":")) {
-        const colonIndex = line.indexOf(":");
+      if (line.includes(':')) {
+        const colonIndex = line.indexOf(':');
         const key = line.substring(0, colonIndex).trim();
         const value = line.substring(colonIndex + 1).trim();
         metadata[key] = value;
@@ -88,7 +88,7 @@ function parseIndexFile(indexPath) {
   // Extract task lines (those starting with - `)
   const taskLines = [];
   for (const line of lines) {
-    if (line.trim().startsWith("- `")) {
+    if (line.trim().startsWith('- `')) {
       taskLines.push(line.trim());
     }
   }
@@ -98,37 +98,37 @@ function parseIndexFile(indexPath) {
 
 function parseFrontmatter(content) {
   /**Parse frontmatter from file content using simple string parsing.*/
-  if (!content.startsWith("---")) {
+  if (!content.startsWith('---')) {
     return null;
   }
 
-  const parts = content.split("---");
+  const parts = content.split('---');
   if (parts.length < 3) {
     return null;
   }
 
-  const frontmatterLines = parts[1].split("\n");
+  const frontmatterLines = parts[1].split('\n');
   const frontmatter = {};
 
   for (const line of frontmatterLines) {
-    if (line.includes(":")) {
-      const colonIndex = line.indexOf(":");
+    if (line.includes(':')) {
+      const colonIndex = line.indexOf(':');
       const key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
 
       // Handle special cases
-      if (key === "submodules" || key === "dependencies") {
+      if (key === 'submodules' || key === 'dependencies') {
         // Parse arrays formatted as: [item1, item2]
-        if (value.startsWith("[") && value.endsWith("]")) {
+        if (value.startsWith('[') && value.endsWith(']')) {
           value = value
             .slice(1, -1)
-            .split(",")
+            .split(',')
             .map((s) => s.trim())
             .filter((s) => s.length > 0);
-        } else if (value === "null" || value === "") {
+        } else if (value === 'null' || value === '') {
           value = null;
         }
-      } else if (value === "null" || value === "") {
+      } else if (value === 'null' || value === '') {
         value = null;
       }
 
@@ -143,16 +143,16 @@ function parseFrontmatter(content) {
 //!> Task status extraction
 function getTaskStatusMap() {
   /**Build a map of task names to their status.*/
-  const tasksDir = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const tasksDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
   const taskStatus = {};
 
-  let taskFiles = [];
+  const taskFiles = [];
 
   // Get regular .md files
   if (fs.existsSync(tasksDir)) {
     const files = fs
       .readdirSync(tasksDir)
-      .filter((f) => f.endsWith(".md") && f !== "TEMPLATE.md")
+      .filter((f) => f.endsWith('.md') && f !== 'TEMPLATE.md')
       .map((f) => path.join(tasksDir, f))
       .sort();
     taskFiles.push(...files);
@@ -164,12 +164,12 @@ function getTaskStatusMap() {
       .readdirSync(tasksDir)
       .filter((f) => {
         const fullPath = path.join(tasksDir, f);
-        return fs.statSync(fullPath).isDirectory() && !["done", "indexes"].includes(f);
+        return fs.statSync(fullPath).isDirectory() && !['done', 'indexes'].includes(f);
       })
       .sort();
 
     for (const dir of dirs) {
-      const readmePath = path.join(tasksDir, dir, "README.md");
+      const readmePath = path.join(tasksDir, dir, 'README.md');
       if (fs.existsSync(readmePath)) {
         taskFiles.push(path.join(tasksDir, dir));
       }
@@ -177,7 +177,7 @@ function getTaskStatusMap() {
       // Get subtask files
       const subtasks = fs
         .readdirSync(path.join(tasksDir, dir))
-        .filter((f) => f.endsWith(".md") && !["TEMPLATE.md", "README.md"].includes(f))
+        .filter((f) => f.endsWith('.md') && !['TEMPLATE.md', 'README.md'].includes(f))
         .map((f) => path.join(tasksDir, dir, f))
         .sort();
       taskFiles.push(...subtasks);
@@ -193,15 +193,17 @@ function getTaskStatusMap() {
     }
 
     try {
-      const content = fs.readFileSync(filePath, "utf8");
-      const lines = content.split("\n").slice(0, 10);
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split('\n').slice(0, 10);
 
-      const taskName = isDirectoryTask(taskFile) ? path.basename(taskFile) + "/" : path.basename(taskFile);
+      const taskName = isDirectoryTask(taskFile)
+        ? `${path.basename(taskFile)}/`
+        : path.basename(taskFile);
 
       let status = null;
       for (const line of lines) {
-        if (line.startsWith("status:")) {
-          status = line.split(":")[1].trim();
+        if (line.startsWith('status:')) {
+          status = line.split(':')[1].trim();
           break;
         }
       }
@@ -209,9 +211,7 @@ function getTaskStatusMap() {
       if (status) {
         taskStatus[taskName] = status;
       }
-    } catch (error) {
-      continue;
-    }
+    } catch (_error) {}
   }
 
   return taskStatus;
@@ -221,26 +221,26 @@ function getTaskStatusMap() {
 //!> Index operations
 function handleIdxList(jsonOutput = false) {
   /**List all available index files.*/
-  const indexesDir = path.join(PROJECT_ROOT, "sessions", "tasks", "indexes");
+  const indexesDir = path.join(PROJECT_ROOT, 'sessions', 'tasks', 'indexes');
 
   if (!fs.existsSync(indexesDir)) {
     if (jsonOutput) {
-      return { indexes: [], message: "No indexes directory found" };
+      return { indexes: [], message: 'No indexes directory found' };
     }
-    return "No indexes directory found at sessions/tasks/indexes";
+    return 'No indexes directory found at sessions/tasks/indexes';
   }
 
   const indexFiles = fs
     .readdirSync(indexesDir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith('.md'))
     .map((f) => path.join(indexesDir, f))
     .sort();
 
   if (indexFiles.length === 0) {
     if (jsonOutput) {
-      return { indexes: [], message: "No index files found" };
+      return { indexes: [], message: 'No index files found' };
     }
-    return "No index files found in sessions/tasks/indexes";
+    return 'No index files found in sessions/tasks/indexes';
   }
 
   const indexesInfo = [];
@@ -250,9 +250,9 @@ function handleIdxList(jsonOutput = false) {
       const { metadata, taskLines } = result;
       indexesInfo.push({
         file: path.basename(indexFile),
-        id: metadata.index || path.basename(indexFile, ".md"),
-        name: metadata.name || path.basename(indexFile, ".md"),
-        description: metadata.description || "",
+        id: metadata.index || path.basename(indexFile, '.md'),
+        name: metadata.name || path.basename(indexFile, '.md'),
+        description: metadata.description || '',
         task_count: taskLines.length,
       });
     }
@@ -263,30 +263,30 @@ function handleIdxList(jsonOutput = false) {
   }
 
   // Format human-readable output
-  const lines = ["Available Task Indexes:", ""];
+  const lines = ['Available Task Indexes:', ''];
   for (const info of indexesInfo) {
     lines.push(`  • ${info.name} (${info.file})`);
     if (info.description) {
       lines.push(`    ${info.description}`);
     }
     lines.push(`    Tasks: ${info.task_count}`);
-    lines.push("");
+    lines.push('');
   }
 
   lines.push("Use '/sessions tasks idx <name>' to view tasks in a specific index");
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function handleIdxShow(indexName, jsonOutput = false) {
   /**Show pending tasks in a specific index file.*/
-  const indexesDir = path.join(PROJECT_ROOT, "sessions", "tasks", "indexes");
+  const indexesDir = path.join(PROJECT_ROOT, 'sessions', 'tasks', 'indexes');
 
   // Try to find the index file (with or without .md extension)
-  let indexPath = path.join(indexesDir, indexName.endsWith(".md") ? indexName : `${indexName}.md`);
+  let indexPath = path.join(indexesDir, indexName.endsWith('.md') ? indexName : `${indexName}.md`);
 
   if (!fs.existsSync(indexPath)) {
     // Try alternate name
-    const altName = indexName.endsWith(".md") ? indexName.slice(0, -3) : `${indexName}.md`;
+    const altName = indexName.endsWith('.md') ? indexName.slice(0, -3) : `${indexName}.md`;
     indexPath = path.join(indexesDir, altName);
   }
 
@@ -311,17 +311,17 @@ function handleIdxShow(indexName, jsonOutput = false) {
   // Extract task names and filter by status
   const pendingTasks = [];
   for (const line of taskLines) {
-    if (line.includes("`")) {
+    if (line.includes('`')) {
       try {
-        const startIdx = line.indexOf("`") + 1;
-        const endIdx = line.indexOf("`", startIdx);
+        const startIdx = line.indexOf('`') + 1;
+        const endIdx = line.indexOf('`', startIdx);
         if (endIdx !== -1) {
           const taskName = line.substring(startIdx, endIdx);
-          const status = taskStatus[taskName] || "unknown";
-          if (status === "pending" || status === "in-progress") {
+          const status = taskStatus[taskName] || 'unknown';
+          if (status === 'pending' || status === 'in-progress') {
             // Extract description if present
             let desc = line.substring(endIdx + 1).trim();
-            if (desc.startsWith(" - ")) {
+            if (desc.startsWith(' - ')) {
               desc = desc.substring(3).trim();
             }
             pendingTasks.push({
@@ -331,9 +331,7 @@ function handleIdxShow(indexName, jsonOutput = false) {
             });
           }
         }
-      } catch (error) {
-        continue;
-      }
+      } catch (_error) {}
     }
   }
 
@@ -341,24 +339,24 @@ function handleIdxShow(indexName, jsonOutput = false) {
     return {
       index: metadata.index || indexName,
       name: metadata.name || indexName,
-      description: metadata.description || "",
+      description: metadata.description || '',
       pending_tasks: pendingTasks,
     };
   }
 
   // Format human-readable output
-  const lines = [`# ${metadata.name || indexName}`, ""];
+  const lines = [`# ${metadata.name || indexName}`, ''];
 
   if (metadata.description) {
     lines.push(metadata.description);
-    lines.push("");
+    lines.push('');
   }
 
   if (pendingTasks.length === 0) {
-    lines.push("No pending tasks in this index");
+    lines.push('No pending tasks in this index');
   } else {
-    lines.push("Pending Tasks:");
-    lines.push("");
+    lines.push('Pending Tasks:');
+    lines.push('');
     for (const task of pendingTasks) {
       lines.push(`  @${task.name} (${task.status})`);
       if (task.description) {
@@ -366,22 +364,22 @@ function handleIdxShow(indexName, jsonOutput = false) {
       }
     }
 
-    lines.push("");
-    lines.push("To start a task, use: /sessions tasks start @<task-name>");
+    lines.push('');
+    lines.push('To start a task, use: /sessions tasks start @<task-name>');
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 //!<
 
 //!> Task startup
-function handleTaskStart(taskName, jsonOutput = false, fromSlash = false) {
+function handleTaskStart(taskName, jsonOutput = false, _fromSlash = false) {
   /**Start a task with validation and protocol loading.*/
   const config = loadConfig();
   const state = loadState();
 
   // Check if there's already an active task
-  if (state.current_task && state.current_task.name) {
+  if (state.current_task?.name) {
     const errorMsg = `Cannot start task - there is already an active task: ${state.current_task.name}
 
 To clear the current task and start a new one:
@@ -393,7 +391,7 @@ To restore the previous task later:
 `;
     if (jsonOutput) {
       return {
-        error: "Task already active",
+        error: 'Task already active',
         current_task: state.current_task.name,
         message: errorMsg,
       };
@@ -402,18 +400,18 @@ To restore the previous task later:
   }
 
   // Strip @ symbol if present
-  if (taskName.startsWith("@")) {
+  if (taskName.startsWith('@')) {
     taskName = taskName.substring(1);
   }
 
   // Resolve task file path
-  const tasksDir = path.join(PROJECT_ROOT, "sessions", "tasks");
+  const tasksDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
   const taskPath = path.join(tasksDir, taskName);
 
   if (!fs.existsSync(taskPath)) {
     const errorMsg = `Task file not found: ${taskName}\n\nMake sure the task file exists in sessions/tasks/`;
     if (jsonOutput) {
-      return { error: "Task not found", message: errorMsg };
+      return { error: 'Task not found', message: errorMsg };
     }
     return errorMsg;
   }
@@ -421,19 +419,19 @@ To restore the previous task later:
   // Read and parse task frontmatter
   let content;
   try {
-    content = fs.readFileSync(taskPath, "utf8");
-  } catch (error) {
+    content = fs.readFileSync(taskPath, 'utf8');
+  } catch (_error) {
     const errorMsg = `Failed to read task file: ${taskName}`;
     if (jsonOutput) {
-      return { error: "Read failed", message: errorMsg };
+      return { error: 'Read failed', message: errorMsg };
     }
     return errorMsg;
   }
 
-  if (!content.startsWith("---")) {
+  if (!content.startsWith('---')) {
     const errorMsg = `Task file missing frontmatter: ${taskName}`;
     if (jsonOutput) {
-      return { error: "Invalid format", message: errorMsg };
+      return { error: 'Invalid format', message: errorMsg };
     }
     return errorMsg;
   }
@@ -442,55 +440,55 @@ To restore the previous task later:
   if (!frontmatter) {
     const errorMsg = `Invalid frontmatter format in: ${taskName}`;
     if (jsonOutput) {
-      return { error: "Invalid format", message: errorMsg };
+      return { error: 'Invalid format', message: errorMsg };
     }
     return errorMsg;
   }
 
   // Load and compose protocol based on config
-  let protocolContent = loadProtocolFile("task-startup/task-startup.md");
+  let protocolContent = loadProtocolFile('task-startup/task-startup.md');
 
   // Load conditional chunks
-  let submoduleManagement = "";
+  let submoduleManagement = '';
   let resumeNotes;
 
   if (config.git_preferences.has_submodules) {
-    const submoduleManagementRaw = loadProtocolFile("task-startup/submodule-management.md");
+    const submoduleManagementRaw = loadProtocolFile('task-startup/submodule-management.md');
     if (submoduleManagementRaw) {
       submoduleManagement = submoduleManagementRaw.replace(
         /\{default_branch\}/g,
         config.git_preferences.default_branch,
       );
     }
-    resumeNotes = loadProtocolFile("task-startup/resume-notes-superrepo.md");
+    resumeNotes = loadProtocolFile('task-startup/resume-notes-superrepo.md');
   } else {
-    submoduleManagement = "";
-    resumeNotes = loadProtocolFile("task-startup/resume-notes-standard.md");
+    submoduleManagement = '';
+    resumeNotes = loadProtocolFile('task-startup/resume-notes-standard.md');
   }
 
   // Set todos based on config
   const todoBranchContent = config.git_preferences.has_submodules
-    ? "Create/checkout task branch and matching submodule branches"
-    : "Create/checkout task branch";
+    ? 'Create/checkout task branch and matching submodule branches'
+    : 'Create/checkout task branch';
   const todoBranchActive = config.git_preferences.has_submodules
-    ? "Creating/checking out task branches"
-    : "Creating/checking out task branch";
+    ? 'Creating/checking out task branches'
+    : 'Creating/checking out task branch';
 
   const todos = [
     {
       content: todoBranchContent,
-      status: "pending",
+      status: 'pending',
       activeForm: todoBranchActive,
     },
     {
-      content: "Gather context if task lacks context manifest",
-      status: "pending",
-      activeForm: "Gathering context for task",
+      content: 'Gather context if task lacks context manifest',
+      status: 'pending',
+      activeForm: 'Gathering context for task',
     },
     {
-      content: "Begin work on the task",
-      status: "pending",
-      activeForm: "Beginning work on task",
+      content: 'Begin work on the task',
+      status: 'pending',
+      activeForm: 'Beginning work on task',
     },
   ];
 
@@ -498,8 +496,8 @@ To restore the previous task later:
   if (protocolContent) {
     protocolContent = protocolContent
       .replace(/\{task_reference\}/g, taskName)
-      .replace(/\{submodule_management\}/g, submoduleManagement || "")
-      .replace(/\{resume_notes\}/g, resumeNotes || "")
+      .replace(/\{submodule_management\}/g, submoduleManagement || '')
+      .replace(/\{resume_notes\}/g, resumeNotes || '')
       .replace(/\{todo_branch\}/g, todos[0].content)
       .replace(/\{todo_branch_active\}/g, todos[0].activeForm);
   }
@@ -510,7 +508,7 @@ To restore the previous task later:
       name: frontmatter.name,
       file: taskName,
       branch: frontmatter.branch,
-      status: "in-progress",
+      status: 'in-progress',
       created: frontmatter.created,
       started: frontmatter.started,
       updated: frontmatter.updated,
@@ -538,7 +536,7 @@ To restore the previous task later:
   if (protocolContent) {
     output += protocolContent;
   } else {
-    output += "Read sessions/protocols/task-startup/task-startup.md for startup protocol";
+    output += 'Read sessions/protocols/task-startup/task-startup.md for startup protocol';
   }
 
   return output;
@@ -555,37 +553,37 @@ function handleTaskCommand(args, jsonOutput = false, fromSlash = false) {
    *     tasks idx <name>            - Show pending tasks in index
    *     tasks start <@task-name>    - Start a task
    */
-  if (!args || args.length === 0 || args[0].toLowerCase() === "help") {
+  if (!args || args.length === 0 || args[0].toLowerCase() === 'help') {
     if (fromSlash) {
       return formatTaskHelp();
     }
-    throw new Error("tasks command requires an action. Valid actions: idx, start");
+    throw new Error('tasks command requires an action. Valid actions: idx, start');
   }
 
   const action = args[0].toLowerCase();
 
-  if (action === "idx") {
+  if (action === 'idx') {
     if (args.length < 2) {
       if (fromSlash) {
-        return "idx command requires an argument.\n\nUsage:\n  /sessions tasks idx list       - List all indexes\n  /sessions tasks idx <name>     - Show tasks in specific index";
+        return 'idx command requires an argument.\n\nUsage:\n  /sessions tasks idx list       - List all indexes\n  /sessions tasks idx <name>     - Show tasks in specific index';
       }
-      throw new Error("idx command requires an argument: list or <index-name>");
+      throw new Error('idx command requires an argument: list or <index-name>');
     }
 
     const idxAction = args[1].toLowerCase();
 
-    if (idxAction === "list") {
+    if (idxAction === 'list') {
       return handleIdxList(jsonOutput);
     } else {
       // Treat as index name
       return handleIdxShow(idxAction, jsonOutput);
     }
-  } else if (action === "start") {
+  } else if (action === 'start') {
     if (args.length < 2) {
       if (fromSlash) {
-        return "start command requires a task name.\n\nUsage:\n  /sessions tasks start @<task-name>";
+        return 'start command requires a task name.\n\nUsage:\n  /sessions tasks start @<task-name>';
       }
-      throw new Error("start command requires a task name");
+      throw new Error('start command requires a task name');
     }
 
     const taskName = args[1];
@@ -601,18 +599,18 @@ function handleTaskCommand(args, jsonOutput = false, fromSlash = false) {
 function formatTaskHelp() {
   /**Format help output for slash command.*/
   const lines = [
-    "Sessions Task Commands:",
-    "",
-    "  /sessions tasks idx list        - List all available task indexes",
-    "  /sessions tasks idx <name>      - Show pending tasks in specific index",
-    "  /sessions tasks start @<name>   - Start working on a task",
-    "",
-    "Examples:",
-    "  /sessions tasks idx list                    - See all indexes",
-    "  /sessions tasks idx architecture            - View architecture tasks",
-    "  /sessions tasks start @m-refactor-commands  - Start a task",
+    'Sessions Task Commands:',
+    '',
+    '  /sessions tasks idx list        - List all available task indexes',
+    '  /sessions tasks idx <name>      - Show pending tasks in specific index',
+    '  /sessions tasks start @<name>   - Start working on a task',
+    '',
+    'Examples:',
+    '  /sessions tasks idx list                    - See all indexes',
+    '  /sessions tasks idx architecture            - View architecture tasks',
+    '  /sessions tasks start @m-refactor-commands  - Start a task',
   ];
-  return lines.join("\n");
+  return lines.join('\n');
 }
 //!<
 

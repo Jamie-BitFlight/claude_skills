@@ -3,12 +3,18 @@
 // ==== IMPORTS ===== //
 
 // ===== STDLIB ===== //
-const fs = require("fs");
-const path = require("path");
+const _fs = require('node:fs');
+const path = require('node:path');
 //--//
 
 // ===== LOCAL ===== //
-const { loadState, editState, TaskState, SessionsProtocol, PROJECT_ROOT } = require("../hooks/shared_state.js");
+const {
+  loadState,
+  editState,
+  TaskState,
+  SessionsProtocol,
+  PROJECT_ROOT,
+} = require('../hooks/shared_state.js');
 //--//
 
 //-#
@@ -18,7 +24,7 @@ const { loadState, editState, TaskState, SessionsProtocol, PROJECT_ROOT } = requ
 
 // ==== FUNCTIONS ===== //
 
-function handleProtocolCommand(args, jsonOutput = false, fromSlash = false) {
+function handleProtocolCommand(args, jsonOutput = false, _fromSlash = false) {
   /**
    * Handle protocol-specific commands that are only available during certain protocols.
    *
@@ -31,7 +37,7 @@ function handleProtocolCommand(args, jsonOutput = false, fromSlash = false) {
 
   const subcommand = args[0];
 
-  if (subcommand === "startup-load") {
+  if (subcommand === 'startup-load') {
     return handleStartupLoad(args.slice(1), jsonOutput);
   } else {
     const errorMsg = `Unknown protocol command: ${subcommand}`;
@@ -45,18 +51,18 @@ function handleProtocolCommand(args, jsonOutput = false, fromSlash = false) {
 function formatProtocolHelp(jsonOutput) {
   /**Format help for protocol commands.*/
   const commands = {
-    "startup-load": "Load a task file during task-startup protocol (requires active protocol)",
+    'startup-load': 'Load a task file during task-startup protocol (requires active protocol)',
   };
 
   if (jsonOutput) {
     return { available_commands: commands };
   }
 
-  const lines = ["Protocol Commands:"];
+  const lines = ['Protocol Commands:'];
   for (const [cmd, desc] of Object.entries(commands)) {
     lines.push(`  ${cmd}: ${desc}`);
   }
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function handleStartupLoad(args, jsonOutput = false) {
@@ -80,11 +86,13 @@ function handleStartupLoad(args, jsonOutput = false) {
 
   // Check if we're in the right protocol state
   if (state.active_protocol !== SessionsProtocol.START) {
-    const errorMsg = "startup-load is only available during task-startup protocol";
+    const errorMsg = 'startup-load is only available during task-startup protocol';
     if (jsonOutput) {
       return {
         error: errorMsg,
-        active_protocol: state.active_protocol ? state.active_protocol.value || state.active_protocol : null,
+        active_protocol: state.active_protocol
+          ? state.active_protocol.value || state.active_protocol
+          : null,
       };
     }
     return `Error: ${errorMsg}`;
@@ -92,7 +100,7 @@ function handleStartupLoad(args, jsonOutput = false) {
 
   // Check if we have permission
   if (!state.api.startup_load) {
-    const errorMsg = "startup-load permission not granted";
+    const errorMsg = 'startup-load permission not granted';
     if (jsonOutput) {
       return { error: errorMsg };
     }
@@ -100,7 +108,7 @@ function handleStartupLoad(args, jsonOutput = false) {
   }
 
   if (!args || args.length === 0) {
-    const errorMsg = "Task file required. Usage: protocol startup-load <task-file>";
+    const errorMsg = 'Task file required. Usage: protocol startup-load <task-file>';
     if (jsonOutput) {
       return { error: errorMsg };
     }
@@ -117,13 +125,13 @@ function handleStartupLoad(args, jsonOutput = false) {
 
   if (path.isAbsolute(taskFileInput)) {
     // Handle absolute path
-    const tasksDir = path.join(PROJECT_ROOT, "sessions", "tasks");
+    const tasksDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
     try {
       // Get the relative path from sessions/tasks/ directory
       relativeTaskPath = path.relative(tasksDir, taskPath);
 
       // Check if the path is actually under sessions/tasks/
-      if (relativeTaskPath.startsWith("..") || path.isAbsolute(relativeTaskPath)) {
+      if (relativeTaskPath.startsWith('..') || path.isAbsolute(relativeTaskPath)) {
         // Path is not under sessions/tasks/
         const errorMsg = `Task file must be under sessions/tasks/ directory: ${taskFileInput}`;
         if (jsonOutput) {
@@ -131,7 +139,7 @@ function handleStartupLoad(args, jsonOutput = false) {
         }
         return `Error: ${errorMsg}`;
       }
-    } catch (error) {
+    } catch (_error) {
       // Path is not under sessions/tasks/
       const errorMsg = `Task file must be under sessions/tasks/ directory: ${taskFileInput}`;
       if (jsonOutput) {
@@ -141,10 +149,10 @@ function handleStartupLoad(args, jsonOutput = false) {
     }
   } else {
     // Handle relative paths
-    if (taskFileInput.startsWith("sessions/tasks/")) {
+    if (taskFileInput.startsWith('sessions/tasks/')) {
       // Strip the sessions/tasks/ prefix
-      relativeTaskPath = taskFileInput.substring("sessions/tasks/".length);
-    } else if (!taskFileInput.includes("/") || taskFileInput.endsWith(".md")) {
+      relativeTaskPath = taskFileInput.substring('sessions/tasks/'.length);
+    } else if (!taskFileInput.includes('/') || taskFileInput.endsWith('.md')) {
       // Just a filename or a simple relative path
       relativeTaskPath = taskFileInput;
     } else {
@@ -158,12 +166,12 @@ function handleStartupLoad(args, jsonOutput = false) {
     const taskData = TaskState.loadTask({ file: relativeTaskPath });
 
     // Auto-update status and started date
-    taskData.status = "in-progress";
+    taskData.status = 'in-progress';
     if (!taskData.started) {
       const today = new Date();
       const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const day = String(today.getDate()).padStart(2, "0");
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
       taskData.started = `${year}-${month}-${day}`;
     }
 
@@ -184,7 +192,7 @@ function handleStartupLoad(args, jsonOutput = false) {
           status: taskData.status,
         },
         next_steps:
-          "If the user has not already shown you the task file with @task-name syntax, read the task file before you continue. Otherwise, you may proceed with the task startup protocol.",
+          'If the user has not already shown you the task file with @task-name syntax, read the task file before you continue. Otherwise, you may proceed with the task startup protocol.',
       };
     }
 
@@ -192,7 +200,11 @@ function handleStartupLoad(args, jsonOutput = false) {
   } catch (error) {
     // Differentiate between FileNotFoundError and other exceptions
     let errorMsg;
-    if (error.code === "ENOENT" || error.message.includes("not found") || error.message.includes("ENOENT")) {
+    if (
+      error.code === 'ENOENT' ||
+      error.message.includes('not found') ||
+      error.message.includes('ENOENT')
+    ) {
       errorMsg = `Task file not found: ${taskFileInput}`;
     } else {
       errorMsg = `Failed to load task: ${error.message || String(error)}`;

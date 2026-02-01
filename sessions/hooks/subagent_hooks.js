@@ -3,15 +3,15 @@
 // ===== IMPORTS ===== //
 
 /// ===== STDLIB ===== ///
-const fs = require("fs");
-const path = require("path");
+const fs = require('node:fs');
+const path = require('node:path');
 ///-///
 
 /// ===== 3RD-PARTY ===== ///
 ///-///
 
 /// ===== LOCAL ===== ///
-const { editState, PROJECT_ROOT, loadState } = require("./shared_state.js");
+const { editState, PROJECT_ROOT, loadState } = require('./shared_state.js');
 ///-///
 
 //-//
@@ -34,8 +34,8 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
   try {
     // Read last line of transcript to get last message timestamp
     const lines = fs
-      .readFileSync(transcriptPath, "utf-8")
-      .split("\n")
+      .readFileSync(transcriptPath, 'utf-8')
+      .split('\n')
       .filter((line) => line.trim());
     if (!lines.length) {
       return transcriptPath;
@@ -63,7 +63,7 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
     const transcriptDir = path.dirname(transcriptPath);
     const allFiles = fs
       .readdirSync(transcriptDir)
-      .filter((f) => f.endsWith(".jsonl"))
+      .filter((f) => f.endsWith('.jsonl'))
       .map((f) => path.join(transcriptDir, f))
       .sort((a, b) => fs.statSync(b).mtime - fs.statSync(a).mtime)
       .slice(0, 5); // Top 5 most recent
@@ -72,8 +72,8 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
     for (const candidate of allFiles) {
       try {
         const candidateLines = fs
-          .readFileSync(candidate, "utf-8")
-          .split("\n")
+          .readFileSync(candidate, 'utf-8')
+          .split('\n')
           .filter((line) => line.trim());
         if (!candidateLines.length) {
           continue;
@@ -95,9 +95,7 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
             }
           }
         }
-      } catch {
-        continue;
-      }
+      } catch {}
     }
 
     // No fresh transcript found, return original
@@ -116,10 +114,10 @@ function findCurrentTranscript(transcriptPath, sessionId, staleThreshold = 30) {
 function isCIEnvironment() {
   // Check if running in a CI environment (GitHub Actions)
   const ciIndicators = [
-    "GITHUB_ACTIONS", // GitHub Actions
-    "GITHUB_WORKFLOW", // GitHub Actions workflow
-    "CI", // Generic CI indicator (set by GitHub Actions)
-    "CONTINUOUS_INTEGRATION", // Generic CI (alternative)
+    'GITHUB_ACTIONS', // GitHub Actions
+    'GITHUB_WORKFLOW', // GitHub Actions workflow
+    'CI', // Generic CI indicator (set by GitHub Actions)
+    'CONTINUOUS_INTEGRATION', // Generic CI (alternative)
   ];
   return ciIndicators.some((indicator) => process.env[indicator]);
 }
@@ -133,7 +131,7 @@ if (isCIEnvironment()) {
 // Load input from stdin
 let inputData = {};
 try {
-  const stdin = fs.readFileSync(0, "utf-8");
+  const stdin = fs.readFileSync(0, 'utf-8');
   inputData = JSON.parse(stdin);
 } catch (e) {
   console.error(`Error: Invalid JSON input: ${e.message}`);
@@ -141,14 +139,14 @@ try {
 }
 
 // Check if this is a Task tool call
-const toolName = inputData.tool_name || "";
-if (toolName !== "Task") {
+const toolName = inputData.tool_name || '';
+if (toolName !== 'Task') {
   process.exit(0);
 }
 
 // Get the transcript path and session ID from the input data
-let transcriptPath = inputData.transcript_path || "";
-const sessionId = inputData.session_id || "";
+let transcriptPath = inputData.transcript_path || '';
+const sessionId = inputData.session_id || '';
 if (!transcriptPath) {
   process.exit(0);
 }
@@ -159,15 +157,15 @@ if (transcriptPath) {
 }
 
 // Get the transcript into memory
-let transcript = [];
+const transcript = [];
 try {
-  const lines = fs.readFileSync(transcriptPath, "utf-8").split("\n");
+  const lines = fs.readFileSync(transcriptPath, 'utf-8').split('\n');
   for (const line of lines) {
     if (line.trim()) {
       transcript.push(JSON.parse(line));
     }
   }
-} catch (e) {
+} catch (_e) {
   process.exit(0);
 }
 //-//
@@ -201,7 +199,7 @@ const STATE = loadState();
 //!> Trunc + clean transcript
 // Remove any pre-work transcript entries
 let startFound = false;
-let transcriptQueue = [...transcript];
+const transcriptQueue = [...transcript];
 while (!startFound && transcriptQueue.length > 0) {
   const entry = transcriptQueue.shift();
   const message = entry.message;
@@ -209,7 +207,7 @@ while (!startFound && transcriptQueue.length > 0) {
     const content = message.content;
     if (Array.isArray(content)) {
       for (const block of content) {
-        if (block.type === "tool_use" && ["Edit", "Write"].includes(block.name)) {
+        if (block.type === 'tool_use' && ['Edit', 'Write'].includes(block.name)) {
           startFound = true;
           break;
         }
@@ -224,7 +222,7 @@ for (const entry of transcriptQueue) {
   const message = entry.message;
   const messageType = entry.type;
 
-  if (message && ["user", "assistant"].includes(messageType)) {
+  if (message && ['user', 'assistant'].includes(messageType)) {
     const content = message.content;
     const role = message.role;
     cleanTranscript.push({ role: role, content: content });
@@ -233,9 +231,9 @@ for (const entry of transcriptQueue) {
 //!<
 
 //!> Prepare subagent dir for transcript files
-let subagentType = "shared";
+let subagentType = 'shared';
 if (cleanTranscript.length === 0) {
-  console.log("[Subagent] No relevant transcript entries found, skipping snapshot.");
+  console.log('[Subagent] No relevant transcript entries found, skipping snapshot.');
   process.exit(0);
 }
 
@@ -243,7 +241,7 @@ const taskCall = cleanTranscript[cleanTranscript.length - 1];
 const content = taskCall.content;
 if (Array.isArray(content)) {
   for (const block of content) {
-    if (block.type === "tool_use" && block.name === "Task") {
+    if (block.type === 'tool_use' && block.name === 'Task') {
       const taskInput = block.input || {};
       subagentType = taskInput.subagent_type || subagentType;
     }
@@ -251,7 +249,7 @@ if (Array.isArray(content)) {
 }
 
 // Clear the current transcript directory
-const BATCH_DIR = path.join(PROJECT_ROOT, "sessions", "transcripts", subagentType);
+const BATCH_DIR = path.join(PROJECT_ROOT, 'sessions', 'transcripts', subagentType);
 if (!fs.existsSync(BATCH_DIR)) {
   fs.mkdirSync(BATCH_DIR, { recursive: true });
 }
@@ -267,9 +265,9 @@ for (const file of existingFiles) {
 
 //!> Chunk and save transcript batches
 const MAX_BYTES = 24000;
-let usableContext = 160000;
-if (STATE.model === "sonnet") {
-  usableContext = 800000;
+let _usableContext = 160000;
+if (STATE.model === 'sonnet') {
+  _usableContext = 800000;
 }
 
 const cleanTranscriptText = JSON.stringify(cleanTranscript, null, 2);
@@ -298,14 +296,14 @@ for (let i = 0; i < cleanTranscriptText.length; i++) {
 
     if (cutIdx !== null && cutIdx > 0) {
       // Emit chunk up to the breakpoint
-      chunks.push(bufChars.slice(0, cutIdx).join(""));
+      chunks.push(bufChars.slice(0, cutIdx).join(''));
       const remainder = bufChars.slice(cutIdx);
       bufChars = remainder;
-      bufBytes = encoder.encode(bufChars.join("")).length;
+      bufBytes = encoder.encode(bufChars.join('')).length;
     } else {
       // No breakpoints, hard cut what we got
       if (bufChars.length > 0) {
-        chunks.push(bufChars.join(""));
+        chunks.push(bufChars.join(''));
       }
       bufChars = [];
       bufBytes = 0;
@@ -318,33 +316,33 @@ for (let i = 0; i < cleanTranscriptText.length; i++) {
   bufChars.push(ch);
   bufBytes += chBytes;
 
-  if (ch === "\n") {
+  if (ch === '\n') {
     lastNewlineIdx = bufChars.length;
     lastSpaceIdx = null;
-  } else if (ch === " " && lastNewlineIdx === null) {
+  } else if (ch === ' ' && lastNewlineIdx === null) {
     lastSpaceIdx = bufChars.length;
   }
 }
 
 // Flush any remaining buffer
 if (bufChars.length > 0) {
-  chunks.push(bufChars.join(""));
+  chunks.push(bufChars.join(''));
 }
 
 // Verify all chunks meet byte limit
 for (const chunk of chunks) {
   const byteLength = encoder.encode(chunk).length;
   if (byteLength > MAX_BYTES) {
-    console.error("Chunking failed to enforce byte limit");
+    console.error('Chunking failed to enforce byte limit');
     process.exit(1);
   }
 }
 
 // Save chunks to files
 chunks.forEach((chunk, idx) => {
-  const partName = `current_transcript_${String(idx + 1).padStart(3, "0")}.txt`;
+  const partName = `current_transcript_${String(idx + 1).padStart(3, '0')}.txt`;
   const partPath = path.join(BATCH_DIR, partName);
-  fs.writeFileSync(partPath, chunk, "utf8");
+  fs.writeFileSync(partPath, chunk, 'utf8');
 });
 //!<
 

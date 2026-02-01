@@ -6,7 +6,7 @@
 
 const output = {
   hookSpecificOutput: {
-    hookEventName: "Stop",
+    hookEventName: 'Stop',
     additionalContext: `<backlog-reminder>
 Before ending session, consider:
 1. Add any new ideas or deferred work to .claude/BACKLOG.md

@@ -3,7 +3,7 @@
 // ==== IMPORTS ===== //
 
 // ===== LOCAL ===== //
-const { routeCommand } = require("./router.js");
+const { routeCommand } = require('./router.js');
 //-##
 
 //-#
@@ -18,14 +18,15 @@ function main() {
   const args = process.argv.slice(2);
 
   // Parse flags
-  const jsonOutput = args.includes("--json");
-  const fromSlash = args.includes("--from-slash");
+  const jsonOutput = args.includes('--json');
+  const fromSlash = args.includes('--from-slash');
 
   // Remove flags from args to get command and subargs
-  const cleanArgs = args.filter((arg) => !arg.startsWith("--"));
+  const cleanArgs = args.filter((arg) => !arg.startsWith('--'));
 
   if (cleanArgs.length === 0) {
-    const error = "No command specified. Usage: node api <command> [<subcommand>] [args] [--json] [--from-slash]";
+    const error =
+      'No command specified. Usage: node api <command> [<subcommand>] [args] [--json] [--from-slash]';
     if (jsonOutput) {
       console.log(JSON.stringify({ error }, null, 2));
     } else {
@@ -42,7 +43,7 @@ function main() {
     const result = routeCommand(command, commandArgs, jsonOutput, fromSlash);
 
     if (result !== undefined && result !== null) {
-      if (jsonOutput && typeof result !== "string") {
+      if (jsonOutput && typeof result !== 'string') {
         console.log(JSON.stringify(result, null, 2));
       } else {
         console.log(result);

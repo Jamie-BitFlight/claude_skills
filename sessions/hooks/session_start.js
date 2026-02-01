@@ -3,9 +3,9 @@
 // ===== IMPORTS ===== //
 
 /// ===== STDLIB ===== ///
-const fs = require("fs");
-const path = require("path");
-const https = require("https");
+const fs = require('node:fs');
+const path = require('node:path');
+const https = require('node:https');
 ///-///
 
 /// ===== 3RD-PARTY ===== ///
@@ -19,32 +19,32 @@ const {
   SessionsProtocol,
   getTaskFilePath,
   isDirectoryTask,
-} = require("./shared_state.js");
+} = require('./shared_state.js');
 ///-///
 
 //-//
 
 // ===== GLOBALS ===== //
-const sessionsDir = path.join(PROJECT_ROOT, "sessions");
+const sessionsDir = path.join(PROJECT_ROOT, 'sessions');
 let STATE = null;
 const CONFIG = loadConfig();
-const developerName = CONFIG.environment?.developer_name || "developer";
+const developerName = CONFIG.environment?.developer_name || 'developer';
 
 // Initialize context
 let context = `You are beginning a new context window with the developer, ${developerName}.\n\n`;
 
 // Quick configuration checks
-let needsSetup = false;
-const quickChecks = [];
+const _needsSetup = false;
+const _quickChecks = [];
 
 /// ===== CI DETECTION ===== ///
 function isCIEnvironment() {
   // Check if running in a CI environment (GitHub Actions)
   const ciIndicators = [
-    "GITHUB_ACTIONS", // GitHub Actions
-    "GITHUB_WORKFLOW", // GitHub Actions workflow
-    "CI", // Generic CI indicator (set by GitHub Actions)
-    "CONTINUOUS_INTEGRATION", // Generic CI (alternative)
+    'GITHUB_ACTIONS', // GitHub Actions
+    'GITHUB_WORKFLOW', // GitHub Actions workflow
+    'CI', // Generic CI indicator (set by GitHub Actions)
+    'CONTINUOUS_INTEGRATION', // Generic CI (alternative)
   ];
   return ciIndicators.some((indicator) => process.env[indicator]);
 }
@@ -74,13 +74,13 @@ Initializes session state and loads task context:
 
 async function readStdin() {
   return new Promise((resolve) => {
-    let data = "";
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => (data += chunk));
-    process.stdin.on("end", () => {
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => (data += chunk));
+    process.stdin.on('end', () => {
       try {
         resolve(JSON.parse(data));
-      } catch (e) {
+      } catch (_e) {
         resolve({});
       }
     });
@@ -93,19 +93,19 @@ function parseIndexFile(indexPath) {
   }
 
   try {
-    const content = fs.readFileSync(indexPath, "utf8");
-    const lines = content.split("\n");
+    const content = fs.readFileSync(indexPath, 'utf8');
+    const lines = content.split('\n');
 
     // Extract frontmatter using simple string parsing (like task files)
     const metadata = {};
-    if (lines.length > 0 && lines[0] === "---") {
+    if (lines.length > 0 && lines[0] === '---') {
       for (let i = 1; i < lines.length; i++) {
-        if (lines[i] === "---") {
+        if (lines[i] === '---') {
           break;
         }
-        if (lines[i].includes(":")) {
-          const [key, ...valueParts] = lines[i].split(":");
-          metadata[key.trim()] = valueParts.join(":").trim();
+        if (lines[i].includes(':')) {
+          const [key, ...valueParts] = lines[i].split(':');
+          metadata[key.trim()] = valueParts.join(':').trim();
         }
       }
     }
@@ -113,35 +113,35 @@ function parseIndexFile(indexPath) {
     // Extract task lines (those starting with - `)
     const taskLines = [];
     for (const line of lines) {
-      if (line.trim().startsWith("- `")) {
+      if (line.trim().startsWith('- `')) {
         taskLines.push(line.trim());
       }
     }
 
     return [metadata, taskLines];
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
 
 function listOpenTasksGrouped() {
-  const tasksDir = path.join(PROJECT_ROOT, "sessions", "tasks");
-  const indexesDir = path.join(tasksDir, "indexes");
+  const tasksDir = path.join(PROJECT_ROOT, 'sessions', 'tasks');
+  const indexesDir = path.join(tasksDir, 'indexes');
 
   // Helper to get status from a task file
   function getTaskStatus(taskPath) {
     try {
-      const content = fs.readFileSync(taskPath, "utf8");
-      const lines = content.split("\n").slice(0, 10);
+      const content = fs.readFileSync(taskPath, 'utf8');
+      const lines = content.split('\n').slice(0, 10);
       for (const line of lines) {
-        if (line.startsWith("status:")) {
-          const status = line.split(":")[1].trim();
-          if (status !== "complete") {
+        if (line.startsWith('status:')) {
+          const status = line.split(':')[1].trim();
+          if (status !== 'complete') {
             return status;
           }
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore read errors
     }
     return null;
@@ -152,7 +152,7 @@ function listOpenTasksGrouped() {
   if (fs.existsSync(tasksDir)) {
     const files = fs
       .readdirSync(tasksDir)
-      .filter((f) => f.endsWith(".md") && f !== "TEMPLATE.md")
+      .filter((f) => f.endsWith('.md') && f !== 'TEMPLATE.md')
       .sort();
 
     for (const file of files) {
@@ -171,12 +171,12 @@ function listOpenTasksGrouped() {
       .readdirSync(tasksDir)
       .filter((item) => {
         const itemPath = path.join(tasksDir, item);
-        return fs.statSync(itemPath).isDirectory() && !["done", "indexes"].includes(item);
+        return fs.statSync(itemPath).isDirectory() && !['done', 'indexes'].includes(item);
       })
       .sort();
 
     for (const dir of dirs) {
-      const readmePath = path.join(tasksDir, dir, "README.md");
+      const readmePath = path.join(tasksDir, dir, 'README.md');
       if (fs.existsSync(readmePath)) {
         const status = getTaskStatus(readmePath);
         if (status) {
@@ -185,7 +185,7 @@ function listOpenTasksGrouped() {
           // Collect subtasks
           const subtaskFiles = fs
             .readdirSync(path.join(tasksDir, dir))
-            .filter((f) => f.endsWith(".md") && !["TEMPLATE.md", "README.md"].includes(f))
+            .filter((f) => f.endsWith('.md') && !['TEMPLATE.md', 'README.md'].includes(f))
             .sort();
 
           for (const subtask of subtaskFiles) {
@@ -208,32 +208,30 @@ function listOpenTasksGrouped() {
   if (fs.existsSync(indexesDir)) {
     const indexFiles = fs
       .readdirSync(indexesDir)
-      .filter((f) => f.endsWith(".md"))
+      .filter((f) => f.endsWith('.md'))
       .sort();
 
     for (const indexFile of indexFiles) {
       const result = parseIndexFile(path.join(indexesDir, indexFile));
       if (result) {
         const [metadata, taskLines] = result;
-        if (metadata && metadata.index) {
+        if (metadata?.index) {
           const indexId = metadata.index;
           indexInfo[indexId] = {
             name: metadata.name || indexId,
-            description: metadata.description || "",
+            description: metadata.description || '',
             tasks: [],
           };
 
           // Extract task names from the lines
           for (const line of taskLines) {
-            if (line.includes("`")) {
+            if (line.includes('`')) {
               try {
-                const start = line.indexOf("`") + 1;
-                const end = line.indexOf("`", start);
-                let task = line.substring(start, end);
+                const start = line.indexOf('`') + 1;
+                const end = line.indexOf('`', start);
+                const task = line.substring(start, end);
                 indexInfo[indexId].tasks.push(task);
-              } catch (error) {
-                continue;
-              }
+              } catch (_error) {}
             }
           }
         }
@@ -263,15 +261,15 @@ function listOpenTasksGrouped() {
     // Check the original task list again for directories
     const originalTasks = [];
     if (fs.existsSync(indexesDir)) {
-      for (const indexFile of fs.readdirSync(indexesDir).filter((f) => f.endsWith(".md"))) {
+      for (const indexFile of fs.readdirSync(indexesDir).filter((f) => f.endsWith('.md'))) {
         const result = parseIndexFile(path.join(indexesDir, indexFile));
         if (result) {
           const [metadata, taskLines] = result;
           if (metadata && metadata.index === indexId) {
             for (const line of taskLines) {
-              if (line.includes("`")) {
-                const start = line.indexOf("`") + 1;
-                const end = line.indexOf("`", start);
+              if (line.includes('`')) {
+                const start = line.indexOf('`') + 1;
+                const end = line.indexOf('`', start);
                 originalTasks.push(line.substring(start, end));
               }
             }
@@ -282,7 +280,7 @@ function listOpenTasksGrouped() {
 
     for (const task of originalTasks) {
       // Check if it's a directory reference (with or without trailing /)
-      const dirName = task.endsWith("/") ? task.slice(0, -1) : task;
+      const dirName = task.endsWith('/') ? task.slice(0, -1) : task;
       if (dirName in dirTasksMap) {
         // Add the directory itself with / suffix
         expandedTasks.push({
@@ -301,11 +299,11 @@ function listOpenTasksGrouped() {
   }
 
   // Step 6: Build output
-  let output = "No active task set. Available tasks:\n\n";
+  let output = 'No active task set. Available tasks:\n\n';
 
   // Display indexed tasks
   const sortedIndexes = Object.entries(indexInfo).sort((a, b) => a[0].localeCompare(b[0]));
-  for (const [indexId, info] of sortedIndexes) {
+  for (const [_indexId, info] of sortedIndexes) {
     if (info.tasks.length > 0) {
       output += `## ${info.name}\n`;
       if (info.description) {
@@ -314,7 +312,7 @@ function listOpenTasksGrouped() {
       for (const task of info.tasks) {
         output += `  • ${task.name} (${task.status})\n`;
       }
-      output += "\n";
+      output += '\n';
     }
   }
 
@@ -331,12 +329,12 @@ function listOpenTasksGrouped() {
   }
 
   if (unindexedTasks.length > 0) {
-    output += "## Uncategorized\n";
+    output += '## Uncategorized\n';
     unindexedTasks.sort((a, b) => a.name.localeCompare(b.name));
     for (const task of unindexedTasks) {
       output += `  • ${task.name} (${task.status})\n`;
     }
-    output += "\n";
+    output += '\n';
   }
 
   // Add startup instructions
@@ -360,7 +358,7 @@ async function main() {
   }
 
   // Read stdin for hook input
-  const hookInput = await readStdin();
+  const _hookInput = await readStdin();
 
   //!> 1. Clear flags and todos for new session
   await editState((s) => {
@@ -369,7 +367,7 @@ async function main() {
     const restored = s.todos.restoreStashed();
     STATE = s;
 
-    context += "Cleared session flags and active todos for new session.\n\n";
+    context += 'Cleared session flags and active todos for new session.\n\n';
 
     if (restored > 0) {
       context += `Restored ${restored} stashed todos from previous session:\n\n${JSON.stringify(s.todos.active)}\n\nTo clear, use \`cd .claude/hooks && node -e "const {editState} = require('./shared_state.js'); editState(s => s.todos.clearStashed()).then(()=>process.exit(0))"\`\n\n`;
@@ -378,11 +376,11 @@ async function main() {
   //!<
 
   //!> 2. Nuke transcripts dir
-  const transcriptsDir = path.join(sessionsDir, "transcripts");
+  const transcriptsDir = path.join(sessionsDir, 'transcripts');
   if (fs.existsSync(transcriptsDir)) {
     try {
       fs.rmSync(transcriptsDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch (_error) {
       // Ignore errors
     }
   }
@@ -393,22 +391,22 @@ async function main() {
   const taskFile = STATE.current_task?.filePath;
   if (taskFile && fs.existsSync(taskFile)) {
     // Check if task status is pending and update to in-progress
-    let taskContent = fs.readFileSync(taskFile, "utf8");
-    let taskUpdated = false;
+    let taskContent = fs.readFileSync(taskFile, 'utf8');
+    let _taskUpdated = false;
 
     // Parse task frontmatter to check status
-    if (taskContent.startsWith("---")) {
-      const lines = taskContent.split("\n");
+    if (taskContent.startsWith('---')) {
+      const lines = taskContent.split('\n');
       for (let i = 1; i < lines.length; i++) {
-        if (lines[i] === "---") {
+        if (lines[i] === '---') {
           break;
         }
-        if (lines[i].startsWith("status: pending")) {
-          lines[i] = "status: in-progress";
-          taskUpdated = true;
+        if (lines[i].startsWith('status: pending')) {
+          lines[i] = 'status: in-progress';
+          _taskUpdated = true;
           // Write back the updated content
-          fs.writeFileSync(taskFile, lines.join("\n"), "utf-8");
-          taskContent = lines.join("\n");
+          fs.writeFileSync(taskFile, lines.join('\n'), 'utf-8');
+          taskContent = lines.join('\n');
           break;
         }
       }
@@ -420,9 +418,9 @@ ${JSON.stringify(STATE.current_task.task_state, null, 2)}
 \`\`\`
 
 Loading task file: ${STATE.current_task.file}
-${"=".repeat(60)}
+${'='.repeat(60)}
 ${taskContent}
-${"=".repeat(60)}
+${'='.repeat(60)}
 
 `;
     }
@@ -475,12 +473,12 @@ After completion of the last task in any todo list:
   // Get current version from package.json
   let currentVersion = null;
   try {
-    const pkgPath = path.join(__dirname, "..", "..", "..", "package.json");
+    const pkgPath = path.join(__dirname, '..', '..', '..', 'package.json');
     if (fs.existsSync(pkgPath)) {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       currentVersion = pkg.version;
     }
-  } catch (error) {
+  } catch (_error) {
     currentVersion = null;
   }
 
@@ -494,14 +492,14 @@ After completion of the last task in any todo list:
       await new Promise((resolve) => {
         https
           .get(
-            "https://registry.npmjs.org/cc-sessions/latest",
+            'https://registry.npmjs.org/cc-sessions/latest',
             {
               timeout: 2000,
             },
             (res) => {
-              let data = "";
-              res.on("data", (chunk) => (data += chunk));
-              res.on("end", () => {
+              let data = '';
+              res.on('data', (chunk) => (data += chunk));
+              res.on('end', () => {
                 try {
                   const registryData = JSON.parse(data);
                   latestVersion = registryData.version;
@@ -509,8 +507,8 @@ After completion of the last task in any todo list:
                   // Set flag based on semantic version comparison
                   const versionTuple = (v) => {
                     try {
-                      return v.split(".").map((n) => parseInt(n, 10));
-                    } catch (e) {
+                      return v.split('.').map((n) => parseInt(n, 10));
+                    } catch (_e) {
                       return [0, 0, 0];
                     }
                   };
@@ -534,18 +532,18 @@ After completion of the last task in any todo list:
                     updateFlag = s.metadata.update_available;
                   });
                   resolve();
-                } catch (e) {
+                } catch (_e) {
                   resolve();
                 }
               });
             },
           )
-          .on("error", () => resolve());
+          .on('error', () => resolve());
 
         // Timeout after 2 seconds
         setTimeout(resolve, 2000);
       });
-    } catch (error) {
+    } catch (_error) {
       // Ignore check errors
     }
   }
@@ -553,35 +551,39 @@ After completion of the last task in any todo list:
   // Display update notification if flag is True
   if (updateFlag && latestVersion && currentVersion) {
     // Detect OS for correct sessions command
-    const isWindows = process.platform === "win32";
-    const sessionsCmd = isWindows ? "sessions/bin/sessions.bat" : "sessions/bin/sessions";
+    const isWindows = process.platform === 'win32';
+    const sessionsCmd = isWindows ? 'sessions/bin/sessions.bat' : 'sessions/bin/sessions';
 
     // Show manual update message
     // Extract first few lines from CHANGELOG for the latest version
     let changelogExcerpt = null;
     try {
-      const changelogPath = path.join(PROJECT_ROOT, "..", "CHANGELOG.md");
+      const changelogPath = path.join(PROJECT_ROOT, '..', 'CHANGELOG.md');
       if (fs.existsSync(changelogPath)) {
-        const content = fs.readFileSync(changelogPath, "utf8");
+        const content = fs.readFileSync(changelogPath, 'utf8');
         // Find the latest version section
-        const versionPattern = new RegExp(`##\\s*\\[${latestVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`);
+        const versionPattern = new RegExp(
+          `##\\s*\\[${latestVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`,
+        );
         const match = content.match(versionPattern);
         if (match) {
           // Extract until next ## or end
           const start = match.index + match[0].length;
-          const nextHeading = content.indexOf("\n## ", start);
-          const section = content.substring(start, nextHeading !== -1 ? nextHeading : start + 500).trim();
+          const nextHeading = content.indexOf('\n## ', start);
+          const section = content
+            .substring(start, nextHeading !== -1 ? nextHeading : start + 500)
+            .trim();
           // Get all lines of changes
           const lines = section
-            .split("\n")
+            .split('\n')
             .map((l) => l.trim())
-            .filter((l) => l && l.startsWith("-"));
+            .filter((l) => l?.startsWith('-'));
           if (lines.length > 0) {
-            changelogExcerpt = lines.map((l) => `  ${l}`).join("\n");
+            changelogExcerpt = lines.map((l) => `  ${l}`).join('\n');
           }
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore changelog extraction errors
     }
 
@@ -624,7 +626,7 @@ This notification will appear on every session start until they update or suppre
   // Output in JSON format as expected by Claude Code hooks
   const output = {
     hookSpecificOutput: {
-      hookEventName: "SessionStart",
+      hookEventName: 'SessionStart',
       additionalContext: context,
     },
   };
@@ -638,7 +640,7 @@ main().catch((error) => {
   console.error(
     JSON.stringify({
       hookSpecificOutput: {
-        hookEventName: "SessionStart",
+        hookEventName: 'SessionStart',
         additionalContext: `Error in session start hook: ${error.message}`,
       },
     }),

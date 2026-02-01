@@ -3,8 +3,8 @@
 // ===== IMPORTS ===== //
 
 /// ===== STDLIB ===== ///
-const fs = require("fs");
-const path = require("path");
+const fs = require('node:fs');
+const path = require('node:path');
 ///-///
 
 /// ===== 3RD-PARTY ===== ///
@@ -22,7 +22,7 @@ const {
   isDirectoryTask,
   isSubtask,
   isParentTask,
-} = require("./shared_state.js");
+} = require('./shared_state.js');
 ///-///
 
 //-//
@@ -33,10 +33,10 @@ const {
 function isCIEnvironment() {
   // Check if running in a CI environment (GitHub Actions)
   const ciIndicators = [
-    "GITHUB_ACTIONS", // GitHub Actions
-    "GITHUB_WORKFLOW", // GitHub Actions workflow
-    "CI", // Generic CI indicator (set by GitHub Actions)
-    "CONTINUOUS_INTEGRATION", // Generic CI (alternative)
+    'GITHUB_ACTIONS', // GitHub Actions
+    'GITHUB_WORKFLOW', // GitHub Actions workflow
+    'CI', // Generic CI indicator (set by GitHub Actions)
+    'CONTINUOUS_INTEGRATION', // Generic CI (alternative)
   ];
   return ciIndicators.some((indicator) => process.env[indicator]);
 }
@@ -50,28 +50,30 @@ if (isCIEnvironment()) {
 // Read stdin synchronously
 let inputData = {};
 try {
-  const stdin = fs.readFileSync(0, "utf-8");
+  const stdin = fs.readFileSync(0, 'utf-8');
   inputData = JSON.parse(stdin);
-} catch (e) {
+} catch (_e) {
   // If parsing fails, treat as empty
   inputData = {};
 }
 
-const prompt = inputData.prompt || "";
-const transcriptPath = inputData.transcript_path || "";
+const prompt = inputData.prompt || '';
+const transcriptPath = inputData.transcript_path || '';
 
 const STATE = loadState();
 const CONFIG = loadConfig();
 
 // Check if this is a slash command we handle via API
 const promptStripped = prompt.trim();
-const apiCommands = ["/mode", "/state", "/config", "/add-trigger", "/remove-trigger"];
-const isApiCommand = promptStripped ? apiCommands.some((cmd) => promptStripped.startsWith(cmd)) : false;
+const apiCommands = ['/mode', '/state', '/config', '/add-trigger', '/remove-trigger'];
+const isApiCommand = promptStripped
+  ? apiCommands.some((cmd) => promptStripped.startsWith(cmd))
+  : false;
 
 // Only add ultrathink if not an API command
-let context = "";
+let context = '';
 if (CONFIG.features.auto_ultrathink && !isApiCommand) {
-  context = "[[ ultrathink ]]\n\n";
+  context = '[[ ultrathink ]]\n\n';
 }
 
 //!> Trigger phrase detection
@@ -86,11 +88,21 @@ function phraseMatches(phrase, text) {
 const implementationPhraseDetected = CONFIG.trigger_phrases.implementation_mode.some((phrase) =>
   phraseMatches(phrase, prompt),
 );
-const discussionPhraseDetected = CONFIG.trigger_phrases.discussion_mode.some((phrase) => phraseMatches(phrase, prompt));
-const taskCreationDetected = CONFIG.trigger_phrases.task_creation.some((phrase) => phraseMatches(phrase, prompt));
-const taskCompletionDetected = CONFIG.trigger_phrases.task_completion.some((phrase) => phraseMatches(phrase, prompt));
-const taskStartDetected = CONFIG.trigger_phrases.task_startup.some((phrase) => phraseMatches(phrase, prompt));
-const compactionDetected = CONFIG.trigger_phrases.context_compaction.some((phrase) => phraseMatches(phrase, prompt));
+const discussionPhraseDetected = CONFIG.trigger_phrases.discussion_mode.some((phrase) =>
+  phraseMatches(phrase, prompt),
+);
+const taskCreationDetected = CONFIG.trigger_phrases.task_creation.some((phrase) =>
+  phraseMatches(phrase, prompt),
+);
+const taskCompletionDetected = CONFIG.trigger_phrases.task_completion.some((phrase) =>
+  phraseMatches(phrase, prompt),
+);
+const taskStartDetected = CONFIG.trigger_phrases.task_startup.some((phrase) =>
+  phraseMatches(phrase, prompt),
+);
+const compactionDetected = CONFIG.trigger_phrases.context_compaction.some((phrase) =>
+  phraseMatches(phrase, prompt),
+);
 //!<
 
 //!> Flags
@@ -120,26 +132,29 @@ Manages DAIC mode transitions and protocol triggers:
 // ===== FUNCTIONS ===== //
 function loadProtocolFile(relativePath) {
   // Load a protocol file or chunk from sessions/protocols/
-  const filePath = path.join(PROJECT_ROOT, "sessions", "protocols", relativePath);
+  const filePath = path.join(PROJECT_ROOT, 'sessions', 'protocols', relativePath);
   if (!fs.existsSync(filePath)) {
-    return "";
+    return '';
   }
-  return fs.readFileSync(filePath, "utf8");
+  return fs.readFileSync(filePath, 'utf8');
 }
 
 function formatTodosForProtocol(todos) {
   // Format a list of CCTodo objects for display in protocols
-  const lines = ["## Protocol Todos", "<!-- Use TodoWrite to add these todos exactly as written -->"];
+  const lines = [
+    '## Protocol Todos',
+    '<!-- Use TodoWrite to add these todos exactly as written -->',
+  ];
   for (const todo of todos) {
     lines.push(`□ ${todo.content}`);
   }
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function getContextLengthFromTranscript(transcriptPath) {
   // Get current context length from the most recent main-chain message in transcript
   try {
-    const lines = fs.readFileSync(transcriptPath, "utf8").split("\n");
+    const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n');
 
     let mostRecentUsage = null;
     let mostRecentTimestamp = null;
@@ -161,9 +176,7 @@ function getContextLengthFromTranscript(transcriptPath) {
             mostRecentUsage = data.message.usage;
           }
         }
-      } catch (e) {
-        continue;
-      }
+      } catch (_e) {}
     }
 
     // Calculate context length from most recent usage
@@ -174,7 +187,7 @@ function getContextLengthFromTranscript(transcriptPath) {
         (mostRecentUsage.cache_creation_input_tokens || 0);
       return contextLength;
     }
-  } catch (e) {
+  } catch (_e) {
     // Ignore errors
   }
   return 0;
@@ -191,18 +204,26 @@ if (transcriptPath && fs.existsSync(transcriptPath)) {
   if (contextLength > 0) {
     // Calculate percentage of usable context (opus 160k/sonnet 800k practical limit before auto-compact)
     let usableTokens = 160000;
-    if (STATE.model === "sonnet") {
+    if (STATE.model === 'sonnet') {
       usableTokens = 800000;
     }
     const usablePercentage = (contextLength / usableTokens) * 100;
 
     // Token warnings (only show once per session)
-    if (usablePercentage >= 90 && !STATE.flags.context_90 && CONFIG.features.context_warnings.warn_90) {
+    if (
+      usablePercentage >= 90 &&
+      !STATE.flags.context_90 &&
+      CONFIG.features.context_warnings.warn_90
+    ) {
       context += `\n[90% WARNING] ${contextLength.toLocaleString()}/${usableTokens.toLocaleString()} tokens used (${usablePercentage.toFixed(1)}%). CRITICAL: Run sessions/protocols/task-completion.md to wrap up this task cleanly!\n`;
       editState((s) => {
         s.flags.context_90 = true;
       });
-    } else if (usablePercentage >= 85 && !STATE.flags.context_85 && CONFIG.features.context_warnings.warn_85) {
+    } else if (
+      usablePercentage >= 85 &&
+      !STATE.flags.context_85 &&
+      CONFIG.features.context_warnings.warn_85
+    ) {
       context += `\n[Warning] Context window is ${usablePercentage.toFixed(1)}% full (${contextLength.toLocaleString()}/${usableTokens.toLocaleString()} tokens). The danger zone is >90%. You will receive another warning when you reach 90% - don't panic but gently guide towards context compaction or task completion (if task is nearly complete). Task completion often satisfies compaction requirements and should allow the user to clear context safely, so you do not need to worry about fitting in both processes.\n`;
       editState((s) => {
         s.flags.context_85 = true;
@@ -235,7 +256,7 @@ CRITICAL RULES:
 // Emergency stop (works in any mode)
 if (STATE.mode === Mode.GO && discussionPhraseDetected) {
   // DEBUG: Log what triggered this
-  const debugLogPath = path.join(PROJECT_ROOT, "sessions", "mode-revert-debug.log");
+  const debugLogPath = path.join(PROJECT_ROOT, 'sessions', 'mode-revert-debug.log');
   const debugLog = `
 [${new Date().toISOString()}] EMERGENCY STOP TRIGGERED
   Prompt: ${prompt.substring(0, 200)}...
@@ -249,7 +270,7 @@ if (STATE.mode === Mode.GO && discussionPhraseDetected) {
     s.todos.clearActive();
   });
   context +=
-    "[DAIC: EMERGENCY STOP] All tools locked. You are now in discussion mode. Re-align with your pair programmer.\n";
+    '[DAIC: EMERGENCY STOP] All tools locked. You are now in discussion mode. Re-align with your pair programmer.\n';
 }
 //!<
 
@@ -258,34 +279,34 @@ if (!isApiCommand && taskCreationDetected) {
   // Define todos for this protocol
   const todos = [
     new CCTodo({
-      content: "Create task file from template with appropriate priority, type, and structure",
-      activeForm: "Creating task file from template",
+      content: 'Create task file from template with appropriate priority, type, and structure',
+      activeForm: 'Creating task file from template',
     }),
     new CCTodo({
-      content: "Ask user about task success and propose success criteria",
-      activeForm: "Asking user about task success and proposing success criteria",
+      content: 'Ask user about task success and propose success criteria',
+      activeForm: 'Asking user about task success and proposing success criteria',
     }),
     new CCTodo({
-      content: "Run context-gathering agent to create context manifest",
-      activeForm: "Running context-gathering agent to create context manifest",
+      content: 'Run context-gathering agent to create context manifest',
+      activeForm: 'Running context-gathering agent to create context manifest',
     }),
     new CCTodo({
-      content: "Update appropriate service index files",
-      activeForm: "Updating appropriate service index files",
+      content: 'Update appropriate service index files',
+      activeForm: 'Updating appropriate service index files',
     }),
     new CCTodo({
-      content: "Commit the new task file",
-      activeForm: "Committing the new task file",
+      content: 'Commit the new task file',
+      activeForm: 'Committing the new task file',
     }),
   ];
 
   // Load and compose protocol based on config
-  let protocolContent = loadProtocolFile("task-creation/task-creation.md");
+  let protocolContent = loadProtocolFile('task-creation/task-creation.md');
 
   // Build template variables
   const submodulesField = CONFIG.git_preferences.has_submodules
-    ? "\n  - submodules: List all submodules requiring git branches for the task (all that will be affected)"
-    : "";
+    ? '\n  - submodules: List all submodules requiring git branches for the task (all that will be affected)'
+    : '';
 
   const templateVars = {
     submodules_field: submodulesField,
@@ -294,7 +315,10 @@ if (!isApiCommand && taskCreationDetected) {
 
   // Format protocol with template variables
   if (protocolContent) {
-    protocolContent = protocolContent.replace(/\{(\w+)\}/g, (match, key) => templateVars[key] || match);
+    protocolContent = protocolContent.replace(
+      /\{(\w+)\}/g,
+      (match, key) => templateVars[key] || match,
+    );
   }
 
   editState((s) => {
@@ -307,17 +331,18 @@ if (!isApiCommand && taskCreationDetected) {
     s.todos.active = todos;
   });
 
-  context += "[Task Creation Notice]\n";
+  context += '[Task Creation Notice]\n';
 
   if (protocolContent) {
     context += `User triggered task creation. Protocol:\n${protocolContent}\n`;
   } else {
     // Fallback to old behavior if protocol not found
-    context += "User triggered task creation. Read sessions/protocols/task-creation.md\n";
+    context += 'User triggered task creation. Read sessions/protocols/task-creation.md\n';
   }
 
   if (hadActiveTodos) {
-    context += "\nYour previous todos have been stashed and will be restored after task creation is complete.\n";
+    context +=
+      '\nYour previous todos have been stashed and will be restored after task creation is complete.\n';
   }
 }
 //!<
@@ -327,32 +352,32 @@ if (!isApiCommand && taskCompletionDetected) {
   // Define todos for this protocol
   const todos = [
     new CCTodo({
-      content: "Verify all success criteria are checked off",
-      activeForm: "Verifying status of success criteria",
+      content: 'Verify all success criteria are checked off',
+      activeForm: 'Verifying status of success criteria',
     }),
     new CCTodo({
-      content: "Run code-review agent and address any critical issues",
-      activeForm: "Running code-review agent",
+      content: 'Run code-review agent and address any critical issues',
+      activeForm: 'Running code-review agent',
     }),
     new CCTodo({
-      content: "Run logging agent to consolidate work logs",
-      activeForm: "Running logging agent to consolidate work logs",
+      content: 'Run logging agent to consolidate work logs',
+      activeForm: 'Running logging agent to consolidate work logs',
     }),
     new CCTodo({
-      content: "Run service-documentation agent to update CLAUDE.md files and other documentation",
-      activeForm: "Running service-documentation agent to update documentation",
+      content: 'Run service-documentation agent to update CLAUDE.md files and other documentation',
+      activeForm: 'Running service-documentation agent to update documentation',
     }),
     new CCTodo({
-      content: "Mark task file complete and move to tasks/done/",
-      activeForm: "Archiving task file",
+      content: 'Mark task file complete and move to tasks/done/',
+      activeForm: 'Archiving task file',
     }),
   ];
 
   // Build commit todo based on auto_merge preference and directory task status
-  let commitContent = "Commit changes";
+  let commitContent = 'Commit changes';
   // Check if this is a directory task - if so, don't merge until all subtasks complete
   if (STATE.current_task.file && isDirectoryTask(STATE.current_task.file)) {
-    commitContent += " (directory task - no merge until all subtasks complete)";
+    commitContent += ' (directory task - no merge until all subtasks complete)';
   } else if (CONFIG.git_preferences.auto_merge) {
     commitContent += ` and merge to ${CONFIG.git_preferences.default_branch}`;
   } else {
@@ -362,7 +387,7 @@ if (!isApiCommand && taskCompletionDetected) {
   todos.push(
     new CCTodo({
       content: commitContent,
-      activeForm: "Committing and handling merge",
+      activeForm: 'Committing and handling merge',
     }),
   );
 
@@ -370,21 +395,21 @@ if (!isApiCommand && taskCompletionDetected) {
   if (CONFIG.git_preferences.auto_push) {
     todos.push(
       new CCTodo({
-        content: "Push changes to remote",
-        activeForm: "Pushing changes to remote",
+        content: 'Push changes to remote',
+        activeForm: 'Pushing changes to remote',
       }),
     );
   } else {
     todos.push(
       new CCTodo({
-        content: "Ask if user wants to push changes to remote",
-        activeForm: "Asking about pushing to remote",
+        content: 'Ask if user wants to push changes to remote',
+        activeForm: 'Asking about pushing to remote',
       }),
     );
   }
 
   // Load and compose protocol based on config
-  let protocolContent = loadProtocolFile("task-completion/task-completion.md");
+  let protocolContent = loadProtocolFile('task-completion/task-completion.md');
 
   // Build template variables based on configuration
   const templateVars = {
@@ -394,34 +419,36 @@ if (!isApiCommand && taskCompletionDetected) {
 
   // Git add warning (only for add_pattern == "all")
   templateVars.git_add_warning =
-    CONFIG.git_preferences.add_pattern === "all" ? loadProtocolFile("task-completion/git-add-warning.md") : "";
+    CONFIG.git_preferences.add_pattern === 'all'
+      ? loadProtocolFile('task-completion/git-add-warning.md')
+      : '';
 
   // Staging instructions based on add_pattern
   templateVars.staging_instructions =
-    CONFIG.git_preferences.add_pattern === "all"
-      ? loadProtocolFile("task-completion/staging-all.md")
-      : loadProtocolFile("task-completion/staging-ask.md"); // Default to 'ask' for safety
+    CONFIG.git_preferences.add_pattern === 'all'
+      ? loadProtocolFile('task-completion/staging-all.md')
+      : loadProtocolFile('task-completion/staging-ask.md'); // Default to 'ask' for safety
 
   // Commit instructions based on has_submodules
   const commitInstructionsContent = CONFIG.git_preferences.has_submodules
-    ? loadProtocolFile("task-completion/commit-superrepo.md")
-    : loadProtocolFile("task-completion/commit-standard.md");
+    ? loadProtocolFile('task-completion/commit-superrepo.md')
+    : loadProtocolFile('task-completion/commit-standard.md');
 
   // Directory task completion check - simplified to just control merge behavior
-  let directoryCompletionCheck = "";
+  let directoryCompletionCheck = '';
   if (STATE.current_task.file && isDirectoryTask(STATE.current_task.file)) {
     if (isParentTask(STATE.current_task.file)) {
       // Completing parent README.md - normal merge behavior
-      directoryCompletionCheck = loadProtocolFile("task-completion/directory-task-completion.md");
+      directoryCompletionCheck = loadProtocolFile('task-completion/directory-task-completion.md');
       directoryCompletionCheck = directoryCompletionCheck.replace(
-        "{default_branch}",
+        '{default_branch}',
         CONFIG.git_preferences.default_branch,
       );
     } else if (isSubtask(STATE.current_task.file)) {
       // Completing a subtask - commit but don't merge
-      directoryCompletionCheck = loadProtocolFile("task-completion/subtask-completion.md");
+      directoryCompletionCheck = loadProtocolFile('task-completion/subtask-completion.md');
       directoryCompletionCheck = directoryCompletionCheck.replace(
-        "{default_branch}",
+        '{default_branch}',
         CONFIG.git_preferences.default_branch,
       );
     }
@@ -430,7 +457,7 @@ if (!isApiCommand && taskCompletionDetected) {
   // Build merge and push instructions based on auto preferences (but override for subtasks)
   let mergeInstruction;
   if (STATE.current_task.file && isSubtask(STATE.current_task.file)) {
-    mergeInstruction = "Do not merge yet - subtask in directory task";
+    mergeInstruction = 'Do not merge yet - subtask in directory task';
   } else if (CONFIG.git_preferences.auto_merge) {
     mergeInstruction = `Merge into ${CONFIG.git_preferences.default_branch}`;
   } else {
@@ -438,36 +465,39 @@ if (!isApiCommand && taskCompletionDetected) {
   }
 
   const pushInstruction = CONFIG.git_preferences.auto_push
-    ? "Push the merged branch to remote"
-    : "Ask user if they want to push to remote";
+    ? 'Push the merged branch to remote'
+    : 'Ask user if they want to push to remote';
 
   // Load commit style guidance based on preference
-  let commitStyleGuidance = "";
-  if (CONFIG.git_preferences.commit_style === "conventional") {
-    commitStyleGuidance = loadProtocolFile("task-completion/commit-style-conventional.md");
-  } else if (CONFIG.git_preferences.commit_style === "simple") {
-    commitStyleGuidance = loadProtocolFile("task-completion/commit-style-simple.md");
-  } else if (CONFIG.git_preferences.commit_style === "detailed") {
-    commitStyleGuidance = loadProtocolFile("task-completion/commit-style-detailed.md");
+  let commitStyleGuidance = '';
+  if (CONFIG.git_preferences.commit_style === 'conventional') {
+    commitStyleGuidance = loadProtocolFile('task-completion/commit-style-conventional.md');
+  } else if (CONFIG.git_preferences.commit_style === 'simple') {
+    commitStyleGuidance = loadProtocolFile('task-completion/commit-style-simple.md');
+  } else if (CONFIG.git_preferences.commit_style === 'detailed') {
+    commitStyleGuidance = loadProtocolFile('task-completion/commit-style-detailed.md');
   } else {
     // Default to conventional if not specified
-    commitStyleGuidance = loadProtocolFile("task-completion/commit-style-conventional.md");
+    commitStyleGuidance = loadProtocolFile('task-completion/commit-style-conventional.md');
   }
   templateVars.commit_style_guidance = commitStyleGuidance;
 
   // Format commit instructions with merge/push
   templateVars.commit_instructions = commitInstructionsContent
-    .replace("{merge_instruction}", mergeInstruction)
-    .replace("{push_instruction}", pushInstruction)
-    .replace("{commit_style_guidance}", commitStyleGuidance)
-    .replace("{default_branch}", CONFIG.git_preferences.default_branch);
+    .replace('{merge_instruction}', mergeInstruction)
+    .replace('{push_instruction}', pushInstruction)
+    .replace('{commit_style_guidance}', commitStyleGuidance)
+    .replace('{default_branch}', CONFIG.git_preferences.default_branch);
 
   // Add directory task completion check
   templateVars.directory_completion_check = directoryCompletionCheck;
 
   // Format protocol with all template variables
   if (protocolContent) {
-    protocolContent = protocolContent.replace(/\{(\w+)\}/g, (match, key) => templateVars[key] || match);
+    protocolContent = protocolContent.replace(
+      /\{(\w+)\}/g,
+      (match, key) => templateVars[key] || match,
+    );
   }
 
   editState((s) => {
@@ -476,110 +506,115 @@ if (!isApiCommand && taskCompletionDetected) {
     s.todos.active = todos;
   });
 
-  context += "[Task Completion Notice]\n";
+  context += '[Task Completion Notice]\n';
 
   if (protocolContent) {
     context += `User triggered task completion. Protocol:\n${protocolContent}\n`;
   } else {
-    context += "User triggered task completion. Read sessions/protocols/task-completion.md\n";
+    context += 'User triggered task completion. Read sessions/protocols/task-completion.md\n';
   }
 }
 //!<
 
 //!> Task startup
 if (!isApiCommand && taskStartDetected) {
-  let taskReference = null;
-  const words = prompt.split(" ");
+  let _taskReference = null;
+  const words = prompt.split(' ');
   for (const word of words) {
-    if (word.startsWith("@") && word.includes("sessions/tasks/") && word.endsWith(".md")) {
-      taskReference = word.split("sessions/tasks/").pop();
+    if (word.startsWith('@') && word.includes('sessions/tasks/') && word.endsWith('.md')) {
+      _taskReference = word.split('sessions/tasks/').pop();
       break;
     }
   }
 
   // Load and compose protocol based on config
-  let protocolContent = loadProtocolFile("task-startup/task-startup.md");
+  let protocolContent = loadProtocolFile('task-startup/task-startup.md');
 
   // Load conditional chunks
-  let submoduleManagement = "";
-  let resumeNotes = "";
+  let submoduleManagement = '';
+  let resumeNotes = '';
 
   if (CONFIG.git_preferences.has_submodules) {
-    const submoduleManagementRaw = loadProtocolFile("task-startup/submodule-management.md");
+    const submoduleManagementRaw = loadProtocolFile('task-startup/submodule-management.md');
     // Format the submodule management content with default_branch
     submoduleManagement = submoduleManagementRaw
-      ? submoduleManagementRaw.replace("{default_branch}", CONFIG.git_preferences.default_branch)
-      : "";
-    resumeNotes = loadProtocolFile("task-startup/resume-notes-superrepo.md");
+      ? submoduleManagementRaw.replace('{default_branch}', CONFIG.git_preferences.default_branch)
+      : '';
+    resumeNotes = loadProtocolFile('task-startup/resume-notes-superrepo.md');
   } else {
-    submoduleManagement = "";
-    resumeNotes = loadProtocolFile("task-startup/resume-notes-standard.md");
+    submoduleManagement = '';
+    resumeNotes = loadProtocolFile('task-startup/resume-notes-standard.md');
   }
 
   // Check if this is a directory task and load appropriate guidance
-  let directoryGuidance = "";
+  let directoryGuidance = '';
   if (STATE.current_task.file && isDirectoryTask(STATE.current_task.file)) {
     if (isParentTask(STATE.current_task.file)) {
       // Starting parent README.md - create task branch
-      directoryGuidance = loadProtocolFile("task-startup/directory-task-startup.md");
+      directoryGuidance = loadProtocolFile('task-startup/directory-task-startup.md');
     } else if (isSubtask(STATE.current_task.file)) {
       // Starting a subtask - ensure on parent task branch
-      directoryGuidance = loadProtocolFile("task-startup/subtask-startup.md");
+      directoryGuidance = loadProtocolFile('task-startup/subtask-startup.md');
     }
   }
 
   // Set todos based on config
   const todoBranchContent = CONFIG.git_preferences.has_submodules
-    ? "Create/checkout task branch and matching submodule branches"
-    : "Create/checkout task branch";
+    ? 'Create/checkout task branch and matching submodule branches'
+    : 'Create/checkout task branch';
   const todoBranchActive = CONFIG.git_preferences.has_submodules
-    ? "Creating/checking out task branches"
-    : "Creating/checking out task branch";
+    ? 'Creating/checking out task branches'
+    : 'Creating/checking out task branch';
 
   // Build todos list - will add read task todo conditionally
   const todos = [
     new CCTodo({
-      content: "Check git status and handle any uncommitted changes",
-      activeForm: "Checking git status and handling uncommitted changes",
+      content: 'Check git status and handle any uncommitted changes',
+      activeForm: 'Checking git status and handling uncommitted changes',
     }),
     new CCTodo({
       content: todoBranchContent,
       activeForm: todoBranchActive,
     }),
     new CCTodo({
-      content: "Verify context manifest for the task",
-      activeForm: "Verifying context manifest",
+      content: 'Verify context manifest for the task',
+      activeForm: 'Verifying context manifest',
     }),
     new CCTodo({
-      content: "Gather context for the task",
-      activeForm: "Catching up to speed...",
+      content: 'Gather context for the task',
+      activeForm: 'Catching up to speed...',
     }),
   ];
 
   // Check if task will be auto-loaded
   // Detect OS for correct sessions command
-  const isWindows = process.platform === "win32";
-  const sessionsCmd = isWindows ? "sessions/bin/sessions.bat" : "sessions/bin/sessions";
+  const isWindows = process.platform === 'win32';
+  const sessionsCmd = isWindows ? 'sessions/bin/sessions.bat' : 'sessions/bin/sessions';
 
-  context += "[Task Startup Notice]\n**If the user mentioned which task to start, *YOU MUST***:\n";
-  context += "1. Return to project root directory\n";
+  context += '[Task Startup Notice]\n**If the user mentioned which task to start, *YOU MUST***:\n';
+  context += '1. Return to project root directory\n';
   context += `2. Run: \`${sessionsCmd} protocol startup-load <task-file>\`\n`;
-  context += "You must do this *BEFORE* the task startup protocol.\n";
-  context += "Otherwise, ask which task they want to start, then use the command from project root.\n\n";
+  context += 'You must do this *BEFORE* the task startup protocol.\n';
+  context +=
+    'Otherwise, ask which task they want to start, then use the command from project root.\n\n';
 
   // Build template variables for protocol
-  const gitStatusScope = CONFIG.git_preferences.has_submodules ? "in both super-repo and all submodules" : "";
+  const gitStatusScope = CONFIG.git_preferences.has_submodules
+    ? 'in both super-repo and all submodules'
+    : '';
 
   // Build git handling instructions based on add_pattern
   const gitHandling =
-    CONFIG.git_preferences.add_pattern === "all"
-      ? "- Commit ALL changes"
-      : "- Either commit changes or explicitly discuss with user";
+    CONFIG.git_preferences.add_pattern === 'all'
+      ? '- Commit ALL changes'
+      : '- Either commit changes or explicitly discuss with user';
 
   const templateVars = {
     default_branch: CONFIG.git_preferences.default_branch,
-    submodule_branch_todo: CONFIG.git_preferences.has_submodules ? " and matching submodule branches" : "",
-    submodule_context: CONFIG.git_preferences.has_submodules ? " (and submodules list)" : "",
+    submodule_branch_todo: CONFIG.git_preferences.has_submodules
+      ? ' and matching submodule branches'
+      : '',
+    submodule_context: CONFIG.git_preferences.has_submodules ? ' (and submodules list)' : '',
     submodule_management_section: submoduleManagement,
     resume_notes: resumeNotes,
     directory_guidance: directoryGuidance,
@@ -588,13 +623,16 @@ if (!isApiCommand && taskStartDetected) {
     todos: formatTodosForProtocol(todos),
     implementation_mode_triggers:
       CONFIG.trigger_phrases.implementation_mode.length > 0
-        ? `[${CONFIG.trigger_phrases.implementation_mode.join(", ")}]`
-        : "[]",
+        ? `[${CONFIG.trigger_phrases.implementation_mode.join(', ')}]`
+        : '[]',
   };
 
   // Format protocol with template variables
   if (protocolContent) {
-    protocolContent = protocolContent.replace(/\{(\w+)\}/g, (match, key) => templateVars[key] || match);
+    protocolContent = protocolContent.replace(
+      /\{(\w+)\}/g,
+      (match, key) => templateVars[key] || match,
+    );
   }
 
   // Set state with todos
@@ -610,7 +648,7 @@ if (!isApiCommand && taskStartDetected) {
   if (protocolContent) {
     context += `User triggered task startup. Protocol:\n${protocolContent}\n`;
   } else {
-    context += "User triggered task startup. Read sessions/protocols/task-startup.md\n";
+    context += 'User triggered task startup. Read sessions/protocols/task-startup.md\n';
   }
 }
 //!<
@@ -620,21 +658,21 @@ if (!isApiCommand && compactionDetected) {
   // Define todos for this protocol
   const todos = [
     new CCTodo({
-      content: "Run logging agent to update work logs",
-      activeForm: "Running logging agent to update work logs",
+      content: 'Run logging agent to update work logs',
+      activeForm: 'Running logging agent to update work logs',
     }),
     new CCTodo({
-      content: "Run context-refinement agent to check for discoveries",
-      activeForm: "Running context-refinement agent to check for discoveries",
+      content: 'Run context-refinement agent to check for discoveries',
+      activeForm: 'Running context-refinement agent to check for discoveries',
     }),
     new CCTodo({
-      content: "Run service-documentation agent if service interfaces changed",
-      activeForm: "Running service-documentation agent if service interfaces changed",
+      content: 'Run service-documentation agent if service interfaces changed',
+      activeForm: 'Running service-documentation agent if service interfaces changed',
     }),
   ];
 
   // Load protocol content
-  let protocolContent = loadProtocolFile("context-compaction/context-compaction.md");
+  let protocolContent = loadProtocolFile('context-compaction/context-compaction.md');
 
   // Build template variables
   const templateVars = {
@@ -643,7 +681,10 @@ if (!isApiCommand && compactionDetected) {
 
   // Format protocol with template variables
   if (protocolContent) {
-    protocolContent = protocolContent.replace(/\{(\w+)\}/g, (match, key) => templateVars[key] || match);
+    protocolContent = protocolContent.replace(
+      /\{(\w+)\}/g,
+      (match, key) => templateVars[key] || match,
+    );
   }
 
   if (STATE.todos.active.length > 0) {
@@ -659,24 +700,24 @@ if (!isApiCommand && compactionDetected) {
     s.todos.active = todos;
   });
 
-  context += "[Context Compaction Notice]\n";
+  context += '[Context Compaction Notice]\n';
 
   if (protocolContent) {
     context += `User triggered context compaction. Protocol:\n${protocolContent}\n`;
   } else {
     // Fallback to old behavior if protocol not found
-    context += "User triggered context compaction. Read sessions/protocols/context-compaction.md\n";
+    context += 'User triggered context compaction. Read sessions/protocols/context-compaction.md\n';
   }
 
   if (hadActiveTodos) {
     context +=
-      "Your todos have been stashed and will be restored in the next session after the user clears context. Do not attempt to update or complete your previous todo list (context compaction todos are now active).\n";
+      'Your todos have been stashed and will be restored in the next session after the user clears context. Do not attempt to update or complete your previous todo list (context compaction todos are now active).\n';
   }
 }
 //!<
 
 //!> Iterloop detection
-if (prompt.toLowerCase().includes("iterloop")) {
+if (prompt.toLowerCase().includes('iterloop')) {
   context +=
     "ITERLOOP DETECTED:\nYou have been instructed to iteratively loop over a list. Identify what list the user is referring to, then follow this loop: present one item, wait for the user to respond with questions and discussion points, only continue to the next item when the user explicitly says 'continue' or something similar\n";
 }
@@ -689,7 +730,7 @@ if (prompt.toLowerCase().includes("iterloop")) {
 // Output the context additions
 const output = {
   hookSpecificOutput: {
-    hookEventName: "UserPromptSubmit",
+    hookEventName: 'UserPromptSubmit',
     additionalContext: context,
   },
 };

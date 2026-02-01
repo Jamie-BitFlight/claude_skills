@@ -36,4 +36,4 @@ uv.lock
 **/session-notes/
 
 !.claude/knowledge/workflow-diagrams
-.env
+.envpackage-lock.json
