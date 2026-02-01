@@ -78,7 +78,7 @@ repos:
       - id: prettier
         name: Format YAML, JSON, and Markdown files
         types_or: [yaml, json, markdown]
-        exclude: (\.lock$|mkdocs\.yml|docs/generated/)
+        exclude: (\.lock$|mkdocs\.yml|docs/generated/|package\.json)
 
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
     rev: 1.34.0

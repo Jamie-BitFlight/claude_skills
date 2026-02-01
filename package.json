@@ -1,19 +1,64 @@
 {
-  "name": "claude_skills",
-  "version": "1.0.0",
-  "description": "Professional development workflow extensions for Claude Code. Make Claude more thorough, accurate, and productive across Python, shell, Perl, CI/CD, and AI tooling.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "http://local_proxy@127.0.0.1:38480/git/Jamie-BitFlight/claude_skills"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@biomejs/biome": "^2.1.1"
-  }
+	"name": "claude_skills",
+	"version": "1.0.0",
+	"description": "Professional development workflow extensions for Claude Code.",
+	"private": true,
+	"devDependencies": {
+		"@biomejs/biome": "^2.1.1"
+	},
+	"biome": {
+		"$schema": "https://biomejs.dev/schemas/2.1.1/schema.json",
+		"vcs": {
+			"enabled": true,
+			"clientKind": "git",
+			"useIgnoreFile": true
+		},
+		"files": {
+			"ignoreUnknown": false,
+			"includes": [
+				"**/*.js",
+				"**/*.ts",
+				"**/*.jsx",
+				"**/*.tsx"
+			]
+		},
+		"formatter": {
+			"enabled": true,
+			"indentStyle": "space",
+			"indentWidth": 2,
+			"lineWidth": 100
+		},
+		"linter": {
+			"enabled": true,
+			"rules": {
+				"recommended": true,
+				"correctness": {
+					"noUnusedVariables": "warn",
+					"noUnusedImports": "warn",
+					"noSelfAssign": "warn"
+				},
+				"suspicious": {
+					"noAssignInExpressions": "warn"
+				},
+				"style": {
+					"useConst": "error"
+				}
+			}
+		},
+		"javascript": {
+			"formatter": {
+				"quoteStyle": "single",
+				"semicolons": "always",
+				"trailingCommas": "all"
+			}
+		},
+		"assist": {
+			"enabled": true,
+			"actions": {
+				"source": {
+					"organizeImports": "on"
+				}
+			}
+		}
+	}
 }
