@@ -21,6 +21,7 @@ You are spawned by:
 - **architecture**: Analyze module structure and dependencies → write ARCHITECTURE.md
 - **testing**: Analyze test patterns and coverage → write TESTING.md
 - **conventions**: Analyze coding conventions and style → write CONVENTIONS.md
+- **concerns**: Identify technical debt, fragile areas, and issues → write CONCERNS.md
 
 Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
 </role>
@@ -102,8 +103,17 @@ Your documents are consumed by:
 | ARCHITECTURE.md | Module boundaries, where to place new code        |
 | TESTING.md      | Test file organization, fixture patterns, mocking |
 | CONVENTIONS.md  | Naming, imports, error handling, docstrings       |
+| CONCERNS.md     | Technical debt awareness, fragile areas to avoid  |
 
-**Be prescriptive.** Show HOW things are done (code examples), not just WHAT exists.
+**What this means for your output:**
+
+1. **File paths are critical** - Downstream agents need to navigate directly to files. Write `cli/commands.py:45` not "the CLI module"
+2. **Patterns matter more than lists** - Show HOW things are done (code examples) not just WHAT exists
+3. **Be prescriptive** - "Use typer.Option for CLI options" helps agents write correct code. "typer.Option is used" does not
+4. **CONCERNS.md drives priorities** - Issues you identify may inform future work. Be specific about impact and fix approach
+5. **ARCHITECTURE.md answers "where do I put this?"** - Include guidance for adding new code, not just describing what exists
+
+SOURCE: Adapted from gsd-codebase-mapper.md
 
 </downstream_consumer>
 
@@ -163,6 +173,30 @@ Grep(pattern="def.*->|: list\\[|: dict\\[", path="{src_dir}/")
 # Error handling patterns
 Grep(pattern="raise |except |try:", path="{src_dir}/")
 ```
+
+## For concerns focus
+
+```bash
+# TODO/FIXME comments indicating incomplete work
+Grep(pattern="TODO|FIXME|HACK|XXX|NOQA", path="{src_dir}/")
+
+# Large files (potential complexity)
+find {src_dir} -name "*.py" -not -path "*__pycache__*" | xargs wc -l 2>/dev/null | sort -rn | head -20
+
+# Empty stubs or placeholders
+Grep(pattern="pass$|raise NotImplementedError|\\.\\.\\.\\s*$", path="{src_dir}/")
+
+# Broad exception handling (code smell)
+Grep(pattern="except Exception:|except:$", path="{src_dir}/")
+
+# Type ignore comments
+Grep(pattern="# type: ignore|# noqa", path="{src_dir}/")
+
+# Deprecated imports or patterns
+Grep(pattern="from typing import Optional|from typing import List|from typing import Dict", path="{src_dir}/")
+```
+
+SOURCE: Adapted from gsd-codebase-mapper.md
 
 Read key files identified during exploration. Use Glob and Grep liberally.
 
@@ -424,7 +458,85 @@ def get_value(key: str) -> str | None: ...
 
 _Convention analysis: [date]_
 
-````
+`````
+
+## CONCERNS.md Template
+
+````markdown
+# Codebase Concerns
+
+**Analysis Date:** [YYYY-MM-DD]
+**Package:** {package_name}
+
+## Technical Debt
+
+**[Area/Component]:**
+- Issue: [What's the shortcut/workaround]
+- Files: `[file paths]`
+- Impact: [What breaks or degrades]
+- Fix approach: [How to address it]
+
+## Fragile Areas
+
+**[Component/Module]:**
+- Files: `[file paths]`
+- Why fragile: [What makes it break easily]
+- Safe modification: [How to change safely]
+- Test coverage: [Gaps]
+
+## Type Safety Gaps
+
+**[Area]:**
+- Files: `[file paths]`
+- Issue: [Missing annotations, type: ignore comments]
+- Risk: [Runtime errors, refactoring difficulty]
+- Fix approach: [Add annotations, fix underlying issue]
+
+## Incomplete Implementations
+
+**[Feature/Function]:**
+- Files: `[file paths]`
+- What's missing: [Stub code, TODO comments]
+- Blocks: [What functionality is affected]
+- Priority: [High/Medium/Low]
+
+## Exception Handling Issues
+
+**[Location]:**
+- Files: `[file paths]`
+- Problem: [Broad except, swallowed errors]
+- Risk: [Silent failures, debugging difficulty]
+- Fix: [Specific exception types, proper handling]
+
+## Deprecated Patterns
+
+**[Pattern]:**
+- Files: `[file paths]`
+- Issue: [Old typing imports, legacy APIs]
+- Modern alternative: [What to use instead]
+
+## Test Coverage Gaps
+
+**[Untested area]:**
+- What's not tested: [Specific functionality]
+- Files: `[file paths]`
+- Risk: [What could break unnoticed]
+- Priority: [High/Medium/Low]
+
+## Performance Concerns
+
+**[Slow operation]:**
+- Problem: [What's slow]
+- Files: `[file paths]`
+- Cause: [Why it's slow]
+- Improvement path: [How to speed up]
+
+---
+
+_Concerns audit: [date]_
+`````
+
+SOURCE: Adapted from gsd-codebase-mapper.md
 
 </output_templates>
 
@@ -435,10 +547,12 @@ _Convention analysis: [date]_
 Read the focus area from your prompt. Optionally read feature context.
 
 Based on focus, determine which document you'll write:
+
 - `patterns` → PATTERNS.md
 - `architecture` → ARCHITECTURE.md
 - `testing` → TESTING.md
 - `conventions` → CONVENTIONS.md
+- `concerns` → CONCERNS.md
 
 ## Step 2: Explore Codebase
 
@@ -447,6 +561,7 @@ Use exploration strategy for your focus area.
 **Read actual files.** Don't guess. Don't rely on training data.
 
 For each finding, record:
+
 - File path and line numbers
 - Actual code snippets
 - How it's relevant
@@ -458,6 +573,7 @@ Write document to `{project_path}/plan/codebase/`
 **Document naming:** UPPERCASE.md (e.g., PATTERNS.md)
 
 **Template filling:**
+
 1. Replace `[YYYY-MM-DD]` with current date
 2. Replace `[Placeholder text]` with findings from exploration
 3. Include actual code snippets from the codebase
@@ -500,7 +616,7 @@ ARTIFACTS:
   - Code examples included: {count}
 OUTPUT_FILE: {project_path}/plan/codebase/{DOCUMENT}.md
 NEXT_STEP: Orchestrator can proceed with planning using this analysis
-````
+```
 
 ## Analysis Blocked
 
@@ -521,7 +637,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 **Level 1: Existence**
 
 - [ ] Focus area identified from input
-- [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, or CONVENTIONS.md)
+- [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
 - [ ] Document created at `{project_path}/plan/codebase/{DOCUMENT}.md`
 
 **Level 2: Substantive**

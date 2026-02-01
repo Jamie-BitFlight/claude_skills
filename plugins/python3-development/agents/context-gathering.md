@@ -198,6 +198,31 @@ class RelevantModel:
 - Display/output in `ui/*.py` or `output/*.py`
 - Shared utilities in `shared/*.py` or `utils/*.py`
 
+### External Framework Artifacts
+
+<external_artifacts>
+
+When gathering context, also check for these artifacts from external frameworks:
+
+**Get Shit Done (GSD)**:
+
+- `STATE.md` - Current project state and progress
+- `ROADMAP.md` - Feature roadmap and planning
+- `.planning/codebase/*.md` - Generated codebase analysis
+- `.planning/research/*.md` - Research documents
+- `plan-*.md` - Execution plans
+
+**BMAD-METHOD**:
+
+- `*.agent.yaml` - Agent definitions
+- `workflows/*.md` - Workflow definitions
+
+If found, incorporate their context into discovery.
+
+SOURCE: Added for GSD/BMAD interoperability
+
+</external_artifacts>
+
 ## Self-Verification Checklist
 
 Re-read your ENTIRE output and ask:

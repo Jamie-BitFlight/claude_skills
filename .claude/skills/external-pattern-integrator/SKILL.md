@@ -1,5 +1,5 @@
 ---
-description: 'Integrate patterns from external sources (URLs or files) into local skills, agents, and plugins. Use when: (1) comparing external agent/skill definitions against local equivalents, (2) extracting best practices from open-source frameworks like GSD or BMAD-METHOD, (3) enhancing local skills with patterns from external sources, (4) ensuring interoperability with external tool ecosystems.'
+description: 'Integrate patterns from external sources (URLs or files) into local skills, agents, and plugins. Triggers on comparing external agent definitions against local equivalents, extracting best practices from frameworks like GSD or BMAD-METHOD, enhancing local skills with external patterns, or ensuring interoperability with external tool ecosystems.'
 argument-hint: '<url-or-file> [url-or-file...]'
 user-invocable: true
 ---
