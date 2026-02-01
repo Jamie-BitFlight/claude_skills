@@ -1,7 +1,7 @@
 ---
 last-updated: 2026-02-01
 p0-count: 0
-p1-count: 6
+p1-count: 7
 p2-count: 9
 ideas-count: 6
 ---
@@ -67,6 +67,22 @@ _(Empty)_
 **Description**: Define mechanism to detect when execution diverges from plan. How does Forensic Review detect that the execution agent solved a different problem than planned?
 **Research first**: How does GSD plan-checker detect deviation? What diff/comparison techniques exist? How do code review tools detect scope creep in PRs?
 **Suggested location**: `methodology_development/stateless-software-engineering-framework.md` (section 3.6 Forensic Review)
+
+### Extract claude-plugin-lint to standalone PyPI package
+
+**Source**: Gap analysis - no existing Claude Code plugin linters exist
+**Added**: 2026-02-01
+**Description**: Extract and enhance `validate_frontmatter.py` into a standalone open-source project. First dedicated linter for Claude Code plugin frontmatter (SKILL.md, agents/*.md, commands/*.md). Official `claude plugin validate` only checks plugin.json structure.
+**Features to include**:
+- YAML frontmatter schema validation with Pydantic models
+- Auto-fix capabilities (arrays → comma-separated, multiline → single-line)
+- Token-based complexity metrics (tiktoken) instead of line counts
+- Cross-reference validation (agent references non-existent skill)
+- Marketplace readiness scoring
+- Pre-commit hook integration
+- CLI with `--fix` and `--report` modes
+**Current source**: `plugins/plugin-creator/scripts/validate_frontmatter.py`
+**Suggested repo name**: `claude-plugin-lint` or `cc-plugin-validator`
 
 ---
 
