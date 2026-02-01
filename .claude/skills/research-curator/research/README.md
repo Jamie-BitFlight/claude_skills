@@ -23,10 +23,11 @@ Resources researched for future reference in Claude Code development.
 
 ## Agent Frameworks
 
-| Resource                               | Description                                                           | Stars  | Research Date |
-| -------------------------------------- | --------------------------------------------------------------------- | ------ | ------------- |
-| [Agno](./agent-frameworks/agno.md)     | Multi-agent framework with learning, 40+ models, MCP support          | 37,379 | 2026-01-31    |
-| [RA.Aid](./agent-frameworks/ra-aid.md) | Autonomous software dev assistant with Research-Plan-Implement stages | 2,204  | 2026-01-31    |
+| Resource                                           | Description                                                           | Stars  | Research Date |
+| -------------------------------------------------- | --------------------------------------------------------------------- | ------ | ------------- |
+| [Agno](./agent-frameworks/agno.md)                 | Multi-agent framework with learning, 40+ models, MCP support          | 37,379 | 2026-01-31    |
+| [BMAD-METHOD](./agent-frameworks/bmad-method.md)   | AI-driven agile framework with 21 agents, 50+ workflows, Party Mode   | 33,343 | 2026-02-01    |
+| [RA.Aid](./agent-frameworks/ra-aid.md)             | Autonomous software dev assistant with Research-Plan-Implement stages | 2,204  | 2026-01-31    |
 
 ---
 

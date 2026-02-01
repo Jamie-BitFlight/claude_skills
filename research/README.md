@@ -171,6 +171,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | Document                                                              | Description                                                                                                                            | Last Updated |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | [ai-agents-frameworks.md](./agent-frameworks/ai-agents-frameworks.md) | Comparative learning repository for 10 AI agent frameworks with benchmarks for response time, memory, tokens, RAG, and API integration | 2026-01-31   |
+| [get-shit-done.md](./agent-frameworks/get-shit-done.md)               | Meta-prompting, context engineering, and spec-driven development system with 11 agents for Claude Code, OpenCode, Gemini (10K+ stars)  | 2026-02-01   |
 | [superpowers.md](./agent-frameworks/superpowers.md)                   | Agentic skills framework with 14 skills for TDD, debugging, and subagent-driven development - works with Claude Code, Codex, OpenCode  | 2026-01-31   |
 
 **Key Topics**:
@@ -185,6 +186,14 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 - Skill triggering patterns and description optimization
 - Fresh context per task to prevent pollution
 - DOT flowcharts as executable specifications
+- Context rot mitigation via subagent spawning
+- XML-structured task specifications with explicit verification
+- File-based state management (STATE.md, ROADMAP.md patterns)
+- Parallel execution waves with dependency ordering
+- Atomic git commits per completed task
+- Model profile configuration (quality/balanced/budget)
+- Orchestrator-worker separation pattern
+- Spec-driven development with plan-verify loops
 
 ---
 
@@ -473,6 +482,7 @@ When adding new research:
 - [Awesome Claude Code Subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) - 5,616 stars
 - [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) - 76,332 stars
 - [Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin) - Plan/Work/Review/Compound workflow (6,830 stars)
+- [Get Shit Done](https://github.com/glittercowboy/get-shit-done) - Meta-prompting and spec-driven development (10,193 stars)
 - [Skill Seekers](https://skillseekersweb.com/) - Documentation to AI skills
 - [OpenHands](https://openhands.dev) - Open platform for cloud coding agents (67,108 stars)
 - [Claude Task Master](https://task-master.dev) - AI-powered task management (25,062 stars)
