@@ -213,7 +213,13 @@ _(Move items here when done, with completion date)_
 
 ### Research Resources
 
-Existing SAM comparisons (start here for competitive analysis):
+**Skill for research phase**: `/research-and-compare <methodology-name-or-url>`
+
+- Produces structured comparison documents following SAM comparison template
+- Includes overlap/divergence analysis, weakness discovery, implementation pairing
+- Outputs to `methodology_development/.meta/v1_comparisons/`
+
+**Existing SAM comparisons** (start here before running new research):
 
 - [methodology_development/.meta/v1_comparisons/](../methodology_development/.meta/v1_comparisons/)
   - sam-vs-get-shit-done.md
@@ -226,3 +232,10 @@ Existing SAM comparisons (start here for competitive analysis):
   - sam-vs-cc-sessions.md
   - sam-vs-v-model.md
   - sam-infrastructure-layer.md
+
+**Workflow for SAM gap items**:
+
+1. Check existing comparisons for relevant findings
+2. If more research needed: `/research-and-compare <framework>` for specific topics
+3. Synthesize findings into SAM framework update
+4. Mark backlog item complete
