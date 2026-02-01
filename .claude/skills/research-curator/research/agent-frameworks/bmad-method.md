@@ -36,14 +36,14 @@ BMAD-METHOD (Breakthrough Method of Agile AI-Driven Development) is an AI-driven
 
 | Metric           | Value           | Date Gathered |
 | ---------------- | --------------- | ------------- |
-| GitHub Stars     | 33,343          | 2026-02-01    |
-| GitHub Forks     | 4,285           | 2026-02-01    |
+| GitHub Stars     | 33,347          | 2026-02-01    |
+| GitHub Forks     | 4,286           | 2026-02-01    |
 | Watchers         | 348             | 2026-02-01    |
-| Open Issues      | 65              | 2026-02-01    |
-| Contributors     | 30              | 2026-02-01    |
+| Open Issues      | 62              | 2026-02-01    |
+| Contributors     | 100+            | 2026-02-01    |
 | Primary Language | JavaScript      | 2026-02-01    |
 | Created          | 2025-04-13      | 2026-02-01    |
-| Last Updated     | 2026-01-31      | 2026-02-01    |
+| Last Updated     | 2026-02-01      | 2026-02-01    |
 
 ---
 
@@ -301,9 +301,9 @@ npx bmad-method install
 | Field              | Value                               |
 | ------------------ | ----------------------------------- |
 | Version Documented | 6.0.0-Beta.4                        |
-| Last Commit        | 2026-01-31                          |
-| GitHub Stars       | 33,343 (as of 2026-02-01)           |
-| Contributors       | 30 (as of 2026-02-01)               |
+| Last Commit        | 2026-02-01                          |
+| GitHub Stars       | 33,347 (as of 2026-02-01)           |
+| Contributors       | 100+ (as of 2026-02-01)             |
 | Next Review Date   | 2026-05-01                          |
 
 **Review Triggers**:
