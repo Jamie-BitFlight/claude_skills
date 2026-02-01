@@ -61,10 +61,9 @@ repos:
         name: Format Python with ruff
   # JavaScript/TypeScript formatting and linting with Biome
   - repo: https://github.com/biomejs/pre-commit
-    rev: "v2.0.6"
+    rev: "v2.3.13"
     hooks:
       - id: biome-check
-        additional_dependencies: ["@biomejs/biome@2.3.13"]
         exclude: \.json$
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
