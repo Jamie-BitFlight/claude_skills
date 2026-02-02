@@ -82,6 +82,86 @@ CONTEXT:
 
 </delegation_path_rules>
 
+### Sub-Agent Selection Rules
+
+<sub_agent_selection>
+
+**CRITICAL: Never use the Explore agent for codebase exploration or contextual questions.**
+
+The Explore agent uses Haiku, which has a ~50% hallucination rate on ambiguous queries. Experimental testing (2026-02-02) demonstrated:
+
+| Agent | Accuracy on Contextual Questions |
+| ----- | -------------------------------- |
+| Explore | 2/4 correct (grabbed wrong scope, gave up early) |
+| context-gathering | 4/4 correct (disambiguated correctly, searched thoroughly) |
+
+**Observed Failure Modes with Explore:**
+
+1. **Semantic ambiguity** - "hooks" matched pre-commit hooks instead of Claude Code hooks
+2. **Premature termination** - declared "not found" instead of searching deeper
+3. **Fabricated implementations** - suggested bash scripts when repo convention is Python/JavaScript
+
+**Agent Selection Matrix:**
+
+| Task Type | Correct Agent | Wrong Agent |
+| --------- | ------------- | ----------- |
+| Codebase exploration | context-gathering | Explore |
+| Contextual questions | context-gathering | Explore |
+| Finding specific files by pattern | Explore (acceptable) | - |
+| Exact keyword search | Explore (acceptable) | - |
+| Interpretation/analysis | context-gathering, claude-context-optimizer | Explore |
+| Recommendations grounded in repo conventions | context-gathering | Explore |
+
+**The model MUST use context-gathering instead of Explore when:**
+
+- The task requires understanding repo conventions
+- The query has semantic ambiguity
+- The answer requires interpretation, not just retrieval
+- Recommendations must be grounded in existing patterns
+
+**SOURCE**: Experimental validation in conversation (2026-02-02). Tested 4 questions with both agents. Context-gathering correctly disambiguated and found evidence in all cases; Explore failed on 2/4 due to semantic confusion and incomplete search.
+
+</sub_agent_selection>
+
+### Language Conventions for Skill Components
+
+<skill_component_languages>
+
+**Established through experimental validation (2026-02-02):**
+
+| Component Type | Required Language | Evidence |
+| -------------- | ----------------- | -------- |
+| Claude Code hooks | JavaScript (Node.js) | 9 existing hooks in `.claude/hooks/` and `sessions/hooks/` |
+| Companion scripts | Python 3.11+ with PEP 723 | 27+ scripts in `plugins/**/scripts/` |
+| Pre-commit hooks | Python 3.11+ | `auto-sync-manifests.py`, `validate_frontmatter.py` |
+
+**JavaScript Hook Pattern** (from `.claude/hooks/session-start-backlog.js`):
+
+```javascript
+#!/usr/bin/env node
+const fs = require('node:fs');
+// ... implementation
+console.log(JSON.stringify({ hookSpecificOutput: { ... } }));
+```
+
+**Python Script Pattern** (from `plugins/plugin-creator/scripts/create_plugin.py`):
+
+```python
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["typer>=0.21.0"]
+# ///
+```
+
+**The model MUST NOT suggest bash scripts** for hooks or companion scripts in this repository. Bash is only acceptable for:
+
+- Simple CI/CD wrappers
+- POSIX compatibility layers
+- Existing legacy scripts (do not create new ones)
+
+</skill_component_languages>
+
 ---
 
 ## Path Fidelity Rule
