@@ -2,7 +2,7 @@
 name: ecosystem-researcher
 description: Researches domain ecosystems and technology landscapes before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, and Comparison analysis. Use when exploring new domains, evaluating technology choices, or comparing implementation approaches. Requires MCP research servers (Ref, exa, context7, or firecrawl) - BLOCKs if none available.
 permissionMode: plan
-tools: Read, Grep, Glob, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__search, mcp__exa__get_contents, mcp__context7__search, mcp__context7__get_library_docs, mcp__firecrawl__scrape, mcp__firecrawl__search
+tools: Read, Grep, Glob, mcp__ref__*, mcp__exa__*, mcp__context7__*, mcp__firecrawl__*
 skills: subagent-contract
 model: sonnet
 color: blue
@@ -118,12 +118,12 @@ Research value comes from accuracy, not comprehensiveness theater.
 
 **Before any research, check that at least ONE of these MCP servers is available:**
 
-| MCP Server | Tools to Check | Purpose |
-|------------|----------------|---------|
-| **Ref** | `mcp__Ref__ref_search_documentation`, `mcp__Ref__ref_read_url` | Indexed documentation search |
-| **exa** | `mcp__exa__search`, `mcp__exa__get_contents` | Web search with content extraction |
-| **context7** | `mcp__context7__search`, `mcp__context7__get_library_docs` | Library documentation lookup |
-| **firecrawl** | `mcp__firecrawl__scrape`, `mcp__firecrawl__search` | Web scraping and search |
+| MCP Server | Tool Pattern | Purpose |
+|------------|--------------|---------|
+| **ref** | `mcp__ref__*` | Indexed documentation search |
+| **exa** | `mcp__exa__*` | Web search with content extraction |
+| **context7** | `mcp__context7__*` | Library documentation lookup |
+| **firecrawl** | `mcp__firecrawl__*` | Web scraping and search |
 
 **How to check**: Attempt a simple query with each tool type. If the tool returns "No such tool available" or similar error, mark that server as unavailable.
 
@@ -154,20 +154,16 @@ When researching a topic, use MCP tools in this priority order:
 
 ```text
 1. context7 (if available) - Best for library/framework documentation
-   └── mcp__context7__search           - Find relevant libraries
-   └── mcp__context7__get_library_docs - Get official documentation
+   └── mcp__context7__*
 
-2. Ref (if available) - Good for indexed documentation
-   └── mcp__Ref__ref_search_documentation  - Search indexed docs
-   └── mcp__Ref__ref_read_url              - Read specific URLs
+2. ref (if available) - Good for indexed documentation
+   └── mcp__ref__*
 
 3. exa (if available) - Web search with content extraction
-   └── mcp__exa__search       - Search the web
-   └── mcp__exa__get_contents - Extract page contents
+   └── mcp__exa__*
 
 4. firecrawl (if available) - Web scraping fallback
-   └── mcp__firecrawl__search - Search the web
-   └── mcp__firecrawl__scrape - Scrape specific pages
+   └── mcp__firecrawl__*
 
 5. Cross-Verification
    └── Verify claims from multiple MCP sources when possible
