@@ -1,7 +1,7 @@
 ---
-last-updated: 2026-02-01
+last-updated: 2026-02-05
 p0-count: 0
-p1-count: 7
+p1-count: 6
 p2-count: 9
 ideas-count: 6
 ---
@@ -19,14 +19,6 @@ _(Empty)_
 ---
 
 ## P1 - Should Have
-
-### Create ecosystem-researcher agent
-
-**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
-**Added**: 2026-02-01
-**Description**: New agent for ecosystem/domain research before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, Comparison analysis.
-**Patterns from**: gsd-project-researcher.md (research modes)
-**Suggested location**: `plugins/python3-development/agents/ecosystem-researcher.md`
 
 ### SAM: Error Recovery / Rollback Procedures
 
@@ -210,7 +202,13 @@ _(Empty)_
 
 ## Completed
 
-_(Move items here when done, with completion date)_
+### Create ecosystem-researcher agent
+
+**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
+**Completed**: 2026-02-05
+**Description**: New agent for ecosystem/domain research before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, Comparison analysis.
+**Patterns from**: gsd-project-researcher.md (research modes)
+**Location**: `plugins/python3-development/agents/ecosystem-researcher.md`
 
 ---
 

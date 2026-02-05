@@ -44,6 +44,7 @@
     "./agents/python-pytest-architect.md",
     "./agents/swarm-task-planner.md",
     "./agents/feature-researcher.md",
+    "./agents/ecosystem-researcher.md",
     "./agents/codebase-analyzer.md",
     "./agents/plan-validator.md",
     "./agents/context-gathering.md",
