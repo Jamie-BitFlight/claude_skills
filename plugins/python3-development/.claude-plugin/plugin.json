@@ -45,6 +45,7 @@
     "./agents/swarm-task-planner.md",
     "./agents/feature-researcher.md",
     "./agents/ecosystem-researcher.md",
+    "./agents/ecosystem-researcher-v1.1-rt-ica.md",
     "./agents/codebase-analyzer.md",
     "./agents/plan-validator.md",
     "./agents/context-gathering.md",
