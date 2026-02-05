@@ -149,7 +149,11 @@ https://claude.ai/code/CURRENT_SESSION_ID"
 - Body: Brief summary of what was documented
 - Footer: Session link for traceability
 
-**Do NOT push** - leave pushing to the user or orchestrating agent.
+**Then push** to the current branch:
+
+```bash
+git push -u origin HEAD
+```
 
 ---
 
