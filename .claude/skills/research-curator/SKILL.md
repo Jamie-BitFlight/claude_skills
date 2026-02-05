@@ -124,6 +124,32 @@ Before reporting done:
 - [ ] Statistics are current (gathered during this session)
 - [ ] `./research/README.md` updated with new entry
 - [ ] Next review date set (3 months from today)
+- [ ] Changes committed to git (see Auto-Commit section)
+
+---
+
+## Auto-Commit
+
+After creating/updating the research entry, automatically commit the changes:
+
+```bash
+git add ./research/README.md ./research/{category}/{resource-name}.md
+git commit -m "docs(research): add {Resource Name} research entry
+
+- Add comprehensive documentation for {Resource Name}
+- Category: {category}
+- Key topics: {brief list of main topics covered}
+
+https://claude.ai/code/CURRENT_SESSION_ID"
+```
+
+**Commit Message Format**:
+
+- Subject: `docs(research): add {Resource Name} research entry`
+- Body: Brief summary of what was documented
+- Footer: Session link for traceability
+
+**Do NOT push** - leave pushing to the user or orchestrating agent.
 
 ---
 
