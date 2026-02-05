@@ -1,6 +1,6 @@
 ---
 description: Browser automation CLI for AI agents. Use when the user needs to interact with websites, including navigating pages, filling forms, clicking buttons, taking screenshots, extracting data, testing web apps, or automating any browser task. Triggers include requests to "open a website", "fill out a form", "click a button", "take a screenshot", "scrape data from a page", "test this web app", "login to a site", "automate browser actions", or any task requiring programmatic web interaction.
-allowed-tools: Bash(agent-browser:*)
+allowed-tools: Bash(npx agent-browser:*)
 ---
 # Browser Automation with agent-browser
 
@@ -8,58 +8,58 @@ allowed-tools: Bash(agent-browser:*)
 
 Every browser automation follows this pattern:
 
-1. **Navigate**: `agent-browser open <url>`
-2. **Snapshot**: `agent-browser snapshot -i` (get element refs like `@e1`, `@e2`)
+1. **Navigate**: `npx agent-browser open <url>`
+2. **Snapshot**: `npx agent-browser snapshot -i` (get element refs like `@e1`, `@e2`)
 3. **Interact**: Use refs to click, fill, select
 4. **Re-snapshot**: After navigation or DOM changes, get fresh refs
 
 ```bash
-agent-browser open https://example.com/form
-agent-browser snapshot -i
+npx agent-browser open https://example.com/form
+npx agent-browser snapshot -i
 # Output: @e1 [input type="email"], @e2 [input type="password"], @e3 [button] "Submit"
 
-agent-browser fill @e1 "user@example.com"
-agent-browser fill @e2 "password123"
-agent-browser click @e3
-agent-browser wait --load networkidle
-agent-browser snapshot -i  # Check result
+npx agent-browser fill @e1 "user@example.com"
+npx agent-browser fill @e2 "password123"
+npx agent-browser click @e3
+npx agent-browser wait --load networkidle
+npx agent-browser snapshot -i  # Check result
 ```
 
 ## Essential Commands
 
 ```bash
 # Navigation
-agent-browser open <url>              # Navigate (aliases: goto, navigate)
-agent-browser close                   # Close browser
+npx agent-browser open <url>              # Navigate (aliases: goto, navigate)
+npx agent-browser close                   # Close browser
 
 # Snapshot
-agent-browser snapshot -i             # Interactive elements with refs (recommended)
-agent-browser snapshot -s "#selector" # Scope to CSS selector
+npx agent-browser snapshot -i             # Interactive elements with refs (recommended)
+npx agent-browser snapshot -s "#selector" # Scope to CSS selector
 
 # Interaction (use @refs from snapshot)
-agent-browser click @e1               # Click element
-agent-browser fill @e2 "text"         # Clear and type text
-agent-browser type @e2 "text"         # Type without clearing
-agent-browser select @e1 "option"     # Select dropdown option
-agent-browser check @e1               # Check checkbox
-agent-browser press Enter             # Press key
-agent-browser scroll down 500         # Scroll page
+npx agent-browser click @e1               # Click element
+npx agent-browser fill @e2 "text"         # Clear and type text
+npx agent-browser type @e2 "text"         # Type without clearing
+npx agent-browser select @e1 "option"     # Select dropdown option
+npx agent-browser check @e1               # Check checkbox
+npx agent-browser press Enter             # Press key
+npx agent-browser scroll down 500         # Scroll page
 
 # Get information
-agent-browser get text @e1            # Get element text
-agent-browser get url                 # Get current URL
-agent-browser get title               # Get page title
+npx agent-browser get text @e1            # Get element text
+npx agent-browser get url                 # Get current URL
+npx agent-browser get title               # Get page title
 
 # Wait
-agent-browser wait @e1                # Wait for element
-agent-browser wait --load networkidle # Wait for network idle
-agent-browser wait --url "**/page"    # Wait for URL pattern
-agent-browser wait 2000               # Wait milliseconds
+npx agent-browser wait @e1                # Wait for element
+npx agent-browser wait --load networkidle # Wait for network idle
+npx agent-browser wait --url "**/page"    # Wait for URL pattern
+npx agent-browser wait 2000               # Wait milliseconds
 
 # Capture
-agent-browser screenshot              # Screenshot to temp dir
-agent-browser screenshot --full       # Full page screenshot
-agent-browser pdf output.pdf          # Save as PDF
+npx agent-browser screenshot              # Screenshot to temp dir
+npx agent-browser screenshot --full       # Full page screenshot
+npx agent-browser pdf output.pdf          # Save as PDF
 ```
 
 ## Common Patterns
@@ -67,86 +67,86 @@ agent-browser pdf output.pdf          # Save as PDF
 ### Form Submission
 
 ```bash
-agent-browser open https://example.com/signup
-agent-browser snapshot -i
-agent-browser fill @e1 "Jane Doe"
-agent-browser fill @e2 "jane@example.com"
-agent-browser select @e3 "California"
-agent-browser check @e4
-agent-browser click @e5
-agent-browser wait --load networkidle
+npx agent-browser open https://example.com/signup
+npx agent-browser snapshot -i
+npx agent-browser fill @e1 "Jane Doe"
+npx agent-browser fill @e2 "jane@example.com"
+npx agent-browser select @e3 "California"
+npx agent-browser check @e4
+npx agent-browser click @e5
+npx agent-browser wait --load networkidle
 ```
 
 ### Authentication with State Persistence
 
 ```bash
 # Login once and save state
-agent-browser open https://app.example.com/login
-agent-browser snapshot -i
-agent-browser fill @e1 "$USERNAME"
-agent-browser fill @e2 "$PASSWORD"
-agent-browser click @e3
-agent-browser wait --url "**/dashboard"
-agent-browser state save auth.json
+npx agent-browser open https://app.example.com/login
+npx agent-browser snapshot -i
+npx agent-browser fill @e1 "$USERNAME"
+npx agent-browser fill @e2 "$PASSWORD"
+npx agent-browser click @e3
+npx agent-browser wait --url "**/dashboard"
+npx agent-browser state save auth.json
 
 # Reuse in future sessions
-agent-browser state load auth.json
-agent-browser open https://app.example.com/dashboard
+npx agent-browser state load auth.json
+npx agent-browser open https://app.example.com/dashboard
 ```
 
 ### Data Extraction
 
 ```bash
-agent-browser open https://example.com/products
-agent-browser snapshot -i
-agent-browser get text @e5           # Get specific element text
-agent-browser get text body > page.txt  # Get all page text
+npx agent-browser open https://example.com/products
+npx agent-browser snapshot -i
+npx agent-browser get text @e5           # Get specific element text
+npx agent-browser get text body > page.txt  # Get all page text
 
 # JSON output for parsing
-agent-browser snapshot -i --json
-agent-browser get text @e1 --json
+npx agent-browser snapshot -i --json
+npx agent-browser get text @e1 --json
 ```
 
 ### Parallel Sessions
 
 ```bash
-agent-browser --session site1 open https://site-a.com
-agent-browser --session site2 open https://site-b.com
+npx agent-browser --session site1 open https://site-a.com
+npx agent-browser --session site2 open https://site-b.com
 
-agent-browser --session site1 snapshot -i
-agent-browser --session site2 snapshot -i
+npx agent-browser --session site1 snapshot -i
+npx agent-browser --session site2 snapshot -i
 
-agent-browser session list
+npx agent-browser session list
 ```
 
 ### Visual Browser (Debugging)
 
 ```bash
-agent-browser --headed open https://example.com
-agent-browser highlight @e1          # Highlight element
-agent-browser record start demo.webm # Record session
+npx agent-browser --headed open https://example.com
+npx agent-browser highlight @e1          # Highlight element
+npx agent-browser record start demo.webm # Record session
 ```
 
 ### iOS Simulator (Mobile Safari)
 
 ```bash
 # List available iOS simulators
-agent-browser device list
+npx agent-browser device list
 
 # Launch Safari on a specific device
-agent-browser -p ios --device "iPhone 16 Pro" open https://example.com
+npx agent-browser -p ios --device "iPhone 16 Pro" open https://example.com
 
 # Same workflow as desktop - snapshot, interact, re-snapshot
-agent-browser -p ios snapshot -i
-agent-browser -p ios tap @e1          # Tap (alias for click)
-agent-browser -p ios fill @e2 "text"
-agent-browser -p ios swipe up         # Mobile-specific gesture
+npx agent-browser -p ios snapshot -i
+npx agent-browser -p ios tap @e1          # Tap (alias for click)
+npx agent-browser -p ios fill @e2 "text"
+npx agent-browser -p ios swipe up         # Mobile-specific gesture
 
 # Take screenshot
-agent-browser -p ios screenshot mobile.png
+npx agent-browser -p ios screenshot mobile.png
 
 # Close session (shuts down simulator)
-agent-browser -p ios close
+npx agent-browser -p ios close
 ```
 
 **Requirements:** macOS with Xcode, Appium (`npm install -g appium && appium driver install xcuitest`)
@@ -162,9 +162,9 @@ Refs (`@e1`, `@e2`, etc.) are invalidated when the page changes. Always re-snaps
 - Dynamic content loading (dropdowns, modals)
 
 ```bash
-agent-browser click @e5              # Navigates to new page
-agent-browser snapshot -i            # MUST re-snapshot
-agent-browser click @e1              # Use new refs
+npx agent-browser click @e5              # Navigates to new page
+npx agent-browser snapshot -i            # MUST re-snapshot
+npx agent-browser click @e1              # Use new refs
 ```
 
 ## Semantic Locators (Alternative to Refs)
@@ -172,11 +172,11 @@ agent-browser click @e1              # Use new refs
 When refs are unavailable or unreliable, use semantic locators:
 
 ```bash
-agent-browser find text "Sign In" click
-agent-browser find label "Email" fill "user@test.com"
-agent-browser find role button click --name "Submit"
-agent-browser find placeholder "Search" type "query"
-agent-browser find testid "submit-btn" click
+npx agent-browser find text "Sign In" click
+npx agent-browser find label "Email" fill "user@test.com"
+npx agent-browser find role button click --name "Submit"
+npx agent-browser find placeholder "Search" type "query"
+npx agent-browser find testid "submit-btn" click
 ```
 
 ## Deep-Dive Documentation
