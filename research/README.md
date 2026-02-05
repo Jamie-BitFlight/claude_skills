@@ -18,6 +18,8 @@ research/
 │   └── plano.md                       # AI-native proxy and data plane for multi-agent orchestration
 ├── async-libraries/                   # Python async I/O libraries and concurrency frameworks
 │   └── trio.md                        # Structured concurrency async library for Python (7K+ stars)
+├── ml-infrastructure/                 # ML compute engines and model serving platforms
+│   └── ray.md                         # AI compute engine for scaling Python/ML workloads (41K+ stars)
 ├── code-auditing/                     # Code security and quality auditing tools
 │   └── hound.md                       # Autonomous AI security auditor with knowledge graphs
 ├── coding-agents/                     # Autonomous AI coding agent platforms
@@ -397,6 +399,33 @@ Python async I/O libraries and concurrency frameworks for building concurrent ap
 
 ---
 
+### 13. ML Infrastructure
+
+**Location**: [./ml-infrastructure/](./ml-infrastructure/)
+
+ML compute engines, model serving platforms, and distributed computing infrastructure for AI workloads.
+
+| Document                           | Description                                                                                                | Last Updated |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ |
+| [ray.md](./ml-infrastructure/ray.md) | Ray - AI compute engine for scaling Python/ML applications with LLM serving and MCP server deployment (41K+ stars) | 2026-02-05   |
+
+**Key Topics**:
+
+- Distributed computing primitives (Tasks, Actors, Objects)
+- Ray Serve for scalable model serving and LLM inference
+- Native MCP server deployment (Streamable HTTP, STDIO conversion)
+- Ray Data for streaming, distributed data processing
+- Ray Train for distributed ML training (PyTorch, Transformers, XGBoost)
+- Ray Tune for hyperparameter optimization at scale
+- RLlib for reinforcement learning
+- Kubernetes-native deployment with KubeRay
+- GPU scheduling and placement groups
+- Fault tolerance with lineage-based reconstruction
+- vLLM integration for high-throughput LLM serving
+- Zero-copy data sharing via plasma object store
+
+---
+
 ## Planned Categories
 
 The following categories are planned for future research:
@@ -414,6 +443,7 @@ The following categories are planned for future research:
 | `developer-tools/`      | Developer productivity and workflow tools          | **Done** |
 | `coding-agents/`        | Autonomous AI coding agent platforms               | **Done** |
 | `task-management/`      | AI-powered task management for development         | **Done** |
+| `ml-infrastructure/`    | ML compute engines and model serving platforms     | **Done** |
 | `evaluation-testing/`   | Agent evaluation and testing tools                 | Planned  |
 
 ---
@@ -523,6 +553,7 @@ When adding new research:
 - [Repomix](https://repomix.com) - Pack codebase into AI-friendly formats (21,597 stars)
 - [Superpowers](https://github.com/obra/superpowers) - Agentic skills framework and software development methodology (40,911 stars)
 - [Trio](https://github.com/python-trio/trio) - Structured concurrency async library for Python (7,143 stars)
+- [Ray](https://github.com/ray-project/ray) - AI compute engine for scaling Python/ML workloads (41,140 stars)
 
 ### Internal References
 
