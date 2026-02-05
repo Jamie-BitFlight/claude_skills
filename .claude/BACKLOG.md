@@ -3,7 +3,7 @@ last-updated: 2026-02-05
 p0-count: 0
 p1-count: 6
 p2-count: 9
-ideas-count: 6
+ideas-count: 7
 ---
 
 # Backlog
@@ -197,6 +197,18 @@ _(Empty)_
 **Added**: 2026-02-01
 **Description**: Explore how SAM handles documentation-only tasks, configuration changes, infrastructure work. Adapt templates?
 **Research first**: How do GSD and BMAD-METHOD handle non-code work? What artifact types exist beyond code?
+
+### Carbonyl Browser Integration for Claude Code
+
+**Source**: Session experimentation 2026-02-05
+**Added**: 2026-02-05
+**Description**: Research whether carbonyl (terminal Chromium browser) can work with Claude Code for reliable web content extraction. Carbonyl renders pages in terminal but needs a TTY.
+**Research areas**:
+- Can carbonyl run via tmux/screen/script to provide a pseudo-TTY?
+- Could carbonyl be wrapped with a screenshot tool (e.g., termshot, asciinema) that passes images back to Claude?
+- What's the minimal TTY setup needed for headless carbonyl operation?
+- Compare with is-fast, lynx, w3m for text extraction capabilities
+**Context**: WebFetch is unreliable (summarizing agents hallucinate), Playwright requires browser downloads that may be blocked. Carbonyl is self-contained but needs TTY.
 
 ---
 
