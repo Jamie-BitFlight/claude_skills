@@ -130,7 +130,15 @@ Before reporting done:
 
 ## Auto-Commit
 
-After creating/updating the research entry, automatically commit the changes:
+After creating/updating the research entry:
+
+**1. Run linting/formatting** and apply any fixes:
+
+```bash
+uv run prek run --files ./research/README.md ./research/{category}/{resource-name}.md
+```
+
+**2. Commit the changes**:
 
 ```bash
 git add ./research/README.md ./research/{category}/{resource-name}.md
