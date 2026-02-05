@@ -16,10 +16,19 @@ research/
 │   └── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
 ├── agent-infrastructure/              # Infrastructure for agentic applications
 │   └── plano.md                       # AI-native proxy and data plane for multi-agent orchestration
+├── api-frameworks/                    # High-performance API frameworks for backend services
+│   ├── fastapi.md                     # Modern Python web framework with Pydantic (95K+ stars)
+│   └── tornado.md                     # Python web framework and async networking library (22K+ stars)
 ├── async-libraries/                   # Python async I/O libraries and concurrency frameworks
 │   └── trio.md                        # Structured concurrency async library for Python (7K+ stars)
 ├── ml-infrastructure/                 # ML compute engines and model serving platforms
 │   └── ray.md                         # AI compute engine for scaling Python/ML workloads (41K+ stars)
+├── python-runtimes/                   # Alternative Python interpreters and runtimes
+│   └── rustpython.md                  # Python 3 interpreter written in Rust with WASM support (22K+ stars)
+├── rust-python-bindings/              # Rust-Python interoperability and binding libraries
+│   └── pyo3.md                        # Rust bindings for Python with maturin build tooling (15K+ stars)
+├── ai-observability/                  # AI/LLM observability and debugging platforms
+│   └── logfire.md                     # Pydantic Logfire - full-stack AI observability with MCP (4K+ stars)
 ├── code-auditing/                     # Code security and quality auditing tools
 │   └── hound.md                       # Autonomous AI security auditor with knowledge graphs
 ├── coding-agents/                     # Autonomous AI coding agent platforms
@@ -229,7 +238,40 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 
 ---
 
-### 7. Developer Tools
+### 7. API Frameworks
+
+**Location**: [./api-frameworks/](./api-frameworks/)
+
+High-performance API frameworks for building backend services, tool endpoints, and MCP server foundations.
+
+| Document                                   | Description                                                                                               | Last Updated |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------ |
+| [fastapi.md](./api-frameworks/fastapi.md)  | Modern Python web framework with Pydantic validation, automatic OpenAPI docs, async support (95K+ stars)  | 2026-02-05   |
+| [tornado.md](./api-frameworks/tornado.md)  | Python web framework and async networking library for WebSockets and long-polling (22K+ stars, 95M+ downloads/month) | 2026-02-05   |
+
+**Key Topics**:
+
+- Python type hint-based API development
+- Automatic OpenAPI/Swagger documentation generation
+- Pydantic v2 data validation and serialization
+- Async/await native support with Starlette ASGI
+- Dependency injection patterns
+- OAuth2/JWT security utilities
+- FastMCP foundation for MCP servers
+- Ray Serve integration for model serving
+- WebSocket support for real-time communication
+- Non-blocking network I/O for C10K concurrent connections
+- Long polling and real-time streaming support
+- Single-threaded event loop with asyncio integration
+- Class-based request handlers with HTTP method dispatching
+- WebSocket server/client with ping/pong and compression
+- Built-in template engine with inheritance and escaping
+- Jupyter notebook server foundation
+- run_in_executor bridge for blocking operations
+
+---
+
+### 8. Developer Tools
 
 **Location**: [./developer-tools/](./developer-tools/)
 
@@ -285,7 +327,7 @@ Developer productivity tools and workflow automation for software engineering wi
 
 ---
 
-### 8. Coding Agents
+### 9. Coding Agents
 
 **Location**: [./coding-agents/](./coding-agents/)
 
@@ -308,7 +350,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 
 ---
 
-### 9. Data Infrastructure
+### 10. Data Infrastructure
 
 **Location**: [./data-infrastructure/](./data-infrastructure/)
 
@@ -331,7 +373,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 
 ---
 
-### 10. Task Management
+### 11. Task Management
 
 **Location**: [./task-management/](./task-management/)
 
@@ -353,7 +395,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 
 ---
 
-### 11. Context Management
+### 12. Context Management
 
 **Location**: [./context-management/](./context-management/)
 
@@ -376,7 +418,7 @@ Memory systems, context window optimization tools, and RAG solutions for maintai
 
 ---
 
-### 12. Async Libraries
+### 13. Async Libraries
 
 **Location**: [./async-libraries/](./async-libraries/)
 
@@ -399,7 +441,7 @@ Python async I/O libraries and concurrency frameworks for building concurrent ap
 
 ---
 
-### 13. ML Infrastructure
+### 14. ML Infrastructure
 
 **Location**: [./ml-infrastructure/](./ml-infrastructure/)
 
@@ -426,6 +468,81 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 
 ---
 
+### 15. Python Runtimes
+
+**Location**: [./python-runtimes/](./python-runtimes/)
+
+Alternative Python interpreters and runtime implementations for specialized use cases.
+
+| Document                                   | Description                                                                                                         | Last Updated |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| [rustpython.md](./python-runtimes/rustpython.md) | RustPython - Python 3 interpreter written in Rust with WASM support, JIT compiler, and Rust embedding (22K+ stars) | 2026-02-05   |
+
+**Key Topics**:
+
+- Python interpreter implementation in Rust
+- WebAssembly (WASI) compilation for browser/portable execution
+- Embedding Python scripting in Rust applications
+- Experimental JIT compiler for native code generation
+- Parser shared with Ruff linter (ruff_python_parser)
+- CPython 3.14.0+ compatibility target
+- Sandboxed code execution via WASM isolation
+- Feature flag architecture for configurable builds
+- pip and venv support for package management
+- Cross-platform single-binary deployment
+
+---
+
+### 16. AI Observability
+
+**Location**: [./ai-observability/](./ai-observability/)
+
+AI-native observability platforms for monitoring, debugging, and optimizing LLM applications and agent systems.
+
+| Document                                   | Description                                                                                                         | Last Updated |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| [logfire.md](./ai-observability/logfire.md) | Pydantic Logfire - full-stack AI observability with OpenTelemetry, MCP server for SQL queries, token/cost tracking | 2026-02-05   |
+
+**Key Topics**:
+
+- Full-stack OpenTelemetry tracing (AI + backend combined)
+- LLM conversation panels with tool call inspection
+- Token tracking and cost monitoring across providers
+- SQL-queryable telemetry (PostgreSQL-compatible syntax)
+- MCP server for AI agents to query production data
+- Native integrations: Pydantic AI, OpenAI, Anthropic, Claude Agent SDK, LangChain
+- Streaming response debugging with chunk-level visibility
+- Code-first evaluations via pydantic-evals (version-controlled, CI-integrated)
+- Database/HTTP client/web framework instrumentation
+- Real-time live view dashboard with natural language search
+
+---
+
+### 17. Rust-Python Bindings
+
+**Location**: [./rust-python-bindings/](./rust-python-bindings/)
+
+Rust-Python interoperability libraries for building high-performance Python extensions and embedding Python in Rust applications.
+
+| Document                                   | Description                                                                                                         | Last Updated |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------ |
+| [pyo3.md](./rust-python-bindings/pyo3.md) | PyO3 - Rust bindings for Python with #[pyclass]/#[pyfunction] macros, maturin build tool, abi3 stable ABI (15K+ stars) | 2026-02-05   |
+
+**Key Topics**:
+
+- Native Python extension modules written in Rust
+- Automatic type conversions via FromPyObject/IntoPy traits
+- maturin for one-command wheel building and publishing
+- abi3 stable ABI for single binary across Python versions
+- GIL management with Python::with_gil and allow_threads
+- Async support bridging Rust futures with Python asyncio
+- Integration with chrono, serde, num-bigint, hashbrown, and more
+- Embedding Python interpreter in Rust applications
+- CPython 3.7+, PyPy 7.3+, GraalPy 25.0+ support
+- Free-threaded Python 3.13t experimental support
+
+---
+
 ## Planned Categories
 
 The following categories are planned for future research:
@@ -437,6 +554,7 @@ The following categories are planned for future research:
 | `mcp-ecosystem/`        | MCP servers and integrations                       | **Done** |
 | `agent-frameworks/`     | Agent SDKs and orchestration frameworks            | **Done** |
 | `agent-infrastructure/` | Infrastructure for deploying agentic apps at scale | **Done** |
+| `api-frameworks/`       | High-performance API frameworks for backend services | **Done** |
 | `async-libraries/`      | Python async I/O and concurrency frameworks        | **Done** |
 | `data-infrastructure/`  | Real-time data platforms for analytics             | **Done** |
 | `code-auditing/`        | Code security and quality auditing tools           | **Done** |
@@ -444,6 +562,9 @@ The following categories are planned for future research:
 | `coding-agents/`        | Autonomous AI coding agent platforms               | **Done** |
 | `task-management/`      | AI-powered task management for development         | **Done** |
 | `ml-infrastructure/`    | ML compute engines and model serving platforms     | **Done** |
+| `python-runtimes/`      | Alternative Python interpreters and runtimes       | **Done** |
+| `rust-python-bindings/` | Rust-Python interoperability and binding libraries | **Done** |
+| `ai-observability/`     | AI/LLM observability and debugging platforms       | **Done** |
 | `evaluation-testing/`   | Agent evaluation and testing tools                 | Planned  |
 
 ---
@@ -554,6 +675,11 @@ When adding new research:
 - [Superpowers](https://github.com/obra/superpowers) - Agentic skills framework and software development methodology (40,911 stars)
 - [Trio](https://github.com/python-trio/trio) - Structured concurrency async library for Python (7,143 stars)
 - [Ray](https://github.com/ray-project/ray) - AI compute engine for scaling Python/ML workloads (41,140 stars)
+- [Pydantic Logfire](https://logfire.pydantic.dev/) - AI-native observability with full-stack tracing and MCP server (3,984 stars)
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework with automatic OpenAPI docs and Pydantic validation (94,804 stars)
+- [RustPython](https://rustpython.github.io/) - Python 3 interpreter written in Rust with WASM support and JIT compiler (21,752 stars)
+- [PyO3](https://pyo3.rs) - Rust bindings for Python with maturin build tool and abi3 stable ABI (15,268 stars)
+- [Tornado](https://www.tornadoweb.org/) - Python web framework and async networking library for WebSockets and long-polling (22,437 stars)
 
 ### Internal References
 
