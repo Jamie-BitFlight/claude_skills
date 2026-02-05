@@ -3,7 +3,7 @@ last-updated: 2026-02-05
 p0-count: 0
 p1-count: 6
 p2-count: 9
-ideas-count: 7
+ideas-count: 11
 ---
 
 # Backlog
@@ -209,6 +209,47 @@ _(Empty)_
 - What's the minimal TTY setup needed for headless carbonyl operation?
 - Compare with is-fast, lynx, w3m for text extraction capabilities
 **Context**: WebFetch is unreliable (summarizing agents hallucinate), Playwright requires browser downloads that may be blocked. Carbonyl is self-contained but needs TTY.
+
+### Validate is-fast for Web Content Extraction
+
+**Source**: Session experimentation 2026-02-05
+**Added**: 2026-02-05
+**Description**: Test is-fast CLI tool on host with unrestricted network access.
+**Validation steps**:
+- Install: `curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Magic-JD/is-fast/releases/latest/download/is-fast-installer.sh | sh`
+- Test: `is-fast --direct https://code.claude.com/docs/en/skills --piped`
+- Verify it extracts text content from JS-rendered pages
+- Compare output quality with curl, lynx, w3m
+- Test CSS selector filtering with `--selector`
+**Blocked on 2026-02-05**: DNS resolution failed in restricted environment
+
+### Validate agent-browser for Web Automation
+
+**Source**: Session experimentation 2026-02-05
+**Added**: 2026-02-05
+**Description**: Test agent-browser (Playwright-based) on host with unrestricted network and Playwright browsers installed.
+**Validation steps**:
+- Install browsers: `npx playwright install`
+- Test: `npx agent-browser open https://code.claude.com/docs/en/skills`
+- Test: `npx agent-browser snapshot -i` (get element refs)
+- Test: `npx agent-browser get text body` (extract page text)
+- Verify snapshot/interact/re-snapshot workflow works
+- Document prerequisites for skill to function
+**Blocked on 2026-02-05**: Could not download Playwright browsers (DNS resolution failed, missing system libs)
+**Skill location**: `.claude/skills/agent-browser/SKILL.md`
+
+### Validate carbonyl Terminal Browser
+
+**Source**: Session experimentation 2026-02-05
+**Added**: 2026-02-05
+**Description**: Test carbonyl on host with proper TTY and network access.
+**Validation steps**:
+- Test basic: `npx -y carbonyl --no-sandbox https://example.com`
+- Test with tmux: `tmux new-session -d -s carbonyl 'npx -y carbonyl --no-sandbox https://example.com'`
+- Test screenshot capture: Can we grab terminal output as image?
+- Test text extraction: Can we pipe output or capture rendered text?
+- Compare JS rendering quality with other tools
+**Blocked on 2026-02-05**: Needs TTY (Inappropriate ioctl for device), DNS also blocked
 
 ---
 
