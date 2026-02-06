@@ -2,8 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "requests>=2.31.0",
-#     "types-requests>=2.31.0",
+#     "httpx>=0.28.1",
 # ]
 # ///
 """GitLab Flavored Markdown Validation Script.
@@ -22,7 +21,7 @@ import os
 import sys
 from pathlib import Path
 
-import requests
+import httpx
 
 
 def get_gitlab_token() -> str | None:
@@ -75,38 +74,37 @@ def validate_markdown(
         print(f"API URL: {api_url}", file=sys.stderr)
         print(f"Request payload: {json.dumps(payload, indent=2)}", file=sys.stderr)
 
-    response: requests.Response | None = None
     try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        response = httpx.post(api_url, headers=headers, json=payload, timeout=30)
+    except httpx.RequestError as e:
+        print(f"Request Error: {e}", file=sys.stderr)
+        return None
 
-        if verbose:
-            print(f"Response status: {response.status_code}", file=sys.stderr)
+    if verbose:
+        print(f"Response status: {response.status_code}", file=sys.stderr)
 
+    try:
         response.raise_for_status()
-
-        result = response.json()
-
-    except requests.exceptions.HTTPError as e:
+    except httpx.HTTPStatusError as e:
         print(
             f"HTTP Error {e.response.status_code}: {e.response.text}", file=sys.stderr
         )
         return None
-    except requests.exceptions.RequestException as e:
-        print(f"Request Error: {e}", file=sys.stderr)
-        return None
+
+    try:
+        result = response.json()
     except json.JSONDecodeError as e:
         print(f"JSON Error: {e}", file=sys.stderr)
-        if response is not None:
-            print(f"Response text: {response.text}", file=sys.stderr)
+        print(f"Response text: {response.text}", file=sys.stderr)
         return None
-    else:
-        if "html" in result:
-            return str(result["html"])
-        if "error" in result:
-            print(f"API Error: {result['error']}", file=sys.stderr)
-            return None
-        print(f"Unexpected response: {result}", file=sys.stderr)
+
+    if "html" in result:
+        return str(result["html"])
+    if "error" in result:
+        print(f"API Error: {result['error']}", file=sys.stderr)
         return None
+    print(f"Unexpected response: {result}", file=sys.stderr)
+    return None
 
 
 def main() -> int:

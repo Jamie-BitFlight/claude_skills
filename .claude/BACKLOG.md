@@ -1,8 +1,8 @@
 ---
-last-updated: 2026-02-05
+last-updated: 2026-02-06
 p0-count: 0
-p1-count: 7
-p2-count: 9
+p1-count: 6
+p2-count: 6
 ideas-count: 10
 ---
 
@@ -60,18 +60,6 @@ _(Empty)_
 **Research first**: How does GSD plan-checker detect deviation? What diff/comparison techniques exist? How do code review tools detect scope creep in PRs?
 **Suggested location**: `methodology_development/stateless-software-engineering-framework.md` (section 3.6 Forensic Review)
 
-### Replace requests with httpx in all scripts
-
-**Source**: CI/pre-commit inconsistency discovery (2026-02-05)
-**Added**: 2026-02-05
-**Description**: Migrate all scripts from `requests` to `httpx`. The `requests` library requires `types-requests` stubs for mypy, adding friction. `httpx` has built-in type annotations and is already the project standard (see python3-development skill modern-modules reference). Add ruff rule to ban `requests` imports.
-**Tasks**:
-- Audit all scripts for `requests` usage (currently: `validate-glfm.py`)
-- Replace with `httpx` equivalents
-- Add ruff ban rule: `"requests" = ["banned-api"]` or similar
-- Update any PEP 723 inline dependencies
-**Suggested location**: Scripts in `plugins/**/scripts/`
-
 ### Extract claude-plugin-lint to standalone PyPI package
 
 **Source**: Gap analysis - no existing Claude Code plugin linters exist
@@ -91,30 +79,6 @@ _(Empty)_
 ---
 
 ## P2 - Could Have
-
-### Enhance swarm-task-planner with multi-source synthesis
-
-**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
-**Added**: 2026-02-01
-**Description**: Add pattern for synthesizing outputs from multiple parallel research agents into unified summary documents.
-**Patterns from**: gsd-research-synthesizer.md
-**Suggested location**: `plugins/python3-development/agents/swarm-task-planner.md`
-
-### Add context compliance checking
-
-**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
-**Added**: 2026-02-01
-**Description**: Verify plans comply with user decisions (Decisions/Discretion/Deferred format). Requires adopting GSD CONTEXT.md artifact format.
-**Patterns from**: gsd-plan-checker.md (context compliance dimension)
-**Suggested location**: `plugins/python3-development/agents/plan-validator.md` or new CONTEXT.md format
-
-### SAM: Artifact Versioning Strategy
-
-**Source**: Gap analysis of SAM framework
-**Added**: 2026-02-01
-**Description**: Define versioning strategy for artifacts. How to track artifact evolution? How to reference specific versions? Git-based vs embedded version fields?
-**Research first**: How do GSD STATE.md and CONTEXT.md handle versioning? How does git-based versioning work in document-heavy workflows? What patterns exist in event sourcing?
-**Suggested location**: `methodology_development/stateless-software-engineering-framework.md` (section 2.1.2)
 
 ### SAM: Parallel Execution Details
 
@@ -266,6 +230,34 @@ _(Empty)_
 ---
 
 ## Completed
+
+### Replace requests with httpx in all scripts
+
+**Source**: CI/pre-commit inconsistency discovery (2026-02-05)
+**Completed**: 2026-02-06
+**Description**: Migrated `validate-glfm.py` from `requests` to `httpx`. Added TID251 ruff ban rule for `requests` imports. Removed `types-requests` from dev dependencies. `sync-gitlab-docs.py` was already using httpx.
+**Location**: `plugins/gitlab-skill/skills/gitlab-skill/scripts/validate-glfm.py`, `pyproject.toml`
+
+### Enhance swarm-task-planner with multi-source synthesis
+
+**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
+**Completed**: 2026-02-06
+**Description**: Multi-source synthesis implemented via CLEAR+CoVe standard and Project Awareness section with investigation commands for searching documentation, assessing project structure, and identifying progress.
+**Location**: `plugins/python3-development/agents/swarm-task-planner.md`
+
+### Add context compliance checking
+
+**Source**: [external-pattern-integration-2026-02-01.md](.claude/external-pattern-integration-2026-02-01.md)
+**Completed**: 2026-02-06
+**Description**: Complete plan-validator agent implements 8 validation dimensions including Requirement Coverage, Task Completeness, Dependency Correctness, Agent Capability Match, Input/Output Validity, Artifact Wiring, Testability, and Scope Sanity.
+**Location**: `plugins/python3-development/agents/plan-validator.md`
+
+### SAM: Artifact Versioning Strategy
+
+**Source**: Gap analysis of SAM framework
+**Completed**: 2026-02-06
+**Description**: Implemented storage-agnostic semantic tokens using pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})` with disambiguators (CTX, PREREQ, EXEC, VERIFY). Provides both filesystem-backed and SQL-backed example implementations.
+**Location**: `methodology_development/stateless-software-engineering-framework.md` (section 2.1.2)
 
 ### Create ecosystem-researcher agent
 

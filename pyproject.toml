@@ -66,6 +66,7 @@ extend-select = [
 	"T10",   # see: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
 	"T20",   # see: https://docs.astral.sh/ruff/rules/#flake8-typing-t20
 	"TC",    # see: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+	"TID",   # see: https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
 	"TRY",   # see: https://docs.astral.sh/ruff/rules/#tryceratops-try
 	"UP",    # see: https://docs.astral.sh/ruff/rules/#pyupgrade-up
 	"W",     # see: https://docs.astral.sh/ruff/rules/#warning-w
@@ -111,6 +112,9 @@ unfixable = ["F401"]
 "**/assets/nested-typer-exceptions/*.py" = ["DOC", "ANN"]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
 "**/assets/version.py" = ["PLC0415"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"requests".msg = "Use httpx instead. httpx has built-in type annotations and is the project standard."
 
 [tool.ruff.lint.pycodestyle]
 max-line-length = 120
@@ -224,5 +228,4 @@ dev = [
 	"tiktoken>=0.12.0",
 	"typer>=0.20.0",
 	"types-pyyaml>=6.0.12.20250915",
-	"types-requests>=2.32.0",
 ]
