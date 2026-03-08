@@ -135,23 +135,57 @@ def _resolve_glob(glob_path: str) -> list[str]:
     return sorted(str(p) for p in base.glob(relative))
 
 
-def _duckdb_glob_pattern(file_paths: list[str]) -> str:
-    """Build a SQL-ready source expression for read_ndjson_auto.
+_SQL_COUNT_USER_MESSAGES: str = (
+    "WITH numbered AS ("
+    " SELECT filename AS file,"
+    "        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
+    '        message, uuid, "timestamp", sessionId AS session_id,'
+    "        type, toolUseResult"
+    " FROM read_ndjson_auto($1::VARCHAR[], union_by_name:=true, filename:=true)"
+    ")"
+    " SELECT count(*) FROM numbered WHERE type = 'user' AND toolUseResult IS NULL"
+)
 
-    Returns a string that can be interpolated directly into SQL without
-    additional quoting (single-file paths are already quoted).
+_SQL_QUERY_USER_MESSAGES: str = (
+    "WITH numbered AS ("
+    " SELECT filename AS file,"
+    "        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
+    '        message, uuid, "timestamp", sessionId AS session_id,'
+    "        type, toolUseResult"
+    " FROM read_ndjson_auto($1::VARCHAR[], union_by_name:=true, filename:=true)"
+    ")"
+    ' SELECT file, line_index, message, uuid, "timestamp", session_id'
+    " FROM numbered"
+    " WHERE type = 'user' AND toolUseResult IS NULL"
+    " LIMIT $2 OFFSET $3"
+)
 
-    Args:
-        file_paths: Sorted list of resolved absolute file paths.
+_SQL_CONTEXT_MESSAGES: str = (
+    "WITH indexed AS ("
+    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
+    " FROM read_ndjson_auto($1, union_by_name:=true)"
+    ")"
+    ' SELECT type AS role, "timestamp", uuid, message, toolUseResult'
+    " FROM indexed WHERE rn >= $2 AND rn < $3"
+)
 
-    Returns:
-        SQL-ready source string: ``'path'`` for one file, ``['p1','p2']``
-        for multiple.
-    """
-    escaped = [fp.replace("'", "''") for fp in file_paths]
-    if len(escaped) == 1:
-        return f"'{escaped[0]}'"
-    return "[" + ", ".join(f"'{fp}'" for fp in escaped) + "]"
+_SQL_GET_SCENARIO: str = (
+    "WITH indexed AS ("
+    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
+    " FROM read_ndjson_auto($1, union_by_name:=true)"
+    ")"
+    ' SELECT type, message, uuid, "timestamp", sessionId AS session_id'
+    " FROM indexed WHERE rn = $2"
+)
+
+_SQL_GET_MESSAGE: str = (
+    "WITH indexed AS ("
+    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
+    " FROM read_ndjson_auto($1, union_by_name:=true)"
+    ")"
+    ' SELECT message, uuid, "timestamp"'
+    " FROM indexed WHERE rn = $2"
+)
 
 
 def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], int, int]:
@@ -175,34 +209,14 @@ def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> t
     if not files:
         raise ToolError(f"No files matched glob pattern: {glob_path}")
 
-    source = _duckdb_glob_pattern(files)
     conn = duckdb.connect()
 
     # Assign stable line_index (0-based row position in file) before filtering,
     # so line_index matches the actual line number for context lookups.
-    base_from = f"read_ndjson_auto({source}, union_by_name=true, filename=true)"
-    numbered_cte = (
-        f"WITH numbered AS ("  # noqa: S608
-        f" SELECT filename AS file,"
-        f"        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
-        f'        message, uuid, "timestamp", sessionId AS session_id,'
-        f"        type, toolUseResult"
-        f" FROM {base_from}"
-        f")"
-    )
-
-    count_sql = f"{numbered_cte} SELECT count(*) FROM numbered WHERE type = 'user' AND toolUseResult IS NULL"  # noqa: S608
-    total_row = conn.execute(count_sql).fetchone()
+    total_row = conn.execute(_SQL_COUNT_USER_MESSAGES, [files]).fetchone()
     total = total_row[0] if total_row else 0
 
-    query_sql = (
-        f"{numbered_cte}"  # noqa: S608
-        f' SELECT file, line_index, message, uuid, "timestamp", session_id'
-        f" FROM numbered"
-        f" WHERE type = 'user' AND toolUseResult IS NULL"
-        f" LIMIT {limit} OFFSET {offset}"
-    )
-    rows = conn.execute(query_sql).fetchall()
+    rows = conn.execute(_SQL_QUERY_USER_MESSAGES, [files, limit, offset]).fetchall()
     columns = ["file", "line_index", "message", "uuid", "timestamp", "session_id"]
     conn.close()
 
@@ -267,12 +281,7 @@ def _get_context_messages(file_path: str, line_index: int, context_window: int) 
     start = max(0, line_index - context_window)
     conn = duckdb.connect()
 
-    sql = (
-        f'SELECT type AS role, "timestamp", uuid, message, toolUseResult'  # noqa: S608
-        f" FROM read_ndjson_auto({file_path!r}, union_by_name=true)"
-        f" WHERE rowid >= {start} AND rowid < {line_index}"
-    )
-    rows = conn.execute(sql).fetchall()
+    rows = conn.execute(_SQL_CONTEXT_MESSAGES, [file_path, start, line_index]).fetchall()
     conn.close()
 
     context: list[dict[str, Any]] = []
@@ -506,12 +515,7 @@ async def get_scenario(file: str, line_index: int, context_window: int = _DEFAUL
     def _query() -> dict[str, Any]:
         resolved = str(pathlib.Path(file).expanduser()) if "~" in file else file
         conn = duckdb.connect()
-        sql = (
-            f'SELECT type, message, uuid, "timestamp", sessionId AS session_id'  # noqa: S608
-            f" FROM read_ndjson_auto({resolved!r}, union_by_name=true)"
-            f" WHERE rowid = {line_index}"
-        )
-        row = conn.execute(sql).fetchone()
+        row = conn.execute(_SQL_GET_SCENARIO, [resolved, line_index]).fetchone()
         conn.close()
 
         if not row:
@@ -569,12 +573,7 @@ async def generate_social_post(
         resolved = str(pathlib.Path(file).expanduser()) if "~" in file else file
         conn = duckdb.connect()
 
-        sql = (
-            f'SELECT message, uuid, "timestamp"'  # noqa: S608
-            f" FROM read_ndjson_auto({resolved!r}, union_by_name=true)"
-            f" WHERE rowid = {line_index}"
-        )
-        row = conn.execute(sql).fetchone()
+        row = conn.execute(_SQL_GET_MESSAGE, [resolved, line_index]).fetchone()
         conn.close()
 
         if not row:
