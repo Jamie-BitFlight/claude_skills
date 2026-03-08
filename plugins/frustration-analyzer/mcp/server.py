@@ -4,6 +4,7 @@
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "duckdb>=0.10.0",
+#     "anthropic>=0.49.0",
 # ]
 # ///
 """Frustration Analyzer MCP Server.
@@ -25,13 +26,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import pathlib
 import re
 from typing import Any
 
+import anthropic
 import duckdb
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -40,7 +45,6 @@ from fastmcp.exceptions import ToolError
 _DEFAULT_CONTEXT_WINDOW: int = 5
 _DEFAULT_DB_DIR: str = "~/.local/share/frustration-analyzer"
 _DEFAULT_DB_NAME: str = "insults.duckdb"
-_MIN_PUNCTUATION_ESCALATION: int = 3
 _MIN_TOKEN_LENGTH: int = 20
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
@@ -66,6 +70,7 @@ _CATEGORY_DISPLAY: dict[str, str] = {
     "sarcasm": "Sarcasm",
     "dismissive_command": "Dismissal",
     "technical_putdown": "Technical Put-Down",
+    "general_frustration": "General Frustration",
 }
 
 _CATEGORY_HASHTAGS: dict[str, str] = {
@@ -77,104 +82,85 @@ _CATEGORY_HASHTAGS: dict[str, str] = {
     "sarcasm": "#SarcasmDetected",
     "dismissive_command": "#Dismissed",
     "technical_putdown": "#TechnicalBurn",
+    "general_frustration": "#GeneralFrustration",
 }
 
 # ---------------------------------------------------------------------------
-# Insult detection patterns (8 categories)
+# LLM classifier configuration
 # ---------------------------------------------------------------------------
 
-_INSULT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    (
-        "profanity_at_ai",
-        re.compile(
-            r"\b(?:you\s+)?(?:fucking|damn|goddamn|bloody)\s+(?:idiot|moron|fool|useless|stupid|dumb|piece\s+of\s+shit)\b"
-            r"|\b(?:wtf|what\s+the\s+fuck|what\s+the\s+hell)\s+(?:are\s+you\s+doing|is\s+this|is\s+wrong\s+with\s+you)\b"
-            r"|\b(?:fuck\s+(?:you|this|off)|go\s+to\s+hell|screw\s+you)\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "model_comparison",
-        re.compile(
-            r"\b(?:you'?re|this\s+is|acting\s+like|sounds?\s+like|worse\s+than|dumber\s+than)\s+"
-            r"(?:gpt[-\s]?[23]|haiku|gemini\s*(?:nano|flash)?|copilot|chatgpt|a\s+chatbot"
-            r"|clippy|eliza|a\s+markov\s+chain|an?\s+intern)\b"
-            r"|\b(?:gpt[-\s]?[23]|haiku|chatgpt)\s+(?:level|quality|tier|grade)\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "competence_challenge",
-        re.compile(
-            r"\b(?:are\s+you\s+(?:stupid|dumb|deaf|blind|broken|brain\s*dead|incapable)"
-            r"|can'?t\s+you\s+(?:read|understand|follow|listen|think|do\s+anything)"
-            r"|do\s+you\s+(?:even|not)\s+(?:understand|know|read|listen)"
-            r"|how\s+(?:hard|difficult)\s+(?:is\s+it|can\s+it\s+be))\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "intelligence_insult",
-        re.compile(
-            r"\b(?:you'?re\s+(?:useless|worthless|hopeless|pathetic|terrible|awful|garbage|trash"
-            r"|incompetent|clueless|brain\s*dead|an?\s+idiot|a\s+moron|the\s+worst)"
-            r"|this\s+(?:is\s+)?(?:garbage|trash|useless|pathetic|terrible|awful|horseshit|bullshit)"
-            r"|absolute(?:ly)?\s+(?:useless|worthless|pathetic|terrible|garbage))\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "repeat_failure",
-        re.compile(
-            r"\b(?:(?:you\s+)?(?:STILL|AGAIN|ONCE\s+AGAIN|YET\s+AGAIN)\s+(?:got\s+it\s+wrong|broke|failed|messed|fucked)"
-            r"|(?:how\s+many\s+times|for\s+the\s+(?:\w+\s+)?time)\b"
-            r"|(?:every\s+(?:single\s+)?time\s+you)"
-            r"|(?:wrong\s+)?again[!?]{2,}"
-            r"|(?:STILL\s+(?:broken|wrong|failing|bugged)))\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "sarcasm",
-        re.compile(
-            r"\b(?:(?:great|good|nice|wonderful|brilliant|excellent|amazing|fantastic)\s+(?:job|work|going)"
-            r"|(?:wow|congrats|congratulations|bravo|well\s+done|genius)\s*[,.]?\s*(?:you|that|now|it)"
-            r"|(?:oh?\s+)?(?:how\s+)?(?:helpful|useful|productive)\s*(?:\.{3,}|/s)"
-            r"|(?:real(?:ly)?\s+)?(?:helpful|useful|smart|intelligent)\s+(?:aren'?t\s+you|one|there)"
-            r"|thanks?\s+for\s+(?:nothing|wasting|breaking|making\s+it\s+worse))\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "dismissive_command",
-        re.compile(
-            r"^(?:just\s+(?:stop|shut\s+up|quit|give\s+up)"
-            r"|(?:shut\s+(?:up|the\s+fuck\s+up))"
-            r"|(?:I'?(?:ll|m\s+going\s+to)\s+(?:do\s+it\s+myself|just\s+do\s+it\s+manually|use\s+\w+\s+instead))"
-            r"|(?:forget\s+(?:it|you)|I\s+give\s+up\s+on\s+you|done\s+with\s+you))\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "technical_putdown",
-        re.compile(
-            r"\b(?:(?:you|this)\s+(?:is\s+)?(?:a\s+)?(?:hallucinating|confabulating|regressing|overfitting|underfitting)"
-            r"|(?:your\s+(?:context\s+window|attention|memory|weights|training\s+data)\s+(?:is|must\s+be)\s+(?:broken|garbage|corrupted|empty|fried))"
-            r"|(?:off[\s-]?by[\s-]?one\s+(?:brain|intelligence|model))"
-            r"|(?:you\s+(?:have|got)\s+(?:the\s+)?(?:memory|attention\s+span)\s+of\s+(?:a\s+)?(?:goldfish|gnat|rock))"
-            r"|(?:temperature\s*=?\s*(?:99|100|infinity|NaN)))\b",
-            re.IGNORECASE,
-        ),
-    ),
-]
+_CLASSIFIER_MODEL: str = "claude-haiku-4-5"
+_CLASSIFIER_MAX_TOKENS: int = 256
+_ASSESS_BATCH_SIZE: int = 10
+_RATE_LIMIT_RETRY_DELAY: float = 2.0
 
-# Kaizen soft-signal patterns for had_prior_correction detection
-_FRUSTRATION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("correction", re.compile(r"\b(?:no[,.]?\s|don'?t|wrong|incorrect|stop|undo|revert)\b", re.IGNORECASE)),
-    ("denial", re.compile(r"\b(?:that'?s not|i didn'?t|never|absolutely not)\b", re.IGNORECASE)),
-    ("interrupt", re.compile(r"\b(?:wait|hold on|cancel|abort|forget it|nevermind)\b", re.IGNORECASE)),
-    ("frustration", re.compile(r"\b(?:why did you|you keep|again\?|still wrong|broken)\b", re.IGNORECASE)),
-]
+_CLASSIFIER_SYSTEM_PROMPT: str = """\
+You are a frustration and insult detector for AI assistant conversations.
+Analyze the user message and determine if it contains frustration directed at the AI assistant, or an insult aimed at the AI.
+
+Classify ONLY genuine negative sentiment targeted at the AI — not:
+- Questions about AI capabilities
+- Neutral feedback
+- Discussing AI in third person
+- Code or technical content that happens to contain strong words
+
+Categories:
+- profanity_at_ai: Direct profanity/swearing at the AI
+- model_comparison: Comparing unfavorably to other models ("GPT would...")
+- competence_challenge: Questioning the AI's ability to do its job
+- intelligence_insult: Calling the AI stupid, dumb, useless, etc.
+- repeat_failure: Expressing frustration at repeated mistakes ("you always...", "again?!")
+- sarcasm: Sarcastic praise masking frustration
+- dismissive_command: Dismissive/contemptuous commands ("just do it", "stop being useless")
+- technical_putdown: Mocking specific technical failure
+- general_frustration: General frustration not fitting above categories
+- none: Not an insult or frustration directed at the AI
+
+Rate 1-5 where applicable (1=lowest, 5=highest).
+had_prior_correction: true if the message suggests the AI was already corrected or failed before.
+matched_text: the specific phrase or sentence that is the insult/frustration.\
+"""
+
+_CLASSIFIER_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "is_insult": {"type": "boolean"},
+        "category": {
+            "type": "string",
+            "enum": [
+                "profanity_at_ai",
+                "model_comparison",
+                "competence_challenge",
+                "intelligence_insult",
+                "repeat_failure",
+                "sarcasm",
+                "dismissive_command",
+                "technical_putdown",
+                "general_frustration",
+                "none",
+            ],
+        },
+        "severity": {"type": "integer"},
+        "creativity": {"type": "integer"},
+        "humor": {"type": "integer"},
+        "accuracy": {"type": "integer"},
+        "had_prior_correction": {"type": "boolean"},
+        "matched_text": {"type": "string"},
+        "reasoning": {"type": "string"},
+    },
+    "required": [
+        "is_insult",
+        "category",
+        "severity",
+        "creativity",
+        "humor",
+        "accuracy",
+        "had_prior_correction",
+        "matched_text",
+        "reasoning",
+    ],
+    "additionalProperties": False,
+}
 
 # PII sanitization patterns (ordered most specific first)
 _PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
@@ -191,21 +177,6 @@ _PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ),
     ("URL", re.compile(r"https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+"), "[URL]"),
 ]
-
-# Technical terms for creativity scoring
-_TECHNICAL_TERMS: re.Pattern[str] = re.compile(
-    r"\b(?:claude|opus|sonnet|haiku|gpt|gemini|llm|transformer|attention|context\s+window"
-    r"|token|embedding|gradient|backprop|neural|perceptron|epoch|batch|inference"
-    r"|hallucin|confabulat|overfit|underfit|regression|latent|vector|matrix"
-    r"|algorithm|compiler|parser|runtime|stack|heap|buffer|pointer|mutex"
-    r"|deadlock|race\s+condition|segfault|null\s+pointer|memory\s+leak)\b",
-    re.IGNORECASE,
-)
-
-# Metaphor indicators for creativity scoring
-_METAPHOR_INDICATORS: re.Pattern[str] = re.compile(
-    r"\b(?:like\s+a|as\s+a|of\s+a|reminds\s+me\s+of|equivalent\s+of)\b", re.IGNORECASE
-)
 
 # ---------------------------------------------------------------------------
 # Schema SQL
@@ -407,79 +378,6 @@ def _extract_user_text(message: dict[str, Any]) -> str:
     return ""
 
 
-def _heuristic_rate(insult_text: str, category: str) -> dict[str, Any]:
-    """Rate an insult heuristically across four dimensions.
-
-    Args:
-        insult_text: The raw insult text.
-        category: The detected insult category slug.
-
-    Returns:
-        Dict with keys: creativity, accuracy, severity, humor, composite.
-    """
-    # --- Creativity ---
-    creativity_bases: dict[str, int] = {
-        "technical_putdown": 4,
-        "model_comparison": 3,
-        "sarcasm": 3,
-        "repeat_failure": 2,
-        "competence_challenge": 2,
-        "profanity_at_ai": 1,
-        "intelligence_insult": 1,
-        "dismissive_command": 1,
-    }
-    creativity = creativity_bases.get(category, 2)
-    if _TECHNICAL_TERMS.search(insult_text):
-        creativity += 1
-    if _METAPHOR_INDICATORS.search(insult_text):
-        creativity += 1
-    creativity = min(creativity, 5)
-
-    # --- Severity ---
-    severity_bases: dict[str, int] = {
-        "profanity_at_ai": 4,
-        "intelligence_insult": 3,
-        "repeat_failure": 3,
-        "competence_challenge": 2,
-        "sarcasm": 2,
-        "dismissive_command": 2,
-        "model_comparison": 2,
-        "technical_putdown": 2,
-    }
-    severity = severity_bases.get(category, 2)
-    exclamation_count = insult_text.count("!") + insult_text.count("?")
-    if exclamation_count >= _MIN_PUNCTUATION_ESCALATION:
-        severity += 1
-    # ALL CAPS word longer than 3 characters
-    if re.search(r"\b[A-Z]{4,}\b", insult_text):
-        severity += 1
-    severity = min(severity, 5)
-
-    # --- Humor ---
-    humor = 2
-    if category in {"sarcasm", "technical_putdown"}:
-        humor += 1
-    # Technical metaphor detection
-    if _METAPHOR_INDICATORS.search(insult_text) and _TECHNICAL_TERMS.search(insult_text):
-        humor += 1
-    humor = min(humor, 5)
-
-    # --- Accuracy ---
-    accuracy = 3 if category == "technical_putdown" else 2
-    accuracy = min(accuracy, 5)
-
-    # --- Composite ---
-    composite = round((creativity + accuracy + severity + humor) / 4, 2)
-
-    return {
-        "creativity": creativity,
-        "accuracy": accuracy,
-        "severity": severity,
-        "humor": humor,
-        "composite": composite,
-    }
-
-
 def _extract_model_from_records(records: list[dict[str, Any]], insult_index: int) -> str | None:
     """Find the model name from the most recent assistant message before the insult.
 
@@ -531,18 +429,6 @@ def _extract_tool_sequence(records: list[dict[str, Any]], start: int, end: int) 
     return tools
 
 
-def _has_prior_correction(text: str) -> bool:
-    """Check if text contains kaizen-level frustration signals.
-
-    Args:
-        text: User message text to check.
-
-    Returns:
-        True if any frustration pattern matches.
-    """
-    return any(pattern.search(text) for _, pattern in _FRUSTRATION_PATTERNS)
-
-
 def _extract_assistant_entry(message: dict[str, Any], entry: dict[str, str]) -> None:
     """Extract text and tool info from an assistant message into entry dict.
 
@@ -566,6 +452,85 @@ def _extract_assistant_entry(message: dict[str, Any], entry: dict[str, str]) -> 
     entry["text"] = " ".join(text_parts)
 
 
+async def _assess_message(text: str, client: anthropic.AsyncAnthropic) -> dict[str, Any] | None:
+    """Classify a user message as frustration/insult using the Claude API.
+
+    Sends the message to Claude Haiku for classification. Returns None if
+    the model determines the message is benign.
+
+    Args:
+        text: The user message text to classify.
+        client: An initialized AsyncAnthropic client.
+
+    Returns:
+        A dict with classification fields (is_insult, category, severity,
+        creativity, humor, accuracy, had_prior_correction, matched_text,
+        reasoning) if the message is an insult/frustration, or None if benign.
+    """
+    try:
+        response = await client.messages.create(
+            model=_CLASSIFIER_MODEL,
+            max_tokens=_CLASSIFIER_MAX_TOKENS,
+            system=_CLASSIFIER_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": text}],
+            output_config={"format": {"type": "json_schema", "schema": _CLASSIFIER_JSON_SCHEMA}},
+        )
+    except anthropic.RateLimitError:
+        logger.warning("Rate limited by Anthropic API, retrying after %.1fs", _RATE_LIMIT_RETRY_DELAY)
+        await asyncio.sleep(_RATE_LIMIT_RETRY_DELAY)
+        try:
+            response = await client.messages.create(
+                model=_CLASSIFIER_MODEL,
+                max_tokens=_CLASSIFIER_MAX_TOKENS,
+                system=_CLASSIFIER_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": text}],
+                output_config={"format": {"type": "json_schema", "schema": _CLASSIFIER_JSON_SCHEMA}},
+            )
+        except Exception:
+            logger.exception("Failed to assess message after rate-limit retry")
+            return None
+    except Exception:
+        logger.exception("Failed to assess message via Claude API")
+        return None
+
+    content_block = response.content[0]
+    if not isinstance(content_block, anthropic.types.TextBlock):
+        logger.warning("Unexpected content block type: %s", type(content_block).__name__)
+        return None
+    result: dict[str, Any] = json.loads(content_block.text)
+
+    if not result.get("is_insult"):
+        return None
+
+    return result
+
+
+async def _assess_batch(
+    messages: list[tuple[str, dict[str, Any]]], client: anthropic.AsyncAnthropic
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Assess a batch of messages concurrently.
+
+    Args:
+        messages: List of (extracted_text, raw_record) pairs.
+        client: An initialized AsyncAnthropic client.
+
+    Returns:
+        List of (raw_record, assessment_dict) pairs for messages that were
+        classified as insults (non-None results). Exceptions are logged
+        and skipped.
+    """
+    tasks = [_assess_message(text, client) for text, _ in messages]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    output: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for i, raw_result in enumerate(results):
+        if isinstance(raw_result, BaseException):
+            logger.exception("Assessment failed for message in batch", exc_info=raw_result)
+            continue
+        if raw_result is not None:
+            output.append((messages[i][1], raw_result))
+    return output
+
+
 def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_window: int) -> dict[str, Any]:
     """Extract the scenario context around an insult.
 
@@ -575,12 +540,11 @@ def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_
         context_window: Number of preceding messages to capture.
 
     Returns:
-        Dict with preceding_messages, had_prior_correction,
-        compact_boundary_in_window, and tool_sequence.
+        Dict with preceding_messages, compact_boundary_in_window,
+        and tool_sequence.
     """
     start = max(0, insult_index - context_window)
     preceding: list[dict[str, Any]] = []
-    had_prior_correction = False
     compact_boundary_in_window = False
 
     for i in range(start, insult_index):
@@ -602,8 +566,6 @@ def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_
             if isinstance(message, dict):
                 text = _extract_user_text(message)
                 entry["text"] = text
-                if _has_prior_correction(text):
-                    had_prior_correction = True
         elif record_type == "assistant":
             message = record.get("message")
             if isinstance(message, dict):
@@ -617,7 +579,6 @@ def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_
 
     return {
         "preceding_messages": preceding,
-        "had_prior_correction": had_prior_correction,
         "compact_boundary_in_window": compact_boundary_in_window,
         "tool_sequence": tool_sequence,
     }
@@ -671,12 +632,14 @@ def _index_insult(
     records: list[dict[str, Any]],
     idx: int,
     text: str,
-    category: str,
-    matched: str,
+    assessment: dict[str, Any],
     context_window: int,
     session_id_from_file: str,
 ) -> bool:
     """Insert a single insult with its rating and scenario into the database.
+
+    Uses LLM-provided classification and ratings from the assessment dict
+    instead of regex-based heuristics.
 
     Args:
         conn: Open DuckDB connection.
@@ -684,8 +647,8 @@ def _index_insult(
         records: All JSONL records in the session.
         idx: Index of the insult record in records.
         text: The insult text.
-        category: Matched insult category.
-        matched: The matched pattern text.
+        assessment: LLM classification dict with category, severity,
+            creativity, humor, accuracy, matched_text, had_prior_correction.
         context_window: Number of preceding messages to capture.
         session_id_from_file: Fallback session ID from filename.
 
@@ -702,6 +665,8 @@ def _index_insult(
         return False
 
     insult_id = _next_id(conn, "insults", "insult_id")
+    category: str = assessment["category"]
+    matched_text: str = assessment.get("matched_text", "")
 
     conn.execute(
         """INSERT INTO insults
@@ -716,7 +681,7 @@ def _index_insult(
             message_uuid,
             text,
             category,
-            matched,
+            matched_text,
             _extract_model_from_records(records, idx),
             record.get("gitBranch"),
             record.get("slug"),
@@ -725,23 +690,21 @@ def _index_insult(
         ],
     )
 
-    rating = _heuristic_rate(text, category)
+    creativity = max(1, min(5, int(assessment.get("creativity", 2))))
+    accuracy = max(1, min(5, int(assessment.get("accuracy", 2))))
+    severity = max(1, min(5, int(assessment.get("severity", 2))))
+    humor = max(1, min(5, int(assessment.get("humor", 2))))
+    composite = round((creativity + accuracy + severity + humor) / 4, 2)
+
     conn.execute(
         """INSERT INTO insult_ratings
         (rating_id, insult_id, creativity, accuracy, severity, humor, composite, rated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'auto')""",
-        [
-            _next_id(conn, "insult_ratings", "rating_id"),
-            insult_id,
-            rating["creativity"],
-            rating["accuracy"],
-            rating["severity"],
-            rating["humor"],
-            rating["composite"],
-        ],
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'llm')""",
+        [_next_id(conn, "insult_ratings", "rating_id"), insult_id, creativity, accuracy, severity, humor, composite],
     )
 
     scenario = _extract_scenario(records, idx, context_window)
+    had_prior_correction = bool(assessment.get("had_prior_correction"))
     conn.execute(
         """INSERT INTO insult_scenarios
         (scenario_id, insult_id, preceding_messages, context_window_n,
@@ -752,7 +715,7 @@ def _index_insult(
             insult_id,
             json.dumps(scenario["preceding_messages"]),
             context_window,
-            scenario["had_prior_correction"],
+            had_prior_correction,
             scenario["compact_boundary_in_window"],
             json.dumps(scenario["tool_sequence"]),
         ],
@@ -761,8 +724,65 @@ def _index_insult(
     return True
 
 
-def _scan_transcripts_impl(glob_path: str, context_window: int, db_path: str) -> dict[str, Any]:
+async def _scan_single_file(
+    file_path: str, conn: duckdb.DuckDBPyConnection, client: anthropic.AsyncAnthropic, context_window: int
+) -> tuple[int, int]:
+    """Scan a single JSONL transcript file for insults via LLM classification.
+
+    Args:
+        file_path: Path to the JSONL file.
+        conn: Open DuckDB connection.
+        client: An initialized AsyncAnthropic client.
+        context_window: Number of preceding messages to capture per insult.
+
+    Returns:
+        Tuple of (insults_found, new_insults_indexed) for this file.
+    """
+    session_id_from_file = file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl")
+    records = _read_jsonl(file_path)
+    insults_found = 0
+    new_insults_indexed = 0
+
+    # Collect all user messages with their record indices
+    user_messages: list[tuple[str, dict[str, Any], int]] = []
+    for idx, record in enumerate(records):
+        if record.get("type") != "user" or record.get("toolUseResult"):
+            continue
+        message = record.get("message")
+        if not isinstance(message, dict):
+            continue
+        text = _extract_user_text(message)
+        if not text:
+            continue
+        user_messages.append((text, record, idx))
+
+    # Process in batches of _ASSESS_BATCH_SIZE
+    for batch_start in range(0, len(user_messages), _ASSESS_BATCH_SIZE):
+        batch_slice = user_messages[batch_start : batch_start + _ASSESS_BATCH_SIZE]
+        batch_input: list[tuple[str, dict[str, Any]]] = [(text, record) for text, record, _ in batch_slice]
+
+        assessed = await _assess_batch(batch_input, client)
+        insults_found += len(assessed)
+
+        for raw_record, assessment in assessed:
+            record_idx = next(idx for _, record, idx in batch_slice if record is raw_record)
+            text = next(t for t, r, _ in batch_slice if r is raw_record)
+
+            was_new = _index_insult(
+                conn, raw_record, records, record_idx, text, assessment, context_window, session_id_from_file
+            )
+            if was_new:
+                new_insults_indexed += 1
+
+    return insults_found, new_insults_indexed
+
+
+async def _scan_transcripts_impl(glob_path: str, context_window: int, db_path: str) -> dict[str, Any]:
     """Core implementation for scanning transcripts and indexing insults.
+
+    Uses the Claude API (Haiku) to classify each user message as
+    frustration/insult. Messages are assessed in concurrent batches of
+    ``_ASSESS_BATCH_SIZE`` to balance throughput and rate-limit safety.
 
     Args:
         glob_path: Glob pattern pointing to JSONL transcript files.
@@ -778,41 +798,21 @@ def _scan_transcripts_impl(glob_path: str, context_window: int, db_path: str) ->
 
     conn = _get_db(db_path)
     resolved_db_path = db_path or _default_db_path()
-    insults_found = 0
-    new_insults_indexed = 0
+    total_found = 0
+    total_indexed = 0
+    client = anthropic.AsyncAnthropic()
 
     for file_path in files:
-        session_id_from_file = file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl")
-        records = _read_jsonl(file_path)
-
-        for idx, record in enumerate(records):
-            if record.get("type") != "user" or record.get("toolUseResult"):
-                continue
-            message = record.get("message")
-            if not isinstance(message, dict):
-                continue
-            text = _extract_user_text(message)
-            if not text:
-                continue
-
-            for category, pattern in _INSULT_PATTERNS:
-                match = pattern.search(text)
-                if not match:
-                    continue
-                insults_found += 1
-                was_new = _index_insult(
-                    conn, record, records, idx, text, category, match.group(), context_window, session_id_from_file
-                )
-                if was_new:
-                    new_insults_indexed += 1
-                break  # One category per message (first match wins)
+        found, indexed = await _scan_single_file(file_path, conn, client, context_window)
+        total_found += found
+        total_indexed += indexed
 
     conn.close()
 
     return {
         "scanned_files": len(files),
-        "insults_found": insults_found,
-        "new_insults_indexed": new_insults_indexed,
+        "insults_found": total_found,
+        "new_insults_indexed": total_indexed,
         "db_path": resolved_db_path,
     }
 
@@ -828,10 +828,10 @@ async def scan_transcripts(
 ) -> dict[str, Any]:
     """Scan JSONL transcript files for insults, rate them, and store in DuckDB.
 
-    Reads each JSONL file matching the glob pattern, scans user messages
-    for insults across 8 categories, extracts the preceding scenario
-    context, rates each insult heuristically, and stores everything in
-    a persistent DuckDB database.
+    Reads each JSONL file matching the glob pattern, sends every user
+    message to the Claude API for classification across 9 categories,
+    extracts the preceding scenario context, and stores LLM-rated
+    insults in a persistent DuckDB database.
 
     Args:
         glob_path: Glob pattern pointing to JSONL transcript files,
@@ -845,7 +845,7 @@ async def scan_transcripts(
         Dict with scanned_files, insults_found, new_insults_indexed,
         and db_path.
     """
-    return await asyncio.to_thread(_scan_transcripts_impl, glob_path, context_window, db_path)
+    return await _scan_transcripts_impl(glob_path, context_window, db_path)
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
