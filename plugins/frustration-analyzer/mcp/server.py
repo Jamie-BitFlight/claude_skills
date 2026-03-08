@@ -4,17 +4,18 @@
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "duckdb>=0.10.0",
-#     "anthropic>=0.49.0",
+#     "pandas>=2.0.0",
 # ]
 # ///
 """Frustration Analyzer MCP Server.
 
-Detects user insults in Claude Code session transcripts, rates them
-across four dimensions (creativity, accuracy, severity, humor),
-extracts precipitating scenarios, and generates social media content.
+Extracts user messages from Claude Code session transcripts for caller-side
+classification, indexes caller-classified insults into DuckDB, and provides
+query/reporting tools.
 
 Tools:
-    scan_transcripts - Scan JSONL files, detect insults, rate and store in DuckDB
+    scan_transcripts - Extract raw user messages from JSONL files for caller classification
+    index_insult - Store a caller-classified insult with ratings and scenario context
     list_insults - Query indexed insults with optional filters
     get_scenario - Get full scenario context for a specific insult
     top_insults - Return top N insults sorted by any rating dimension
@@ -31,7 +32,6 @@ import pathlib
 import re
 from typing import Any
 
-import anthropic
 import duckdb
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -46,6 +46,8 @@ _DEFAULT_CONTEXT_WINDOW: int = 5
 _DEFAULT_DB_DIR: str = "~/.local/share/frustration-analyzer"
 _DEFAULT_DB_NAME: str = "insults.duckdb"
 _MIN_TOKEN_LENGTH: int = 20
+_MIN_RATING: int = 1
+_MAX_RATING: int = 5
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
     "readOnlyHint": True,
@@ -85,81 +87,17 @@ _CATEGORY_HASHTAGS: dict[str, str] = {
     "general_frustration": "#GeneralFrustration",
 }
 
-# ---------------------------------------------------------------------------
-# LLM classifier configuration
-# ---------------------------------------------------------------------------
-
-_CLASSIFIER_MODEL: str = "claude-haiku-4-5"
-_CLASSIFIER_MAX_TOKENS: int = 256
-_ASSESS_BATCH_SIZE: int = 10
-_RATE_LIMIT_RETRY_DELAY: float = 2.0
-
-_CLASSIFIER_SYSTEM_PROMPT: str = """\
-You are a frustration and insult detector for AI assistant conversations.
-Analyze the user message and determine if it contains frustration directed at the AI assistant, or an insult aimed at the AI.
-
-Classify ONLY genuine negative sentiment targeted at the AI — not:
-- Questions about AI capabilities
-- Neutral feedback
-- Discussing AI in third person
-- Code or technical content that happens to contain strong words
-
-Categories:
-- profanity_at_ai: Direct profanity/swearing at the AI
-- model_comparison: Comparing unfavorably to other models ("GPT would...")
-- competence_challenge: Questioning the AI's ability to do its job
-- intelligence_insult: Calling the AI stupid, dumb, useless, etc.
-- repeat_failure: Expressing frustration at repeated mistakes ("you always...", "again?!")
-- sarcasm: Sarcastic praise masking frustration
-- dismissive_command: Dismissive/contemptuous commands ("just do it", "stop being useless")
-- technical_putdown: Mocking specific technical failure
-- general_frustration: General frustration not fitting above categories
-- none: Not an insult or frustration directed at the AI
-
-Rate 1-5 where applicable (1=lowest, 5=highest).
-had_prior_correction: true if the message suggests the AI was already corrected or failed before.
-matched_text: the specific phrase or sentence that is the insult/frustration.\
-"""
-
-_CLASSIFIER_JSON_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "is_insult": {"type": "boolean"},
-        "category": {
-            "type": "string",
-            "enum": [
-                "profanity_at_ai",
-                "model_comparison",
-                "competence_challenge",
-                "intelligence_insult",
-                "repeat_failure",
-                "sarcasm",
-                "dismissive_command",
-                "technical_putdown",
-                "general_frustration",
-                "none",
-            ],
-        },
-        "severity": {"type": "integer"},
-        "creativity": {"type": "integer"},
-        "humor": {"type": "integer"},
-        "accuracy": {"type": "integer"},
-        "had_prior_correction": {"type": "boolean"},
-        "matched_text": {"type": "string"},
-        "reasoning": {"type": "string"},
-    },
-    "required": [
-        "is_insult",
-        "category",
-        "severity",
-        "creativity",
-        "humor",
-        "accuracy",
-        "had_prior_correction",
-        "matched_text",
-        "reasoning",
-    ],
-    "additionalProperties": False,
+# Valid insult categories accepted by index_insult
+_VALID_CATEGORIES: set[str] = {
+    "profanity_at_ai",
+    "model_comparison",
+    "competence_challenge",
+    "intelligence_insult",
+    "repeat_failure",
+    "sarcasm",
+    "dismissive_command",
+    "technical_putdown",
+    "general_frustration",
 }
 
 # PII sanitization patterns (ordered most specific first)
@@ -452,85 +390,6 @@ def _extract_assistant_entry(message: dict[str, Any], entry: dict[str, str]) -> 
     entry["text"] = " ".join(text_parts)
 
 
-async def _assess_message(text: str, client: anthropic.AsyncAnthropic) -> dict[str, Any] | None:
-    """Classify a user message as frustration/insult using the Claude API.
-
-    Sends the message to Claude Haiku for classification. Returns None if
-    the model determines the message is benign.
-
-    Args:
-        text: The user message text to classify.
-        client: An initialized AsyncAnthropic client.
-
-    Returns:
-        A dict with classification fields (is_insult, category, severity,
-        creativity, humor, accuracy, had_prior_correction, matched_text,
-        reasoning) if the message is an insult/frustration, or None if benign.
-    """
-    try:
-        response = await client.messages.create(
-            model=_CLASSIFIER_MODEL,
-            max_tokens=_CLASSIFIER_MAX_TOKENS,
-            system=_CLASSIFIER_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": text}],
-            output_config={"format": {"type": "json_schema", "schema": _CLASSIFIER_JSON_SCHEMA}},
-        )
-    except anthropic.RateLimitError:
-        logger.warning("Rate limited by Anthropic API, retrying after %.1fs", _RATE_LIMIT_RETRY_DELAY)
-        await asyncio.sleep(_RATE_LIMIT_RETRY_DELAY)
-        try:
-            response = await client.messages.create(
-                model=_CLASSIFIER_MODEL,
-                max_tokens=_CLASSIFIER_MAX_TOKENS,
-                system=_CLASSIFIER_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": text}],
-                output_config={"format": {"type": "json_schema", "schema": _CLASSIFIER_JSON_SCHEMA}},
-            )
-        except Exception:
-            logger.exception("Failed to assess message after rate-limit retry")
-            return None
-    except Exception:
-        logger.exception("Failed to assess message via Claude API")
-        return None
-
-    content_block = response.content[0]
-    if not isinstance(content_block, anthropic.types.TextBlock):
-        logger.warning("Unexpected content block type: %s", type(content_block).__name__)
-        return None
-    result: dict[str, Any] = json.loads(content_block.text)
-
-    if not result.get("is_insult"):
-        return None
-
-    return result
-
-
-async def _assess_batch(
-    messages: list[tuple[str, dict[str, Any]]], client: anthropic.AsyncAnthropic
-) -> list[tuple[dict[str, Any], dict[str, Any]]]:
-    """Assess a batch of messages concurrently.
-
-    Args:
-        messages: List of (extracted_text, raw_record) pairs.
-        client: An initialized AsyncAnthropic client.
-
-    Returns:
-        List of (raw_record, assessment_dict) pairs for messages that were
-        classified as insults (non-None results). Exceptions are logged
-        and skipped.
-    """
-    tasks = [_assess_message(text, client) for text, _ in messages]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    output: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    for i, raw_result in enumerate(results):
-        if isinstance(raw_result, BaseException):
-            logger.exception("Assessment failed for message in batch", exc_info=raw_result)
-            continue
-        if raw_result is not None:
-            output.append((messages[i][1], raw_result))
-    return output
-
-
 def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_window: int) -> dict[str, Any]:
     """Extract the scenario context around an insult.
 
@@ -690,10 +549,10 @@ def _index_insult(
         ],
     )
 
-    creativity = max(1, min(5, int(assessment.get("creativity", 2))))
-    accuracy = max(1, min(5, int(assessment.get("accuracy", 2))))
-    severity = max(1, min(5, int(assessment.get("severity", 2))))
-    humor = max(1, min(5, int(assessment.get("humor", 2))))
+    creativity = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("creativity", 2))))
+    accuracy = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("accuracy", 2))))
+    severity = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("severity", 2))))
+    humor = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("humor", 2))))
     composite = round((creativity + accuracy + severity + humor) / 4, 2)
 
     conn.execute(
@@ -724,97 +583,54 @@ def _index_insult(
     return True
 
 
-async def _scan_single_file(
-    file_path: str, conn: duckdb.DuckDBPyConnection, client: anthropic.AsyncAnthropic, context_window: int
-) -> tuple[int, int]:
-    """Scan a single JSONL transcript file for insults via LLM classification.
+def _scan_transcripts_impl(glob_path: str, context_window: int, offset: int, limit: int) -> dict[str, Any]:
+    """Extract user messages from JSONL transcripts for caller-side classification.
 
-    Args:
-        file_path: Path to the JSONL file.
-        conn: Open DuckDB connection.
-        client: An initialized AsyncAnthropic client.
-        context_window: Number of preceding messages to capture per insult.
-
-    Returns:
-        Tuple of (insults_found, new_insults_indexed) for this file.
-    """
-    session_id_from_file = file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl")
-    records = _read_jsonl(file_path)
-    insults_found = 0
-    new_insults_indexed = 0
-
-    # Collect all user messages with their record indices
-    user_messages: list[tuple[str, dict[str, Any], int]] = []
-    for idx, record in enumerate(records):
-        if record.get("type") != "user" or record.get("toolUseResult"):
-            continue
-        message = record.get("message")
-        if not isinstance(message, dict):
-            continue
-        text = _extract_user_text(message)
-        if not text:
-            continue
-        user_messages.append((text, record, idx))
-
-    # Process in batches of _ASSESS_BATCH_SIZE
-    for batch_start in range(0, len(user_messages), _ASSESS_BATCH_SIZE):
-        batch_slice = user_messages[batch_start : batch_start + _ASSESS_BATCH_SIZE]
-        batch_input: list[tuple[str, dict[str, Any]]] = [(text, record) for text, record, _ in batch_slice]
-
-        assessed = await _assess_batch(batch_input, client)
-        insults_found += len(assessed)
-
-        for raw_record, assessment in assessed:
-            record_idx = next(idx for _, record, idx in batch_slice if record is raw_record)
-            text = next(t for t, r, _ in batch_slice if r is raw_record)
-
-            was_new = _index_insult(
-                conn, raw_record, records, record_idx, text, assessment, context_window, session_id_from_file
-            )
-            if was_new:
-                new_insults_indexed += 1
-
-    return insults_found, new_insults_indexed
-
-
-async def _scan_transcripts_impl(glob_path: str, context_window: int, db_path: str) -> dict[str, Any]:
-    """Core implementation for scanning transcripts and indexing insults.
-
-    Uses the Claude API (Haiku) to classify each user message as
-    frustration/insult. Messages are assessed in concurrent batches of
-    ``_ASSESS_BATCH_SIZE`` to balance throughput and rate-limit safety.
+    Walks matching JSONL files, extracts user messages with surrounding
+    context, and returns them for the MCP caller to classify.
 
     Args:
         glob_path: Glob pattern pointing to JSONL transcript files.
-        context_window: Number of preceding messages to capture per insult.
-        db_path: Path to DuckDB file. Empty string uses default.
+        context_window: Number of preceding messages to capture per message.
+        offset: Number of messages to skip (pagination).
+        limit: Maximum number of messages to return.
 
     Returns:
-        Dict with scanned_files, insults_found, new_insults_indexed, db_path.
+        Dict with messages list, total count, offset, limit, and files_scanned.
+
+    Raises:
+        ToolError: If no files match the glob pattern.
     """
     files = _resolve_glob(glob_path)
     if not files:
         raise ToolError(f"No files matched glob pattern: {glob_path}")
 
-    conn = _get_db(db_path)
-    resolved_db_path = db_path or _default_db_path()
-    total_found = 0
-    total_indexed = 0
-    client = anthropic.AsyncAnthropic()
+    all_messages: list[dict[str, Any]] = []
 
     for file_path in files:
-        found, indexed = await _scan_single_file(file_path, conn, client, context_window)
-        total_found += found
-        total_indexed += indexed
+        records = _read_jsonl(file_path)
+        for idx, record in enumerate(records):
+            if record.get("type") != "user" or record.get("toolUseResult"):
+                continue
+            message = record.get("message")
+            if not isinstance(message, dict):
+                continue
+            text = _extract_user_text(message)
+            if not text:
+                continue
 
-    conn.close()
+            scenario = _extract_scenario(records, idx, context_window)
+            all_messages.append({
+                "file": file_path,
+                "line_index": idx,
+                "text": text,
+                "context": scenario["preceding_messages"],
+            })
 
-    return {
-        "scanned_files": len(files),
-        "insults_found": total_found,
-        "new_insults_indexed": total_indexed,
-        "db_path": resolved_db_path,
-    }
+    total = len(all_messages)
+    page = all_messages[offset : offset + limit]
+
+    return {"messages": page, "total": total, "offset": offset, "limit": limit, "files_scanned": len(files)}
 
 
 # ---------------------------------------------------------------------------
@@ -822,30 +638,125 @@ async def _scan_transcripts_impl(glob_path: str, context_window: int, db_path: s
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_WRITE_ANNOTATIONS)
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def scan_transcripts(
-    glob_path: str, context_window: int = _DEFAULT_CONTEXT_WINDOW, db_path: str = ""
+    glob_path: str, context_window: int = _DEFAULT_CONTEXT_WINDOW, db_path: str = "", offset: int = 0, limit: int = 100
 ) -> dict[str, Any]:
-    """Scan JSONL transcript files for insults, rate them, and store in DuckDB.
+    """Extract raw user messages from JSONL transcript files for classification.
 
-    Reads each JSONL file matching the glob pattern, sends every user
-    message to the Claude API for classification across 9 categories,
-    extracts the preceding scenario context, and stores LLM-rated
-    insults in a persistent DuckDB database.
+    Returns a paginated list of user messages with surrounding context.
+    The caller (Claude) is responsible for classifying each message and
+    calling ``index_insult`` for those it decides to index.
+
+    No classification or external API calls are performed. No data is
+    written to DuckDB.
 
     Args:
         glob_path: Glob pattern pointing to JSONL transcript files,
             e.g. ``~/.claude/projects/-my-project/*.jsonl``
-        context_window: Number of preceding messages to capture per
-            insult for scenario extraction. Default 5.
-        db_path: Path to DuckDB file. Empty string uses default
-            (~/.local/share/frustration-analyzer/insults.duckdb).
+        context_window: Number of preceding messages to include as
+            context for each user message. Default 5.
+        db_path: Unused, kept for call-site compatibility.
+        offset: Number of messages to skip for pagination. Default 0.
+        limit: Maximum number of messages to return. Default 100.
 
     Returns:
-        Dict with scanned_files, insults_found, new_insults_indexed,
-        and db_path.
+        Dict with messages (list of {file, line_index, text, context}),
+        total message count, offset, limit, and files_scanned.
     """
-    return await _scan_transcripts_impl(glob_path, context_window, db_path)
+    return await asyncio.to_thread(_scan_transcripts_impl, glob_path, context_window, offset, limit)
+
+
+@mcp.tool(annotations=_WRITE_ANNOTATIONS)
+async def index_insult(
+    file: str,
+    line_index: int,
+    text: str,
+    category: str,
+    severity: int = 2,
+    creativity: int = 2,
+    humor: int = 2,
+    accuracy: int = 2,
+    had_prior_correction: bool = False,
+    matched_text: str = "",
+    reasoning: str = "",
+    context_window: int = _DEFAULT_CONTEXT_WINDOW,
+    db_path: str = "",
+) -> dict[str, Any]:
+    """Store a caller-classified insult with ratings and scenario context.
+
+    The caller (Claude) decides which messages are insults and provides
+    classification details. This tool writes the insult, its ratings,
+    and the surrounding scenario context to DuckDB.
+
+    Args:
+        file: Source JSONL file path.
+        line_index: Position of the insult record in the JSONL file.
+        text: The insult text.
+        category: One of: profanity_at_ai, model_comparison,
+            competence_challenge, intelligence_insult, repeat_failure,
+            sarcasm, dismissive_command, technical_putdown,
+            general_frustration.
+        severity: Severity rating 1-5.
+        creativity: Creativity rating 1-5.
+        humor: Humor rating 1-5.
+        accuracy: Accuracy rating 1-5.
+        had_prior_correction: Whether the AI was already corrected before.
+        matched_text: The specific phrase that is the insult.
+        reasoning: Free-text reasoning for the classification.
+        context_window: Number of preceding messages to capture.
+        db_path: Path to DuckDB file. Empty string uses default.
+
+    Returns:
+        Dict with indexed (bool), insult_id (int), and db_path (str).
+
+    Raises:
+        ToolError: If category is invalid, ratings are out of range,
+            or the file/line_index cannot be read.
+    """
+    if category not in _VALID_CATEGORIES:
+        raise ToolError(f"category must be one of {sorted(_VALID_CATEGORIES)}, got: {category!r}")
+    for name, value in [("severity", severity), ("creativity", creativity), ("humor", humor), ("accuracy", accuracy)]:
+        if not (_MIN_RATING <= value <= _MAX_RATING):
+            raise ToolError(f"{name} must be between {_MIN_RATING} and {_MAX_RATING}, got: {value}")
+
+    def _do_index() -> dict[str, Any]:
+        records = _read_jsonl(file)
+        if line_index < 0 or line_index >= len(records):
+            raise ToolError(f"line_index {line_index} out of range for {file} (has {len(records)} records)")
+        record = records[line_index]
+        assessment: dict[str, Any] = {
+            "category": category,
+            "severity": severity,
+            "creativity": creativity,
+            "humor": humor,
+            "accuracy": accuracy,
+            "had_prior_correction": had_prior_correction,
+            "matched_text": matched_text,
+            "reasoning": reasoning,
+        }
+        conn = _get_db(db_path)
+        resolved_db_path = db_path or _default_db_path()
+        was_new = _index_insult(
+            conn,
+            record,
+            records,
+            line_index,
+            text,
+            assessment,
+            context_window,
+            file.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl"),
+        )
+        conn.close()
+        insult_id: int | None = None
+        if was_new:
+            conn2 = _get_db(db_path)
+            row = conn2.execute("SELECT MAX(insult_id) FROM insults").fetchone()
+            conn2.close()
+            insult_id = row[0] if row else None
+        return {"indexed": was_new, "insult_id": insult_id, "db_path": resolved_db_path}
+
+    return await asyncio.to_thread(_do_index)
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
