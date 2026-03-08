@@ -19,7 +19,7 @@ Transcripts live at `~/.claude/projects/**/*.jsonl`. Each project directory cont
 
 1. Scan: `mcp__frustration-analyzer__scan_transcripts(glob_path="~/.claude/projects/**/*.jsonl")`
 2. Classify each returned message — call `mcp__frustration-analyzer__index_insult(...)` for each qualifying one
-3. Explore: `mcp__frustration-analyzer__list_insults()` / `mcp__frustration-analyzer__top_insults(limit=10)`
+3. Explore: `mcp__frustration-analyzer__list_insults()` / `mcp__frustration-analyzer__top_insults(n=10)`
 
 ## Workflow
 
@@ -37,7 +37,7 @@ mcp__frustration-analyzer__scan_transcripts(
 )
 ```
 
-Returns a paginated list of raw user messages. Each item:
+Returns a paginated list of raw user messages. Each message includes `context` (N preceding turns) already bundled — context is extracted at scan time, not fetched lazily. DuckDB is not involved at this stage. Each item:
 
 - `file` — source JSONL path
 - `line_index` — position in file
@@ -91,11 +91,10 @@ Each result includes insult text, category, all four rating dimensions, and comp
 
 ### Step 5 — Get Scenarios (understand why)
 
-For any insult worth investigating, call `get_scenario` to retrieve the preceding messages:
+For any insult **already indexed**, call `get_scenario` to retrieve its stored scenario from DuckDB:
 
 ```text
 mcp__frustration-analyzer__get_scenario(insult_id={id})
-mcp__frustration-analyzer__get_scenario(insult_id={id}, context_n=10)
 ```
 
 Returns N preceding messages (default 5). Identify the precipitating failure pattern:
@@ -151,7 +150,7 @@ Default to `sanitized` in all cases unless the user explicitly says "raw" or "un
 Sanitize text independently:
 
 ```text
-mcp__frustration-analyzer__sanitize_text(text="{text}", replace_profanity=true)
+mcp__frustration-analyzer__sanitize_text(text="{text}")
 ```
 
 ## Insult Categories
@@ -212,13 +211,13 @@ mcp__frustration-analyzer__list_insults(
 Get top 5 by humor:
 
 ```text
-mcp__frustration-analyzer__top_insults(dimension="humor", limit=5)
+mcp__frustration-analyzer__top_insults(n=5, sort_by="humor")
 ```
 
-Get scenario for insult 42 with 10 messages of context:
+Get scenario for insult 42:
 
 ```text
-mcp__frustration-analyzer__get_scenario(insult_id=42, context_n=10)
+mcp__frustration-analyzer__get_scenario(insult_id=42)
 ```
 
 Generate a sanitized post:
