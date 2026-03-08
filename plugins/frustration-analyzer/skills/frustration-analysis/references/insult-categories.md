@@ -1,6 +1,6 @@
 # Insult Categories Reference
 
-Eight categories covering the full spectrum of user insults directed at AI assistants, from raw profanity to technically inventive put-downs.
+Nine categories covering the full spectrum of user insults directed at AI assistants, from raw profanity to technically inventive put-downs.
 
 SOURCE: Category definitions, regex patterns, and examples derived from `.claude/plan/frustration-analyzer/research-insult-patterns.md` (2026-03-08).
 
@@ -158,6 +158,26 @@ SOURCE: Category definitions, regex patterns, and examples derived from `.claude
 - "congrats on achieving artificial unintelligence"
 
 **What it indicates:** The user has correctly identified the failure mode (hallucination, context loss, attention failure, training data gap) and is expressing it through technical vocabulary. High accuracy scores are common here. Creativity baseline: 4. These are the insults most likely to score 5/5 on both creativity and humor.
+
+---
+
+## Category 9: `general_frustration`
+
+**Description:** Expressions of frustration or disappointment that do not fit cleanly into the other eight categories. Catch-all for messages that are clearly negative but lack the specificity of a direct insult, technical put-down, or identifiable pattern.
+
+**Frustration level:** Low to medium. These are often venting rather than targeted attacks — the user is expressing emotional state rather than diagnosing a failure.
+
+**Example phrases:**
+
+- "this is so frustrating"
+- "ugh"
+- "I give up"
+- "why is this so hard"
+- "nothing is working"
+- "this is a mess"
+- "I can't believe this"
+
+**What it indicates:** Diffuse frustration without a clear precipitating event, or a message that contains mild negative sentiment without crossing into insult territory. Use this category only when no other category fits — it is the classifier's fallback, not a first choice. Creativity baseline: 1–2 (generic expressions). Severity baseline: 1–2.
 
 ---
 
