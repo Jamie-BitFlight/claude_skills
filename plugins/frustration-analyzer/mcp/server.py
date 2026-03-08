@@ -111,9 +111,15 @@ def _resolve_glob(glob_path: str) -> list[str]:
         Sorted list of matching absolute file path strings.
     """
     expanded = str(pathlib.Path(glob_path).expanduser()) if "~" in glob_path else glob_path
+    glob_chars = {"*", "?", "["}
+
+    # No glob characters — treat as a literal file path
+    if not any(c in expanded for c in glob_chars):
+        p = pathlib.Path(expanded)
+        return [str(p)] if p.is_file() else []
+
     parts = pathlib.PurePosixPath(expanded).parts
     base_parts: list[str] = []
-    glob_chars = {"*", "?", "["}
     for part in parts:
         if any(c in part for c in glob_chars):
             break
@@ -130,21 +136,21 @@ def _resolve_glob(glob_path: str) -> list[str]:
 
 
 def _duckdb_glob_pattern(file_paths: list[str]) -> str:
-    """Build a DuckDB-compatible glob or list expression for read_ndjson_auto.
+    """Build a SQL-ready source expression for read_ndjson_auto.
 
-    If all paths share a common directory with a simple glob, returns that.
-    Otherwise returns a list literal.
+    Returns a string that can be interpolated directly into SQL without
+    additional quoting (single-file paths are already quoted).
 
     Args:
         file_paths: Sorted list of resolved absolute file paths.
 
     Returns:
-        A string usable inside ``read_ndjson_auto()``.
+        SQL-ready source string: ``'path'`` for one file, ``['p1','p2']``
+        for multiple.
     """
-    if len(file_paths) == 1:
-        return file_paths[0]
-    # Use a DuckDB list literal for multiple files
     escaped = [fp.replace("'", "''") for fp in file_paths]
+    if len(escaped) == 1:
+        return f"'{escaped[0]}'"
     return "[" + ", ".join(f"'{fp}'" for fp in escaped) + "]"
 
 
@@ -172,19 +178,27 @@ def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> t
     source = _duckdb_glob_pattern(files)
     conn = duckdb.connect()
 
-    # Count total matching messages
-    count_sql = (
-        f"SELECT count(*) FROM read_ndjson_auto({source!r}, union_by_name=true)"  # noqa: S608
-        " WHERE type = 'user' AND toolUseResult IS NULL"
+    # Assign stable line_index (0-based row position in file) before filtering,
+    # so line_index matches the actual line number for context lookups.
+    base_from = f"read_ndjson_auto({source}, union_by_name=true, filename=true)"
+    numbered_cte = (
+        f"WITH numbered AS ("  # noqa: S608
+        f" SELECT filename AS file,"
+        f"        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
+        f'        message, uuid, "timestamp", sessionId AS session_id,'
+        f"        type, toolUseResult"
+        f" FROM {base_from}"
+        f")"
     )
+
+    count_sql = f"{numbered_cte} SELECT count(*) FROM numbered WHERE type = 'user' AND toolUseResult IS NULL"  # noqa: S608
     total_row = conn.execute(count_sql).fetchone()
     total = total_row[0] if total_row else 0
 
-    # Fetch the page of messages with file metadata
     query_sql = (
-        f"SELECT filename AS file, rowid AS line_index, message, uuid,"  # noqa: S608
-        f' "timestamp", sessionId AS session_id'
-        f" FROM read_ndjson_auto({source!r}, union_by_name=true, filename=true)"
+        f"{numbered_cte}"  # noqa: S608
+        f' SELECT file, line_index, message, uuid, "timestamp", session_id'
+        f" FROM numbered"
         f" WHERE type = 'user' AND toolUseResult IS NULL"
         f" LIMIT {limit} OFFSET {offset}"
     )
