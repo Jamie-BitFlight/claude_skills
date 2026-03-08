@@ -103,3 +103,18 @@ validator from scratch exceeds the stated constraint of a surgical change only.
 - `_apply_extension` merges `ext.additional_frozen_artefacts` into `step.frozen_artefacts` with order-preserving deduplication (via `dict.fromkeys`)
 - Duplicate keys in `additional_frozen_artefacts` that already exist in `step.frozen_artefacts` are deduplicated (base key wins position)
 **Reason not written**: T4 scope is integration wiring only. Test creation is assigned to T6 per the task plan.
+
+## Gap: frustration-analyzer MCP server
+
+**Files**: `plugins/frustration-analyzer/mcp/server.py`
+**Behavior to cover**:
+- `_heuristic_rate()`: verify creativity/severity/humor/accuracy base scores per category, modifier logic (+1 for technical terms, +1 for metaphors, +1 for caps/punctuation), cap at 5, composite calculation
+- `_sanitize_text_impl()`: EMAIL, IP, PATH, URL, TOKEN pattern matching and replacement; TOKEN minimum length filter; redaction ordering (most specific first)
+- `_extract_scenario()`: preceding message extraction, compact_boundary detection, had_prior_correction via kaizen soft signals, tool_sequence extraction
+- `_index_insult()`: duplicate detection (session_id + message_uuid), insert into all 3 tables, heuristic rating storage
+- `_scan_transcripts_impl()`: glob resolution, JSONL parsing, insult pattern matching across 8 categories, first-match-wins behavior, result counts
+- `scan_transcripts` / `list_insults` / `get_scenario` / `top_insults` / `generate_social_post` / `sanitize_text`: async tool wrappers with parameter validation, error cases (invalid sort_by, invalid mode, missing insult_id)
+- All 8 `_INSULT_PATTERNS` regex patterns: positive and negative matches per category
+- `_build_hashtags()`: category-specific hashtag, #ClaudeCode conditional on model name
+- `_fetch_insult_for_post()`: ToolError on missing insult
+**Reason not written**: New plugin created in this session; sub-agent scope limited to implementation. Test suite creation is a separate task.
