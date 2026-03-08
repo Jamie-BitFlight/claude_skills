@@ -4,34 +4,30 @@
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "duckdb>=0.10.0",
-#     "pandas>=2.0.0",
 # ]
 # ///
 """Frustration Analyzer MCP Server.
 
-Extracts user messages from Claude Code session transcripts for caller-side
-classification, indexes caller-classified insults into DuckDB, and provides
-query/reporting tools.
+Extracts user messages from Claude Code session transcripts using DuckDB as
+a query engine against the existing JSONL session log files.  No persistent
+database file is created -- every query runs in-memory against
+``read_ndjson_auto()``.
 
 Tools:
     scan_transcripts - Extract raw user messages from JSONL files for caller classification
-    index_insult - Store a caller-classified insult with ratings and scenario context
-    index_insults - Batch-index multiple insults in a single call (one DB connection per call)
-    list_insults - Query indexed insults with optional filters
-    get_scenario - Get full scenario context for a specific insult
-    top_insults - Return top N insults sorted by any rating dimension
-    generate_social_post - Generate social media content for an insult
+    list_insults - Query user messages from JSONL files with optional filters
+    top_insults - Return the longest/most notable user messages from JSONL files
+    get_scenario - Get full message context for a specific file + line position
+    generate_social_post - Generate social media content for a user message
     sanitize_text - Standalone PII sanitizer
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import pathlib
 import re
-from collections import defaultdict
 from typing import Any
 
 import duckdb
@@ -45,21 +41,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _DEFAULT_CONTEXT_WINDOW: int = 5
-_DEFAULT_DB_DIR: str = "~/.local/share/frustration-analyzer"
-_DEFAULT_DB_NAME: str = "insults.duckdb"
 _MIN_TOKEN_LENGTH: int = 20
-_MIN_RATING: int = 1
-_MAX_RATING: int = 5
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
     "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
-}
-
-_WRITE_ANNOTATIONS: dict[str, bool] = {
-    "readOnlyHint": False,
     "destructiveHint": False,
     "idempotentHint": True,
     "openWorldHint": False,
@@ -89,19 +74,6 @@ _CATEGORY_HASHTAGS: dict[str, str] = {
     "general_frustration": "#GeneralFrustration",
 }
 
-# Valid insult categories accepted by index_insult
-_VALID_CATEGORIES: set[str] = {
-    "profanity_at_ai",
-    "model_comparison",
-    "competence_challenge",
-    "intelligence_insult",
-    "repeat_failure",
-    "sarcasm",
-    "dismissive_command",
-    "technical_putdown",
-    "general_frustration",
-}
-
 # PII sanitization patterns (ordered most specific first)
 _PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), "[EMAIL]"),
@@ -119,89 +91,6 @@ _PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Schema SQL
-# ---------------------------------------------------------------------------
-
-_SCHEMA_SQL: str = """
-CREATE TABLE IF NOT EXISTS insults (
-    insult_id INTEGER PRIMARY KEY,
-    session_id VARCHAR NOT NULL,
-    timestamp VARCHAR NOT NULL,
-    message_uuid VARCHAR,
-    insult_text VARCHAR NOT NULL,
-    category VARCHAR NOT NULL,
-    matched_pattern VARCHAR,
-    model VARCHAR,
-    git_branch VARCHAR,
-    session_slug VARCHAR,
-    is_subagent BOOLEAN DEFAULT FALSE,
-    agent_name VARCHAR
-);
-
-CREATE TABLE IF NOT EXISTS insult_ratings (
-    rating_id INTEGER PRIMARY KEY,
-    insult_id INTEGER NOT NULL REFERENCES insults(insult_id),
-    creativity TINYINT NOT NULL CHECK (creativity BETWEEN 1 AND 5),
-    accuracy TINYINT NOT NULL CHECK (accuracy BETWEEN 1 AND 5),
-    severity TINYINT NOT NULL CHECK (severity BETWEEN 1 AND 5),
-    humor TINYINT NOT NULL CHECK (humor BETWEEN 1 AND 5),
-    composite DECIMAL(3,2),
-    rated_by VARCHAR NOT NULL DEFAULT 'auto',
-    rated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS insult_scenarios (
-    scenario_id INTEGER PRIMARY KEY,
-    insult_id INTEGER NOT NULL REFERENCES insults(insult_id),
-    preceding_messages JSON NOT NULL,
-    context_window_n TINYINT NOT NULL DEFAULT 5,
-    summary VARCHAR,
-    precipitating_failure VARCHAR,
-    had_prior_correction BOOLEAN DEFAULT FALSE,
-    compact_boundary_in_window BOOLEAN DEFAULT FALSE,
-    tool_sequence JSON
-);
-
-CREATE VIEW IF NOT EXISTS insult_leaderboard AS
-SELECT i.insult_id, i.insult_text, i.category, i.session_slug,
-       r.creativity, r.accuracy, r.severity, r.humor, r.composite,
-       s.precipitating_failure, s.summary
-FROM insults i
-JOIN insult_ratings r ON i.insult_id = r.insult_id
-LEFT JOIN insult_scenarios s ON i.insult_id = s.insult_id
-ORDER BY r.composite DESC;
-
-CREATE VIEW IF NOT EXISTS category_distribution AS
-SELECT i.category, COUNT(*) AS count,
-       AVG(r.severity) AS avg_severity,
-       AVG(r.composite) AS avg_composite
-FROM insults i
-JOIN insult_ratings r ON i.insult_id = r.insult_id
-GROUP BY i.category
-ORDER BY count DESC;
-
-CREATE VIEW IF NOT EXISTS failure_triggers AS
-SELECT s.precipitating_failure,
-       COUNT(*) AS insult_count,
-       AVG(r.severity) AS avg_severity,
-       AVG(r.composite) AS avg_composite,
-       MAX(r.composite) AS best_insult_score
-FROM insult_scenarios s
-JOIN insult_ratings r ON s.insult_id = r.insult_id
-GROUP BY s.precipitating_failure
-ORDER BY avg_severity DESC;
-
-CREATE VIEW IF NOT EXISTS escalation_patterns AS
-SELECT i.insult_id, i.insult_text, i.category, s.had_prior_correction,
-       s.precipitating_failure, r.severity
-FROM insults i
-JOIN insult_ratings r ON i.insult_id = r.insult_id
-JOIN insult_scenarios s ON i.insult_id = s.insult_id
-WHERE s.had_prior_correction = TRUE
-ORDER BY r.severity DESC;
-"""
-
-# ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
 
@@ -210,56 +99,6 @@ mcp = FastMCP("frustration-analyzer", mask_error_details=False)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _default_db_path() -> str:
-    """Return the default DuckDB file path, creating directories as needed.
-
-    Returns:
-        Absolute path to the default insults.duckdb file.
-    """
-    db_dir = pathlib.Path(_DEFAULT_DB_DIR).expanduser()
-    db_dir.mkdir(parents=True, exist_ok=True)
-    return str(db_dir / _DEFAULT_DB_NAME)
-
-
-def _ensure_schema(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create tables and views if they do not exist.
-
-    Args:
-        conn: An open DuckDB connection.
-    """
-    conn.execute(_SCHEMA_SQL)
-
-
-def _get_db(db_path: str) -> duckdb.DuckDBPyConnection:
-    """Open a DuckDB connection and ensure schema exists.
-
-    Args:
-        db_path: Path to the .duckdb file. Empty string uses default.
-
-    Returns:
-        An open DuckDB connection with schema initialized.
-    """
-    resolved = db_path or _default_db_path()
-    conn = duckdb.connect(resolved)
-    _ensure_schema(conn)
-    return conn
-
-
-def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
-    """Read a JSONL file and return a list of parsed records.
-
-    Args:
-        file_path: Path to a single JSONL file.
-
-    Returns:
-        List of dicts, one per line.
-    """
-    records: list[dict[str, Any]] = []
-    with pathlib.Path(file_path).open(encoding="utf-8") as fh:
-        records.extend(json.loads(stripped) for line in fh if (stripped := line.strip()))
-    return records
 
 
 def _resolve_glob(glob_path: str) -> list[str]:
@@ -290,92 +129,167 @@ def _resolve_glob(glob_path: str) -> list[str]:
     return sorted(str(p) for p in base.glob(relative))
 
 
-def _extract_user_text(message: dict[str, Any]) -> str:
-    """Extract plain text from a user message content field.
+def _duckdb_glob_pattern(file_paths: list[str]) -> str:
+    """Build a DuckDB-compatible glob or list expression for read_ndjson_auto.
 
-    Handles both string content and list-of-blocks content formats.
+    If all paths share a common directory with a simple glob, returns that.
+    Otherwise returns a list literal.
 
     Args:
-        message: The ``message`` dict from a ``user`` record.
+        file_paths: Sorted list of resolved absolute file paths.
+
+    Returns:
+        A string usable inside ``read_ndjson_auto()``.
+    """
+    if len(file_paths) == 1:
+        return file_paths[0]
+    # Use a DuckDB list literal for multiple files
+    escaped = [fp.replace("'", "''") for fp in file_paths]
+    return "[" + ", ".join(f"'{fp}'" for fp in escaped) + "]"
+
+
+def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], int, int]:
+    """Query user messages from JSONL files using DuckDB.
+
+    Uses ``read_ndjson_auto()`` to read JSONL files and SQL to filter
+    for user messages (type = 'user', no toolUseResult).
+
+    Args:
+        glob_path: Glob pattern pointing to JSONL transcript files.
+        offset: Number of messages to skip (pagination).
+        limit: Maximum number of messages to return.
+
+    Returns:
+        Tuple of (messages list, total count, files_scanned count).
+
+    Raises:
+        ToolError: If no files match the glob pattern.
+    """
+    files = _resolve_glob(glob_path)
+    if not files:
+        raise ToolError(f"No files matched glob pattern: {glob_path}")
+
+    source = _duckdb_glob_pattern(files)
+    conn = duckdb.connect()
+
+    # Count total matching messages
+    count_sql = (
+        f"SELECT count(*) FROM read_ndjson_auto({source!r}, union_by_name=true)"  # noqa: S608
+        " WHERE type = 'user' AND toolUseResult IS NULL"
+    )
+    total_row = conn.execute(count_sql).fetchone()
+    total = total_row[0] if total_row else 0
+
+    # Fetch the page of messages with file metadata
+    query_sql = (
+        f"SELECT filename AS file, rowid AS line_index, message, uuid,"  # noqa: S608
+        f' "timestamp", sessionId AS session_id'
+        f" FROM read_ndjson_auto({source!r}, union_by_name=true, filename=true)"
+        f" WHERE type = 'user' AND toolUseResult IS NULL"
+        f" LIMIT {limit} OFFSET {offset}"
+    )
+    rows = conn.execute(query_sql).fetchall()
+    columns = ["file", "line_index", "message", "uuid", "timestamp", "session_id"]
+    conn.close()
+
+    messages: list[dict[str, Any]] = []
+    for row in rows:
+        record = dict(zip(columns, row, strict=False))
+        text = _extract_user_text_from_value(record.pop("message"))
+        if text:
+            record["text"] = text
+            messages.append(record)
+
+    return messages, total, len(files)
+
+
+def _extract_user_text_from_value(
+    content: str | list[str | dict[str, str]] | dict[str, str | list[str | dict[str, str]]],
+) -> str:
+    """Extract plain text from a user message content field.
+
+    Handles both string content and list-of-blocks content formats,
+    as well as the ``{"content": ...}`` wrapper dict that DuckDB may
+    return from JSON columns.
+
+    Args:
+        content: The content value -- may be a string, list, or dict
+            with a ``content`` key.
 
     Returns:
         Extracted text, or empty string if no text found.
     """
-    content = message.get("content")
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
+    # Unwrap {"content": ...} dict wrapper
+    unwrapped = content.get("content", content) if isinstance(content, dict) else content
+
+    if isinstance(unwrapped, str):
+        return unwrapped
+    if isinstance(unwrapped, list):
         parts: list[str] = []
-        for block in content:
-            if isinstance(block, dict):
-                if block.get("type") == "text":
-                    text = block.get("text", "")
-                    if isinstance(text, str):
-                        parts.append(text)
+        for block in unwrapped:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                if isinstance(text, str):
+                    parts.append(text)
             elif isinstance(block, str):
                 parts.append(block)
         return " ".join(parts)
     return ""
 
 
-def _extract_model_from_records(records: list[dict[str, Any]], insult_index: int) -> str | None:
-    """Find the model name from the most recent assistant message before the insult.
+def _get_context_messages(file_path: str, line_index: int, context_window: int) -> list[dict[str, Any]]:
+    """Get surrounding context messages for a specific position in a JSONL file.
+
+    Uses DuckDB to read the file and extract preceding messages.
 
     Args:
-        records: All JSONL records in the session.
-        insult_index: Index of the insult record in the list.
+        file_path: Path to the JSONL file.
+        line_index: Row index of the target message.
+        context_window: Number of preceding messages to capture.
 
     Returns:
-        Model name string or None if not found.
+        List of context message dicts with role, timestamp, uuid, and text.
     """
-    for i in range(insult_index - 1, -1, -1):
-        record = records[i]
-        if record.get("type") == "assistant":
-            message = record.get("message")
-            if isinstance(message, dict):
-                model = message.get("model")
-                if isinstance(model, str):
-                    return model
-    return None
+    start = max(0, line_index - context_window)
+    conn = duckdb.connect()
+
+    sql = (
+        f'SELECT type AS role, "timestamp", uuid, message, toolUseResult'  # noqa: S608
+        f" FROM read_ndjson_auto({file_path!r}, union_by_name=true)"
+        f" WHERE rowid >= {start} AND rowid < {line_index}"
+    )
+    rows = conn.execute(sql).fetchall()
+    conn.close()
+
+    context: list[dict[str, Any]] = []
+    for row in rows:
+        role, timestamp, uuid_val, message, tool_use_result = row
+        if role == "user" and tool_use_result is None:
+            text = _extract_user_text_from_value(message)
+            if text:
+                context.append({
+                    "role": role,
+                    "timestamp": str(timestamp or ""),
+                    "uuid": str(uuid_val or ""),
+                    "text": text,
+                })
+        elif role == "assistant":
+            entry: dict[str, Any] = {"role": role, "timestamp": str(timestamp or ""), "uuid": str(uuid_val or "")}
+            _extract_assistant_context(message, entry)
+            context.append(entry)
+
+    return context
 
 
-def _extract_tool_sequence(records: list[dict[str, Any]], start: int, end: int) -> list[str]:
-    """Extract tool names from assistant messages in a record range.
+def _extract_assistant_context(message: str | dict[str, Any] | None, entry: dict[str, Any]) -> None:
+    """Extract text and tool info from an assistant message into an entry dict.
 
     Args:
-        records: All JSONL records.
-        start: Start index (inclusive).
-        end: End index (exclusive).
-
-    Returns:
-        Ordered list of tool names used.
-    """
-    tools: list[str] = []
-    for i in range(start, min(end, len(records))):
-        record = records[i]
-        if record.get("type") != "assistant":
-            continue
-        message = record.get("message")
-        if not isinstance(message, dict):
-            continue
-        content = message.get("content")
-        if not isinstance(content, list):
-            continue
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "tool_use":
-                name = block.get("name")
-                if isinstance(name, str):
-                    tools.append(name)
-    return tools
-
-
-def _extract_assistant_entry(message: dict[str, Any], entry: dict[str, str]) -> None:
-    """Extract text and tool info from an assistant message into entry dict.
-
-    Args:
-        message: The assistant message dict.
+        message: The assistant message value from DuckDB (may be dict or None).
         entry: Mutable entry dict to populate with text and tool_name.
     """
+    if not isinstance(message, dict):
+        return
     content = message.get("content")
     if not isinstance(content, list):
         return
@@ -383,66 +297,14 @@ def _extract_assistant_entry(message: dict[str, Any], entry: dict[str, str]) -> 
     for block in content:
         if not isinstance(block, dict):
             continue
-        if block.get("type") == "text":
-            t = block.get("text", "")
-            if isinstance(t, str):
-                text_parts.append(t)
-        elif block.get("type") == "tool_use":
-            entry["tool_name"] = str(block.get("name", "unknown"))
+        match block.get("type"):
+            case "text":
+                t = block.get("text", "")
+                if isinstance(t, str):
+                    text_parts.append(t)
+            case "tool_use":
+                entry["tool_name"] = str(block.get("name", "unknown"))
     entry["text"] = " ".join(text_parts)
-
-
-def _extract_scenario(records: list[dict[str, Any]], insult_index: int, context_window: int) -> dict[str, Any]:
-    """Extract the scenario context around an insult.
-
-    Args:
-        records: All JSONL records in the session.
-        insult_index: Index of the insult record.
-        context_window: Number of preceding messages to capture.
-
-    Returns:
-        Dict with preceding_messages, compact_boundary_in_window,
-        and tool_sequence.
-    """
-    start = max(0, insult_index - context_window)
-    preceding: list[dict[str, Any]] = []
-    compact_boundary_in_window = False
-
-    for i in range(start, insult_index):
-        record = records[i]
-        record_type = record.get("type", "")
-
-        if record_type == "system" and record.get("subtype") == "compact_boundary":
-            compact_boundary_in_window = True
-            continue
-
-        entry: dict[str, str] = {
-            "role": record_type,
-            "timestamp": str(record.get("timestamp", "")),
-            "uuid": str(record.get("uuid", "")),
-        }
-
-        if record_type == "user" and not record.get("toolUseResult"):
-            message = record.get("message")
-            if isinstance(message, dict):
-                text = _extract_user_text(message)
-                entry["text"] = text
-        elif record_type == "assistant":
-            message = record.get("message")
-            if isinstance(message, dict):
-                _extract_assistant_entry(message, entry)
-        else:
-            continue
-
-        preceding.append(entry)
-
-    tool_sequence = _extract_tool_sequence(records, start, insult_index)
-
-    return {
-        "preceding_messages": preceding,
-        "compact_boundary_in_window": compact_boundary_in_window,
-        "tool_sequence": tool_sequence,
-    }
 
 
 def _sanitize_text_impl(text: str) -> dict[str, Any]:
@@ -472,638 +334,6 @@ def _sanitize_text_impl(text: str) -> dict[str, Any]:
     return {"original": text, "sanitized": sanitized, "redactions": redactions, "redaction_count": len(redactions)}
 
 
-def _next_id(conn: duckdb.DuckDBPyConnection, table: str, id_column: str) -> int:
-    """Get the next auto-increment ID for a table.
-
-    Args:
-        conn: Open DuckDB connection.
-        table: Table name.
-        id_column: Primary key column name.
-
-    Returns:
-        Next integer ID value.
-    """
-    row = conn.execute(f"SELECT COALESCE(MAX({id_column}), 0) FROM {table}").fetchone()  # noqa: S608
-    return (row[0] if row else 0) + 1
-
-
-def _index_insult(
-    conn: duckdb.DuckDBPyConnection,
-    record: dict[str, Any],
-    records: list[dict[str, Any]],
-    idx: int,
-    text: str,
-    assessment: dict[str, Any],
-    context_window: int,
-    session_id_from_file: str,
-) -> bool:
-    """Insert a single insult with its rating and scenario into the database.
-
-    Uses LLM-provided classification and ratings from the assessment dict
-    instead of regex-based heuristics.
-
-    Args:
-        conn: Open DuckDB connection.
-        record: The JSONL record containing the insult.
-        records: All JSONL records in the session.
-        idx: Index of the insult record in records.
-        text: The insult text.
-        assessment: LLM classification dict with category, severity,
-            creativity, humor, accuracy, matched_text, had_prior_correction.
-        context_window: Number of preceding messages to capture.
-        session_id_from_file: Fallback session ID from filename.
-
-    Returns:
-        True if a new insult was indexed, False if duplicate.
-    """
-    session_id = str(record.get("sessionId", session_id_from_file))
-    message_uuid = str(record.get("uuid", ""))
-
-    existing = conn.execute(
-        "SELECT insult_id FROM insults WHERE session_id = ? AND message_uuid = ?", [session_id, message_uuid]
-    ).fetchone()
-    if existing:
-        return False
-
-    insult_id = _next_id(conn, "insults", "insult_id")
-    category: str = assessment["category"]
-    matched_text: str = assessment.get("matched_text", "")
-
-    conn.execute(
-        """INSERT INTO insults
-        (insult_id, session_id, timestamp, message_uuid, insult_text,
-         category, matched_pattern, model, git_branch, session_slug,
-         is_subagent, agent_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        [
-            insult_id,
-            session_id,
-            str(record.get("timestamp", "")),
-            message_uuid,
-            text,
-            category,
-            matched_text,
-            _extract_model_from_records(records, idx),
-            record.get("gitBranch"),
-            record.get("slug"),
-            bool(record.get("isSidechain")),
-            record.get("agentName"),
-        ],
-    )
-
-    creativity = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("creativity", 2))))
-    accuracy = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("accuracy", 2))))
-    severity = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("severity", 2))))
-    humor = max(_MIN_RATING, min(_MAX_RATING, int(assessment.get("humor", 2))))
-    composite = round((creativity + accuracy + severity + humor) / 4, 2)
-
-    conn.execute(
-        """INSERT INTO insult_ratings
-        (rating_id, insult_id, creativity, accuracy, severity, humor, composite, rated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'llm')""",
-        [_next_id(conn, "insult_ratings", "rating_id"), insult_id, creativity, accuracy, severity, humor, composite],
-    )
-
-    scenario = _extract_scenario(records, idx, context_window)
-    had_prior_correction = bool(assessment.get("had_prior_correction"))
-    conn.execute(
-        """INSERT INTO insult_scenarios
-        (scenario_id, insult_id, preceding_messages, context_window_n,
-         had_prior_correction, compact_boundary_in_window, tool_sequence)
-        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        [
-            _next_id(conn, "insult_scenarios", "scenario_id"),
-            insult_id,
-            json.dumps(scenario["preceding_messages"]),
-            context_window,
-            had_prior_correction,
-            scenario["compact_boundary_in_window"],
-            json.dumps(scenario["tool_sequence"]),
-        ],
-    )
-
-    return True
-
-
-def _build_assessment(item: dict[str, Any]) -> dict[str, Any]:
-    """Build an assessment dict from a batch item.
-
-    Args:
-        item: A single insult dict from the batch input.
-
-    Returns:
-        Assessment dict suitable for ``_index_insult``.
-    """
-    return {
-        "category": item["category"],
-        "severity": int(item.get("severity", 2)),
-        "creativity": int(item.get("creativity", 2)),
-        "humor": int(item.get("humor", 2)),
-        "accuracy": int(item.get("accuracy", 2)),
-        "had_prior_correction": bool(item.get("had_prior_correction")),
-        "matched_text": str(item.get("matched_text", "")),
-        "reasoning": str(item.get("reasoning", "")),
-    }
-
-
-def _validate_batch_line_indexes(
-    by_file: dict[str, list[tuple[int, dict[str, Any]]]], file_records: dict[str, list[dict[str, Any]]]
-) -> None:
-    """Validate all line_index values in a batch before writing.
-
-    Args:
-        by_file: Items grouped by file path with batch indices.
-        file_records: Pre-read JSONL records keyed by file path.
-
-    Raises:
-        ToolError: If any line_index is out of range.
-    """
-    for file_path, items in by_file.items():
-        records = file_records[file_path]
-        for batch_idx, item in items:
-            line_index = int(item["line_index"])
-            if line_index < 0 or line_index >= len(records):
-                raise ToolError(
-                    f"insults[{batch_idx}]: line_index {line_index} out of range "
-                    f"for {file_path} (has {len(records)} records)"
-                )
-
-
-def _index_batch_items(
-    conn: duckdb.DuckDBPyConnection,
-    by_file: dict[str, list[tuple[int, dict[str, Any]]]],
-    file_records: dict[str, list[dict[str, Any]]],
-    result_count: int,
-) -> tuple[list[dict[str, Any]], int, int]:
-    """Index all batch items using a single DB connection.
-
-    Args:
-        conn: Open DuckDB connection.
-        by_file: Items grouped by file path with batch indices.
-        file_records: Pre-read JSONL records keyed by file path.
-        result_count: Total number of items (for result list sizing).
-
-    Returns:
-        Tuple of (results list, indexed count, skipped count).
-    """
-    results: list[dict[str, Any]] = [{}] * result_count
-    indexed_count = 0
-    skipped_count = 0
-
-    for file_path, items in by_file.items():
-        records = file_records[file_path]
-        for batch_idx, item in items:
-            line_index = int(item["line_index"])
-            context_window = int(item.get("context_window", _DEFAULT_CONTEXT_WINDOW))
-            was_new = _index_insult(
-                conn,
-                records[line_index],
-                records,
-                line_index,
-                str(item["text"]),
-                _build_assessment(item),
-                context_window,
-                file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl"),
-            )
-            if was_new:
-                row = conn.execute("SELECT MAX(insult_id) FROM insults").fetchone()
-                insult_id = row[0] if row else None
-                results[batch_idx] = {"insult_id": insult_id, "indexed": True}
-                indexed_count += 1
-            else:
-                results[batch_idx] = {"insult_id": None, "indexed": False}
-                skipped_count += 1
-
-    return results, indexed_count, skipped_count
-
-
-def _scan_transcripts_impl(glob_path: str, context_window: int, offset: int, limit: int) -> dict[str, Any]:
-    """Extract user messages from JSONL transcripts for caller-side classification.
-
-    Walks matching JSONL files, extracts user messages with surrounding
-    context, and returns them for the MCP caller to classify.
-
-    Args:
-        glob_path: Glob pattern pointing to JSONL transcript files.
-        context_window: Number of preceding messages to capture per message.
-        offset: Number of messages to skip (pagination).
-        limit: Maximum number of messages to return.
-
-    Returns:
-        Dict with messages list, total count, offset, limit, and files_scanned.
-
-    Raises:
-        ToolError: If no files match the glob pattern.
-    """
-    files = _resolve_glob(glob_path)
-    if not files:
-        raise ToolError(f"No files matched glob pattern: {glob_path}")
-
-    all_messages: list[dict[str, Any]] = []
-
-    for file_path in files:
-        records = _read_jsonl(file_path)
-        for idx, record in enumerate(records):
-            if record.get("type") != "user" or record.get("toolUseResult"):
-                continue
-            message = record.get("message")
-            if not isinstance(message, dict):
-                continue
-            text = _extract_user_text(message)
-            if not text:
-                continue
-
-            scenario = _extract_scenario(records, idx, context_window)
-            all_messages.append({
-                "file": file_path,
-                "line_index": idx,
-                "text": text,
-                "context": scenario["preceding_messages"],
-            })
-
-    total = len(all_messages)
-    page = all_messages[offset : offset + limit]
-
-    return {"messages": page, "total": total, "offset": offset, "limit": limit, "files_scanned": len(files)}
-
-
-# ---------------------------------------------------------------------------
-# MCP Tools
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def scan_transcripts(
-    glob_path: str, context_window: int = _DEFAULT_CONTEXT_WINDOW, db_path: str = "", offset: int = 0, limit: int = 100
-) -> dict[str, Any]:
-    """Extract raw user messages from JSONL transcript files for classification.
-
-    Returns a paginated list of user messages with surrounding context.
-    The caller (Claude) is responsible for classifying each message and
-    calling ``index_insult`` for those it decides to index.
-
-    No classification or external API calls are performed. No data is
-    written to DuckDB.
-
-    Args:
-        glob_path: Glob pattern pointing to JSONL transcript files,
-            e.g. ``~/.claude/projects/-my-project/*.jsonl``
-        context_window: Number of preceding messages to include as
-            context for each user message. Default 5.
-        db_path: Unused, kept for call-site compatibility.
-        offset: Number of messages to skip for pagination. Default 0.
-        limit: Maximum number of messages to return. Default 100.
-
-    Returns:
-        Dict with messages (list of {file, line_index, text, context}),
-        total message count, offset, limit, and files_scanned.
-    """
-    return await asyncio.to_thread(_scan_transcripts_impl, glob_path, context_window, offset, limit)
-
-
-@mcp.tool(annotations=_WRITE_ANNOTATIONS)
-async def index_insult(
-    file: str,
-    line_index: int,
-    text: str,
-    category: str,
-    severity: int = 2,
-    creativity: int = 2,
-    humor: int = 2,
-    accuracy: int = 2,
-    had_prior_correction: bool = False,
-    matched_text: str = "",
-    reasoning: str = "",
-    context_window: int = _DEFAULT_CONTEXT_WINDOW,
-    db_path: str = "",
-) -> dict[str, Any]:
-    """Store a caller-classified insult with ratings and scenario context.
-
-    The caller (Claude) decides which messages are insults and provides
-    classification details. This tool writes the insult, its ratings,
-    and the surrounding scenario context to DuckDB.
-
-    Args:
-        file: Source JSONL file path.
-        line_index: Position of the insult record in the JSONL file.
-        text: The insult text.
-        category: One of: profanity_at_ai, model_comparison,
-            competence_challenge, intelligence_insult, repeat_failure,
-            sarcasm, dismissive_command, technical_putdown,
-            general_frustration.
-        severity: Severity rating 1-5.
-        creativity: Creativity rating 1-5.
-        humor: Humor rating 1-5.
-        accuracy: Accuracy rating 1-5.
-        had_prior_correction: Whether the AI was already corrected before.
-        matched_text: The specific phrase that is the insult.
-        reasoning: Free-text reasoning for the classification.
-        context_window: Number of preceding messages to capture.
-        db_path: Path to DuckDB file. Empty string uses default.
-
-    Returns:
-        Dict with indexed (bool), insult_id (int), and db_path (str).
-
-    Raises:
-        ToolError: If category is invalid, ratings are out of range,
-            or the file/line_index cannot be read.
-    """
-    if category not in _VALID_CATEGORIES:
-        raise ToolError(f"category must be one of {sorted(_VALID_CATEGORIES)}, got: {category!r}")
-    for name, value in [("severity", severity), ("creativity", creativity), ("humor", humor), ("accuracy", accuracy)]:
-        if not (_MIN_RATING <= value <= _MAX_RATING):
-            raise ToolError(f"{name} must be between {_MIN_RATING} and {_MAX_RATING}, got: {value}")
-
-    def _do_index() -> dict[str, Any]:
-        records = _read_jsonl(file)
-        if line_index < 0 or line_index >= len(records):
-            raise ToolError(f"line_index {line_index} out of range for {file} (has {len(records)} records)")
-        record = records[line_index]
-        assessment: dict[str, Any] = {
-            "category": category,
-            "severity": severity,
-            "creativity": creativity,
-            "humor": humor,
-            "accuracy": accuracy,
-            "had_prior_correction": had_prior_correction,
-            "matched_text": matched_text,
-            "reasoning": reasoning,
-        }
-        conn = _get_db(db_path)
-        resolved_db_path = db_path or _default_db_path()
-        was_new = _index_insult(
-            conn,
-            record,
-            records,
-            line_index,
-            text,
-            assessment,
-            context_window,
-            file.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl"),
-        )
-        conn.close()
-        insult_id: int | None = None
-        if was_new:
-            conn2 = _get_db(db_path)
-            row = conn2.execute("SELECT MAX(insult_id) FROM insults").fetchone()
-            conn2.close()
-            insult_id = row[0] if row else None
-        return {"indexed": was_new, "insult_id": insult_id, "db_path": resolved_db_path}
-
-    return await asyncio.to_thread(_do_index)
-
-
-@mcp.tool(annotations=_WRITE_ANNOTATIONS)
-async def index_insults(insults: list[dict[str, Any]], db_path: str = "") -> dict[str, Any]:
-    """Store multiple caller-classified insults in a single call.
-
-    Accepts a list of insult dicts and indexes them all using one DB
-    connection, reading each source JSONL file at most once. Each item
-    uses the same fields as ``index_insult``.
-
-    All categories and ratings are validated before any rows are written
-    (fail-fast). If validation fails, nothing is persisted.
-
-    Args:
-        insults: List of dicts, each with keys: file, line_index, text,
-            category, severity (1-5), creativity (1-5), humor (1-5),
-            accuracy (1-5), had_prior_correction (bool),
-            matched_text (str), reasoning (str), context_window (int).
-        db_path: Path to DuckDB file. Empty string uses default.
-
-    Returns:
-        Dict with indexed (int count of new insults), skipped (int count
-        of duplicates), and results (list of {insult_id, indexed} per item).
-
-    Raises:
-        ToolError: If any item has an invalid category or out-of-range
-            rating. The entire batch is rejected.
-    """
-    if not insults:
-        return {"indexed": 0, "skipped": 0, "results": []}
-
-    # --- Fail-fast validation (no writes until all items pass) ---
-    for i, item in enumerate(insults):
-        cat = item.get("category", "")
-        if cat not in _VALID_CATEGORIES:
-            raise ToolError(f"insults[{i}]: category must be one of {sorted(_VALID_CATEGORIES)}, got: {cat!r}")
-        for name in ("severity", "creativity", "humor", "accuracy"):
-            value = item.get(name, 2)
-            if not (_MIN_RATING <= int(value) <= _MAX_RATING):
-                raise ToolError(f"insults[{i}]: {name} must be between {_MIN_RATING} and {_MAX_RATING}, got: {value}")
-
-    def _do_batch() -> dict[str, Any]:
-        # Group items by file so each JSONL is read once
-        by_file: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
-        for idx, item in enumerate(insults):
-            by_file[item["file"]].append((idx, item))
-
-        # Pre-read all files
-        file_records: dict[str, list[dict[str, Any]]] = {fp: _read_jsonl(fp) for fp in by_file}
-
-        # Validate all line_index values before writing
-        _validate_batch_line_indexes(by_file, file_records)
-
-        # One DB connection for the whole batch
-        conn = _get_db(db_path)
-        resolved_db_path = db_path or _default_db_path()
-
-        results, indexed_count, skipped_count = _index_batch_items(conn, by_file, file_records, len(insults))
-        conn.close()
-        return {"indexed": indexed_count, "skipped": skipped_count, "results": results, "db_path": resolved_db_path}
-
-    return await asyncio.to_thread(_do_batch)
-
-
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def list_insults(
-    db_path: str = "", category: str = "", min_composite: float = 0.0, limit: int = 20, offset: int = 0
-) -> list[dict[str, Any]]:
-    """Query indexed insults from the database with optional filters.
-
-    Returns rows from the insult_leaderboard view, which joins
-    insults, ratings, and scenarios.
-
-    Args:
-        db_path: Path to DuckDB file. Empty string uses default.
-        category: Filter by insult category slug. Empty for all.
-        min_composite: Minimum composite score threshold.
-        limit: Maximum number of results to return.
-        offset: Number of results to skip for pagination.
-
-    Returns:
-        List of dicts with insult details, ratings, and scenario info.
-    """
-
-    def _query() -> list[dict[str, Any]]:
-        conn = _get_db(db_path)
-        conditions: list[str] = []
-        params: list[Any] = []
-
-        if category:
-            conditions.append("category = ?")
-            params.append(category)
-        if min_composite > 0:
-            conditions.append("composite >= ?")
-            params.append(min_composite)
-
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        sql = f"SELECT * FROM insult_leaderboard {where} LIMIT ? OFFSET ?"  # noqa: S608
-        params.extend([limit, offset])
-
-        result = conn.execute(sql, params).fetchdf()
-        conn.close()
-        return result.to_dict(orient="records")
-
-    return await asyncio.to_thread(_query)
-
-
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def get_scenario(insult_id: int, db_path: str = "") -> dict[str, Any]:
-    """Get the full scenario context for a specific insult.
-
-    Includes preceding messages, summary, precipitating failure,
-    and tool sequence leading up to the insult.
-
-    Args:
-        insult_id: The ID of the insult to retrieve the scenario for.
-        db_path: Path to DuckDB file. Empty string uses default.
-
-    Returns:
-        Dict with insult details and full scenario including
-        preceding_messages JSON.
-
-    Raises:
-        ToolError: If the insult_id is not found.
-    """
-
-    def _query() -> dict[str, Any]:
-        conn = _get_db(db_path)
-        row = conn.execute(
-            """SELECT i.insult_id, i.insult_text, i.category, i.session_id,
-                      i.timestamp, i.model, i.session_slug,
-                      s.preceding_messages, s.context_window_n,
-                      s.summary, s.precipitating_failure,
-                      s.had_prior_correction, s.compact_boundary_in_window,
-                      s.tool_sequence,
-                      r.creativity, r.accuracy, r.severity, r.humor, r.composite
-               FROM insults i
-               LEFT JOIN insult_scenarios s ON i.insult_id = s.insult_id
-               LEFT JOIN insult_ratings r ON i.insult_id = r.insult_id
-               WHERE i.insult_id = ?""",
-            [insult_id],
-        ).fetchone()
-        conn.close()
-
-        if not row:
-            raise ToolError(f"Insult ID {insult_id} not found")
-
-        columns = [
-            "insult_id",
-            "insult_text",
-            "category",
-            "session_id",
-            "timestamp",
-            "model",
-            "session_slug",
-            "preceding_messages",
-            "context_window_n",
-            "summary",
-            "precipitating_failure",
-            "had_prior_correction",
-            "compact_boundary_in_window",
-            "tool_sequence",
-            "creativity",
-            "accuracy",
-            "severity",
-            "humor",
-            "composite",
-        ]
-        result = dict(zip(columns, row, strict=False))
-
-        # Parse JSON fields
-        for json_field in ("preceding_messages", "tool_sequence"):
-            val = result.get(json_field)
-            if isinstance(val, str):
-                result[json_field] = json.loads(val)
-
-        return result
-
-    return await asyncio.to_thread(_query)
-
-
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def top_insults(n: int = 10, sort_by: str = "composite", db_path: str = "") -> list[dict[str, Any]]:
-    """Return the top N insults sorted by a rating dimension.
-
-    Args:
-        n: Number of top insults to return.
-        sort_by: Rating dimension to sort by. One of: composite,
-            humor, creativity, severity, accuracy.
-        db_path: Path to DuckDB file. Empty string uses default.
-
-    Returns:
-        List of dicts with insult details and ratings, sorted by
-        the specified dimension descending.
-
-    Raises:
-        ToolError: If sort_by is not a valid dimension.
-    """
-    valid_sorts = {"composite", "humor", "creativity", "severity", "accuracy"}
-    if sort_by not in valid_sorts:
-        raise ToolError(f"sort_by must be one of {valid_sorts}, got: {sort_by}")
-
-    def _query() -> list[dict[str, Any]]:
-        conn = _get_db(db_path)
-        # sort_by is validated against valid_sorts whitelist above
-        sql = (
-            f"SELECT i.insult_id, i.insult_text, i.category, i.session_slug,"  # noqa: S608
-            f" r.creativity, r.accuracy, r.severity, r.humor, r.composite,"
-            f" s.summary, s.precipitating_failure"
-            f" FROM insults i"
-            f" JOIN insult_ratings r ON i.insult_id = r.insult_id"
-            f" LEFT JOIN insult_scenarios s ON i.insult_id = s.insult_id"
-            f" ORDER BY r.{sort_by} DESC"
-            f" LIMIT ?"
-        )
-        result = conn.execute(sql, [n]).fetchdf()
-        conn.close()
-        return result.to_dict(orient="records")
-
-    return await asyncio.to_thread(_query)
-
-
-def _fetch_insult_for_post(insult_id: int, db_path: str) -> tuple[Any, ...]:
-    """Fetch insult data needed for social post generation.
-
-    Args:
-        insult_id: The insult to fetch.
-        db_path: Path to DuckDB file.
-
-    Returns:
-        Tuple of (id, text, category, model, creativity, accuracy,
-        severity, humor, summary).
-
-    Raises:
-        ToolError: If insult_id not found.
-    """
-    conn = _get_db(db_path)
-    row = conn.execute(
-        """SELECT i.insult_id, i.insult_text, i.category, i.model,
-                  r.creativity, r.accuracy, r.severity, r.humor,
-                  s.summary
-           FROM insults i
-           JOIN insult_ratings r ON i.insult_id = r.insult_id
-           LEFT JOIN insult_scenarios s ON i.insult_id = s.insult_id
-           WHERE i.insult_id = ?""",
-        [insult_id],
-    ).fetchone()
-    conn.close()
-    if not row:
-        raise ToolError(f"Insult ID {insult_id} not found")
-    return row
-
-
 def _build_hashtags(category: str, model: str | None) -> list[str]:
     """Build hashtag list for a social post.
 
@@ -1123,57 +353,254 @@ def _build_hashtags(category: str, model: str | None) -> list[str]:
     return hashtags
 
 
-@mcp.tool(annotations=_WRITE_ANNOTATIONS)
-async def generate_social_post(insult_id: int, mode: str = "sanitized", db_path: str = "") -> dict[str, Any]:
-    """Generate social media content for a specific insult.
+# ---------------------------------------------------------------------------
+# MCP Tools
+# ---------------------------------------------------------------------------
 
-    Creates a formatted post suitable for Twitter/X with the insult,
-    its ratings, scenario context, and relevant hashtags.
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def scan_transcripts(
+    glob_path: str, context_window: int = _DEFAULT_CONTEXT_WINDOW, offset: int = 0, limit: int = 100
+) -> dict[str, Any]:
+    """Extract raw user messages from JSONL transcript files for classification.
+
+    Returns a paginated list of user messages with surrounding context.
+    The caller (Claude) is responsible for classifying each message and
+    deciding what to do with it.
+
+    Uses DuckDB ``read_ndjson_auto()`` to query JSONL files directly --
+    no persistent database is created.
 
     Args:
-        insult_id: The ID of the insult to generate a post for.
-        mode: Either ``raw`` (verbatim text) or ``sanitized`` (PII stripped).
-        db_path: Path to DuckDB file. Empty string uses default.
+        glob_path: Glob pattern pointing to JSONL transcript files,
+            e.g. ``~/.claude/projects/-my-project/*.jsonl``
+        context_window: Number of preceding messages to include as
+            context for each user message. Default 5.
+        offset: Number of messages to skip for pagination. Default 0.
+        limit: Maximum number of messages to return. Default 100.
 
     Returns:
-        Dict with post_text, raw_insult, sanitized_insult, char_count,
+        Dict with messages (list of {file, line_index, text, context}),
+        total message count, offset, limit, and files_scanned.
+    """
+
+    def _scan() -> dict[str, Any]:
+        messages, total, files_scanned = _query_user_messages(glob_path, offset, limit)
+
+        # Enrich each message with context from surrounding records
+        for msg in messages:
+            msg["context"] = _get_context_messages(msg["file"], msg["line_index"], context_window)
+
+        return {"messages": messages, "total": total, "offset": offset, "limit": limit, "files_scanned": files_scanned}
+
+    return await asyncio.to_thread(_scan)
+
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def list_insults(
+    glob_path: str, category: str = "", min_length: int = 0, limit: int = 20, offset: int = 0
+) -> dict[str, Any]:
+    """Query user messages from JSONL transcript files with optional filters.
+
+    Searches JSONL session logs directly via DuckDB for user messages.
+    Optionally filter by minimum text length. The ``category`` parameter
+    is accepted for forward-compatibility but requires caller-side
+    classification to be meaningful.
+
+    Args:
+        glob_path: Glob pattern pointing to JSONL transcript files.
+        category: Reserved for caller-side filtering (currently unused
+            -- all messages returned regardless of category value).
+        min_length: Minimum character length of user message text.
+        limit: Maximum number of results to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        Dict with messages list, total count, offset, limit, and
+        files_scanned.
+    """
+
+    def _query() -> dict[str, Any]:
+        messages, total, files_scanned = _query_user_messages(glob_path, offset, limit)
+        if min_length > 0:
+            messages = [m for m in messages if len(m.get("text", "")) >= min_length]
+        return {
+            "messages": messages,
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "files_scanned": files_scanned,
+            "category_filter": category or None,
+        }
+
+    return await asyncio.to_thread(_query)
+
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def top_insults(glob_path: str, n: int = 10, sort_by: str = "length") -> dict[str, Any]:
+    """Return the top N user messages sorted by length from JSONL files.
+
+    Queries JSONL session logs directly via DuckDB.  Without a
+    persistent rating store, messages are ranked by text length as a
+    proxy for expressiveness.
+
+    Args:
+        glob_path: Glob pattern pointing to JSONL transcript files.
+        n: Number of top messages to return.
+        sort_by: Sort dimension. Currently only ``length`` is supported.
+
+    Returns:
+        Dict with messages list, count, and sort_by value.
+
+    Raises:
+        ToolError: If sort_by is not a valid dimension.
+    """
+    valid_sorts = {"length"}
+    if sort_by not in valid_sorts:
+        raise ToolError(f"sort_by must be one of {valid_sorts}, got: {sort_by}")
+
+    def _query() -> dict[str, Any]:
+        messages, _total, _files_scanned = _query_user_messages(glob_path, offset=0, limit=n * 3)
+        # Sort by text length descending and take top N
+        messages.sort(key=lambda m: len(m.get("text", "")), reverse=True)
+        top = messages[:n]
+        return {"messages": top, "count": len(top), "sort_by": sort_by}
+
+    return await asyncio.to_thread(_query)
+
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def get_scenario(file: str, line_index: int, context_window: int = _DEFAULT_CONTEXT_WINDOW) -> dict[str, Any]:
+    """Get the full message context for a specific file and line position.
+
+    Reads the target JSONL file via DuckDB and returns the message at
+    the given line index along with surrounding context messages.
+
+    Args:
+        file: Path to the JSONL transcript file.
+        line_index: Row index (0-based) of the target message.
+        context_window: Number of preceding messages to capture.
+
+    Returns:
+        Dict with the target message text, file, line_index, and
+        preceding context messages.
+
+    Raises:
+        ToolError: If the file cannot be read or line_index is out of range.
+    """
+
+    def _query() -> dict[str, Any]:
+        resolved = str(pathlib.Path(file).expanduser()) if "~" in file else file
+        conn = duckdb.connect()
+        sql = (
+            f'SELECT type, message, uuid, "timestamp", sessionId AS session_id'  # noqa: S608
+            f" FROM read_ndjson_auto({resolved!r}, union_by_name=true)"
+            f" WHERE rowid = {line_index}"
+        )
+        row = conn.execute(sql).fetchone()
+        conn.close()
+
+        if not row:
+            raise ToolError(f"line_index {line_index} not found in {resolved}")
+
+        msg_type, message, uuid_val, timestamp, session_id = row
+        text = _extract_user_text_from_value(message) if msg_type == "user" else ""
+        context = _get_context_messages(resolved, line_index, context_window)
+
+        return {
+            "file": resolved,
+            "line_index": line_index,
+            "type": msg_type,
+            "text": text,
+            "uuid": str(uuid_val or ""),
+            "timestamp": str(timestamp or ""),
+            "session_id": str(session_id or ""),
+            "context": context,
+        }
+
+    return await asyncio.to_thread(_query)
+
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def generate_social_post(
+    file: str,
+    line_index: int,
+    category: str = "general_frustration",
+    mode: str = "sanitized",
+    context_window: int = _DEFAULT_CONTEXT_WINDOW,
+) -> dict[str, Any]:
+    """Generate social media content for a user message from a JSONL file.
+
+    Reads the message directly from the JSONL file via DuckDB, formats
+    it as a social media post with the caller-provided category.
+
+    Args:
+        file: Path to the JSONL transcript file.
+        line_index: Row index (0-based) of the target message.
+        category: Insult category slug for display/hashtags.
+        mode: Either ``raw`` (verbatim text) or ``sanitized`` (PII stripped).
+        context_window: Number of preceding messages for context summary.
+
+    Returns:
+        Dict with post_text, raw_text, sanitized_text, char_count,
         and hashtags.
 
     Raises:
-        ToolError: If the insult is not found or mode is invalid.
+        ToolError: If the message is not found or mode is invalid.
     """
     if mode not in {"raw", "sanitized"}:
         raise ToolError(f"mode must be 'raw' or 'sanitized', got: {mode}")
 
     def _generate() -> dict[str, Any]:
-        row = _fetch_insult_for_post(insult_id, db_path)
-        (id_, insult_text, category, model, creativity, accuracy, severity, humor, summary) = row
+        resolved = str(pathlib.Path(file).expanduser()) if "~" in file else file
+        conn = duckdb.connect()
 
-        sanitized_result = _sanitize_text_impl(insult_text)
-        sanitized_insult = sanitized_result["sanitized"]
-        display_text = sanitized_insult if mode == "sanitized" else insult_text
+        sql = (
+            f'SELECT message, uuid, "timestamp"'  # noqa: S608
+            f" FROM read_ndjson_auto({resolved!r}, union_by_name=true)"
+            f" WHERE rowid = {line_index}"
+        )
+        row = conn.execute(sql).fetchone()
+        conn.close()
+
+        if not row:
+            raise ToolError(f"line_index {line_index} not found in {resolved}")
+
+        message_val, _uuid_val, _timestamp = row
+        text = _extract_user_text_from_value(message_val)
+        if not text:
+            raise ToolError(f"No text content at line_index {line_index} in {resolved}")
+
+        sanitized_result = _sanitize_text_impl(text)
+        sanitized_text = sanitized_result["sanitized"]
+        display_text = sanitized_text if mode == "sanitized" else text
+
+        # Look for model name in preceding assistant messages
+        context = _get_context_messages(resolved, line_index, context_window)
+        model: str | None = None
+        for ctx_msg in reversed(context):
+            if ctx_msg.get("role") == "assistant" and ctx_msg.get("text"):
+                # Model info isn't in context text; leave as None
+                break
 
         hashtags = _build_hashtags(category, model)
         post_text = (
             f"\U0001f525 AI Frustration Report\n"
             f"\n"
-            f"The situation: {summary or 'Unknown context'}\n"
-            f"\n"
             f'What the user said: "{display_text}"\n'
             f"\n"
             f"Category: {_CATEGORY_DISPLAY.get(category, category)}\n"
-            f"Creativity: {creativity}/5 | Humor: {humor}/5\n"
-            f"Accuracy: {accuracy}/5 | Severity: {severity}/5\n"
             f"\n"
             f"{' '.join(hashtags)}"
         )
 
         return {
-            "insult_id": id_,
+            "file": resolved,
+            "line_index": line_index,
             "mode": mode,
             "post_text": post_text,
-            "raw_insult": insult_text,
-            "sanitized_insult": sanitized_insult,
+            "raw_text": text,
+            "sanitized_text": sanitized_text,
             "char_count": len(post_text),
             "hashtags": hashtags,
         }
