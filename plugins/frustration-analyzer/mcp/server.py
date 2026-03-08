@@ -30,6 +30,7 @@ import json
 import logging
 import pathlib
 import re
+from collections import defaultdict
 from typing import Any
 
 import duckdb
@@ -583,6 +584,98 @@ def _index_insult(
     return True
 
 
+def _build_assessment(item: dict[str, Any]) -> dict[str, Any]:
+    """Build an assessment dict from a batch item.
+
+    Args:
+        item: A single insult dict from the batch input.
+
+    Returns:
+        Assessment dict suitable for ``_index_insult``.
+    """
+    return {
+        "category": item["category"],
+        "severity": int(item.get("severity", 2)),
+        "creativity": int(item.get("creativity", 2)),
+        "humor": int(item.get("humor", 2)),
+        "accuracy": int(item.get("accuracy", 2)),
+        "had_prior_correction": bool(item.get("had_prior_correction")),
+        "matched_text": str(item.get("matched_text", "")),
+        "reasoning": str(item.get("reasoning", "")),
+    }
+
+
+def _validate_batch_line_indexes(
+    by_file: dict[str, list[tuple[int, dict[str, Any]]]], file_records: dict[str, list[dict[str, Any]]]
+) -> None:
+    """Validate all line_index values in a batch before writing.
+
+    Args:
+        by_file: Items grouped by file path with batch indices.
+        file_records: Pre-read JSONL records keyed by file path.
+
+    Raises:
+        ToolError: If any line_index is out of range.
+    """
+    for file_path, items in by_file.items():
+        records = file_records[file_path]
+        for batch_idx, item in items:
+            line_index = int(item["line_index"])
+            if line_index < 0 or line_index >= len(records):
+                raise ToolError(
+                    f"insults[{batch_idx}]: line_index {line_index} out of range "
+                    f"for {file_path} (has {len(records)} records)"
+                )
+
+
+def _index_batch_items(
+    conn: duckdb.DuckDBPyConnection,
+    by_file: dict[str, list[tuple[int, dict[str, Any]]]],
+    file_records: dict[str, list[dict[str, Any]]],
+    result_count: int,
+) -> tuple[list[dict[str, Any]], int, int]:
+    """Index all batch items using a single DB connection.
+
+    Args:
+        conn: Open DuckDB connection.
+        by_file: Items grouped by file path with batch indices.
+        file_records: Pre-read JSONL records keyed by file path.
+        result_count: Total number of items (for result list sizing).
+
+    Returns:
+        Tuple of (results list, indexed count, skipped count).
+    """
+    results: list[dict[str, Any]] = [{}] * result_count
+    indexed_count = 0
+    skipped_count = 0
+
+    for file_path, items in by_file.items():
+        records = file_records[file_path]
+        for batch_idx, item in items:
+            line_index = int(item["line_index"])
+            context_window = int(item.get("context_window", _DEFAULT_CONTEXT_WINDOW))
+            was_new = _index_insult(
+                conn,
+                records[line_index],
+                records,
+                line_index,
+                str(item["text"]),
+                _build_assessment(item),
+                context_window,
+                file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl"),
+            )
+            if was_new:
+                row = conn.execute("SELECT MAX(insult_id) FROM insults").fetchone()
+                insult_id = row[0] if row else None
+                results[batch_idx] = {"insult_id": insult_id, "indexed": True}
+                indexed_count += 1
+            else:
+                results[batch_idx] = {"insult_id": None, "indexed": False}
+                skipped_count += 1
+
+    return results, indexed_count, skipped_count
+
+
 def _scan_transcripts_impl(glob_path: str, context_window: int, offset: int, limit: int) -> dict[str, Any]:
     """Extract user messages from JSONL transcripts for caller-side classification.
 
@@ -757,6 +850,68 @@ async def index_insult(
         return {"indexed": was_new, "insult_id": insult_id, "db_path": resolved_db_path}
 
     return await asyncio.to_thread(_do_index)
+
+
+@mcp.tool(annotations=_WRITE_ANNOTATIONS)
+async def index_insults(insults: list[dict[str, Any]], db_path: str = "") -> dict[str, Any]:
+    """Store multiple caller-classified insults in a single call.
+
+    Accepts a list of insult dicts and indexes them all using one DB
+    connection, reading each source JSONL file at most once. Each item
+    uses the same fields as ``index_insult``.
+
+    All categories and ratings are validated before any rows are written
+    (fail-fast). If validation fails, nothing is persisted.
+
+    Args:
+        insults: List of dicts, each with keys: file, line_index, text,
+            category, severity (1-5), creativity (1-5), humor (1-5),
+            accuracy (1-5), had_prior_correction (bool),
+            matched_text (str), reasoning (str), context_window (int).
+        db_path: Path to DuckDB file. Empty string uses default.
+
+    Returns:
+        Dict with indexed (int count of new insults), skipped (int count
+        of duplicates), and results (list of {insult_id, indexed} per item).
+
+    Raises:
+        ToolError: If any item has an invalid category or out-of-range
+            rating. The entire batch is rejected.
+    """
+    if not insults:
+        return {"indexed": 0, "skipped": 0, "results": []}
+
+    # --- Fail-fast validation (no writes until all items pass) ---
+    for i, item in enumerate(insults):
+        cat = item.get("category", "")
+        if cat not in _VALID_CATEGORIES:
+            raise ToolError(f"insults[{i}]: category must be one of {sorted(_VALID_CATEGORIES)}, got: {cat!r}")
+        for name in ("severity", "creativity", "humor", "accuracy"):
+            value = item.get(name, 2)
+            if not (_MIN_RATING <= int(value) <= _MAX_RATING):
+                raise ToolError(f"insults[{i}]: {name} must be between {_MIN_RATING} and {_MAX_RATING}, got: {value}")
+
+    def _do_batch() -> dict[str, Any]:
+        # Group items by file so each JSONL is read once
+        by_file: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
+        for idx, item in enumerate(insults):
+            by_file[item["file"]].append((idx, item))
+
+        # Pre-read all files
+        file_records: dict[str, list[dict[str, Any]]] = {fp: _read_jsonl(fp) for fp in by_file}
+
+        # Validate all line_index values before writing
+        _validate_batch_line_indexes(by_file, file_records)
+
+        # One DB connection for the whole batch
+        conn = _get_db(db_path)
+        resolved_db_path = db_path or _default_db_path()
+
+        results, indexed_count, skipped_count = _index_batch_items(conn, by_file, file_records, len(insults))
+        conn.close()
+        return {"indexed": indexed_count, "skipped": skipped_count, "results": results, "db_path": resolved_db_path}
+
+    return await asyncio.to_thread(_do_batch)
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
