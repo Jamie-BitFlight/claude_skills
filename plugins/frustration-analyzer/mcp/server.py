@@ -16,6 +16,7 @@ query/reporting tools.
 Tools:
     scan_transcripts - Extract raw user messages from JSONL files for caller classification
     index_insult - Store a caller-classified insult with ratings and scenario context
+    index_insults - Batch-index multiple insults in a single call (one DB connection per call)
     list_insults - Query indexed insults with optional filters
     get_scenario - Get full scenario context for a specific insult
     top_insults - Return top N insults sorted by any rating dimension

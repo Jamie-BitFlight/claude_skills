@@ -1,6 +1,6 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Analyze Claude Code session transcripts to detect user insults directed at AI assistants, identify the scenarios that caused them, rate insult creativity and humor, and generate sanitized social media content from the findings.",
   "author": {
     "name": "Jamie-BitFlight"
