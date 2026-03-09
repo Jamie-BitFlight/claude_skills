@@ -19,29 +19,23 @@ Tools:
     top_insults - Return the longest/most notable user messages from JSONL files
     get_scenario - Get full message context for a specific file + line position
     generate_social_post - Generate social media content for a user message
-    sanitize_text - Standalone PII sanitizer
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
 import pathlib
-import re
 from typing import Any
 
 import duckdb
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 _DEFAULT_CONTEXT_WINDOW: int = 5
-_MIN_TOKEN_LENGTH: int = 20
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
     "readOnlyHint": True,
@@ -73,22 +67,6 @@ _CATEGORY_HASHTAGS: dict[str, str] = {
     "technical_putdown": "#TechnicalBurn",
     "general_frustration": "#GeneralFrustration",
 }
-
-# PII sanitization patterns (ordered most specific first)
-_PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
-    ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), "[EMAIL]"),
-    ("IP", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "[IP]"),
-    ("TOKEN", re.compile(r"\b(?:sk-|ghp_|gho_|github_pat_|xoxb-|xoxp-|Bearer\s+)?[A-Za-z0-9_\-]{20,}\b"), "[TOKEN]"),
-    (
-        "PATH",
-        re.compile(
-            r"(?:/home/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+|C:\\Users\\[A-Za-z0-9._-]+)"
-            r"(?:[/\\][A-Za-z0-9._\-/\\]*)*"
-        ),
-        "[PATH]",
-    ),
-    ("URL", re.compile(r"https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+"), "[URL]"),
-]
 
 # ---------------------------------------------------------------------------
 # Server
@@ -330,33 +308,6 @@ def _extract_assistant_context(message: str | dict[str, Any] | None, entry: dict
     entry["text"] = " ".join(text_parts)
 
 
-def _sanitize_text_impl(text: str) -> dict[str, Any]:
-    """Strip PII from text, returning sanitized version and redaction log.
-
-    Args:
-        text: The raw text to sanitize.
-
-    Returns:
-        Dict with original, sanitized, redactions list, and redaction_count.
-    """
-    sanitized = text
-    redactions: list[dict[str, str]] = []
-
-    for pii_type, pattern, replacement in _PII_PATTERNS:
-        for match in pattern.finditer(sanitized):
-            original_text = match.group()
-            # Skip short matches for TOKEN pattern to avoid false positives
-            if pii_type == "TOKEN" and len(original_text) < _MIN_TOKEN_LENGTH:
-                continue
-            redactions.append({"type": pii_type, "original": original_text, "replacement": replacement})
-
-    # Apply redactions in reverse order to preserve positions
-    for redaction in reversed(redactions):
-        sanitized = sanitized.replace(redaction["original"], redaction["replacement"], 1)
-
-    return {"original": text, "sanitized": sanitized, "redactions": redactions, "redaction_count": len(redactions)}
-
-
 def _build_hashtags(category: str, model: str | None) -> list[str]:
     """Build hashtag list for a social post.
 
@@ -541,33 +492,28 @@ async def get_scenario(file: str, line_index: int, context_window: int = _DEFAUL
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def generate_social_post(
-    file: str,
-    line_index: int,
-    category: str = "general_frustration",
-    mode: str = "sanitized",
-    context_window: int = _DEFAULT_CONTEXT_WINDOW,
+    file: str, line_index: int, category: str = "general_frustration", context_window: int = _DEFAULT_CONTEXT_WINDOW
 ) -> dict[str, Any]:
     """Generate social media content for a user message from a JSONL file.
 
     Reads the message directly from the JSONL file via DuckDB, formats
-    it as a social media post with the caller-provided category.
+    it as a social media post with the caller-provided category.  Content
+    is always returned raw so the caller (agent) can present it to the user
+    and ask whether any personal or business details should be replaced with
+    placeholders before sharing.
 
     Args:
         file: Path to the JSONL transcript file.
         line_index: Row index (0-based) of the target message.
         category: Insult category slug for display/hashtags.
-        mode: Either ``raw`` (verbatim text) or ``sanitized`` (PII stripped).
         context_window: Number of preceding messages for context summary.
 
     Returns:
-        Dict with post_text, raw_text, sanitized_text, char_count,
-        and hashtags.
+        Dict with post, hashtags, category, and privacy_reminder.
 
     Raises:
-        ToolError: If the message is not found or mode is invalid.
+        ToolError: If the message is not found.
     """
-    if mode not in {"raw", "sanitized"}:
-        raise ToolError(f"mode must be 'raw' or 'sanitized', got: {mode}")
 
     def _generate() -> dict[str, Any]:
         resolved = str(pathlib.Path(file).expanduser()) if "~" in file else file
@@ -584,10 +530,6 @@ async def generate_social_post(
         if not text:
             raise ToolError(f"No text content at line_index {line_index} in {resolved}")
 
-        sanitized_result = _sanitize_text_impl(text)
-        sanitized_text = sanitized_result["sanitized"]
-        display_text = sanitized_text if mode == "sanitized" else text
-
         # Look for model name in preceding assistant messages
         context = _get_context_messages(resolved, line_index, context_window)
         model: str | None = None
@@ -600,7 +542,7 @@ async def generate_social_post(
         post_text = (
             f"\U0001f525 AI Frustration Report\n"
             f"\n"
-            f'What the user said: "{display_text}"\n'
+            f'What the user said: "{text}"\n'
             f"\n"
             f"Category: {_CATEGORY_DISPLAY.get(category, category)}\n"
             f"\n"
@@ -608,34 +550,17 @@ async def generate_social_post(
         )
 
         return {
-            "file": resolved,
-            "line_index": line_index,
-            "mode": mode,
-            "post_text": post_text,
-            "raw_text": text,
-            "sanitized_text": sanitized_text,
-            "char_count": len(post_text),
+            "post": post_text,
             "hashtags": hashtags,
+            "category": category,
+            "privacy_reminder": (
+                "Review before sharing: this content may contain personal, business, or identifying details. "
+                "Ask the user to confirm, or offer to replace specific details with mock placeholders like "
+                "[Company], [Project], [Colleague], [Tool]."
+            ),
         }
 
     return await asyncio.to_thread(_generate)
-
-
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def sanitize_text(text: str) -> dict[str, Any]:
-    """Strip PII from arbitrary text.
-
-    Detects and replaces email addresses, IP addresses, file paths,
-    URLs, and API tokens/keys with type-specific placeholders.
-
-    Args:
-        text: The raw text to sanitize.
-
-    Returns:
-        Dict with original text, sanitized text, list of redactions
-        (each with type, original, replacement), and redaction_count.
-    """
-    return await asyncio.to_thread(_sanitize_text_impl, text)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 ---
 name: frustration-analysis
-description: "Analyze session transcripts for user insults and AI failures. Finds moments where users insulted Claude Code or other AI assistants, rates the insults on creativity/humor/severity/accuracy, identifies what caused each breakdown, and generates sanitized social media content. Use when asked to find insults in transcripts, build an insult hall of fame, or create social content from AI frustration moments."
-allowed-tools: "mcp__frustration-analyzer__scan_transcripts, mcp__frustration-analyzer__index_insult, mcp__frustration-analyzer__list_insults, mcp__frustration-analyzer__get_scenario, mcp__frustration-analyzer__top_insults, mcp__frustration-analyzer__generate_social_post, mcp__frustration-analyzer__sanitize_text, Read, Glob"
+description: "Analyze session transcripts for user insults and AI failures. Finds moments where users insulted Claude Code or other AI assistants, rates the insults on creativity/humor/severity/accuracy, identifies what caused each breakdown, and generates social media content. Use when asked to find insults in transcripts, build an insult hall of fame, or create social content from AI frustration moments."
+allowed-tools: "mcp__frustration-analyzer__scan_transcripts, mcp__frustration-analyzer__list_insults, mcp__frustration-analyzer__get_scenario, mcp__frustration-analyzer__top_insults, mcp__frustration-analyzer__generate_social_post, Read, Glob"
 ---
 
 # Frustration Analysis
@@ -110,11 +110,14 @@ Returns N preceding messages (default 5). Identify the precipitating failure pat
 ### Step 6 — Generate Social Posts
 
 ```text
-mcp__frustration-analyzer__generate_social_post(insult_id={id})
-mcp__frustration-analyzer__generate_social_post(insult_id={id}, mode="raw")
+mcp__frustration-analyzer__generate_social_post(file={file}, line_index={line_index}, category={category})
 ```
 
-Default mode is `sanitized`. Use `raw` only when the user explicitly requests it. Always state which mode was used when presenting generated content.
+1. Call `generate_social_post` with `file`, `line_index`, and `category`.
+2. Present the raw `post` text and `hashtags` to the user.
+3. Always surface the `privacy_reminder` from the response as a note to the user.
+4. Ask the user: "Would you like me to replace any personal or business details with placeholders before sharing?"
+5. If yes: rewrite the post replacing sensitive details with contextually appropriate mock placeholders (e.g. [Company], [Project], [Colleague], [Internal Tool]) — preserving the insult and all profanity verbatim.
 
 ## Rating System
 
@@ -140,18 +143,7 @@ ORDER BY humor_weighted DESC;
 
 ## Social Media Output
 
-| Mode | Behavior |
-|------|----------|
-| `sanitized` | Redacts PII (usernames, file paths, project names); replaces profanity with symbols |
-| `raw` | Full original text, no substitutions |
-
-Default to `sanitized` in all cases unless the user explicitly says "raw" or "uncensored". Generated posts include: the insult (sanitized or raw), the failure context in one line, and a relevant hashtag.
-
-Sanitize text independently:
-
-```text
-mcp__frustration-analyzer__sanitize_text(text="{text}")
-```
+Content is always presented raw — insult and profanity intact. After presenting generated content, always display the `privacy_reminder` from the response as a note to the user. Ask whether to replace personal or business details with placeholders before sharing. If yes: rewrite the post using contextually appropriate placeholders (e.g. [Company], [Project], [Colleague], [Internal Tool]) while preserving the insult and all profanity verbatim.
 
 ## Insult Categories
 
@@ -220,16 +212,16 @@ Get scenario for insult 42:
 mcp__frustration-analyzer__get_scenario(insult_id=42)
 ```
 
-Generate a sanitized post:
+Generate a social post:
 
 ```text
-mcp__frustration-analyzer__generate_social_post(insult_id=42, mode="sanitized")
+mcp__frustration-analyzer__generate_social_post(file="{file}", line_index=42, category="{category}")
 ```
 
 ## Privacy
 
-Session transcripts contain PII: project names, file paths, usernames, repository URLs, and code snippets. The `sanitize_text` tool and the `sanitized` mode of `generate_social_post` redact these before output.
+Session transcripts may contain personal, business, or identifying details: project names, file paths, usernames, repository URLs, and code snippets. Content is always shown raw — no mechanical filtering is applied.
 
-Default to sanitized mode. Confirm explicitly with the user before generating raw-mode output. Never display raw PII in generated social content without sanitization.
+After every `generate_social_post` call, surface the `privacy_reminder` from the response to the user. Ask whether any personal or business details should be replaced with placeholders before sharing. If yes: rewrite the post using contextually appropriate mock placeholders (e.g. [Company], [Project], [Colleague], [Tool]) while preserving the insult and all profanity verbatim.
 
 SOURCE: Insult category definitions derived from `.claude/plan/frustration-analyzer/research-insult-patterns.md` (2026-03-08).

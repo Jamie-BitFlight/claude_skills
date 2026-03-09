@@ -1,6 +1,6 @@
 # frustration-analyzer
 
-Analyzes Claude Code session transcripts to detect user insults directed at AI assistants, identify the failure scenarios that caused them, rate each insult on creativity, humor, severity, and accuracy, and generate sanitized social media content from the findings. It builds on the existing frustration signal detection in `agentskill-kaizen` (which covers soft signals like corrections and interrupts) and targets the harder signal class: explicit insults.
+Analyzes Claude Code session transcripts to detect user insults directed at AI assistants, identify the failure scenarios that caused them, rate each insult on creativity, humor, severity, and accuracy, and generate social media content from the findings. It builds on the existing frustration signal detection in `agentskill-kaizen` (which covers soft signals like corrections and interrupts) and targets the harder signal class: explicit insults.
 
 ## Installation
 
@@ -64,35 +64,32 @@ Input insult (raw):
 "off-by-one brain, you deleted line 42 again you fucking moron"
 ```
 
-Generated sanitized post:
+Generated post:
 
 ```text
-User to Claude after it deleted the wrong line for the third time:
+🔥 AI Frustration Report
 
-"off-by-one brain, you deleted line 42 again [redacted]"
+What the user said: "off-by-one brain, you deleted line 42 again you fucking moron"
 
-Category: technical_putdown 🏆
-Creativity: 5 | Humor: 5 | Severity: 4 | Accuracy: 5 | Composite: 4.75
+Category: Technical Put-Down
 
-#AIFails #ClaudeCode #FrustratedDev
+#AIFrustration #TechnicalBurn #ClaudeCode
 ```
 
-## Privacy: Raw vs Sanitized Modes
+The agent then surfaces a privacy reminder and asks whether to replace personal or business details with placeholders before sharing.
 
-| Mode | Behavior |
-|------|---------|
-| `sanitized` (default) | Redacts PII (usernames, file paths, project names, repo URLs); replaces profanity with symbols |
-| `raw` | Full original text — only use when explicitly requested |
+## Privacy
 
-All social media generation defaults to sanitized mode. Confirm with the user before generating raw-mode output.
+Content is always shown raw — insult and profanity intact. No mechanical regex filtering is applied.
+
+After every post generation, the agent surfaces a privacy reminder from the response, then asks the user: "Would you like me to replace any personal or business details with placeholders before sharing?" If yes, the agent rewrites the post replacing sensitive details with contextually appropriate mock placeholders (e.g. [Company], [Project], [Colleague], [Tool]) while preserving the insult and all profanity verbatim. The AI identifies what is sensitive in context — no blind pattern matching.
 
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `scan_transcripts` | Scan JSONL transcript files to detect and store insults in DuckDB |
+| `scan_transcripts` | Scan JSONL transcript files and return raw paginated user messages with context |
 | `list_insults` | List detected insults with ratings; filterable by category, min score, or session |
 | `get_scenario` | Retrieve the N preceding messages that led to a specific insult |
 | `top_insults` | Get the top-rated insults by composite score or specific dimension |
-| `generate_social_post` | Generate a social media post from an insult (sanitized or raw) |
-| `sanitize_text` | Redact PII and optionally replace profanity from arbitrary text |
+| `generate_social_post` | Generate a raw social media post from an insult (always includes a privacy reminder) |
