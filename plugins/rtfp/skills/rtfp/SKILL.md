@@ -38,7 +38,7 @@ Present the numbered list to the user. Ask which session to inspect. Wait for th
 uv run ./scripts/extract_batches.py <session_jsonl_path> --out-dir /tmp/rtfp-batches-<sessionid>
 ```
 
-The script outputs a JSON array of batch file paths. Capture that list — each path is one batch to scan in Step 3.
+The script outputs a JSON object. Read the `batch_files` array from this object — each path in that array is one batch to scan in Step 3.
 
 ### Step 3 — Fan-Out Scan (one subagent per batch)
 
