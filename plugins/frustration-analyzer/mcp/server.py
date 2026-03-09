@@ -25,7 +25,7 @@ Tools:
     scan_transcripts      - Extract raw user messages with context (Stage 1)
     get_scenario          - Get full message context for a specific file+line
     generate_social_post  - Generate social media content for a user message
-    render_rage_receipt   - Render terminal-style SVG/PNG card from 3-field artifact
+    render_rage_receipt   - Render terminal-style SVG/PNG card and return image inline
 """
 
 from __future__ import annotations
@@ -40,6 +40,8 @@ from typing import Any
 import duckdb
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.utilities.types import Image
+from mcp.types import TextContent
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -453,12 +455,23 @@ def _build_card_content(task_summary: str, assistant_excerpt: str, user_reply: s
     return content
 
 
-def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str) -> dict[str, Any]:
+def _render_card(
+    task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
+) -> list[TextContent | Image]:
     """Render a terminal-style card as SVG or PNG.
 
     Uses Rich ``Console(record=True)`` to render a styled Panel, then
     exports as SVG.  If ``output_path`` ends with ``.png``, the SVG is
     converted to PNG via ``cairosvg.svg2png()``.
+
+    The rendered asset is saved to *output_path* **and** returned inline
+    so MCP clients receive the content directly:
+
+    * SVG  -- returned as ``TextContent`` (the SVG XML string).
+    * PNG  -- returned as a FastMCP ``Image`` (base64-encoded PNG bytes).
+
+    A leading ``TextContent`` always carries JSON metadata (``output_path``,
+    ``format``) for callers that also need the filesystem path.
 
     Args:
         task_summary: Short description of the task context.
@@ -467,7 +480,8 @@ def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, outp
         output_path: File path to write (``.svg`` or ``.png``).
 
     Returns:
-        Dict with ``output_path`` and ``format`` (``"svg"`` or ``"png"``).
+        List of MCP content blocks: metadata ``TextContent`` followed by
+        either an SVG ``TextContent`` or a PNG ``Image``.
     """
     content = _build_card_content(task_summary, assistant_excerpt, user_reply)
     panel = Panel(content, title="RTFP", title_align="left", border_style="bright_blue", padding=(1, 2))
@@ -481,16 +495,25 @@ def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, outp
     out.parent.mkdir(parents=True, exist_ok=True)
 
     output_format: str
-    if out.suffix.lower() == ".png":
-        import cairosvg  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    result: list[TextContent | Image]
 
-        cairosvg.svg2png(bytestring=svg_text.encode("utf-8"), write_to=str(out))
+    if out.suffix.lower() == ".png":
+        import cairosvg  # noqa: PLC0415
+
+        png_bytes: bytes = cairosvg.svg2png(bytestring=svg_text.encode("utf-8"))
+        out.write_bytes(png_bytes)
         output_format = "png"
+
+        metadata = json.dumps({"output_path": str(out), "format": output_format})
+        result = [TextContent(type="text", text=metadata), Image(data=png_bytes, format="png")]
     else:
         out.write_text(svg_text, encoding="utf-8")
         output_format = "svg"
 
-    return {"output_path": str(out), "format": output_format}
+        metadata = json.dumps({"output_path": str(out), "format": output_format})
+        result = [TextContent(type="text", text=metadata), TextContent(type="text", text=svg_text)]
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +698,7 @@ async def get_context_window(file: str, line_index: int, before: int = 10, after
 @mcp.tool(annotations=_WRITE_ANNOTATIONS)
 async def render_rage_receipt(
     task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
-) -> dict[str, Any]:
+) -> list[TextContent | Image]:
     """Render a terminal-style card from the 3-field RTFP artifact.
 
     Produces a styled Rich Panel rendered as SVG (default) or PNG.
@@ -690,6 +713,15 @@ async def render_rage_receipt(
     - ``.svg`` — direct SVG export (primary)
     - ``.png`` — SVG rendered then converted via ``cairosvg``
 
+    The rendered asset is saved to ``output_path`` AND returned inline
+    in the MCP response so agents can view the content directly:
+
+    - SVG is returned as text content (the SVG XML string).
+    - PNG is returned as an MCP ``ImageContent`` (base64-encoded bytes).
+
+    A leading text content block always carries JSON metadata with
+    ``output_path`` and ``format`` for callers with filesystem access.
+
     Args:
         task_summary: Short description of the task context.
         assistant_excerpt: The offending assistant response excerpt.
@@ -697,15 +729,16 @@ async def render_rage_receipt(
         output_path: File path to write (``.svg`` or ``.png``).
 
     Returns:
-        Dict with ``output_path`` and ``format`` (``"svg"`` or ``"png"``).
+        List of MCP content blocks: metadata text followed by either
+        SVG text or PNG image content.
 
     Raises:
         ToolError: If the file cannot be written.
     """
 
-    def _render() -> dict[str, Any]:
+    def _render() -> list[TextContent | Image]:
         try:
-            return _render_png(task_summary, assistant_excerpt, user_reply, output_path)
+            return _render_card(task_summary, assistant_excerpt, user_reply, output_path)
         except OSError as exc:
             raise ToolError(f"Failed to write card to {output_path}: {exc}") from exc
 
