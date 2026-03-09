@@ -8,13 +8,13 @@
 """Retrieve context windows around flagged user messages from a session transcript.
 
 Stage 3 helper tool for the RTFP pipeline. This script is a RETRIEVAL TOOL,
-not a decision-maker. It accepts a session JSONL path and one or more message
-indexes, uses DuckDB to load the session data, and returns a window of nearby
-transcript entries for each flagged index so the calling agent can inspect the
-surrounding context and make its own judgments about winner/runner-up selection
-and task summary.
+not a decision-maker. It accepts a flagged JSON file path and uses DuckDB to
+load both the flagged data and the session transcript, returning a window of
+nearby transcript entries for each flagged index so the calling agent can
+inspect the surrounding context and make its own judgments about winner/runner-up
+selection and task summary.
 
-Input (stdin JSON or --flagged-file)::
+Input (--flagged-file, required)::
 
     {"source_file": "/path/to/session.jsonl", "flagged_indexes": [12, 45, 78]}
 
@@ -30,7 +30,6 @@ Usage::
     reconstruct_context.py --flagged-file /tmp/flagged.json
     reconstruct_context.py --flagged-file /tmp/flagged.json --session-file /path/to/session.jsonl
     reconstruct_context.py --flagged-file /tmp/flagged.json --window 15
-    cat flagged.json | reconstruct_context.py
 """
 
 from __future__ import annotations
@@ -39,6 +38,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
@@ -85,6 +85,36 @@ def _load_transcript_duckdb(session_path: Path) -> list[dict]:
         columns = [desc[0] for desc in con.description]
 
     return [dict(zip(columns, row, strict=False)) for row in result]
+
+
+def _load_flagged_duckdb(flagged_path: Path) -> dict[str, Any]:
+    """Load flagged message data from a JSON file using DuckDB read_json_auto.
+
+    Args:
+        flagged_path: Path to the flagged JSON file produced by reaction-detector.
+
+    Returns:
+        Dict with 'source_file' (str) and 'flagged_indexes' (list[int]) keys.
+
+    Raises:
+        FileNotFoundError: If the flagged file does not exist.
+        ValueError: If the file contains no data.
+        duckdb.IOException: If DuckDB cannot read the file.
+    """
+    if not flagged_path.exists():
+        raise FileNotFoundError(f"Flagged file not found: {flagged_path}")
+
+    with duckdb.connect(":memory:") as con:
+        row = con.execute("SELECT source_file, flagged_indexes FROM read_json_auto($1)", [str(flagged_path)]).fetchone()
+        columns = [desc[0] for desc in con.description]
+
+    if row is None:
+        raise ValueError(f"No data found in flagged file: {flagged_path}")
+
+    data = dict(zip(columns, row, strict=False))
+    flagged = data.get("flagged_indexes") or []
+    data["flagged_indexes"] = [int(i) for i in flagged]
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +348,7 @@ def main() -> None:
         )
     )
     parser.add_argument(
-        "--flagged-file", default=None, help="JSON file with flagged message data (default: read from stdin)"
+        "--flagged-file", required=True, help="JSON file with flagged message data (produced by reaction-detector)"
     )
     parser.add_argument(
         "--session-file", default=None, help="Override session JSONL path (takes precedence over source_file in input)"
@@ -331,21 +361,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.flagged_file is not None:
-        flagged_path = Path(args.flagged_file)
-        if not flagged_path.exists():
-            print(f"Error: flagged file not found: {flagged_path}", file=sys.stderr)
-            sys.exit(1)
-        with flagged_path.open(encoding="utf-8") as fh:
-            input_data = json.load(fh)
-    else:
-        input_data = json.load(sys.stdin)
-
-    if not isinstance(input_data, dict):
-        print("Error: input must be a JSON object with 'source_file' and 'flagged_indexes' keys", file=sys.stderr)
-        sys.exit(1)
-
     try:
+        input_data = _load_flagged_duckdb(Path(args.flagged_file))
         result = retrieve_contexts(input_data, session_override=args.session_file, window=args.window)
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
