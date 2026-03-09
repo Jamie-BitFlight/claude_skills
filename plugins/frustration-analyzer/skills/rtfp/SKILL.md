@@ -67,9 +67,18 @@ Wait for all subagents to complete. Collect the output file paths.
 
 Report: "Detection complete. Found M flagged messages across K batches."
 
-If no flags were found across all batches, stop here:
+If no flags were found across all batches, render a "no rage" card. Call:
 
-> No strong emotional reactions detected in this session.
+```text
+mcp__frustration-analyzer__render_rage_receipt(
+    task_summary="Session analysis complete",
+    assistant_excerpt="No strong emotional reactions detected in this session.",
+    user_reply="👍",
+    output_path="/tmp/rtfp-{session_stem}-clean.png"
+)
+```
+
+Then skip to Step 8 and present the result using the same format as a normal receipt. Do NOT return a plain text string.
 
 ## Step 5 — Merge Flags
 

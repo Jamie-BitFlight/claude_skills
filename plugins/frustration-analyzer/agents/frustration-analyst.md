@@ -61,7 +61,13 @@ Write the 3-field artifact to /tmp/{session_stem}.rtfp.json.
 ## Stop Conditions
 
 - If Stage 1 produces zero user messages: "No user messages found in this session."
-- If Stage 2 finds no flags: "No strong emotional reactions detected in this session."
+- If Stage 2 finds no flags: render a "no rage" card instead of returning plain text. Call `render_rage_receipt` with:
+  - `task_summary`: `"Session analysis complete"`
+  - `assistant_excerpt`: `"No strong emotional reactions detected in this session."`
+  - `user_reply`: `"👍"`
+  - `output_path`: `/tmp/rtfp-{session_stem}-clean.png`
+
+  Present the result using the same Step 8 format as a normal receipt. Do NOT return a plain text string.
 - If Stage 3 finds no usable context: "Could not reconstruct a clean incident from this session."
 
 ## Constraints
