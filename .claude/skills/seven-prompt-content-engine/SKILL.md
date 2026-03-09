@@ -53,7 +53,7 @@ Collect or infer before starting:
 
 If some items are missing, proceed with the rough idea and clearly label assumptions before Step 1 output.
 
-## Execution Pattern
+## Output Format
 
 For each step:
 
@@ -61,6 +61,8 @@ For each step:
 2. Show the exact input being used for that step
 3. Produce output in a copyable code block
 4. Note briefly what carries forward to the next step
+5. Label all assumptions separately when intake was incomplete
+6. Do not include email subject lines unless explicitly requested
 
 ## Step 1 — Idea Extractor
 
@@ -194,12 +196,6 @@ Constraints:
 
 Use the templates in [./references/prompt-templates.md](./references/prompt-templates.md).
 
-## Response Formatting
-
-- Label each step clearly with its number and name before output
-- Place all deliverables in copyable code blocks
-- Separate labeled assumptions from step output when intake was incomplete
-- Do not include email subject lines unless explicitly requested
 
 ## Quality Checklist
 

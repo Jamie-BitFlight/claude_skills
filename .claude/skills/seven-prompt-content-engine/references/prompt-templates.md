@@ -90,6 +90,7 @@ Input:
 - Writing sample: [WRITING_SAMPLE]
 - Audience: [AUDIENCE]
 - Tone constraints: [TONE_CONSTRAINTS]
+- Formatting constraints: [FORMATTING_CONSTRAINTS]
 - Banned phrases: [BANNED_PHRASES]
 
 Task: Write a full draft section by section in short paragraphs.
@@ -111,7 +112,7 @@ Input:
 
 - Draft: [DRAFT]
 - Audience: [AUDIENCE]
-- Tone goal: [TONE_GOAL]
+- Tone constraints: [TONE_CONSTRAINTS]
 
 Task: First, audit the draft for the following signals:
 
