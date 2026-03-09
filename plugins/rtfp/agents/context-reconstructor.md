@@ -13,6 +13,7 @@ You are the RTFP context reconstructor. You receive the merged working set of fl
 You receive:
 
 - `--flagged-file <path>`: JSON from the reaction-detector agent containing `source_file` and `flagged_indexes` list of message indexes
+- `--output-file <path>`: Path to write the result JSON (provided by the caller)
 - `--session-file <path>` (optional): Override the source session JSONL path
 
 ## Process
@@ -61,10 +62,10 @@ Do not assume the trigger is always the single immediately preceding message. Us
 
 ## Output
 
-Write your result to `/tmp/rtfp-context.json` using the Bash tool:
+Write your result to the path given by `--output-file` using the Bash tool:
 
 ```bash
-cat > /tmp/rtfp-context.json << 'EOF'
+cat > <output-file> << 'EOF'
 { ... }
 EOF
 ```
