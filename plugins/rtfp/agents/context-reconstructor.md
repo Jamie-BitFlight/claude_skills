@@ -12,30 +12,34 @@ You are the RTFP context reconstructor. You receive the merged working set of fl
 
 You receive:
 
-- `--flagged-file <path>`: JSON from the reaction-detector agent containing `source_file` and `flagged` list of message indexes
+- `--flagged-file <path>`: JSON from the reaction-detector agent containing `source_file` and `flagged_indexes` list of message indexes
 - `--session-file <path>` (optional): Override the source session JSONL path
 
 ## Process
 
-### Step 1: Read all flagged user messages
+### Step 1: Retrieve context windows for all flagged messages
 
-Open the flagged JSON. For each flagged index, read only that user message from the session JSONL. Do not read surrounding context yet. Collect the raw text of every flagged user message.
+Run `reconstruct_context.py` to load the transcript and retrieve surrounding context for every flagged index:
+
+```bash
+python plugins/rtfp/skills/rtfp/scripts/reconstruct_context.py \
+  --flagged-file <path>
+```
+
+This returns a JSON object with a `contexts` array. Each element contains `flagged_index`, `user_message` (the flagged user text), and `nearby_entries` (the surrounding transcript window).
 
 ### Step 2: Choose winner and runner-up by judgment
 
-Read all flagged user messages together and use your judgment to identify:
+Read the `user_message` from each context entry and use your judgment to identify:
 
 1. The single most emotionally charged, rage-filled user response — this is the winner
 2. A runner-up, if one or more other responses are also strongly spicy
 
 Make this selection based on the emotional intensity of the user message alone. Do not score. Do not rank by signal density. Do not apply any quantitative method. This is a qualitative judgment call: which message is most viscerally reactive.
 
-### Step 3: Retrieve full session context for winner (and runner-up if present)
+### Step 3: Inspect context for the selected candidates
 
-Go back to the full session JSONL. For each selected candidate (winner, and runner-up if chosen):
-
-- Load the entries surrounding that flagged user message — inspect messages before and after it, not just the immediately preceding one
-- Look at a window of nearby entries to understand what was happening in the conversation at that point: what tools were being used, what was being built or written, what the assistant had recently done or said
+For each selected candidate (winner, and runner-up if chosen), read the `nearby_entries` array from the script output. Inspect messages before and after the flagged message — not just the immediately preceding one. Look at a window of nearby entries to understand what was happening in the conversation at that point: what tools were being used, what was being built or written, what the assistant had recently done or said.
 
 ### Step 4: Derive the task summary
 

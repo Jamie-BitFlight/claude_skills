@@ -73,7 +73,6 @@ def _load_transcript_duckdb(session_path: Path) -> list[dict]:
     if not session_path.exists():
         raise FileNotFoundError(f"Session file not found: {session_path}")
 
-    con = duckdb.connect(":memory:")
     # read_ndjson_auto reads newline-delimited JSON; maximum_object_size
     # handles large assistant messages.  Use parameterized query to avoid
     # S608 (SQL injection) lint warning.
@@ -81,17 +80,11 @@ def _load_transcript_duckdb(session_path: Path) -> list[dict]:
         SELECT *, row_number() OVER () - 1 AS _line_index
         FROM read_ndjson_auto($1, maximum_object_size=10485760)
     """
-    try:
+    with duckdb.connect(":memory:") as con:
         result = con.execute(query, [str(session_path)]).fetchall()
         columns = [desc[0] for desc in con.description]
-    finally:
-        con.close()
 
-    records: list[dict] = []
-    for row in result:
-        rec = dict(zip(columns, row, strict=False))
-        records.append(rec)
-    return records
+    return [dict(zip(columns, row, strict=False)) for row in result]
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +135,23 @@ def _extract_text(content: str | list | dict | None) -> str:
     return "\n".join(parts)
 
 
+def _extract_message_text(rec: dict) -> str:
+    """Extract readable text from the 'message' field of a transcript record.
+
+    Args:
+        rec: Raw record dict from the transcript.
+
+    Returns:
+        Plain text of the message content, or empty string if absent.
+    """
+    message = rec.get("message")
+    if isinstance(message, dict):
+        return _extract_text(message.get("content"))
+    if isinstance(message, str):
+        return message
+    return ""
+
+
 def _record_to_entry(rec: dict) -> dict:
     """Convert a raw transcript record to a simplified entry for output.
 
@@ -176,10 +186,7 @@ def _record_to_entry(rec: dict) -> dict:
         role = message.get("role")
         if role is not None:
             entry["role"] = role
-        content = message.get("content")
-        entry["text"] = _extract_text(content)
-    elif isinstance(message, str):
-        entry["text"] = message
+    entry["text"] = _extract_message_text(rec)
 
     # Tool use result indicator
     if "toolUseResult" in rec:
@@ -193,7 +200,21 @@ def _record_to_entry(rec: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _get_context_window(records: list[dict], flagged_index: int, window: int = _DEFAULT_WINDOW) -> dict | None:
+def _build_index_map(records: list[dict]) -> dict[int, int]:
+    """Build a lookup from _line_index to list position.
+
+    Args:
+        records: Full transcript records from ``_load_transcript_duckdb``.
+
+    Returns:
+        Dict mapping each record's ``_line_index`` to its position in ``records``.
+    """
+    return {int(rec["_line_index"]): pos for pos, rec in enumerate(records) if "_line_index" in rec}
+
+
+def _get_context_window(
+    records: list[dict], index_to_pos: dict[int, int], flagged_index: int, window: int = _DEFAULT_WINDOW
+) -> dict | None:
     """Retrieve a window of nearby transcript entries around a flagged index.
 
     The flagged_index is the zero-based line index in the JSONL file
@@ -201,6 +222,7 @@ def _get_context_window(records: list[dict], flagged_index: int, window: int = _
 
     Args:
         records: Full transcript records loaded via DuckDB.
+        index_to_pos: Pre-built lookup from ``_build_index_map``.
         flagged_index: The ``_line_index`` value of the flagged user message.
         window: Number of entries to retrieve before and after the flagged
             message.
@@ -209,26 +231,10 @@ def _get_context_window(records: list[dict], flagged_index: int, window: int = _
         Dict with flagged_index, user_message text, and nearby_entries list.
         None if the flagged index is not found in the transcript.
     """
-    # Build a lookup from _line_index to position in the records list
-    index_to_pos: dict[int, int] = {}
-    for pos, rec in enumerate(records):
-        line_idx = rec.get("_line_index")
-        if line_idx is not None:
-            index_to_pos[int(line_idx)] = pos
-
     pos = index_to_pos.get(flagged_index)
     if pos is None:
         print(f"  Warning: line index {flagged_index} not found in transcript", file=sys.stderr)
         return None
-
-    # Extract user message text
-    flagged_rec = records[pos]
-    message = flagged_rec.get("message")
-    user_text = ""
-    if isinstance(message, dict):
-        user_text = _extract_text(message.get("content"))
-    elif isinstance(message, str):
-        user_text = message
 
     # Compute window bounds
     start = max(0, pos - window)
@@ -240,7 +246,11 @@ def _get_context_window(records: list[dict], flagged_index: int, window: int = _
         entry["is_flagged"] = i == pos
         nearby.append(entry)
 
-    return {"flagged_index": flagged_index, "user_message": user_text, "nearby_entries": nearby}
+    return {
+        "flagged_index": flagged_index,
+        "user_message": _extract_message_text(records[pos]),
+        "nearby_entries": nearby,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -264,13 +274,11 @@ def retrieve_contexts(input_data: dict, session_override: str | None = None, win
     flagged_indexes: list[int] = input_data.get("flagged_indexes", [])
 
     if not source_file:
-        print("Error: no source_file specified in input or via --session-file", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("no source_file specified in input or via --session-file")
 
     session_path = Path(source_file)
     if not session_path.exists():
-        print(f"Error: session file not found: {session_path}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"session file not found: {session_path}")
 
     if not flagged_indexes:
         print("No flagged indexes in input.", file=sys.stderr)
@@ -280,12 +288,14 @@ def retrieve_contexts(input_data: dict, session_override: str | None = None, win
     records = _load_transcript_duckdb(session_path)
     print(f"  Loaded {len(records)} records.", file=sys.stderr)
 
+    index_to_pos = _build_index_map(records)
+
     print(
         f"Retrieving context windows (window={window}) for {len(flagged_indexes)} flagged index(es)...", file=sys.stderr
     )
     contexts: list[dict] = []
     for idx in flagged_indexes:
-        ctx = _get_context_window(records, idx, window=window)
+        ctx = _get_context_window(records, index_to_pos, idx, window=window)
         if ctx is not None:
             contexts.append(ctx)
             print(f"  Index {idx}: retrieved {len(ctx['nearby_entries'])} nearby entries", file=sys.stderr)
@@ -335,7 +345,11 @@ def main() -> None:
         print("Error: input must be a JSON object with 'source_file' and 'flagged_indexes' keys", file=sys.stderr)
         sys.exit(1)
 
-    result = retrieve_contexts(input_data, session_override=args.session_file, window=args.window)
+    try:
+        result = retrieve_contexts(input_data, session_override=args.session_file, window=args.window)
+    except (ValueError, FileNotFoundError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     json.dump(result, sys.stdout, ensure_ascii=False, indent=2, default=str)
     print()  # trailing newline
