@@ -148,7 +148,6 @@ Input:
 - Core asset: [FINAL_DRAFT]
 - Platform: [PLATFORM]
 - Audience/context: [AUDIENCE]
-- CTA preference: [CTA]
 
 Task: Rewrite the asset so it feels native to the platform rather than copied over.
 

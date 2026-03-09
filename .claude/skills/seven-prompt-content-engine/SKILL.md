@@ -48,6 +48,7 @@ Collect or infer before starting:
 | Rough idea / frustration / client situation / lesson / observation | Required | Core material for Step 1 |
 | Target audience | Required | Shapes angle, voice, platform fit |
 | Desired platform or primary destination | Required | Drives Step 6 |
+| Offer / business context | Optional | Sharpens angle specificity in Step 1 |
 | Writing sample | Optional | Used in Step 4 for voice matching |
 | Banned phrases / tone constraints / formatting constraints | Optional | Applied in Steps 4 and 5 |
 
