@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import pathlib
 import textwrap
 from datetime import UTC, datetime
@@ -481,7 +482,9 @@ def _get_font(size: int) -> FreeTypeFont | PILImageFont:
 
 _FONT_SIZE = 16
 _PADDING = 24
-_INNER_WIDTH = 700
+# Card width in *characters* (including the ┌/┘ corners).
+# Layout per content row: │ + 1 space + 2 indent + 72 wrap + 2 pad + │ = 80
+_INNER_WIDTH = 80
 _LINE_HEIGHT = _FONT_SIZE + 6
 _WRAP_WIDTH = 72
 
@@ -521,19 +524,24 @@ def _count_card_lines(sections: list[tuple[str, list[str], tuple[int, int, int]]
 
 
 def _char_width(font: FreeTypeFont | PILImageFont) -> int:
-    """Get the pixel width of a single monospace character for the given font.
+    """Get the advance width of a single monospace character for the given font.
 
-    Uses ``getbbox`` on FreeTypeFont; falls back to 8px for PIL's default
-    bitmap font.
+    Uses ``getlength`` (advance width) on FreeTypeFont for accurate glyph
+    spacing.  Falls back to ``getbbox`` then 8px for PIL's default bitmap
+    font.
 
     Args:
         font: PIL font instance.
 
     Returns:
-        Character width in pixels.
+        Character advance width in pixels (rounded up).
     """
+    if hasattr(font, "getlength"):
+        # getlength returns the advance width -- the distance the cursor
+        # moves, which is what we need for positioning adjacent characters.
+        return math.ceil(font.getlength("M"))
     if hasattr(font, "getbbox"):
-        bbox = font.getbbox("─")
+        bbox = font.getbbox("M")
         return int(bbox[2] - bbox[0])
     # PIL default bitmap font: fixed 6x11 or 8px wide depending on version
     return 8
@@ -570,7 +578,8 @@ def _draw_card(
 
     # --- Header row: ┌─ RTFP ─────...─┐ ---
     rtfp_label = " RTFP "
-    dashes = "─" * (header_inner - len(rtfp_label) - 2)
+    # header_inner chars sit between ┌ and ┐: one leading ─, the label, then fill dashes
+    dashes = "─" * (header_inner - len(rtfp_label) - 1)
     header_text = f"┌─{rtfp_label}{dashes}┐"
     draw.text((pad, pad), header_text, font=font, fill=_COLOR_HEADER)
 
@@ -626,6 +635,7 @@ def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, outp
         Dict with output_path, width, height.
     """
     font: FreeTypeFont | PILImageFont = _get_font(_FONT_SIZE)
+    cw = _char_width(font)
     sections: list[tuple[str, list[str], tuple[int, int, int]]] = [
         ("task:", _wrap_text(task_summary), _COLOR_TASK_LABEL),
         ("assistant:", _wrap_text(assistant_excerpt), _COLOR_ASSISTANT_LABEL),
@@ -633,7 +643,8 @@ def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, outp
     ]
     total_lines = _count_card_lines(sections)
     height = _PADDING * 2 + total_lines * _LINE_HEIGHT + 4
-    width = _INNER_WIDTH + _PADDING * 2
+    # Image width = left padding + (char_count * char_width) + right padding
+    width = _PADDING * 2 + _INNER_WIDTH * cw
 
     img = Image.new("RGB", (width, height), color=_COLOR_BG)
     draw = ImageDraw.Draw(img)
