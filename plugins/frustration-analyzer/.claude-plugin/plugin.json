@@ -1,24 +1,26 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.1.13",
-  "description": "Analyze Claude Code session transcripts to detect user insults directed at AI assistants, identify the scenarios that caused them, rate insult creativity and humor, and generate sanitized social media content from the findings.",
+  "version": "0.2.0",
+  "description": "Read The Fucking Prompt — finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
   "author": {
     "name": "Jamie-BitFlight"
   },
   "keywords": [
     "transcripts",
     "frustration",
-    "insults",
-    "analysis",
-    "social-media",
-    "duckdb"
+    "rage-receipt",
+    "duckdb",
+    "session-analysis",
+    "png"
   ],
   "license": "MIT",
   "skills": [
-    "./skills/frustration-analysis"
+    "./skills/rtfp"
   ],
   "agents": [
-    "./agents/frustration-analyst.md"
+    "./agents/frustration-analyst.md",
+    "./agents/batch-detector.md",
+    "./agents/context-reconstructor.md"
   ],
   "mcpServers": "./.mcp.json"
 }

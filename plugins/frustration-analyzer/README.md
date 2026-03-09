@@ -1,6 +1,6 @@
-# frustration-analyzer
+# RTFP — Read The Fucking Prompt
 
-Analyzes Claude Code session transcripts to detect user insults directed at AI assistants, identify the failure scenarios that caused them, rate each insult on creativity, humor, severity, and accuracy, and generate social media content from the findings. It builds on the existing frustration signal detection in `agentskill-kaizen` (which covers soft signals like corrections and interrupts) and targets the harder signal class: explicit insults.
+Finds the single strongest user reaction to an AI instruction-following failure in a chosen Claude Code session, reconstructs the assistant output that triggered it, and renders the exchange as a terminal-style PNG ready for social media.
 
 ## Installation
 
@@ -14,82 +14,95 @@ Or for local testing:
 claude --plugin-dir ./plugins/frustration-analyzer
 ```
 
+## What It Does
+
+RTFP runs a 3-stage pipeline:
+
+```
+Stage 1: Extract user-only messages → batch files
+Stage 2: Subagents detect emotional reactions per batch → flagged indexes
+Stage 3: Reconstruction agent picks winner → reads full context → 3-field artifact
+Output:  Terminal-style PNG
+```
+
+The final artifact contains exactly three things:
+
+1. **task** — a single dry line describing what was being worked on
+2. **assistant said** — the assistant output that triggered the reaction
+3. **user replied** — the user's exact words
+
 ## Quick Start
 
-1. Open a Claude Code session with the plugin loaded.
-2. Find your transcripts:
-
-   ```text
-   Scan my transcripts for insults
-   ```
-
-3. Explore and generate:
-
-   ```text
-   Show me the top 10 most creative insults
-   Generate a tweet for the funniest one
-   ```
-
-The plugin scans `~/.claude/projects/**/*.jsonl` by default.
-
-## The 8 Insult Categories
-
-| Category | Description |
-|----------|-------------|
-| `profanity_at_ai` | Direct swear words aimed at the AI as an entity |
-| `model_comparison` | Unfavorable comparison to inferior AI models (Haiku, GPT-3, Copilot) |
-| `competence_challenge` | Questions challenging the AI's ability to do its job ("can't you read?") |
-| `intelligence_insult` | Declarative labels: "you're useless", "this is garbage" |
-| `repeat_failure` | Exasperation at the same mistake recurring — requires emphasis (caps, `?!`) |
-| `sarcasm` | Mock praise or ironic congratulations following a failure |
-| `dismissive_command` | Terse imperatives: "just stop", "I'll do it myself", "I'm switching to Cursor" |
-| `technical_putdown` | Inventive CS-metaphor insults diagnosing the failure mode ("off-by-one brain") |
-
-## Rating Dimensions
-
-Each insult is scored 1–5 on four dimensions. Composite = equal-weighted average.
-
-| Dimension | What it measures | 5/5 example |
-|-----------|-----------------|-------------|
-| Creativity | How original and inventive the insult is | "you're a Monte Carlo simulation of competence" |
-| Humor | Whether it is genuinely funny, even to the target | "congrats on achieving artificial unintelligence" |
-| Severity | Intensity of emotional escalation | Session-ending, multi-category rage message |
-| Accuracy | How correctly it diagnoses the actual AI failure mode | "your context window lost my constraints from 3 turns ago" |
-
-## Social Media Output Example
-
-Input insult (raw):
-
 ```text
-"off-by-one brain, you deleted line 42 again you fucking moron"
+/rtfp
 ```
 
-Generated post:
+The plugin lists your recent sessions, you pick one, and it runs the pipeline automatically.
+
+Or pass a session path directly:
 
 ```text
-🔥 AI Frustration Report
-
-What the user said: "off-by-one brain, you deleted line 42 again you fucking moron"
-
-Category: Technical Put-Down
-
-#AIFrustration #TechnicalBurn #ClaudeCode
+/rtfp ~/.claude/projects/myproject/abc123.jsonl
 ```
 
-The agent then surfaces a privacy reminder and asks whether to replace personal or business details with placeholders before sharing.
+## Example Output
 
-## Privacy
+```
+┌─ RTFP ──────────────────────────────────────────┐
 
-Content is always shown raw — insult and profanity intact. No mechanical regex filtering is applied.
+  task: writing a Claude Code plugin
 
-After every post generation, the agent surfaces a privacy reminder from the response, then asks the user: "Would you like me to replace any personal or business details with placeholders before sharing?" If yes, the agent rewrites the post replacing sensitive details with contextually appropriate mock placeholders (e.g. [Company], [Project], [Colleague], [Tool]) while preserving the insult and all profanity verbatim. The AI identifies what is sensitive in context — no blind pattern matching.
+  assistant:
+    Here is a bulleted list of steps:
+    - Step 1: Create the SKILL.md file
+    - Step 2: Add frontmatter
+
+  user:
+    I said no bullets. How are you still doing bullets.
+
+└──────────────────────────────────────────────────┘
+```
+
+PNG saved to `/tmp/rtfp-abc123.png`
+
+## Architecture
+
+**Data layer**: Claude Code sessions are stored as JSONL files in `~/.claude/projects/`. JSONL is the storage layer. DuckDB is the query layer used to read, filter, and analyze session data directly — no persistent database is created.
+
+**Stage 1 — User-only extraction**: The session JSONL is queried via DuckDB. Only user-authored messages are written to a batch file. No assistant content, tool outputs, system messages, or context windows are included at this stage.
+
+**Stage 2 — Parallel detection**: One subagent per batch file identifies messages containing strong emotional reactions (frustration, disbelief, insults, arguments). Each subagent returns a flagged index file.
+
+**Stage 3 — Context reconstruction**: A reconstruction agent reads the merged flagged indexes, picks the strongest incident, and goes back to the full session transcript to read surrounding context and identify the triggering assistant output.
+
+**Render**: The 3-field artifact is rendered as a dark-background terminal-style PNG using PIL.
+
+## Agents
+
+| Agent | Role |
+|-------|------|
+| `frustration-analyst` | Orchestrator — runs the full pipeline, presents result |
+| `batch-detector` | Stage 2 — detects emotional reactions in a user-only batch file |
+| `context-reconstructor` | Stage 3 — picks winner, reads full context, produces 3-field artifact |
 
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `scan_transcripts` | Scan JSONL transcript files and return raw paginated user messages with context |
-| `list_insults` | List detected insults with ratings; filterable by category, min score, or session |
-| `get_scenario` | Retrieve the N preceding messages that led to a specific insult |
-| `top_insults` | Get the top-rated insults by composite score or specific dimension |
-| `generate_social_post` | Generate a raw social media post from an insult (always includes a privacy reminder) |
+| `list_sessions` | List JSONL session files from `~/.claude/projects/`, sorted by recency |
+| `extract_user_messages` | Write a user-only batch JSONL from a session file (Stage 1) |
+| `get_context_window` | Return N messages before/after a target line (Stage 3 reconstruction) |
+| `render_rage_receipt` | Render task_summary + assistant_excerpt + user_reply as a terminal PNG |
+| `scan_transcripts` | Paginated user message extraction with context (direct use) |
+| `get_scenario` | Get full message context for a specific file and line position |
+| `generate_social_post` | Generate a text social media post from a user message |
+
+## Privacy
+
+Session transcripts may contain personal, business, or identifying details. Content is always shown raw — no mechanical filtering is applied. After presenting a PNG, ask the user whether any details should be replaced with placeholders before sharing externally.
+
+## What This Is Not
+
+- Not a corpus-wide analytics tool — one session per run
+- Not an insult scorer — no taxonomy, no ratings, no verdicts
+- Not a sentiment analyzer — it finds specific instruction-following failures
