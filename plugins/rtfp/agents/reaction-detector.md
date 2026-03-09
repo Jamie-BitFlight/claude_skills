@@ -44,7 +44,13 @@ Collect the `index` value from every message you judge as a strong emotional rea
 
 ## Step 3: Write the JSON output file
 
-Write a JSON file to `/tmp/rtfp-flagged-<batch_index>.json` where `<batch_index>` is the `batch_index` value from the batch JSON header.
+Determine the platform temp directory, then write the flagged indexes JSON file:
+
+```bash
+TMPDIR=$(python3 -c "import tempfile; print(tempfile.gettempdir())")
+```
+
+Write a JSON file to `$TMPDIR/rtfp-flagged-<batch_index>.json` where `<batch_index>` is the `batch_index` value from the batch JSON header.
 
 The file must have this exact format:
 
@@ -61,7 +67,8 @@ The file must have this exact format:
 Write the file using the Bash tool:
 
 ```bash
-cat > /tmp/rtfp-flagged-<batch_index>.json << 'EOF'
+TMPDIR=$(python3 -c "import tempfile; print(tempfile.gettempdir())")
+cat > "$TMPDIR/rtfp-flagged-<batch_index>.json" << 'EOF'
 { ... }
 EOF
 ```

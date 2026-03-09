@@ -38,7 +38,7 @@ Each batch file is a JSON object:
 }
 
 Usage:
-    extract_batches.py <session_jsonl_path> [--out-dir /tmp/rtfp-batches] [--batch-tokens 100000]
+    extract_batches.py <session_jsonl_path> [--out-dir <tempdir>/rtfp-batches] [--batch-tokens 100000]
     extract_batches.py <session_jsonl_path> --list-only
 """
 

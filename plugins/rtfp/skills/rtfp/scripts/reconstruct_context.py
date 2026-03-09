@@ -27,9 +27,9 @@ Output (stdout, JSON)::
 
 Usage::
 
-    reconstruct_context.py --flagged-file /tmp/flagged.json
-    reconstruct_context.py --flagged-file /tmp/flagged.json --session-file /path/to/session.jsonl
-    reconstruct_context.py --flagged-file /tmp/flagged.json --window 15
+    reconstruct_context.py --flagged-file flagged.json
+    reconstruct_context.py --flagged-file flagged.json --session-file /path/to/session.jsonl
+    reconstruct_context.py --flagged-file flagged.json --window 15
 """
 
 from __future__ import annotations

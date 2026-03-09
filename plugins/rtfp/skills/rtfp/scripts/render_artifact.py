@@ -15,12 +15,12 @@ Input JSON format::
 
     {"task_summary": "task: writing a Claude Code plugin", "triggering_assistant_output": "...", "user_reaction": "..."}
 
-Output: PNG file (default /tmp/rtfp-artifact.png).
+Output: PNG file (default ``<tempdir>/rtfp-artifact.png``).
 
 Usage::
 
-    render_artifact.py --input-file input.json --output /tmp/out.png --width 900
-    cat input.json | render_artifact.py --output /tmp/out.png
+    render_artifact.py --input-file input.json --output out.png --width 900
+    cat input.json | render_artifact.py --output out.png
 """
 
 from __future__ import annotations
