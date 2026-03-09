@@ -253,8 +253,17 @@ def _is_human_plaintext(text: str) -> bool:
         stripped = stripped[1:-1].strip()
     if not stripped:
         return False
-    # Skill/command injection payloads start with XML tags
-    if stripped.startswith(("<command-message", "<command-name", "<command-args")):
+    # Skill/command injection payloads, system-injected XML tags, and
+    # stop-hook feedback lines are not genuine human input.
+    if stripped.startswith((
+        "<command-message",
+        "<command-name",
+        "<command-args",
+        "<task-notification",
+        "<system-reminder",
+        '<parameter name="orchestrator-read-warning',
+        "[~/.claude/",
+    )):
         return False
     # Tool result blocks are JSON arrays of dicts
     return not stripped.startswith("[{")
@@ -487,6 +496,7 @@ def _render_card(
     panel = Panel(content, title="RTFP", title_align="left", border_style="bright_blue", padding=(1, 2))
 
     console = Console(record=True, width=100, force_terminal=True, color_system="truecolor")
+    panel.width = console.width
     console.print(panel)
 
     svg_text = console.export_svg(title="RTFP")
