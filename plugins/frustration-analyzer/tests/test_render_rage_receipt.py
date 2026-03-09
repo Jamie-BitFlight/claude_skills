@@ -10,16 +10,14 @@ Verifies that:
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
-
-# Add the MCP server directory to the path so we can import the module
-_SERVER_DIR = Path(__file__).resolve().parent.parent / "mcp"
-sys.path.insert(0, str(_SERVER_DIR))
+from typing import TYPE_CHECKING
 
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
 from server import _render_card  # ty: ignore[unresolved-import]
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _TASK = "Implement login page"
 _ASSISTANT = "I have written the login page using React."

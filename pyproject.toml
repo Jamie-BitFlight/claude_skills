@@ -13,6 +13,7 @@ dependencies = [
 dev = [
     "anthropic>=0.80.0",
     "basedpyright>=1.33.0",
+    "cairosvg>=2.7.0",
     "claude-code-sdk>=0.0.25",
     "defusedxml>=0.7.1",
     "duckdb>=1.4.4",

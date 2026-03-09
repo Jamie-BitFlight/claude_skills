@@ -34,6 +34,8 @@ import asyncio
 import json
 import logging
 import pathlib
+import re
+import xml.etree.ElementTree as ET  # noqa: S405
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -473,6 +475,12 @@ _BORDER_COLOR = "#1984e9"
 _BOX_DRAWING_CHARS = frozenset("╭╮╰╯│─┐┘┌└├┤┬┴┼")
 _G_TAG = f"{{{_SVG_NS}}}g"
 _TEXT_TAG = f"{{{_SVG_NS}}}text"
+_CLIP_LINE_MARKER = "-line-"
+_CLIP_FIRST_LINE_MARKER = "-line-0"
+_CONSOLE_WIDTH = 100
+
+_RE_TRANSLATE = re.compile(r"translate\(")
+_RE_TRANSLATE_COORDS = re.compile(r"translate\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
 
 
 def _find_content_group(root: _Element) -> _Element | None:
@@ -484,10 +492,8 @@ def _find_content_group(root: _Element) -> _Element | None:
     Returns:
         The ``<g>`` element, or ``None`` if the expected structure is absent.
     """
-    import re  # noqa: PLC0415
-
     for g in root.iter(_G_TAG):
-        if re.search(r"translate\(", g.get("transform", "")) and any(True for _ in g.iter(_TEXT_TAG)):
+        if _RE_TRANSLATE.search(g.get("transform", "")) and any(True for _ in g.iter(_TEXT_TAG)):
             return g
     return None
 
@@ -501,9 +507,7 @@ def _parse_translate(g: _Element) -> tuple[float, float]:
     Returns:
         Tuple of ``(tx, ty)`` floats, defaulting to ``(9.0, 41.0)``.
     """
-    import re  # noqa: PLC0415
-
-    m = re.search(r"translate\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)", g.get("transform", ""))
+    m = _RE_TRANSLATE_COORDS.search(g.get("transform", ""))
     return (float(m.group(1)), float(m.group(2))) if m else (9.0, 41.0)
 
 
@@ -516,8 +520,6 @@ def _extract_line_height(root: _Element) -> float:
     Returns:
         Line height in pixels (defaults to ``24.4``).
     """
-    import re  # noqa: PLC0415
-
     style_el = root.find(f"{{{_SVG_NS}}}style")
     if style_el is not None and style_el.text and (m := re.search(r"line-height:\s*([\d.]+)px", style_el.text)):
         return float(m.group(1))
@@ -538,10 +540,10 @@ def _count_line_clips(root: _Element) -> tuple[int, float]:
     first_line_y = 1.5
     for cp in clips:
         cp_id = cp.get("id") or ""
-        if "-line-" not in cp_id:
+        if _CLIP_LINE_MARKER not in cp_id:
             continue
         num_lines += 1
-        if "-line-0" in cp_id:
+        if _CLIP_FIRST_LINE_MARKER in cp_id:
             rect_el = cp.find(f"{{{_SVG_NS}}}rect")
             if rect_el is not None:
                 first_line_y = float(rect_el.get("y", "1.5"))
@@ -585,19 +587,22 @@ def _hide_box_drawing_glyphs(matrix_g: _Element) -> None:
     Args:
         matrix_g: The matrix ``<g>`` element containing rendered text.
     """
+    # Single pass: hide box-drawing elements and find the title candidate
+    title_candidate: _Element | None = None
+    longest_non_box = 0
     for text_el in matrix_g.iter(_TEXT_TAG):
         raw = "".join(text_el.itertext()).strip().replace("\xa0", " ")
         if _is_box_drawing_only(raw):
             text_el.set("fill-opacity", "0")
+            # Check if this hidden element contains the RTFP title
+            cleaned = "".join(c for c in raw if c not in _BOX_DRAWING_CHARS).strip()
+            if cleaned == "RTFP" and len(cleaned) > longest_non_box:
+                longest_non_box = len(cleaned)
+                title_candidate = text_el
 
     # Re-show the RTFP title element (it shares a row with ─ chars)
-    for text_el in matrix_g.iter(_TEXT_TAG):
-        if text_el.get("fill-opacity") != "0":
-            continue
-        raw = "".join(text_el.itertext()).strip().replace("\xa0", " ")
-        cleaned = "".join(c for c in raw if c not in _BOX_DRAWING_CHARS).strip()
-        if cleaned == "RTFP":
-            text_el.attrib.pop("fill-opacity", None)
+    if title_candidate is not None:
+        title_candidate.attrib.pop("fill-opacity", None)
 
 
 def _inject_border_rect(svg_text: str) -> str:
@@ -615,8 +620,6 @@ def _inject_border_rect(svg_text: str) -> str:
     Returns:
         Modified SVG string with gapless border rect and hidden box glyphs.
     """
-    import xml.etree.ElementTree as ET  # noqa: PLC0415, S405
-
     ET.register_namespace("", _SVG_NS)
     root = ET.fromstring(svg_text)  # noqa: S314
 
@@ -636,7 +639,7 @@ def _inject_border_rect(svg_text: str) -> str:
     rect_attrs: dict[str, str] = {
         "x": f"{tx + char_width * 0.5:.1f}",
         "y": f"{ty + first_line_y:.1f}",
-        "width": f"{char_width * 99:.1f}",
+        "width": f"{char_width * (_CONSOLE_WIDTH - 1):.1f}",
         "height": f"{num_lines * line_height:.1f}",
         "rx": "4",
         "ry": "4",
