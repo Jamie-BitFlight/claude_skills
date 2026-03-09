@@ -244,6 +244,33 @@ def _extract_user_text_from_value(
     return ""
 
 
+def _is_human_plaintext(text: str) -> bool:
+    """Check whether extracted text is genuine human-typed content.
+
+    Filters out skill/command injection payloads, tool result blocks,
+    and empty/whitespace-only strings that leak through the DuckDB
+    ``type='user' AND toolUseResult IS NULL`` filter.
+
+    The content field in Claude Code JSONL may wrap the actual text in
+    surrounding double-quote characters, so those are stripped before
+    pattern matching.
+
+    Args:
+        text: The extracted text string to validate.
+
+    Returns:
+        True if the text appears to be genuine human input.
+    """
+    stripped = text.strip().strip('"').strip()
+    if not stripped:
+        return False
+    # Skill/command injection payloads start with XML tags
+    if stripped.startswith(("<command-message", "<command-name", "<command-args")):
+        return False
+    # Tool result blocks are JSON arrays of dicts
+    return not stripped.startswith("[{")
+
+
 def _extract_assistant_text(message: str | dict[str, Any] | None) -> str:
     """Extract plain text from an assistant message content array.
 
@@ -371,21 +398,28 @@ def _get_context_messages(file_path: str, line_index: int, context_window: int) 
 
 
 def _derive_session_title(file_path: str) -> str:
-    """Derive a human-readable title from the first user message in a session file.
+    """Derive a human-readable title from the first genuine user message in a session file.
+
+    Scans through user messages, skipping skill/command injection payloads
+    and tool result blocks, until a real human-typed message is found.
 
     Args:
         file_path: Absolute path to a JSONL session file.
 
     Returns:
-        First 80 characters of the first user message, or the filename stem as fallback.
+        First 80 characters of the first human-typed user message,
+        or the filename stem as fallback.
     """
     try:
         conn = duckdb.connect()
-        row = conn.execute(_SQL_FIRST_USER_MESSAGE, [file_path]).fetchone()
+        # Query ALL user messages (not just the first) so we can skip injected ones
+        rows = conn.execute(_SQL_ALL_MESSAGES_IN_FILE, [file_path]).fetchall()
         conn.close()
-        if row and row[0] is not None:
-            text = _extract_user_text_from_value(row[0])
-            if text:
+        for _line_index, msg_type, _timestamp, message, tool_use_result in rows:
+            if msg_type != "user" or tool_use_result is not None:
+                continue
+            text = _extract_user_text_from_value(message)
+            if text and _is_human_plaintext(text):
                 return text[:80].replace("\n", " ").strip()
     except Exception as exc:  # noqa: BLE001
         logger.debug("Could not derive session title from %s: %s", file_path, exc)
@@ -630,7 +664,7 @@ async def extract_user_messages(file: str, output_path: str) -> dict[str, Any]:
                 if msg_type != "user" or tool_use_result is not None:
                     continue
                 text = _extract_user_text_from_value(message)
-                if not text:
+                if not text or not _is_human_plaintext(text):
                     continue
                 fh.write(json.dumps({"file": resolved, "line_index": int(line_index), "text": text}) + "\n")
                 count += 1
