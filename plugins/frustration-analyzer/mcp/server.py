@@ -154,14 +154,15 @@ _SQL_ALL_MESSAGES_IN_FILE: str = (
     " FROM indexed ORDER BY rn"
 )
 
-_SQL_FIRST_USER_MESSAGE: str = (
+_SQL_FIRST_USER_MESSAGES: str = (
     "WITH indexed AS ("
     " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
     " FROM read_ndjson_auto($1, union_by_name:=true)"
     ")"
-    " SELECT message FROM indexed"
+    ' SELECT rn AS line_index, type, "timestamp", message, toolUseResult'
+    " FROM indexed"
     " WHERE type = 'user' AND toolUseResult IS NULL"
-    " ORDER BY rn LIMIT 1"
+    " ORDER BY rn LIMIT 20"
 )
 
 # ---------------------------------------------------------------------------
@@ -261,7 +262,10 @@ def _is_human_plaintext(text: str) -> bool:
     Returns:
         True if the text appears to be genuine human input.
     """
-    stripped = text.strip().strip('"').strip()
+    stripped = text.strip()
+    # Remove exactly one wrapping pair of double-quotes if present
+    if stripped.startswith('"') and stripped.endswith('"') and len(stripped) > 1:
+        stripped = stripped[1:-1].strip()
     if not stripped:
         return False
     # Skill/command injection payloads start with XML tags
@@ -397,7 +401,7 @@ def _get_context_messages(file_path: str, line_index: int, context_window: int) 
     return context
 
 
-def _derive_session_title(file_path: str) -> str:
+def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None = None) -> str:
     """Derive a human-readable title from the first genuine user message in a session file.
 
     Scans through user messages, skipping skill/command injection payloads
@@ -405,16 +409,20 @@ def _derive_session_title(file_path: str) -> str:
 
     Args:
         file_path: Absolute path to a JSONL session file.
+        conn: Optional shared DuckDB connection. When provided the caller
+            owns the connection lifecycle; when ``None`` a temporary
+            connection is created and closed internally.
 
     Returns:
         First 80 characters of the first human-typed user message,
         or the filename stem as fallback.
     """
+    own_conn = conn is None
     try:
-        conn = duckdb.connect()
-        # Query ALL user messages (not just the first) so we can skip injected ones
-        rows = conn.execute(_SQL_ALL_MESSAGES_IN_FILE, [file_path]).fetchall()
-        conn.close()
+        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else conn  # type: ignore[assignment]
+        rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
+        if own_conn:
+            db.close()
         for _line_index, msg_type, _timestamp, message, tool_use_result in rows:
             if msg_type != "user" or tool_use_result is not None:
                 continue
@@ -431,8 +439,13 @@ def _derive_session_title(file_path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+_FONT_CACHE: dict[int, Any] = {}
+
+
 def _get_font(size: int) -> FreeTypeFont | PILImageFont:
     """Load a monospace font at the given size, falling back to PIL default.
+
+    Results are cached by size to avoid re-loading the font file on every call.
 
     Args:
         size: Font size in points.
@@ -440,6 +453,9 @@ def _get_font(size: int) -> FreeTypeFont | PILImageFont:
     Returns:
         PIL ImageFont instance (FreeTypeFont if a path matched, else default).
     """
+    if size in _FONT_CACHE:
+        return _FONT_CACHE[size]
+
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
@@ -452,10 +468,15 @@ def _get_font(size: int) -> FreeTypeFont | PILImageFont:
     for path in candidates:
         if pathlib.Path(path).exists():
             try:
-                return _ImageFont.truetype(path, size)
+                font = _ImageFont.truetype(path, size)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Could not load font %s: %s", path, exc)
-    return _ImageFont.load_default()
+            else:
+                _FONT_CACHE[size] = font
+                return font
+    font = _ImageFont.load_default()
+    _FONT_CACHE[size] = font
+    return font
 
 
 _FONT_SIZE = 16
@@ -605,18 +626,22 @@ async def list_sessions(project_path: str = "~/.claude/projects/") -> dict[str, 
         jsonl_files = sorted(root.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
 
         sessions: list[dict[str, Any]] = []
-        for f in jsonl_files:
-            stat = f.stat()
-            project = f.parent.name
-            modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
-            title = _derive_session_title(str(f))
-            sessions.append({
-                "file": str(f),
-                "project": project,
-                "modified": modified,
-                "size_bytes": stat.st_size,
-                "title": title,
-            })
+        conn = duckdb.connect()
+        try:
+            for f in jsonl_files:
+                stat = f.stat()
+                project = f.parent.name
+                modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
+                title = _derive_session_title(str(f), conn=conn)
+                sessions.append({
+                    "file": str(f),
+                    "project": project,
+                    "modified": modified,
+                    "size_bytes": stat.st_size,
+                    "title": title,
+                })
+        finally:
+            conn.close()
 
         return {"sessions": sessions, "count": len(sessions)}
 
