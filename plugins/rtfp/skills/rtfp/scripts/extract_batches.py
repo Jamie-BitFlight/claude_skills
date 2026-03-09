@@ -151,7 +151,7 @@ def load_messages(session_path: Path) -> list[dict]:
             continue
 
         # Skip tool result lines (infrastructure, not user-authored)
-        if "toolUseResult" in rec:
+        if rec.get("toolUseResult") is not None:
             continue
 
         content = _extract_text(rec.get("message", {}).get("content"))

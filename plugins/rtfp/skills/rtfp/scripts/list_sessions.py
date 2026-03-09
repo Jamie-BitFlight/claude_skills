@@ -111,7 +111,7 @@ def _derive_title(path: Path) -> tuple[str, int]:
             continue
         if rec.get("type") != "user":
             continue
-        if "toolUseResult" in rec:
+        if rec.get("toolUseResult") is not None:
             continue
         msg = rec.get("message")
         if not isinstance(msg, dict):
@@ -145,8 +145,8 @@ def _find_project_dir(project_dir: str) -> Path | None:
         return candidate
 
     # Try hyphen-joined path form (older versions)
-    parts = project_path.parts
-    hyphen_slug = "-".join(p.lstrip("/") for p in parts if p and p != "/")
+    # Claude Code replaces every `/` (including leading) with `-` and `_` with `-`
+    hyphen_slug = str(project_path).replace("/", "-").replace("_", "-")
     candidate = PROJECTS_DIR / hyphen_slug
     if candidate.exists():
         return candidate
