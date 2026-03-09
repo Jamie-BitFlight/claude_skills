@@ -35,7 +35,10 @@ import json
 import logging
 import pathlib
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from xml.etree.ElementTree import Element as _Element  # noqa: S405
 
 import duckdb
 from fastmcp import FastMCP
@@ -464,14 +467,202 @@ def _build_card_content(task_summary: str, assistant_excerpt: str, user_reply: s
     return content
 
 
+_SVG_NS = "http://www.w3.org/2000/svg"
+_SVG_NS_MAP = {"svg": _SVG_NS}
+_BORDER_COLOR = "#1984e9"
+_BOX_DRAWING_CHARS = frozenset("╭╮╰╯│─┐┘┌└├┤┬┴┼")
+_G_TAG = f"{{{_SVG_NS}}}g"
+_TEXT_TAG = f"{{{_SVG_NS}}}text"
+
+
+def _find_content_group(root: _Element) -> _Element | None:
+    """Find the outermost ``<g transform="translate(...)">`` containing text.
+
+    Args:
+        root: Parsed SVG ``Element`` root.
+
+    Returns:
+        The ``<g>`` element, or ``None`` if the expected structure is absent.
+    """
+    import re  # noqa: PLC0415
+
+    for g in root.iter(_G_TAG):
+        if re.search(r"translate\(", g.get("transform", "")) and any(True for _ in g.iter(_TEXT_TAG)):
+            return g
+    return None
+
+
+def _parse_translate(g: _Element) -> tuple[float, float]:
+    """Extract ``(tx, ty)`` from a ``translate()`` transform attribute.
+
+    Args:
+        g: An SVG ``<g>`` element.
+
+    Returns:
+        Tuple of ``(tx, ty)`` floats, defaulting to ``(9.0, 41.0)``.
+    """
+    import re  # noqa: PLC0415
+
+    m = re.search(r"translate\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)", g.get("transform", ""))
+    return (float(m.group(1)), float(m.group(2))) if m else (9.0, 41.0)
+
+
+def _extract_line_height(root: _Element) -> float:
+    """Read ``line-height`` from the embedded ``<style>`` element.
+
+    Args:
+        root: Parsed SVG ``Element`` root.
+
+    Returns:
+        Line height in pixels (defaults to ``24.4``).
+    """
+    import re  # noqa: PLC0415
+
+    style_el = root.find(f"{{{_SVG_NS}}}style")
+    if style_el is not None and style_el.text and (m := re.search(r"line-height:\s*([\d.]+)px", style_el.text)):
+        return float(m.group(1))
+    return 24.4
+
+
+def _count_line_clips(root: _Element) -> tuple[int, float]:
+    """Count content line clip-paths and find the first line's y-offset.
+
+    Args:
+        root: Parsed SVG ``Element`` root.
+
+    Returns:
+        Tuple of ``(num_lines, first_line_y)``.
+    """
+    clips = root.findall(".//svg:defs/svg:clipPath", _SVG_NS_MAP)
+    num_lines = 0
+    first_line_y = 1.5
+    for cp in clips:
+        cp_id = cp.get("id") or ""
+        if "-line-" not in cp_id:
+            continue
+        num_lines += 1
+        if "-line-0" in cp_id:
+            rect_el = cp.find(f"{{{_SVG_NS}}}rect")
+            if rect_el is not None:
+                first_line_y = float(rect_el.get("y", "1.5"))
+    return num_lines, first_line_y
+
+
+def _find_matrix_group(outer_g: _Element) -> _Element:
+    """Locate the ``<g class="...-matrix">`` inside the content group.
+
+    Args:
+        outer_g: The translated content ``<g>`` element.
+
+    Returns:
+        The matrix ``<g>``, or *outer_g* as fallback.
+    """
+    for g in outer_g.iter(_G_TAG):
+        if "matrix" in g.get("class", ""):
+            return g
+    return outer_g
+
+
+def _is_box_drawing_only(text: str) -> bool:
+    """Return True if *text* contains only box-drawing and whitespace chars.
+
+    Args:
+        text: Normalised text content of an SVG ``<text>`` element.
+
+    Returns:
+        True when all visible characters are box-drawing glyphs.
+    """
+    non_ws = text.replace(" ", "").replace("\n", "").replace("\r", "")
+    return bool(non_ws) and all(c in _BOX_DRAWING_CHARS for c in non_ws)
+
+
+def _hide_box_drawing_glyphs(matrix_g: _Element) -> None:
+    """Set ``fill-opacity="0"`` on text elements that contain only box-drawing chars.
+
+    After hiding, any element whose non-box-drawing content equals the
+    panel title ``"RTFP"`` is re-shown so the title remains visible.
+
+    Args:
+        matrix_g: The matrix ``<g>`` element containing rendered text.
+    """
+    for text_el in matrix_g.iter(_TEXT_TAG):
+        raw = "".join(text_el.itertext()).strip().replace("\xa0", " ")
+        if _is_box_drawing_only(raw):
+            text_el.set("fill-opacity", "0")
+
+    # Re-show the RTFP title element (it shares a row with ─ chars)
+    for text_el in matrix_g.iter(_TEXT_TAG):
+        if text_el.get("fill-opacity") != "0":
+            continue
+        raw = "".join(text_el.itertext()).strip().replace("\xa0", " ")
+        cleaned = "".join(c for c in raw if c not in _BOX_DRAWING_CHARS).strip()
+        if cleaned == "RTFP":
+            text_el.attrib.pop("fill-opacity", None)
+
+
+def _inject_border_rect(svg_text: str) -> str:
+    """Replace Rich's box-drawing character border with a continuous SVG rect.
+
+    Rich renders Panel borders using individual box-drawing glyphs
+    (``╭╮╰╯│─``).  When cairosvg rasterises these, sub-pixel gaps appear
+    between glyphs -- especially at the corners.  This function hides the
+    glyph-based border and injects an SVG ``<rect>`` with a solid stroke
+    that traces the same boundary as a single continuous path.
+
+    Args:
+        svg_text: The raw SVG string produced by ``console.export_svg()``.
+
+    Returns:
+        Modified SVG string with gapless border rect and hidden box glyphs.
+    """
+    import xml.etree.ElementTree as ET  # noqa: PLC0415, S405
+
+    ET.register_namespace("", _SVG_NS)
+    root = ET.fromstring(svg_text)  # noqa: S314
+
+    outer_g = _find_content_group(root)
+    if outer_g is None:
+        return svg_text
+
+    tx, ty = _parse_translate(outer_g)
+    line_height = _extract_line_height(root)
+    char_width = line_height / 2.0
+    num_lines, first_line_y = _count_line_clips(root)
+
+    _hide_box_drawing_glyphs(_find_matrix_group(outer_g))
+
+    # Rect aligns with where box-drawing chars were: left/right edges
+    # centered on first/last character cells, top/bottom at clip boundaries.
+    rect_attrs: dict[str, str] = {
+        "x": f"{tx + char_width * 0.5:.1f}",
+        "y": f"{ty + first_line_y:.1f}",
+        "width": f"{char_width * 99:.1f}",
+        "height": f"{num_lines * line_height:.1f}",
+        "rx": "4",
+        "ry": "4",
+        "fill": "none",
+        "stroke": _BORDER_COLOR,
+        "stroke-width": "2",
+    }
+    rect = ET.SubElement(root, f"{{{_SVG_NS}}}rect")
+    for attr, val in rect_attrs.items():
+        rect.set(attr, val)
+
+    return ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+
 def _render_card(
     task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
 ) -> list[TextContent | Image]:
     """Render a terminal-style card as SVG or PNG.
 
     Uses Rich ``Console(record=True)`` to render a styled Panel, then
-    exports as SVG.  If ``output_path`` ends with ``.png``, the SVG is
-    converted to PNG via ``cairosvg.svg2png()``.
+    exports as SVG.  The Rich box-drawing character border is replaced
+    with a continuous SVG ``<rect>`` stroke to eliminate sub-pixel gaps
+    that appear when cairosvg rasterises individual glyphs.
+
+    If ``output_path`` ends with ``.png``, the patched SVG is converted
+    to PNG via ``cairosvg.svg2png()``.
 
     The rendered asset is saved to *output_path* **and** returned inline
     so MCP clients receive the content directly:
@@ -500,6 +691,9 @@ def _render_card(
     console.print(panel)
 
     svg_text = console.export_svg(title="RTFP")
+
+    # Replace box-drawing character border with a continuous SVG <rect>
+    svg_text = _inject_border_rect(svg_text)
 
     out = pathlib.Path(output_path).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
