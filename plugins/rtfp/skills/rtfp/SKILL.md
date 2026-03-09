@@ -27,7 +27,7 @@ Output is exactly three things: what they were doing, what Claude said, how the 
 ### Step 1 — List Sessions
 
 ```bash
-uv run .claude/skills/rtfp/scripts/list_sessions.py --json
+uv run ./scripts/list_sessions.py --json
 ```
 
 Present the numbered list to the user. Ask which session to inspect. Wait for the user's selection (by number or session ID) before proceeding.
@@ -35,7 +35,7 @@ Present the numbered list to the user. Ask which session to inspect. Wait for th
 ### Step 2 — Extract Batches
 
 ```bash
-uv run .claude/skills/rtfp/scripts/extract_batches.py <session_jsonl_path> --out-dir /tmp/rtfp-batches-<sessionid>
+uv run ./scripts/extract_batches.py <session_jsonl_path> --out-dir /tmp/rtfp-batches-<sessionid>
 ```
 
 The script outputs a JSON array of batch file paths. Capture that list — each path is one batch to scan in Step 3.
@@ -99,7 +99,7 @@ Wait for the subagent to finish. Verify `/tmp/rtfp-result.json` exists before pr
 ### Step 6 — Render PNG
 
 ```bash
-uv run .claude/skills/rtfp/scripts/render_artifact.py --input-file /tmp/rtfp-result.json --output rtfp_artifact.png
+uv run ./scripts/render_artifact.py --input-file /tmp/rtfp-result.json --output rtfp_artifact.png
 ```
 
 The script produces a terminal-style dark PNG with:
