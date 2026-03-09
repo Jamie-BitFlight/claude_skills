@@ -1,0 +1,22 @@
+{
+  "name": "rtfp",
+  "version": "1.0.9",
+  "description": "Read The Fucking Prompt \u2014 mines Claude Code session transcripts to surface the strongest user reactions to assistant instruction-following failures and renders the exchange as a terminal-style PNG",
+  "author": {
+    "name": "Jamie-BitFlight",
+    "url": "https://github.com/Jamie-BitFlight"
+  },
+  "repository": "https://github.com/Jamie-BitFlight/claude_skills",
+  "license": "MIT",
+  "keywords": [
+    "session-analysis",
+    "emotional-reaction",
+    "instruction-following",
+    "png-artifact"
+  ],
+  "skills": "./skills/",
+  "agents": [
+    "./agents/reaction-detector.md",
+    "./agents/context-reconstructor.md"
+  ]
+}

@@ -41,7 +41,7 @@ from rich.console import Console
 # ---------------------------------------------------------------------------
 
 DEFAULT_TOKEN_LIMIT: int = int(os.environ.get("DAILY_RELEASES_TOKEN_LIMIT", "100000"))
-_TIKTOKEN_ENCODING: str = "cl100k_base"
+_TIKTOKEN_ENCODING: str = "p50k_base"
 
 # ---------------------------------------------------------------------------
 # Typer app
