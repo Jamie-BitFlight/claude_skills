@@ -353,7 +353,7 @@ def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> t
     for row in rows:
         record = dict(zip(columns, row, strict=False))
         text = _extract_user_text_from_value(record.pop("message"))
-        if text:
+        if text and _is_human_plaintext(text):
             record["text"] = text
             messages.append(record)
 
