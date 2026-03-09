@@ -520,6 +520,25 @@ def _count_card_lines(sections: list[tuple[str, list[str], tuple[int, int, int]]
     return total
 
 
+def _char_width(font: FreeTypeFont | PILImageFont) -> int:
+    """Get the pixel width of a single monospace character for the given font.
+
+    Uses ``getbbox`` on FreeTypeFont; falls back to 8px for PIL's default
+    bitmap font.
+
+    Args:
+        font: PIL font instance.
+
+    Returns:
+        Character width in pixels.
+    """
+    if hasattr(font, "getbbox"):
+        bbox = font.getbbox("─")
+        return int(bbox[2] - bbox[0])
+    # PIL default bitmap font: fixed 6x11 or 8px wide depending on version
+    return 8
+
+
 def _draw_card(
     draw: PILImageDraw,
     font: FreeTypeFont | PILImageFont,
@@ -528,6 +547,11 @@ def _draw_card(
     height: int,
 ) -> None:
     """Draw all card elements onto the ImageDraw canvas.
+
+    Draws a complete text-art box using ``┌┐└┘│─`` characters so that
+    all four sides are connected.  Each content row is bracketed by
+    ``│`` on the left and right edges at the same x-positions as the
+    corners of the header and footer lines.
 
     Args:
         draw: PIL ImageDraw instance.
@@ -538,24 +562,54 @@ def _draw_card(
     """
     pad = _PADDING
     lh = _LINE_HEIGHT
+    cw = _char_width(font)
 
-    draw.rectangle([(pad // 2, pad // 2), (width - pad // 2, height - pad // 2)], outline=_COLOR_BORDER, width=1)
-
+    # The header/footer span _INNER_WIDTH characters total (including corners).
+    # header_inner is the number of characters between ┌ and ┐ (exclusive).
     header_inner = _INNER_WIDTH - 2
+
+    # --- Header row: ┌─ RTFP ─────...─┐ ---
     rtfp_label = " RTFP "
     dashes = "─" * (header_inner - len(rtfp_label) - 2)
-    draw.text((pad, pad), f"┌─{rtfp_label}{dashes}┐", font=font, fill=_COLOR_HEADER)
+    header_text = f"┌─{rtfp_label}{dashes}┐"
+    draw.text((pad, pad), header_text, font=font, fill=_COLOR_HEADER)
 
+    # x-position of the right-edge │ (same column as ┐ in header)
+    right_x = pad + cw * (_INNER_WIDTH - 1)
+
+    def _draw_bordered_line(y_pos: int, content: str, fill: tuple[int, int, int]) -> None:
+        """Draw a single content row with │ borders on left and right.
+
+        The content is padded with spaces to fill the full inner width so
+        that the right ``│`` aligns with the header/footer corners.
+
+        Args:
+            y_pos: Vertical pixel position for the line.
+            content: Text content (without border chars) to draw inside.
+            fill: RGB color tuple for the content text.
+        """
+        # Pad content to fill inner width (between the two │ chars)
+        # Inner chars = header_inner (space between ┌ and ┐)
+        padded = content.ljust(header_inner)
+        draw.text((pad, y_pos), "│", font=font, fill=_COLOR_HEADER)
+        draw.text((pad + cw, y_pos), padded, font=font, fill=fill)
+        draw.text((right_x, y_pos), "│", font=font, fill=_COLOR_HEADER)
+
+    # --- Content rows ---
     y = pad + lh
     for label, lines, label_color in sections:
+        _draw_bordered_line(y, "", _COLOR_BODY)  # blank separator line
         y += lh
-        draw.text((pad, y), f"  {label}", font=font, fill=label_color)
+        _draw_bordered_line(y, f" {label}", label_color)
         y += lh
         for line in lines:
-            draw.text((pad, y), f"    {line}", font=font, fill=_COLOR_BODY)
+            _draw_bordered_line(y, f"   {line}", _COLOR_BODY)
             y += lh
 
+    _draw_bordered_line(y, "", _COLOR_BODY)  # trailing blank before footer
     y += lh
+
+    # --- Footer row: └────────...─┘ ---
     draw.text((pad, y), f"└{'─' * header_inner}┘", font=font, fill=_COLOR_HEADER)
 
 
