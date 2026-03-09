@@ -1,8 +1,13 @@
 ---
 name: rtfp
-description: "Scan Claude Code session transcripts to find the strongest user emotional reaction to an assistant instruction-following failure — frustration, rage, disbelief, insults — reconstruct the triggering context, and render a shareable terminal-style PNG artifact. Use when: 'rtfp', 'read the fucking prompt', 'find my worst AI moment', 'make a rage screenshot', 'session analysis', 'show me where Claude ignored me', 'share my frustration screenshot', 'find where the assistant failed me'. Outputs exactly three things: what the user was doing, what Claude said, how the user reacted. Fast mode available using heuristic pipeline (no subagents)."
+description: "SUPERSEDED — use the plugin version at plugins/rtfp/skills/rtfp/SKILL.md instead. This skill and its scripts have been migrated to the plugins/rtfp/ plugin directory."
 allowed-tools: "Read, Bash, Glob, Write"
+deprecated: true
 ---
+
+> **SUPERSEDED**: This skill has been migrated to `plugins/rtfp/`. Use the plugin version instead.
+> The canonical location is `plugins/rtfp/skills/rtfp/SKILL.md` with scripts at `plugins/rtfp/skills/rtfp/scripts/`.
+> Scripts in `.claude/skills/rtfp/scripts/` are the originals preserved for reference only.
 
 # RTFP — Read The Fucking Prompt
 

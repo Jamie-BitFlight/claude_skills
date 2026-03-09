@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "duckdb>=1.0.0",
 #   "tiktoken>=0.7.0",
 # ]
 # ///
@@ -49,6 +50,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import duckdb
 import tiktoken
 
 _TIKTOKEN_ENCODING = "p50k_base"
@@ -111,6 +113,7 @@ def _is_noise(text: str) -> bool:
 def load_messages(session_path: Path) -> list[dict]:
     """Load user-authored messages only from a JSONL session file.
 
+    Uses DuckDB ``read_ndjson()`` as the query layer for all JSONL reads.
     Excludes assistant messages, tool outputs, system messages, and developer
     messages. Each entry preserves source_file and index for later trace-back
     to the full transcript during reconstruction.
@@ -119,42 +122,50 @@ def load_messages(session_path: Path) -> list[dict]:
         List of user message dicts with keys: index, source_file, timestamp,
         content, token_count.
     """
-    messages = []
+    messages: list[dict] = []
     msg_index = 0
     source_file = str(session_path)
 
-    with session_path.open(encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            raw = line.strip()
-            if not raw:
-                continue
-            try:
-                rec = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(rec, dict):
-                continue
+    conn = duckdb.connect()
+    try:
+        rows = conn.execute(
+            "SELECT to_json(t) AS raw FROM read_ndjson(?, ignore_errors := true, maximum_object_size := 67108864) t",
+            [str(session_path)],
+        ).fetchall()
+    except duckdb.Error:
+        conn.close()
+        return messages
+    finally:
+        conn.close()
 
-            # User messages only — assistant/tool/system entries are excluded
-            if rec.get("type") != "user":
-                continue
+    for (raw_json,) in rows:
+        try:
+            rec = json.loads(raw_json)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(rec, dict):
+            continue
 
-            # Skip tool result lines (infrastructure, not user-authored)
-            if "toolUseResult" in rec:
-                continue
+        # User messages only — assistant/tool/system entries are excluded
+        if rec.get("type") != "user":
+            continue
 
-            content = _extract_text(rec.get("message", {}).get("content"))
-            if not content or _is_noise(content):
-                continue
+        # Skip tool result lines (infrastructure, not user-authored)
+        if "toolUseResult" in rec:
+            continue
 
-            messages.append({
-                "index": msg_index,
-                "source_file": source_file,
-                "timestamp": rec.get("timestamp", ""),
-                "content": content,
-                "token_count": count_tokens(content),
-            })
-            msg_index += 1
+        content = _extract_text(rec.get("message", {}).get("content"))
+        if not content or _is_noise(content):
+            continue
+
+        messages.append({
+            "index": msg_index,
+            "source_file": source_file,
+            "timestamp": rec.get("timestamp", ""),
+            "content": content,
+            "token_count": count_tokens(content),
+        })
+        msg_index += 1
 
     return messages
 

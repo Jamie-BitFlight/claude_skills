@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv --quiet run --active --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#   "duckdb>=1.0.0",
+# ]
 # ///
 """List recent Claude Code sessions for the current project.
 
@@ -21,6 +23,8 @@ import sys
 import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
+
+import duckdb
 
 PROJECTS_DIR = Path("~/.claude/projects").expanduser()
 _TITLE_MAX_LEN = 80
@@ -73,6 +77,8 @@ def _is_noise(text: str) -> bool:
 def _derive_title(path: Path) -> tuple[str, int]:
     """Derive a session title from the first non-noise user message.
 
+    Uses DuckDB ``read_ndjson()`` to read the JSONL session file.
+
     Args:
         path: Path to the JSONL session file.
 
@@ -81,35 +87,40 @@ def _derive_title(path: Path) -> tuple[str, int]:
     """
     message_count = 0
     title = ""
+    conn = duckdb.connect()
     try:
-        with path.open(encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                raw = line.strip()
-                if not raw:
-                    continue
-                try:
-                    rec = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(rec, dict):
-                    continue
-                message_count += 1
-                if title:
-                    continue
-                if rec.get("type") != "user":
-                    continue
-                if "toolUseResult" in rec:
-                    continue
-                msg = rec.get("message")
-                if not isinstance(msg, dict):
-                    continue
-                content = _extract_text(msg.get("content"))
-                if not content or _is_noise(content):
-                    continue
-                snippet = content.replace("\n", " ").strip()
-                title = snippet[:_TITLE_MAX_LEN] if len(snippet) > _TITLE_MAX_LEN else snippet
-    except OSError:
-        pass
+        rows = conn.execute(
+            "SELECT to_json(t) AS raw FROM read_ndjson(?, ignore_errors := true, maximum_object_size := 67108864) t",
+            [str(path)],
+        ).fetchall()
+    except duckdb.Error:
+        conn.close()
+        return title, message_count
+    finally:
+        conn.close()
+
+    for (raw_json,) in rows:
+        try:
+            rec = json.loads(raw_json)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(rec, dict):
+            continue
+        message_count += 1
+        if title:
+            continue
+        if rec.get("type") != "user":
+            continue
+        if "toolUseResult" in rec:
+            continue
+        msg = rec.get("message")
+        if not isinstance(msg, dict):
+            continue
+        content = _extract_text(msg.get("content"))
+        if not content or _is_noise(content):
+            continue
+        snippet = content.replace("\n", " ").strip()
+        title = snippet[:_TITLE_MAX_LEN] if len(snippet) > _TITLE_MAX_LEN else snippet
     return title, message_count
 
 
