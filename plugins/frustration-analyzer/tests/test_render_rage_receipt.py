@@ -9,15 +9,23 @@ Verifies that:
 
 from __future__ import annotations
 
+import importlib.util
 import json
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
-from server import _render_card  # ty: ignore[unresolved-import]
 
-if TYPE_CHECKING:
-    from pathlib import Path
+# Import _render_card by absolute file path to avoid the fragile bare
+# ``from server import ...`` that relies on sys.path ordering.  In CI the
+# wrong ``server.py`` (agentskill-kaizen) was resolved first.
+_SERVER_PATH = Path(__file__).resolve().parent.parent / "mcp" / "server.py"
+_spec = importlib.util.spec_from_file_location("frustration_analyzer_server", _SERVER_PATH)
+assert _spec is not None
+assert _spec.loader is not None
+_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_module)
+_render_card = _module._render_card  # type: ignore[attr-defined]
 
 _TASK = "Implement login page"
 _ASSISTANT = "I have written the login page using React."

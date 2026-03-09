@@ -689,7 +689,7 @@ def _render_card(
     content = _build_card_content(task_summary, assistant_excerpt, user_reply)
     panel = Panel(content, title="RTFP", title_align="left", border_style="bright_blue", padding=(1, 2))
 
-    console = Console(record=True, width=100, force_terminal=True, color_system="truecolor")
+    console = Console(record=True, width=_CONSOLE_WIDTH, force_terminal=True, color_system="truecolor")
     panel.width = console.width
     console.print(panel)
 
@@ -701,26 +701,19 @@ def _render_card(
     out = pathlib.Path(output_path).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    output_format: str
-    result: list[TextContent | Image]
-
-    if out.suffix.lower() == ".png":
+    is_png = out.suffix.lower() == ".png"
+    if is_png:
         import cairosvg  # noqa: PLC0415
 
         png_bytes: bytes = cairosvg.svg2png(bytestring=svg_text.encode("utf-8"))
         out.write_bytes(png_bytes)
-        output_format = "png"
-
-        metadata = json.dumps({"output_path": str(out), "format": output_format})
-        result = [TextContent(type="text", text=metadata), Image(data=png_bytes, format="png")]
+        inline_content: TextContent | Image = Image(data=png_bytes, format="png")
     else:
         out.write_text(svg_text, encoding="utf-8")
-        output_format = "svg"
+        inline_content = TextContent(type="text", text=svg_text)
 
-        metadata = json.dumps({"output_path": str(out), "format": output_format})
-        result = [TextContent(type="text", text=metadata), TextContent(type="text", text=svg_text)]
-
-    return result
+    metadata = json.dumps({"output_path": str(out), "format": "png" if is_png else "svg"})
+    return [TextContent(type="text", text=metadata), inline_content]
 
 
 # ---------------------------------------------------------------------------
@@ -754,13 +747,15 @@ async def list_sessions(project_path: str = "~/.claude/projects/") -> dict[str, 
         if not root.exists():
             raise ToolError(f"Project path does not exist: {root}")
 
-        jsonl_files = sorted(root.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+        # Pre-compute stat() per file to avoid calling it twice (once for
+        # sort key, once inside the loop).
+        file_stats = [(f, f.stat()) for f in root.rglob("*.jsonl")]
+        file_stats.sort(key=lambda pair: pair[1].st_mtime, reverse=True)
 
         sessions: list[dict[str, Any]] = []
         conn = duckdb.connect()
         try:
-            for f in jsonl_files:
-                stat = f.stat()
+            for f, stat in file_stats:
                 project = f.parent.name
                 modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
                 title = _derive_session_title(str(f), conn=conn)
