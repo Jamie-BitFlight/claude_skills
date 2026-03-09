@@ -53,11 +53,12 @@ responses aimed at the AI's behavior.
 Produce TWO outputs:
 
 1. Write a JSON file to /tmp/rtfp-flagged-<batch_index>.json with this format:
-   {"source_file": "<batch_file_path>", "flagged_indexes": [N, ...]}
+   {"source_file": "<original_session_jsonl_path>", "flagged_indexes": [N, ...]}
+   Use the source_file field from the batch JSON header (the original session JSONL path, not the batch file path).
    Write an empty flagged_indexes array if no reactions are found.
 
 2. Print a plain list of flagged entries to your output:
-   each line: <message_index> | <first 200 chars of content>
+   each line: <message_index> | <full content> (no truncation)
 ```
 
 Wait for all subagents to finish before proceeding.
@@ -85,7 +86,7 @@ Flagged indexes: <merged_working_set_as_json>
    CORRECT:   "refactoring test fixtures"
    INCORRECT: "the assistant ignored the constraint about scoring"
    INCORRECT: "failure to follow the instruction to omit scoring"
-5. Identify the assistant message(s) immediately preceding the winning reaction.
+5. Inspect nearby transcript entries and identify the assistant message(s) that triggered the winning reaction. Do not assume it is always the single immediately preceding message — look at the surrounding context window.
 6. Write /tmp/rtfp-result.json with exactly these fields:
    {
      "task_summary": "<dry one-line activity description>",
