@@ -61,6 +61,16 @@ Do not assume the trigger is always the single immediately preceding message. Us
 
 ## Output
 
+Write your result to `/tmp/rtfp-context.json` using the Bash tool:
+
+```bash
+cat > /tmp/rtfp-context.json << 'EOF'
+{ ... }
+EOF
+```
+
+The file must have this exact format:
+
 ```json
 {
   "source_file": "/path/to/session.jsonl",
