@@ -4,7 +4,8 @@
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "duckdb>=0.10.0",
-#     "pillow>=10.0.0",
+#     "rich>=13.0",
+#     "cairosvg>=2.7.0",
 # ]
 # ///
 """RTFP (Read The Fucking Prompt) MCP Server.
@@ -24,7 +25,7 @@ Tools:
     scan_transcripts      - Extract raw user messages with context (Stage 1)
     get_scenario          - Get full message context for a specific file+line
     generate_social_post  - Generate social media content for a user message
-    render_rage_receipt   - Render terminal-style PNG card from 3-field artifact
+    render_rage_receipt   - Render terminal-style SVG/PNG card from 3-field artifact
 """
 
 from __future__ import annotations
@@ -32,28 +33,18 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import math
 import pathlib
-import textwrap
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import duckdb
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-
-if TYPE_CHECKING:
-    from PIL.ImageDraw import ImageDraw as PILImageDraw
-    from PIL.ImageFont import FreeTypeFont, ImageFont as PILImageFont
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 logger = logging.getLogger(__name__)
-
-try:
-    from PIL import Image, ImageDraw, ImageFont as _ImageFont
-
-    _PIL_AVAILABLE = True
-except ImportError:
-    _PIL_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -74,15 +65,6 @@ _WRITE_ANNOTATIONS: dict[str, bool] = {
     "idempotentHint": True,
     "openWorldHint": False,
 }
-
-# Terminal card colors (dark terminal theme)
-_COLOR_BG = (26, 26, 46)  # #1a1a2e
-_COLOR_BORDER = (80, 80, 120)
-_COLOR_TASK_LABEL = (80, 200, 200)  # dim cyan
-_COLOR_ASSISTANT_LABEL = (220, 200, 80)  # yellow
-_COLOR_USER_LABEL = (220, 80, 60)  # red/orange
-_COLOR_BODY = (230, 230, 230)  # white
-_COLOR_HEADER = (140, 140, 180)  # dim purple-white
 
 # ---------------------------------------------------------------------------
 # Server
@@ -436,225 +418,79 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
 
 
 # ---------------------------------------------------------------------------
-# PNG rendering helpers
+# Card rendering (Rich-based SVG/PNG)
 # ---------------------------------------------------------------------------
 
 
-_FONT_CACHE: dict[int, Any] = {}
+def _build_card_content(task_summary: str, assistant_excerpt: str, user_reply: str) -> Text:
+    """Build the Rich Text content for the RTFP card.
 
-
-def _get_font(size: int) -> FreeTypeFont | PILImageFont:
-    """Load a monospace font at the given size, falling back to PIL default.
-
-    Results are cached by size to avoid re-loading the font file on every call.
-
-    Args:
-        size: Font size in points.
-
-    Returns:
-        PIL ImageFont instance (FreeTypeFont if a path matched, else default).
-    """
-    if size in _FONT_CACHE:
-        return _FONT_CACHE[size]
-
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeMono.ttf",
-        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-        "/System/Library/Fonts/Menlo.ttc",
-        "/Library/Fonts/Courier New.ttf",
-        "C:/Windows/Fonts/consola.ttf",
-    ]
-    for path in candidates:
-        if pathlib.Path(path).exists():
-            try:
-                font = _ImageFont.truetype(path, size)
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("Could not load font %s: %s", path, exc)
-            else:
-                _FONT_CACHE[size] = font
-                return font
-    font = _ImageFont.load_default()
-    _FONT_CACHE[size] = font
-    return font
-
-
-_FONT_SIZE = 16
-_PADDING = 24
-# Card width in *characters* (including the ┌/┘ corners).
-# Layout per content row: │ + 1 space + 2 indent + 72 wrap + 2 pad + │ = 80
-_INNER_WIDTH = 80
-_LINE_HEIGHT = _FONT_SIZE + 6
-_WRAP_WIDTH = 72
-
-
-def _wrap_text(text: str) -> list[str]:
-    """Word-wrap text into lines of at most _WRAP_WIDTH characters.
-
-    Args:
-        text: Multi-line input text.
-
-    Returns:
-        List of wrapped lines.
-    """
-    lines: list[str] = []
-    for paragraph in text.split("\n"):
-        if paragraph.strip():
-            lines.extend(textwrap.wrap(paragraph, _WRAP_WIDTH) or [paragraph])
-        else:
-            lines.append("")
-    return lines
-
-
-def _count_card_lines(sections: list[tuple[str, list[str], tuple[int, int, int]]]) -> int:
-    """Count total text rows needed for the card layout.
-
-    Args:
-        sections: List of (label, wrapped_lines, color) tuples.
-
-    Returns:
-        Total line count including header and footer spacing.
-    """
-    total = 1  # header row
-    for _, lines, _ in sections:
-        total += 2 + len(lines)  # blank + label + content lines
-    total += 1  # trailing blank before footer
-    return total
-
-
-def _char_width(font: FreeTypeFont | PILImageFont) -> int:
-    """Get the advance width of a single monospace character for the given font.
-
-    Uses ``getlength`` (advance width) on FreeTypeFont for accurate glyph
-    spacing.  Falls back to ``getbbox`` then 8px for PIL's default bitmap
-    font.
-
-    Args:
-        font: PIL font instance.
-
-    Returns:
-        Character advance width in pixels (rounded up).
-    """
-    if hasattr(font, "getlength"):
-        # getlength returns the advance width -- the distance the cursor
-        # moves, which is what we need for positioning adjacent characters.
-        return math.ceil(font.getlength("M"))
-    if hasattr(font, "getbbox"):
-        bbox = font.getbbox("M")
-        return int(bbox[2] - bbox[0])
-    # PIL default bitmap font: fixed 6x11 or 8px wide depending on version
-    return 8
-
-
-def _draw_card(
-    draw: PILImageDraw,
-    font: FreeTypeFont | PILImageFont,
-    sections: list[tuple[str, list[str], tuple[int, int, int]]],
-    width: int,
-    height: int,
-) -> None:
-    """Draw all card elements onto the ImageDraw canvas.
-
-    Draws a complete text-art box using ``┌┐└┘│─`` characters so that
-    all four sides are connected.  Each content row is bracketed by
-    ``│`` on the left and right edges at the same x-positions as the
-    corners of the header and footer lines.
-
-    Args:
-        draw: PIL ImageDraw instance.
-        font: PIL font instance.
-        sections: List of (label, wrapped_lines, label_color) tuples.
-        width: Total image width.
-        height: Total image height.
-    """
-    pad = _PADDING
-    lh = _LINE_HEIGHT
-    cw = _char_width(font)
-
-    # The header/footer span _INNER_WIDTH characters total (including corners).
-    # header_inner is the number of characters between ┌ and ┐ (exclusive).
-    header_inner = _INNER_WIDTH - 2
-
-    # --- Header row: ┌─ RTFP ─────...─┐ ---
-    rtfp_label = " RTFP "
-    # header_inner chars sit between ┌ and ┐: one leading ─, the label, then fill dashes
-    dashes = "─" * (header_inner - len(rtfp_label) - 1)
-    header_text = f"┌─{rtfp_label}{dashes}┐"
-    draw.text((pad, pad), header_text, font=font, fill=_COLOR_HEADER)
-
-    # x-position of the right-edge │ (same column as ┐ in header)
-    right_x = pad + cw * (_INNER_WIDTH - 1)
-
-    def _draw_bordered_line(y_pos: int, content: str, fill: tuple[int, int, int]) -> None:
-        """Draw a single content row with │ borders on left and right.
-
-        The content is padded with spaces to fill the full inner width so
-        that the right ``│`` aligns with the header/footer corners.
-
-        Args:
-            y_pos: Vertical pixel position for the line.
-            content: Text content (without border chars) to draw inside.
-            fill: RGB color tuple for the content text.
-        """
-        # Pad content to fill inner width (between the two │ chars)
-        # Inner chars = header_inner (space between ┌ and ┐)
-        padded = content.ljust(header_inner)
-        draw.text((pad, y_pos), "│", font=font, fill=_COLOR_HEADER)
-        draw.text((pad + cw, y_pos), padded, font=font, fill=fill)
-        draw.text((right_x, y_pos), "│", font=font, fill=_COLOR_HEADER)
-
-    # --- Content rows ---
-    y = pad + lh
-    for label, lines, label_color in sections:
-        _draw_bordered_line(y, "", _COLOR_BODY)  # blank separator line
-        y += lh
-        _draw_bordered_line(y, f" {label}", label_color)
-        y += lh
-        for line in lines:
-            _draw_bordered_line(y, f"   {line}", _COLOR_BODY)
-            y += lh
-
-    _draw_bordered_line(y, "", _COLOR_BODY)  # trailing blank before footer
-    y += lh
-
-    # --- Footer row: └────────...─┘ ---
-    draw.text((pad, y), f"└{'─' * header_inner}┘", font=font, fill=_COLOR_HEADER)
-
-
-def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str) -> dict[str, Any]:
-    """Render a terminal-style PNG card.
+    Creates a styled text block with three labelled sections (task,
+    assistant, user) separated by blank lines.
 
     Args:
         task_summary: Short description of the task context.
         assistant_excerpt: The offending assistant response excerpt.
         user_reply: The user's frustrated reply.
-        output_path: File path to write the PNG.
 
     Returns:
-        Dict with output_path, width, height.
+        Rich Text object with all sections styled.
     """
-    font: FreeTypeFont | PILImageFont = _get_font(_FONT_SIZE)
-    cw = _char_width(font)
-    sections: list[tuple[str, list[str], tuple[int, int, int]]] = [
-        ("task:", _wrap_text(task_summary), _COLOR_TASK_LABEL),
-        ("assistant:", _wrap_text(assistant_excerpt), _COLOR_ASSISTANT_LABEL),
-        ("user:", _wrap_text(user_reply), _COLOR_USER_LABEL),
-    ]
-    total_lines = _count_card_lines(sections)
-    height = _PADDING * 2 + total_lines * _LINE_HEIGHT + 4
-    # Image width = left padding + (char_count * char_width) + right padding
-    width = _PADDING * 2 + _INNER_WIDTH * cw
+    content = Text()
 
-    img = Image.new("RGB", (width, height), color=_COLOR_BG)
-    draw = ImageDraw.Draw(img)
-    _draw_card(draw, font, sections, width, height)
+    sections: list[tuple[str, str, str]] = [
+        ("task:", task_summary, "#4ec9b0"),
+        ("assistant:", assistant_excerpt, "#dcdcaa"),
+        ("user:", user_reply, "#f44747"),
+    ]
+
+    for i, (label, body, color) in enumerate(sections):
+        if i > 0:
+            content.append("\n")
+        content.append(label, style=f"bold {color}")
+        content.append(f" {body}\n", style="dim white")
+
+    return content
+
+
+def _render_png(task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str) -> dict[str, Any]:
+    """Render a terminal-style card as SVG or PNG.
+
+    Uses Rich ``Console(record=True)`` to render a styled Panel, then
+    exports as SVG.  If ``output_path`` ends with ``.png``, the SVG is
+    converted to PNG via ``cairosvg.svg2png()``.
+
+    Args:
+        task_summary: Short description of the task context.
+        assistant_excerpt: The offending assistant response excerpt.
+        user_reply: The user's frustrated reply.
+        output_path: File path to write (``.svg`` or ``.png``).
+
+    Returns:
+        Dict with ``output_path`` and ``format`` (``"svg"`` or ``"png"``).
+    """
+    content = _build_card_content(task_summary, assistant_excerpt, user_reply)
+    panel = Panel(content, title="RTFP", title_align="left", border_style="bright_blue", padding=(1, 2))
+
+    console = Console(record=True, width=100, force_terminal=True, color_system="truecolor")
+    console.print(panel)
+
+    svg_text = console.export_svg(title="RTFP")
 
     out = pathlib.Path(output_path).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
-    img.save(str(out), format="PNG")
 
-    return {"output_path": str(out), "width": width, "height": height}
+    output_format: str
+    if out.suffix.lower() == ".png":
+        import cairosvg  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+        cairosvg.svg2png(bytestring=svg_text.encode("utf-8"), write_to=str(out))
+        output_format = "png"
+    else:
+        out.write_text(svg_text, encoding="utf-8")
+        output_format = "svg"
+
+    return {"output_path": str(out), "format": output_format}
 
 
 # ---------------------------------------------------------------------------
@@ -840,50 +676,38 @@ async def get_context_window(file: str, line_index: int, before: int = 10, after
 async def render_rage_receipt(
     task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
 ) -> dict[str, Any]:
-    """Render a terminal-style PNG card from the 3-field RTFP artifact.
+    """Render a terminal-style card from the 3-field RTFP artifact.
 
-    Produces a dark-background terminal-style PNG with:
-    - task label in dim cyan
-    - "assistant:" label in yellow, body in white
-    - "user:" label in red/orange, body in white
+    Produces a styled Rich Panel rendered as SVG (default) or PNG.
+    Sections are colour-coded:
 
-    Uses PIL with a bundled or system monospace font, falling back to
-    PIL's built-in default font.  Works without network access.
+    - ``task:`` label in cyan (#4ec9b0), body in dim white
+    - ``assistant:`` label in yellow (#dcdcaa), body in dim white
+    - ``user:`` label in red (#f44747), body in dim white
 
-    Layout::
+    Output format is determined by ``output_path`` extension:
 
-        ┌─ RTFP ──────────────────────────────────────┐
-
-          task: {task_summary}
-
-          assistant:
-            {assistant_excerpt (word-wrapped)}
-
-          user:
-            {user_reply (word-wrapped)}
-
-        └──────────────────────────────────────────────┘
+    - ``.svg`` — direct SVG export (primary)
+    - ``.png`` — SVG rendered then converted via ``cairosvg``
 
     Args:
         task_summary: Short description of the task context.
         assistant_excerpt: The offending assistant response excerpt.
         user_reply: The user's frustrated reply.
-        output_path: File path to write the PNG (e.g. ``/tmp/rtfp.png``).
+        output_path: File path to write (``.svg`` or ``.png``).
 
     Returns:
-        Dict with ``output_path``, ``width``, and ``height``.
+        Dict with ``output_path`` and ``format`` (``"svg"`` or ``"png"``).
 
     Raises:
-        ToolError: If PIL is unavailable or the file cannot be written.
+        ToolError: If the file cannot be written.
     """
 
     def _render() -> dict[str, Any]:
-        if not _PIL_AVAILABLE:
-            raise ToolError("pillow is required for render_rage_receipt but is not installed")
         try:
             return _render_png(task_summary, assistant_excerpt, user_reply, output_path)
         except OSError as exc:
-            raise ToolError(f"Failed to write PNG to {output_path}: {exc}") from exc
+            raise ToolError(f"Failed to write card to {output_path}: {exc}") from exc
 
     return await asyncio.to_thread(_render)
 
