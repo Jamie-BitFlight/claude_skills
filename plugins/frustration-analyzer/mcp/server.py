@@ -1078,7 +1078,12 @@ async def get_context_window(file: str, line_index: int, before: int = 10, after
 
 @mcp.tool(annotations=_WRITE_ANNOTATIONS)
 async def render_rage_receipt(
-    task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
+    task_summary: str,
+    assistant_excerpt: str,
+    user_reply: str,
+    output_path: str,
+    width: int = _DEFAULT_WIDTH,
+    font_size: int = _DEFAULT_FONT_SIZE,
 ) -> list[TextContent | Image]:
     """Render a terminal-style card from the 3-field RTFP artifact.
 
@@ -1108,6 +1113,8 @@ async def render_rage_receipt(
         assistant_excerpt: The offending assistant response excerpt.
         user_reply: The user's frustrated reply.
         output_path: File path to write (``.svg`` or ``.png``).
+        width: Image width in pixels. Default 900.
+        font_size: Font size in points. Default 15.
 
     Returns:
         List of MCP content blocks: metadata text followed by either
@@ -1119,7 +1126,9 @@ async def render_rage_receipt(
 
     def _render() -> list[TextContent | Image]:
         try:
-            return _render_card(task_summary, assistant_excerpt, user_reply, output_path)
+            return _render_card(
+                task_summary, assistant_excerpt, user_reply, output_path, width=width, font_size=font_size
+            )
         except OSError as exc:
             raise ToolError(f"Failed to write card to {output_path}: {exc}") from exc
 
