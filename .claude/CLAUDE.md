@@ -246,6 +246,8 @@ Skills `/create-backlog-item` and `/work-backlog-item` invoke these tools. See `
 
 - Plugin Development Workflows: `.claude/rules/plugin-development.md`
 
+**Automatic version bumping**: `plugin.json` and `marketplace.json` are automatically bumped and staged by the pre-commit hook when any plugin file is modified. Do not manually edit version fields — the hook handles this. After a successful commit, the updated versions are already included.
+
 ---
 
 - SAM Feature Implementation Workflow: `.claude/rules/local-workflow.md`
