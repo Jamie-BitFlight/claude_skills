@@ -9,26 +9,22 @@ Verifies that:
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+from _server import ASSISTANT, DEFAULT_FONT_SIZE, DEFAULT_WIDTH, TASK, USER, render_card
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
 
-_SERVER_PATH = Path(__file__).resolve().parent.parent / "mcp" / "server.py"
-_spec = importlib.util.spec_from_file_location("frustration_analyzer_server", _SERVER_PATH)
-assert _spec is not None
-assert _spec.loader is not None
-_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_module)
-_render_card = _module._render_card  # type: ignore[attr-defined]
-_DEFAULT_WIDTH = _module._DEFAULT_WIDTH  # type: ignore[attr-defined]
-_DEFAULT_FONT_SIZE = _module._DEFAULT_FONT_SIZE  # type: ignore[attr-defined]
+if TYPE_CHECKING:
+    from pathlib import Path
 
-_TASK = "Implement login page"
-_ASSISTANT = "I have written the login page using React."
-_USER = "I said use Vue, not React! Read the prompt!"
+_render_card = render_card
+_DEFAULT_WIDTH = DEFAULT_WIDTH
+_DEFAULT_FONT_SIZE = DEFAULT_FONT_SIZE
+_TASK = TASK
+_ASSISTANT = ASSISTANT
+_USER = USER
 
 
 class TestRenderCardCustomWidth:

@@ -10,19 +10,10 @@ Verifies that:
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
 
-_SERVER_PATH = Path(__file__).resolve().parent.parent / "mcp" / "server.py"
-_spec = importlib.util.spec_from_file_location("frustration_analyzer_server", _SERVER_PATH)
-assert _spec is not None
-assert _spec.loader is not None
-_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_module)
-_count_tokens = _module._count_tokens  # type: ignore[attr-defined]
-_DEFAULT_BATCH_TOKENS = _module._DEFAULT_BATCH_TOKENS  # type: ignore[attr-defined]
-_EncoderCache = _module._EncoderCache  # type: ignore[attr-defined]
+from _server import DEFAULT_BATCH_TOKENS, EncoderCache, count_tokens, extract_user_messages
 
 
 def _make_session_jsonl(path: Path, messages: list[str]) -> None:
@@ -49,32 +40,32 @@ class TestCountTokens:
     """Tests for the _count_tokens helper."""
 
     def test_empty_string_returns_zero(self) -> None:
-        assert _count_tokens("") == 0
+        assert count_tokens("") == 0
 
     def test_short_string_returns_positive(self) -> None:
-        count = _count_tokens("hello world")
-        assert count > 0
+        result = count_tokens("hello world")
+        assert result > 0
 
     def test_longer_string_returns_more_tokens(self) -> None:
-        short = _count_tokens("hi")
-        long = _count_tokens("This is a much longer string with many more tokens in it.")
+        short = count_tokens("hi")
+        long = count_tokens("This is a much longer string with many more tokens in it.")
         assert long > short
 
     def test_consistent_results(self) -> None:
         text = "The quick brown fox jumps over the lazy dog."
-        assert _count_tokens(text) == _count_tokens(text)
+        assert count_tokens(text) == count_tokens(text)
 
 
 class TestEncoderCache:
     """Tests for the _EncoderCache singleton."""
 
     def test_returns_encoder(self) -> None:
-        enc = _EncoderCache.get()
+        enc = EncoderCache.get()
         assert enc is not None
 
     def test_returns_same_instance(self) -> None:
-        enc1 = _EncoderCache.get()
-        enc2 = _EncoderCache.get()
+        enc1 = EncoderCache.get()
+        enc2 = EncoderCache.get()
         assert enc1 is enc2
 
 
@@ -82,34 +73,30 @@ class TestDefaultBatchTokens:
     """Tests for the default batch token constant."""
 
     def test_default_is_100k(self) -> None:
-        assert _DEFAULT_BATCH_TOKENS == 100_000
+        assert DEFAULT_BATCH_TOKENS == 100_000
 
 
 class TestExtractUserMessagesSingleBatch:
     """Tests for single-batch output (backward compatibility)."""
 
-    def test_single_batch_writes_one_file(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_single_batch_writes_one_file(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         _make_session_jsonl(session, ["Hello, how are you?", "Please help me."])
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        result = await extract_user_messages(str(session), str(output))
 
         assert result["batch_count"] == 1
         assert len(result["output_paths"]) == 1
         assert result["output_paths"][0] == str(output)
         assert output.exists()
 
-    def test_single_batch_jsonl_format(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_single_batch_jsonl_format(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         _make_session_jsonl(session, ["Hello world"])
 
         output = tmp_path / "output.jsonl"
-        asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        await extract_user_messages(str(session), str(output))
 
         lines = output.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 1
@@ -119,15 +106,13 @@ class TestExtractUserMessagesSingleBatch:
         assert "line_index" in entry
         assert "file" in entry
 
-    def test_single_batch_metadata(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_single_batch_metadata(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         msgs = ["Short message one.", "Short message two."]
         _make_session_jsonl(session, msgs)
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        result = await extract_user_messages(str(session), str(output))
 
         assert result["message_count"] == 2
         assert result["total_tokens"] > 0
@@ -137,34 +122,26 @@ class TestExtractUserMessagesSingleBatch:
 class TestExtractUserMessagesMultiBatch:
     """Tests for multi-batch output with token-aware splitting."""
 
-    def test_multi_batch_creates_directory(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_multi_batch_creates_directory(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         # Create messages that exceed a tiny batch_tokens budget
         long_msg = "word " * 500  # ~500 tokens
         _make_session_jsonl(session, [long_msg, long_msg, long_msg])
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(
-            _module.extract_user_messages(str(session), str(output), batch_tokens=600)
-        )
+        result = await extract_user_messages(str(session), str(output), batch_tokens=600)
 
         assert result["batch_count"] > 1
         batch_dir = tmp_path / "rtfp-batches-output"
         assert batch_dir.is_dir()
 
-    def test_multi_batch_file_naming(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_multi_batch_file_naming(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         long_msg = "word " * 500
         _make_session_jsonl(session, [long_msg, long_msg, long_msg])
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(
-            _module.extract_user_messages(str(session), str(output), batch_tokens=600)
-        )
+        result = await extract_user_messages(str(session), str(output), batch_tokens=600)
 
         for path_str in result["output_paths"]:
             p = Path(path_str)
@@ -172,18 +149,14 @@ class TestExtractUserMessagesMultiBatch:
             assert p.suffix == ".jsonl"
             assert p.name.startswith("batch_")
 
-    def test_multi_batch_all_messages_preserved(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_multi_batch_all_messages_preserved(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         long_msg = "word " * 500
         msgs = [long_msg] * 5
         _make_session_jsonl(session, msgs)
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(
-            _module.extract_user_messages(str(session), str(output), batch_tokens=600)
-        )
+        result = await extract_user_messages(str(session), str(output), batch_tokens=600)
 
         total_lines = 0
         for path_str in result["output_paths"]:
@@ -193,18 +166,14 @@ class TestExtractUserMessagesMultiBatch:
         assert total_lines == result["message_count"]
         assert result["message_count"] == 5
 
-    def test_multi_batch_respects_token_budget(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_multi_batch_respects_token_budget(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         long_msg = "word " * 500
         _make_session_jsonl(session, [long_msg, long_msg, long_msg])
 
         budget = 600
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(
-            _module.extract_user_messages(str(session), str(output), batch_tokens=budget)
-        )
+        result = await extract_user_messages(str(session), str(output), batch_tokens=budget)
 
         # Each batch file should have messages whose total tokens <= budget
         # (except when a single message exceeds budget, it gets its own batch)
@@ -217,14 +186,12 @@ class TestExtractUserMessagesMultiBatch:
             if len(lines) > 1:
                 assert batch_tokens <= budget + max(json.loads(line)["token_count"] for line in lines)
 
-    def test_default_batch_tokens_produces_single_file_for_small_session(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_default_batch_tokens_produces_single_file_for_small_session(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         _make_session_jsonl(session, ["Hello", "World"])
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        result = await extract_user_messages(str(session), str(output))
 
         # With default 100k tokens, two short messages should be single batch
         assert result["batch_count"] == 1
@@ -234,9 +201,7 @@ class TestExtractUserMessagesMultiBatch:
 class TestExtractUserMessagesFiltering:
     """Tests that non-user messages are filtered out."""
 
-    def test_filters_assistant_messages(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_filters_assistant_messages(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         with session.open("w", encoding="utf-8") as fh:
             fh.write(
@@ -261,13 +226,11 @@ class TestExtractUserMessagesFiltering:
             )
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        result = await extract_user_messages(str(session), str(output))
 
         assert result["message_count"] == 1
 
-    def test_filters_tool_use_results(self, tmp_path: Path) -> None:
-        import asyncio
-
+    async def test_filters_tool_use_results(self, tmp_path: Path) -> None:
         session = tmp_path / "session.jsonl"
         with session.open("w", encoding="utf-8") as fh:
             fh.write(
@@ -292,6 +255,6 @@ class TestExtractUserMessagesFiltering:
             )
 
         output = tmp_path / "output.jsonl"
-        result = asyncio.get_event_loop().run_until_complete(_module.extract_user_messages(str(session), str(output)))
+        result = await extract_user_messages(str(session), str(output))
 
         assert result["message_count"] == 1

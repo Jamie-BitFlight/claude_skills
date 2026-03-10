@@ -95,6 +95,7 @@ pythonpath = [
     "./plugins/python3-development/skills/mkdocs/scripts",
     "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
+    "./plugins/frustration-analyzer/tests",
 ]
 testpaths = ["**/tests"]
 
