@@ -6,6 +6,8 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "agents": ["./agents/semantic-code-search.md"],
+  "agents": [
+    "./agents/semantic-code-search.md"
+  ],
   "mcpServers": "./.mcp.json"
 }
