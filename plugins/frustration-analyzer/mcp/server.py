@@ -6,6 +6,7 @@
 #     "duckdb>=0.10.0",
 #     "rich>=13.0",
 #     "cairosvg>=2.7.0",
+#     "tiktoken>=0.7.0",
 # ]
 # ///
 """RTFP (Read The Fucking Prompt) MCP Server.
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     from xml.etree.ElementTree import Element as _Element  # noqa: S405
 
 import duckdb
+import tiktoken
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import Image
@@ -72,6 +74,101 @@ _WRITE_ANNOTATIONS: dict[str, bool] = {
     "idempotentHint": True,
     "openWorldHint": False,
 }
+
+_DEFAULT_BATCH_TOKENS: int = 100_000
+_TIKTOKEN_ENCODING: str = "p50k_base"
+
+
+class _EncoderCache:
+    """Lazily-initialised tiktoken encoder singleton."""
+
+    _enc: tiktoken.Encoding | None = None
+
+    @classmethod
+    def get(cls) -> tiktoken.Encoding:
+        """Return the shared p50k_base encoder, creating it on first call."""
+        if cls._enc is None:
+            cls._enc = tiktoken.get_encoding(_TIKTOKEN_ENCODING)
+        return cls._enc
+
+
+def _count_tokens(text: str) -> int:
+    """Count tokens using tiktoken p50k_base encoding (Claude approximation).
+
+    Args:
+        text: The string to tokenise.
+
+    Returns:
+        Number of tokens in the text.
+    """
+    return len(_EncoderCache.get().encode(text))
+
+
+def _split_into_batches(messages: list[dict[str, Any]], batch_tokens: int) -> list[list[dict[str, Any]]]:
+    """Split messages into token-bounded batches.
+
+    Args:
+        messages: List of message dicts, each with a ``token_count`` key.
+        batch_tokens: Maximum token budget per batch.
+
+    Returns:
+        List of batch lists. Each batch stays within the token budget.
+    """
+    batches: list[list[dict[str, Any]]] = []
+    current_batch: list[dict[str, Any]] = []
+    current_tokens = 0
+    for msg in messages:
+        tokens = msg["token_count"]
+        if current_tokens + tokens > batch_tokens and current_batch:
+            batches.append(current_batch)
+            current_batch = []
+            current_tokens = 0
+        current_batch.append(msg)
+        current_tokens += tokens
+    if current_batch:
+        batches.append(current_batch)
+    return batches
+
+
+def _write_batches(messages: list[dict[str, Any]], output_path: str, batch_tokens: int) -> list[str]:
+    """Write messages to one or more batch JSONL files.
+
+    When total tokens fit within ``batch_tokens``, writes a single file at
+    ``output_path`` for backward compatibility.  Otherwise splits into
+    multiple files in a directory derived from ``output_path``.
+
+    Args:
+        messages: User message dicts to write.
+        output_path: Base output file path.
+        batch_tokens: Token budget per batch.
+
+    Returns:
+        List of written file paths.
+    """
+    total_tokens = sum(m["token_count"] for m in messages)
+
+    if total_tokens <= batch_tokens:
+        out_path = pathlib.Path(output_path).expanduser()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as fh:
+            for msg in messages:
+                fh.write(json.dumps(msg) + "\n")
+        return [str(out_path)]
+
+    base = pathlib.Path(output_path).expanduser()
+    batch_dir = base.parent / f"rtfp-batches-{base.stem}"
+    batch_dir.mkdir(parents=True, exist_ok=True)
+
+    batches = _split_into_batches(messages, batch_tokens)
+    written_paths: list[str] = []
+    for i, batch in enumerate(batches):
+        batch_path = batch_dir / f"batch_{i + 1:03d}.jsonl"
+        with batch_path.open("w", encoding="utf-8") as fh:
+            for msg in batch:
+                fh.write(json.dumps(msg) + "\n")
+        written_paths.append(str(batch_path))
+    return written_paths
+
 
 # ---------------------------------------------------------------------------
 # Server
@@ -654,8 +751,56 @@ def _inject_border_rect(svg_text: str) -> str:
     return ET.tostring(root, encoding="unicode", xml_declaration=False)
 
 
+_DEFAULT_WIDTH: int = 900
+_DEFAULT_FONT_SIZE: int = 15
+
+
+def _apply_svg_dimensions(svg_text: str, *, width: int, font_size: int) -> str:
+    """Apply configurable width and font-size to an SVG string.
+
+    Rewrites the root ``<svg>`` element's ``width`` attribute and
+    updates ``font-size`` declarations in the embedded ``<style>``
+    element.  The aspect ratio is preserved by scaling ``height``
+    proportionally.
+
+    Args:
+        svg_text: Raw SVG XML string.
+        width: Desired image width in pixels.
+        font_size: Desired font size in points.
+
+    Returns:
+        Modified SVG string with updated dimensions.
+    """
+    ET.register_namespace("", _SVG_NS)
+    root = ET.fromstring(svg_text)  # noqa: S314
+
+    # Scale width/height proportionally
+    old_width_str = root.get("width", "")
+    old_width = float(re.sub(r"[^0-9.]", "", old_width_str)) if old_width_str else float(width)
+    scale = width / old_width if old_width else 1.0
+
+    root.set("width", str(width))
+
+    old_height_str = root.get("height", "")
+    if old_height_str:
+        old_height = float(re.sub(r"[^0-9.]", "", old_height_str))
+        root.set("height", str(int(old_height * scale)))
+
+    # Update font-size in embedded <style>
+    style_el = root.find(f"{{{_SVG_NS}}}style")
+    if style_el is not None and style_el.text:
+        style_el.text = re.sub(r"font-size:\s*[\d.]+px", f"font-size: {font_size}px", style_el.text)
+
+    return ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+
 def _render_card(
-    task_summary: str, assistant_excerpt: str, user_reply: str, output_path: str
+    task_summary: str,
+    assistant_excerpt: str,
+    user_reply: str,
+    output_path: str,
+    width: int = _DEFAULT_WIDTH,
+    font_size: int = _DEFAULT_FONT_SIZE,
 ) -> list[TextContent | Image]:
     """Render a terminal-style card as SVG or PNG.
 
@@ -681,6 +826,8 @@ def _render_card(
         assistant_excerpt: The offending assistant response excerpt.
         user_reply: The user's frustrated reply.
         output_path: File path to write (``.svg`` or ``.png``).
+        width: Image width in pixels for the output. Default 900.
+        font_size: Font size in points for the SVG/PNG text. Default 15.
 
     Returns:
         List of MCP content blocks: metadata ``TextContent`` followed by
@@ -698,6 +845,9 @@ def _render_card(
     # Replace box-drawing character border with a continuous SVG <rect>
     svg_text = _inject_border_rect(svg_text)
 
+    # Apply configurable dimensions: scale SVG viewBox and font-size
+    svg_text = _apply_svg_dimensions(svg_text, width=width, font_size=font_size)
+
     out = pathlib.Path(output_path).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -705,7 +855,7 @@ def _render_card(
     if is_png:
         import cairosvg  # noqa: PLC0415
 
-        png_bytes: bytes = cairosvg.svg2png(bytestring=svg_text.encode("utf-8"))
+        png_bytes: bytes = cairosvg.svg2png(bytestring=svg_text.encode("utf-8"), output_width=width)
         out.write_bytes(png_bytes)
         inline_content: TextContent | Image = Image(data=png_bytes, format="png")
     else:
@@ -775,13 +925,24 @@ async def list_sessions(project_path: str = "~/.claude/projects/") -> dict[str, 
 
 
 @mcp.tool(annotations=_WRITE_ANNOTATIONS)
-async def extract_user_messages(file: str, output_path: str) -> dict[str, Any]:
-    """Extract user-only messages from a session file to a batch JSONL.
+async def extract_user_messages(
+    file: str, output_path: str, batch_tokens: int = _DEFAULT_BATCH_TOKENS
+) -> dict[str, Any]:
+    """Extract user-only messages from a session file to batch JSONL file(s).
 
     Reads the given JSONL session file via DuckDB and filters to ONLY
-    user-authored messages (type='user', toolUseResult IS NULL).  Writes
-    a new JSONL file at output_path with entries:
-    ``{"file": str, "line_index": int, "text": str}``.
+    user-authored messages (type='user', toolUseResult IS NULL).
+
+    **Token-aware batch splitting**: Uses tiktoken (p50k_base) to count
+    tokens per message.  When the session's total token count exceeds
+    ``batch_tokens``, the output is split into multiple batch files inside
+    a directory derived from ``output_path`` (e.g. for ``/tmp/batch.jsonl``
+    the directory ``/tmp/rtfp-batches-batch/batch_001.jsonl``, etc.).
+    When the session fits in a single batch, a single file is written at
+    ``output_path`` for backward compatibility.
+
+    Each output JSONL entry:
+    ``{"file": str, "line_index": int, "text": str, "token_count": int}``.
 
     No assistant messages, tool outputs, or context is included.
     The output is suitable as input to a Stage 2 batch-detector subagent.
@@ -789,9 +950,15 @@ async def extract_user_messages(file: str, output_path: str) -> dict[str, Any]:
     Args:
         file: Path to the source JSONL session file.
         output_path: Path to write the output batch JSONL file.
+        batch_tokens: Target token budget per batch file.  When total
+            tokens exceed this value the output is split into multiple
+            files.  Default 100 000.
 
     Returns:
-        Dict with ``output_path``, ``message_count``, and ``source_file``.
+        Dict with ``output_paths`` (list of written file paths),
+        ``batch_count``, ``message_count``, ``total_tokens``, and
+        ``source_file``.  For single-batch output ``output_paths``
+        contains one entry identical to the legacy ``output_path``.
 
     Raises:
         ToolError: If the source file cannot be read.
@@ -806,21 +973,33 @@ async def extract_user_messages(file: str, output_path: str) -> dict[str, Any]:
         rows = conn.execute(_SQL_ALL_MESSAGES_IN_FILE, [resolved]).fetchall()
         conn.close()
 
-        out_path = pathlib.Path(output_path).expanduser()
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        # -- Collect user messages with token counts -------------------------
+        user_messages: list[dict[str, Any]] = []
+        for line_index, msg_type, _timestamp, message, tool_use_result in rows:
+            if msg_type != "user" or tool_use_result is not None:
+                continue
+            text = _extract_user_text_from_value(message)
+            if not text or not _is_human_plaintext(text):
+                continue
+            token_count = _count_tokens(text)
+            user_messages.append({
+                "file": resolved,
+                "line_index": int(line_index),
+                "text": text,
+                "token_count": token_count,
+            })
 
-        count = 0
-        with out_path.open("w", encoding="utf-8") as fh:
-            for line_index, msg_type, _timestamp, message, tool_use_result in rows:
-                if msg_type != "user" or tool_use_result is not None:
-                    continue
-                text = _extract_user_text_from_value(message)
-                if not text or not _is_human_plaintext(text):
-                    continue
-                fh.write(json.dumps({"file": resolved, "line_index": int(line_index), "text": text}) + "\n")
-                count += 1
+        total_tokens = sum(m["token_count"] for m in user_messages)
 
-        return {"output_path": str(out_path), "message_count": count, "source_file": resolved}
+        written_paths = _write_batches(user_messages, output_path, batch_tokens)
+
+        return {
+            "output_paths": written_paths,
+            "batch_count": len(written_paths),
+            "message_count": len(user_messages),
+            "total_tokens": total_tokens,
+            "source_file": resolved,
+        }
 
     return await asyncio.to_thread(_extract)
 
