@@ -2,7 +2,7 @@
   "mcpServers": {
     "cocoindex-code": {
       "command": "uvx",
-      "args": ["cocoindex-code"]
+      "args": ["cocoindex-code==0.1.11"]
     }
   }
 }

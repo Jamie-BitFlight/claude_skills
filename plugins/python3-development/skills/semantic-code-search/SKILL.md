@@ -13,6 +13,6 @@ Use `mcp__cocoindex-code__search` for semantic code search when:
 
 Prefer Grep/Glob when you know exact identifiers, filenames, or string literals. Prefer semantic search when you know what the code *does* but not what it's *called*.
 
-The CocoIndex Code MCP server is bundled with this plugin via `.mcp.json` and launches automatically using `uvx cocoindex-code` — no pre-installation required. If `mcp__cocoindex-code__search` is not listed in available tools, report BLOCKED — this is a configuration error, not a fallback scenario.
+The CocoIndex Code MCP server is bundled with this plugin via `.mcp.json` and launches automatically using `uvx cocoindex-code==0.1.11` — no pre-installation required. If `mcp__cocoindex-code__search` is not listed in available tools, report BLOCKED — this is a configuration error, not a fallback scenario.
 
 SOURCE: [CocoIndex Code GitHub Repository](https://github.com/cocoindex-io/cocoindex-code) (accessed 2026-03-10)
