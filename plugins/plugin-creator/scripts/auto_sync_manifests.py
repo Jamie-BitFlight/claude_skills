@@ -425,8 +425,11 @@ def _update_component_arrays(data: dict[str, list[str] | str], changes: Componen
 
         field_name = f"{comp_type}s"
 
-        # Standard-path skills are auto-discovered; skip explicit registration.
+        # Standard-path skills are auto-discovered; skip explicit array
+        # registration, but still record the addition so the caller emits a
+        # minor version bump for the new skill directory.
         if _is_standard_path_skill(field_name, comp_path):
+            modified = True
             continue
 
         relative_path = f"./{comp_path}"
