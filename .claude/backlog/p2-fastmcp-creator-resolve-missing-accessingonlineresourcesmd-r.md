@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/tasks-23-fastmcp-creator-v3-overhaul-followup-2.md
   issue: '#520'
-  last_synced: '2026-03-07T18:29:18Z'
+  last_synced: '2026-03-10T06:55:57Z'
 ---
 
 ## Story

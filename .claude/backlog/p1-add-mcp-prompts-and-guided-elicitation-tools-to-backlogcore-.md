@@ -9,10 +9,49 @@ metadata:
   type: Feature
   status: in-progress
   issue: '#473'
-  last_synced: '2026-03-07T18:29:30Z'
+  last_synced: '2026-03-10T06:56:07Z'
   groomed: '2026-03-06'
   plan: plan/tasks-1-mcp-prompts-elicitation.md
 ---
+
+## Story
+
+As a **developer**, I want **The workflow logic currently scattered across /backlog, /create-backlog-item,...** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+The workflow logic currently scattered across /backlog, /create-backlog-item, /groom-backlog-item, and /work-backlog-item skills should live in the MCP server so it travels with the tools and stays current without skill updates.
+
+Two additions to backlog_core/server.py:
+
+**New MCP prompts** (return message content clients inject into LLM context):
+- `backlog_guide()` — full tool reference documentation as messages; replaces /backlog skill entirely
+- `create_item_guided()` — intake field instructions and format as messages
+- `groom_item(selector)` — fetches item via operations.view_item() server-side, returns item state + grooming workflow as messages
+- `work_item(selector)` — returns item state + planning instructions as messages
+- `close_or_resolve(selector)` — returns item state + close vs. resolve decision guide as messages
+
+**New guided tools using ctx.elicit()** (interactive versions of existing CRUD tools):
+- `backlog_add_guided` — elicits title, priority, description, type interactively then calls operations.add_item(); replaces the /create-backlog-item interactive flow
+- `backlog_close_confirmed` — elicits confirmation before closing, then delegates to operations.close_item(); absorbs the confirm step currently in the skill
+- `backlog_resolve_confirmed` — elicits summary + confirmation before resolving; absorbs the confirm step currently in the skill
+- `backlog_setup_github` — runs label taxonomy + milestone init; absorbs setup-github command from /work-backlog-item
+
+Prerequisites: ctx.elicit() requires async tools (see #472) and Context logging (#465).
+
+Files: .claude/skills/backlog/backlog_core/server.py, operations.py
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: GitHub Issue #473
+- **Priority**: P1
+- **Added**: 2026-03-06
+- **Research questions**: None
 
 ## Story
 

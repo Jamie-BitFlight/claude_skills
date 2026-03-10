@@ -1,6 +1,6 @@
 ---
 name: 'RTFP: Read The Fucking Prompt — Claude Code plugin for session reaction mining'
-description: "Plugin that scans Claude Code session transcripts to find the strongest user reactions to instruction-following failures, reconstructs the assistant output that triggered them, and turns the best exchange into a shareable terminal-style PNG artifact.\n\n## Constraints\n\n- Session data stored in JSONL files on disk (storage layer)\n- DuckDB is the query layer for inspecting session data\n- First-pass batch files contain ONLY user-authored messages (no assistant, tool, system, or developer messages)\n- Each batched entry preserves: source session file path + original message index id\n\n## Workflow\n\n### Session selection\nAssistant finds and presents recent sessions from the current project with titles. User selects one.\n\n### Stage 1: User-only extraction and batching\n- Read selected session JSONL\n- Filter to user-authored messages only — exclude everything else\n- Create temporary batch files ~100k tokens each (user messages only)\n- Purpose: emotional-reply detection only, NOT contextual reconstruction\n\n### Stage 2: Subagent detection over user-only batch files\n- For each batch file, start a subagent\n- Subagent identifies messages with strong emotional reactions: frustration, disappointment, disbelief, argument, insults, other clearly negative emotional responses aimed at the assistant\n- Each subagent returns: (1) JSON file with flagged message indexes grouped by source file, (2) plain list of flagged entries\n- Parent assistant merges returned index ids per file into a single working set\n\n### Stage 3: Context reconstruction after candidate selection\n- Given merged flagged indexes, select: (1) single most emotional/rage-filled response, (2) runner-up if present\n- ONLY at this stage go back to the full session transcript\n- Retrieve each flagged user message from full session\n- Inspect nearby transcript entries\n- Determine current activity/task\n- Identify assistant message(s) that triggered the reaction\n\n### Output artifact\nThree elements only:\n1. Short dry task summary (e.g. 'task: writing a Claude Code plugin') — scene-setting only, not diagnosis\n2. Assistant output that triggered the reaction\n3. User's emotional reply\n\nRendered as PNG with terminal interface aesthetic, ready for social media.\n\n## Anti-requirements\n- NOT a generic analytics tool\n- NO broad taxonomy\n- NO scoring\n- NO verdicts\n- NO extra evaluative layers\n\n## Key constraint sentence\n'The first-pass temporary batch files must contain only user-authored messages, because they are for emotional-reply detection only; full transcript context must be retrieved later during reconstruction.'"
+description: Plugin that scans Claude Code session transcripts to find the strongest user reactions to instruction-following failures, reconstructs the assistant output that triggered them, and turns the best exchange into a shareable terminal-style PNG artifact.
 metadata:
   topic: rtfp-read-the-fucking-prompt-claude-code-plugin-for-session-
   source: User request
@@ -9,9 +9,79 @@ metadata:
   type: Feature
   status: open
   issue: '#555'
-  last_synced: '2026-03-09T03:44:03Z'
+  last_synced: '2026-03-10T06:55:33Z'
   groomed: '2026-03-09'
 ---
+
+## Story
+
+As a **developer**, I want **Plugin that scans Claude Code session transcripts to find the strongest user ...** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+Plugin that scans Claude Code session transcripts to find the strongest user reactions to instruction-following failures, reconstructs the assistant output that triggered them, and turns the best exchange into a shareable terminal-style PNG artifact.
+
+## Constraints
+
+- Session data stored in JSONL files on disk (storage layer)
+- DuckDB is the query layer for inspecting session data
+- First-pass batch files contain ONLY user-authored messages (no assistant, tool, system, or developer messages)
+- Each batched entry preserves: source session file path + original message index id
+
+## Workflow
+
+### Session selection
+Assistant finds and presents recent sessions from the current project with titles. User selects one.
+
+### Stage 1: User-only extraction and batching
+- Read selected session JSONL
+- Filter to user-authored messages only — exclude everything else
+- Create temporary batch files ~100k tokens each (user messages only)
+- Purpose: emotional-reply detection only, NOT contextual reconstruction
+
+### Stage 2: Subagent detection over user-only batch files
+- For each batch file, start a subagent
+- Subagent identifies messages with strong emotional reactions: frustration, disappointment, disbelief, argument, insults, other clearly negative emotional responses aimed at the assistant
+- Each subagent returns: (1) JSON file with flagged message indexes grouped by source file, (2) plain list of flagged entries
+- Parent assistant merges returned index ids per file into a single working set
+
+### Stage 3: Context reconstruction after candidate selection
+- Given merged flagged indexes, select: (1) single most emotional/rage-filled response, (2) runner-up if present
+- ONLY at this stage go back to the full session transcript
+- Retrieve each flagged user message from full session
+- Inspect nearby transcript entries
+- Determine current activity/task
+- Identify assistant message(s) that triggered the reaction
+
+### Output artifact
+Three elements only:
+1. Short dry task summary (e.g. 'task: writing a Claude Code plugin') — scene-setting only, not diagnosis
+2. Assistant output that triggered the reaction
+3. User's emotional reply
+
+Rendered as PNG with terminal interface aesthetic, ready for social media.
+
+## Anti-requirements
+- NOT a generic analytics tool
+- NO broad taxonomy
+- NO scoring
+- NO verdicts
+- NO extra evaluative layers
+
+## Key constraint sentence
+'The first-pass temporary batch files must contain only user-authored messages, because they are for emotional-reply detection only; full transcript context must be retrieved later during reconstruction.'
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: User request
+- **Priority**: P1
+- **Added**: 2026-03-09
+- **Research questions**: None
 
 ## Fact-Check
 

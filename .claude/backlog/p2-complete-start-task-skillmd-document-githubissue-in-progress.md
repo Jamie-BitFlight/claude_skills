@@ -9,7 +9,7 @@ metadata:
   type: Docs
   status: needs-grooming
   issue: '#500'
-  last_synced: '2026-03-07T18:29:27Z'
+  last_synced: '2026-03-10T06:56:05Z'
   plan: plan/tasks-33-migrate-sam-task-github-subissues-followup-4.md
 ---
 

@@ -9,7 +9,7 @@ metadata:
   type: Bug
   status: needs-grooming
   issue: '#499'
-  last_synced: '2026-03-07T18:29:28Z'
+  last_synced: '2026-03-10T06:56:06Z'
   plan: plan/tasks-32-migrate-sam-task-github-subissues-followup-3.md
 ---
 
