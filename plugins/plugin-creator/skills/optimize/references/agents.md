@@ -29,3 +29,15 @@ An agent file is a system prompt. It describes what the agent is, what it produc
 ## Size Signal
 
 If the agent file is longer than the skill that uses it, the agent is carrying content that belongs in the skill's references/. An agent file that works standalone without its skill is probably duplicating the skill's knowledge layer.
+
+## When Optimizing an Agent File
+
+For each block of content in the agent that isn't role, output, project-specific constraints, or stopping conditions:
+
+1. **Is it domain reference material?** → candidate for a skill's `references/` file. If the agent is in a plugin, check whether an existing skill in that plugin already covers the topic. If yes, merge into it. If no, create a new reference file under the most relevant skill.
+
+2. **Is it a workflow or procedure?** → candidate for a `SKILL.md` body. The skill invokes the agent; the agent shouldn't carry the workflow.
+
+3. **Is it discoverable or derivable?** → cut it entirely. Do not move it.
+
+For plugin agents: run `Glob("skills/*/SKILL.md", path="{plugin_dir}")` to see existing skills before deciding whether to create a new one or extend an existing one.
