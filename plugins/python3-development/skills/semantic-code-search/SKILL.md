@@ -4,20 +4,12 @@ description: Teaches agents to use CocoIndex Code MCP server for semantic code s
 user-invocable: false
 ---
 
-# Semantic Code Search via CocoIndex Code
+Use the cocoindex-code MCP server for semantic code search when:
 
-Teaching resource for agents. When this skill is loaded, you gain semantic code search capability
-via the `mcp__cocoindex_code__search` MCP tool. Read this skill once, then use the tool in your
-normal workflow.
-
-## When to Use Semantic Search
-
-Use `mcp__cocoindex_code__search` instead of Grep/Glob when:
-
-- Exploring an unfamiliar module or codebase section without knowing class or function names
-- Looking for implementations of a concept (e.g., "authentication logic", "retry handling")
-- Grep returns zero results (unknown identifier) or too many false positives (common word)
-- You want to find all usages of a pattern across files without knowing exact syntax
+- Searching for code by meaning or description rather than exact text
+- Exploring unfamiliar parts of the codebase
+- Looking for implementations without knowing exact names
+- Finding similar code patterns or related functionality
 - The user describes behavior in natural language and you need to locate the code responsible
 
 Continue using Grep/Glob when:
