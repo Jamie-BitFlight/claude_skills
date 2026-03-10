@@ -9,8 +9,28 @@ metadata:
   type: Feature
   status: needs-grooming
   issue: '#260'
-  last_synced: '2026-03-07T18:29:50Z'
+  last_synced: '2026-03-10T06:56:26Z'
 ---
+
+## Story
+
+As a **developer**, I want **Wrap `connections** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+Wrap `connections.py`, `evaluation.py`, and `get_environment.py` as MCP tools. An MCP server that helps build MCP servers — agents could test connections, run evaluations, and inspect environments. Tools: `test_mcp_connection`, `run_evaluation`, `get_mcp_environment`, `validate_mcp_config`.
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: GitHub Issue #260
+- **Priority**: P1
+- **Added**: 2026-03-03
+- **Research questions**: None
 
 ## Story
 

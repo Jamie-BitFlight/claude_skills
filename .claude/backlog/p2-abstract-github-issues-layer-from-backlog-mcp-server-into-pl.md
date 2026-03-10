@@ -9,9 +9,29 @@ metadata:
   type: Feature
   status: needs-grooming
   issue: '#389'
-  last_synced: '2026-03-07T18:29:44Z'
+  last_synced: '2026-03-10T06:56:22Z'
   groomed: '2026-03-02'
 ---
+
+## Story
+
+As a **developer**, I want **The backlog MCP server (10 tools, 382+ tests) is tightly coupled to GitHub Is...** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+The backlog MCP server (10 tools, 382+ tests) is tightly coupled to GitHub Issues as its issue-tracking backend. Every operation — add, list, sync, close, resolve, groom — assumes GitHub Issues API. This prevents using the backlog system with GitLab, Jira, databases, or alternative agent task systems like GSD (get-shit-done), Superpowers, or Beads. Success: a clean backend protocol/interface with 2+ working backends shipped (GitHub Issues as default + at least one alternative like Beads graph tracker or SQLite) proving the abstraction works. You know it works when the same 10 MCP tools produce equivalent behavior against a different backend with zero changes to skill workflows or MCP tool signatures. Research refs: research/agent-frameworks/get-shit-done.md, research/agent-frameworks/superpowers.md, research/task-management/beads.md.
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: User request
+- **Priority**: P2
+- **Added**: 2026-03-02
+- **Research questions**: None
 
 ## Story
 
