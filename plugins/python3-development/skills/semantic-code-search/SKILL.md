@@ -49,20 +49,7 @@ SOURCE: [CocoIndex Code GitHub Repository](https://github.com/cocoindex-io/cocoi
 
 Use phrases of 3+ words describing behavior, purpose, or structure.
 
-## Result Interpretation
-
-```mermaid
-flowchart TD
-    Score{Score range?}
-    Score -->|"> 0.8"| Strong["Strong match — read this result first"]
-    Score -->|"0.5 – 0.8"| Related["Related code — worth reviewing"]
-    Score -->|"< 0.5"| Weak["Weak match — try rephrasing query"]
-    Weak --> Rephrase["Use different vocabulary or increase limit and paginate"]
-```
-
-**Pagination**: Set `offset` to skip already-seen results. Use `limit=10` for broader initial coverage.
-
-**Reading results**: Use `Read` on `file_path` at lines `start_line`–`end_line` for full context.
+Scores above 0.8 are strong matches. Below 0.5, rephrase the query with different vocabulary.
 
 ## Server Availability
 
