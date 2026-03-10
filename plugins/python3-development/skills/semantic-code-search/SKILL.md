@@ -111,25 +111,13 @@ flowchart TD
 When falling back, be explicit: state that the MCP tool was unavailable and the results came
 from keyword-based text search.
 
-## Installation Prerequisite
+## Server Availability
 
-The `mcp__cocoindex_code__search` tool is available only if the user has:
+The CocoIndex Code MCP server is bundled with this plugin via `.mcp.json` and launches
+automatically using `uvx cocoindex-code` — no pre-installation required. The `uv` package
+manager fetches and caches the package on first use.
 
-1. Installed CocoIndex Code:
-
-   ```bash
-   pipx install cocoindex-code
-   # or
-   uv tool install --upgrade cocoindex-code --prerelease explicit --with "cocoindex>=1.0.0a24"
-   ```
-
-2. Registered it as an MCP server:
-
-   ```bash
-   claude mcp add cocoindex-code -- cocoindex-code
-   ```
-
-If the tool is missing and the user has not installed CocoIndex Code, inform them of these steps
-and fall back to Grep/Glob for the current task.
+If the `mcp__cocoindex_code__search` tool is not available at runtime, fall back to Grep/Glob
+and note that semantic search is unavailable.
 
 SOURCE: [CocoIndex Code README](https://github.com/cocoindex-io/cocoindex-code/blob/main/README.md) (accessed 2026-03-10)

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "cocoindex-code": {
-      "command": "cocoindex-code",
-      "args": []
+      "command": "uvx",
+      "args": ["cocoindex-code"]
     }
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: semantic-code-search
-description: Uses CocoIndex Code MCP server to search codebases by semantic meaning — finds code by concept, behavior, or natural language description rather than exact keywords. Use when exploring unfamiliar codebases, finding implementations of a concept, or when grep-based search fails because the exact identifiers are unknown. Requires CocoIndex Code MCP server registered in the project (`claude mcp add cocoindex-code -- cocoindex-code`).
+description: Uses CocoIndex Code MCP server to search codebases by semantic meaning — finds code by concept, behavior, or natural language description rather than exact keywords. Use when exploring unfamiliar codebases, finding implementations of a concept, or when grep-based search fails because the exact identifiers are unknown. MCP server launches automatically via uvx when the python3-development plugin is installed.
 tools: Read, Grep, Glob, mcp__cocoindex_code__*
 model: haiku
 permissionMode: dontAsk
@@ -71,7 +71,7 @@ Format each result as:
 ```
 
 Group results under a `## Results` heading. If MCP was unavailable, prepend a `## Note` section
-stating this and recommending `claude mcp add cocoindex-code -- cocoindex-code`.
+stating this and noting the MCP server may not have started.
 
 </workflow>
 
@@ -81,7 +81,7 @@ stating this and recommending `claude mcp add cocoindex-code -- cocoindex-code`.
 STATUS: DONE
 
 ## Note (if MCP unavailable)
-Semantic search unavailable. Install CocoIndex Code: `claude mcp add cocoindex-code -- cocoindex-code`
+Semantic search unavailable — CocoIndex Code MCP server did not start.
 Fallback results returned using Grep/Glob.
 
 ## Results
