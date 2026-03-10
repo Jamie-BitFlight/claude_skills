@@ -37,16 +37,6 @@ No canonical "best" tags — use semantic names matching information type.
 
 SOURCE: [Anthropic prompt engineering - XML tags](https://docs.anthropic.com/prompt-engineering/use-xml-tags)
 
-## No Invented Constraints
-
-Before writing any content into a skill or agent, apply this filter:
-
-1. **Will the agent already know this at runtime?** Tool schemas, parameter names, response shapes, and standard library behavior are visible to the agent when it runs. Do not document them.
-2. **Is this verified or invented?** If you have no source for a claim (e.g., "scores above 0.8 are strong matches"), do not write it. Unverified guidance presented as fact degrades trust.
-3. **Is this a constraint or a preference?** Output formats, naming conventions, and structural requirements that the agent would handle fine without instruction are preferences, not constraints. Only document constraints that prevent actual failure modes.
-
-**Test**: "If I deleted this line, would the agent produce a worse result?" If the answer is "no" or "I don't know," delete the line.
-
 ## Transformation Checklist
 
 1. Open with directive on how to read/apply rules
