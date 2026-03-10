@@ -11,6 +11,7 @@ from backlog_core.parsing import (
     append_or_replace_section,
     build_backlog_frontmatter,
     build_issue_body,
+    build_issue_body_from_file,
     find_fuzzy_duplicates,
     find_item,
     normalize_issue_title,
@@ -485,6 +486,338 @@ class TestBuildIssueBody:
         assert "## Description" in body
         assert "## Acceptance Criteria" in body
         assert "## Context" in body
+
+
+# ---------------------------------------------------------------------------
+# build_issue_body_from_file (BacklogItem-based, parsing.py)
+# ---------------------------------------------------------------------------
+
+
+# Realistic groomed backlog item body with multiple sections
+_GROOMED_RAW_BODY = """\
+**Description**: Implement duplicate detection for backlog items
+
+**Suggested location**: packages/backlog/
+
+## Story
+
+As a **developer**, I want to **detect duplicate backlog items** so that **the backlog stays clean**.
+
+## Description
+
+Full description of the feature with all details preserved.
+
+## Groomed (2026-01-15)
+
+### Priority
+
+Confirmed P1 — high impact on workflow efficiency.
+
+### Reproducibility
+
+N/A — new feature.
+
+## Fact-Check
+
+Score: 9/10 — verified against codebase.
+"""
+
+_UNGROOMED_RAW_BODY = """\
+**Description**: Some ungroomed idea
+
+## Story
+
+As a developer, I want to do something.
+
+## Description
+
+Not yet groomed.
+"""
+
+
+class TestBuildIssueBodyFromFile:
+    """Tests for build_issue_body_from_file(item: BacklogItem) -> str | None.
+
+    Verifies the passthrough behavior: raw_body is returned directly when
+    it contains a '## Groomed' section, and None is returned otherwise.
+    """
+
+    def test_returns_none_when_raw_body_has_no_groomed_section(self) -> None:
+        """Ungroomed items return None — they should not be synced to GitHub.
+
+        Tests: Gate logic for sync eligibility
+        How: Create BacklogItem with body lacking '## Groomed', call function
+        Why: Ungroomed items must not push incomplete bodies to GitHub issues
+        """
+        # Arrange
+        item = BacklogItem(title="Ungroomed Item", description="desc", raw_body=_UNGROOMED_RAW_BODY)
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is None
+
+    def test_returns_stripped_body_plus_newline_when_groomed_present(self) -> None:
+        """Groomed items return raw_body.strip() + newline.
+
+        Tests: Passthrough behavior for groomed content
+        How: Create BacklogItem with groomed body, verify output matches input
+        Why: Body must be emitted verbatim without synthetic generation
+        """
+        # Arrange
+        item = BacklogItem(title="Groomed Item", description="desc", raw_body=_GROOMED_RAW_BODY)
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is not None
+        assert result == _GROOMED_RAW_BODY.strip() + "\n"
+
+    def test_preserves_all_sections_without_duplication(self) -> None:
+        """All sections from raw_body appear exactly once in output.
+
+        Tests: Content integrity — no duplication or loss
+        How: Count occurrences of each section header in the result
+        Why: Previous bug duplicated Story headers; this is a regression guard
+        """
+        # Arrange
+        item = BacklogItem(title="Full Item", description="desc", raw_body=_GROOMED_RAW_BODY)
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is not None
+        assert result.count("## Story") == 1
+        assert result.count("## Description") == 1
+        assert result.count("## Groomed") == 1
+        assert result.count("## Fact-Check") == 1
+
+    def test_does_not_generate_synthetic_story_text(self) -> None:
+        """Output must NOT contain synthetic 'As a developer, I want to' text.
+
+        Tests: Regression guard for old synthetic header bug
+        How: Verify output does not contain the old template pattern
+        Why: The refactored function passes through raw_body; it must never
+             generate synthetic content like build_issue_body() does
+        """
+        # Arrange
+        item = BacklogItem(
+            title="Detect Duplicates", description="Implement duplicate detection", raw_body=_GROOMED_RAW_BODY
+        )
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is not None
+        # The old bug generated "As a **role**, I want to **goal**..." from title
+        # The new behavior passes through whatever Story text the file already has
+        assert "I want to **detect duplicates" not in result.lower()
+
+    def test_does_not_truncate_content(self) -> None:
+        """Full raw_body content is preserved — no truncation.
+
+        Tests: No Invented Limits compliance
+        How: Verify all content from raw_body appears in result
+        Why: Truncation violates the repo's 'No Invented Limits' policy
+        """
+        # Arrange
+        item = BacklogItem(title="Full Content", description="desc", raw_body=_GROOMED_RAW_BODY)
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is not None
+        assert "Score: 9/10" in result
+        assert "Confirmed P1" in result
+        assert "Full description of the feature" in result
+
+    def test_returns_none_for_empty_raw_body(self) -> None:
+        """Empty raw_body returns None.
+
+        Tests: Edge case — empty body
+        How: Create BacklogItem with empty raw_body
+        Why: Empty body has no groomed section, must return None
+        """
+        # Arrange
+        item = BacklogItem(title="Empty", raw_body="")
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is None
+
+    def test_output_ends_with_single_newline(self) -> None:
+        """Output ends with exactly one trailing newline.
+
+        Tests: Consistent formatting
+        How: Check result ends with newline but not double newline
+        Why: GitHub markdown rendering expects clean trailing newline
+        """
+        # Arrange
+        item = BacklogItem(title="Trailing", raw_body="Some content\n\n## Groomed (2026-01-01)\n\nDone.\n\n\n")
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is not None
+        assert result.endswith("\n")
+        assert not result.endswith("\n\n")
+
+    def test_groomed_keyword_in_non_heading_position_does_not_match(self) -> None:
+        """The word 'Groomed' in body text (not as ## heading) returns None.
+
+        Tests: Heading-level matching specificity
+        How: Body contains 'Groomed' in prose but no '## Groomed' heading
+        Why: Only the section heading indicates actual grooming status
+        """
+        # Arrange
+        item = BacklogItem(title="False Positive", raw_body="This item has not been Groomed yet.\n\nStill needs work.")
+
+        # Act
+        result = build_issue_body_from_file(item)
+
+        # Assert
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _build_issue_body_from_file (dict-based, scripts/backlog.py)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildIssueBodyFromFileDict:
+    """Tests for _build_issue_body_from_file(item: dict) -> str | None.
+
+    This is the dict-based version in scripts/backlog.py. It uses '_raw_body'
+    key instead of BacklogItem.raw_body attribute, but has identical logic.
+    """
+
+    @pytest.fixture
+    def build_fn(self) -> object:
+        """Import the dict-based _build_issue_body_from_file via importlib.
+
+        The scripts/ directory must be on sys.path so that backlog.py's
+        sibling imports (state_handler, frontmatter_utils) resolve correctly.
+
+        Returns:
+            The _build_issue_body_from_file function from scripts/backlog.py.
+        """
+        import importlib.util
+        import sys
+        from pathlib import Path as _Path
+
+        scripts_dir = _Path(__file__).parent.parent / "scripts"
+        script = scripts_dir / "backlog.py"
+        # backlog.py does top-level imports from sibling modules in scripts/
+        added = str(scripts_dir) not in sys.path
+        if added:
+            sys.path.insert(0, str(scripts_dir))
+        try:
+            spec = importlib.util.spec_from_file_location("backlog_script", script)
+            assert spec is not None
+            assert spec.loader is not None
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod._build_issue_body_from_file
+        finally:
+            if added and str(scripts_dir) in sys.path:
+                sys.path.remove(str(scripts_dir))
+
+    def test_returns_none_when_no_groomed_section(self, build_fn: object) -> None:
+        """Dict item without '## Groomed' in _raw_body returns None.
+
+        Tests: Gate logic for dict-based version
+        How: Pass dict with _raw_body lacking groomed heading
+        Why: Consistency with BacklogItem-based version
+        """
+        # Arrange
+        item = {"_raw_body": _UNGROOMED_RAW_BODY, "_title": "Test"}
+        build = build_fn  # type: ignore[operator]
+
+        # Act
+        result = build(item)
+
+        # Assert
+        assert result is None
+
+    def test_returns_body_when_groomed_present(self, build_fn: object) -> None:
+        """Dict item with '## Groomed' in _raw_body returns stripped body + newline.
+
+        Tests: Passthrough behavior for dict-based version
+        How: Pass dict with groomed _raw_body, verify output
+        Why: Must match BacklogItem-based version behavior
+        """
+        # Arrange
+        item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Test"}
+        build = build_fn  # type: ignore[operator]
+
+        # Act
+        result = build(item)
+
+        # Assert
+        assert result is not None
+        assert result == _GROOMED_RAW_BODY.strip() + "\n"
+
+    def test_preserves_all_sections(self, build_fn: object) -> None:
+        """All sections from _raw_body appear exactly once — no duplication.
+
+        Tests: Content integrity for dict-based version
+        How: Count section headers in output
+        Why: Regression guard matching BacklogItem-based tests
+        """
+        # Arrange
+        item = {"_raw_body": _GROOMED_RAW_BODY}
+        build = build_fn  # type: ignore[operator]
+
+        # Act
+        result = build(item)
+
+        # Assert
+        assert result is not None
+        assert result.count("## Story") == 1
+        assert result.count("## Groomed") == 1
+
+    def test_missing_raw_body_key_returns_none(self, build_fn: object) -> None:
+        """Dict without _raw_body key returns None (empty string default).
+
+        Tests: Missing key handling
+        How: Pass dict without _raw_body key
+        Why: Function uses .get() with default; must not raise
+        """
+        # Arrange
+        item: dict[str, str] = {"_title": "No body"}
+        build = build_fn  # type: ignore[operator]
+
+        # Act
+        result = build(item)
+
+        # Assert
+        assert result is None
+
+    def test_does_not_generate_synthetic_story(self, build_fn: object) -> None:
+        """Dict-based version must not generate synthetic story text.
+
+        Tests: Regression guard for old bug
+        How: Verify output contains only the raw_body content
+        Why: The function was refactored to passthrough; synthetic generation is gone
+        """
+        # Arrange
+        item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Detect Duplicates"}
+        build = build_fn  # type: ignore[operator]
+
+        # Act
+        result = build(item)
+
+        # Assert
+        assert result is not None
+        assert "I want to **detect duplicates" not in result.lower()
 
 
 # ---------------------------------------------------------------------------
