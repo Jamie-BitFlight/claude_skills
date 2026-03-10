@@ -5,5 +5,6 @@
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
-  }
+  },
+  "agents": ["./agents/semantic-code-search.md"]
 }
