@@ -33,7 +33,6 @@ from .models import (
     BACKLOG_DIR,
     BENEFIT_MAP,
     FUZZY_DUPLICATE_THRESHOLD,
-    GITHUB_ISSUE_TITLE_TRUNCATE,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
     ROLE_MAP,
@@ -443,8 +442,12 @@ def build_backlog_frontmatter(
 def build_issue_body_from_file(item: BacklogItem) -> str | None:
     """Build GitHub issue body from local per-item file content.
 
-    Reads the raw body from the BacklogItem. Returns None if the body has no
-    groomed content (i.e. no '## Groomed' section).
+    Emits the file's raw body directly — all sections (Story, Description,
+    Groomed, Fact-Check, etc.) are authored in the local file and passed
+    through without synthetic header generation.
+
+    Returns None if the body has no groomed content (i.e. no '## Groomed'
+    section), since ungroomed items don't need their body synced to GitHub.
 
     Args:
         item: Parsed BacklogItem with raw_body and frontmatter fields.
@@ -455,48 +458,7 @@ def build_issue_body_from_file(item: BacklogItem) -> str | None:
     raw_body = item.raw_body
     if "## Groomed" not in raw_body:
         return None
-    # Build a complete body: standard header + full file body
-    title = item.title
-    desc = item.description
-    source = item.source or "Not specified"
-    priority = item.priority
-    added = item.added
-    research = item.research_first
-    first_sent = desc.split(".")[0].strip() if desc else title
-    if len(first_sent) > GITHUB_ISSUE_TITLE_TRUNCATE:
-        first_sent = first_sent[: GITHUB_ISSUE_TITLE_TRUNCATE - 3] + "..."
-    header = f"""## Story
-
-As a **developer**, I want **{first_sent}** so that **backlog items are tracked in GitHub**.
-
-## Description
-
-{desc}
-
-## Acceptance Criteria
-
-- [ ] Work matches description
-- [ ] Plan or implementation complete
-
-## Context
-
-- **Source**: {source}
-- **Priority**: {priority}
-- **Added**: {added}
-- **Research questions**: {research or "None"}
-"""
-    # Strip sections from raw_body that are already in the header to prevent
-    # duplication on each sync→pull cycle (see PR #560 review).
-    header_headings = {"## Story", "## Description", "## Acceptance Criteria", "## Context"}
-    raw_sections = extract_sections(raw_body)
-    extra_parts: list[str] = []
-    for heading, content in raw_sections.items():
-        if heading not in header_headings:
-            extra_parts.append(f"{heading}\n\n{content}" if content else heading)
-    extra_body = "\n\n".join(extra_parts)
-    if extra_body.strip():
-        return header + "\n" + extra_body.strip() + "\n"
-    return header
+    return raw_body.strip() + "\n"
 
 
 def build_issue_body(item: BacklogItem) -> str:

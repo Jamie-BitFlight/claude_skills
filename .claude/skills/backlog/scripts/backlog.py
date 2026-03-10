@@ -442,8 +442,12 @@ def items_with_issues(items: list[dict]) -> list[dict]:
 def _build_issue_body_from_file(item: dict) -> str | None:
     """Build GitHub issue body from local per-item file content.
 
-    Reads the raw body from the item dict. Returns None if the body has no
-    groomed content (i.e. no '## Groomed' section).
+    Emits the file's raw body directly — all sections (Story, Description,
+    Groomed, Fact-Check, etc.) are authored in the local file and passed
+    through without synthetic header generation.
+
+    Returns None if the body has no groomed content (i.e. no '## Groomed'
+    section), since ungroomed items don't need their body synced to GitHub.
 
     Args:
         item: Parsed backlog item dict with _raw_body and frontmatter fields.
@@ -454,37 +458,7 @@ def _build_issue_body_from_file(item: dict) -> str | None:
     raw_body = item.get("_raw_body", "")
     if "## Groomed" not in raw_body:
         return None
-    # Build a complete body: standard header + full file body
-    title = item.get("_title", "")
-    desc = item.get("**Description**", "")
-    source = item.get("**Source**", "Not specified")
-    priority = item.get("**Priority**", "")
-    added = item.get("**Added**", "")
-    research = item.get("**Research first**", "")
-    first_sent = desc.split(".")[0].strip() if desc else title
-    if len(first_sent) > GITHUB_ISSUE_TITLE_TRUNCATE:
-        first_sent = first_sent[: GITHUB_ISSUE_TITLE_TRUNCATE - 3] + "..."
-    header = f"""## Story
-
-As a **developer**, I want **{first_sent}** so that **backlog items are tracked in GitHub**.
-
-## Description
-
-{desc}
-
-## Acceptance Criteria
-
-- [ ] Work matches description
-- [ ] Plan or implementation complete
-
-## Context
-
-- **Source**: {source}
-- **Priority**: {priority}
-- **Added**: {added}
-- **Research questions**: {research or "None"}
-"""
-    return header + "\n" + raw_body.strip() + "\n"
+    return raw_body.strip() + "\n"
 
 
 def build_issue_body(item: dict) -> str:
