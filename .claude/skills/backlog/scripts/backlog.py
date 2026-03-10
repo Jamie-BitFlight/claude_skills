@@ -67,6 +67,7 @@ from rich.table import Table
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _SCRIPT_DIR.parent.parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "plugins" / "plugin-creator" / "scripts"))
+sys.path.insert(0, str(_SCRIPT_DIR))  # expose sibling modules (state_handler, frontmatter_utils)
 sys.path.insert(0, str(_SCRIPT_DIR.parent))  # expose backlog_core package
 
 import operator
