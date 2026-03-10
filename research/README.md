@@ -18,7 +18,8 @@ research/
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
 │   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native (3.6K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
-│   └── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
+│   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
+│   └── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
 ├── claude-code-plugins/               # Claude Code plugin ecosystems and configuration repositories
 │   └── claude-codex-settings.md      # Battle-tested Claude Code plugin ecosystem: 17 plugins, 9 MCP integrations, multi-LLM backend configs (Z.ai, Kimi K2, ccproxy) (452 stars)
 ├── agent-infrastructure/              # Infrastructure for agentic applications
@@ -131,7 +132,8 @@ research/
 │   ├── octocode-mcp.md                # Research Driven Development platform
 │   ├── perplexity-mcp-server.md       # Perplexity AI real-time web search and reasoning MCP server
 │   ├── retio-pagemap.md               # MCP server compressing HTML to 2-5K token structured maps
-│   └── spec-workflow-mcp.md           # Spec-driven development workflow with approval gates and real-time dashboard (3.9K stars)
+│   ├── spec-workflow-mcp.md           # Spec-driven development workflow with approval gates and real-time dashboard (3.9K stars)
+│   └── cocoindex-code.md             # Embedded MCP server for semantic code search via AST analysis and embeddings (Apache-2.0)
 ├── research-agent-patterns/           # Multi-agent architectures and orchestration
 │   ├── claw-loop.md                   # Autonomous development orchestration via tmux + cron
 │   ├── compound-engineering-plugin.md # Every Inc's Plan/Work/Review/Compound workflow plugin
@@ -267,6 +269,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | [ultra-mcp.md](./mcp-ecosystem/ultra-mcp.md)                 | Ultra MCP - single MCP interface routing to OpenAI/Gemini/Azure/Grok with cost tracking, vector search, React dashboard, 25 tools as prompts (269 stars) | 2026-03-02   |
 | [openspec-mcp.md](./mcp-ecosystem/openspec-mcp.md)           | OpenSpec MCP - 50+ tool spec-driven workflow: approval state machine, threaded review, task tracking, Fastify+WebSocket dashboard on port 3000 | 2026-03-02   |
 | [spec-workflow-mcp.md](./mcp-ecosystem/spec-workflow-mcp.md) | Spec Workflow MCP - spec-driven development with Requirements→Design→Tasks approval gates, real-time React dashboard on port 5000 (3.9K stars) | 2026-03-02   |
+| [cocoindex-code.md](./mcp-ecosystem/cocoindex-code.md)       | CocoIndex Code — embedded MCP server for semantic code search via AST analysis and embeddings; zero-config, 30+ languages, ~70% token savings, incremental indexing (Apache-2.0) | 2026-03-10   |
 
 **Key Topics**:
 
@@ -439,6 +442,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [openfang.md](./agent-frameworks/openfang.md)                         | OpenFang - Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, 16-layer security, native SKILL.md support (Apache-2.0/MIT) | 2026-02-27   |
 | [superpowers.md](./agent-frameworks/superpowers.md)                   | Agentic skills framework with 14 skills for TDD, debugging, and subagent-driven development - works with Claude Code, Codex, OpenCode  | 2026-01-31   |
 | [tersa.md](./agent-frameworks/tersa.md)                               | vercel-labs/tersa — Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars) | 2026-03-06   |
+| [everything-claude-code.md](./agent-frameworks/everything-claude-code.md) | Everything Claude Code — comprehensive performance optimization system: 16 specialized agents, 65+ skills, hook-based automation, token optimization, 6-language support (50K+ stars, MIT) | 2026-03-10   |
 
 **Key Topics**:
 
