@@ -143,6 +143,7 @@ research/
 │   ├── ollama-subagents-web-search-claude-code.md  # Ollama native subagents and web search for Claude Code (163K+ stars)
 │   └── oh-my-opencode.md              # code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months)
 ├── skill-generation-tools/            # Tools that create AI skills/prompts
+│   ├── claude-code-skills-alirezarezvani.md # 170 modular skill packages for Claude Code, Codex, Gemini CLI across 9 domains (2.5K+ stars)
 │   ├── clawhub.md                     # Skill registry for AI agents with vector search
 │   ├── claude-code-templates.md       # 100+ Claude Code agents/commands/skills/MCPs/hooks via npx installer and aitmpl.com (21.8K stars)
 │   ├── claude-skillz.md               # 18+ behavioral skills, 12 personas, Claude Launcher utility
@@ -326,6 +327,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | Document                                                            | Description                                                                                                    | Last Updated |
 | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------ |
 | [anthropics-skills.md](./skill-generation-tools/anthropics-skills.md) | Anthropic Agent Skills - official Anthropic skills repo with 17 skills in 3 plugins, A/B eval harness, description-driven triggering (84.9K stars) | 2026-03-06   |
+| [claude-code-skills-alirezarezvani.md](./skill-generation-tools/claude-code-skills-alirezarezvani.md) | Claude Code Skills Library - 170 production-ready modular skill packages across 9 domains (engineering, marketing, C-level, compliance) for Claude Code, Codex, Gemini CLI, OpenClaw; 210+ stdlib-only Python tools, 18 marketplace plugins (2.5K+ stars) | 2026-03-10   |
 | [clawhub.md](./skill-generation-tools/clawhub.md)                    | ClawHub - public skill registry for OpenClaw/Clawdbot agents; vector search, semver versioning, MIT CLI (3,286+ skills) | 2026-02-23   |
 | [claude-code-templates.md](./skill-generation-tools/claude-code-templates.md) | Claude Code Templates - 100+ ready-to-use agents, commands, skills, MCPs, hooks, and settings for Claude Code; npx installer and aitmpl.com browser (21.8K stars) | 2026-03-03   |
 | [claude-skillz.md](./skill-generation-tools/claude-skillz.md)       | Claude Skillz - 18+ behavioral skills, 12 personas, 10 plugins, and Claude Launcher for rapid persona switching (238 stars) | 2026-02-20   |
