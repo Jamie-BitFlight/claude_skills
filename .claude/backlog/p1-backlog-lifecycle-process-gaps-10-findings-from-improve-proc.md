@@ -34,26 +34,6 @@ Process audit of the full backlog item lifecycle (create → groom → discuss �
 - **Added**: 2026-03-02
 - **Research questions**: None
 
-## Story
-
-As a **developer using Claude Code skills**, I want to **backlog lifecycle process gaps — 10 findings from improve-processes audit** so that **the tooling becomes more capable and complete**.
-
-## Description
-
-Process audit of the full backlog item lifecycle (create → groom → discuss → research → validate → feasibility → plan → implement → close/resolve) using the /improve-processes excellence checklist and triage protocol. 10 findings identified across 3 severity levels. 2 HIGH: (F1) no feasibility gate between RT-ICA APPROVED and SAM planning, (F9) 6 implied handoffs that break autonomous execution. 5 MEDIUM: (F2) no discussion/interview step, (F4) vague 'is job valid' condition, (F5) non-sequential step numbering, (F6) no groomer output validation, (F10) draft lifecycle doc not promoted. 3 LOW: (F3) RT-ICA staleness, (F7) auto-mode P1 default, (F8) fact-check auto-push. Full report: .claude/docs/process-audit-backlog-lifecycle-2026-03-02.md
-
-## Acceptance Criteria
-
-- [ ] Work matches description
-- [ ] Plan or implementation complete
-
-## Context
-
-- **Source**: Session observation — /improve-processes audit
-- **Priority**: P1
-- **Added**: 2026-03-02
-- **Research questions**: None
-
 ## Groomed (2026-03-03)
 
 ### Fact-Check

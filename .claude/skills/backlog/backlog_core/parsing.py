@@ -485,7 +485,18 @@ As a **developer**, I want **{first_sent}** so that **backlog items are tracked 
 - **Added**: {added}
 - **Research questions**: {research or "None"}
 """
-    return header + "\n" + raw_body.strip() + "\n"
+    # Strip sections from raw_body that are already in the header to prevent
+    # duplication on each sync→pull cycle (see PR #560 review).
+    header_headings = {"## Story", "## Description", "## Acceptance Criteria", "## Context"}
+    raw_sections = extract_sections(raw_body)
+    extra_parts: list[str] = []
+    for heading, content in raw_sections.items():
+        if heading not in header_headings:
+            extra_parts.append(f"{heading}\n\n{content}" if content else heading)
+    extra_body = "\n\n".join(extra_parts)
+    if extra_body.strip():
+        return header + "\n" + extra_body.strip() + "\n"
+    return header
 
 
 def build_issue_body(item: BacklogItem) -> str:
