@@ -10,9 +10,29 @@ metadata:
   status: in-progress
   issue: '#117'
   groomed: '2026-03-02'
-  last_synced: '2026-03-07T18:30:01Z'
+  last_synced: '2026-03-10T06:56:37Z'
   plan: plan/tasks-6-plan-artifact-lifecycle.md
 ---
+
+## Story
+
+As a **developer**, I want **The research/plan from Phase 2-3 was committed early as a markdown file** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+The research/plan from Phase 2-3 was committed early as a markdown file. During implementation (Phase 5), decisions changed — the MCP server grew from planned scope, analysis dimensions were rebalanced, hook patterns shifted. The plan was never updated to reflect actual implementation. After compaction, the stale plan became a potential source of confusion. Two options to address: (1) update the plan artifact after each phase, or (2) treat the plan as disposable and track only the living state (what's done, what's pending, what deferred).
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: agentskill-kaizen plugin build (2026-02-18), plan committed as `87a0b93`
+- **Priority**: P2
+- **Added**: 2026-02-18
+- **Research questions**: None
 
 ## Story
 

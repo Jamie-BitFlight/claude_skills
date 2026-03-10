@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   issue: '#87'
   plan: ''
-  last_synced: '2026-03-07T18:30:19Z'
+  last_synced: '2026-03-10T06:56:54Z'
 ---
 
 ## Story

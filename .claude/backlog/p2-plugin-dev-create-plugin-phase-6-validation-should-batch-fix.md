@@ -10,8 +10,28 @@ metadata:
   status: needs-grooming
   issue: '#116'
   groomed: '2026-02-26'
-  last_synced: '2026-03-07T18:30:01Z'
+  last_synced: '2026-03-10T06:56:38Z'
 ---
+
+## Story
+
+As a **developer**, I want **Phase 6 collected findings from 3 parallel review agents, then applied fixes ...** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+Phase 6 collected findings from 3 parallel review agents, then applied fixes one finding at a time. This resulted in SKILL.md being edited 3 separate times (description rewrite, SQL removal, MCP server name fix) when a single pass through the file would have applied all fixes together. The workflow should group all findings by file, then make one editing pass per file. Reduces Edit tool calls and context consumed by repeated reads.
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: agentskill-kaizen plugin build Phase 6 (2026-02-18)
+- **Priority**: P2
+- **Added**: 2026-02-18
+- **Research questions**: None
 
 ## Story
 

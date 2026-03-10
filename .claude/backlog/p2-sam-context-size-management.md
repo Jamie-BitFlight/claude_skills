@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: needs-grooming
   issue: '#111'
-  last_synced: '2026-03-07T18:30:06Z'
+  last_synced: '2026-03-10T06:56:42Z'
 ---
 
 ## Story

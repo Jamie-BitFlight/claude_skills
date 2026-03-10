@@ -10,8 +10,28 @@ metadata:
   status: needs-grooming
   groomed: '2026-02-23'
   issue: '#94'
-  last_synced: '2026-03-07T18:30:14Z'
+  last_synced: '2026-03-10T06:56:50Z'
 ---
+
+## Story
+
+As a **developer**, I want **CHANGELOG references files that do not exist in the repository** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+CHANGELOG references files that do not exist in the repository. Additionally, related skills referenced in the plugin do not exist. All dead references need to be either created or removed.
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: Plugin code review session 2026-02-21
+- **Priority**: P2
+- **Added**: 2026-02-21
+- **Research questions**: None
 
 ## Story
 

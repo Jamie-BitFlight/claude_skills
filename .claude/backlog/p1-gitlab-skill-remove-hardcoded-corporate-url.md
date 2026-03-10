@@ -11,8 +11,28 @@ metadata:
   groomed: '2026-02-24'
   plan: ''
   issue: '#76'
-  last_synced: '2026-03-07T18:30:22Z'
+  last_synced: '2026-03-10T06:56:57Z'
 ---
+
+## Story
+
+As a **developer**, I want **`validate_glfm** so that **backlog items are tracked in GitHub**.
+
+## Description
+
+`validate_glfm.py` lines 152-153 hardcode `https://sourcery.assaabloy.net` as the default GitLab instance URL. `gitlab-ci-local-guide.md` line 51 also references this URL. This leaks a corporate internal URL into a public repository. Replace with a generic placeholder (e.g., `https://gitlab.example.com`) or make the URL a required argument with no default.
+
+## Acceptance Criteria
+
+- [ ] Work matches description
+- [ ] Plan or implementation complete
+
+## Context
+
+- **Source**: Plugin code review session 2026-02-21
+- **Priority**: P1
+- **Added**: 2026-02-21
+- **Research questions**: None
 
 ## Story
 
