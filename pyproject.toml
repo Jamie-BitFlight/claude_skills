@@ -68,6 +68,8 @@ addopts = [
     "--import-mode=importlib",
     "-n",
     "auto",
+    "--dist",
+    "loadgroup",
 ]
 asyncio_mode = "auto"
 markers = [
