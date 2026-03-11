@@ -11,7 +11,15 @@ from pydantic import Field
 from . import operations
 from .models import BacklogError, Output
 
-mcp = FastMCP("backlog")
+mcp = FastMCP(
+    "backlog",
+    instructions=(
+        "Backlog management server. Manages per-item markdown files in .claude/backlog/, "
+        "syncs with GitHub Issues (source of truth), and provides CRUD operations for "
+        "backlog items including add, list, view, update, groom, close, resolve, and sync."
+    ),
+    version="0.1.0",
+)
 
 
 @mcp.tool()
