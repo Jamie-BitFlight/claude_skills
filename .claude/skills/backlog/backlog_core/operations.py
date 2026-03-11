@@ -465,9 +465,11 @@ def _close_cleanup(item: BacklogItem, issue_ref: str, repo: str, output: Output 
     if not filepath_str:
         return
     filepath = Path(filepath_str)
-    if filepath.exists():
+    try:
         filepath.unlink()
         out.info(f"  Removed local file {filepath.name} (canonical: GH #{issue_ref.lstrip('#')})")
+    except FileNotFoundError:
+        pass
 
 
 def _pull_if_issue_selector(selector: str, repo: str, output: Output | None = None) -> None:
@@ -1060,7 +1062,7 @@ def list_items(
         refresh_local_cache_from_github(repo, label, output=out)
     items = parse_backlog()
     open_items = [it for it in items if not it.skip and it.section]
-    status_map = batch_fetch_statuses(open_items, repo)
+    status_map = batch_fetch_statuses(open_items, repo) if (with_status or status) else {}
     open_items = _filter_open_items(open_items, section, title, status, status_map)
     result_items = [_build_list_entry(it, with_status, status_map) for it in open_items]
     return {"items": result_items, "count": len(result_items), **out.to_dict()}

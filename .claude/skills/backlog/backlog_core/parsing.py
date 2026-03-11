@@ -796,6 +796,13 @@ def view_result_from_local_item(item: BacklogItem) -> ViewItemResult:
         file_path=item.file_path,
         groomed=bool(item.groomed),
     )
+    # Use fields already parsed on BacklogItem instead of re-reading the file
+    result.description = item.description or ""
+    result.source = item.source or ""
+    result.added = item.added or ""
+    if item.raw_body:
+        result.body = item.raw_body
+    # status is not on BacklogItem — extract from frontmatter metadata if file exists
     fp = item.file_path
     if fp and Path(fp).exists():
         raw = Path(fp).read_text(encoding="utf-8")
@@ -804,13 +811,7 @@ def view_result_from_local_item(item: BacklogItem) -> ViewItemResult:
         fm: dict[str, str] = dict(fm_raw) if isinstance(fm_raw, dict) else {}
         meta_raw = fm.get("metadata", {})
         meta: dict[str, str] = dict(meta_raw) if isinstance(meta_raw, dict) else {}
-        result.description = str(fm.get("description", ""))
-        result.source = str(meta.get("source", fm.get("source", "")))
-        result.added = str(meta.get("added", fm.get("added", "")))
         result.status = str(meta.get("status", fm.get("status", "")))
-        body_text = post.content if hasattr(post, "content") else ""
-        if body_text:
-            result.body = str(body_text)
     return result
 
 

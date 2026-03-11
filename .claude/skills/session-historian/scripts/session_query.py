@@ -26,6 +26,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Annotated
 
 import duckdb
@@ -124,17 +125,16 @@ def _is_noise(text: str) -> bool:
     return any(stripped.startswith(p) for p in _NOISE_PREFIXES)
 
 
-def _iter_records(path: Path) -> list[dict]:
-    """Parse a JSONL file and return all valid records as dicts.
+def _iter_records(path: Path) -> Iterator[dict]:
+    """Yield valid JSON records from a JSONL file.
 
     Args:
         path: Filesystem path to a ``.jsonl`` file.
 
-    Returns:
-        A list of parsed JSON objects. Lines that are empty or fail to parse
+    Yields:
+        Parsed JSON objects. Lines that are empty or fail to parse
         are silently skipped. Non-dict objects are also skipped.
     """
-    records: list[dict] = []
     with path.open(encoding="utf-8", errors="replace") as fh:
         for raw_line in fh:
             stripped = raw_line.strip()
@@ -143,10 +143,9 @@ def _iter_records(path: Path) -> list[dict]:
             try:
                 rec = json.loads(stripped)
                 if isinstance(rec, dict):
-                    records.append(rec)
+                    yield rec
             except json.JSONDecodeError:
                 continue
-    return records
 
 
 def _slug_to_project_name(slug: str) -> str:

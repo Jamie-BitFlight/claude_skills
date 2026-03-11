@@ -11,6 +11,8 @@ from ruamel.yaml import YAML, YAMLError
 if TYPE_CHECKING:
     from pathlib import Path
 
+_YAML = YAML()
+
 # Canonical SDLC stage identifiers
 VALID_STAGES: frozenset[str] = frozenset({
     "discovery",
@@ -107,9 +109,8 @@ def _parse_yaml_data(path: Path) -> dict:
         FileNotFoundError: If the manifest file does not exist.
         ManifestValidationError: If the YAML is invalid or not a mapping.
     """
-    yaml = YAML()
     try:
-        data = yaml.load(path)
+        data = _YAML.load(path)
     except FileNotFoundError:
         raise FileNotFoundError(f"Manifest not found: {path}") from None
     except YAMLError as exc:

@@ -3,21 +3,12 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
 
 from .models import Entry
+from .parsing import now_iso
 
 ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
 STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>\s*(.*?)</details>", re.DOTALL)
-
-
-def _utc_now_iso() -> str:
-    """Return current UTC time as ISO 8601 string.
-
-    Returns:
-        Timestamp string in ``YYYY-MM-DDTHH:MM:SSZ`` format.
-    """
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def wrap_entry(content: str) -> str:
@@ -26,8 +17,7 @@ def wrap_entry(content: str) -> str:
     Returns:
         HTML div string with ``<sub>`` timestamp and content.
     """
-    now = _utc_now_iso()
-    return f"<div><sub>{now}</sub>\n\n{content}\n</div>"
+    return f"<div><sub>{now_iso()}</sub>\n\n{content}\n</div>"
 
 
 def wrap_entry_with_timestamp(content: str, timestamp: str) -> str:
@@ -86,7 +76,7 @@ def _apply_show_filter(raw_entries: list[Entry], show: str | int | None) -> list
     """
     active = [e for e in raw_entries if not e.struck]
 
-    if show == "all":
+    if show is None or show == "all":
         return raw_entries
     if show == "struck":
         return [e for e in raw_entries if e.struck]
@@ -96,8 +86,6 @@ def _apply_show_filter(raw_entries: list[Entry], show: str | int | None) -> list
         return active[:1] if active else []
     if isinstance(show, int):
         return active[:show] if show >= 0 else active[show:]
-    if show is None:
-        return raw_entries
     msg = f"Unrecognized show filter: {show!r}"
     raise ValueError(msg)
 
@@ -143,7 +131,7 @@ def strike_entry(entry_raw: str, reason: str) -> str:
     Raises:
         ValueError: If ``entry_raw`` is not a valid entry block.
     """
-    now = _utc_now_iso()
+    now = now_iso()
     match = ENTRY_RE.search(entry_raw)
     if not match:
         msg = "Cannot strike: not a valid entry block"

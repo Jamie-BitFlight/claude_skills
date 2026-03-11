@@ -143,12 +143,11 @@ def detect_project_dependencies(project_root: Path) -> set[str]:
         Set of lowercased package names found in dependencies.
     """
     pyproject = project_root / "pyproject.toml"
-    if not pyproject.exists():
-        return set()
-
     try:
         data = tomlkit.loads(pyproject.read_text())
-    except (FileNotFoundError, tomlkit.exceptions.TOMLKitError) as exc:
+    except FileNotFoundError:
+        return set()
+    except tomlkit.exceptions.TOMLKitError as exc:
         logger.warning("Cannot read dependencies from %s: %s", pyproject, exc)
         return set()
 
