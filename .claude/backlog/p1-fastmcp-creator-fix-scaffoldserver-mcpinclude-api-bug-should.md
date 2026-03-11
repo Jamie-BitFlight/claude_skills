@@ -5,9 +5,9 @@ metadata:
   topic: fastmcp-creator-fix-scaffoldserver-mcpinclude-api-bug-should
   source: Code review — fastmcp-creator v3 overhaul (2026-03-05)
   added: '2026-03-05'
-  priority: P1
+  priority: completed
   type: Bug
-  status: needs-grooming
+  status: done
   plan: plan/tasks-22-fastmcp-creator-v3-overhaul-followup-1.md
   issue: '#514'
   last_synced: '2026-03-10T06:56:01Z'
