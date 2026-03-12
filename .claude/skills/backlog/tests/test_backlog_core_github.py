@@ -16,6 +16,7 @@ from backlog_core.github import (
     batch_fetch_statuses,
     check_open_prs_for_issue,
     create_issue_for_item,
+    get_github,
     issue_to_local_fields,
     try_get_github,
     view_enrich_from_github,
@@ -762,6 +763,98 @@ class TestViewEnrichFromGithub:
 
         # Assert
         assert result.status == "needs-grooming"
+
+
+# ---------------------------------------------------------------------------
+# get_github
+# ---------------------------------------------------------------------------
+
+
+class TestGetGithub:
+    """get_github raises on missing token and passes timeout to Github()."""
+
+    def test_no_token_raises_github_unavailable_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Raises GitHubUnavailableError when GITHUB_TOKEN is absent.
+
+        Tests: guard clause for missing token.
+        How: Remove GITHUB_TOKEN; call get_github and assert the error type.
+        Why: Callers expect this specific error type — not a KeyError or None.
+        """
+        # Arrange
+        from backlog_core.models import GitHubUnavailableError
+
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError):
+            get_github("test/repo")
+
+    def test_passes_default_timeout_to_github_constructor(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Github() is constructed with the default timeout=15.
+
+        Tests: timeout kwarg forwarding — the fix for the MCP transport timeout bug.
+        How: Patch Github; call get_github; inspect constructor call_args.
+        Why: Without timeout, a slow GitHub API response blocks the entire
+             asyncio.to_thread() worker until the 60-second MCP deadline fires.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mock_repo = mocker.Mock()
+        mock_gh_instance = mocker.Mock()
+        mock_gh_instance.get_repo.return_value = mock_repo
+        mock_github_cls = mocker.patch("backlog_core.github.Github", return_value=mock_gh_instance)
+
+        # Act
+        get_github("owner/repo")
+
+        # Assert
+        _, kwargs = mock_github_cls.call_args
+        assert kwargs.get("timeout") == 15
+
+    def test_passes_custom_timeout_to_github_constructor(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Github() receives caller-supplied timeout when provided.
+
+        Tests: timeout parameter passthrough for non-default values.
+        How: Call get_github with timeout=5; verify Github() got timeout=5.
+        Why: Callers may need a shorter timeout for time-sensitive contexts.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mock_repo = mocker.Mock()
+        mock_gh_instance = mocker.Mock()
+        mock_gh_instance.get_repo.return_value = mock_repo
+        mock_github_cls = mocker.patch("backlog_core.github.Github", return_value=mock_gh_instance)
+
+        # Act
+        get_github("owner/repo", timeout=5)
+
+        # Assert
+        _, kwargs = mock_github_cls.call_args
+        assert kwargs.get("timeout") == 5
+
+    def test_returns_repository_from_get_repo(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Returns the Repository object from gh.get_repo().
+
+        Tests: return value is the repo object, not the Github client.
+        How: Patch Github.get_repo to return a sentinel; assert it is returned.
+        Why: Callers pass the return value directly to PyGithub Repository methods.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "valid-token")
+        mock_repo = mocker.Mock()
+        mock_gh_instance = mocker.Mock()
+        mock_gh_instance.get_repo.return_value = mock_repo
+        mocker.patch("backlog_core.github.Github", return_value=mock_gh_instance)
+
+        # Act
+        result = get_github("owner/repo")
+
+        # Assert
+        assert result is mock_repo
 
 
 # ---------------------------------------------------------------------------

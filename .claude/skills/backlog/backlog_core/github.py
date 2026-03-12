@@ -45,8 +45,16 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def get_github(repo: str = DEFAULT_REPO) -> Repository:
+def get_github(repo: str = DEFAULT_REPO, timeout: int = 15) -> Repository:
     """Get a PyGithub Repository object.
+
+    Args:
+        repo: Repository name in ``owner/name`` format.
+        timeout: HTTP request timeout in seconds. Defaults to 15 to prevent
+            blocking the FastMCP async event loop when called via
+            ``asyncio.to_thread()``. The MCP transport enforces a 60-second
+            tool deadline; without a timeout here, a slow GitHub API response
+            blocks the thread for the full 60 seconds before timing out.
 
     Returns:
         PyGithub Repository object.
@@ -57,7 +65,7 @@ def get_github(repo: str = DEFAULT_REPO) -> Repository:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise GitHubUnavailableError("GITHUB_TOKEN not set")
-    gh = Github(auth=Auth.Token(token))
+    gh = Github(auth=Auth.Token(token), timeout=timeout)
     return gh.get_repo(repo)
 
 
