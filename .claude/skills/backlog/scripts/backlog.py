@@ -75,7 +75,22 @@ import operator
 import frontmatter
 from backlog_core import operations as _backlog_operations
 from backlog_core.entry_blocks import rewrite_section as _rewrite_section
-from backlog_core.models import BacklogError as _BacklogError, ItemNotFoundError as _ItemNotFoundError
+from backlog_core.models import (
+    BACKLOG_DIR,
+    BENEFIT_MAP,
+    DEFAULT_REPO,
+    FUZZY_DUPLICATE_THRESHOLD,
+    GITHUB_ISSUE_TITLE_TRUNCATE,
+    GITHUB_ISSUE_URL_RE,
+    MIN_FRONTMATTER_PARTS,
+    ROLE_MAP,
+    SECTION_RE,
+    SKIP_STATUS,
+    TYPE_TO_LABEL,
+    _COMMIT_PREFIX_RE,
+    BacklogError as _BacklogError,
+    ItemNotFoundError as _ItemNotFoundError,
+)
 
 from frontmatter_utils import dump_frontmatter, loads_frontmatter
 from state_handler import BacklogState, StateTransitionError, apply_github_transition
@@ -83,39 +98,6 @@ from state_handler import BacklogState, StateTransitionError, apply_github_trans
 if TYPE_CHECKING:
     from github.Issue import Issue
     from github.Repository import Repository
-
-BACKLOG_DIR = _REPO_ROOT / ".claude" / "backlog"
-DEFAULT_REPO = "Jamie-BitFlight/claude_skills"
-
-# Regex
-SECTION_RE = re.compile(r"^##\s+(P0|P1|P2|Ideas)")
-SKIP_STATUS = ("DONE", "RESOLVED", "COMPLETED")
-GITHUB_ISSUE_URL_RE = re.compile(r"https?://github\.com/([^/]+/[^/]+)/issues/(\d+)")
-GITHUB_ISSUE_TITLE_TRUNCATE = 80
-MIN_FRONTMATTER_PARTS = 3
-TYPE_TO_LABEL = {
-    "feature": "type:feature",
-    "bug": "type:bug",
-    "refactor": "type:refactor",
-    "docs": "type:docs",
-    "chore": "type:chore",
-}
-
-ROLE_MAP = {
-    "Feature": "developer using Claude Code skills",
-    "Bug": "developer relying on this plugin",
-    "Refactor": "maintainer of the codebase",
-    "Docs": "developer reading the documentation",
-    "Chore": "maintainer of the project infrastructure",
-}
-
-BENEFIT_MAP = {
-    "Feature": "the tooling becomes more capable and complete",
-    "Bug": "the tool works correctly and reliably",
-    "Refactor": "the code is cleaner and more maintainable",
-    "Docs": "documentation is accurate and trustworthy",
-    "Chore": "the project infrastructure stays healthy",
-}
 
 app = typer.Typer(help="Backlog and GitHub Issue CRUD — single interface")
 _console = Console()
@@ -341,9 +323,6 @@ def find_item(items: list[dict], selector: str) -> dict | None:
     return matches[0] if len(matches) == 1 else (matches[0] if matches else None)
 
 
-_COMMIT_PREFIX_RE = re.compile(r"^(feat|fix|refactor|docs|chore|perf|test|ci):\s*", re.IGNORECASE)
-
-
 def _normalize_issue_title(title: str) -> str:
     """Strip conventional-commit prefix and normalize for dedup comparison.
 
@@ -357,9 +336,6 @@ def _normalize_issue_title(title: str) -> str:
         'sam: error recovery'
     """
     return _COMMIT_PREFIX_RE.sub("", title).strip().lower()
-
-
-FUZZY_DUPLICATE_THRESHOLD = 0.80
 
 
 def _find_fuzzy_duplicates(
