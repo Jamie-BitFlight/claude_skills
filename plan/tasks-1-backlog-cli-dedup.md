@@ -217,7 +217,7 @@ All tasks are sequential because they modify the same file (`.claude/skills/back
 ---
 task: T1
 title: Replace CLI constant definitions with imports from backlog_core/models.py
-status: in-progress
+status: complete
 agent: python3-development:python-cli-architect
 dependencies: []
 priority: 1
@@ -228,6 +228,7 @@ parallelize-with: []
 reason: "Sequential -- modifies backlog.py which all subsequent tasks also modify"
 handoff: "Summary of constants replaced, diff of import block changes, test results"
 started: "2026-03-12T02:41:09Z"
+completed: "2026-03-12T03:01:00Z"
 ---
 
 ## Task T1: Replace CLI constant definitions with imports from backlog_core/models.py
