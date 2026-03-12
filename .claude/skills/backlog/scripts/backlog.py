@@ -78,6 +78,7 @@ from backlog_core.entry_blocks import rewrite_section as _rewrite_section
 from backlog_core.models import (
     BACKLOG_DIR,
     BENEFIT_MAP,
+    BacklogItem,
     DEFAULT_REPO,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_TITLE_TRUNCATE,
@@ -90,6 +91,14 @@ from backlog_core.models import (
     _COMMIT_PREFIX_RE,
     BacklogError as _BacklogError,
     ItemNotFoundError as _ItemNotFoundError,
+)
+from backlog_core.operations import update_item_metadata as _update_item_metadata
+from backlog_core.parsing import (
+    infer_type as _infer_type,
+    normalize_issue_title as _normalize_issue_title,
+    now_iso as _now_iso,
+    title_to_slug as _title_to_slug,
+    today as _today,
 )
 
 from frontmatter_utils import dump_frontmatter, loads_frontmatter
@@ -140,34 +149,6 @@ def _try_get_github(repo: str) -> Repository | None:
     except GithubException:
         return None
 
-
-def _infer_type(description: str, title: str) -> str:
-    text = f"{title} {description}".lower()
-    if any(w in text for w in ("fix", "bug", "broken", "vulnerability")):
-        return "type:bug"
-    if any(w in text for w in ("add", "create", "implement", "build")):
-        return "type:feature"
-    if any(w in text for w in ("refactor", "remove dead", "consolidate")):
-        return "type:refactor"
-    if any(w in text for w in ("document", "update readme", "docs")):
-        return "type:docs"
-    return "type:feature"
-
-
-def _title_to_slug(title: str, max_len: int = 60) -> str:
-    """Convert item title to filename slug.
-
-    Returns:
-        Slug string suitable for filenames.
-    """
-    # Strip strikethrough and status suffixes
-    t = re.sub(r"^~~(.+)~~\s*(RESOLVED|COMPLETED)?\s*$", r"\1", title.strip())
-    t = t.lower()
-    t = re.sub(r"[:\[\]\(\)]", " ", t)
-    t = re.sub(r"[^a-z0-9\s-]", "", t)
-    t = re.sub(r"\s+", "-", t)
-    t = re.sub(r"-+", "-", t).strip("-")
-    return t[:max_len] if len(t) > max_len else t
 
 
 def _parse_backlog_from_directory() -> list[dict]:
@@ -322,20 +303,6 @@ def find_item(items: list[dict], selector: str) -> dict | None:
     matches = [it for it in items if selector_lower in it.get("_title", "").lower()]
     return matches[0] if len(matches) == 1 else (matches[0] if matches else None)
 
-
-def _normalize_issue_title(title: str) -> str:
-    """Strip conventional-commit prefix and normalize for dedup comparison.
-
-    Returns:
-        Lowercased title with any ``feat:``/``fix:``/etc. prefix removed.
-
-    Examples:
-        >>> _normalize_issue_title("feat: SAM: Error Recovery")
-        'sam: error recovery'
-        >>> _normalize_issue_title("SAM: Error Recovery")
-        'sam: error recovery'
-    """
-    return _COMMIT_PREFIX_RE.sub("", title).strip().lower()
 
 
 def _find_fuzzy_duplicates(
@@ -534,43 +501,6 @@ def _create_issue_and_update_item(item: dict, repo: str) -> int | None:
         return issue_num
 
 
-def _today() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%d")
-
-
-def _now_iso() -> str:
-    """Return current UTC time as ISO 8601 string for last_synced tracking."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _update_item_metadata(filepath: Path, updates: dict[str, Any], set_synced: bool = False) -> None:
-    """Update per-item file frontmatter. Supports nested metadata.plan, metadata.issue, etc.
-
-    When set_synced=True, also sets metadata.last_synced to current UTC time.
-    """
-    post = loads_frontmatter(filepath.read_text(encoding="utf-8"))
-    meta = post.metadata or {}
-    for key, value in updates.items():
-        if key == "metadata" and isinstance(value, dict):
-            raw_nested = meta.get("metadata")
-            nested_dict: dict[str, Any] = (
-                cast("dict[str, Any]", dict(raw_nested.items())) if isinstance(raw_nested, dict) else {}
-            )
-            nested_dict.update(value)
-            if set_synced:
-                nested_dict["last_synced"] = _now_iso()
-            meta["metadata"] = nested_dict
-        else:
-            meta[key] = value
-    if set_synced and "metadata" not in updates:
-        raw_nested = meta.get("metadata")
-        nested_dict2: dict[str, Any] = (
-            cast("dict[str, Any]", dict(raw_nested.items())) if isinstance(raw_nested, dict) else {}
-        )
-        nested_dict2["last_synced"] = _now_iso()
-        meta["metadata"] = nested_dict2
-    post.metadata = meta
-    filepath.write_text(dump_frontmatter(post), encoding="utf-8")
 
 
 def _issue_to_local_fields(issue: Issue) -> dict[str, str]:
