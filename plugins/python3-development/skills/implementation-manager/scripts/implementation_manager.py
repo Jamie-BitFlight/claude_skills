@@ -501,9 +501,10 @@ def parse_task_content(content: str) -> list[Task]:
         sys.stderr.write(f"WARNING: YAML frontmatter parsing failed: {exc}\n")
         return []
 
-    # Detect multi-task file: global manifest block has 'feature:' but not a task identifier.
+    # Detect multi-task file: global manifest block has 'feature:' or 'feature_slug:' but not a task identifier.
     # Support both 'task:' and 'task_id:' as task identifier fields.
-    if "feature" in frontmatter and "task" not in frontmatter and "task_id" not in frontmatter:
+    has_feature = "feature" in frontmatter or "feature_slug" in frontmatter
+    if has_feature and "task" not in frontmatter and "task_id" not in frontmatter:
         return _parse_multi_task_body(body)
 
     # Single-task file: the leading frontmatter IS the task
