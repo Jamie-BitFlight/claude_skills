@@ -54,7 +54,7 @@ print_debug() {
 
 Implement configurable log levels.
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#log-levels)
 
 ## TTY Detection
 
@@ -127,15 +127,15 @@ section_end "build"
 
 ## GitHub Actions Grouping
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#github-actions-grouping)
 
 ## Progress Indicators
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#progress-indicators)
 
 ## Structured Step Logging
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#structured-step-logging)
 
 ## Shlocksmith Logging Library
 

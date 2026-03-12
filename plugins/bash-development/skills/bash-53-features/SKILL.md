@@ -61,7 +61,7 @@ benchmark_substitution
 Execute commands and automatically store output in `REPLY`. Note: `REPLY` is local to the
 substitution — its value is restored after completion, so capture it immediately:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#check_service-function)
 
 **Benefits:**
 - Cleaner code without intermediate variables
@@ -91,7 +91,7 @@ result=$(cat file.txt | grep pattern | sort | uniq)
 Control the sorting order of filename and pathname expansion. The specifier is optionally
 prefixed with `+` (ascending, default) or `-` (descending):
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#process_by_size-function)
 
 **Available sort specifiers:**
 - `name` — Alphabetical by filename
@@ -110,7 +110,7 @@ prefixed with `+` (ascending, default) or `-` (descending):
 
 Store completions directly in a variable:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#get_available_commands-function)
 
 ### `read` with Readline Completion (`-E`)
 
@@ -154,7 +154,7 @@ configure_app() {
 
 Specify search path for sourced scripts:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#load_library-function)
 
 ### `printf` Enhancements
 
@@ -191,7 +191,7 @@ Create associative arrays from key-value data. **Note:** The `kv` builtin existe
 confirmed in Bash 5.3; the exact interface shown below is illustrative — verify with
 `help kv` after loading:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#kv-builtin--load_env_config)
 
 ### `strptime` - Date Parsing
 
@@ -199,13 +199,13 @@ Parse textual dates into Unix timestamps. **Note:** The `strptime` builtin exist
 confirmed in Bash 5.3; the exact interface shown below is illustrative — verify with
 `help strptime` after loading:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#strptime--parse_log_timestamp)
 
 ### `fltexpr` - Floating-Point Calculations
 
 Perform floating-point arithmetic without external tools:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#fltexpr--calculate_percentage)
 
 ## POSIX Mode Improvements
 
@@ -238,7 +238,7 @@ fi
 
 More detailed error messages:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#validate_pattern-function)
 
 ## C Standard Conformance Improvements
 

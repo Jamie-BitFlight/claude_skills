@@ -55,7 +55,7 @@ validate_config
 
 Enhanced reference variable handling.
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#nameref-improvements)
 
 ## Readline 8.2 Integration
 
@@ -83,7 +83,7 @@ set completion-display-width 0  # Use full terminal width
 
 ### Input Handling Improvements
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#input-handling-improvements)
 
 ## Array Support Enhancements
 
@@ -123,17 +123,17 @@ process_batch "${files[@]}"
 
 ### Associative Array Improvements
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#cache-implementation)
 
 ## Parameter Expansion Enhancements
 
 ### Improved Pattern Matching
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#parameter-expansion--string-sanitization)
 
 ### Enhanced Substring Operations
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#url-parsing)
 
 ## Security Fixes
 
@@ -143,7 +143,7 @@ Bash 5.2 includes several security-related fixes:
 - Better validation of variable names
 - Enhanced protection against command injection in certain contexts
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#safe-environment-variable-export)
 
 ## Performance Improvements
 
@@ -207,7 +207,7 @@ fi
 
 Most scripts work without modification, but consider:
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#migration-improved-error-handler)
 
 ## References
 

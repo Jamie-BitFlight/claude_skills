@@ -34,13 +34,13 @@ readonly SCRIPT_NAME SCRIPT_DIR
 
 Implement trap-based error handling for robust scripts.
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#error-handling)
 
 ## Argument Parsing
 
 Standard argument parsing template.
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#argument-parsing)
 
 ## Variable Best Practices
 
@@ -162,7 +162,7 @@ Use `[[ ]]` for conditionals (bash-specific, more powerful):
 
 ## Utility Functions
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#utility-functions)
 
 ## Performance Guidelines
 
