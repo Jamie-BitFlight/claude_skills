@@ -12,7 +12,7 @@ task_exports:
 tasks:
   - T1: Replace CLI constant definitions with imports from backlog_core/models.py
   - T2: Fix core internal SKIP_STATUS and SECTION_RE inconsistencies (FIND-14/FIND-15)
-  - T3: Replace Category A functions with direct imports (no adapter needed)
+  - T3: Replace Category A functions with direct imports from backlog_core (no adapter needed)
   - T4: Replace Category B functions with core imports plus dict/BacklogItem adapters
   - T5: Decouple test importlib imports and add CLI re-export compatibility layer
   - T6: Final cleanup, dead code removal, unused import audit, and full verification
@@ -41,20 +41,24 @@ sync_checkpoints:
 ## Dependency Graph
 
 ```text
-T1 (constants)
+T1 (constants dedup)          -- Priority 1, modifies backlog.py
  |
- +---> T2 (identical-logic utility functions)
- |      |
- |      +---> T3 (dict/BacklogItem adapter functions)
- |             |
- |             +---> T4 (CLI-only function migration)
- |                    |
- |                    +---> T5 (test decoupling)
- |                           |
- |                           +---> T6 (final cleanup + verification)
+ +---> T2 (core internal fix)  -- Priority 1, modifies backlog_core/parsing.py
+        |
+        +---> T3 (Category A functions)  -- Priority 2, modifies backlog.py
+               |
+               +---> T4 (Category B functions + adapters)  -- Priority 2, modifies backlog.py
+                      |
+                      +---> T5 (test re-export compat)  -- Priority 3, modifies backlog.py
+                             |
+                             +---> T6 (cleanup + verification)  -- Priority 3, modifies backlog.py
+
+SYNC CHECKPOINT 1: After T1+T2 (constants consistent)
+SYNC CHECKPOINT 2: After T3+T4+T5 (functions deduplicated)
+SYNC CHECKPOINT 3: After T6 (final gate)
 ```
 
-All tasks are sequential because they modify the same file (`.claude/skills/backlog/scripts/backlog.py`). Each task independently testable -- all 12 test files must pass after each task completes.
+All tasks are sequential because they modify the same file (`.claude/skills/backlog/scripts/backlog.py`) or depend on the prior task's state. Each task is independently testable -- all 12 test files must pass after each task completes.
 
 ---
 
