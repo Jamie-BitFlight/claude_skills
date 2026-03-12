@@ -16,7 +16,7 @@ Fixes #612
 ---
 task: T1
 title: Add status field to BacklogItem and update parsing and view logic
-status: not-started
+status: in-progress
 agent: python-cli-architect
 dependencies: []
 priority: 1
@@ -25,6 +25,7 @@ accuracy-risk: low
 skills:
   - python3-development
 parallelize-with: []
+started: "2026-03-12T02:23:02Z"
 ---
 
 ## Context

@@ -229,6 +229,7 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
     # Research-style: name, description, metadata.*
     # Flat (legacy): title, source, added, ...
     plan_raw = _fm_str(fm, meta, "plan")
+    status_raw = _fm_str(fm, meta, "status")
     groomed = _fm_str(fm, meta, "groomed")
     if not groomed and "## Groomed" in body:
         groomed = "true"
@@ -240,7 +241,8 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
         priority=_fm_str(fm, meta, "priority"),
         issue=_fm_str(fm, meta, "issue"),
         plan="" if plan_raw.upper() == "N/A" else plan_raw,
-        skip=_fm_str(fm, meta, "status").lower() in {"done", "resolved"},
+        skip=status_raw.lower() in {"done", "resolved"},
+        status=status_raw,
         groomed=groomed,
         last_synced=_fm_str(fm, meta, "last_synced"),
         raw_body=body,
@@ -802,16 +804,7 @@ def view_result_from_local_item(item: BacklogItem) -> ViewItemResult:
     result.added = item.added or ""
     if item.raw_body:
         result.body = item.raw_body
-    # status is not on BacklogItem — extract from frontmatter metadata if file exists
-    fp = item.file_path
-    if fp and Path(fp).exists():
-        raw = Path(fp).read_text(encoding="utf-8")
-        post = loads_frontmatter(raw)
-        fm_raw = post.metadata if hasattr(post, "metadata") else (post[0] if isinstance(post, tuple) else {})
-        fm: dict[str, str] = dict(fm_raw) if isinstance(fm_raw, dict) else {}
-        meta_raw = fm.get("metadata", {})
-        meta: dict[str, str] = dict(meta_raw) if isinstance(meta_raw, dict) else {}
-        result.status = str(meta.get("status", fm.get("status", "")))
+    result.status = item.status
     return result
 
 

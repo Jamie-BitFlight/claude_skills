@@ -160,6 +160,7 @@ class BacklogItem(BaseModel):
     section: str = ""
     file_path: str = ""
     skip: bool = False
+    status: str = ""
     groomed: str = ""
     last_synced: str = ""
     raw_body: str = ""

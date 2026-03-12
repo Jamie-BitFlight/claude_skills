@@ -1891,6 +1891,7 @@ def _view_result_from_local_item(item: dict) -> dict[str, Any]:
         result["description"] = str(fm.get("description", ""))
         result["source"] = str(meta.get("source", fm.get("source", "")))
         result["added"] = str(meta.get("added", fm.get("added", "")))
+        # TODO(#612): status not available on item dict; re-read still needed
         result["status"] = str(meta.get("status", fm.get("status", "")))
     return result
 
