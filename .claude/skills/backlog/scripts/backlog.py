@@ -37,7 +37,6 @@ Environment:
 
 from __future__ import annotations
 
-import difflib
 import json
 import os
 import re
@@ -69,19 +68,20 @@ sys.path.insert(0, str(_REPO_ROOT / "plugins" / "plugin-creator" / "scripts"))
 sys.path.insert(0, str(_SCRIPT_DIR))  # expose sibling modules (state_handler, frontmatter_utils)
 sys.path.insert(0, str(_SCRIPT_DIR.parent))  # expose backlog_core package
 
-import operator
-
 import frontmatter
 from backlog_core import operations as _backlog_operations
 from backlog_core.entry_blocks import rewrite_section as _rewrite_section
-from backlog_core.github import create_issue_for_item as _create_issue_for_item
+from backlog_core.github import (
+    create_issue_for_item as _create_issue_for_item,
+    fetch_open_issues_by_title as _fetch_open_issues_by_title_core,
+    issue_to_local_fields as _issue_to_local_fields_core,
+)
 from backlog_core.models import (
     BACKLOG_DIR,
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
     DEFAULT_REPO,
     FIELD_TO_INDEX,
     FUZZY_DUPLICATE_THRESHOLD,
-    GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
     BacklogError as _BacklogError,
     BacklogItem,
@@ -91,9 +91,14 @@ from backlog_core.models import (
 from backlog_core.operations import update_item_metadata as _update_item_metadata
 from backlog_core.parsing import (
     build_issue_body as _build_issue_body,
+    build_issue_body_from_file as _build_issue_body_from_file_core,
+    find_fuzzy_duplicates as _find_fuzzy_duplicates_core,
     find_item as _find_item,
+    items_needing_issues as _items_needing_issues_core,
+    items_with_issues as _items_with_issues_core,
     normalize_issue_title as _normalize_issue_title,
     now_iso as _now_iso,
+    parse_issue_selector,
     parse_item_file as _parse_item_file_core,
     title_to_slug as _title_to_slug,
     today as _today,
@@ -305,28 +310,12 @@ def _parse_item_file(text: str, path: Path) -> dict:
 def _parse_issue_selector(selector: str) -> str | None:
     """Extract issue number from selector (URL, #N, or bare number).
 
-    Supports:
-      - ``https://github.com/owner/repo/issues/123``
-      - ``#123``
-      - ``123`` (bare number)
+    Delegates to backlog_core.parsing.parse_issue_selector.
 
     Returns:
         Issue number as string (e.g. ``"123"``) or None if not an issue ref.
     """
-    selector = selector.strip()
-    # URL form: https://github.com/owner/repo/issues/123
-    url_match = GITHUB_ISSUE_URL_RE.search(selector)
-    if url_match:
-        return url_match.group(2)
-    # #N form
-    if selector.startswith("#"):
-        num = selector.lstrip("#").strip()
-        if num.isdigit():
-            return num
-    # Bare number form
-    if selector.isdigit():
-        return selector
-    return None
+    return parse_issue_selector(selector)
 
 
 def find_item(items: list[dict], selector: str) -> dict | None:
@@ -361,8 +350,9 @@ def _find_fuzzy_duplicates(
 ) -> list[tuple[str, float, str]]:
     """Find existing backlog items with titles similar to the given title.
 
-    Uses ``difflib.SequenceMatcher`` on normalized titles (conventional-commit
-    prefixes stripped, lowercased) to detect near-duplicates.
+    Delegates to backlog_core.parsing.find_fuzzy_duplicates. Converts each
+    dict to BacklogItem for the core call, returns the same
+    ``list[tuple[str, float, str]]`` interface.
 
     Args:
         title: The new item title to check.
@@ -373,74 +363,55 @@ def _find_fuzzy_duplicates(
         List of ``(existing_title, similarity_ratio, file_path)`` tuples sorted
         by similarity descending. Empty list if no matches above threshold.
     """
-    normalized_new = _normalize_issue_title(title)
-    if not normalized_new:
-        return []
-    matches: list[tuple[str, float, str]] = []
-    for item in items:
-        existing_title = item.get("_title", "")
-        if not existing_title:
-            continue
-        # Skip done/resolved items
-        if item.get("_skip"):
-            continue
-        normalized_existing = _normalize_issue_title(existing_title)
-        if not normalized_existing:
-            continue
-        ratio = difflib.SequenceMatcher(None, normalized_new, normalized_existing).ratio()
-        if ratio >= threshold:
-            filepath = item.get("_file_path", "")
-            matches.append((existing_title, ratio, filepath))
-    matches.sort(key=operator.itemgetter(1), reverse=True)
-    return matches
+    core_items = [BacklogItem.model_validate(_dict_to_backlog_item_fields(d)) for d in items]
+    return _find_fuzzy_duplicates_core(title, core_items, threshold)
 
 
 def _fetch_open_issues_by_title(repo: Repository) -> dict[str, int]:
     """Fetch all open issues and return ``{normalized_title: issue_number}`` map.
 
-    When duplicates exist, keeps the lowest issue number (the original).
+    Delegates to backlog_core.github.fetch_open_issues_by_title.
 
     Returns:
         Dict mapping normalized title strings to their GitHub issue number.
     """
-    title_to_num: dict[str, int] = {}
-    for issue in repo.get_issues(state="open"):
-        if issue.pull_request:
-            continue
-        key = _normalize_issue_title(issue.title)
-        if key not in title_to_num or issue.number < title_to_num[key]:
-            title_to_num[key] = issue.number
-    return title_to_num
+    return _fetch_open_issues_by_title_core(repo)
 
 
 def items_needing_issues(items: list[dict]) -> list[dict]:
-    """Return all backlog items that lack GitHub issues and are not skipped."""
-    return [
-        it
-        for it in items
-        if it.get("_section") in {"P0", "P1", "P2", "Ideas"} and not it.get("_skip") and not it.get("_issue")
-    ]
+    """Return all backlog items that lack GitHub issues and are not skipped.
+
+    Delegates to backlog_core.parsing.items_needing_issues. Converts dicts to
+    BacklogItems for the core call, then maps results back to original dicts by
+    title to preserve all dict fields including ``_file_path``.
+    """
+    core_items = [BacklogItem.model_validate(_dict_to_backlog_item_fields(d)) for d in items]
+    core_result = _items_needing_issues_core(core_items)
+    result_titles = {item.title for item in core_result}
+    return [d for d in items if d.get("_title") in result_titles]
 
 
 def items_with_issues(items: list[dict]) -> list[dict]:
     """Return backlog items that already have a GitHub issue and are not skipped.
 
+    Delegates to backlog_core.parsing.items_with_issues. Converts dicts to
+    BacklogItems for the core call, then maps results back to original dicts by
+    title to preserve all dict fields including ``_file_path``.
+
     Returns:
         List of item dicts that have an issue reference.
     """
-    return [
-        it
-        for it in items
-        if it.get("_section") in {"P0", "P1", "P2", "Ideas"} and not it.get("_skip") and it.get("_issue")
-    ]
+    core_items = [BacklogItem.model_validate(_dict_to_backlog_item_fields(d)) for d in items]
+    core_result = _items_with_issues_core(core_items)
+    result_titles = {item.title for item in core_result}
+    return [d for d in items if d.get("_title") in result_titles]
 
 
 def _build_issue_body_from_file(item: dict) -> str | None:
     """Build GitHub issue body from local per-item file content.
 
-    Emits the file's raw body directly — all sections (Story, Description,
-    Groomed, Fact-Check, etc.) are authored in the local file and passed
-    through without synthetic header generation.
+    Delegates to backlog_core.parsing.build_issue_body_from_file. Converts
+    the dict to BacklogItem for the core call.
 
     Returns None if the body has no groomed content (i.e. no '## Groomed'
     section), since ungroomed items don't need their body synced to GitHub.
@@ -451,10 +422,7 @@ def _build_issue_body_from_file(item: dict) -> str | None:
     Returns:
         Issue body markdown string, or None if no groomed section present.
     """
-    raw_body = item.get("_raw_body", "")
-    if "## Groomed" not in raw_body:
-        return None
-    return raw_body.strip() + "\n"
+    return _build_issue_body_from_file_core(BacklogItem.model_validate(_dict_to_backlog_item_fields(item)))
 
 
 def build_issue_body(item: dict) -> str:
@@ -512,36 +480,21 @@ def _create_issue_and_update_item(item: dict, repo: str) -> int | None:
 def _issue_to_local_fields(issue: Issue) -> dict[str, str]:
     """Extract backlog-relevant fields from a PyGithub Issue object.
 
+    Delegates to backlog_core.github.issue_to_local_fields and converts the
+    returned IssueLocalFields model to the dict[str, str] interface callers expect.
+
     Returns:
-        Dict with title, description, priority, type, status, etc.
+        Dict with title, body, priority, type, status, updated_at, milestone.
     """
-    labels = [lbl.name for lbl in issue.labels]
-    priority = "P1"
-    for lbl in labels:
-        if lbl.startswith("priority:"):
-            priority = lbl.split(":")[1].upper()
-            break
-    item_type = "Feature"
-    for lbl in labels:
-        if lbl.startswith("type:"):
-            item_type = lbl.split(":")[1].capitalize()
-            break
-    status = "open"
-    if issue.state == "closed":
-        status = "done"
-    else:
-        for lbl in labels:
-            if lbl.startswith("status:"):
-                status = lbl.split(":")[1]
-                break
+    result = _issue_to_local_fields_core(issue)
     return {
-        "title": issue.title,
-        "body": issue.body or "",
-        "priority": priority,
-        "type": item_type,
-        "status": status,
-        "updated_at": issue.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ") if issue.updated_at else "",
-        "milestone": issue.milestone.title if issue.milestone else "",
+        "title": result.title,
+        "body": result.body,
+        "priority": result.priority,
+        "type": result.item_type,
+        "status": result.status,
+        "updated_at": result.updated_at,
+        "milestone": result.milestone,
     }
 
 
