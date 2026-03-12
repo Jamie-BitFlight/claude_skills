@@ -147,7 +147,7 @@ parse_config() {
 
 Improved handling of nested array structures.
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#multidimensional-array-support)
 
 ## Readline 8.1 Integration
 

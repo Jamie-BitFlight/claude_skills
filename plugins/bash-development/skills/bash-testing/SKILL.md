@@ -108,7 +108,7 @@ assertEquals 0 $?
 
 ### Testing Functions in Isolation
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#testing-functions-in-isolation)
 
 ```bash
 #!/usr/bin/env bash
@@ -183,7 +183,7 @@ project/
 
 ### Basic Spec Structure
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#basic-spec-structure)
 
 ### shellspec Matchers
 

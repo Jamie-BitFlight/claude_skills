@@ -222,7 +222,7 @@ esac
 
 ## Portable Utility Functions
 
-[Code examples](./references/code-examples.md)
+[Code examples](./references/code-examples.md#portable-utility-functions)
 
 ## Portability Decision Guide
 
