@@ -11,6 +11,7 @@ metadata:
   issue: '#612'
   last_synced: '2026-03-12T02:10:24Z'
   groomed: '2026-03-12'
+  plan: plan/tasks-1-add-status-field-to-backlogitem-model.md
 ---
 
 ## Groomed (2026-03-12)
