@@ -564,7 +564,7 @@ completed: "2026-03-12T03:45:00Z"
 
 This is the most complex task in the dedup. Category B functions exist in both CLI and core but have different type signatures: the CLI versions accept/return `dict`, while the core versions accept/return `BacklogItem` (Pydantic model). The architecture spec (Section 5) defines the adapter strategy: conversion happens inline at CLI call sites, no new adapter module.
 
-The 5 Category B functions are:
+The 6 Category B functions are:
 
 | CLI Function | Core Equivalent | Type Difference |
 |-------------|-----------------|-----------------|

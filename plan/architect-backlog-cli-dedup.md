@@ -186,9 +186,9 @@ Each of the 12 duplicated functions falls into one of three categories:
 | `_now_iso` (line 565) | `parsing.now_iso` | **A** | No | Delete, import from parsing |
 | `_update_item_metadata` (line 570) | `operations.update_item_metadata` | **A** | No | Delete, import from operations |
 
-**Category A functions (5)**: Pure drop-in import replacement. No call-site changes.
+**Category A functions (7)**: Pure drop-in import replacement. No call-site changes.
 
-**Category B functions (7)**: Require type boundary adaptation. See Section 5 for adapter pattern.
+**Category B functions (6)**: Require type boundary adaptation. See Section 5 for adapter pattern.
 
 **Category C re-export (1)**: `_build_issue_body_from_file` is tested directly in `test_backlog_core_parsing.py:691-723` via importlib. A one-line re-export alias is kept in backlog.py for backward compatibility.
 
@@ -677,13 +677,12 @@ print('SKIP_STATUS includes CLOSED: PASS')
 | Step | Scope | Risk | Lines Removed (est.) | Commit |
 |------|-------|------|---------------------|--------|
 | 1 | Constants (10) | Low | ~35 | Standalone |
-| 2 | Category A functions (6) | Low | ~80 | Standalone |
-| 3 | Fuzzy matching (1) | Low | ~25 | Standalone |
-| 4 | Parsing functions (3) | Medium | ~60 | Standalone |
+| 2 | Core internal cleanup | Low | ~5 (net change) | Standalone |
+| 3 | Category A functions (7) | Low | ~105 | Standalone |
+| 4 | Category B functions (6) — parsing + adapters | Medium | ~60 | Standalone |
 | 5 | find_item, build_issue_body, create_issue_for_item (3) | Medium | ~120 | Standalone |
-| 6 | Core internal cleanup | Low | ~5 (net change) | Standalone |
-| 7 | Final cleanup + verification | Low | ~10 | Standalone |
-| **Total** | **12 functions + 10 constants** | | **~335 lines removed** | **7 commits** |
+| 6 | Final cleanup + verification | Low | ~10 | Standalone |
+| **Total** | **12 functions + 10 constants** | | **~335 lines removed** | **6 commits** |
 
 Estimated `backlog.py` line count after: ~2230 (down from 2563). The remaining ~2230 lines are Typer command definitions, Rich display formatting, `_get_github`/`_try_get_github`, `_get_table_width`, and the `state_handler` integration.
 

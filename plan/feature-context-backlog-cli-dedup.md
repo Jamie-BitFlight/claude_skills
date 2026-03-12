@@ -74,7 +74,7 @@ Code duplication between `backlog.py` (2563 lines) and `backlog_core/` causes:
 
 1. **sys.path setup**: `backlog.py:71` already adds `_SCRIPT_DIR.parent` to sys.path, making `from backlog_core import ...` work.
 2. **Three existing imports**: `backlog.py:76-78` imports operations, entry_blocks, and model exceptions from backlog_core.
-3. **14 test files**: Tests cover both CLI (via `test_backlog_gh_first.py` using importlib) and core modules (via direct imports). Test file `test_backlog_core_parsing.py:691-723` explicitly tests the dict-based `_build_issue_body_from_file` from the CLI script alongside the BacklogItem-based version.
+3. **12 test files**: Tests cover both CLI (via `test_backlog_gh_first.py` using importlib) and core modules (via direct imports). Test file `test_backlog_core_parsing.py:691-723` explicitly tests the dict-based `_build_issue_body_from_file` from the CLI script alongside the BacklogItem-based version.
 
 ### Code References
 
@@ -118,7 +118,7 @@ Code duplication between `backlog.py` (2563 lines) and `backlog_core/` causes:
 
 **Actor**: CI or developer running `uv run pytest .claude/skills/backlog/tests/`
 **Trigger**: After dedup changes are made.
-**Goal**: All 14 test files pass without modification (or with minimal test adapter changes).
+**Goal**: All 12 test files pass without modification (or with minimal test adapter changes).
 **Expected Outcome**: Tests that import CLI functions directly (e.g., `test_backlog_gh_first.py`, `test_backlog_core_parsing.py:691-723`) still work because the CLI re-exports or adapts from core.
 
 ---
@@ -207,7 +207,7 @@ _These goals will be finalized after questions are resolved._
 1. All shared constants (BACKLOG_DIR, DEFAULT_REPO, SECTION_RE, SKIP_STATUS, TYPE_TO_LABEL, ROLE_MAP, BENEFIT_MAP) are imported from `backlog_core/models.py` -- no CLI-local definitions
 2. Duplicated functions (find_item, build_issue_body, create_issue_for_item) are replaced with calls to backlog_core equivalents, with adapter logic for dict/BacklogItem conversion
 3. The SKIP_STATUS "CLOSED" bug is fixed (naturally or explicitly)
-4. All 14 test files in `.claude/skills/backlog/tests/` pass
+4. All 12 test files in `.claude/skills/backlog/tests/` pass
 5. MCP server behavior is unaffected
 6. CLI output is identical for all commands (except the SKIP_STATUS bug fix behavior)
 7. backlog.py line count decreases meaningfully (target depends on Q4 resolution)
