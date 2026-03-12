@@ -316,7 +316,7 @@ Return:
 ---
 task: T2
 title: Fix core internal SKIP_STATUS and SECTION_RE inconsistencies (FIND-14/FIND-15)
-status: in-progress
+status: complete
 agent: python3-development:python-cli-architect
 dependencies: [T1]
 priority: 1
@@ -327,6 +327,7 @@ parallelize-with: []
 reason: "Sequential -- T1 must complete first so constants are imported; this task modifies backlog_core/ files"
 handoff: "Summary of core internal fixes, diff of parsing.py changes, test results"
 started: "2026-03-12T02:53:47Z"
+completed: "2026-03-12T03:10:00Z"
 ---
 
 ## Task T2: Fix core internal SKIP_STATUS and SECTION_RE inconsistencies (FIND-14/FIND-15)
