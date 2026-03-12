@@ -41,7 +41,9 @@ flowchart TD
     Skip2 --> More{More candidate systems?}
     Proposal --> More
     More -->|Yes| ForEach
-    More -->|No| WriteFile[Write proposals to<br>./research/insights/YYYY-MM-DD-resource-name-utilization.md]
+    More -->|No| AnyProposals{Were any proposals written?}
+    AnyProposals -->|"Yes"| WriteFile[Write proposals to<br>./research/insights/YYYY-MM-DD-resource-name-utilization.md]
+    AnyProposals -->|"No — all candidates skipped"| NoProposals(["Return STATUS: complete<br>PROPOSALS_WRITTEN: 0<br>Do not write an output file. Stop."])
     WriteFile --> Return([Return structured result])
 ```
 
@@ -133,6 +135,18 @@ RESEARCH_ENTRY: ./research/{category}/{name}.md
 REASON: {why no surface — e.g., "conceptual framework only, no API or SDK documented"}
 ```
 
+If a surface exists but all candidate systems were skipped (no suitable callers found):
+
+```text
+STATUS: complete
+
+RESEARCH_ENTRY: ./research/{category}/{name}.md
+SURFACES_FOUND: N (API | SDK | CLI | webhook)
+PROPOSALS_WRITTEN: 0
+SKIPPED: N — {brief reasons for each skipped candidate}
+NOTE: Integration surface documented but no suitable local caller identified.
+```
+
 ---
 
 ## Boundaries
@@ -146,3 +160,5 @@ This agent MUST NOT:
 - Write files outside `./research/insights/`
 - Invent integration surfaces not documented in the research entry
 - Propose integrations without reading the local system file first
+- Read any local system files (`.claude/agents/`, `.claude/skills/`, hooks) when the surface
+  check returns "No — conceptual only". The early-exit path is terminal; stop immediately.

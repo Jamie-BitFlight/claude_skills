@@ -56,6 +56,8 @@ flowchart TD
 
 **Sequential waves**: Wait for all agents in current wave to complete before spawning next wave. This prevents overwhelming MCP tool rate limits.
 
+**Analysis phase concurrency**: After all curator waves complete, analysis agents spawn concurrently per entry: up to 5 entries × 3 agents (insight-extractor + utilization-assessor + cross-referencer) = maximum 15 concurrent agents. This is distinct from the 5-agent curator wave limit.
+
 ---
 
 ## Error Handling

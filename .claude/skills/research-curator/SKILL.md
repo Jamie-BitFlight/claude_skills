@@ -135,21 +135,13 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    d. Update ./research/README.md -- add new entry to category table
    ```
 
-6. **Wait for all four tasks** -- collect structured return blocks from all three agents and confirm README updated
-7. **Surface insight results** -- if the insight result contains an `IMMEDIATE_ATTENTION:` section, report each listed item to the user immediately:
+6. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
 
-   ```text
-   New backlog item requiring attention: #{issue} {title}
-   {one-sentence reason from insight result}
-   ```
+   - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
+   - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
+   - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-   If no `IMMEDIATE_ATTENTION` section: report only the count — "N improvements added to backlog from {resource-name}."
-
-8. **Surface utilization results** -- relay `PROPOSALS_WRITTEN` count and `FILE` path from the utilization assessor result. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
-
-9. **Surface cross-reference results** -- relay `CROSS_REFERENCES_ADDED` count from the cross-referencer result.
-
-10. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+7. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 

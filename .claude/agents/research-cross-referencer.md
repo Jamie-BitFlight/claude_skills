@@ -29,8 +29,9 @@ flowchart TD
     ReadREADME --> Extract[Extract topic domain technology and problem<br>keywords from the new entry:<br>category, key technologies, problem domain,<br>integration patterns, workflow position]
     Extract --> Scan[Scan README.md category tables<br>for entries with overlapping characteristics]
     Scan --> Score["Score each candidate entry:<br>same category = highest weight<br>same technology stack = high weight<br>same problem domain = medium weight<br>adjacent workflow step = medium weight<br>(e.g. tool A feeds tool B)"]
-    Score --> Count{How many candidates scored above threshold?}
-    Count -->|"Fewer than 3"| WriteMin["Use all candidates found<br>(minimum 1 required to proceed)"]
+    Score --> Count{How many candidates scored above threshold<br>(score >= 2)?}
+    Count -->|"0 — none scored above threshold"| Done(["Return STATUS: complete<br>CROSS_REFERENCES_ADDED: 0<br>Do not write a section. Stop."])
+    Count -->|"1 or 2 — fewer than 3"| WriteMin["Use all candidates found"]
     Count -->|"3 to 8"| WriteSection[Use all found candidates]
     Count -->|"More than 8"| Top8[Select top 8 by score]
     WriteMin --> CheckExists{Does ## Cross-References<br>already exist in the entry?}
@@ -102,7 +103,7 @@ CANDIDATES_SCANNED: N entries from README.md
 CROSS_REFERENCES_ADDED: N
 ```
 
-If fewer than 1 candidate was found above threshold:
+If no candidates scored above threshold (score ≥ 2):
 
 ```text
 STATUS: complete
@@ -110,7 +111,7 @@ STATUS: complete
 ENTRY: ./research/{category}/{name}.md
 CANDIDATES_SCANNED: N entries from README.md
 CROSS_REFERENCES_ADDED: 0
-NOTE: No entries scored above threshold — Cross-References section not added.
+NOTE: No entries scored above threshold (score >= 2) — Cross-References section not added.
 ```
 
 ---
