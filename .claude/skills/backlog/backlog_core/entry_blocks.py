@@ -111,10 +111,10 @@ def parse_entries(
         content = section_body.strip()
         if not content:
             return []
-        return [Entry(id=f"{added_date}T00:00:00Z", content=content, raw=section_body)]
-
-    raw_entries = [_parse_match_to_entry(m) for m in matches]
-    _deduplicate_timestamps(raw_entries)
+        raw_entries = [Entry(id=f"{added_date}T00:00:00Z", content=content, raw=section_body)]
+    else:
+        raw_entries = [_parse_match_to_entry(m) for m in matches]
+        _deduplicate_timestamps(raw_entries)
 
     if since:
         raw_entries = [e for e in raw_entries if (e.id.split("Z")[0] + "Z" if "Z" in e.id else e.id) >= since]
