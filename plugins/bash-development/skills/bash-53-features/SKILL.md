@@ -191,42 +191,7 @@ Create associative arrays from key-value data. **Note:** The `kv` builtin existe
 confirmed in Bash 5.3; the exact interface shown below is illustrative — verify with
 `help kv` after loading:
 
-```bash
-# Enable kv builtin (if not already loaded)
-enable -f /usr/local/lib/bash/kv kv 2>/dev/null || true
-
-# Create associative array from key=value pairs
-declare -A config
-kv config <<EOF
-database_host=localhost
-database_port=5432
-database_name=myapp
-api_key=secret123
-debug_mode=true
-EOF
-
-# Access values
-echo "Database: ${config[database_host]}:${config[database_port]}"
-echo "Debug: ${config[debug_mode]}"
-
-# Practical example: Parse environment-style config
-load_env_config() {
-    local config_file="${1}"
-    declare -gA APP_CONFIG
-
-    while IFS='=' read -r key value; do
-        # Skip comments and empty lines
-        [[ "${key}" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${key}" ]] && continue
-
-        # Trim whitespace
-        key="${key#"${key%%[![:space:]]*}"}"
-        value="${value#"${value%%[![:space:]]*}"}"
-
-        APP_CONFIG["${key}"]="${value}"
-    done < "${config_file}"
-}
-```
+[Code examples](./references/code-examples.md)
 
 ### `strptime` - Date Parsing
 
@@ -234,85 +199,13 @@ Parse textual dates into Unix timestamps. **Note:** The `strptime` builtin exist
 confirmed in Bash 5.3; the exact interface shown below is illustrative — verify with
 `help strptime` after loading:
 
-```bash
-# Enable strptime builtin
-enable -f /usr/local/lib/bash/strptime strptime 2>/dev/null || true
-
-# Parse date string to timestamp
-date_string="2025-07-15 14:30:00"
-timestamp=$(strptime "%Y-%m-%d %H:%M:%S" "${date_string}")
-
-echo "Timestamp: ${timestamp}"
-echo "Date: $(date -d "@${timestamp}" '+%Y-%m-%d %H:%M:%S')"
-
-# Practical example: Log timestamp parsing
-parse_log_timestamp() {
-    local log_line="${1}"
-    local timestamp_str date_format timestamp
-
-    # Extract timestamp from log line
-    timestamp_str="${log_line%% *}"
-
-    # Parse different date formats
-    if [[ "${timestamp_str}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-        date_format="%Y-%m-%d"
-    elif [[ "${timestamp_str}" =~ ^[0-9]{2}/[0-9]{2}/[0-9]{4}$ ]]; then
-        date_format="%m/%d/%Y"
-    else
-        echo "Unknown date format" >&2
-        return 1
-    fi
-
-    timestamp=$(strptime "${date_format}" "${timestamp_str}")
-    echo "${timestamp}"
-}
-
-parse_log_timestamp "2025-07-15 Application started"
-```
+[Code examples](./references/code-examples.md)
 
 ### `fltexpr` - Floating-Point Calculations
 
 Perform floating-point arithmetic without external tools:
 
-```bash
-# Enable fltexpr builtin
-enable -f /usr/local/lib/bash/fltexpr fltexpr 2>/dev/null || true
-
-# Floating-point calculations
-result=$(fltexpr "3.14159 * 2.0")
-echo "Result: ${result}"
-
-# Practical example: Performance metrics
-calculate_average() {
-    local -a values=("$@")
-    local sum=0.0
-    local count=${#values[@]}
-
-    for value in "${values[@]}"; do
-        sum=$(fltexpr "${sum} + ${value}")
-    done
-
-    local average
-    average=$(fltexpr "${sum} / ${count}")
-    echo "${average}"
-}
-
-response_times=(0.123 0.456 0.234 0.567 0.321)
-avg=$(calculate_average "${response_times[@]}")
-echo "Average response time: ${avg}s"
-
-# Example: Calculate percentage
-calculate_percentage() {
-    local part="${1}"
-    local total="${2}"
-    local percentage
-
-    percentage=$(fltexpr "(${part} / ${total}) * 100.0")
-    printf '%.2f%%\n' "${percentage}"
-}
-
-calculate_percentage 75 200  # 37.50%
-```
+[Code examples](./references/code-examples.md)
 
 ## POSIX Mode Improvements
 
@@ -345,35 +238,7 @@ fi
 
 More detailed error messages:
 
-```bash
-# Regular expression compilation errors now include details
-pattern="[invalid"
-
-if [[ "test" =~ ${pattern} ]]; then
-    echo "Match"
-else
-    # Error message now explains what went wrong:
-    # bash: regex error: brackets ([ ]) not balanced
-    echo "No match" >&2
-fi
-
-# Practical example: Robust pattern validation
-validate_pattern() {
-    local pattern="${1}"
-    local test_string="test"
-
-    if [[ "${test_string}" =~ ${pattern} ]] 2>/dev/null; then
-        echo "Pattern is valid"
-        return 0
-    else
-        echo "Invalid regex pattern: ${pattern}" >&2
-        return 1
-    fi
-}
-
-validate_pattern "[a-z]+"  # Valid
-validate_pattern "[a-z"    # Invalid
-```
+[Code examples](./references/code-examples.md)
 
 ## C Standard Conformance Improvements
 
