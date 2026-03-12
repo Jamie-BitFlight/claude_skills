@@ -31,7 +31,7 @@ from enum import StrEnum
 from typing import Any
 
 try:
-    from github import GithubException  # type: ignore[import-untyped]
+    from github import GithubException
 except ImportError:
     GithubException = Exception  # type: ignore[misc,assignment]
 

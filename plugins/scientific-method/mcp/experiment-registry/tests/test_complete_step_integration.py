@@ -48,7 +48,7 @@ def _error_codes(result: dict[str, object]) -> set[str]:
     codes: set[str] = set()
     for e in errors:
         assert isinstance(e, dict)
-        code = e["code"]
+        code = e["code"]  # type: ignore[index]
         assert isinstance(code, str)
         codes.add(code)
     return codes

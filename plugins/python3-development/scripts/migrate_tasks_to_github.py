@@ -77,8 +77,8 @@ SamTask = None
 
 if _BACKLOG_CORE.exists():
     try:
-        from backlog_core.github import create_task_issue, get_github  # type: ignore[import-not-found,assignment]
-        from backlog_core.models import SamTask  # type: ignore[import-not-found,assignment]
+        from backlog_core.github import create_task_issue, get_github
+        from backlog_core.models import SamTask
     except ImportError:
         pass
 

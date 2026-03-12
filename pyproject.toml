@@ -380,6 +380,8 @@ max-complexity = 12
 ]
 # Lazy import for optional duckdb dependency in _write_duckdb
 "plugins/agentskill-kaizen/scripts/sentiment-score.py" = ["PLC0415"]
+# Hyphenated package directory name is required by MCP convention
+"plugins/scientific-method/mcp/experiment-registry/__init__.py" = ["N999"]
 "research/knowledge-explorer.py" = [
     "ANN401", # Any required for YAMLHandler base class kwargs and JSON return types
     "S",      # Security checks relaxed for CLI scripts

@@ -374,12 +374,7 @@ def render(
 
     # Create image with rounded-corner background
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw_rounded_rect(
-        img,
-        (0, 0, width, height),
-        CORNER_RADIUS,
-        BG,  # type: ignore[arg-type]
-    )
+    draw_rounded_rect(img, (0, 0, width, height), CORNER_RADIUS, BG)
     draw = ImageDraw.Draw(img)
 
     # Chrome

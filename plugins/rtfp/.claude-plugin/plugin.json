@@ -1,6 +1,6 @@
 {
   "name": "rtfp",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Read The Fucking Prompt \u2014 mines Claude Code session transcripts to surface the strongest user reactions to assistant instruction-following failures and renders the exchange as a terminal-style PNG",
   "author": {
     "name": "Jamie-BitFlight",

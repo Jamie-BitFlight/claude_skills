@@ -20,7 +20,7 @@ from git import Repo
 # Add parent directory to path to import plugin_validator
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from plugin_validator import FrontmatterValidator, HookValidator
+from plugin_validator import FrontmatterValidator, HookValidator, YamlValue
 
 
 class TestIsFilePathReference:
@@ -108,7 +108,7 @@ class TestValidateCommandScriptReferences:
 
         validator = HookValidator()
         errors: list = []
-        entries = [{"type": "command", "command": "./hook.sh"}]
+        entries: list[dict[str, YamlValue]] = [{"type": "command", "command": "./hook.sh"}]
         validator._validate_command_script_references(entries, tmp_path, errors)
 
         hk_codes = [e.code for e in errors]
@@ -124,7 +124,7 @@ class TestValidateCommandScriptReferences:
         """
         validator = HookValidator()
         errors: list = []
-        entries = [{"type": "command", "command": "./nonexistent.sh"}]
+        entries: list[dict[str, YamlValue]] = [{"type": "command", "command": "./nonexistent.sh"}]
         validator._validate_command_script_references(entries, tmp_path, errors)
 
         hk_codes = [e.code for e in errors]
@@ -146,7 +146,7 @@ class TestValidateCommandScriptReferences:
 
         validator = HookValidator()
         errors: list = []
-        entries = [{"type": "command", "command": "./hook.sh"}]
+        entries: list[dict[str, YamlValue]] = [{"type": "command", "command": "./hook.sh"}]
         validator._validate_command_script_references(entries, tmp_path, errors)
 
         hk_codes = [e.code for e in errors]
@@ -161,7 +161,7 @@ class TestValidateCommandScriptReferences:
         """
         validator = HookValidator()
         errors: list = []
-        entries = [{"type": "command", "command": "echo hello"}]
+        entries: list[dict[str, YamlValue]] = [{"type": "command", "command": "echo hello"}]
         validator._validate_command_script_references(entries, tmp_path, errors)
 
         assert len(errors) == 0
@@ -189,7 +189,7 @@ class TestValidateCommandScriptReferences:
 
         validator = HookValidator()
         errors: list = []
-        entries = [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hook.sh"}]
+        entries: list[dict[str, YamlValue]] = [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hook.sh"}]
         validator._validate_command_script_references(entries, hooks_dir, errors)
 
         hk_codes = [e.code for e in errors]
@@ -211,7 +211,7 @@ class TestHookScriptReferencesInHooksDict:
         script.write_text("#!/bin/bash\necho ok\n")
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
 
-        hooks_dict = {"PreToolUse": [{"hooks": [{"type": "command", "command": "./hook.sh"}]}]}
+        hooks_dict: dict[str, YamlValue] = {"PreToolUse": [{"hooks": [{"type": "command", "command": "./hook.sh"}]}]}
 
         validator = HookValidator()
         errors: list = []
@@ -228,7 +228,9 @@ class TestHookScriptReferencesInHooksDict:
         How: Build hooks dict referencing non-existent script, validate
         Why: Verify HK004 is reported for missing scripts in full dict structure
         """
-        hooks_dict = {"PostToolUse": [{"hooks": [{"type": "command", "command": "./missing-script.sh"}]}]}
+        hooks_dict: dict[str, YamlValue] = {
+            "PostToolUse": [{"hooks": [{"type": "command", "command": "./missing-script.sh"}]}]
+        }
 
         validator = HookValidator()
         errors: list = []
@@ -244,7 +246,9 @@ class TestHookScriptReferencesInHooksDict:
         How: Build hooks dict with prompt type entry, validate
         Why: Verify only command-type hooks are checked for file paths
         """
-        hooks_dict = {"PreToolUse": [{"hooks": [{"type": "prompt", "prompt": "Check tool usage"}]}]}
+        hooks_dict: dict[str, YamlValue] = {
+            "PreToolUse": [{"hooks": [{"type": "prompt", "prompt": "Check tool usage"}]}]
+        }
 
         validator = HookValidator()
         errors: list = []

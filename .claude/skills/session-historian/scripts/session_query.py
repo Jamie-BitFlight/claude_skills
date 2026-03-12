@@ -26,8 +26,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from collections.abc import Iterator
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import duckdb
 import typer
@@ -36,6 +35,9 @@ from rich.console import Console
 from rich.measure import Measurement
 from rich.panel import Panel
 from rich.table import Table
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 app = typer.Typer(
     name="session-historian",
@@ -350,7 +352,7 @@ def _index_file(con: duckdb.DuckDBPyConnection, path: Path) -> tuple[int, int]:
     Returns:
         A tuple of ``(user_msgs_indexed, assistant_turns)`` for the file.
     """
-    stats = _scan_records(path, _iter_records(path))
+    stats = _scan_records(path, list(_iter_records(path)))
     sid = path.stem  # filename UUID — stable, never changes
     SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
     has_summary = (SUMMARIES_DIR / f"{sid}.md").exists()
@@ -857,7 +859,7 @@ def cmd_errors(
     """
     con = _open_db()
     session_id, path = _resolve_session(con, session_id)
-    records = _iter_records(path)
+    records = list(_iter_records(path))
 
     tool_name_map = _build_tool_name_map(records)
     errors = _collect_errors(records, tool_name_map)
@@ -994,7 +996,7 @@ def cmd_tools(
     """
     con = _open_db()
     session_id, path = _resolve_session(con, session_id)
-    records = _iter_records(path)
+    records = list(_iter_records(path))
 
     tool_uses = _collect_tool_uses(records)
     if not tool_uses:
@@ -1133,7 +1135,7 @@ def cmd_irritation(
     """
     con = _open_db()
     session_id, path = _resolve_session(con, session_id)
-    records = _iter_records(path)
+    records = list(_iter_records(path))
 
     phrases = _collect_correction_phrases(records)
     loops = _collect_stuck_loops(records)

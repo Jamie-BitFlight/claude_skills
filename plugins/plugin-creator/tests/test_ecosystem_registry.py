@@ -67,7 +67,7 @@ class TestGetEcosystemOwnedKeys:
 
         # Act / Assert
         with pytest.raises(AttributeError):
-            owned.add("test")  # type: ignore[attr-defined]
+            owned.add("test")
 
     def test_description_not_in_owned_keys(self) -> None:
         """Claude Code's 'description' field is not in ecosystem-owned keys.

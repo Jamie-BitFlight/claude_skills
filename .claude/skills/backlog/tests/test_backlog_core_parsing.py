@@ -739,7 +739,7 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _UNGROOMED_RAW_BODY, "_title": "Test"}
-        build = build_fn  # type: ignore[operator]
+        build = build_fn
 
         # Act
         result = build(item)
@@ -756,7 +756,7 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Test"}
-        build = build_fn  # type: ignore[operator]
+        build = build_fn
 
         # Act
         result = build(item)
@@ -774,7 +774,7 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY}
-        build = build_fn  # type: ignore[operator]
+        build = build_fn
 
         # Act
         result = build(item)
@@ -793,7 +793,7 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item: dict[str, str] = {"_title": "No body"}
-        build = build_fn  # type: ignore[operator]
+        build = build_fn
 
         # Act
         result = build(item)
@@ -810,7 +810,7 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Detect Duplicates"}
-        build = build_fn  # type: ignore[operator]
+        build = build_fn
 
         # Act
         result = build(item)

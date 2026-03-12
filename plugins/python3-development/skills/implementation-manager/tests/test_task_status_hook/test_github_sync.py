@@ -239,8 +239,8 @@ class TestSyncCompletionToGithub:
         mock_bc = types.ModuleType("backlog_core")
         mock_bc_github = types.ModuleType("backlog_core.github")
         mock_update = MagicMock(return_value=True)
-        mock_bc_github.update_task_status = mock_update  # type: ignore[attr-defined]
-        mock_bc_github.get_github = MagicMock()  # type: ignore[attr-defined]
+        mock_bc_github.update_task_status = mock_update
+        mock_bc_github.get_github = MagicMock()
 
         with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
             # Act
@@ -273,8 +273,8 @@ class TestSyncCompletionToGithub:
         mock_bc_github = types.ModuleType("backlog_core.github")
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(return_value=True)
-        mock_bc_github.get_github = mock_get_github  # type: ignore[attr-defined]
-        mock_bc_github.update_task_status = mock_update  # type: ignore[attr-defined]
+        mock_bc_github.get_github = mock_get_github
+        mock_bc_github.update_task_status = mock_update
 
         with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
             # Act
@@ -305,8 +305,8 @@ class TestSyncCompletionToGithub:
         mock_bc_github = types.ModuleType("backlog_core.github")
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(side_effect=RuntimeError("GitHub API error"))
-        mock_bc_github.get_github = mock_get_github  # type: ignore[attr-defined]
-        mock_bc_github.update_task_status = mock_update  # type: ignore[attr-defined]
+        mock_bc_github.get_github = mock_get_github
+        mock_bc_github.update_task_status = mock_update
 
         with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
             # Act
@@ -336,8 +336,8 @@ class TestSyncCompletionToGithub:
         mock_bc_github = types.ModuleType("backlog_core.github")
         mock_get_github = MagicMock(side_effect=RuntimeError("No token"))
         mock_update = MagicMock()
-        mock_bc_github.get_github = mock_get_github  # type: ignore[attr-defined]
-        mock_bc_github.update_task_status = mock_update  # type: ignore[attr-defined]
+        mock_bc_github.get_github = mock_get_github
+        mock_bc_github.update_task_status = mock_update
 
         with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
             # Act

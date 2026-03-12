@@ -126,8 +126,8 @@ def _make_mock_backlog_core_github(
     """
     mock_bc = types.ModuleType("backlog_core")
     mock_bc_github = types.ModuleType("backlog_core.github")
-    mock_bc_github.get_github = MagicMock(return_value=mock_repo)  # type: ignore[attr-defined]
-    mock_bc_github.update_task_status = update_task_status_mock  # type: ignore[attr-defined]
+    mock_bc_github.get_github = MagicMock(return_value=mock_repo)
+    mock_bc_github.update_task_status = update_task_status_mock
     return mock_bc, mock_bc_github
 
 
