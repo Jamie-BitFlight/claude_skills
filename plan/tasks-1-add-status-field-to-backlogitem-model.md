@@ -324,7 +324,8 @@ Both fixtures have `status: open`. New tests can reuse these fixtures to verify 
 ---
 task: T2
 title: Add test coverage for BacklogItem status field population
-status: in-progress
+status: complete
+completed: 2026-03-12T02:35:00Z
 agent: python-pytest-architect
 dependencies:
   - T1
