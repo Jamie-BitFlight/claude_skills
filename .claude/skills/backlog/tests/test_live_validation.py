@@ -132,12 +132,12 @@ class TestLiveLifecycle:
         assert result["title"] == f"{prefix} Live Test Item"
         assert isinstance(result["issue_num"], int)
         assert result["issue_num"] > 0
-        assert isinstance(result["filepath"], str)
+        assert isinstance(result["file_path"], str)
         assert isinstance(result["messages"], list)
         # Track for cleanup and later tests
         live_items["issues"].append(result["issue_num"])
         live_items["item_title"] = result["title"]
-        live_items["item_filepath"] = result["filepath"]
+        live_items["item_filepath"] = result["file_path"]
         live_items["item_issue_num"] = result["issue_num"]
 
     async def test_l2_list_includes_created_item(self, live_items):

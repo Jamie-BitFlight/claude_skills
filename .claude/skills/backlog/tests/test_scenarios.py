@@ -55,13 +55,13 @@ class TestCreateBacklogItem:
 
         assert result["title"] == "Test Create Item"
         assert result["priority"] == "P1"
-        assert isinstance(result["filepath"], str)
+        assert isinstance(result["file_path"], str)
         assert result["issue_num"] == 42
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
         mock_github["create_issue_for_item"].assert_called_once()
-        assert result["filepath"]  # path string returned
+        assert result["file_path"]  # path string returned
 
 
 # ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ class TestNormalize:
 
         result = await _call("backlog_normalize")
 
-        assert isinstance(result["updated"], int)
+        assert isinstance(result["normalized"], int)
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -588,7 +588,7 @@ class TestLifecycles:
             },
         )
         assert create_result["issue_num"] == 71
-        assert create_result["filepath"]  # non-empty path string
+        assert create_result["file_path"]  # non-empty path string
         # Verify file exists: list files in backlog_dir matching the item slug
         item_files = list(backlog_dir.glob("*resolve*"))
         assert item_files, "Expected item file to exist after create"

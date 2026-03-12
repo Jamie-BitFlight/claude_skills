@@ -138,6 +138,35 @@ def update_item_metadata(
 # ---------------------------------------------------------------------------
 
 
+_CHANGES_KEY_MAP: dict[str, str] = {
+    "renamed_to": "title",
+    "description_updated": "description",
+    "plan": "plan",
+    "status": "status",
+    "issue_num": "issue_num",
+}
+
+
+def _extract_changes(result: dict[str, object]) -> dict[str, str | int | bool]:
+    """Build a changes summary from update_item result keys.
+
+    Returns:
+        Dict mapping changed field names to their new values.
+    """
+    changes: dict[str, str | int | bool] = {}
+    for key, target in _CHANGES_KEY_MAP.items():
+        if key not in result:
+            continue
+        val = result[key]
+        if target == "issue_num":
+            changes[target] = int(str(val))
+        elif target == "description":
+            changes[target] = True
+        else:
+            changes[target] = str(val)
+    return changes
+
+
 def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output | None = None) -> int | None:
     """Create GitHub issue for item and update per-item file metadata.
 
@@ -406,7 +435,7 @@ def _handle_update_groomed(
     """Handle groomed content update: GitHub-first, then cache locally.
 
     Write order: (1) GitHub issue (canonical), (2) local file (cache).
-    If item has no issue, creates one for P0/P1 first.
+    If item has no existing issue, skips GitHub sync and writes locally only.
     Sets last_synced after successful GitHub write.
     """
     out = output or Output()
@@ -415,16 +444,15 @@ def _handle_update_groomed(
 
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
-    # Step 1: Ensure GitHub issue exists for P0/P1 items
-    if not issue_ref and not item.skip and item.section in {"P0", "P1", "P2", "Ideas"}:
-        issue_ref = _ensure_github_issue(item, filepath, repo, output=out)
-
-    # Step 2: Write to GitHub FIRST (canonical source of truth)
+    # Step 1: Write to GitHub FIRST (canonical source of truth), but only if
+    # the item already has an issue. Groom must not create a new issue as a
+    # side-effect — callers that want issue creation use backlog_add or
+    # backlog_sync with create_issue=True.
     github_synced = False
     if issue_ref:
         github_synced = _write_groomed_to_github(issue_ref, groomed_content_val, section_name, repo, output=out)
 
-    # Step 3: Write to local file (cache) with entry block wrapping
+    # Step 2: Write to local file (cache) with entry block wrapping
     _write_groomed_to_item_file(
         filepath,
         groomed_content_val,
@@ -437,7 +465,7 @@ def _handle_update_groomed(
     )
     out.info(f"Updated {filepath.name} with groomed content")
 
-    # Step 4: Set last_synced if GitHub write succeeded
+    # Step 3: Set last_synced if GitHub write succeeded
     if github_synced:
         update_item_metadata(filepath, {"metadata": {"last_synced": now_iso()}}, output=out)
 
@@ -923,12 +951,7 @@ def add_item(
         out.info(f"  Issue: #{issue_num}")
     out.info(f"Next steps: /groom-backlog-item {title}  /work-backlog-item {title}")
 
-    result: dict[str, str | int | bool | list[str]] = {
-        "title": title,
-        "priority": priority,
-        "filepath": str(filepath),
-        "filename": filepath.name,
-    }
+    result: dict[str, str | int | bool | list[str]] = {"title": title, "priority": priority, "file_path": str(filepath)}
     if issue_num:
         result["issue_num"] = issue_num
     return {**result, **out.to_dict()}
@@ -1598,6 +1621,8 @@ def update_item(
         apply_status_in_progress(item, repo, output=out)
         result["status"] = "in-progress"
 
+    result["changes"] = _extract_changes(result)  # type: ignore[assignment]
+
     return {**result, **out.to_dict()}
 
 
@@ -1763,10 +1788,10 @@ def normalize_items(dry_run: bool = False, output: Output | None = None) -> dict
     files = sorted(f for f in BACKLOG_DIR.glob("*.md") if pattern.match(f.name))
     if not files:
         out.info("No backlog item files found")
-        return {"updated": 0, **out.to_dict()}
+        return {"normalized": 0, **out.to_dict()}
     updated = sum(1 for f in files if _normalize_item_file(f, dry_run, output=out))
     out.info(f"Normalized {updated} item file(s)" + (" [dry-run]" if dry_run else ""))
-    return {"updated": updated, "dry_run": dry_run, **out.to_dict()}
+    return {"normalized": updated, "dry_run": dry_run, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
