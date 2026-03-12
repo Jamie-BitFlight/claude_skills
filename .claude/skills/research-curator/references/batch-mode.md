@@ -42,13 +42,13 @@ flowchart TD
     QMore -->|"No — all URLs processed"| Collect
     Collect --> RelayCheck["Apply pre-relay quality checklist<br>to all collected agent results"]
     RelayCheck --> Results{"Did any agent return status: failed?"}
-    Results -->|"No — all succeeded"| SpawnInsights["Spawn @research-insight-extractor<br>for each successful entry (concurrent, up to 5)<br>prompt: 'Extract improvements from {file-path}'"]
-    Results -->|"Yes — one or more failed"| SpawnInsightsPartial["Spawn @research-insight-extractor<br>for each successful entry only (concurrent)<br>Relay each failure with exact reason to user"]
-    SpawnInsights --> UpdateAll["Update ./research/README.md<br>add all new entries to category tables<br>(concurrent with insight agents)"]
-    SpawnInsightsPartial --> Partial["Update ./research/README.md<br>with successful entries only<br>(concurrent with insight agents)"]
-    UpdateAll --> WaitInsights["Wait for all insight agents to complete<br>Collect IMMEDIATE_ATTENTION items from each result"]
-    Partial --> WaitInsights
-    WaitInsights --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count"]
+    Results -->|"No — all succeeded"| SpawnAnalysis["For each successful entry (up to 5 entries concurrently)<br>spawn 3 agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
+    Results -->|"Yes — one or more failed"| SpawnAnalysisPartial["For each successful entry only (up to 5 concurrently)<br>spawn 3 agents per entry:<br>- @research-insight-extractor<br>- @research-utilization-assessor<br>- @research-cross-referencer<br>Relay each failure with exact reason to user"]
+    SpawnAnalysis --> UpdateAll["Update ./research/README.md<br>add all new entries to category tables<br>(concurrent with analysis agents)"]
+    SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with successful entries only<br>(concurrent with analysis agents)"]
+    UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
+    Partial --> WaitAnalysis
+    WaitAnalysis --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added"]
     NotifyUser --> PostActions(["Execute Post-Actions — lint, commit, push"])
 ```
 
@@ -83,6 +83,8 @@ After all waves:
 Batch complete: X/Y total succeeded
 Files created: [list]
 README updated: Yes
+Utilization proposals written: N files
+Cross-references added: N entries updated
 ```
 
 ---

@@ -165,6 +165,14 @@ How the resource works internally. Include diagrams if helpful.
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
+
+---
+
 ## Freshness Tracking
 
 | Field | Value |
@@ -173,6 +181,11 @@ How the resource works internally. Include diagrams if helpful.
 | Version at Verification | vX.Y.Z |
 | Next Review Recommended | YYYY-MM-DD |
 ````
+
+> **Note**: The `## Cross-References` section is populated automatically by
+> `@research-cross-referencer` after entry creation. For manually created entries, add it
+> after the fact. This section is optional for entries created before 2026-03-12; the
+> validator emits a warning (not error) if absent on newer entries.
 
 > **Note**: "Next Review Recommended" is a suggestion, not a gate. When a user or
 > orchestrator explicitly requests re-research for this entry — via `--rerun`, via

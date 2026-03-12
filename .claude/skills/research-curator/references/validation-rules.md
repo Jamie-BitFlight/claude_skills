@@ -18,6 +18,7 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 - **freshness_tracking**: Freshness Tracking section must contain Last Verified, Version at Verification, Next Review Recommended fields
 - **statistics_currency**: Dates in Key Statistics section older than 6 months from today trigger a staleness warning
 - **url_format**: All URLs must be valid `http://` or `https://` format
+- **cross_references_absent**: Entry does not contain a `## Cross-References` section. Expected for entries created or last verified on or after 2026-03-12. Entries with Research Date or Last Verified before this date are exempt. Note for `validate_research.py` implementers: gate this warning on the Research Date or Last Verified field value — exempt entries with dates before 2026-03-12.
 
 ### Info Severity (optional)
 

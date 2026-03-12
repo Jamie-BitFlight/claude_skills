@@ -117,17 +117,26 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 3. **Wait** for structured result (status, file path, category, key findings)
 4. **Apply relay rules** -- verify pre-relay checklist before proceeding
-5. **Spawn insight agent** (concurrent with step 6) -- if research status is not `failed`, spawn `@research-insight-extractor`:
+5. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
    ```text
-   Agent tool parameters:
-     agent: .claude/agents/research-insight-extractor.md
-     prompt: "Extract improvements from {file-path-from-agent-result}"
+   a. Agent tool parameters:
+        agent: .claude/agents/research-insight-extractor.md
+        prompt: "Extract improvements from {file-path-from-agent-result}"
+
+   b. Agent tool parameters:
+        agent: .claude/agents/research-utilization-assessor.md
+        prompt: "Assess utilization opportunities from {file-path-from-agent-result}"
+
+   c. Agent tool parameters:
+        agent: .claude/agents/research-cross-referencer.md
+        prompt: "Add cross-references to {file-path-from-agent-result}"
+
+   d. Update ./research/README.md -- add new entry to category table
    ```
 
-6. **Update README** (concurrent with insight agent) -- add new entry to `./research/README.md`
-7. **Wait for insight agent result** -- collect the structured return block
-8. **Surface immediate items** -- if the insight result contains an `IMMEDIATE_ATTENTION:` section, report each listed item to the user immediately:
+6. **Wait for all four tasks** -- collect structured return blocks from all three agents and confirm README updated
+7. **Surface insight results** -- if the insight result contains an `IMMEDIATE_ATTENTION:` section, report each listed item to the user immediately:
 
    ```text
    New backlog item requiring attention: #{issue} {title}
@@ -136,7 +145,11 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
    If no `IMMEDIATE_ATTENTION` section: report only the count — "N improvements added to backlog from {resource-name}."
 
-9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+8. **Surface utilization results** -- relay `PROPOSALS_WRITTEN` count and `FILE` path from the utilization assessor result. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
+
+9. **Surface cross-reference results** -- relay `CROSS_REFERENCES_ADDED` count from the cross-referencer result.
+
+10. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -161,7 +174,7 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, spawn `@research-insight-extractor` for each successful entry (concurrent, up to 5). See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each). See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
 ### Duplicate Detection
 
@@ -225,12 +238,12 @@ flowchart TD
     FindAll --> WaveSpawn["Spawn @research-curator agents in waves of 5<br>each receives --rerun ./research/category/name.md<br>wait for each wave before spawning next"]
     WaveSpawn --> RelayCheck2["Apply pre-relay quality checklist<br>to all wave results"]
     RelayCheck2 --> UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
-    UpdateDate --> SpawnInsight1["Spawn @research-insight-extractor<br>prompt: 'Extract improvements from ./research/category/name.md'"]
-    SpawnInsight1 --> WaitInsight1["Wait for insight result<br>Check for IMMEDIATE_ATTENTION items<br>Notify user if any present"]
-    WaitInsight1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
-    UpdateDates --> SpawnInsightsN["Spawn @research-insight-extractor for each updated entry<br>(concurrent, up to 5)"]
-    SpawnInsightsN --> WaitInsightsN["Wait for all insight results<br>Collect IMMEDIATE_ATTENTION items<br>Notify user of any P1 items"]
-    WaitInsightsN --> PostActions
+    UpdateDate --> SpawnAnalysis1["Concurrently spawn 3 agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
+    SpawnAnalysis1 --> WaitAnalysis1["Wait for all 3 agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
+    WaitAnalysis1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn 3 agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
+    SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
+    WaitAnalysisN --> PostActions
 ```
 
 ### Single Entry Rerun
@@ -245,6 +258,15 @@ flowchart TD
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
 5. Update README with refreshed date
+6. Concurrently spawn three analysis agents:
+
+   ```text
+   - @research-insight-extractor — "Extract improvements from ./research/{category}/{name}.md"
+   - @research-utilization-assessor — "Assess utilization opportunities from ./research/{category}/{name}.md"
+   - @research-cross-referencer — "Add cross-references to ./research/{category}/{name}.md"
+   ```
+
+7. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
 
 ### All Entries Rerun
 
@@ -389,6 +411,8 @@ Report to user after any mode completes. All counts and failure reasons MUST be 
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes
+**Cross-References Added**: N
+**Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
 ### Key Findings
 - Finding 1
@@ -460,5 +484,7 @@ YYYY-MM-DD
 - [Batch Mode](./references/batch-mode.md) -- wave spawning workflow for `--batch` mode
 - Agent: `@research-curator` at `.claude/agents/research-curator.md` -- single-entry research executor
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
+- Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
+- Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).
