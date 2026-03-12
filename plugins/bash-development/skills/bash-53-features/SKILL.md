@@ -61,62 +61,7 @@ benchmark_substitution
 Execute commands and automatically store output in `REPLY`. Note: `REPLY` is local to the
 substitution — its value is restored after completion, so capture it immediately:
 
-```bash
-# Output goes to REPLY — capture it right away
-${| date +%Y-%m-%d; }
-today="${REPLY}"
-echo "Today is: ${today}"
-
-# Practical example: Multiple captures
-get_system_info() {
-    local os kernel host
-
-    ${| uname -s; }
-    os="${REPLY}"
-
-    ${| uname -r; }
-    kernel="${REPLY}"
-
-    ${| hostname; }
-    host="${REPLY}"
-
-    printf 'System: %s %s on %s\n' "${os}" "${kernel}" "${host}"
-}
-
-get_system_info
-
-# Example: Processing pipeline results
-process_data() {
-    local error_count warning_count
-
-    ${| grep "ERROR" logfile.txt | wc -l; }
-    error_count="${REPLY}"
-
-    ${| grep "WARNING" logfile.txt | wc -l; }
-    warning_count="${REPLY}"
-
-    printf 'Errors: %d, Warnings: %d\n' "${error_count}" "${warning_count}"
-}
-
-# Example: Conditional logic — capture REPLY before using it
-check_service() {
-    local service="${1}"
-    local status
-
-    ${| systemctl is-active "${service}" 2>/dev/null; }
-    status="${REPLY}"
-
-    if [[ "${status}" == "active" ]]; then
-        echo "Service ${service} is running"
-        return 0
-    else
-        echo "Service ${service} is not running"
-        return 1
-    fi
-}
-
-check_service "ssh"
-```
+[Code examples](./references/code-examples.md)
 
 **Benefits:**
 - Cleaner code without intermediate variables
@@ -146,50 +91,7 @@ result=$(cat file.txt | grep pattern | sort | uniq)
 Control the sorting order of filename and pathname expansion. The specifier is optionally
 prefixed with `+` (ascending, default) or `-` (descending):
 
-```bash
-# Set sort order for globbing (prefix + = ascending, - = descending)
-GLOBSORT="name"       # Sort by name (default, ascending)
-GLOBSORT="+name"      # Explicit ascending name sort
-GLOBSORT="-name"      # Descending name sort
-GLOBSORT="+size"      # Sort by file size (ascending)
-GLOBSORT="-size"      # Descending size sort
-GLOBSORT="+mtime"     # Sort by modification time (ascending)
-GLOBSORT="-mtime"     # Newest files last
-
-# Practical example: Process largest files first
-process_by_size() {
-    local dir="${1}"
-
-    GLOBSORT="-size"
-
-    for file in "${dir}"/*; do
-        [[ -f "${file}" ]] || continue
-
-        size=$(stat -f%z "${file}" 2>/dev/null || stat -c%s "${file}" 2>/dev/null)
-        printf 'Processing %s (%d bytes)\n' "${file}" "${size}"
-        # Process file...
-    done
-}
-
-process_by_size "/var/log"
-
-# Example: Process newest files first
-process_newest() {
-    local dir="${1}"
-    local -a files
-
-    GLOBSORT="-mtime"
-    files=("${dir}"/*)
-
-    echo "Processing files from newest to oldest:"
-    for file in "${files[@]}"; do
-        [[ -f "${file}" ]] || continue
-        echo "  ${file}"
-    done
-}
-
-process_newest "/tmp"
-```
+[Code examples](./references/code-examples.md)
 
 **Available sort specifiers:**
 - `name` — Alphabetical by filename
@@ -208,33 +110,7 @@ process_newest "/tmp"
 
 Store completions directly in a variable:
 
-```bash
-# NEW: Store completions in variable
-compgen -V completions -c ba
-
-echo "Commands starting with 'ba':"
-for cmd in "${completions[@]}"; do
-    echo "  ${cmd}"
-done
-
-# Practical example: Custom completion helper
-get_available_commands() {
-    local prefix="${1}"
-    local -a commands
-
-    compgen -V commands -c "${prefix}"
-
-    if [[ ${#commands[@]} -eq 0 ]]; then
-        echo "No commands found starting with '${prefix}'"
-        return 1
-    fi
-
-    printf 'Available commands (%d):\n' "${#commands[@]}"
-    printf '  - %s\n' "${commands[@]}"
-}
-
-get_available_commands "git"
-```
+[Code examples](./references/code-examples.md)
 
 ### `read` with Readline Completion (`-E`)
 
@@ -278,36 +154,7 @@ configure_app() {
 
 Specify search path for sourced scripts:
 
-```bash
-# Traditional source
-source /opt/app/lib/utils.sh
-
-# NEW: Source with custom path
-source -p "/opt/app/lib:/usr/local/lib" utils.sh
-
-# Practical example: Library loader
-load_library() {
-    local lib_name="${1}"
-    local -a search_paths=(
-        "${HOME}/.local/lib"
-        "/usr/local/lib"
-        "/opt/lib"
-    )
-
-    local search_path
-    search_path=$(IFS=:; echo "${search_paths[*]}")
-
-    if source -p "${search_path}" "${lib_name}" 2>/dev/null; then
-        echo "Loaded library: ${lib_name}"
-        return 0
-    else
-        echo "Failed to load library: ${lib_name}" >&2
-        return 1
-    fi
-}
-
-load_library "common.sh"
-```
+[Code examples](./references/code-examples.md)
 
 ### `printf` Enhancements
 
