@@ -16,7 +16,8 @@ Fixes #612
 ---
 task: T1
 title: Add status field to BacklogItem and update parsing and view logic
-status: in-progress
+status: complete
+completed: 2026-03-12T02:28:00Z
 agent: python-cli-architect
 dependencies: []
 priority: 1
@@ -323,7 +324,7 @@ Both fixtures have `status: open`. New tests can reuse these fixtures to verify 
 ---
 task: T2
 title: Add test coverage for BacklogItem status field population
-status: not-started
+status: in-progress
 agent: python-pytest-architect
 dependencies:
   - T1
@@ -334,6 +335,7 @@ skills:
   - python3-development
   - fastmcp-python-tests
 parallelize-with: []
+started: "2026-03-12T02:29:10Z"
 ---
 
 ## Context

@@ -251,6 +251,103 @@ status: resolved
 
         assert item.skip is True
 
+    # -- status field population tests (T2 / #612) --
+
+    def test_parse_item_file_nested_meta_status_populated(self, tmp_path: Path) -> None:
+        """Nested-metadata frontmatter with status: open populates item.status.
+
+        Tests: BacklogItem.status field population from nested metadata
+        How: Parse _NESTED_META_FRONTMATTER and assert item.status == "open"
+        Why: status field must be populated from nested metadata.status key
+        """
+        # Arrange / Act
+        item = parse_item_file(_NESTED_META_FRONTMATTER, tmp_path / "item.md")
+
+        # Assert
+        assert item.status == "open"
+
+    def test_parse_item_file_flat_status_preserves_case(self, tmp_path: Path) -> None:
+        """Flat frontmatter with mixed-case status preserves original case.
+
+        Tests: Case preservation of status field
+        How: Parse frontmatter with status: Done (capital D), verify exact string
+        Why: status must preserve raw frontmatter case per architecture spec
+        """
+        # Arrange
+        text = """\
+---
+name: Case Test
+description: case test
+source: test
+priority: P1
+status: Done
+---
+"""
+        # Act
+        item = parse_item_file(text, tmp_path / "item.md")
+
+        # Assert
+        assert item.status == "Done"
+
+    def test_parse_item_file_no_frontmatter_status_empty(self, tmp_path: Path) -> None:
+        """Plain text input with no frontmatter produces empty status.
+
+        Tests: Default status for non-frontmatter files
+        How: Parse plain text, verify item.status == ""
+        Why: Files without frontmatter must not raise or produce garbage status
+        """
+        # Arrange / Act
+        item = parse_item_file(_NO_FRONTMATTER, tmp_path / "item.md")
+
+        # Assert
+        assert item.status == ""
+
+    def test_parse_item_file_missing_status_key_gives_empty(self, tmp_path: Path) -> None:
+        """Frontmatter without a status key produces empty status string.
+
+        Tests: Missing optional field behavior
+        How: Parse frontmatter with no status key, verify item.status == ""
+        Why: status is optional; missing key must default to empty string
+        """
+        # Arrange
+        text = """\
+---
+name: No Status
+description: no status key
+source: test
+priority: P1
+---
+"""
+        # Act
+        item = parse_item_file(text, tmp_path / "item.md")
+
+        # Assert
+        assert item.status == ""
+
+    def test_parse_item_file_resolved_status_populates_status_and_skip(self, tmp_path: Path) -> None:
+        """Resolved status populates both item.status and item.skip consistently.
+
+        Tests: Consistency between status string and skip boolean
+        How: Parse frontmatter with status: resolved, verify both fields
+        Why: status and skip must agree — resolved means skip=True and status="resolved"
+        """
+        # Arrange
+        text = """\
+---
+name: Resolved Consistency
+description: test
+source: test
+priority: P1
+status: resolved
+---
+"""
+        # Act
+        item = parse_item_file(text, tmp_path / "item.md")
+
+        # Assert
+        assert item.status == "resolved"
+        assert item.skip is True
+
 
 # ---------------------------------------------------------------------------
 # _parse_frontmatter
@@ -1132,14 +1229,20 @@ class TestViewResultFromLocalItem:
 
         assert isinstance(result, ViewItemResult)
 
-    def test_view_result_from_local_item_reads_file_when_path_exists(self, tmp_path: Path) -> None:
-        # Write a file with flat frontmatter and verify description is read
-        item_file = tmp_path / "p1-my-item.md"
-        item_file.write_text(_FLAT_WITH_ALL_FIELDS, encoding="utf-8")
-        item = BacklogItem(title="Flat Item", section="P1", file_path=str(item_file))
+    def test_view_result_from_local_item_uses_item_description_directly(self) -> None:
+        """View helper uses description from BacklogItem model, not file re-read.
 
+        Tests: Description field mapping after T1 refactor (#612)
+        How: Create BacklogItem with description set, verify result.description matches
+        Why: After T1 removed file re-read, description comes from the parsed model
+        """
+        # Arrange
+        item = BacklogItem(title="Flat Item", section="P1", description="flat description")
+
+        # Act
         result = view_result_from_local_item(item)
 
+        # Assert
         assert result.description == "flat description"
 
     def test_view_result_from_local_item_no_file_path_skips_file_read(self) -> None:
@@ -1149,6 +1252,58 @@ class TestViewResultFromLocalItem:
 
         # Should not raise even with empty file_path
         assert result.title == "No path item"
+
+    # -- status field mapping tests (T2 / #612) --
+
+    def test_view_result_from_local_item_maps_status(self) -> None:
+        """BacklogItem with status="open" produces result.status == "open".
+
+        Tests: Status field mapping from BacklogItem to ViewItemResult
+        How: Create BacklogItem with status="open", call view helper, check result
+        Why: Status must flow from parsed model to view result without file I/O
+        """
+        # Arrange
+        item = BacklogItem(title="Status Item", section="P1", status="open")
+
+        # Act
+        result = view_result_from_local_item(item)
+
+        # Assert
+        assert result.status == "open"
+
+    def test_view_result_from_local_item_default_status_empty(self) -> None:
+        """BacklogItem with default (empty) status produces empty result.status.
+
+        Tests: Default status propagation
+        How: Create BacklogItem without setting status, verify result.status == ""
+        Why: Default empty status must propagate consistently to ViewItemResult
+        """
+        # Arrange
+        item = BacklogItem(title="Default Status", section="P1")
+
+        # Act
+        result = view_result_from_local_item(item)
+
+        # Assert
+        assert result.status == ""
+
+    def test_view_result_from_local_item_nonexistent_path_no_error(self) -> None:
+        """BacklogItem with nonexistent file_path and status="open" succeeds without FileNotFoundError.
+
+        Tests: Regression — old code re-read file from disk and would fail on missing files
+        How: Create BacklogItem with status and nonexistent file_path, verify no exception
+        Why: After T1 refactor, view helper uses item.status directly — no file I/O needed
+        """
+        # Arrange
+        item = BacklogItem(
+            title="Missing File", section="P1", status="open", file_path="/nonexistent/path/that/does/not/exist.md"
+        )
+
+        # Act
+        result = view_result_from_local_item(item)
+
+        # Assert
+        assert result.status == "open"
 
 
 # ---------------------------------------------------------------------------
