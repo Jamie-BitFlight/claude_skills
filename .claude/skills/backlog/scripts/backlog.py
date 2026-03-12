@@ -75,6 +75,7 @@ import operator
 import frontmatter
 from backlog_core import operations as _backlog_operations
 from backlog_core.entry_blocks import rewrite_section as _rewrite_section
+from backlog_core.github import create_issue_for_item as _create_issue_for_item
 from backlog_core.models import (
     _COMMIT_PREFIX_RE,
     BACKLOG_DIR,
@@ -93,7 +94,6 @@ from backlog_core.models import (
     ItemNotFoundError as _ItemNotFoundError,
 )
 from backlog_core.operations import update_item_metadata as _update_item_metadata
-from backlog_core.github import create_issue_for_item as _create_issue_for_item
 from backlog_core.parsing import (
     build_issue_body as _build_issue_body,
     find_item as _find_item,
@@ -172,7 +172,7 @@ def _dict_to_backlog_item_fields(d: dict) -> dict:
         "title": d.get("_title", ""),
         "section": d.get("_section", ""),
         "file_path": d.get("_file_path", ""),
-        "skip": bool(d.get("_skip", False)),
+        "skip": bool(d.get("_skip")),
         "issue": d.get("_issue", ""),
         "raw_body": d.get("_raw_body", ""),
         "description": d.get("**Description**", ""),
@@ -234,25 +234,68 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
 def _parse_backlog_from_directory() -> list[dict]:
     """Parse backlog items directly from .claude/backlog/ per-item files.
 
-    Delegates to backlog_core.parsing.parse_backlog_from_directory and converts
-    each BacklogItem to the dict format the CLI expects via backlog_item_to_display_dict.
+    Uses the module-level BACKLOG_DIR so tests can redirect it via monkeypatch.
+    Mirrors the logic in backlog_core.parsing.parse_backlog_from_directory but
+    reads from the local BACKLOG_DIR name instead of the core's private binding.
 
     Returns:
         List of item dicts with _section, _title, and field keys.
     """
-    return [backlog_item_to_display_dict(item) for item in _parse_backlog_from_directory_core()]
+    # Use module-level BACKLOG_DIR so tests can patch it via monkeypatch.setattr(_mod, "BACKLOG_DIR", ...)
+    # Do NOT call _parse_backlog_from_directory_core() — it reads backlog_core.models.BACKLOG_DIR
+    # which ignores the patched value.
+    if not BACKLOG_DIR.exists():
+        return []
+    prefix_to_section = {
+        "p0-": "P0",
+        "p1-": "P1",
+        "p2-": "P2",
+        "idea-": "Ideas",
+        "ideas-": "Ideas",
+        "completed-": "Completed",
+        "medium-": "P1",
+    }
+    items: list[dict] = []
+    for filepath in sorted(BACKLOG_DIR.glob("*.md")):
+        name = filepath.stem
+        section = ""
+        for prefix, sec in prefix_to_section.items():
+            if name.startswith(prefix):
+                section = sec
+                break
+        try:
+            item_text = filepath.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        item = _parse_item_file_core(item_text, filepath)
+        meta_priority = item.priority
+        if meta_priority and meta_priority.upper() in {"P0", "P1", "P2"}:
+            section = meta_priority.upper()
+        item.section = section
+        if not item.title:
+            item.title = name
+        item.file_path = str(filepath)
+        if section == "Completed":
+            item.skip = True
+        items.append(backlog_item_to_display_dict(item))
+    return items
 
 
 def parse_backlog() -> list[dict]:
     """Parse backlog items from .claude/backlog/ per-item files.
 
-    Delegates to backlog_core.parsing.parse_backlog and converts each BacklogItem
-    to the dict format the CLI expects via backlog_item_to_display_dict.
+    Uses the module-level BACKLOG_DIR so tests can redirect it via monkeypatch.
+    Delegates directory iteration to _parse_backlog_from_directory() which
+    uses the patchable local BACKLOG_DIR name.
 
     Returns:
         List of item dicts with _section, _title, and field keys.
     """
-    return [backlog_item_to_display_dict(item) for item in _parse_backlog_core()]
+    # Use _parse_backlog_from_directory() — NOT _parse_backlog_core() — so that
+    # tests patching _mod.BACKLOG_DIR via monkeypatch.setattr take effect.
+    # _parse_backlog_core() reads backlog_core.models.BACKLOG_DIR directly and
+    # ignores any patches applied to the backlog.py module namespace.
+    return _parse_backlog_from_directory()
 
 
 def _parse_item_file(text: str, path: Path) -> dict:
