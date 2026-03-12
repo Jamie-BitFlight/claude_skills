@@ -150,6 +150,7 @@ research/
 │   ├── claude-code-templates.md       # 100+ Claude Code agents/commands/skills/MCPs/hooks via npx installer and aitmpl.com (21.8K stars)
 │   ├── claude-skillz.md               # 18+ behavioral skills, 12 personas, Claude Launcher utility
 │   ├── codex-skills.md                # 19-skill catalog for OpenAI Codex CLI with npx installer (116 stars)
+│   ├── obsidian-skills.md             # 5 modular Agent Skills for Obsidian by Steph Ango (13.3K stars)
 │   ├── everything-claude-code.md      # Comprehensive agent harness performance system: 65+ skills, 16 agents, 40+ commands, hooks, AgentShield security scanner (61.7K stars)
 │   ├── human-compiler.md              # Interview-to-agent plugin generator for Claude Code (MIT)
 │   ├── mcpskills-cli.md               # MCP-to-skill converter via Streamable HTTP discovery
@@ -343,6 +344,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [skillsmp.md](./skill-generation-tools/skillsmp.md)                   | SkillsMP - open marketplace for 66,500+ AI agent skills (Claude Code, Codex CLI, ChatGPT); REST API, MCP server, SKILL.md standard (MIT) | 2026-02-23   |
 | [skrills.md](./skill-generation-tools/skrills.md)                    | Skrills - Rust skills support engine validating and syncing skills across Claude Code, Codex CLI, and Copilot CLI with 40+ MCP tools (52 stars) | 2026-02-23   |
 | [softaworks-agent-toolkit.md](./skill-generation-tools/softaworks-agent-toolkit.md) | Softaworks Agent Toolkit - 43 skills, 6 agents, 7 slash commands for Claude Code with multi-platform support (621 stars) | 2026-02-20   |
+| [obsidian-skills.md](./skill-generation-tools/obsidian-skills.md)     | Obsidian Skills - 5 modular Agent Skills for Obsidian (markdown, bases, JSON Canvas, CLI, defuddle) by Steph Ango (13.3K stars) | 2026-03-12   |
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
 
 **Key Topics**:
