@@ -39,17 +39,17 @@ Write these files:
 - `presentation/component-index.md` — follow the Component Index Format in [output-format.md](./output-format.md)
 - One `presentation/deck-plans/component-deck-plan-{name}.md` per component — follow the Deck Plan Format in [output-format.md](./output-format.md)
 
-Create the directories: `presentation/`, `presentation/deck-plans/`, `presentation/narratives/`, `presentation/decks/`, `presentation/validation/`.
+Create the directories: `presentation/`, `presentation/deck-plans/`, `presentation/decks/`, `presentation/validation/`.
 
-## Narrative Agent Instructions
+## Deck Generation Agent Instructions
 
 ### Goal
 
-Construct a presentation narrative for one component that answers the eight core questions. Transform walkthrough material into presentation form — do not merely summarize.
+Construct a presentation narrative and generate a full deck outline for one component in a single pass. Answer the eight core questions, then produce slides following the 12-section structure with titles, key points, speaker notes, suggested visuals, and evidence references.
 
 ### Procedure
 
-1. Read the component deck plan to understand scope, source sections, and narrative arc.
+1. Read the component deck plan to understand scope, source sections, narrative arc, audience, and slide count estimate.
 
 2. Read the walkthrough sections listed in the deck plan's source material table.
 
@@ -57,7 +57,7 @@ Construct a presentation narrative for one component that answers the eight core
 
 4. Read `open-questions.md` for unresolved issues affecting this component.
 
-5. Construct the narrative by answering each question:
+5. Build the narrative by answering each question:
    - What is this component?
    - Why does it exist?
    - How does execution enter it?
@@ -67,30 +67,10 @@ Construct a presentation narrative for one component that answers the eight core
    - How is it developed, tested, reviewed, deployed, and operated?
    - What risks, gaps, and open questions remain?
 
-6. Build an evidence map linking each major claim to its source (walkthrough section, validation report, or source file). Mark each claim as verified, inference, or uncertain.
-
-7. Preserve technical accuracy and execution sequence from the walkthrough. Do not simplify away important ordering, dependencies, or handoffs.
-
-### Output
-
-Write one file: `presentation/narratives/component-narrative-{name}.md` following the Component Narrative Format in [output-format.md](./output-format.md).
-
-## Slide Generation Agent Instructions
-
-### Goal
-
-Generate a full deck outline for one component with slides following the 12-section structure, including titles, key points, speaker notes, suggested visuals, and evidence references.
-
-### Procedure
-
-1. Read the component narrative file for content.
-
-2. Read the component deck plan for audience, narrative arc, and slide count estimate.
-
-3. Generate slides following the 12 required deck sections in order:
+6. Generate slides following the 12 required deck sections in order:
    1. Cover slide
    2. Component summary
-   3. Component system position
+   3. System position
    4. Entry points and triggers
    5. Internal flow (may span multiple slides for complex components)
    6. Key files and structure
@@ -101,7 +81,7 @@ Generate a full deck outline for one component with slides following the 12-sect
    11. Risks and open questions
    12. Appendix
 
-4. For each slide, produce all required fields:
+7. For each slide, produce all required fields:
    - Slide number and title
    - Section assignment
    - Purpose statement
@@ -111,18 +91,22 @@ Generate a full deck outline for one component with slides following the 12-sect
    - Evidence references linking to walkthrough sections or source files
    - Confidence level with basis
 
-5. Slide text rules:
+8. Slide text rules:
    - Use concise, high-signal text on slides.
    - No dense paragraphs — use bullet points.
    - Put detailed context in speaker notes.
    - Include concrete file paths, symbols, commands, and configs.
 
-6. Visual selection rules:
+9. Visual selection rules:
    - Prefer visuals derivable from walkthrough structure.
    - Do not invent architecture not in source materials.
    - Mark conceptual visuals as `[CONCEPTUAL]`.
 
-7. The internal flow section should present the component's execution path as a linear sequence of steps, preserving the order from the walkthrough. Use multiple slides if the flow has more than 6-8 steps.
+10. The internal flow section should present the component's execution path as a linear sequence of steps, preserving the order from the walkthrough. Use multiple slides if the flow has more than 6-8 steps.
+
+11. Build an evidence map linking each major claim to its source. Mark each claim as `[VERIFIED]`, `[INFERENCE]`, or `[UNCERTAIN]` — matching the convention used by the linear-walkthrough skill.
+
+12. Preserve technical accuracy and execution sequence from the walkthrough. Do not simplify away important ordering, dependencies, or handoffs.
 
 ### Output
 

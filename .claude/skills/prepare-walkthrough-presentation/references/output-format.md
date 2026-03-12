@@ -80,52 +80,6 @@ File: `presentation/deck-plans/component-deck-plan-{name}.md`
 {Any special considerations for this deck — complex branching, shared infrastructure, etc.}
 ```
 
-## Component Narrative Format
-
-File: `presentation/narratives/component-narrative-{name}.md`
-
-```markdown
-# Component Narrative: {component-name}
-
-## What is this component?
-
-{Clear explanation of purpose, scope, and importance. What it owns and does not own.}
-
-## Why does it exist?
-
-{The problem it solves or role it fills in the system.}
-
-## How does execution enter it?
-
-{Entry points, triggers, API routes, commands, jobs, events, workers, schedulers, pipelines, or startup hooks.}
-
-## What happens inside it?
-
-{Ordered explanation of internal flow — modules, classes, functions, control flow, data flow, branching, retries, exits.}
-
-## What systems does it depend on?
-
-{Upstream dependencies — services, databases, queues, APIs, shared libraries, config.}
-
-## What systems depend on it?
-
-{Downstream consumers — who calls this component and why.}
-
-## How is it developed, tested, reviewed, deployed, and operated?
-
-{Development workflow, build steps, local setup, testing strategy, CI/CD, deployment path, observability.}
-
-## What risks, gaps, and open questions remain?
-
-{Known uncertainty, fragile areas, undocumented behavior, ownership ambiguity, missing tests.}
-
-## Evidence Map
-
-| Claim | Source | Type |
-|-------|--------|------|
-| {claim} | {walkthrough section or file reference} | {verified | inference | uncertain} |
-```
-
 ## Deck Outline Format
 
 File: `presentation/decks/component-deck-outline-{name}.md`
@@ -142,7 +96,6 @@ The deck follows this required section structure. Each section contains one or m
 - **Repo location**: {path}
 - **Slide count**: {N}
 - **Audience**: {technical description}
-- **Narrative source**: presentation/narratives/component-narrative-{name}.md
 
 ## Slides
 

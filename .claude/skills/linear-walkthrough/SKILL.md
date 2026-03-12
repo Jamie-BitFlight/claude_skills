@@ -8,7 +8,7 @@ argument-hint: '[target-directory]'
 
 Produce a navigable, fact-checked explanation of how a codebase works — from entry points through major execution paths — by orchestrating parallel subagents across four phases.
 
-Target directory: `linear-walkthrough` (default: current working directory).
+Target directory: provided as argument (default: current working directory).
 
 Output directory: `walkthrough/` inside the target directory.
 
@@ -111,7 +111,6 @@ Spawn one `general-purpose` agent to merge all validated walkthrough sections in
 - All walkthrough section files from `walkthrough/sections/`
 - All validation reports from `walkthrough/validation/`
 - Entry points file from `walkthrough/entry-points.md`
-- Coverage plan from `walkthrough/coverage-plan.md`
 - Read [agent-instructions.md](./references/agent-instructions.md) section "Synthesis Agent Instructions"
 - Read [output-format.md](./references/output-format.md) section "Unified Walkthrough Format"
 
@@ -120,7 +119,7 @@ Spawn one `general-purpose` agent to merge all validated walkthrough sections in
 | Artifact | Path | Contents |
 |----------|------|----------|
 | Unified walkthrough | `walkthrough/unified-walkthrough.md` | Complete codebase walkthrough with all sections connected |
-| Open questions | `walkthrough/open-questions.md` | Unresolved uncertainties, partial coverage areas, follow-up suggestions |
+| Open questions | `walkthrough/open-questions.md` | Standalone file of unresolved uncertainties, partial coverage areas, follow-up suggestions. The unified walkthrough's Validation Appendix references this file rather than duplicating it. |
 
 ### Large output handling
 

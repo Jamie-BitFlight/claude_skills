@@ -8,7 +8,7 @@ argument-hint: '[walkthrough-directory]'
 
 Transform validated `/linear-walkthrough` output into one presentation-ready deck outline per major codebase component. Each deck explains what the component is, how it works, how it connects to the system, how it is developed and operated, and what risks remain.
 
-Walkthrough directory: `prepare-walkthrough-presentation` (default: `walkthrough/` in current directory).
+Walkthrough directory: provided as argument (default: `walkthrough/` in current directory).
 
 Output directory: `presentation/` inside the walkthrough directory.
 
@@ -19,19 +19,17 @@ flowchart TD
     Start(["Invoke /prepare-walkthrough-presentation"]) --> P1
     P1["Phase 1: Component Extraction and Deck Planning<br>1 agent — read walkthrough outputs, identify components,<br>build deck plan per component"] --> P1Out
     P1Out["Artifacts:<br>presentation/component-index.md<br>presentation/deck-plans/component-deck-plan-{name}.md"] --> P2
-    P2["Phase 2: Narrative Construction<br>N parallel agents — build presentation narrative<br>for each component from walkthrough material"] --> P2Out
-    P2Out["Artifacts:<br>presentation/narratives/component-narrative-{name}.md"] --> P3
-    P3["Phase 3: Slide Generation<br>N parallel agents — generate full deck outline<br>with slides, notes, visuals, and evidence"] --> P3Out
-    P3Out["Artifacts:<br>presentation/decks/component-deck-outline-{name}.md"] --> P4
-    P4["Phase 4: Validation<br>M parallel agents — fact-check decks against<br>walkthrough sources, check cross-deck consistency"] --> P4Out
-    P4Out["Artifacts:<br>presentation/validation/component-deck-validation-{name}.md"] --> P5
-    P5["Phase 5: Packaging<br>1 agent — produce crosswalk index, apply corrections,<br>finalize all deck outlines"] --> P5Out
-    P5Out["Artifacts:<br>presentation/presentation-crosswalk.md<br>presentation/decks/ (finalized)"] --> Done(["Complete"])
+    P2["Phase 2: Deck Generation<br>N parallel agents — build narrative and generate<br>full deck outline per component in one pass"] --> P2Out
+    P2Out["Artifacts:<br>presentation/decks/component-deck-outline-{name}.md"] --> P3
+    P3["Phase 3: Validation<br>M parallel agents — fact-check decks against<br>walkthrough sources, check cross-deck consistency"] --> P3Out
+    P3Out["Artifacts:<br>presentation/validation/component-deck-validation-{name}.md"] --> P4
+    P4["Phase 4: Packaging<br>1 agent — produce crosswalk index, apply corrections,<br>finalize all deck outlines"] --> P4Out
+    P4Out["Artifacts:<br>presentation/presentation-crosswalk.md<br>presentation/decks/ (finalized)"] --> Done(["Complete"])
 ```
 
 ## Inputs
 
-Read these artifacts from the walkthrough directory:
+Read these artifacts from the walkthrough directory (all paths below are relative to that directory):
 
 | Artifact | Path | Required |
 |----------|------|----------|
@@ -61,42 +59,18 @@ Spawn one `general-purpose` agent to read walkthrough outputs and produce a comp
 
 ### Orchestrator actions after Phase 1
 
-1. Read `presentation/component-index.md` to get the component list.
-2. Read each deck plan to understand scope and narrative direction.
-3. Proceed to Phase 2 with one agent per component.
+1. Read `presentation/component-index.md` to get the component list and deck-to-component mapping.
+2. Proceed to Phase 2 with one agent per component. Each agent reads its own deck plan.
 
-## Phase 2: Narrative Construction
+## Phase 2: Deck Generation
 
-Spawn N parallel `general-purpose` agents — one per component from the deck plan.
+Spawn N parallel `general-purpose` agents — one per component from the deck plan. Each agent constructs the presentation narrative and generates the full deck outline in a single pass, eliminating the intermediate narrative artifact.
 
 ### Agent prompt context (per agent)
 
 - Component deck plan file path
-- Walkthrough directory path (for reading source sections)
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Narrative Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Component Narrative Format"
-
-### Agent deliverables (per agent)
-
-| Artifact | Path |
-|----------|------|
-| Component narrative | `presentation/narratives/component-narrative-{name}.md` |
-
-### Orchestrator actions after Phase 2
-
-1. Verify all expected narrative files exist.
-2. Proceed to Phase 3.
-
-## Phase 3: Slide Generation
-
-Spawn N parallel `general-purpose` agents — one per component.
-
-### Agent prompt context (per agent)
-
-- Component narrative file path
-- Component deck plan file path
-- Walkthrough directory path (for evidence references)
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Slide Generation Agent Instructions"
+- Walkthrough directory path (for reading source sections and evidence references)
+- Read [agent-instructions.md](./references/agent-instructions.md) section "Deck Generation Agent Instructions"
 - Read [output-format.md](./references/output-format.md) section "Deck Outline Format" and "Slide Format"
 
 ### Agent deliverables (per agent)
@@ -105,12 +79,12 @@ Spawn N parallel `general-purpose` agents — one per component.
 |----------|------|
 | Deck outline | `presentation/decks/component-deck-outline-{name}.md` |
 
-### Orchestrator actions after Phase 3
+### Orchestrator actions after Phase 2
 
 1. Verify all expected deck outline files exist.
-2. Proceed to Phase 4.
+2. Proceed to Phase 3.
 
-## Phase 4: Validation
+## Phase 3: Validation
 
 Spawn M parallel `general-purpose` agents. Each validator checks one or more deck outlines against the source walkthrough. Cross-assign validators so they do not validate decks produced by the same agent that generated them.
 
@@ -128,13 +102,13 @@ Spawn M parallel `general-purpose` agents. Each validator checks one or more dec
 |----------|------|
 | Validation report | `presentation/validation/component-deck-validation-{name}.md` |
 
-### Orchestrator actions after Phase 4
+### Orchestrator actions after Phase 3
 
 1. Read all validation reports.
 2. If critical corrections exist, instruct agents to apply them to deck outlines before packaging.
-3. Proceed to Phase 5.
+3. Proceed to Phase 4.
 
-## Phase 5: Packaging
+## Phase 4: Packaging
 
 Spawn one `general-purpose` agent to finalize all deck outlines and produce the crosswalk index.
 
@@ -184,5 +158,5 @@ Technical audience: engineers, tech leads, platform owners, SRE/DevOps engineers
 
 ## Resources
 
-- [Agent instructions](./references/agent-instructions.md) — detailed prompts for each agent type (planning, narrative, slide generation, validation, packaging)
+- [Agent instructions](./references/agent-instructions.md) — detailed prompts for each agent type (planning, deck generation, validation, packaging)
 - [Output format](./references/output-format.md) — required structure and templates for all artifacts

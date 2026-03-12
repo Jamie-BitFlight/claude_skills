@@ -143,7 +143,7 @@ Merge all validated walkthrough sections into a single unified walkthrough docum
 
 2. Read all validation reports from `walkthrough/validation/`. Apply any corrections noted in validation reports to the section content as it is merged.
 
-3. Read `walkthrough/entry-points.md` and `walkthrough/coverage-plan.md` for context.
+3. Read `walkthrough/entry-points.md` for the complete entry point index.
 
 4. Determine a logical reading order for sections. Prefer:
    - Start with application bootstrap and initialization
