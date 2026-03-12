@@ -5,9 +5,9 @@ metadata:
   topic: convert-backlogcore-tools-to-async-def-for-non-blocking-gith
   source: 'GitHub Issue #472'
   added: '2026-03-06'
-  priority: P2
+  priority: completed
   type: Refactor
-  status: needs-grooming
+  status: done
   issue: '#472'
   last_synced: '2026-03-06T17:48:59Z'
   groomed: '2026-03-06'

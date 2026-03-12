@@ -239,7 +239,7 @@ Key asyncio behaviors to verify CoVe checks:
 ---
 task: T1
 title: "Convert all 10 server.py tools to async def with asyncio.to_thread()"
-status: not-started
+status: complete
 agent: python3-development:python-cli-architect
 dependencies: []
 priority: 1
@@ -334,7 +334,7 @@ Return: diff summary (count of `async def` conversions, count of `to_thread` wra
 ---
 task: T2
 title: "Verify all existing tests pass after async conversion"
-status: not-started
+status: complete
 agent: python3-development:python-pytest-architect
 dependencies: ["T1"]
 priority: 2
@@ -420,7 +420,7 @@ Return: pytest exit code, pass/fail/skip counts, list of any modified test files
 ---
 task: T3
 title: "Validate conversion completeness via shell acceptance criteria"
-status: not-started
+status: complete
 agent: python3-development:python-pytest-architect
 dependencies: ["T1"]
 priority: 2
