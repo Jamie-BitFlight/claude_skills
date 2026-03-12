@@ -11,11 +11,15 @@ task_exports:
   directory: "TASK"
 tasks:
   - T1: Replace CLI constant definitions with imports from backlog_core/models.py
-  - T2: Replace confirmed-duplicate utility functions with imports from backlog_core
-  - T3: Replace dict-accepting duplicate functions with core calls plus adapters
-  - T4: Migrate CLI-only functions to core imports
-  - T5: Decouple test_backlog_core_parsing.py importlib imports and add CLI re-export wrapper
-  - T6: Final cleanup, dead code removal, and full verification
+  - T2: Fix core internal SKIP_STATUS and SECTION_RE inconsistencies (FIND-14/FIND-15)
+  - T3: Replace Category A functions with direct imports (no adapter needed)
+  - T4: Replace Category B functions with core imports plus dict/BacklogItem adapters
+  - T5: Decouple test importlib imports and add CLI re-export compatibility layer
+  - T6: Final cleanup, dead code removal, unused import audit, and full verification
+sync_checkpoints:
+  - SC1: After T1+T2 — constants consistent across CLI and core
+  - SC2: After T3+T4+T5 — all function dedup complete, tests pass
+  - SC3: After T6 — final verification gate
 ---
 
 ## Context Manifest
@@ -252,12 +256,565 @@ Return:
 - Case handling approach used (uppercase normalization vs other)
 - Full test suite output (pass/fail count)
 
-<!-- PENDING: T3 -->
+---
+task: T3
+title: Replace Category A functions with direct imports from backlog_core (no adapter needed)
+status: not-started
+agent: python3-development:python-cli-architect
+dependencies: [T2]
+priority: 2
+complexity: medium
+accuracy-risk: medium
+skills: ["python3-development"]
+parallelize-with: []
+reason: "Sequential -- modifies backlog.py; depends on T2 so core is internally consistent before importing"
+handoff: "List of functions replaced, import block diff, call site audit results, test output"
+---
 
-<!-- PENDING: T4 -->
+## Task T3: Replace Category A functions with direct imports from backlog_core (no adapter needed)
 
-<!-- PENDING: T5 -->
+### Context
 
-<!-- PENDING: T6 -->
+The architecture spec (Section 4.3) categorizes 12 duplicated functions into three categories. Category A functions have identical logic in both CLI and core -- they can be replaced with a direct import, no adapter needed.
 
-<!-- PENDING: SYNC_CHECKPOINTS -->
+The 6 Category A functions are:
+
+| CLI Function | Core Equivalent | CLI Line | Notes |
+|-------------|-----------------|----------|-------|
+| `_infer_type` | `parsing.infer_type` | ~162 | Identical logic |
+| `_title_to_slug` | `parsing.title_to_slug` | ~175 | Identical logic |
+| `_normalize_issue_title` | `parsing.normalize_issue_title` | ~347 | Identical logic |
+| `_find_fuzzy_duplicates` | `parsing.find_fuzzy_duplicates` | ~365 | Identical logic |
+| `_today` | `parsing.today` | ~561 | Identical logic |
+| `_now_iso` | `parsing.now_iso` | ~565 | Identical logic |
+
+Additionally, `_update_item_metadata` (~line 570) maps to `operations.update_item_metadata` -- also Category A (identical logic, no type adapter needed).
+
+Read `plan/architect-backlog-cli-dedup.md` Section 4.3 and Section 4.5 for the target import block.
+
+### Objective
+
+Delete all 7 Category A function definitions from `backlog.py` and replace them with underscore-prefixed import aliases from `backlog_core`, ensuring all call sites continue to resolve.
+
+### Inputs
+
+- `.claude/skills/backlog/scripts/backlog.py` -- target file (after T1 and T2 edits)
+- `.claude/skills/backlog/backlog_core/parsing.py` -- source of 6 function imports
+- `.claude/skills/backlog/backlog_core/operations.py` -- source of `update_item_metadata`
+- `plan/architect-backlog-cli-dedup.md` Section 4.3 -- migration categorization
+- `plan/architect-backlog-cli-dedup.md` Section 4.5 -- target import block
+
+### Requirements
+
+1. Add imports to the `backlog_core` import block in `backlog.py`:
+
+   ```python
+   from backlog_core.parsing import (
+       find_fuzzy_duplicates as _find_fuzzy_duplicates,
+       infer_type as _infer_type,
+       normalize_issue_title as _normalize_issue_title,
+       now_iso as _now_iso,
+       title_to_slug as _title_to_slug,
+       today as _today,
+   )
+   from backlog_core.operations import (
+       update_item_metadata as _update_item_metadata,
+   )
+   ```
+
+2. Delete the function definitions for all 7 functions from `backlog.py`
+3. Verify every call site in `backlog.py` that references these functions by their underscore-prefixed name still resolves to the imported version
+4. If any function has a different signature in core vs CLI (e.g., different parameter names or defaults), note it and adjust the import alias or add a thin wrapper instead of a bare import
+5. Handle `_COMMIT_PREFIX_RE` -- if this regex is defined locally in `backlog.py` and used by `_normalize_issue_title`, and the core version imports it from `models.py`, ensure the CLI no longer needs a local copy after the function is imported
+
+### Constraints
+
+- Do NOT modify any `backlog_core/` files in this task
+- Do NOT modify any test files
+- Do NOT replace Category B functions (those needing dict/BacklogItem adapters) -- that is T4
+- The underscore-prefix convention (`_infer_type` not `infer_type`) must be preserved for all imports to maintain the private naming convention used throughout the CLI
+- Do NOT change CLI command output or behavior
+
+### Expected Outputs
+
+- Modified `.claude/skills/backlog/scripts/backlog.py` with 7 fewer function definitions and corresponding new imports
+
+### Acceptance Criteria
+
+1. No function definitions for `_infer_type`, `_title_to_slug`, `_normalize_issue_title`, `_find_fuzzy_duplicates`, `_today`, `_now_iso`, `_update_item_metadata` remain in `backlog.py` (only import aliases)
+2. All 12 test files pass: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+3. CLI smoke test: `uv run .claude/skills/backlog/scripts/backlog.py list --format text` produces output without errors
+4. `backlog.py` loads without import errors (importlib test from T1 verification step 4)
+5. Grep for orphaned function definitions returns zero matches: `grep -n "^def _infer_type\|^def _title_to_slug\|^def _normalize_issue_title\|^def _find_fuzzy_duplicates\|^def _today\|^def _now_iso\|^def _update_item_metadata" .claude/skills/backlog/scripts/backlog.py`
+
+### Verification Steps
+
+1. Run full test suite: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+2. Grep for removed function definitions: `grep -n "^def _infer_type\|^def _title_to_slug\|^def _normalize_issue_title\|^def _find_fuzzy_duplicates\|^def _today\|^def _now_iso\|^def _update_item_metadata" .claude/skills/backlog/scripts/backlog.py` -- expect 0 matches
+3. Verify call sites resolve: `uv run python -c "import importlib.util; s=importlib.util.spec_from_file_location('b', '.claude/skills/backlog/scripts/backlog.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); funcs=['_infer_type','_title_to_slug','_normalize_issue_title','_find_fuzzy_duplicates','_today','_now_iso','_update_item_metadata']; [print(f'{f}: {type(getattr(m, f))}') for f in funcs]"`
+4. CLI smoke test: `uv run .claude/skills/backlog/scripts/backlog.py list --format text 2>&1 | head -5`
+
+### CoVe Checks
+
+- Key claims to verify:
+  - All 7 functions have identical logic in CLI and core (architecture spec claim)
+  - The underscore-prefixed names match the call sites in `backlog.py`
+  - `_update_item_metadata` is in `operations.py`, not `parsing.py`
+- Verification questions:
+  1. For each function, does the core version have the same parameter signature (names, types, defaults)?
+  2. Does `_normalize_issue_title` in the CLI reference `_COMMIT_PREFIX_RE` locally, and if so, does the core version handle this via its own import?
+  3. Are there any call sites that pass keyword arguments that differ between CLI and core signatures?
+- Evidence to collect:
+  - Read each CLI function definition and its core counterpart side by side
+  - Grep for each function name in `backlog.py` to identify all call sites
+- Revision rule:
+  - If any function has a signature mismatch, wrap it in a thin adapter instead of bare import alias. Document which functions needed wrapping.
+
+### Handoff
+
+Return:
+- List of 7 functions replaced (name, CLI line removed, core import source)
+- Any functions that required a wrapper instead of bare import (and why)
+- `_COMMIT_PREFIX_RE` disposition (removed, kept, or imported)
+- Full test suite output
+- Line count delta for `backlog.py`
+
+---
+task: T4
+title: Replace Category B functions with core imports plus dict/BacklogItem adapters
+status: not-started
+agent: python3-development:python-cli-architect
+dependencies: [T3]
+priority: 2
+complexity: high
+accuracy-risk: medium
+skills: ["python3-development"]
+parallelize-with: []
+reason: "Sequential -- modifies backlog.py; depends on T3 so Category A replacements are stable"
+handoff: "Functions replaced, adapter pattern used at each call site, display dict helper details, test output"
+---
+
+## Task T4: Replace Category B functions with core imports plus dict/BacklogItem adapters
+
+### Context
+
+This is the most complex task in the dedup. Category B functions exist in both CLI and core but have different type signatures: the CLI versions accept/return `dict`, while the core versions accept/return `BacklogItem` (Pydantic model). The architecture spec (Section 5) defines the adapter strategy: conversion happens inline at CLI call sites, no new adapter module.
+
+The 5 Category B functions are:
+
+| CLI Function | Core Equivalent | Type Difference |
+|-------------|-----------------|-----------------|
+| `_parse_backlog_from_directory` (~line 191) | `parsing.parse_backlog_from_directory` | Returns `list[BacklogItem]` not `list[dict]` |
+| `parse_backlog` (~line 239) | `parsing.parse_backlog` | Returns `list[BacklogItem]` not `list[dict]` |
+| `_parse_item_file` (~line 248) | `parsing.parse_item_file` | Returns `BacklogItem` not `dict` |
+| `find_item` (~line 318) | `parsing.find_item` | Accepts `list[BacklogItem]`, returns `BacklogItem` |
+| `build_issue_body` (~line 466) | `parsing.build_issue_body` | Accepts `BacklogItem` not `dict` |
+| `create_issue_for_item` (~line 508) | `github.create_issue_for_item` | Accepts `BacklogItem` not `dict` |
+
+Read `plan/architect-backlog-cli-dedup.md` Sections 5.1-5.6 for the adapter pattern, and Section 4.3 for the full categorization table.
+
+### Objective
+
+Delete all 6 Category B function definitions from `backlog.py`, replace with imports from `backlog_core`, and add inline `BacklogItem`-to-dict and dict-to-`BacklogItem` conversion at call sites. Add a `backlog_item_to_display_dict()` local helper for the BacklogItem-to-display-dict conversion pattern.
+
+### Inputs
+
+- `.claude/skills/backlog/scripts/backlog.py` -- target file (after T1-T3 edits)
+- `.claude/skills/backlog/backlog_core/parsing.py` -- source of `parse_backlog_from_directory`, `parse_backlog`, `parse_item_file`, `find_item`, `build_issue_body`
+- `.claude/skills/backlog/backlog_core/github.py` -- source of `create_issue_for_item`
+- `.claude/skills/backlog/backlog_core/models.py` -- `BacklogItem` model definition
+- `plan/architect-backlog-cli-dedup.md` Sections 5.1-5.6 -- adapter pattern specification
+
+### Requirements
+
+#### Import additions
+
+1. Add to the `backlog_core.parsing` import block:
+
+   ```python
+   build_issue_body as _build_issue_body,
+   find_item as _find_item,
+   parse_backlog_from_directory as _parse_backlog_from_directory,
+   parse_item_file as _parse_item_file,
+   ```
+
+2. Add `parse_backlog` import if `parsing.py` exports it (verify first)
+3. Add to imports: `from backlog_core.github import create_issue_for_item as _create_issue_for_item`
+4. Add `BacklogItem` to the `backlog_core.models` import if not already present from T1
+
+#### Display dict helper
+
+5. Add a local helper `backlog_item_to_display_dict(item: BacklogItem) -> dict` that converts `BacklogItem` to the dict format the CLI's Rich display code expects, mapping typed fields to the underscore-prefixed keys:
+   - `item.title` -> `d["_title"]`
+   - `item.section` -> `d["_section"]`
+   - `item.file_path` -> `d["_file_path"]`
+   - `item.skip` -> `d["_skip"]`
+   - Plus all metadata fields as `**Key**` -> value pairs via `item.model_dump()`
+
+6. This helper is a LOCAL function in `backlog.py`, NOT a core function. It is explicitly temporary (architecture spec Section 5.6)
+
+#### Call site adaptation
+
+7. At each CLI command that calls `_parse_backlog_from_directory()`, the return is now `list[BacklogItem]`. Adapt call sites to either:
+   - Work with `BacklogItem` objects directly (preferred where possible)
+   - Convert via `backlog_item_to_display_dict()` where the code expects dict keys
+
+8. At `find_item` call sites: the return is now `BacklogItem | None`. Adapt call sites to work with BacklogItem or convert as needed
+
+9. At `build_issue_body` call sites: convert the dict to `BacklogItem` via `BacklogItem.model_validate(item_dict)` before calling
+
+10. At `create_issue_for_item` call sites: convert the dict to `BacklogItem` via `BacklogItem.model_validate(item_dict)` before calling
+
+#### Function removal
+
+11. Delete the CLI definitions of all 6 Category B functions
+
+### Constraints
+
+- Do NOT modify any `backlog_core/` files
+- Do NOT modify any test files
+- Do NOT change CLI command output format or behavior
+- The `backlog_item_to_display_dict` helper must be in `backlog.py`, not in `backlog_core/`
+- Preserve backward compatibility: if any CLI function is called by other scripts or tests via importlib, keep a thin re-export (this is handled in T5, but be aware of it)
+
+### Expected Outputs
+
+- Modified `.claude/skills/backlog/scripts/backlog.py` with:
+  - 6 fewer function definitions
+  - New imports from `backlog_core.parsing` and `backlog_core.github`
+  - New local `backlog_item_to_display_dict()` helper
+  - Adapted call sites throughout CLI commands
+
+### Acceptance Criteria
+
+1. No function definitions for `_parse_backlog_from_directory`, `parse_backlog`, `_parse_item_file`, `find_item`, `build_issue_body`, `create_issue_for_item` remain in `backlog.py`
+2. All 12 test files pass: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+3. CLI `list` command produces identical output format: `uv run .claude/skills/backlog/scripts/backlog.py list --format text`
+4. CLI `view` command works: `uv run .claude/skills/backlog/scripts/backlog.py view "#611" --format text 2>&1 | head -10`
+5. `backlog_item_to_display_dict` function exists in `backlog.py` and converts BacklogItem to dict with `_title`, `_section`, `_file_path` keys
+6. `BacklogItem` is imported from `backlog_core.models`
+
+### Verification Steps
+
+1. Run full test suite: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+2. Grep for removed function defs: `grep -n "^def _parse_backlog_from_directory\|^def parse_backlog\|^def _parse_item_file\|^def find_item\|^def build_issue_body\|^def create_issue_for_item" .claude/skills/backlog/scripts/backlog.py` -- expect 0 matches
+3. Verify display dict helper exists: `grep -n "def backlog_item_to_display_dict" .claude/skills/backlog/scripts/backlog.py` -- expect 1 match
+4. CLI list smoke test: `uv run .claude/skills/backlog/scripts/backlog.py list --format text 2>&1 | head -20`
+5. CLI view smoke test: `uv run .claude/skills/backlog/scripts/backlog.py view "#611" --format text 2>&1 | head -10`
+
+### CoVe Checks
+
+- Key claims to verify:
+  - `parsing.parse_backlog_from_directory` returns `list[BacklogItem]`
+  - `BacklogItem.model_validate(dict)` works for the dict shape the CLI constructs
+  - `parsing.find_item` accepts `list[BacklogItem]` and returns `BacklogItem | None`
+  - `github.create_issue_for_item` signature matches what the CLI passes (repo, item, dry_run)
+- Verification questions:
+  1. What is the exact signature of `parsing.parse_backlog_from_directory()` in `parsing.py`?
+  2. What dict keys does `backlog.py`'s `_parse_backlog_from_directory` add that are NOT fields on `BacklogItem` (e.g., `_section`, `_file_path`)?
+  3. Does `BacklogItem` have `section`, `title`, `file_path`, `skip` fields that map to the underscore-prefixed dict keys?
+  4. Does `github.create_issue_for_item` accept a `dry_run` parameter?
+- Evidence to collect:
+  - Read `BacklogItem` model definition in `models.py`
+  - Read `parsing.parse_backlog_from_directory` signature and return type in `parsing.py`
+  - Read `github.create_issue_for_item` signature in `github.py`
+  - Read call sites in `backlog.py` that use these functions to understand the dict keys expected
+- Revision rule:
+  - If `BacklogItem` fields do not map cleanly to the dict keys the CLI expects, expand `backlog_item_to_display_dict` to handle the mapping explicitly. If any core function signature differs from expected, add a thin wrapper.
+
+### Handoff
+
+Return:
+- List of 6 functions replaced with their adapter approach
+- `backlog_item_to_display_dict` implementation summary (fields mapped)
+- Number of call sites adapted and the pattern used at each
+- Full test suite output
+- Line count delta for `backlog.py`
+
+---
+task: T5
+title: Decouple test importlib imports and add CLI re-export compatibility layer
+status: not-started
+agent: python3-development:python-cli-architect
+dependencies: [T4]
+priority: 3
+complexity: medium
+accuracy-risk: medium
+skills: ["python3-development", "fastmcp-python-tests"]
+parallelize-with: []
+reason: "Sequential -- depends on T4 function removals being complete before adding re-exports"
+handoff: "Re-exports added, test import verification results, test suite output"
+---
+
+## Task T5: Decouple test importlib imports and add CLI re-export compatibility layer
+
+### Context
+
+Two test files import CLI internals via `importlib`:
+
+1. **`test_backlog_core_parsing.py` (lines 691-728)**: Imports `_build_issue_body_from_file` from `scripts/backlog.py` via importlib. This function may have been removed or renamed during T4.
+
+2. **`test_backlog_gh_first.py` (lines 9-28)**: Loads `backlog.py` as a module via importlib and accesses CLI functions. After T3-T4, these functions are now import aliases pointing to core -- the importlib import should still work, but this must be verified.
+
+The architecture spec (Section 7.2) specifies that `_build_issue_body_from_file` gets a one-line re-export in `backlog.py` for backward compatibility.
+
+Read `plan/architect-backlog-cli-dedup.md` Sections 7.2-7.3 for the test coupling fix design.
+
+### Objective
+
+Ensure all test files that import from `backlog.py` via importlib continue to work after the function dedup, by adding re-export aliases where needed and verifying importlib resolution.
+
+### Inputs
+
+- `.claude/skills/backlog/scripts/backlog.py` -- target file for re-exports (after T1-T4 edits)
+- `.claude/skills/backlog/tests/test_backlog_core_parsing.py` -- lines 691-728, imports `_build_issue_body_from_file`
+- `.claude/skills/backlog/tests/test_backlog_gh_first.py` -- lines 9-28, imports CLI module via importlib
+- `plan/architect-backlog-cli-dedup.md` Sections 7.2-7.3 -- test coupling fix design
+
+### Requirements
+
+#### Re-export for _build_issue_body_from_file
+
+1. Determine whether `_build_issue_body_from_file` still exists in `backlog.py` after T4 changes. If it was removed (because `build_issue_body` was replaced with a core import), add a one-line re-export:
+
+   ```python
+   _build_issue_body_from_file = _build_issue_body  # re-export for test compatibility
+   ```
+
+2. If `_build_issue_body_from_file` is a separate function from `build_issue_body` (i.e., it is a file-path-based wrapper), determine whether the core has an equivalent and re-export from core, or keep the wrapper
+
+#### test_backlog_gh_first.py verification
+
+3. Read `test_backlog_gh_first.py` to identify which CLI functions it accesses after the importlib load
+4. Verify each accessed function exists in `backlog.py` (either as a definition or as an import alias)
+5. If any accessed function no longer exists, add a re-export alias
+
+#### General importlib compatibility
+
+6. Search all test files for any other importlib-based imports from `backlog.py` beyond the two known files
+7. For each found, verify the imported name still exists in `backlog.py`
+
+### Constraints
+
+- Do NOT modify test files -- all compatibility is achieved via re-exports in `backlog.py`
+- Do NOT modify any `backlog_core/` files
+- Re-exports must be clearly commented as backward-compatibility aliases
+- Minimize the number of re-exports -- only add what is needed for tests to pass
+
+### Expected Outputs
+
+- Modified `.claude/skills/backlog/scripts/backlog.py` with re-export aliases for test compatibility
+
+### Acceptance Criteria
+
+1. `test_backlog_core_parsing.py` lines 691-728 can import `_build_issue_body_from_file` from `backlog.py` via importlib without error
+2. `test_backlog_gh_first.py` can load `backlog.py` via importlib and access all functions it references
+3. All 12 test files pass: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+4. Each re-export alias in `backlog.py` has a comment explaining why it exists and which test requires it
+
+### Verification Steps
+
+1. Run full test suite: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+2. Run the specific test class that uses importlib: `uv run pytest .claude/skills/backlog/tests/test_backlog_core_parsing.py -x -q -k "build_issue_body_from_file"` (adjust test name if needed)
+3. Run the gh-first test file: `uv run pytest .claude/skills/backlog/tests/test_backlog_gh_first.py -x -q`
+4. Verify re-export exists: `grep -n "re-export\|backward.compat" .claude/skills/backlog/scripts/backlog.py`
+
+### CoVe Checks
+
+- Key claims to verify:
+  - `test_backlog_core_parsing.py:691-728` specifically imports `_build_issue_body_from_file` (not `build_issue_body`)
+  - `_build_issue_body_from_file` is a distinct function from `build_issue_body` (file-path wrapper vs item-based)
+- Verification questions:
+  1. What exact attribute name does `test_backlog_core_parsing.py` access from the importlib-loaded module?
+  2. Is `_build_issue_body_from_file` the same as `build_issue_body`, or does it read a file first and then call `build_issue_body`?
+  3. What functions does `test_backlog_gh_first.py` access from the importlib-loaded CLI module?
+- Evidence to collect:
+  - Read `test_backlog_core_parsing.py` lines 691-730 to see exact attribute access
+  - Read `test_backlog_gh_first.py` lines 1-50 to see which attributes are accessed
+  - Read the original `_build_issue_body_from_file` definition in backlog.py (from git history if removed in T4)
+- Revision rule:
+  - If `_build_issue_body_from_file` has logic beyond calling `build_issue_body` (e.g., it reads a file path first), the re-export must be a wrapper function, not a bare alias.
+
+### Handoff
+
+Return:
+- List of re-exports added (name, target, reason)
+- Which test files were verified
+- Whether `_build_issue_body_from_file` needed a wrapper or bare alias
+- Full test suite output
+
+---
+task: T6
+title: Final cleanup, dead code removal, unused import audit, and full verification
+status: not-started
+agent: python3-development:python-cli-architect
+dependencies: [T5]
+priority: 3
+complexity: medium
+accuracy-risk: low
+skills: ["python3-development"]
+parallelize-with: []
+reason: "Sequential -- final task, depends on all prior work"
+handoff: "Final line count, dead code removed, linting results, full test output, commit reference"
+---
+
+## Task T6: Final cleanup, dead code removal, unused import audit, and full verification
+
+### Context
+
+This is the final task. All constants and functions have been deduplicated (T1-T4) and test compatibility verified (T5). This task performs a comprehensive audit of `backlog.py` to remove any dead code, unused imports, or artifacts left from the dedup process, then runs the full verification suite.
+
+Read `plan/architect-backlog-cli-dedup.md` for the target state description (Section 2, target state diagram).
+
+### Objective
+
+Bring `backlog.py` to its target state as a thin CLI wrapper: clean up dead code and unused imports introduced during the dedup, verify all tests pass, run linting, and commit the complete dedup with a message referencing Fixes #611.
+
+### Inputs
+
+- `.claude/skills/backlog/scripts/backlog.py` -- target file (after T1-T5 edits)
+- `plan/architect-backlog-cli-dedup.md` Section 4.4 -- functions that should remain in CLI
+- `plan/architect-backlog-cli-dedup.md` Section 4.5 -- target import block
+
+### Requirements
+
+#### Dead code audit
+
+1. Search `backlog.py` for any remaining function definitions that duplicate `backlog_core/` functions (should be none after T3-T4, but verify)
+2. Search for any local constant definitions that duplicate `backlog_core/models.py` (should be none after T1, but verify)
+3. Identify any imports that are now unused after function removals (e.g., `import re` if no local regex remains, `import difflib` if fuzzy matching was removed)
+4. Remove confirmed dead imports
+
+#### Unused _backlog_operations audit
+
+5. Check whether `_backlog_operations` (imported at the original line 76) is now used after the dedup. If still unused, determine whether it should be: (a) used by refactoring some command to delegate to operations, or (b) removed. Architecture spec says CLI should delegate to core -- if no command uses `_backlog_operations` yet, leave the import as a marker for future refactoring and add a `# TODO: delegate CLI commands to _backlog_operations` comment
+
+#### Linting
+
+6. Run `uv run prek run --files .claude/skills/backlog/scripts/backlog.py` and fix any linting errors introduced by the dedup
+7. If linting tools flag unused imports or formatting issues from the new import block, fix them
+
+#### Final verification
+
+8. Run the full test suite
+9. Run CLI smoke tests for key commands: `list`, `view`, `add --dryrun`
+10. Verify line count reduction: `wc -l .claude/skills/backlog/scripts/backlog.py` -- should be meaningfully less than 2563
+
+#### Commit
+
+11. Stage all modified files and commit with message: `refactor(backlog): deduplicate CLI by importing from backlog_core Fixes #611`
+
+### Constraints
+
+- Do NOT modify any `backlog_core/` files
+- Do NOT modify any test files
+- Do NOT remove functions listed in architecture spec Section 4.4 (functions that stay in CLI)
+- Do NOT remove re-export aliases added in T5 (they are needed for test compatibility)
+- Commit must reference `Fixes #611`
+
+### Expected Outputs
+
+- Final version of `.claude/skills/backlog/scripts/backlog.py` -- clean, deduplicated
+- Git commit with all dedup changes
+
+### Acceptance Criteria
+
+1. All 12 test files pass: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+2. `backlog.py` line count is less than 2200 (meaningful reduction from 2563)
+3. Zero duplicated constants (grep verification)
+4. Zero duplicated function definitions for functions that exist in `backlog_core/`
+5. Linting passes: `uv run prek run --files .claude/skills/backlog/scripts/backlog.py` exits 0
+6. CLI commands produce correct output:
+   - `uv run .claude/skills/backlog/scripts/backlog.py list --format text` shows items
+   - `uv run .claude/skills/backlog/scripts/backlog.py view "#611" --format text` shows issue #611 details
+7. Git commit exists referencing `Fixes #611`
+
+### Verification Steps
+
+1. Run full test suite: `uv run pytest .claude/skills/backlog/tests/ -x -q`
+2. Run linting: `uv run prek run --files .claude/skills/backlog/scripts/backlog.py`
+3. Check line count: `wc -l .claude/skills/backlog/scripts/backlog.py`
+4. Verify no duplicate constants: `grep -c "^BACKLOG_DIR\|^DEFAULT_REPO\|^SECTION_RE\|^SKIP_STATUS\|^TYPE_TO_LABEL\|^ROLE_MAP\|^BENEFIT_MAP" .claude/skills/backlog/scripts/backlog.py` -- expect 0
+5. Verify no duplicate functions: `grep -c "^def _infer_type\|^def _title_to_slug\|^def _parse_backlog_from_directory\|^def _parse_item_file\|^def find_item\|^def build_issue_body\|^def create_issue_for_item\|^def _normalize_issue_title\|^def _find_fuzzy_duplicates\|^def _today\|^def _now_iso\|^def _update_item_metadata" .claude/skills/backlog/scripts/backlog.py` -- expect 0
+6. CLI list smoke test: `uv run .claude/skills/backlog/scripts/backlog.py list --format text 2>&1 | head -10`
+7. CLI view smoke test: `uv run .claude/skills/backlog/scripts/backlog.py view "#611" --format text 2>&1 | head -10`
+8. Verify commit: `git log --oneline -1` -- expect message containing "Fixes #611"
+
+### Handoff
+
+Return:
+- Final `backlog.py` line count (before and after)
+- List of dead code removed (imports, functions, constants)
+- Linting results (pass/fail, issues fixed)
+- Full test suite output (all 12 files)
+- Git commit hash and message
+- Summary of overall dedup: constants replaced, functions replaced, adapter pattern used
+
+## Sync Checkpoints
+
+### SYNC CHECKPOINT 1: Constants Consistent Across CLI and Core
+
+**Convergence point**: T1 + T2 outputs
+
+**Quality gates**:
+
+1. All CLI-local constant definitions removed from `backlog.py` (T1 acceptance criteria)
+2. `SKIP_STATUS` in CLI resolves to the canonical value including `"CLOSED"` (T1)
+3. Core `parsing.py` uses `SKIP_STATUS` from `models.py` instead of inline sets (T2)
+4. All 12 test files pass after both T1 and T2
+5. CLI `list` command output unchanged (except CLOSED items now skipped)
+
+**Reflection questions**:
+
+- Are there any other constants in `backlog.py` that were missed?
+- Did the SKIP_STATUS case handling in core require any unexpected normalization?
+- Are there remaining inline magic values in `backlog.py` that should be extracted?
+
+**Proceed to T3-T4 only after all quality gates pass.**
+
+---
+
+### SYNC CHECKPOINT 2: All Function Dedup Complete
+
+**Convergence point**: T3 + T4 + T5 outputs
+
+**Quality gates**:
+
+1. Zero duplicated function definitions in `backlog.py` for functions that exist in `backlog_core/` (T3 + T4 acceptance criteria)
+2. All Category A functions replaced with direct imports (T3)
+3. All Category B functions replaced with imports + adapters (T4)
+4. `backlog_item_to_display_dict` helper exists and correctly maps BacklogItem fields (T4)
+5. Test re-exports work: importlib-based tests pass without modification (T5)
+6. All 12 test files pass
+7. CLI commands produce identical output format (list, view, add)
+
+**Reflection questions**:
+
+- Did any function require unexpected adapter logic beyond what the architecture spec predicted?
+- Are there call sites where the dict-to-BacklogItem conversion is fragile or could fail on edge cases?
+- Should any re-exports be promoted to permanent APIs rather than backward-compatibility shims?
+
+**Proceed to T6 only after all quality gates pass.**
+
+---
+
+### SYNC CHECKPOINT 3: Final Verification Gate
+
+**Convergence point**: T6 output
+
+**Quality gates**:
+
+1. All 12 test files pass
+2. Linting passes on `backlog.py`
+3. `backlog.py` line count meaningfully reduced (target: <2200 from 2563)
+4. Git commit exists with `Fixes #611`
+5. No dead imports, no dead constants, no dead function definitions
+6. CLI smoke tests pass: `list`, `view`, `add --dryrun`
+
+**Reflection questions**:
+
+- Is the import block clean and organized (grouped by source module)?
+- Are there any TODO items left that should be tracked as backlog items?
+- Does the `_backlog_operations` import have a clear path to usage in a future task?
+
+**Feature complete after this checkpoint passes.**
