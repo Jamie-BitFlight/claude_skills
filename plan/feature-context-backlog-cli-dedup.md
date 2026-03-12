@@ -222,3 +222,31 @@ After questions are resolved:
 2. Finalize Goals section
 3. Proceed to RT-ICA assessment
 4. Then proceed to architecture design
+
+---
+
+## Post-Implementation Annotations
+
+_Added by context-refinement agent on 2026-03-12_
+
+### Design Refinements
+
+1. **`_find_fuzzy_duplicates` mis-classified as having a compatible core equivalent**: The feature context stated the ARCHITECTURE.md migration mapping covers all 9 CLI-only functions. In practice, the core `find_fuzzy_duplicates` accepts `list[BacklogItem]` while the CLI call site passes `list[dict]`. A direct import replacement was not possible without also updating the call site. The function was retained locally as a `list[dict]`-accepting implementation.
+   - Original: "9 functions NOT found in backlog_core" (Gap Analysis, Category 6) implied all 9 have confirmed core equivalents
+   - Actual: `_find_fuzzy_duplicates` has a core equivalent but with an incompatible signature — retained locally
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+2. **Monkeypatch constraint prevents `_parse_backlog_from_directory` from using core import**: The feature context identified `_parse_backlog_from_directory` as a dedup target. The test suite uses `monkeypatch.setattr(mod, "BACKLOG_DIR", ...)` which only affects the `backlog.py` module namespace. Core functions read `backlog_core.models.BACKLOG_DIR` directly and ignore these patches. The function was retained as a local implementation with an explicit comment documenting this constraint.
+   - Original: "_parse_backlog_from_directory ... will be replaced with imports + adapters" (implied by dedup scope)
+   - Actual: Retained as local implementation; test isolation constraint documented in function docstring
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+3. **Scope of constant imports narrower than documented**: The feature context listed 7 constants for replacement. The final import block does not include `SECTION_RE`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, and `GITHUB_ISSUE_TITLE_TRUNCATE` — these are not called in the CLI after dedup (clean removal, no dead imports).
+   - Original: "All 7 CLI-local constants are replaced with imports from backlog_core.models" (Goals item 1)
+   - Actual: 4 constants imported from core; 5 constants removed without import (not referenced in CLI)
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+4. **Net line reduction was ~97, not ~335**: The dedup removed fewer lines than the feature context's reduction target implied, primarily because two functions were retained locally and two adapter functions were added.
+   - Original: "backlog.py line count decreases meaningfully (target depends on Q4 resolution)" (Goals item 7)
+   - Actual: 2563 → 2466 lines (-97 net); 582 tests passing, ruff clean
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation

@@ -985,4 +985,43 @@ Return:
 - Are there any TODO items left that should be tracked as backlog items?
 - Does the `_backlog_operations` import have a clear path to usage in a future task?
 
+---
+
+### Discovered During Implementation
+
+_Session Date: 2026-03-12_
+
+During implementation, six discoveries were made that differ from the architect spec's predictions. None change the intent of the feature (deduplication), but they correct the spec's classification of two functions, explain why two local implementations were retained, document an unplanned adapter function, and record the actual outcome metrics.
+
+**Key Discoveries:**
+
+1. **`_find_fuzzy_duplicates` is Category B, not Category A**: The architect spec (Section 4.3, Rollout Step 3) classified `_find_fuzzy_duplicates` as a direct import replacement (Category A — no adapter needed). During implementation, the core function `find_fuzzy_duplicates` in `backlog_core/parsing.py` was found to accept `list[BacklogItem]`, not `list[dict]`. Because the CLI's `add` command calls `_find_fuzzy_duplicates` with a `list[dict]` (the output of `parse_backlog()`), a direct import would break call sites. The CLI retained a local implementation (`_find_fuzzy_duplicates`, line 359) that accepts `list[dict]`, mirroring the core logic but operating on the dict format. Future cleanup should either update the call site to pass `list[BacklogItem]` or wrap the core function at the boundary.
+
+2. **`_parse_backlog_from_directory` retained as full local implementation due to monkeypatch constraints**: The architect spec classified `_parse_backlog_from_directory` as Category B (replace with core import + adapter). During implementation, it was discovered that every test in the suite that calls `parse_backlog()` uses `monkeypatch.setattr(mod, "BACKLOG_DIR", ...)` to redirect the directory. The core function `parse_backlog_from_directory()` reads `backlog_core.models.BACKLOG_DIR` directly and ignores any patches applied to the `backlog.py` module namespace. Calling the core function would silently break all test isolation. The function was retained as a local implementation that reads the module-level `BACKLOG_DIR` name. Its doc comment explicitly states this constraint and warns against calling the core equivalent.
+
+3. **`_dict_to_backlog_item_fields` adapter added — not in architect spec**: The architect spec (Section 5.3–5.4) described one adapter function: `backlog_item_to_display_dict` (BacklogItem → dict). During implementation a second adapter was required: `_dict_to_backlog_item_fields` (dict → BacklogItem field kwargs), implemented as a local function at line 151. This is the inverse direction, needed at call sites where the CLI has a `list[dict]` and needs to pass individual items to core functions that accept `BacklogItem`. The spec assumed `BacklogItem.model_validate(d)` would suffice at call sites, but the CLI's dict keys use `_title`, `_section`, and `**Key**` formats that do not map directly to BacklogItem field names. A named helper function was required to make the field mapping explicit and reusable.
+
+4. **Constants `_COMMIT_PREFIX_RE` and `_FIELD_TO_INDEX` renamed to public names in models.py**: The architect spec's target import block (Section 4.5) imported these as private names already present in models.py. During implementation, the names were changed in `backlog_core/models.py` from private (`_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`) to public (`COMMIT_PREFIX_RE`, `FIELD_TO_INDEX`), with backwards-compat aliases pointing the old private names to the new public ones. The CLI now imports them under the new public names. `parsing.py` also updated its internal imports to use the private alias for backwards compatibility.
+
+5. **`SECTION_RE`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, `GITHUB_ISSUE_TITLE_TRUNCATE`, and `infer_type` not imported by CLI**: The architect spec listed all 7 constants for replacement and classified `infer_type` as Category A. In the final implementation, these are not present in the backlog.py import block. The CLI does not call `infer_type` at any reachable path, and the constants `SECTION_RE`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, and `GITHUB_ISSUE_TITLE_TRUNCATE` are not referenced in the CLI after the dedup. This is consistent with clean removal (no dead imports), not an oversight — but it means the dedup scope was narrower than the spec's exhaustive constant list.
+
+6. **Actual line reduction was ~97 lines (not ~335 estimated); final count is 2466**: The architect spec's Rollout Summary (Section 10) estimated ~335 lines removed, targeting a post-dedup count of ~2230. The actual result is 2466 lines (down from 2563 — a net reduction of 97). The gap is explained by discoveries 1–2 (two local implementations retained rather than replaced), the addition of two adapter functions (~50 lines), and the retained `parse_backlog()` wrapper function. The test count reported was 582 passing tests (not 12 files as the spec's baseline stated — the spec counted test files, not individual test cases).
+
+#### Updated Technical Details
+
+- `_find_fuzzy_duplicates` in backlog.py (line 359): local impl accepting `list[dict]` — NOT imported from core
+- `_parse_backlog_from_directory` in backlog.py (line 226): local impl reading module-level `BACKLOG_DIR` — NOT imported from core; retained for monkeypatch test compatibility
+- `_dict_to_backlog_item_fields(d: dict) -> dict` in backlog.py (line 151): new adapter converting CLI display dict keys to BacklogItem field names
+- `backlog_item_to_display_dict(item: BacklogItem) -> dict` in backlog.py (line 185): adapter as planned
+- `COMMIT_PREFIX_RE` in models.py (line 30): now public name; `_COMMIT_PREFIX_RE` is a backwards-compat alias on line 31
+- `FIELD_TO_INDEX` in models.py (line 72): now public name (was `_FIELD_TO_INDEX`)
+- `backlog.py` final line count: 2466 (was 2563)
+
+#### Gotchas for Future Developers
+
+- **Monkeypatch and module-level names**: Any function in backlog.py that needs to be testable with a redirected `BACKLOG_DIR` must read the name `BACKLOG_DIR` from the `backlog.py` module namespace, not from `backlog_core.models`. Calling the core equivalent bypasses the patch. This is a structural constraint of the test suite that cannot be resolved without refactoring tests to use a different isolation mechanism.
+- **`_find_fuzzy_duplicates` operates on `list[dict]`**: The CLI's `parse_backlog()` returns `list[dict]`. Any future change to make `parse_backlog()` return `list[BacklogItem]` would allow replacing `_find_fuzzy_duplicates` with the core import. These two changes are coupled.
+- **`_dict_to_backlog_item_fields` field mapping is the canonical dict-to-BacklogItem bridge**: When the CLI needs to pass a dict item to a core function, use this function rather than writing ad-hoc mappings. The `**Key**` format (e.g., `**Description**`, `**Priority**`) is the CLI's internal serialization of BacklogItem metadata fields.
+- **Test count vs test file count**: The spec's baseline of "12 test files" refers to test files, not individual test cases. The actual test count at session end was 582 passing tests. Use `uv run pytest .claude/skills/backlog/tests/ -q` to get the current count.
+
 **Feature complete after this checkpoint passes.**

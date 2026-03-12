@@ -686,3 +686,46 @@ print('SKIP_STATUS includes CLOSED: PASS')
 | **Total** | **12 functions + 10 constants** | | **~335 lines removed** | **7 commits** |
 
 Estimated `backlog.py` line count after: ~2230 (down from 2563). The remaining ~2230 lines are Typer command definitions, Rich display formatting, `_get_github`/`_try_get_github`, `_get_table_width`, and the `state_handler` integration.
+
+---
+
+## Post-Implementation Annotations
+
+_Added by context-refinement agent on 2026-03-12_
+
+### Design Refinements
+
+1. **`_find_fuzzy_duplicates` is Category B, not Category A**: Section 4.3 classified `_find_fuzzy_duplicates` as Category A (direct import, no adapter needed). The core function `parsing.find_fuzzy_duplicates` accepts `list[BacklogItem]`, not `list[dict]`. The CLI's `add` command calls it with the output of `parse_backlog()` which returns `list[dict]`. A local implementation was retained accepting `list[dict]`.
+   - Original: "`_find_fuzzy_duplicates` (line 365) | `parsing.find_fuzzy_duplicates` | **A** | No | Delete, import from parsing" (Section 4.3 table)
+   - Actual: Retained as local `_find_fuzzy_duplicates(title, items: list[dict], ...)` at line 359; core function not imported
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+2. **`_parse_backlog_from_directory` retained as local implementation, not replaced with core import**: Section 4.3 classified this as Category B (import + adapter). The test suite uses `monkeypatch.setattr(mod, "BACKLOG_DIR", ...)` which only patches the `backlog.py` namespace. Core's `parse_backlog_from_directory()` reads `backlog_core.models.BACKLOG_DIR` directly, ignoring patches. Replacing with the core import would silently break all test isolation.
+   - Original: "`_parse_backlog_from_directory` (line 191) | `parsing.parse_backlog_from_directory` | **B** | Yes: returns `list[BacklogItem]` not `list[dict]`" (Section 4.3 table)
+   - Actual: Retained as full local implementation reading module-level `BACKLOG_DIR`; doc comment documents the monkeypatch constraint and warns against calling the core equivalent
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+3. **Second adapter function `_dict_to_backlog_item_fields` added — not in spec**: Section 5.3–5.4 described one adapter (`backlog_item_to_display_dict`) and assumed `BacklogItem.model_validate(d)` would handle the reverse direction. The CLI's internal dict format uses `_title`, `_section`, and `**Key**` keys that do not map directly to BacklogItem field names. A named helper function `_dict_to_backlog_item_fields(d: dict) -> dict` was added at line 151 to make the field mapping explicit.
+   - Original: "dict to BacklogItem Conversion: `item = BacklogItem.model_validate(raw_dict)`" (Section 5.4)
+   - Actual: `_dict_to_backlog_item_fields(d)` helper added at line 151; used at call sites before `BacklogItem.model_validate()`
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+4. **`COMMIT_PREFIX_RE` and `FIELD_TO_INDEX` renamed from private to public in models.py**: The target import block (Section 4.5) showed these as underscore-prefixed names already in models.py. During implementation, the names were promoted from private (`_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`) to public, with backwards-compat aliases. The CLI imports the public names; `parsing.py` uses the private alias.
+   - Original: Target import block showed `COMMIT_PREFIX_RE` and `FIELD_TO_INDEX` as if already public (Section 4.5)
+   - Actual: Were private in models.py; promoted to public names with `_COMMIT_PREFIX_RE = COMMIT_PREFIX_RE` alias added for backwards compatibility
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+5. **`SECTION_RE`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `infer_type` not imported**: Section 4.2 listed all 10 constants for import and Section 4.3 classified `infer_type` as Category A. In the final implementation these are absent from the import block — the CLI does not reference them after dedup, so they were removed without adding a corresponding import (no dead imports).
+   - Original: All 10 constants listed in Section 4.2 as "REPLACE with import"; `infer_type` in Section 4.3 as Category A
+   - Actual: 4 constants imported (`BACKLOG_DIR`, `DEFAULT_REPO`, `FUZZY_DUPLICATE_THRESHOLD`, `GITHUB_ISSUE_URL_RE`, `MIN_FRONTMATTER_PARTS`, `BacklogItem`, `BacklogError`, `ItemNotFoundError`, `Output`, `COMMIT_PREFIX_RE`, `FIELD_TO_INDEX`); `SECTION_RE`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `infer_type` removed without import replacement
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+6. **Actual line reduction ~97 (not ~335 estimated); final count 2466**: Rollout Summary estimated ~335 lines removed, targeting ~2230 lines. Retained local implementations and added adapter functions account for the gap.
+   - Original: "~335 lines removed ... Estimated backlog.py line count after: ~2230" (Section 10 Rollout Summary)
+   - Actual: 2466 lines (was 2563); net -97; 582 tests passing, ruff clean
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
+
+7. **Test baseline was "12 test files" not 582 individual tests**: Section 7.1 and quality gates in the task file use "12 test files" as the baseline. The actual verification metric is 582 individual passing tests across those files.
+   - Original: "All 12 test files must pass" (Section 7.1); "12 test files pass" (constraint in spec header)
+   - Actual: 582 individual tests passing; test file count unchanged
+   - Recorded in: plan/tasks-1-backlog-cli-dedup.md, Discovered During Implementation
