@@ -321,13 +321,15 @@ class TestListItemsFiltering:
         assert items[0]["status"] == "status:in-progress"
         assert items[0]["milestone"] == "v2"
 
-    def test_list_items_without_status_still_calls_batch_fetch(self, mocker: MockerFixture) -> None:
-        """Verify list_items always calls batch_fetch_statuses (it returns {} when not needed).
+    def test_list_items_without_status_skips_batch_fetch(self, mocker: MockerFixture) -> None:
+        """Verify list_items skips batch_fetch_statuses when with_status=False and no status filter.
 
-        Tests: batch_fetch_statuses called unconditionally.
-        How: Call list_items with with_status=False; check batch fetch was called.
-        Why: batch_fetch_statuses is always invoked; status fields are populated only when
-             with_status=True.
+        Tests: batch_fetch_statuses is not called when neither with_status nor status is set.
+        How: Call list_items with with_status=False and no status filter; assert batch fetch
+             was not called.
+        Why: batch_fetch_statuses is only invoked when results require GitHub status data
+             (with_status=True or status filter provided). Skipping it avoids unnecessary
+             network calls.
         """
         import backlog_core.models as models
 
@@ -337,7 +339,7 @@ class TestListItemsFiltering:
 
         list_items(with_status=False, from_github=False)
 
-        mock_batch.assert_called_once()
+        mock_batch.assert_not_called()
 
     def test_list_items_from_github_calls_refresh(self, mocker: MockerFixture) -> None:
         """Verify list_items with from_github=True triggers a cache refresh.
