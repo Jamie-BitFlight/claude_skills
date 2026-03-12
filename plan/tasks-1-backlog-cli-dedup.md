@@ -1,6 +1,7 @@
 ---
 description: "Deduplicate backlog CLI by replacing local implementations with imports from backlog_core/"
 version: "1.0"
+feature: backlog-cli-dedup
 feature_slug: backlog-cli-dedup
 github_issue: 611
 architecture_spec: plan/architect-backlog-cli-dedup.md
