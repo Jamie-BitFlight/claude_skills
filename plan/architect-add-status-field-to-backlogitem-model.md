@@ -361,3 +361,21 @@ Not applicable for this change. The change reduces I/O (eliminates one file read
 - `operations.py:1196` -- the only caller in backlog_core
 
 All callers receive the same data. The only difference: `ViewItemResult.status` is now populated from the model field instead of a file re-read. The value is identical.
+
+---
+
+## Post-Implementation Annotations
+
+_Added by context-refinement agent on 2026-03-12_
+
+### Design Refinements
+
+1. **`view_result_from_local_item()` scope of change**: Section 4.2.2 specified replacing only lines 805-814 (the status re-read block) with `result.status = item.status`, keeping the earlier block at lines 791-804 intact. The actual implementation rewrote the entire function body as a single coherent flat block with no conditional sections.
+   - Original: "Replace entire block [lines 805-814] with `result.status = item.status`"
+   - Actual: Full function rewrite — `ViewItemResult(...)` constructor plus sequential `result.* = item.*` assignments for description, source, added, raw_body, status. The intermediate block structure at lines 791-804 (described in section 4.2.2 as "copies fields already on BacklogItem") was absorbed into the new flat structure. Observable behavior is identical.
+   - Recorded in: plan/tasks-1-add-status-field-to-backlogitem-model.md
+
+2. **ADR-003 outcome — legacy script left with comment**: Section 4.3.1 described a "minimum viable change" path: add `result["status"] = item.get("_status", "")` and keep the file re-read only for description/source/added. The implementer found `_status` is not populated on item dicts (confirming the "Alternative" path in ADR-003), so the function was left unchanged with a `# TODO(#612)` comment. The "minimum viable change" path was not taken.
+   - Original: "Add `result['status'] = item.get('_status', '')` as primary path, keep re-read for description/source/added"
+   - Actual: Function left completely unchanged; comment `# TODO(#612): status not available on item dict; re-read still needed` added at line 1894 before the status assignment
+   - Recorded in: plan/tasks-1-add-status-field-to-backlogitem-model.md

@@ -322,6 +322,36 @@ Both fixtures have `status: open`. New tests can reuse these fixtures to verify 
 - **Test fixtures:** `.claude/skills/backlog/tests/test_backlog_core_parsing.py` (lines ~1072-1148, use existing fixtures)
 
 ---
+
+### Discovered During Implementation
+
+_Session Date: 2026-03-12_
+
+During implementation, we discovered that `view_result_from_local_item()` had a slightly different structure than what the architect spec described. The spec characterized the old function as having two distinct phases: lines 791-804 copying fields already on `BacklogItem`, followed by lines 805-814 re-reading the file only for `status`. In reality, the pre-existing function also populated `description`, `source`, `added`, and `raw_body` via direct field copies in the same block — not through a file re-read. The file re-read covered status exclusively.
+
+The implementation cleaned up the entire function body as a coherent unit rather than making a minimal line-splice, resulting in a simpler function that reads naturally from top to bottom with no conditional block. This went slightly beyond the minimum viable change described in section 4.2.2, but achieved the same goal with a cleaner result.
+
+The legacy script (`backlog.py`) confirmed the `_status` key was NOT pre-populated on item dicts during parsing, so the file re-read block was retained for description/source/added/status with only a `# TODO(#612)` comment added for status. This matched the "if NO: leave unchanged" path in the requirements.
+
+**Key Discoveries:**
+
+1. **`view_result_from_local_item()` cleanup scope**: The spec described a minimal splice (replace lines 805-814 with one line). The actual implementation simplified the entire function body. The end state is functionally identical but structurally cleaner. Future changes to this function do not need to work around intermediate block boundaries — the function is now a flat sequence of field assignments.
+
+2. **Legacy script item dict gaps**: The `backlog.py` untyped dict items do not carry `_status` (or `_description`, `_source`, `_added`). The file re-read in `_view_result_from_local_item()` is load-bearing for all four fields. Full elimination requires either backfilling these keys during item dict construction (in the legacy parse path) or migrating callers to the `backlog_core` module. This is tracked by the `# TODO(#612)` comment at line 1894.
+
+3. **No `Intent Source` metadata in plan artifacts**: The feature-context and architect spec for this feature do not contain `Intent Source` headers (pre-policy artifacts). Per the plan artifact lifecycle policy, intent-divergence classification is skipped — all divergences default to design-refinement.
+
+#### Updated Technical Details
+
+- `view_result_from_local_item()` final shape (parsing.py lines 786-808): single `ViewItemResult(...)` constructor call followed by direct field assignments for description, source, added, raw_body, status — no conditional blocks, no file I/O
+- Legacy `_view_result_from_local_item()` (backlog.py lines 1883-1896): file re-read block retained intact; `# TODO(#612): status not available on item dict; re-read still needed` added at line 1894 before the status assignment
+
+#### Gotchas for Future Developers
+
+- The architect spec's line number references for `view_result_from_local_item()` (lines 791-804 and 805-814) do not correspond to the post-implementation line numbers. The function body is now shorter. Use grep/search to locate the function, not line numbers.
+- The legacy `backlog.py` script has a parallel `_view_result_from_local_item()` that is architecturally decoupled from `backlog_core`. Any future cleanup of the file re-read pattern there requires modifying the item dict construction phase in the legacy parse path, not just the view function.
+
+---
 task: T2
 title: Add test coverage for BacklogItem status field population
 status: complete

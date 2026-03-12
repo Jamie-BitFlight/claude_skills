@@ -167,3 +167,26 @@ After questions are resolved:
 2. Finalize Goals section
 3. Proceed to RT-ICA assessment
 4. Then proceed to architecture design
+
+---
+
+## Post-Implementation Annotations
+
+_Added by context-refinement agent on 2026-03-12_
+
+### Design Refinements
+
+1. **`view_result_from_local_item()` full function cleanup**: The implementation simplified the entire function body rather than making only the minimal splice described in the original request. The result is a flat sequence of field assignments with no conditional blocks or file I/O.
+   - Original: "Replace `view_result_from_local_item()` file re-read block with `result.status = item.status`"
+   - Actual: The entire function was rewritten as a clean flat assignment block — `ViewItemResult(...)` constructor plus direct `item.*` assignments for description, source, added, raw_body, and status. No file I/O anywhere in the function.
+   - Recorded in: plan/tasks-1-add-status-field-to-backlogitem-model.md
+
+2. **Legacy script left unchanged (best-effort path taken)**: The `_status` key is not present on item dicts in `backlog.py`'s untyped parse path, so the file re-read in `_view_result_from_local_item()` was retained with a `# TODO(#612)` comment. Q1 ("Should the legacy backlog.py script be updated too?") resolved as: partial — comment added, full fix deferred.
+   - Original: "Q1 resolution: pending"
+   - Actual: Legacy function unchanged; `# TODO(#612): status not available on item dict; re-read still needed` comment added at backlog.py line 1894
+   - Recorded in: plan/tasks-1-add-status-field-to-backlogitem-model.md
+
+3. **Q2 resolved as raw case preservation**: The `status` field stores the raw frontmatter value without lowercasing, matching the existing behavior of the old file re-read path.
+   - Original: "Q2 resolution: pending"
+   - Actual: `status=status_raw` (no `.lower()`); `skip=status_raw.lower() in {"done", "resolved"}` — separation preserved
+   - Recorded in: plan/tasks-1-add-status-field-to-backlogitem-model.md
