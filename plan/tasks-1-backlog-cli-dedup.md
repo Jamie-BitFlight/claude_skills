@@ -419,7 +419,7 @@ Return:
 ---
 task: T3
 title: Replace Category A functions with direct imports from backlog_core (no adapter needed)
-status: in-progress
+status: complete
 agent: python3-development:python-cli-architect
 dependencies: [T2]
 priority: 2
@@ -430,6 +430,7 @@ parallelize-with: []
 reason: "Sequential -- modifies backlog.py; depends on T2 so core is internally consistent before importing"
 handoff: "List of functions replaced, import block diff, call site audit results, test output"
 started: "2026-03-12T03:00:09Z"
+completed: "2026-03-12T03:22:00Z"
 ---
 
 ## Task T3: Replace Category A functions with direct imports from backlog_core (no adapter needed)
