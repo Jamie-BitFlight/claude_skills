@@ -1,15 +1,15 @@
 ---
 name: Enhance session-historian script with Agent SDK navigation and current session path reporting
-description: "Enhance the session-historian's session_query.py script with richer navigation capabilities: finding errors, tools used, user irritation signals and the actions that caused them. Also add the ability to return the current session's JSONL file path back to the Claude Code agent on demand. Enhancement should use the Agent SDK (https://platform.claude.com/docs/en/agent-sdk/sessions.md)."
+description: <div><sub>2026-03-11T15:47:18Z</sub>
 metadata:
   topic: enhance-session-historian-script-with-agent-sdk-navigation-a
   source: User request — session 2026-03-11
   added: '2026-03-11'
   priority: P1
   type: Feature
-  status: open
+  status: in-progress
   issue: '#599'
-  last_synced: '2026-03-11T15:52:05Z'
+  last_synced: '2026-03-12T12:47:32Z'
   groomed: '2026-03-11'
   plan: plan/tasks-6-session-historian-enhance.md
 ---

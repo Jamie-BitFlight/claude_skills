@@ -1,6 +1,6 @@
 ---
 name: Development Harness Architecture Refactor
-description: "Refactor the development-harness and python3-development plugins to establish a clean separation between process orchestration and domain knowledge.\n\nCurrent state: Both plugins evolved independently. python3-development has its own parallel SAM-like workflow that duplicates the harness pipeline, and 10 agents are duplicated across both plugins. No language manifest connects them.\n\nDesired outcome:\n1. development-harness owns ALL process, workflow, orchestration, CI monitoring, job dispatch, and agent spawning\n2. Language plugins (python3-development, future typescript/embedded/etc.) provide ONLY domain knowledge — skills, references, conventions, quality gate commands\n3. Generic role-based agents in the harness replace per-language specialist agents — a generic agent loads a workflow stage + domain skill(s) at dispatch time\n4. python3-development creates a language manifest per the existing schema in development-harness\n5. SDLC stage naming taxonomy established as namespace convention for all cross-plugin skills\n6. Single interop skill with references for reading/writing GSD .planning/ and Superpowers docs/superpowers/specs/ artifacts\n7. Nestable skill naming convention for decomposition levels (milestone, feature, story, task)\n\nSuccess criteria:\n- A generic harness agent can execute a Python task by loading stage workflow + python3 domain skill\n- python3-development works standalone for Python best practices without requiring the harness\n- The harness can read GSD planning artifacts and execute from them\n- The harness can read Superpowers spec artifacts and execute from them\n- No specialist agents needed in language plugins — only skills and references\n- Skill naming convention supports future language plugins (typescript, embedded, etc.)\n\nResearch first: What are conventional SDLC stage names (IEEE/ISO, SAFe) that could serve as the universal namespace for cross-plugin skill naming?"
+description: 'Type: unbounded-design'
 metadata:
   topic: development-harness-architecture-refactor
   source: Session observation — brainstorming discussion about harness architecture
@@ -9,7 +9,7 @@ metadata:
   type: Refactor
   status: open
   issue: '#581'
-  last_synced: '2026-03-11T03:15:38Z'
+  last_synced: '2026-03-12T12:47:34Z'
   groomed: '2026-03-11'
 ---
 

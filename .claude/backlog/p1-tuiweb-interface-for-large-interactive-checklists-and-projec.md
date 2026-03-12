@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#437'
-  last_synced: '2026-03-10T06:56:17Z'
+  last_synced: '2026-03-12T12:48:24Z'
   groomed: '2026-03-05'
 ---
 
@@ -435,4 +435,3 @@ The `hint` parameter lets Claude override when it has context the MCP server lac
 Alternative considered: inject endpoint registry into Claude's system prompt so Claude selects. Rejected (for now) because it couples routing logic into every skill prompt and makes the routing layer untestable independently.
 
 **Still needs**: Confirm MCP server is the right process boundary vs. a local Python CLI the skill calls directly. MCP server adds setup friction; CLI is simpler but loses the tool-call ergonomics.
-

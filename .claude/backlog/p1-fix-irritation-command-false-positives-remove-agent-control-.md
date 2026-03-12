@@ -1,16 +1,16 @@
 ---
 name: Fix irritation command false positives — remove agent-control words from correction phrases
-description: The _CORRECTION_PHRASES constant was defined in the architecture spec and implemented verbatim without validating the phrases against real session JSONL data. Words like "stop", "undo", "revert", "don't", "no," appear in ordinary conversational user messages in contexts unrelated to frustration. No analysis of actual session data was done before or during implementation to verify that each phrase reliably signals user frustration when it appears in a user-role record. Before fixing the phrase list, sample real session JSONL files and examine how each phrase actually appears in context. The fix should be driven by observed data, not a revised guess at a better list.
+description: <div><sub>2026-03-11T19:47:34Z</sub>
 metadata:
   topic: fix-irritation-command-false-positives-remove-agent-control-
   source: User feedback — 2026-03-11
   added: '2026-03-11'
   priority: P1
   type: Bug
-  status: open
+  status: in-progress
   issue: '#610'
   groomed: '2026-03-11'
-  last_synced: '2026-03-11T20:06:23Z'
+  last_synced: '2026-03-12T12:47:31Z'
   plan: plan/tasks-5-irritation-llm-fix.md
 ---
 

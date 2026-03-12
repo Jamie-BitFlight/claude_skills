@@ -1,15 +1,15 @@
 ---
 name: 'Backlog MCP: Timestamped entry blocks for section content'
-description: "When agents add or update sections on backlog items via backlog_update/backlog_groom (section + content parameters), there is no record of when each piece of content was written. Multiple updates to the same section silently replace previous content with no audit trail.\n\nThe backend should wrap section content in timestamped, addressable blocks using the format:\n```html\n<div><sub>2026-03-10T22:18:04Z</sub>\n\nContent here with **markdown** support.\n</div>\n```\n\nKey behaviors:\n- section + content (no entry_id): appends a new timestamped block to the section\n- entry_id provided: overwrites or removes that specific block. entry_id alone (no section) works if the ID is unique across the issue\n- Legacy content without div/sub wrappers gets assigned entry_id derived from item added date (e.g. 2026-03-09T00:00:00Z) on first new append\n- Parse: regex on `<div><sub>([^<]+)</sub>` extracts entry IDs\n- backlog_view response includes num_entries per section and entry metadata (id, preview)\n- Pagination operates on block/entry count, not line count\n- New tool: backlog_remove_entry(selector, entry_id) for explicit deletion\n\nAffected tools: backlog_update, backlog_groom, backlog_view. Possibly backlog_pull (merge logic needs to respect entry blocks)."
+description: 'Each content entry in a section is wrapped in a timestamped, addressable block:'
 metadata:
   topic: backlog-mcp-timestamped-entry-blocks-for-section-content
   source: User request
   added: '2026-03-11'
   priority: P1
   type: Feature
-  status: open
+  status: in-progress
   issue: '#583'
-  last_synced: '2026-03-11T03:18:12Z'
+  last_synced: '2026-03-12T12:47:33Z'
   groomed: '2026-03-11'
   plan: docs/superpowers/plans/2026-03-10-backlog-mcp-timestamped-entry-blocks.md
 ---

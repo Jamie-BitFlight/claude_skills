@@ -9,14 +9,14 @@ metadata:
   type: Feature
   status: open
   issue: '#398'
-  last_synced: '2026-03-10T06:56:21Z'
+  last_synced: '2026-03-12T12:48:27Z'
   plan: .claude/docs/process-audit-backlog-lifecycle-2026-03-02.md
   groomed: '2026-03-06'
 ---
 
 ## Story
 
-As a **developer**, I want **Process audit of the full backlog item lifecycle (create → groom → discuss → ...** so that **backlog items are tracked in GitHub**.
+As a **developer using Claude Code skills**, I want to **backlog lifecycle process gaps — 10 findings from improve-processes audit** so that **the tooling becomes more capable and complete**.
 
 ## Description
 

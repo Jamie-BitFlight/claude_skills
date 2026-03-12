@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/tasks-2-hooks-two-layer-pattern-followup-1.md
   issue: '#521'
-  last_synced: '2026-03-10T06:55:56Z'
+  last_synced: '2026-03-12T12:48:02Z'
 ---
 
 ## Story

@@ -7,9 +7,9 @@ metadata:
   added: '2026-03-08'
   priority: P1
   type: Bug
-  status: needs-grooming
+  status: in-progress
   issue: '#552'
-  last_synced: '2026-03-10T06:55:34Z'
+  last_synced: '2026-03-12T12:47:39Z'
 ---
 
 ## Story
