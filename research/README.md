@@ -57,7 +57,9 @@ research/
 ├── ai-design-tools/                   # AI-powered visual creation and design platforms
 │   ├── hedra.md                       # AI video/image/audio creation platform
 │   ├── jimeng.md                      # ByteDance SeedDance 2.0 AI video/image generation with cinematic camera control
-│   └── ui-ux-pro-max-skill.md        # AI design skill for 16 coding assistants with BM25 search over 67 styles, 96 palettes, 57 font pairings (34.9K stars)
+│   ├── ui-ux-pro-max-skill.md        # AI design skill for 16 coding assistants with BM25 search over 67 styles, 96 palettes, 57 font pairings (34.9K stars)
+│   ├── google-stitch.md              # Google Stitch - AI UI design tool generating app frontends from text/images using Gemini 2.5
+│   └── diode.md                      # Diode - Browser-based 3D hardware simulator for circuit building, programming, and simulation
 ├── ai-research-tools/                 # AI research tools and newsletters
 │   └── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
 ├── coding-agents/                     # Autonomous AI coding agent platforms
@@ -1085,6 +1087,7 @@ AI-powered visual creation platforms and design intelligence tools for video, im
 | [jimeng.md](./ai-design-tools/jimeng.md)    | Jimeng AI (即梦AI) - ByteDance SeedDance 2.0 multimodal video/image generation with cinematic camera control | 2026-02-23   |
 | [ui-ux-pro-max-skill.md](./ai-design-tools/ui-ux-pro-max-skill.md) | UI UX Pro Max - AI design skill injecting 67 styles, 96 palettes, 57 font pairings into 16 coding assistants via BM25+regex search (34.9K stars) | 2026-02-26   |
 | [google-stitch.md](./ai-design-tools/google-stitch.md) | Google Stitch - AI-powered UI design tool generating app frontends (HTML/CSS, React) from text prompts or images using Gemini 2.5 models; launched Google I/O 2025 (proprietary) | 2026-03-04   |
+| [diode.md](./ai-design-tools/diode.md) | Diode - Browser-based 3D hardware simulator for building, programming, and simulating circuits with Arduino support; shut down 2022, site still operational | 2026-03-12   |
 
 **Key Topics**:
 
