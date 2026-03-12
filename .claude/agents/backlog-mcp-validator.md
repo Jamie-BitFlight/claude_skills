@@ -109,7 +109,7 @@ Parameters:
   cleanup   bool  optional  Remove local file after resolve  (default: false)
   force     bool  optional  Resolve even with open PRs  (default: false)
 
-Returns: {title, reason, issue?, messages, warnings}
+Returns: {title, summary, issue?, messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py resolve "<title>" --reason "..."
 ```
 
@@ -127,7 +127,7 @@ Parameters:
   title           str|null  optional  Rename item title
   description     str|null  optional  Update item description
 
-Returns: {title, changes, messages, warnings}
+Returns: {title, changes: {field: value, ...}, messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py update "<title>" [--plan P] [--status S]
 ```
 
@@ -212,17 +212,19 @@ For each tool, call it via native MCP and verify the response contract:
 
 ### Step 4: Run Lifecycle Scenario
 
-End-to-end test using a throwaway item. Run with `create_issue=false` to avoid GitHub API calls:
+End-to-end test using a throwaway item. Run with `create_issue=false` on ALL calls to avoid GitHub API side effects:
 
 ```text
-1. backlog_add  — create "mcp-validator-test" item, priority P2, create_issue=false
-2. backlog_list — confirm item appears in result
-3. backlog_view — view item by title substring
-4. backlog_update — attach a plan path or set status
-5. backlog_groom — write a test section
+1. backlog_add    — create "mcp-validator-test" item, priority P2, create_issue=false
+2. backlog_list   — confirm item appears in result
+3. backlog_view   — view item by title substring; record whether "issue" field is set
+4. backlog_update — set status (use create_issue=false); do NOT use create_issue=true
+5. backlog_groom  — write a test section; do NOT allow GitHub issue creation
 6. backlog_resolve — resolve with reason "Validation test item", cleanup=true
-7. backlog_list — confirm item is gone
+7. backlog_list   — confirm item is gone from local list
 ```
+
+**CRITICAL**: Never pass `create_issue=true` on any call during validation. Some operations (like `backlog_groom`) may auto-create GitHub issues as a side effect — if Step 3's `backlog_view` shows an `issue` field appeared despite `create_issue=false`, record it as a finding and ensure Step 6 (Cleanup Verification) closes it.
 
 ### Step 5: Error Path Validation
 
@@ -234,6 +236,26 @@ Verify error handling:
 - backlog_close with checklist_pass=false → error key present
 - backlog_resolve with empty reason → error key present
 ```
+
+### Step 6: Cleanup Verification (MANDATORY)
+
+After all validation is complete, verify no test artifacts remain. This step runs unconditionally — even if earlier steps failed.
+
+```text
+1. backlog_list(title="mcp-validator-test") — check for any items matching the test prefix
+2. For EACH match found:
+   a. backlog_view(selector="{title}") — check if "issue" field contains a GitHub issue number
+   b. If issue exists: backlog_close(selector="{title}", plan="Validator cleanup — test artifact",
+      checklist_pass=true, cleanup=true, force=true)
+   c. If no issue: backlog_resolve(selector="{title}", reason="Validator cleanup — test artifact",
+      cleanup=true)
+3. backlog_list(title="mcp-validator-test") — confirm zero matches remain
+4. If any items still remain, report them in the FAIL section with their titles
+```
+
+**Why close vs resolve**: `backlog_close` closes both the local file AND the linked GitHub issue. `backlog_resolve` only handles the local file. Use `close` when a GitHub issue was inadvertently created; use `resolve` when no issue exists.
+
+**If cleanup itself fails**: Report the item title(s) and issue number(s) in the output under a `## Cleanup Failures` section so the caller can manually remove them. Never silently leave test artifacts behind.
 
 ---
 
@@ -275,6 +297,13 @@ Details:
 2. backlog_list: {result summary}
 ...
 
+## Cleanup Verification
+
+{PASS | FAIL}
+- Items found after lifecycle: {count}
+- GitHub issues closed: {count or N/A}
+- Items remaining: {count — must be 0 for PASS}
+
 ## Recommendations
 
 {Any follow-up fixes needed, ordered by priority}
@@ -285,9 +314,10 @@ Details:
 ## Scope Rules
 
 - Run ONLY validation code — do not modify backlog items or files except for the lifecycle throwaway item
-- Use `create_issue=false` on all add/update calls during validation to avoid GitHub API side effects
-- Clean up the throwaway item at the end of the lifecycle scenario (resolve with cleanup=true)
-- If cleanup fails, list the item title so the caller can clean up manually
+- Use `create_issue=false` on ALL add, update, and groom calls during validation to prevent GitHub issue creation
+- NEVER pass `create_issue=true` during validation — this is the primary cause of orphaned test artifacts
+- Step 6 (Cleanup Verification) is MANDATORY and runs even if earlier steps fail
+- If cleanup fails, report item titles and issue numbers in a `## Cleanup Failures` section — never leave artifacts silently
 - Report what you observed, not what you expect — if output doesn't match spec, cite the actual value
 
 ## Important Output Note
