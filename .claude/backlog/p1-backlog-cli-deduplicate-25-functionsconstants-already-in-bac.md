@@ -11,6 +11,7 @@ metadata:
   issue: '#611'
   last_synced: '2026-03-12T02:15:15Z'
   groomed: '2026-03-12'
+  plan: plan/tasks-1-backlog-cli-dedup.md
 ---
 
 ## Fact-Check
