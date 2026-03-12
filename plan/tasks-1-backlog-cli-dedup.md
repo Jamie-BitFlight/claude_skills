@@ -544,7 +544,7 @@ Return:
 ---
 task: T4
 title: Replace Category B functions with core imports plus dict/BacklogItem adapters
-status: not-started
+status: in-progress
 agent: python3-development:python-cli-architect
 dependencies: [T3]
 priority: 2
@@ -554,6 +554,7 @@ skills: ["python3-development"]
 parallelize-with: []
 reason: "Sequential -- modifies backlog.py; depends on T3 so Category A replacements are stable"
 handoff: "Functions replaced, adapter pattern used at each call site, display dict helper details, test output"
+started: "2026-03-12T03:09:00Z"
 ---
 
 ## Task T4: Replace Category B functions with core imports plus dict/BacklogItem adapters
