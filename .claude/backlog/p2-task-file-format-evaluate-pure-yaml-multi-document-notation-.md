@@ -5,13 +5,13 @@ metadata:
   topic: task-file-format-evaluate-pure-yaml-multi-document-notation-
   source: Not specified
   added: '2026-03-01'
-  priority: P2
+  priority: completed
   type: Enhancement
-  status: open
+  status: done
   issue: '#320'
   last_synced: '2026-03-02T01:11:27Z'
   groomed: '2026-03-02'
-  plan: plan/tasks-15-fix-multi-yaml-fence
+  plan: plan/tasks-15-fix-multi-yaml-fence/
 ---
 
 ## Story
