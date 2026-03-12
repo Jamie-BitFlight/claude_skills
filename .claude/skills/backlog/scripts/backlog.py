@@ -42,10 +42,9 @@ import json
 import os
 import re
 import sys
-from datetime import UTC, datetime
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any
 
 from dotenv import load_dotenv
 
@@ -77,31 +76,24 @@ from backlog_core import operations as _backlog_operations
 from backlog_core.entry_blocks import rewrite_section as _rewrite_section
 from backlog_core.github import create_issue_for_item as _create_issue_for_item
 from backlog_core.models import (
-    _COMMIT_PREFIX_RE,
     BACKLOG_DIR,
-    BENEFIT_MAP,
+    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
     DEFAULT_REPO,
+    FIELD_TO_INDEX,
     FUZZY_DUPLICATE_THRESHOLD,
-    GITHUB_ISSUE_TITLE_TRUNCATE,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
-    ROLE_MAP,
-    SECTION_RE,
-    SKIP_STATUS,
-    TYPE_TO_LABEL,
     BacklogError as _BacklogError,
     BacklogItem,
     ItemNotFoundError as _ItemNotFoundError,
+    Output as _Output,
 )
 from backlog_core.operations import update_item_metadata as _update_item_metadata
 from backlog_core.parsing import (
     build_issue_body as _build_issue_body,
     find_item as _find_item,
-    infer_type as _infer_type,
     normalize_issue_title as _normalize_issue_title,
     now_iso as _now_iso,
-    parse_backlog as _parse_backlog_core,
-    parse_backlog_from_directory as _parse_backlog_from_directory_core,
     parse_item_file as _parse_item_file_core,
     title_to_slug as _title_to_slug,
     today as _today,
@@ -485,8 +477,6 @@ def create_issue_for_item(repo: Repository, item: dict, dry_run: bool = False) -
     Returns:
         Issue number if created, None otherwise.
     """
-    from backlog_core.models import Output as _Output
-
     out = _Output()
     result = _create_issue_for_item(
         repo, BacklogItem.model_validate(_dict_to_backlog_item_fields(item)), dry_run=dry_run, output=out
@@ -1329,16 +1319,6 @@ def _build_backlog_frontmatter(
     return dump_frontmatter(post)
 
 
-_FIELD_TO_INDEX: dict[str, int] = {
-    "description": 0,
-    "suggested location": 1,
-    "research first": 2,
-    "decision needed": 3,
-    "files": 4,
-    "required work": 5,
-}
-
-
 def _apply_field_to_result(key_lower: str, val: str) -> tuple[str, str, str, str, str, str]:
     """Return (desc, suggested, research, decision, files_val, required_work) with val applied to the matching key.
 
@@ -1346,8 +1326,8 @@ def _apply_field_to_result(key_lower: str, val: str) -> tuple[str, str, str, str
         Tuple of (desc, suggested, research, decision, files_val, required_work).
     """
     result: list[str] = ["", "", "", "", "", ""]
-    if key_lower in _FIELD_TO_INDEX:
-        result[_FIELD_TO_INDEX[key_lower]] = val
+    if key_lower in FIELD_TO_INDEX:
+        result[FIELD_TO_INDEX[key_lower]] = val
     return (result[0], result[1], result[2], result[3], result[4], result[5])
 
 

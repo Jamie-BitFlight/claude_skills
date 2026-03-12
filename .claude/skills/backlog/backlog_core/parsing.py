@@ -28,10 +28,10 @@ from frontmatter_utils import dump_frontmatter, loads_frontmatter
 # Imports from sibling models module
 # ---------------------------------------------------------------------------
 from .models import (
-    _COMMIT_PREFIX_RE,
-    _FIELD_TO_INDEX,
     BACKLOG_DIR,
     BENEFIT_MAP,
+    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
+    FIELD_TO_INDEX as _FIELD_TO_INDEX,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,

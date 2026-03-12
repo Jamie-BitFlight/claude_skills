@@ -41,8 +41,8 @@ from .github import (
     view_enrich_from_github,
 )
 from .models import (
-    _COMMIT_PREFIX_RE,
     BACKLOG_DIR,
+    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
     DEFAULT_REPO,
     MIN_FRONTMATTER_PARTS,
     VALID_CLOSE_REASONS,
