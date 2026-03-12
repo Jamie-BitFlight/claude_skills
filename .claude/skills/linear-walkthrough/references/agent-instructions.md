@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Detailed instructions for each agent type spawned by the linear-walkthrough skill. Pass the relevant section to each agent as part of its prompt.
+Each section below contains the complete instructions for one agent role. The orchestrator passes the relevant section to each agent.
 
 ## Discovery Agent Instructions
 

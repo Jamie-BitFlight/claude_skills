@@ -8,9 +8,9 @@ argument-hint: '[target-directory]'
 
 Produce a navigable, fact-checked explanation of how a codebase works — from entry points through major execution paths — by orchestrating parallel subagents across four phases.
 
-Target directory: provided as argument (default: current working directory).
+Target directory: `<target-directory>` (default: current working directory).
 
-Output directory: `walkthrough/` inside the target directory.
+Output directory: `<target-directory>/walkthrough/` (created if it does not exist).
 
 ## Workflow
 
@@ -27,15 +27,21 @@ flowchart TD
     P4Out["Artifacts:<br>walkthrough/unified-walkthrough.md<br>walkthrough/open-questions.md"] --> Done(["Complete"])
 ```
 
+## Input Validation
+
+Before starting Phase 1, verify the target directory exists and contains source files. If the target directory does not exist or is empty, stop and report the error.
+
 ## Phase 1: Discovery and Planning
 
 Spawn one `general-purpose` agent to scan the repository and produce a coverage plan.
 
 ### Agent prompt context
 
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
 - Target directory path
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Discovery Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Coverage Plan Format" and "Entry Point Index Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Discovery Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads sections "Coverage Plan Format" and "Entry Point Index Format"
 
 ### Agent deliverables
 
@@ -57,10 +63,12 @@ Spawn N parallel `general-purpose` agents — one per assignment from the covera
 
 ### Agent prompt context (per agent)
 
-- Assignment scope from coverage-plan.md (agent ID, assigned files, entry points)
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
+- Assignment scope from coverage-plan.md (agent ID, assigned files, entry points) — this is the one exception: include the assignment text directly since each agent gets only its own assignment
 - Target directory path
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Tracing Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Walkthrough Section Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Tracing Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads section "Walkthrough Section Format"
 - Constraint: read at most 50k tokens of source files
 
 ### Agent deliverables (per agent)
@@ -79,14 +87,18 @@ Each section follows the format defined in [output-format.md](./references/outpu
 
 ## Phase 3: Validation
 
-Spawn M parallel `general-purpose` agents. Each validator checks one or more walkthrough sections produced in Phase 2. Assign validators so that no validator checks sections produced by the same agent that created them if possible.
+Spawn M parallel `general-purpose` agents. Each validator checks one or more walkthrough sections produced in Phase 2.
+
+Validator cross-assignment: rotate section assignments so validator 1 checks sections from agent 2, validator 2 checks sections from agent 3, and so on (wrapping around). If there are fewer validators than tracing agents, each validator checks multiple agents' sections. If there is only one tracing agent, the single validator checks all sections (self-validation is acceptable when no alternative exists).
 
 ### Agent prompt context (per validator)
 
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
 - Paths to assigned walkthrough section files
 - Target directory path (for source file access)
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Validation Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Validation Report Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Validation Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads section "Validation Report Format"
 - Constraint: read at most 50k tokens of explanation files plus relevant source context
 
 ### Agent deliverables (per validator)
@@ -99,7 +111,7 @@ Spawn M parallel `general-purpose` agents. Each validator checks one or more wal
 
 1. Read all validation reports from `walkthrough/validation/`.
 2. Check for blocking issues (incorrect sequencing, invented behavior, broken references).
-3. If critical corrections exist, instruct the original tracing agent (or a new agent) to apply corrections to the walkthrough section before synthesis.
+3. If critical corrections exist (incorrect sequencing, invented behavior, broken references), spawn a new `general-purpose` agent per affected section to apply the corrections. Pass the agent the validation report and the walkthrough section file path. The agent edits the section file in place.
 4. Proceed to Phase 4.
 
 ## Phase 4: Synthesis
@@ -108,11 +120,13 @@ Spawn one `general-purpose` agent to merge all validated walkthrough sections in
 
 ### Agent prompt context
 
-- All walkthrough section files from `walkthrough/sections/`
-- All validation reports from `walkthrough/validation/`
-- Entry points file from `walkthrough/entry-points.md`
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Synthesis Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Unified Walkthrough Format"
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
+- Directory path: `walkthrough/sections/` — agent reads all walkthrough section files
+- Directory path: `walkthrough/validation/` — agent reads all validation reports
+- File path: `walkthrough/entry-points.md`
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Synthesis Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads section "Unified Walkthrough Format"
 
 ### Agent deliverables
 

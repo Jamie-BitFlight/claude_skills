@@ -8,9 +8,9 @@ argument-hint: '[walkthrough-directory]'
 
 Transform validated `/linear-walkthrough` output into one presentation-ready deck outline per major codebase component. Each deck explains what the component is, how it works, how it connects to the system, how it is developed and operated, and what risks remain.
 
-Walkthrough directory: provided as argument (default: `walkthrough/` in current directory).
+Walkthrough directory: `<walkthrough-directory>` (default: `./walkthrough/` in the current directory).
 
-Output directory: `presentation/` inside the walkthrough directory.
+Output directory: `<walkthrough-directory>/presentation/` (created if it does not exist).
 
 ## Workflow
 
@@ -40,15 +40,21 @@ Read these artifacts from the walkthrough directory (all paths below are relativ
 | Entry points | `entry-points.md` | Yes |
 | Open questions | `open-questions.md` | Yes |
 
+## Input Validation
+
+Before starting Phase 1, verify all required walkthrough artifacts exist. Check for `unified-walkthrough.md` (or `unified/index.md`), at least one file matching `sections/walkthrough-section-*.md`, `coverage-plan.md`, `entry-points.md`, and `open-questions.md`. If any required artifact is missing, stop and report which files are absent.
+
 ## Phase 1: Component Extraction and Deck Planning
 
 Spawn one `general-purpose` agent to read walkthrough outputs and produce a component index and per-component deck plans.
 
 ### Agent prompt context
 
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
 - Walkthrough directory path
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Planning Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Component Index Format" and "Deck Plan Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Planning Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads sections "Component Index Format" and "Deck Plan Format"
 
 ### Agent deliverables
 
@@ -68,10 +74,12 @@ Spawn N parallel `general-purpose` agents — one per component from the deck pl
 
 ### Agent prompt context (per agent)
 
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
 - Component deck plan file path
 - Walkthrough directory path (for reading source sections and evidence references)
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Deck Generation Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Deck Outline Format" and "Slide Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Deck Generation Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads sections "Deck Outline Format" and "Slide Format"
 
 ### Agent deliverables (per agent)
 
@@ -86,15 +94,19 @@ Spawn N parallel `general-purpose` agents — one per component from the deck pl
 
 ## Phase 3: Validation
 
-Spawn M parallel `general-purpose` agents. Each validator checks one or more deck outlines against the source walkthrough. Cross-assign validators so they do not validate decks produced by the same agent that generated them.
+Spawn M parallel `general-purpose` agents. Each validator checks one or more deck outlines against the source walkthrough.
+
+Validator cross-assignment: rotate deck assignments so validator 1 checks decks from generation agent 2, validator 2 checks decks from generation agent 3, and so on (wrapping around). If there are fewer validators than generation agents, each validator checks multiple decks. If there is only one deck, the single validator checks it (self-validation is acceptable when no alternative exists).
 
 ### Agent prompt context (per validator)
+
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
 
 - Assigned deck outline file paths
 - Walkthrough directory path
 - Other deck outline file paths (for cross-deck consistency checks)
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Deck Validation Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Deck Validation Report Format"
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Deck Validation Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads section "Deck Validation Report Format"
 
 ### Agent deliverables (per validator)
 
@@ -105,7 +117,7 @@ Spawn M parallel `general-purpose` agents. Each validator checks one or more dec
 ### Orchestrator actions after Phase 3
 
 1. Read all validation reports.
-2. If critical corrections exist, instruct agents to apply them to deck outlines before packaging.
+2. If critical corrections exist (unsupported claims, invented architecture, incorrect sequencing), spawn a new `general-purpose` agent per affected deck to apply the corrections. Pass the agent the validation report and deck outline file path. The agent edits the deck file in place.
 3. Proceed to Phase 4.
 
 ## Phase 4: Packaging
@@ -114,11 +126,13 @@ Spawn one `general-purpose` agent to finalize all deck outlines and produce the 
 
 ### Agent prompt context
 
-- All deck outline files from `presentation/decks/`
-- All validation reports from `presentation/validation/`
-- Component index from `presentation/component-index.md`
-- Read [agent-instructions.md](./references/agent-instructions.md) section "Packaging Agent Instructions"
-- Read [output-format.md](./references/output-format.md) section "Presentation Crosswalk Format"
+Include these in the agent prompt (pass file paths — do not transcribe file contents):
+
+- Directory path: `presentation/decks/` — agent reads all deck outline files
+- Directory path: `presentation/validation/` — agent reads all validation reports
+- File path: `presentation/component-index.md`
+- File path: [agent-instructions.md](./references/agent-instructions.md) — agent reads section "Packaging Agent Instructions"
+- File path: [output-format.md](./references/output-format.md) — agent reads section "Presentation Crosswalk Format"
 
 ### Agent deliverables
 

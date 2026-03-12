@@ -200,7 +200,7 @@ File: `walkthrough/validation/validation-report-{id}.md`
 
 File: `walkthrough/unified-walkthrough.md`
 
-The unified walkthrough merges all validated sections into one navigable document with five major parts.
+The unified walkthrough merges all validated sections into one navigable document with six major parts.
 
 ### Part 1: Executive Overview
 

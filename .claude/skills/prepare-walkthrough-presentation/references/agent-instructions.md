@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Detailed instructions for each agent type spawned by the prepare-walkthrough-presentation skill. Pass the relevant section to each agent as part of its prompt.
+Each section below contains the complete instructions for one agent role. The orchestrator passes the relevant section to each agent.
 
 ## Planning Agent Instructions
 
@@ -107,6 +107,35 @@ Construct a presentation narrative and generate a full deck outline for one comp
 11. Build an evidence map linking each major claim to its source. Mark each claim as `[VERIFIED]`, `[INFERENCE]`, or `[UNCERTAIN]` — matching the convention used by the linear-walkthrough skill.
 
 12. Preserve technical accuracy and execution sequence from the walkthrough. Do not simplify away important ordering, dependencies, or handoffs.
+
+### Example Slide
+
+```markdown
+### Slide 3: Where API Gateway Sits in the System
+
+**Section**: System position
+
+**Purpose**: Show upstream clients and downstream services the gateway connects.
+
+**Key points**:
+
+- Receives HTTP requests from web frontend and mobile clients
+- Routes to auth-service, user-service, and billing-service
+- Applies rate limiting and request validation before forwarding
+
+**Suggested visual**: Component context diagram — API Gateway centered, with upstream clients on the left and downstream services on the right, showing request flow direction.
+
+**Speaker notes**:
+
+The API Gateway is the single ingress point for all client traffic. It performs JWT validation via the auth-service before forwarding requests. Rate limiting is configured per-route in `config/rate-limits.yaml`. The gateway does not transform request bodies — it forwards them unchanged to downstream services. Health checks from the load balancer hit `/healthz` which bypasses rate limiting (see `src/routes/health.ts:12`).
+
+**Evidence references**:
+
+- Section 2: API Gateway Flow — routing table and middleware chain
+- `src/gateway/router.ts:45` — route registration
+
+**Confidence**: High — verified against route configuration and middleware source
+```
 
 ### Output
 
