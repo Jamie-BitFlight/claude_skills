@@ -5,9 +5,9 @@ metadata:
   topic: backlog-add-status-field-to-backlogitem-model
   source: Code review 2026-03-11
   added: '2026-03-11'
-  priority: P2
+  priority: completed
   type: Refactor
-  status: in-progress
+  status: done
   issue: '#612'
   last_synced: '2026-03-14T01:26:48Z'
   groomed: '2026-03-12'
