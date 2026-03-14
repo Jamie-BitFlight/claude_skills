@@ -225,6 +225,8 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
         d["_groomed"] = item.groomed
     if item.last_synced:
         d["_last_synced"] = item.last_synced
+    if item.status:
+        d["_status"] = item.status
     return d
 
 
