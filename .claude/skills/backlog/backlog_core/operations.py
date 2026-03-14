@@ -2279,7 +2279,7 @@ def get_ready_sam_tasks(
     """
     out = output or Output()
     tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, output=out)
-    tasks: list[dict[str, object]] = tasks_result.get("tasks", [])
+    tasks: list[dict[str, object]] = [t for t in tasks_result.get("tasks", []) if isinstance(t, dict)]
     feature_slug = _extract_feature_slug(tasks)
     status_by_id = _build_task_status_map(tasks)
     ready: list[dict[str, object]] = [

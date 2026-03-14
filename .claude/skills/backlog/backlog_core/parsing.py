@@ -878,8 +878,8 @@ def parse_sam_task_metadata(body: str) -> SamTask | None:
         status=str(data.get("status", "not-started")),
         agent=str(data.get("agent", "")),
         priority=int(data.get("priority", 2)),
-        skills=list(skills_raw) if isinstance(skills_raw, list) else [],
-        dependencies=list(deps_raw) if isinstance(deps_raw, list) else [],
+        skills=[str(s) for s in skills_raw] if isinstance(skills_raw, list) else [],
+        dependencies=[str(d) for d in deps_raw] if isinstance(deps_raw, list) else [],
     )
 
 
