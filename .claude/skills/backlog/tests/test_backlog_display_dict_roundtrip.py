@@ -27,38 +27,17 @@ from backlog import _dict_to_backlog_item_fields, backlog_item_to_display_dict  
 class TestBacklogItemToDisplayDictStatusKey:
     """backlog_item_to_display_dict includes _status for non-empty status values."""
 
-    def test_backlog_item_to_display_dict_with_status_open_includes_status_key(self) -> None:
+    @pytest.mark.parametrize("status_value", ["open", "in-progress", "needs-grooming"])
+    def test_backlog_item_to_display_dict_with_non_empty_status_includes_status_key(self, status_value: str) -> None:
         # Arrange
-        item = BacklogItem(status="open")
+        item = BacklogItem(status=status_value)
 
         # Act
         result = backlog_item_to_display_dict(item)
 
         # Assert
         assert "_status" in result
-        assert result["_status"] == "open"
-
-    def test_backlog_item_to_display_dict_with_status_in_progress_includes_status_key(self) -> None:
-        # Arrange
-        item = BacklogItem(status="in-progress")
-
-        # Act
-        result = backlog_item_to_display_dict(item)
-
-        # Assert
-        assert "_status" in result
-        assert result["_status"] == "in-progress"
-
-    def test_backlog_item_to_display_dict_with_status_needs_grooming_includes_status_key(self) -> None:
-        # Arrange
-        item = BacklogItem(status="needs-grooming")
-
-        # Act
-        result = backlog_item_to_display_dict(item)
-
-        # Assert
-        assert "_status" in result
-        assert result["_status"] == "needs-grooming"
+        assert result["_status"] == status_value
 
     def test_backlog_item_to_display_dict_with_empty_status_omits_status_key(self) -> None:
         # Arrange

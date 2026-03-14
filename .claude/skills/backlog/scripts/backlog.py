@@ -1736,6 +1736,7 @@ def _view_result_from_local_item(item: dict) -> dict[str, Any]:
         "plan": item.get("**Plan**", ""),
         "file_path": item.get("_file_path", ""),
         "groomed": bool(item.get("_groomed")),
+        "status": item.get("_status", ""),
     }
     fp = item.get("_file_path")
     if fp and Path(fp).exists():
@@ -1748,8 +1749,6 @@ def _view_result_from_local_item(item: dict) -> dict[str, Any]:
         result["description"] = str(fm.get("description", ""))
         result["source"] = str(meta.get("source", fm.get("source", "")))
         result["added"] = str(meta.get("added", fm.get("added", "")))
-        # TODO(#612): status not available on item dict; re-read still needed
-        result["status"] = str(meta.get("status", fm.get("status", "")))
     return result
 
 
