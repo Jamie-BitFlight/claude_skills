@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -194,6 +195,17 @@ class Output(BaseModel):
     def to_dict(self) -> dict[str, list[str]]:
         """Return all collected messages as a dict (alias for model_dump)."""
         return self.model_dump()
+
+
+class SamTasksResult(TypedDict):
+    """Return type for ``get_sam_tasks``."""
+
+    tasks: list[dict[str, object]]
+    count: int
+    parent_issue_number: int
+    messages: list[str]
+    warnings: list[str]
+    errors: list[str]
 
 
 class IssueStatus(BaseModel):

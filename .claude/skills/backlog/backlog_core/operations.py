@@ -55,6 +55,7 @@ from .models import (
     ItemNotFoundError,
     Output,
     SamTask,
+    SamTasksResult,
     ValidationError,
     ViewItemResult,
 )
@@ -2146,9 +2147,7 @@ def create_sam_task(
     return {"issue_number": issue.number, "title": issue.title, "url": issue.html_url, **out.to_dict()}
 
 
-def get_sam_tasks(
-    parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None
-) -> dict[str, list[dict[str, object]] | int | list[str]]:
+def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None) -> SamTasksResult:
     """Fetch all SAM task sub-issues for a parent story issue.
 
     When GitHub is unavailable, falls back to the local cache file
@@ -2164,11 +2163,6 @@ def get_sam_tasks(
         and output messages.
     """
     out = output or Output()
-    empty: dict[str, list[dict[str, object]] | int] = {
-        "tasks": [],
-        "count": 0,
-        "parent_issue_number": parent_issue_number,
-    }
 
     repo = try_get_github()
     if repo is None:
@@ -2182,22 +2176,39 @@ def get_sam_tasks(
                 if cached.get("parent_issue_number") == parent_issue_number:
                     out.warn(f"  WARNING: GitHub unavailable — returning cached tasks from {cache_file.name}")
                     cached_tasks: list[dict[str, object]] = cached.get("tasks", [])
+                    count_raw = cached.get("count", len(cached_tasks))
                     return {
                         "tasks": cached_tasks,
-                        "count": cached.get("count", len(cached_tasks)),
+                        "count": int(count_raw) if isinstance(count_raw, int) else len(cached_tasks),
                         "parent_issue_number": parent_issue_number,
-                        **out.to_dict(),
+                        "messages": out.messages,
+                        "warnings": out.warnings,
+                        "errors": out.errors,
                     }
             except (json.JSONDecodeError, OSError):
                 continue
         out.warn(f"  WARNING: GitHub unavailable and no cache found for parent #{parent_issue_number}")
-        return {**empty, **out.to_dict()}
+        return {
+            "tasks": [],
+            "count": 0,
+            "parent_issue_number": parent_issue_number,
+            "messages": out.messages,
+            "warnings": out.warnings,
+            "errors": out.errors,
+        }
 
     sub_issues = get_task_issues(repo, parent_issue_number, output=out)
     tasks = _sub_issues_to_task_dicts(sub_issues)
     if refresh_cache and tasks and not _write_sam_task_cache(tasks, parent_issue_number):
         out.warn("  WARNING: Could not write SAM task cache — no feature slug found in tasks")
-    return {"tasks": tasks, "count": len(tasks), "parent_issue_number": parent_issue_number, **out.to_dict()}
+    return {
+        "tasks": tasks,
+        "count": len(tasks),
+        "parent_issue_number": parent_issue_number,
+        "messages": out.messages,
+        "warnings": out.warnings,
+        "errors": out.errors,
+    }
 
 
 def update_sam_task_status(
@@ -2279,7 +2290,7 @@ def get_ready_sam_tasks(
     """
     out = output or Output()
     tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, output=out)
-    tasks: list[dict[str, object]] = [t for t in tasks_result.get("tasks", []) if isinstance(t, dict)]
+    tasks: list[dict[str, object]] = tasks_result["tasks"]
     feature_slug = _extract_feature_slug(tasks)
     status_by_id = _build_task_status_map(tasks)
     ready: list[dict[str, object]] = [
