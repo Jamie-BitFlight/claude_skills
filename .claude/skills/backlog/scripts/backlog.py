@@ -202,7 +202,8 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
 
     Returns:
         Dict with ``_title``, ``_section``, ``_file_path``, ``_skip``, ``_issue``,
-        ``_raw_body``, ``_groomed``, ``_last_synced`` and ``**Key**`` metadata keys.
+        ``_raw_body``, ``_groomed``, ``_last_synced``, ``_status`` (conditional —
+        only present when ``item.status`` is non-empty) and ``**Key**`` metadata keys.
     """
     d: dict = {
         "_title": item.title,

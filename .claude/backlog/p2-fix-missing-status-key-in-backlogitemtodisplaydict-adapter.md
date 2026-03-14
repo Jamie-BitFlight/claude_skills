@@ -56,9 +56,9 @@ The backlog_item_to_display_dict adapter in backlog.py omits the _status key, bu
 
 ### Output / Evidence
 
-- Grep `.claude/skills/backlog/scripts/backlog.py` lines 207-228: `_status` is absent from `backlog_item_to_display_dict` return dict.
-- Grep `.claude/skills/backlog/scripts/backlog.py` line 186: `_dict_to_backlog_item_fields` reads `d.get("_status", "")` — receives `None` on every round-trip.
-- All call sites of `_dict_to_backlog_item_fields` (lines 336, 366, 388, 404, 425, 436, 450) silently lose `status` on items that passed through `backlog_item_to_display_dict`.
+- Grep `.claude/skills/backlog/scripts/backlog.py` function `backlog_item_to_display_dict`: `_status` is absent from return dict.
+- Grep `.claude/skills/backlog/scripts/backlog.py` function `_dict_to_backlog_item_fields`: reads `d.get("_status", "")` — receives `None` on every round-trip.
+- All call sites of `_dict_to_backlog_item_fields` in `backlog.py` silently lose `status` on items that passed through `backlog_item_to_display_dict`.
 - No existing tests cover either adapter function (grep of test directory returned zero matches).
 
 ### Priority
@@ -68,7 +68,7 @@ The backlog_item_to_display_dict adapter in backlog.py omits the _status key, bu
 ### Impact
 
 - Blocks: Any call site that round-trips a `BacklogItem` through `backlog_item_to_display_dict` then `_dict_to_backlog_item_fields` loses the `status` field silently.
-- Affected call sites: lines 336, 366, 388, 404, 425, 436, 450 in `backlog.py` — all perform `BacklogItem.model_validate(_dict_to_backlog_item_fields(d))`.
+- Affected call sites: all functions in `backlog.py` that call `BacklogItem.model_validate(_dict_to_backlog_item_fields(d))`.
 - Bottleneck: The asymmetry between the two adapter functions is the single point of failure.
 
 ### Benefits
@@ -99,8 +99,8 @@ After the fix, a `BacklogItem` with any `status` value survives a full round-tri
 
 | Type | Item |
 |------|------|
-| Prior work | `.claude/skills/backlog/scripts/backlog.py` — `backlog_item_to_display_dict` (line 190), `_dict_to_backlog_item_fields` (line 156) |
-| Prior work | `.claude/skills/backlog/backlog_core/models.py` — `BacklogItem.status: str = ""` (line 164) |
+| Prior work | `.claude/skills/backlog/scripts/backlog.py` — functions `backlog_item_to_display_dict`, `_dict_to_backlog_item_fields` |
+| Prior work | `.claude/skills/backlog/backlog_core/models.py` — `BacklogItem.status: str = ""` |
 | Prior work | `.claude/skills/backlog/tests/` — existing test files (no current adapter coverage) |
 
 ### Dependencies
@@ -160,9 +160,9 @@ The defect is a specific omission in an adapter function causing silent data los
 Claims checked: 2
 VERIFIED: 2 | REFUTED: 0 | INCONCLUSIVE: 0
 
-- [VERIFIED] `_dict_to_backlog_item_fields` reads `d.get("_status", "")` — File: `.claude/skills/backlog/scripts/backlog.py` line 186
-- [VERIFIED] `backlog_item_to_display_dict` does NOT include `"_status"` in its output dict — File: `.claude/skills/backlog/scripts/backlog.py` lines 190–228 (confirmed by groomer agent verification)
-- [VERIFIED] `BacklogItem.status` is `str = ""` (plain string, no enum) — File: `.claude/skills/backlog/backlog_core/models.py` line 164
+- [VERIFIED] `_dict_to_backlog_item_fields` reads `d.get("_status", "")` — File: `.claude/skills/backlog/scripts/backlog.py` function `_dict_to_backlog_item_fields`
+- [VERIFIED] `backlog_item_to_display_dict` does NOT include `"_status"` in its output dict — File: `.claude/skills/backlog/scripts/backlog.py` function `backlog_item_to_display_dict` (confirmed by groomer agent verification)
+- [VERIFIED] `BacklogItem.status` is `str = ""` (plain string, no enum) — File: `.claude/skills/backlog/backlog_core/models.py` field `BacklogItem.status`
 </div>
 
 ## RT-ICA
@@ -179,10 +179,10 @@ VERIFIED: 2 | REFUTED: 0 | INCONCLUSIVE: 0
 Goal: Eliminate latent data loss during round-trip dict conversions by ensuring _status is present in backlog_item_to_display_dict output.
 
 Conditions:
-1. backlog_item_to_display_dict omits _status | Status: AVAILABLE | Evidence: grep + groomer verification, lines 190–228
-2. _dict_to_backlog_item_fields reads d.get("_status") | Status: AVAILABLE | Evidence: line 186 confirmed
-3. Fix location is backlog_item_to_display_dict in backlog.py | Status: AVAILABLE | Evidence: line 190 confirmed
-4. item.status exists on BacklogItem model | Status: AVAILABLE | Evidence: models.py line 164, str field
+1. backlog_item_to_display_dict omits _status | Status: AVAILABLE | Evidence: grep + groomer verification of function body
+2. _dict_to_backlog_item_fields reads d.get("_status") | Status: AVAILABLE | Evidence: function body confirmed
+3. Fix location is backlog_item_to_display_dict in backlog.py | Status: AVAILABLE | Evidence: function identified
+4. item.status exists on BacklogItem model | Status: AVAILABLE | Evidence: BacklogItem.status field, str type
 5. No tests currently cover this round-trip | Status: AVAILABLE | Evidence: groomer confirmed zero tests for either adapter
 
 Decision: APPROVED

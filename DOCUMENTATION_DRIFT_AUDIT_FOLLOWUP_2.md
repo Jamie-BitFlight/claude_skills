@@ -1,7 +1,7 @@
 # Documentation Drift Audit: backlog_item_to_display_dict Change
 
 **Generated**: 2026-03-14
-**Repository**: /home/user/claude_skills
+**Repository**: claude_skills
 **Analyzed Change**: Addition of `"_status": item.status` to `backlog_item_to_display_dict` function output
 **Issue**: #670
 **Task File**: plan/tasks-36-backlog-cli-dedup-followup-2.md
@@ -28,10 +28,10 @@ The implementation change to add `"_status": item.status` to the `backlog_item_t
 ### 1. Documentation References to `backlog_item_to_display_dict`
 
 **Files Analyzed**:
-- `/home/user/claude_skills/plan/architect-backlog-cli-dedup.md` (Architecture spec)
-- `/home/user/claude_skills/plan/tasks-1-backlog-cli-dedup.md` (Main task file)
-- `/home/user/claude_skills/.claude/backlog/p2-fix-missing-status-key-in-backlogitemtodisplaydict-adapter.md` (Backlog item)
-- `/home/user/claude_skills/plan/tasks-36-backlog-cli-dedup-followup-2.md` (Current task file)
+- `plan/architect-backlog-cli-dedup.md` (Architecture spec)
+- `plan/tasks-1-backlog-cli-dedup.md` (Main task file)
+- `.claude/backlog/p2-fix-missing-status-key-in-backlogitemtodisplaydict-adapter.md` (Backlog item)
+- `plan/tasks-36-backlog-cli-dedup-followup-2.md` (Current task file)
 
 #### Reference 1: Architecture Spec (Section 5.3)
 
@@ -200,7 +200,7 @@ needed -- Pydantic's constructor handles the mapping.
 
 **Category**: Documented but Outdated Example
 **Priority**: Low
-**File**: `/home/user/claude_skills/plan/architect-backlog-cli-dedup.md`
+**File**: `plan/architect-backlog-cli-dedup.md`
 **Lines**: 283-293
 
 **Evidence**:
@@ -233,7 +233,7 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
 
 **Category**: Implemented but Undocumented (Internal Helper)
 **Priority**: Medium
-**File**: `/home/user/claude_skills/plan/architect-backlog-cli-dedup.md`
+**File**: `plan/architect-backlog-cli-dedup.md`
 **Gap**: Section 5.4 (dict to BacklogItem Conversion)
 
 **Evidence**:
@@ -294,7 +294,7 @@ Together, these ensure symmetric round-trip conversion:
 
 **Category**: Acceptance Criterion Incomplete
 **Priority**: Medium
-**File**: `/home/user/claude_skills/plan/tasks-36-backlog-cli-dedup-followup-2.md`
+**File**: `plan/tasks-36-backlog-cli-dedup-followup-2.md`
 **Lines**: 91-96 (Acceptance Criteria #3)
 
 **Evidence**:
@@ -364,7 +364,7 @@ The change to add `"_status": item.status` to `backlog_item_to_display_dict` out
 3. **Well-motivated** by the silent failure prevention principle
 4. **Tested-ready** (round-trip test requirement exists but not yet completed)
 
-### Minor Documentation Gaps (Low Priority):
+### Minor Documentation Gaps (Low Priority)
 
 1. **Example fields in spec**: The docstring example in Section 5.3 predates the full field list and does not explicitly show `_status` (and other underscore-prefixed fields)
 2. **Missing helper documentation**: The architecture spec (Section 5.4) does not document `_dict_to_backlog_item_fields` helper, which was added during implementation
@@ -394,12 +394,12 @@ The change to add `"_status": item.status` to `backlog_item_to_display_dict` out
 ## Files Examined
 
 **Documentation Files**:
-- `/home/user/claude_skills/plan/architect-backlog-cli-dedup.md` (Lines: 1-730, relevant sections: 5.2-5.6)
-- `/home/user/claude_skills/plan/tasks-1-backlog-cli-dedup.md` (Lines: 1-731, full file)
-- `/home/user/claude_skills/plan/tasks-36-backlog-cli-dedup-followup-2.md` (Lines: 1-190, full file)
-- `/home/user/claude_skills/.claude/backlog/p2-fix-missing-status-key-in-backlogitemtodisplaydict-adapter.md` (Lines: 1-166, full file)
+- `plan/architect-backlog-cli-dedup.md` (Lines: 1-730, relevant sections: 5.2-5.6)
+- `plan/tasks-1-backlog-cli-dedup.md` (Lines: 1-731, full file)
+- `plan/tasks-36-backlog-cli-dedup-followup-2.md` (Lines: 1-190, full file)
+- `.claude/backlog/p2-fix-missing-status-key-in-backlogitemtodisplaydict-adapter.md` (Lines: 1-166, full file)
 
 **Implementation Files**:
-- `/home/user/claude_skills/.claude/skills/backlog/scripts/backlog.py` (Lines: 150-230, adapter functions)
+- `.claude/skills/backlog/scripts/backlog.py` (Lines: 150-230, adapter functions)
 
 **Audit Scope**: Internal adapter functions only; no changes to CLI commands, core API, or test suite examined outside of acceptance criteria documentation.

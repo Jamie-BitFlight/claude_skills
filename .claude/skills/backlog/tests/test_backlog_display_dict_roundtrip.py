@@ -5,17 +5,22 @@ Covers: _status field presence and full status round-trip for all relevant statu
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
 from backlog_core.models import BacklogItem
 
-# Ensure scripts/ directory is importable (conftest adds backlog root, but backlog.py
-# lives one level deeper in scripts/).
-_SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
+# Load backlog.py via importlib — the .claude/ path prefix breaks normal import resolution.
+_SCRIPT = Path(__file__).parent.parent / "scripts" / "backlog.py"
+_spec = importlib.util.spec_from_file_location("backlog", _SCRIPT)
+assert _spec is not None, f"Cannot find spec for {_SCRIPT}"
+assert _spec.loader is not None, f"Cannot find loader for {_SCRIPT}"
+if "backlog" not in sys.modules:
+    _mod = importlib.util.module_from_spec(_spec)
+    sys.modules["backlog"] = _mod
+    _spec.loader.exec_module(_mod)
 
 from backlog import _dict_to_backlog_item_fields, backlog_item_to_display_dict  # ty: ignore[unresolved-import]
 
