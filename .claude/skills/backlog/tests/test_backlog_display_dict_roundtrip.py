@@ -17,7 +17,7 @@ _SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from backlog import _dict_to_backlog_item_fields, backlog_item_to_display_dict
+from backlog import _dict_to_backlog_item_fields, backlog_item_to_display_dict  # ty: ignore[unresolved-import]
 
 # ---------------------------------------------------------------------------
 # backlog_item_to_display_dict — _status key presence
