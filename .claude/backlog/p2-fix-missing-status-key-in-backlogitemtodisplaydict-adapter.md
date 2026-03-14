@@ -7,10 +7,11 @@ metadata:
   added: '2026-03-12'
   priority: P2
   type: Bug
-  status: in-progress
+  status: needs-grooming
   issue: '#670'
   last_synced: '2026-03-14T15:59:42Z'
   plan: plan/tasks-36-backlog-cli-dedup-followup-2.md
+  groomed: '2026-03-14'
 ---
 
 ## Story
@@ -33,8 +34,12 @@ The backlog_item_to_display_dict adapter in backlog.py omits the _status key, bu
 - **Added**: 2026-03-12
 - **Research questions**: None
 
-
 ## Groomed (2026-03-14)
+
+### Groomed
+
+<div><sub>2026-03-14T03:21:12Z</sub>
+
 
 ### RT-ICA
 
@@ -111,6 +116,21 @@ Small — single-line addition to `backlog_item_to_display_dict` plus one round-
 
 ### Root-Cause Analysis
 
+<div><sub>2026-03-12T00:00:00Z</sub>
+
+5-Whys (defect classification):
+
+1. `backlog_item_to_display_dict` omits `_status` because the status field was not present when the adapter was written.
+2. The two adapter functions evolved asymmetrically — each modified independently without cross-checking the other.
+3. No round-trip test existed to catch field parity violations between the two functions.
+4. Adapter functions were added as internal helpers without test contracts.
+5. Root cause: internal adapters evolved without enforced parity — fix requires BOTH the missing field AND a round-trip test to prevent recurrence.
+
+</div>
+</div>
+
+<div><sub>2026-03-14T03:22:10Z</sub>
+
 5-Whys:
 1. Why missing? — status field was not added when the adapter was first written
 2. Why not added? — backlog_item_to_display_dict and _dict_to_backlog_item_fields evolved asymmetrically as internal helpers
@@ -119,17 +139,23 @@ Small — single-line addition to `backlog_item_to_display_dict` plus one round-
 5. Root cause: adapter functions evolved without parity contracts
 
 Fix requires: (a) add `"_status": item.status` to backlog_item_to_display_dict return dict AND (b) add a round-trip test asserting field identity.
+</div>
 
 ### Issue Classification
+
+<div><sub>2026-03-14T03:21:58Z</sub>
 
 Type: defect
 Analysis method: 5-whys
 
 The defect is a specific omission in an adapter function causing silent data loss on every round-trip through the two adapter functions.
+</div>
 
 
 
 ## Fact-Check
+
+<div><sub>2026-03-14T03:21:42Z</sub>
 
 Claims checked: 2
 VERIFIED: 2 | REFUTED: 0 | INCONCLUSIVE: 0
@@ -137,8 +163,18 @@ VERIFIED: 2 | REFUTED: 0 | INCONCLUSIVE: 0
 - [VERIFIED] `_dict_to_backlog_item_fields` reads `d.get("_status", "")` — File: `.claude/skills/backlog/scripts/backlog.py` line 186
 - [VERIFIED] `backlog_item_to_display_dict` does NOT include `"_status"` in its output dict — File: `.claude/skills/backlog/scripts/backlog.py` lines 190–228 (confirmed by groomer agent verification)
 - [VERIFIED] `BacklogItem.status` is `str = ""` (plain string, no enum) — File: `.claude/skills/backlog/backlog_core/models.py` line 164
+</div>
 
 ## RT-ICA
+
+<div><sub>2026-03-12T00:00:00Z</sub>
+
+- Decision: APPROVED
+- All conditions AVAILABLE or DERIVABLE from codebase inspection.
+- Fact-check: 2/2 claims VERIFIED against source.
+</div>
+
+<div><sub>2026-03-14T03:21:52Z</sub>
 
 Goal: Eliminate latent data loss during round-trip dict conversions by ensuring _status is present in backlog_item_to_display_dict output.
 
@@ -151,3 +187,4 @@ Conditions:
 
 Decision: APPROVED
 Missing: None
+</div>
