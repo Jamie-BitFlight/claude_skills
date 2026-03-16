@@ -355,6 +355,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [softaworks-agent-toolkit.md](./skill-generation-tools/softaworks-agent-toolkit.md) | Softaworks Agent Toolkit - 43 skills, 6 agents, 7 slash commands for Claude Code with multi-platform support (621 stars) | 2026-02-20   |
 | [obsidian-skills.md](./skill-generation-tools/obsidian-skills.md)     | Obsidian Skills - 5 modular Agent Skills for Obsidian (markdown, bases, JSON Canvas, CLI, defuddle) by Steph Ango (13.3K stars) | 2026-03-12   |
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
+| [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
 
 **Key Topics**:
 
