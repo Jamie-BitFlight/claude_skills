@@ -916,6 +916,7 @@ Memory systems, context window optimization tools, and RAG solutions for maintai
 | [local-memory.md](./context-management/local-memory.md)   | Local Memory - persistent memory infrastructure with MCP, REST API, CLI, embedded Qdrant, and knowledge evolution (L0-L3)      | 2026-02-07   |
 | [sourcesyncai.md](./context-management/sourcesyncai.md)   | SourceSync.ai - managed RAG platform with 15+ auto-syncing connectors, hybrid search, BYOC storage, and MCP integration       | 2026-02-23   |
 | [straion.md](./context-management/straion.md)             | Straion - SaaS rules-management platform that dynamically injects relevant engineering standards into AI coding agents (Claude Code, Cursor, Copilot) at task time; validates agent plans against rules before code is written | 2026-03-04   |
+| [slimcontext.md](./context-management/slimcontext.md)     | SlimContext — zero-dependency TypeScript library for chat history compression; TrimCompressor (token-based drop) and SummarizeCompressor (AI-powered); BYOM model interface; preserves system messages and recent messages by default (v2.1.3, 22 stars) | 2026-03-17   |
 | [unblocked.md](./context-management/unblocked.md)         | Unblocked — context engine augmenting AI coding agents with org knowledge (27+ integrations: GitHub, Slack, Confluence, Jira, Linear); 5-component retrieval, MCP server, 48% token reduction, 83% faster task completion; $29/user/mo Platform tier (SOC 2 Type II) | 2026-03-13   |
 
 **Key Topics**:
@@ -1084,6 +1085,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 
 | Document                                                  | Description                                                                                                                    | Last Updated |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| [awesome-ai-apps.md](./ai-research-tools/awesome-ai-apps.md) | Awesome AI Apps — curated collection of 76 AI agent projects across 6 categories (Starter, Simple, MCP, Memory, RAG, Advanced Agents); 8-lesson AWS Strands course; 10+ frameworks (Agno, LangChain, CrewAI, PydanticAI); 9,278 stars | 2026-03-17   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
 
 **Key Topics**:
@@ -1195,6 +1197,7 @@ Interactive prompt development platforms and tools for iterating on LLM prompts,
 | [google-ai-studio.md](./prompt-engineering/google-ai-studio.md) | Google AI Studio — free browser-based IDE for Gemini API with 20+ models, function calling, Google Search grounding, sandboxed code execution, and OpenAI-compatible endpoint | 2026-02-23 |
 | [nano-banana-pro-prompting.md](./prompt-engineering/nano-banana-pro-prompting.md) | Nano-Banana Pro Prompting Guide — 10-category strategy guide for Google's `gemini-3-pro-image-preview` Thinking image model covering text rendering, character consistency, Search grounding, in-painting, 2D↔3D translation, 4K output, visual reasoning, storyboarding, and structural layout control | 2026-02-23 |
 | [prompt-engine.md](./prompt-engineering/prompt-engine.md) | Prompt Engine — SaaS prompt generator and optimizer that converts plain-language descriptions into professional-grade prompts in < 15 seconds; includes library/tagging for reuse ($19/month) | 2026-02-23 |
+| [ctxforge.md](./prompt-engineering/ctxforge.md)           | ctxforge — protocol-based context engineering framework; 16 markdown workflows auto-loaded via intent detection (~95% accuracy); 30+ performance/quality directives; project.md cross-session memory; ~15K token overhead (7.5%); v3.1.2, 22 stars | 2026-03-17 |
 | [system-prompts-ai-tools.md](./prompt-engineering/system-prompts-ai-tools.md) | x1xhlol/system-prompts-and-models-of-ai-tools — 30,000+ lines of leaked system prompts and model configs for 30+ AI tools including Claude Code, Cursor, Windsurf, Devin AI, Copilot, v0, Replit (117.9K stars, GPL-3.0) | 2026-02-23 |
 
 **Key Topics**:
