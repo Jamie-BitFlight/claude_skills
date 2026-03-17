@@ -85,7 +85,7 @@ The result is a production-ready integration you can actually use reliably.
 
 ## Supported Languages
 
-- **Python** with FastMCP 3.x framework (primary — fully supported, all v3 patterns covered)
+- **Python** with FastMCP 3.x framework (primary — fully supported through v3.1, all patterns covered). Source: [PrefectHQ/fastmcp](https://github.com/PrefectHQ/fastmcp)
 - **TypeScript/Node.js** — legacy reference only; the included reference file is not updated for FastMCP v3 and covers v2-era patterns
 
 Python implementations include:
@@ -94,7 +94,11 @@ Python implementations include:
 - Async/await patterns for I/O operations
 - Proper error handling and logging
 - Security best practices
-- Transport options (STDIO, HTTP); SSE is a client-compatibility option for connecting to legacy servers, not a v3 server transport
+- Transport options (STDIO, HTTP, `FASTMCP_TRANSPORT` env var); SSE is a client-compatibility option for connecting to legacy servers, not a v3 server transport
+- Server-level transforms (Tool Search, CodeMode for large tool catalogs)
+- MultiAuth and PropelAuth for flexible authentication
+- Prefab Apps for interactive UI components (experimental)
+- nginx reverse proxy deployment guidance
 
 ## What's Included
 

@@ -8,6 +8,9 @@ SOURCE: `.claude/worktrees/fastmcp/docs/integrations/gemini.mdx` (accessed 2026-
 SOURCE: `.claude/worktrees/fastmcp/docs/integrations/fastapi.mdx` (accessed 2026-03-05)
 SOURCE: `.claude/worktrees/fastmcp/docs/integrations/claude-code.mdx` (accessed 2026-03-05)
 SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17) — PropelAuth integration (v3.1)
+SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — Prefab Apps (v3.1)
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — Google GenAI sampling handler (v3.1)
 
 ---
 
@@ -325,6 +328,169 @@ claude mcp add my-server --scope user -- uv run --with fastmcp fastmcp run serve
 CONSTRAINT: Claude Code must be installed and the CLI available at `~/.claude/local/claude` for `fastmcp install claude-code` to work.
 
 RULE: For remote FastMCP servers (HTTP/SSE transport), use Claude Code's native `claude mcp add --transport http` command rather than the install command. See `./claude-code-mcp-integration.md` for complete Claude Code MCP configuration reference.
+
+---
+
+## PropelAuth Authentication
+
+SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17) — v3.1.0
+
+PropelAuth provides full OAuth 2.0 authentication for FastMCP servers via the Remote OAuth pattern. PropelAuth handles user login and consent; FastMCP validates tokens.
+
+CONSTRAINT: Requires `fastmcp>=3.1.0`. PropelAuth account and dashboard configuration is required before server setup.
+
+### Environment Configuration
+
+```bash
+PROPELAUTH_AUTH_URL=https://auth.yourdomain.com           # From Backend Integration page
+PROPELAUTH_INTROSPECTION_CLIENT_ID=your-client-id         # From MCP > Request Validation
+PROPELAUTH_INTROSPECTION_CLIENT_SECRET=your-client-secret # From MCP > Request Validation
+SERVER_URL=http://localhost:8000                           # Your server's base URL
+```
+
+### Basic Server Setup
+
+```python
+import os
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.propelauth import PropelAuthProvider
+
+auth_provider = PropelAuthProvider(
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],
+    introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
+    base_url=os.environ["SERVER_URL"],
+    required_scopes=["read:user_data"],  # optional scope enforcement
+)
+
+mcp = FastMCP(name="My Protected Server", auth=auth_provider)
+```
+
+### Accessing Authenticated User Identity
+
+Use `get_access_token()` inside tools to read token claims:
+
+```python
+from fastmcp.server.dependencies import get_access_token
+
+@mcp.tool
+def whoami() -> dict:
+    """Return the authenticated user's ID."""
+    token = get_access_token()
+    if token is None:
+        return {"error": "Not authenticated"}
+    user_id = token.claims.get("sub")
+    return {"user_id": user_id}
+```
+
+### Client Testing with OAuth
+
+```python
+from fastmcp import Client
+import asyncio
+
+async def main():
+    async with Client("http://localhost:8000/mcp", auth="oauth") as client:
+        assert await client.ping()
+
+asyncio.run(main())
+```
+
+### Advanced Configuration (Caching and Timeouts)
+
+```python
+auth = PropelAuthProvider(
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],
+    introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
+    base_url=os.environ.get("BASE_URL", "https://your-server.com"),
+    required_scopes=["read:user_data"],
+    resource="https://your-server.com/mcp",  # RFC 8707 audience restriction
+    token_introspection_overrides={
+        "cache_ttl_seconds": 300,   # cache introspection results for 5 minutes
+        "max_cache_size": 1000,     # maximum cached tokens
+        "timeout_seconds": 15,      # HTTP request timeout
+    },
+)
+```
+
+RULE: For PropelAuth dashboard configuration (enabling MCP, adding redirect URIs, defining scopes, creating introspection credentials), see [PropelAuth MCP documentation](https://docs.propelauth.com/mcp-authentication/overview).
+
+---
+
+## Prefab Apps — Interactive Tool UIs
+
+SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — v3.1.0
+
+Prefab is a declarative UI framework for building interactive MCP tool UIs in pure Python — no HTML or JavaScript required. Tools return Prefab components; FastMCP handles renderer registration and protocol wiring.
+
+CONSTRAINT: Requires `fastmcp[apps]` extra. Prefab is in early active development — pin `prefab-ui` to a specific version in `pyproject.toml`.
+
+```bash
+pip install "fastmcp[apps]"
+```
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Dashboard")
+
+@mcp.tool(app=True)
+def revenue_chart(year: int) -> PrefabApp:
+    """Show annual revenue as an interactive bar chart."""
+    data = [
+        {"quarter": "Q1", "revenue": 42000},
+        {"quarter": "Q2", "revenue": 51000},
+        {"quarter": "Q3", "revenue": 47000},
+        {"quarter": "Q4", "revenue": 63000},
+    ]
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f"{year} Revenue")
+        BarChart(
+            data=data,
+            series=[ChartSeries(data_key="revenue", label="Revenue")],
+            x_axis="quarter",
+        )
+
+    return PrefabApp(view=view)
+```
+
+RULE: Use `app=True` on `@mcp.tool` to enable Prefab rendering. FastMCP registers a shared `ui://prefab/renderer.html` resource automatically — no additional configuration needed.
+
+PATTERN: Wrap return in `ToolResult` when the LLM also needs to reason about the data — the component tree becomes `structured_content`; the text field is what the LLM reads.
+
+For full Prefab component reference (charts, tables, forms, state management, reactive expressions), see the [Prefab UI documentation](https://prefab.prefect.io) and the [advanced patterns reference](./advanced.md).
+
+---
+
+## Google GenAI Sampling Handler
+
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — v3.1.0
+
+FastMCP provides a built-in sampling handler for Google Gemini. Use this when a FastMCP server issues sampling requests (server-initiated LLM completions) and you want Gemini to fulfil them.
+
+CONSTRAINT: Requires `fastmcp[gemini]` extra. Added in v3.1.0.
+
+```bash
+pip install "fastmcp[gemini]"
+```
+
+```python
+from fastmcp import Client
+from fastmcp.client.sampling.handlers.google_genai import GoogleGenAISamplingHandler
+
+client = Client(
+    "my_mcp_server.py",
+    sampling_handler=GoogleGenAISamplingHandler(default_model="gemini-2.0-flash"),
+)
+```
+
+RULE: FastMCP automatically advertises full sampling capabilities (including tool support) when `sampling_handler` is provided. To disable tool support for simpler use cases, pass `sampling_capabilities=SamplingCapability()` explicitly.
+
+Equivalent built-in handlers also exist for OpenAI (`OpenAISamplingHandler`, `fastmcp[openai]`, v2.11.0) and Anthropic (`AnthropicSamplingHandler`, `fastmcp[anthropic]`, v2.14.1). Custom handlers are supported by implementing the handler function signature — see the [FastMCP sampling handler source](https://github.com/PrefectHQ/fastmcp/tree/main/src/fastmcp/client/sampling/handlers) as a reference.
 
 ---
 

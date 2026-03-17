@@ -331,3 +331,243 @@ else:
 CONSTRAINT: Elicitation requires the client to implement an elicitation handler. If the client does not support elicitation, calls to `ctx.elicit()` raise an error. See [./client-sdk.md](./client-sdk.md) for client-side elicitation handler implementation.
 
 SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+
+---
+
+## Prefab Apps (EXPERIMENTAL — SOON)
+
+SOURCE: `https://gofastmcp.com/apps/prefab` (accessed 2026-03-17)
+
+CONSTRAINT: Prefab Apps require the `apps` optional extra. Install with:
+
+```bash
+pip install "fastmcp[apps]"
+```
+
+WARNING: Prefab UI is in extremely early, active development — its API changes frequently and breaking changes can occur with any release. Pin `prefab-ui` to a specific version:
+
+```toml
+# pyproject.toml
+dependencies = [
+    "fastmcp[apps]",
+    "prefab-ui==0.8.0",  # pin to a known working version
+]
+```
+
+RULE: Do not recommend Prefab Apps for production use. Advise users to pin `prefab-ui` explicitly.
+
+PATTERN: Declare a tool as a Prefab App using `app=True`. The tool returns a `PrefabApp` with declarative UI components — no HTML or JavaScript required:
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Dashboard")
+
+
+@mcp.tool(app=True)
+def revenue_chart(year: int) -> PrefabApp:
+    """Show annual revenue as an interactive bar chart."""
+    data = [
+        {"quarter": "Q1", "revenue": 42000},
+        {"quarter": "Q2", "revenue": 51000},
+        {"quarter": "Q3", "revenue": 47000},
+        {"quarter": "Q4", "revenue": 63000},
+    ]
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f"{year} Revenue")
+        BarChart(
+            data=data,
+            series=[ChartSeries(data_key="revenue", label="Revenue")],
+            x_axis="quarter",
+        )
+
+    return PrefabApp(view=view)
+```
+
+PATTERN: Return type inference — if the return annotation is a Prefab type (`PrefabApp`, `Component`, or their `Optional` variants), FastMCP enables app rendering automatically without `app=True`:
+
+```python
+@mcp.tool
+def greet(name: str) -> PrefabApp:
+    return PrefabApp(view=Heading(f"Hello, {name}!"))
+```
+
+Explicit `app=True` is recommended for clarity; it is required when the return type is `ToolResult` (which does not reveal a Prefab type).
+
+### Available Components
+
+- `Column` — layout container with `gap` and `css_class`
+- `Heading` — text heading
+- `BarChart` / `ChartSeries` — interactive bar chart with configurable data key and label
+- `Table` — tabular data display
+- `Form` — user input form
+- `Toggle` / `Button` — interactive controls
+- `Badge` — status indicator with `variant`
+- `If` — conditional rendering using `{{ expression }}` templates
+
+### Returning Components Directly
+
+PATTERN: Return a component directly when you do not need `PrefabApp`'s state or stylesheet configuration. FastMCP wraps it automatically:
+
+```python
+from prefab_ui.components import Column, Heading, Badge
+from fastmcp import FastMCP
+
+mcp = FastMCP("Status")
+
+
+@mcp.tool(app=True)
+def status_badge() -> Column:
+    """Show system status."""
+    with Column(gap=2) as view:
+        Heading("All Systems Operational")
+        Badge("Healthy", variant="success")
+    return view
+```
+
+### Interactive State with PrefabApp
+
+PATTERN: Use `PrefabApp(view=..., state={...})` when components need to read and react to initial state. State mutations (e.g., `ToggleState`) happen in the browser — no server round-trip:
+
+```python
+from prefab_ui.components import Column, Button, If, Badge
+from prefab_ui.actions import ToggleState
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Demo")
+
+
+@mcp.tool(app=True)
+def toggle_demo() -> PrefabApp:
+    """Interactive toggle with state."""
+    with Column(gap=4, css_class="p-6") as view:
+        Button("Toggle", on_click=ToggleState("show"))
+        with If("{{ show }}"):
+            Badge("Visible!", variant="success")
+
+    return PrefabApp(view=view, state={"show": False})
+```
+
+### ToolResult — LLM Text Alongside Rendered UI
+
+PATTERN: Wrap the return in `ToolResult` when you need the LLM to understand the data (not just render it). Without this, the LLM receives only `"[Rendered Prefab UI]"`:
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+from fastmcp.tools import ToolResult
+
+mcp = FastMCP("Sales")
+
+
+@mcp.tool(app=True)
+def sales_overview(year: int) -> ToolResult:
+    """Show sales data visually and summarize for the model."""
+    data = get_sales_data(year)
+    total = sum(row["revenue"] for row in data)
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading("Sales Overview")
+        BarChart(data=data, series=[ChartSeries(data_key="revenue")])
+
+    return ToolResult(
+        content=f"Total revenue for {year}: ${total:,} across {len(data)} quarters",
+        structured_content=view,
+    )
+```
+
+The user sees the chart; the LLM sees the text summary and can reason about it.
+
+### How FastMCP Wires Prefab Apps
+
+When a tool returns a Prefab component or `PrefabApp`, FastMCP automatically:
+
+1. Registers a shared `ui://prefab/renderer.html` resource containing the JavaScript rendering engine — fetched once by the host and reused across all Prefab tools.
+2. Wires tool metadata so the host knows to load the renderer iframe when displaying the result.
+3. Serializes the component tree as `structuredContent` on the tool result.
+
+No configuration is required beyond `app=True` (or type inference).
+
+### Previewing Prefab Apps Locally
+
+```bash
+fastmcp dev apps
+```
+
+Launches a browser-based preview so you can inspect Prefab tool output without a full MCP host.
+
+SOURCE: `https://gofastmcp.com/apps/prefab` (accessed 2026-03-17)
+
+---
+
+## Google GenAI Sampling Handler
+
+SOURCE: `https://gofastmcp.com/clients/sampling` (accessed 2026-03-17)
+
+PATTERN: Use `GoogleGenAISamplingHandler` for server-initiated LLM calls via the Google GenAI (Gemini) API — an alternative to the Anthropic and OpenAI handlers:
+
+```python
+from fastmcp import Client
+from fastmcp.client.sampling.handlers.google_genai import GoogleGenAISamplingHandler
+
+client = Client(
+    "my_mcp_server.py",
+    sampling_handler=GoogleGenAISamplingHandler(default_model="gemini-2.0-flash"),
+)
+```
+
+CONSTRAINT: Requires the `gemini` optional extra:
+
+```bash
+pip install "fastmcp[gemini]"
+```
+
+All three built-in sampling handlers (OpenAI, Anthropic, Google GenAI) share the same interface and support the full sampling API including tool use. Choose based on which LLM provider the client application uses.
+
+| Handler | Import path | Extra |
+|---|---|---|
+| OpenAI | `fastmcp.client.sampling.handlers.openai.OpenAISamplingHandler` | `fastmcp[openai]` |
+| Anthropic | `fastmcp.client.sampling.handlers.anthropic.AnthropicSamplingHandler` | `fastmcp[anthropic]` |
+| Google GenAI | `fastmcp.client.sampling.handlers.google_genai.GoogleGenAISamplingHandler` | `fastmcp[gemini]` |
+
+SOURCE: `https://gofastmcp.com/clients/sampling` (accessed 2026-03-17)
+
+---
+
+## Dependency Injection — `uncalled-for` Library
+
+SOURCE: `https://gofastmcp.com/servers/dependencies` (accessed 2026-03-17)
+
+UPDATE: FastMCP replaced its vendored dependency injection implementation with the `uncalled-for` library (part of the Docket ecosystem). The `Depends()` API surface is unchanged — existing code requires no modification.
+
+RULE: The `Depends()`, `CurrentContext()`, `CurrentFastMCP()`, `CurrentRequest()`, `CurrentHeaders()`, `CurrentAccessToken()`, and `Progress()` APIs all remain the same. Users should not notice any difference from prior FastMCP versions.
+
+```python
+from fastmcp import FastMCP
+from fastmcp.dependencies import Depends
+
+mcp = FastMCP("Demo")
+
+
+def get_config() -> dict:
+    return {"api_url": "https://api.example.com", "timeout": 30}
+
+
+@mcp.tool
+async def fetch_data(
+    query: str,
+    config: dict = Depends(get_config),
+) -> str:
+    return f"Fetching '{query}' from {config['api_url']}"
+```
+
+PATTERN: Core DI features (`Depends()`, `CurrentContext()`) work without installing `fastmcp[tasks]`. Background task dependencies (`CurrentDocket()`, `CurrentWorker()`, `Progress()`) still require `fastmcp[tasks]`.
+
+The underlying library is [uncalled-for](https://github.com/chrisguidry/uncalled-for), also available as a standalone package for use outside FastMCP.
+
+SOURCE: `https://gofastmcp.com/servers/dependencies` (accessed 2026-03-17)

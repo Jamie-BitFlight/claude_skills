@@ -6,6 +6,151 @@ SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05
 
 ---
 
+## CLI Client Commands
+
+SOURCE: <https://gofastmcp.com/cli/client> (accessed 2026-03-17)
+
+The FastMCP CLI can act as an MCP client — connecting to any server (local or remote) to list tools, call them, and discover configured servers. Useful for development, debugging, scripting, and giving shell-capable LLM agents MCP access.
+
+### fastmcp list
+
+Connects to a server and prints its tools as function signatures with parameter names, types, and descriptions:
+
+```bash
+fastmcp list http://localhost:8000/mcp
+fastmcp list server.py
+fastmcp list weather          # name-based resolution
+fastmcp list claude-code:my-server  # source:name disambiguation
+```
+
+Show full JSON Schema for inputs or outputs with `--input-schema` / `--output-schema`:
+
+```bash
+fastmcp list server.py --input-schema
+fastmcp list server.py --output-schema
+```
+
+Include resources and prompts (tools only by default):
+
+```bash
+fastmcp list server.py --resources --prompts
+```
+
+Machine-readable output for LLM consumption or automation:
+
+```bash
+fastmcp list server.py --json
+```
+
+**Options:**
+
+| Option | Flag | Description |
+| ------ | ---- | ----------- |
+| Command | `--command` | Connect via stdio (e.g., `'npx -y @mcp/server'`) |
+| Transport | `--transport`, `-t` | Force `http` or `sse` for URL targets |
+| Resources | `--resources` | Include resources in output |
+| Prompts | `--prompts` | Include prompts in output |
+| Input Schema | `--input-schema` | Show full input schemas |
+| Output Schema | `--output-schema` | Show full output schemas |
+| JSON | `--json` | Structured JSON output |
+| Timeout | `--timeout` | Connection timeout in seconds |
+| Auth | `--auth` | `oauth` (default for HTTP), a bearer token, or `none` |
+
+### fastmcp call
+
+Invokes a single tool on a server. Pass arguments as `key=value` pairs — the CLI fetches the schema and coerces string values to the right types automatically:
+
+```bash
+fastmcp call server.py greet name=World
+fastmcp call http://localhost:8000/mcp search query=hello limit=5
+```
+
+Type coercion is schema-driven: `"5"` becomes integer `5`. Booleans accept `true`/`false`, `yes`/`no`, `1`/`0`. Arrays and objects are parsed as JSON.
+
+**Complex arguments** — pass a JSON object positionally or use `--input-json` as a base dict merged with `key=value` overrides:
+
+```bash
+# Positional JSON object
+fastmcp call server.py create_item '{"name": "Widget", "tags": ["sale"], "metadata": {"color": "blue"}}'
+
+# --input-json with key=value overrides
+fastmcp call server.py search --input-json '{"query": "hello", "limit": 5}' limit=10
+```
+
+**Fuzzy typo correction** — if you misspell a tool name, the CLI suggests corrections automatically. Missing required arguments produce a clear message with the tool's signature.
+
+**Structured output:**
+
+```bash
+fastmcp call server.py get_weather city=London --json
+```
+
+**Interactive elicitation** — when a tool requests additional input during execution, the CLI prompts you in the terminal showing each field's name, type, and whether it's required. Type `decline` to skip a field or `cancel` to abort the call.
+
+**Options:**
+
+| Option | Flag | Description |
+| ------ | ---- | ----------- |
+| Command | `--command` | Connect via stdio |
+| Transport | `--transport`, `-t` | Force `http` or `sse` |
+| Input JSON | `--input-json` | Base arguments as JSON (merged with `key=value` pairs) |
+| JSON | `--json` | Raw JSON output |
+| Timeout | `--timeout` | Connection timeout in seconds |
+| Auth | `--auth` | `oauth`, a bearer token, or `none` |
+
+### fastmcp discover
+
+Scans your machine for MCP servers configured in editors and tools:
+
+```bash
+fastmcp discover
+fastmcp discover --source claude-code
+fastmcp discover --source cursor --source gemini --json
+```
+
+Sources scanned:
+
+- **Claude Desktop** — `claude_desktop_config.json`
+- **Claude Code** — `~/.claude.json`
+- **Cursor** — `.cursor/mcp.json` (walks up from current directory)
+- **Gemini CLI** — `~/.gemini/settings.json`
+- **Goose** — `~/.config/goose/config.yaml`
+- **Project** — `./mcp.json` in the current directory
+
+Any server that appears here can be used by name with `list`, `call`, and other commands — no need to copy URLs or paths.
+
+### Name-Based Server Resolution
+
+If servers are configured in an editor or tool, refer to them by name — FastMCP scans configs from Claude Desktop, Claude Code, Cursor, Gemini CLI, and Goose:
+
+```bash
+fastmcp list weather
+fastmcp call weather get_forecast city=London
+```
+
+When the same name appears in multiple configs, use `source:name` to disambiguate:
+
+```bash
+fastmcp list claude-code:my-server
+fastmcp call cursor:weather get_forecast city=London
+```
+
+### Authentication (CLI)
+
+For HTTP targets, the CLI enables OAuth authentication by default. Pass `--auth none` to skip for local dev servers, or pass a bearer token directly:
+
+```bash
+# Skip auth entirely
+fastmcp call http://localhost:8000/mcp my_tool --auth none
+
+# Bearer token
+fastmcp list http://localhost:8000/mcp --auth "Bearer sk-..."
+```
+
+SOURCE: <https://gofastmcp.com/cli/overview> (accessed 2026-03-17)
+
+---
+
 ## Creating a Client
 
 RULE: Always use `async with client:` for connection lifecycle management. Client operations require an active connection context.
@@ -163,6 +308,8 @@ config = {
     }
 }
 ```
+
+CONSTRAINT: `MCPConfigTransport` (multi-server config) maintains session persistence across tool calls — each server connection is reused within a single `async with client:` block. This is the correct behavior for multi-tool workflows; do NOT create a new client per tool call when using config-based multi-server setups.
 
 SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
 

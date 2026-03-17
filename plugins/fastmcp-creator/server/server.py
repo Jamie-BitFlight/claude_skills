@@ -92,6 +92,10 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
         "tasks",
         "elicitation",
         "transforms",
+        "tool-search",
+        "code-mode",
+        "multi-auth",
+        "prefab-apps",
         "client",
         "middleware",
         "dependency-injection",
@@ -99,16 +103,40 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
 
     if "auth" in feature_set:
         lines.append("from fastmcp.server.auth import require_scopes  # v3 auth")
+    if "multi-auth" in feature_set:
+        lines.append("from fastmcp.server.auth import MultiAuth, OAuthProxy  # v3.1 multi-auth")
+        lines.append("from fastmcp.server.auth.providers.jwt import JWTVerifier")
     if "filesystem-provider" in feature_set:
         lines.append("from fastmcp.server.providers import FileSystemProvider")
     if "tasks" in feature_set:
         lines.append("# Requires: fastmcp[tasks] extra")
+    if "tool-search" in feature_set:
+        lines.append("from fastmcp.server.transforms.search import BM25SearchTransform  # v3.1")
+    if "code-mode" in feature_set:
+        lines.append(
+            "from fastmcp.experimental.transforms.code_mode import CodeMode  # v3.1 experimental"
+        )
     if "middleware" in feature_set:
         lines.append("from fastmcp.server.middleware import Middleware")
     if "dependency-injection" in feature_set:
         lines.append("from fastmcp.server.dependencies import Depends")
+    if "prefab-apps" in feature_set:
+        lines.append("# Requires: fastmcp[apps] extra")
+        lines.append("from prefab_ui.components import Column, Heading")
+        lines.append("from prefab_ui.app import PrefabApp")
 
-    lines += ["", f'mcp = FastMCP("{safe_name}")', ""]
+    # Build transforms list for constructor
+    transforms_args: list[str] = []
+    if "tool-search" in feature_set:
+        transforms_args.append("BM25SearchTransform()")
+    if "code-mode" in feature_set:
+        transforms_args.append("CodeMode()")
+
+    if transforms_args:
+        transforms_str = ", ".join(transforms_args)
+        lines += ["", f'mcp = FastMCP("{safe_name}", transforms=[{transforms_str}])', ""]
+    else:
+        lines += ["", f'mcp = FastMCP("{safe_name}")', ""]
 
     if "filesystem-provider" in feature_set:
         lines += [
@@ -161,6 +189,17 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
             "        schema={'type': 'object', 'properties': {'name': {'type': 'string'}}}",
             "    )",
             "    return f'Hello, {result.data[\"name\"]}!'",
+            "",
+        ]
+
+    if "prefab-apps" in feature_set:
+        lines += [
+            "@mcp.tool(app=True)",
+            "def dashboard() -> PrefabApp:",
+            '    """Return an interactive UI dashboard — requires fastmcp[apps]."""',
+            "    with Column(gap=4) as view:",
+            f'        Heading("{safe_name} Dashboard")',
+            "    return PrefabApp(view=view)",
             "",
         ]
 
@@ -362,10 +401,14 @@ Ask the user the following questions (you may ask all at once):
 1. **Server name** — what should the server be called? (used as the FastMCP instance name)
 2. **Features** — which features do you need? Choose any that apply:
    - `auth` — OAuth / token-based authentication with `require_scopes`
+   - `multi-auth` — compose OAuth + multiple token verifiers (v3.1)
    - `filesystem-provider` — serve files as MCP resources via FileSystemProvider
    - `tasks` — long-running background tasks (requires `fastmcp[tasks]` extra)
    - `elicitation` — multi-turn user input prompts
    - `transforms` — mount sub-servers with namespace transforms
+   - `tool-search` — BM25/regex search transforms for large tool catalogs (v3.1)
+   - `code-mode` — experimental CodeMode sandbox transform (v3.1)
+   - `prefab-apps` — declarative UI components via Prefab Apps (v3.1, experimental)
    - `middleware` — request/response middleware
    - `dependency-injection` — FastAPI-style dependency injection
 3. **Transport** — how will clients connect?
@@ -457,6 +500,16 @@ After validation, apply this migration checklist:
 - `SkillsProvider` for exposing skills as `skill://` URI resources
 - `require_scopes` for fine-grained per-tool auth
 - `@mcp.tool(task=True)` for long-running operations (requires `fastmcp[tasks]` extra)
+
+## New v3.1 features to consider
+
+- `transforms=[BM25SearchTransform()]` — server-level search transforms for large tool catalogs
+- `CodeMode()` transform — experimental sandboxed Python execution for tool invocation
+- `MultiAuth` — compose OAuth proxy with JWT verifiers for hybrid auth
+- `PropelAuthProvider` — PropelAuth integration for OAuth + token introspection
+- `@mcp.tool(app=True)` + Prefab Apps — declarative UI components (experimental)
+- `fastmcp run -m module` — run servers as Python modules
+- `FASTMCP_TRANSPORT` env var — set default transport without CLI flag
 
 For full migration details, call: `search_docs(query="migrating from fastmcp 2")`
 """
