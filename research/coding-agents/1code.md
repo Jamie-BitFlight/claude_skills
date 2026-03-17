@@ -234,7 +234,14 @@ Pre-built releases and background agent support require a subscription at `https
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| To be populated by @research-cross-referencer | — | — |
+| [Accomplish](./accomplish.md) | coding-agents | alternative Electron+React desktop agent UI with MCP tools and permission-gated execution |
+| [OpenAI Codex CLI](./openai-codex-cli.md) | coding-agents | Codex binary bundled inside 1Code; shares dual MCP client+server role and AGENTS.md context |
+| [Tembo](./tembo.md) | coding-agents | overlapping multi-agent orchestration use case (Claude Code, Codex, Cursor) with event-driven automation triggers |
+| [Superset](../developer-tools/superset-sh.md) | developer-tools | alternative Electron app running parallel agents via git worktrees — same isolation pattern, agent-agnostic |
+| [Cline](./cline.md) | coding-agents | alternative open-source coding agent with human-in-the-loop approvals and multi-provider LLM support |
+| [OpenHands](./openhands.md) | coding-agents | alternative cloud coding agent platform addressing same goal of autonomous software development |
+| [Pilot](./pilot.md) | coding-agents | alternative Claude Code wrapper with ticket-to-PR automation and autonomous development pipeline |
+| [OpenAI Symphony](./openai-symphony.md) | coding-agents | alternative autonomous coding agent platform with workspace sandboxing and issue-tracker-driven workflows |
 
 ---
 
