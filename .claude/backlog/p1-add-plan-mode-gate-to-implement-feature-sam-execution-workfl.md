@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#758'
-  last_synced: '2026-03-17T01:09:52Z'
+  last_synced: '2026-03-17T01:11:08Z'
   groomed: '2026-03-17'
 ---
 
@@ -159,4 +159,41 @@ INCONCLUSIVE: 0
 5. CLAIM: "Agent tool has a plan mode parameter for delegated agents"
    VERDICT: VERIFIED
    EVIDENCE: File: .claude/skills/swarm-patterns/SKILL.md, lines 191-198 — Agent call with explicit parameter: `mode: "plan",  // Requires plan approval`. This is used in Pattern 5 to control whether the agent enters plan-only mode (requiring explicit approval) vs. direct execution mode. The mechanism is documented and instantiated in working example code.
+</div>
+
+## RT-ICA
+
+<div><sub>2026-03-17T01:11:08Z</sub>
+
+RT-ICA: Add plan-mode gate to implement-feature SAM execution workflow
+
+**Goal**: Add optional plan-first mode to SAM task execution so agents surface structured plans for human review before irreversible operations.
+
+**Conditions Assessment**:
+
+1. implement-feature SKILL.md execution loop structure understood | Status: **AVAILABLE** | Verified in implement-feature SKILL.md lines 55-75; loop structure: status → ready → for each task → dispatch → repeat. Documented in local-workflow.md Phase 2 Execution Loop.
+
+2. start-task SKILL.md task claim and execution flow understood | Status: **AVAILABLE** | Verified in start-task SKILL.md steps 1-6; step 3 claims task, step 6 implements. Exact sequence and call order are documented and fact-checked.
+
+3. Task YAML frontmatter schema supports additional fields (sam_schema Task model) | Status: **AVAILABLE** | Field task_file_format.md documents Task Pydantic model. Verified: models.py uses Pydantic with AliasChoices. New `plan_review: bool = False` field with alias mapping can be added without breaking existing tasks.
+
+4. swarm-patterns Pattern 5 plan_approval_response mechanism documented | Status: **AVAILABLE** | Verified in swarm-patterns SKILL.md lines 182-218. Pattern 5 "Plan Approval Workflow" documents mode="plan" parameter, plan_approval_request, plan_approval_response with approve/reject logic. Mechanism is proven, bounded, and has working example code.
+
+5. Plan file naming convention (plan/task-plan-{task_id}.md) does not conflict | Status: **DERIVABLE** | Existing convention: plan/T0-baseline-{slug}.yaml, plan/TN-verification-{slug}.yaml (from bookend tasks). Proposed: plan/task-plan-{task_id}.md. No conflict detected in Impact Radius; `sam` CLI would need to exclude plan-task-*.md from task discovery (verification task during implementation).
+
+6. Hook system (SubagentStop, PostToolUse) interaction with plan-only mode understood | Status: **AVAILABLE** | Critical risk identified in Impact Radius: task_status_hook.py SubagentStop handler will falsely mark plan-only sub-agents as COMPLETE. Handler must detect plan-only invocation pattern and skip COMPLETE marking. PostToolUse behavior is acceptable (silent skip if context file absent).
+
+7. Agent tool plan mode parameter exists for delegated agents | Status: **AVAILABLE** | Verified in swarm-patterns SKILL.md line 196. Agent() tool call shows `mode: "plan"` parameter in working example. Orchestrator can delegate with mode="plan" to implement-feature OR start-task can auto-detect plan_review: true from task YAML.
+
+8. How plan-only sub-agent communicates "plan ready" signal to orchestrator | Status: **DERIVABLE** | Signal mechanism not explicitly designed. Options: (a) Write plan file → orchestrator polls for file existence; (b) Agent returns explicit status code/message; (c) Combined: agent writes plan file + prints "PLAN_READY: {file_path}" to stdout for orchestrator to parse. Design decision needed. Recommended: (c) to maintain compatibility with hook system and provide clear orchestrator handoff.
+
+9. Whether plan_review should be set per-task or per-plan-run | Status: **DERIVABLE** | Backlog item describes per-task flag: "task-level flag `plan_review: true`". However, `implement-feature` could also accept `--plan-first` flag at orchestrator level (applies to all eligible tasks). Decision: per-task flag is more flexible (review only high-risk tasks); orchestrator flag can be derived as "any task has plan_review: true" during status query. No blocking decision required — both can coexist.
+
+10. How rejection feedback loop works (orchestrator re-spawns agent with feedback?) | Status: **DERIVABLE** | Pattern 5 documents approve/reject but swarm-patterns mechanism uses TeamCreate/SendMessage (not applicable to SAM skill invocation). For SAM: if human rejects plan, orchestrator must re-invoke start-task with feedback in context. Mechanism: (a) write rejection reason to plan/task-plan-{task_id}-feedback.md; (b) re-invoke Skill(skill="start-task", args="... --plan-only {task_id}") with feedback in prompt; (c) sub-agent reads feedback, revises plan, overwrites plan file. No design blocker — standard delegation + file I/O pattern.
+
+**Additional Finding**: Impact Radius inventory identifies 24 files across 5 categories (Code Producers, Code Consumers, Documentation, Tests, Agent Instructions). "Ecosystem Completeness Checklist" provides 13 concrete checkpoints for implementation. No pre-existing blockers identified.
+
+**Decision**: **APPROVED FOR IMPLEMENTATION**
+
+Rationale: All 10 conditions are AVAILABLE (7) or DERIVABLE (3). No MISSING information blocks progress. Critical risk (hook false-COMPLETE) is identified and bounded. Pattern precedent (swarm-patterns Pattern 5) exists. Scope is well-defined: two primary changes (models.py Task field + two SKILL.md files), bounded guard logic in task_status_hook.py, and documentation updates across 6 files. Implementation order: (1) Task model + schema + tests; (2) start-task logic + hook guard; (3) implement-feature orchestration; (4) documentation and agent guidance. Follow the Ecosystem Completeness Checklist to ensure coverage.
 </div>
