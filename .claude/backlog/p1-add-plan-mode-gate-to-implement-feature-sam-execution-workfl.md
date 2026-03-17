@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#758'
-  last_synced: '2026-03-17T01:11:08Z'
+  last_synced: '2026-03-17T01:15:03Z'
   groomed: '2026-03-17'
 ---
 
@@ -43,9 +43,21 @@ Confidence: high
 Rationale: The item describes a safety mechanism that should exist but doesn't — a human review/approval gate before destructive operations (file edits, bash commands). Current state directly dispatches agents to execution without plan review. Target state adds an optional --plan-first mode with structured plan output and approval step before execution proceeds. This mirrors the established swarm-patterns Pattern 5 plan_approval_response mechanism, confirming the pattern is proven and bounded. Design is not open-ended because it has clear precedent, specific task-level flag (plan_review: true), specific output file path convention (plan/task-plan-{task_id}.md), and defined approval loop. This is a guardrail (preventing unreviewed agent actions) that is currently absent.
 </div>
 
-### Impact Radius
+### Impact
+
+<div><sub>2026-03-17T00:00:00Z</sub>
 
 <div><sub>2026-03-17T01:09:52Z</sub>
+</div>
+
+<div><sub>2026-03-17T01:12:43Z</sub>
+
+- **Blocks**: Any developer who wants to review and approve a sub-agent's intended changes before those changes are applied. Currently there is no pause point — the agent executes immediately.
+- **Bottleneck**: High-risk or complex tasks where a file edit or bash command error is expensive to reverse. Without this gate, the cost of a mistake is discovered after the fact, during code review or quality gates, when rework is more expensive.
+- **User experience change**: When `--plan-first` is passed to `implement-feature` (or `plan_review: true` is set on a task), the orchestrator surfaces a structured plan file at `plan/task-plan-{task_id}.md` before dispatching the execution sub-agent. The user approves or rejects with feedback; rejected plans are revised and re-surfaced.
+- **Safety improvement**: The SubagentStop hook false-COMPLETE risk (plan-only sub-agents being marked COMPLETE prematurely) is eliminated by the guard logic added to `task_status_hook.py`.
+- **No impact on existing workflows**: The `--plan-first` flag and `plan_review: true` field are opt-in. Tasks without the flag dispatch exactly as they do today.
+</div>
 
 ### Code — Producers
 
@@ -130,6 +142,179 @@ Rationale: The item describes a safety mechanism that should exist but doesn't �
 
 </div>
 
+### Reproducibility
+
+<div><sub>2026-03-17T01:12:22Z</sub>
+
+1. Open `plugins/python3-development/skills/implement-feature/SKILL.md` and read the Progress Loop section — observe that the loop calls `Skill(skill="start-task", args="{task_file_path} --task {task_id}")` with no conditional plan-review step between the `sam ready` query and the sub-agent dispatch.
+2. Open `plugins/python3-development/skills/start-task/SKILL.md` and read steps 1–6 — observe that step 3 claims the task and step 6 begins implementation immediately; there is no plan generation, plan file write, or user approval step between claim and execution.
+3. Create a SAM task file containing a task with `plan_review: true` in its YAML frontmatter — invoke `/implement-feature` — observe that the task is dispatched to `start-task` without a plan-approval pause; the sub-agent executes file edits and bash commands directly.
+4. Check `plan/` directory after dispatch — observe that no `task-plan-{task_id}.md` file is written; no plan-approval signal appears in the orchestrator output.
+
+**Observable signal**: The `plan_review` field in task YAML has no effect on dispatch behavior because `implement-feature` does not read it and `start-task` does not check for it before claiming and executing.
+</div>
+
+### Priority
+
+<div><sub>2026-03-17T01:12:31Z</sub>
+
+8/10 — Safety guardrail for irreversible operations with bounded implementation scope and proven precedent.
+
+Rationale:
+- **Safety impact is direct**: `start-task` sub-agents execute Write, Edit, and Bash tool calls — operations that overwrite files and run shell commands — without any human-approval checkpoint. Loss of data or incorrect edits cannot be undone once a sub-agent completes.
+- **Pattern is proven**: swarm-patterns Pattern 5 documents an identical plan-approval mechanism (`mode: "plan"`, `plan_approval_request`, `plan_approval_response`). This is not speculative design — it is an established, fact-checked pattern already present in the codebase.
+- **Scope is bounded**: 5 code files + 4 test files + 3 docs + 1 agent instruction. The critical risk (task_status_hook.py false-COMPLETE) is identified and bounded. No new enum values, no schema migrations, no CI changes.
+- **Not P0**: The system functions without this gate; existing tasks complete successfully. The missing guardrail increases risk for high-complexity or high-risk tasks but does not block current workflows.
+- **Not P2**: The absence of this gate is an active safety gap for any task where destructive changes are hard to review after the fact. It is not cosmetic or speculative.
+</div>
+
+### Scope
+
+<div><sub>2026-03-17T01:12:54Z</sub>
+
+**In scope**:
+- `implement-feature` SKILL.md: `--plan-first` flag and plan-approval loop in the Progress Loop section
+- `start-task` SKILL.md: `plan_review: true` field detection, plan generation step (before claim), plan file write to `plan/task-plan-{task_id}.md`, halt after plan write
+- `packages/sam_schema/sam_schema/core/models.py`: add `plan_review: bool = False` field to `Task` model
+- `packages/sam_schema/sam_schema/writers/yaml_writer.py`: round-trip `plan_review` / `plan-review` serialization alias
+- `task_status_hook.py`: guard `handle_subagent_stop` against false-COMPLETE for plan-only sub-agent invocations
+- `sam ready` JSON output: verify `plan_review` field appears (no code change expected if model auto-serializes)
+- Documentation: `local-workflow.md` (Execution Loop, Phase 2a, Hook table, Data Flow Diagram), `TASK_FILE_FORMAT.md`, `implementation-manager/SKILL.md`
+- Agent instruction: `swarm-task-planner.md` — when to emit `plan_review: true`
+- Tests: `test_models.py`, `test_legacy_reader.py`, `test_manifest_reader.py`, `test_yaml_writer.py`
+
+**Out of scope**:
+- New `TaskStatus` enum value — plan-mode tasks remain `not-started` while awaiting approval
+- CI workflow changes — no CI files reference `implement-feature` or `start-task`
+- `swarm-patterns` SKILL.md — Pattern 5 is the source precedent, not modified here
+- `complete-implementation` SKILL.md — not structurally affected; recursion propagates the flag if present
+- `add-new-feature` SKILL.md — upstream planning phase; not affected
+- Mandatory plan-review for all tasks — the gate is opt-in only
+</div>
+
+### Expected Behavior
+
+<div><sub>2026-03-17T01:13:11Z</sub>
+
+When `implement-feature` is invoked with `--plan-first`, or when a task in the ready list has `plan_review: true` in its YAML frontmatter:
+
+1. The orchestrator dispatches the sub-agent in plan-only mode (not execution mode).
+2. The sub-agent reads the task's acceptance criteria, lists the files it intends to edit, lists each bash command it intends to run, and provides rationale for each action. It writes this structured plan to `plan/task-plan-{task_id}.md`.
+3. The sub-agent halts after writing the plan file. No Write, Edit, or Bash tool calls that modify the codebase are made during the plan phase. The task status remains `not-started`.
+4. The orchestrator reads `plan/task-plan-{task_id}.md` and surfaces it to the user for review.
+5. If the user approves: the orchestrator dispatches the sub-agent again in full execution mode. The sub-agent claims the task, executes against acceptance criteria, and the SubagentStop hook marks the task COMPLETE.
+6. If the user rejects with feedback: the orchestrator writes rejection feedback to `plan/task-plan-{task_id}-feedback.md` and re-invokes the plan-only sub-agent. The sub-agent reads the feedback, revises the plan, overwrites `plan/task-plan-{task_id}.md`, and halts again for re-review.
+7. Tasks without `plan_review: true` and runs without `--plan-first` behave identically to current behavior — no plan file is written, no approval step occurs, execution proceeds immediately.
+
+The `task_status_hook.py` SubagentStop handler does not mark a plan-only sub-agent as COMPLETE. It distinguishes plan-only invocations from execution invocations by the presence of a `--plan-only` flag or equivalent signal in the sub-agent prompt.
+</div>
+
+### Acceptance Criteria
+
+<div><sub>2026-03-17T01:13:20Z</sub>
+
+- [ ] `implement-feature` SKILL.md Progress Loop section documents a `--plan-first` flag; when the flag is present, the loop reads `plan_review` from each task's ready JSON and dispatches plan-only before execution dispatch.
+- [ ] `start-task` SKILL.md documents `plan_review: true` as a recognized task YAML field; steps before the claim step describe plan generation and file write behavior when `plan_review: true` is detected.
+- [ ] `packages/sam_schema/sam_schema/core/models.py` `Task` model contains a `plan_review: bool = False` field with `AliasChoices("plan-review", "plan_review")`.
+- [ ] `sam ready --format json` output for a task with `plan_review: true` in its YAML includes `"plan_review": true` in the task object.
+- [ ] A task YAML file with `plan_review: true` processed by `start-task` in plan-only mode produces `plan/task-plan-{task_id}.md` and does not produce any Write, Edit, or Bash calls that modify codebase files.
+- [ ] `task_status_hook.py` SubagentStop handler does not mark a plan-only sub-agent invocation as COMPLETE; the task status remains `not-started` after a plan-only run.
+- [ ] `task_status_hook.py` SubagentStop handler correctly marks an execution sub-agent invocation as COMPLETE (existing behavior preserved).
+- [ ] `local-workflow.md` Phase 2 Execution Loop, Phase 2a Task Execution, Hook Script Event Handling table, and Data Flow Diagram reflect plan-mode branch and conditional COMPLETE behavior.
+- [ ] `TASK_FILE_FORMAT.md` field table includes `plan_review` with type `bool`, default `false`, and semantics.
+- [ ] `implementation-manager/SKILL.md` Hook Configuration table documents conditional SubagentStop behavior for plan-only sub-agents.
+- [ ] `swarm-task-planner.md` agent instruction includes guidance on when to emit `plan_review: true` on a generated task.
+- [ ] `test_models.py` includes a test for `plan_review: bool = False` default and `plan-review` alias deserialization.
+- [ ] `test_yaml_writer.py` includes a test that a `Task` with `plan_review: true` serializes the field with the `plan-review` alias.
+- [ ] `test_manifest_reader.py` and `test_legacy_reader.py` include tests that `plan_review: true` round-trips correctly through each reader.
+</div>
+
+### Files
+
+<div><sub>2026-03-17T01:13:34Z</sub>
+
+**Code changes required** (5 files):
+
+| File | Change |
+|------|--------|
+| `plugins/python3-development/skills/implement-feature/SKILL.md` | Add `--plan-first` flag and plan-approval loop to Progress Loop section |
+| `plugins/python3-development/skills/start-task/SKILL.md` | Add `plan_review: true` early-halt path before task claim |
+| `packages/sam_schema/sam_schema/core/models.py` | Add `plan_review: bool = False` field with `AliasChoices` to `Task` model |
+| `packages/sam_schema/sam_schema/writers/yaml_writer.py` | Round-trip `plan_review` / `plan-review` serialization alias |
+| `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py` | Guard `handle_subagent_stop` against false-COMPLETE for plan-only sub-agents |
+
+**Test changes required** (4 files):
+
+| File | Change |
+|------|--------|
+| `packages/sam_schema/tests/test_models.py` | Add `plan_review` field coverage |
+| `packages/sam_schema/tests/test_readers/test_legacy_reader.py` | Verify `plan_review` round-trips in legacy format |
+| `packages/sam_schema/tests/test_readers/test_manifest_reader.py` | Verify `plan_review` field parsed from YAML |
+| `packages/sam_schema/tests/test_writers/test_yaml_writer.py` | Verify `plan-review` serialization alias |
+
+**Documentation changes required** (3 files):
+
+| File | Change |
+|------|--------|
+| `.claude/rules/local-workflow.md` | Update Execution Loop, Phase 2a, Hook Event Handling table, Data Flow Diagram |
+| `.claude/docs/TASK_FILE_FORMAT.md` | Add `plan_review` field to Task schema field table |
+| `plugins/python3-development/skills/implementation-manager/SKILL.md` | Update Hook Configuration table for conditional SubagentStop behavior |
+
+**Agent instruction changes required** (1 file):
+
+| File | Change |
+|------|--------|
+| `plugins/python3-development/agents/swarm-task-planner.md` | Add guidance on when to emit `plan_review: true` |
+
+**Verification only — no change expected** (1 file):
+
+| File | Change |
+|------|--------|
+| `packages/sam_schema/sam_schema/cli.py` | Verify `sam ready --format json` includes `plan_review` field after model update |
+</div>
+
+### Dependencies
+
+<div><sub>2026-03-17T01:13:37Z</sub>
+
+- Depends on: None — all prerequisite information (swarm-patterns Pattern 5, task_status_hook.py SubagentStop logic, sam_schema Task model, start-task and implement-feature SKILL.md structures) is available in the current codebase. RT-ICA assessment: APPROVED with 0 MISSING conditions.
+- Blocks: None identified in current backlog. This feature unlocks safer dispatch for high-risk SAM tasks but no existing backlog items are gated on it.
+</div>
+
+### Effort
+
+<div><sub>2026-03-17T01:13:52Z</sub>
+
+Medium — 3–5 focused sessions.
+
+Rationale:
+- **Schema change** (models.py + yaml_writer.py + 4 test files): Small. Adding one `bool` field with an alias is a well-worn pattern in this codebase. Tests follow existing patterns in test_models, test_readers, test_yaml_writer.
+- **Hook guard** (task_status_hook.py): Small-Medium. The SubagentStop handler has a defined regex-based detection path. Adding plan-only detection requires understanding the invocation pattern and adding a conditional branch. Risk is bounded by existing tests.
+- **SKILL.md changes** (implement-feature + start-task): Medium. These are instruction files, not code — but the plan-approval loop in implement-feature requires careful description of the plan-only dispatch, file-read, user-surface, approve/reject, and re-invoke cycle. The start-task early-halt path requires inserting a pre-claim step that generates and writes the plan file.
+- **Documentation** (local-workflow.md, TASK_FILE_FORMAT.md, implementation-manager/SKILL.md): Small-Medium. local-workflow.md is the most involved — Execution Loop, Phase 2a, Hook table, and Data Flow Diagram all need updates.
+- **Agent instruction** (swarm-task-planner.md): Small. One addendum on when to set `plan_review: true`.
+- **No unknowns**: All design decisions are resolved. The RT-ICA assessment has 0 MISSING conditions. The Ecosystem Completeness Checklist provides 13 concrete implementation checkpoints.
+</div>
+
+### Resources
+
+<div><sub>2026-03-17T01:14:00Z</sub>
+
+| Type | Item |
+|------|------|
+| Pattern precedent | `.claude/skills/swarm-patterns/SKILL.md` lines 182–218 — Pattern 5 "Plan Approval Workflow" with `mode: "plan"`, `plan_approval_request`, `plan_approval_response` approve/reject logic |
+| Primary skill (orchestrator) | `plugins/python3-development/skills/implement-feature/SKILL.md` — Progress Loop section (lines 55–75): current dispatch path to modify |
+| Primary skill (executor) | `plugins/python3-development/skills/start-task/SKILL.md` — steps 1–6: claim-and-execute flow to extend with plan-first path |
+| Hook script | `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py` — `handle_subagent_stop` and `extract_task_info_from_prompt` functions |
+| Schema model | `packages/sam_schema/sam_schema/core/models.py` — `Task` Pydantic model with `AliasChoices` pattern |
+| YAML serializer | `packages/sam_schema/sam_schema/writers/yaml_writer.py` — serialization alias conventions |
+| Test patterns | `packages/sam_schema/tests/test_models.py`, `test_readers/`, `test_writers/` — existing field and round-trip test patterns |
+| Workflow doc | `.claude/rules/local-workflow.md` — authoritative Phase 2 Execution section and Data Flow Diagram |
+| Schema doc | `.claude/docs/TASK_FILE_FORMAT.md` — Task field reference table |
+| Agent instruction | `plugins/python3-development/agents/swarm-task-planner.md` — CLEAR task writing section |
+| Research source | `./research/coding-agents/1code.md` — "Plan mode before agent mode" pattern (item origin) |
+</div>
+
 
 ## Fact-Check
 
@@ -163,37 +348,27 @@ INCONCLUSIVE: 0
 
 ## RT-ICA
 
-<div><sub>2026-03-17T01:11:08Z</sub>
+<div><sub>2026-03-17T01:15:03Z</sub>
 
-RT-ICA: Add plan-mode gate to implement-feature SAM execution workflow
+RT-ICA Final: Add plan-mode gate to implement-feature SAM execution workflow
+Goal: Add optional plan-first mode so agents surface structured plans for human review before irreversible operations.
+Conditions:
+1. implement-feature execution loop structure | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Fact-check verified dispatch via Skill(skill='start-task') at SKILL.md lines documented
+2. start-task claim and execution flow | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Fact-check verified immediate claim+execute at step 3
+3. Task YAML schema extensibility | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Impact-analyst confirmed sam_schema Task model at models.py supports new fields
+4. Pattern 5 plan_approval_response precedent | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Fact-check verified at swarm-patterns SKILL.md lines 182-218
+5. Plan file naming conflict check | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Impact-analyst found no conflicts; plan/task-plan-{task_id}.md is unique
+6. Hook system interaction (critical risk) | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Impact-analyst identified SubagentStop false-COMPLETE risk; groomer included guard logic in acceptance criteria
+7. Agent tool plan mode parameter | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: Fact-check verified mode="plan" at Pattern 5 example code line 196
+8. Plan-ready signal mechanism | Snapshot: (new) DERIVABLE → Final: AVAILABLE | Citation: Groomer Expected Behavior describes write-plan-and-exit signal
+9. Per-task vs per-plan-run scope | Snapshot: (new) DERIVABLE → Final: AVAILABLE | Citation: Groomer resolves both: plan_review (per-task YAML) and --plan-first (per-run flag)
+10. Rejection feedback loop design | Snapshot: (new) DERIVABLE → Final: AVAILABLE | Citation: Groomer Expected Behavior step 7 describes re-spawn with feedback
 
-**Goal**: Add optional plan-first mode to SAM task execution so agents surface structured plans for human review before irreversible operations.
-
-**Conditions Assessment**:
-
-1. implement-feature SKILL.md execution loop structure understood | Status: **AVAILABLE** | Verified in implement-feature SKILL.md lines 55-75; loop structure: status → ready → for each task → dispatch → repeat. Documented in local-workflow.md Phase 2 Execution Loop.
-
-2. start-task SKILL.md task claim and execution flow understood | Status: **AVAILABLE** | Verified in start-task SKILL.md steps 1-6; step 3 claims task, step 6 implements. Exact sequence and call order are documented and fact-checked.
-
-3. Task YAML frontmatter schema supports additional fields (sam_schema Task model) | Status: **AVAILABLE** | Field task_file_format.md documents Task Pydantic model. Verified: models.py uses Pydantic with AliasChoices. New `plan_review: bool = False` field with alias mapping can be added without breaking existing tasks.
-
-4. swarm-patterns Pattern 5 plan_approval_response mechanism documented | Status: **AVAILABLE** | Verified in swarm-patterns SKILL.md lines 182-218. Pattern 5 "Plan Approval Workflow" documents mode="plan" parameter, plan_approval_request, plan_approval_response with approve/reject logic. Mechanism is proven, bounded, and has working example code.
-
-5. Plan file naming convention (plan/task-plan-{task_id}.md) does not conflict | Status: **DERIVABLE** | Existing convention: plan/T0-baseline-{slug}.yaml, plan/TN-verification-{slug}.yaml (from bookend tasks). Proposed: plan/task-plan-{task_id}.md. No conflict detected in Impact Radius; `sam` CLI would need to exclude plan-task-*.md from task discovery (verification task during implementation).
-
-6. Hook system (SubagentStop, PostToolUse) interaction with plan-only mode understood | Status: **AVAILABLE** | Critical risk identified in Impact Radius: task_status_hook.py SubagentStop handler will falsely mark plan-only sub-agents as COMPLETE. Handler must detect plan-only invocation pattern and skip COMPLETE marking. PostToolUse behavior is acceptable (silent skip if context file absent).
-
-7. Agent tool plan mode parameter exists for delegated agents | Status: **AVAILABLE** | Verified in swarm-patterns SKILL.md line 196. Agent() tool call shows `mode: "plan"` parameter in working example. Orchestrator can delegate with mode="plan" to implement-feature OR start-task can auto-detect plan_review: true from task YAML.
-
-8. How plan-only sub-agent communicates "plan ready" signal to orchestrator | Status: **DERIVABLE** | Signal mechanism not explicitly designed. Options: (a) Write plan file → orchestrator polls for file existence; (b) Agent returns explicit status code/message; (c) Combined: agent writes plan file + prints "PLAN_READY: {file_path}" to stdout for orchestrator to parse. Design decision needed. Recommended: (c) to maintain compatibility with hook system and provide clear orchestrator handoff.
-
-9. Whether plan_review should be set per-task or per-plan-run | Status: **DERIVABLE** | Backlog item describes per-task flag: "task-level flag `plan_review: true`". However, `implement-feature` could also accept `--plan-first` flag at orchestrator level (applies to all eligible tasks). Decision: per-task flag is more flexible (review only high-risk tasks); orchestrator flag can be derived as "any task has plan_review: true" during status query. No blocking decision required — both can coexist.
-
-10. How rejection feedback loop works (orchestrator re-spawns agent with feedback?) | Status: **DERIVABLE** | Pattern 5 documents approve/reject but swarm-patterns mechanism uses TeamCreate/SendMessage (not applicable to SAM skill invocation). For SAM: if human rejects plan, orchestrator must re-invoke start-task with feedback in context. Mechanism: (a) write rejection reason to plan/task-plan-{task_id}-feedback.md; (b) re-invoke Skill(skill="start-task", args="... --plan-only {task_id}") with feedback in prompt; (c) sub-agent reads feedback, revises plan, overwrites plan file. No design blocker — standard delegation + file I/O pattern.
-
-**Additional Finding**: Impact Radius inventory identifies 24 files across 5 categories (Code Producers, Code Consumers, Documentation, Tests, Agent Instructions). "Ecosystem Completeness Checklist" provides 13 concrete checkpoints for implementation. No pre-existing blockers identified.
-
-**Decision**: **APPROVED FOR IMPLEMENTATION**
-
-Rationale: All 10 conditions are AVAILABLE (7) or DERIVABLE (3). No MISSING information blocks progress. Critical risk (hook false-COMPLETE) is identified and bounded. Pattern precedent (swarm-patterns Pattern 5) exists. Scope is well-defined: two primary changes (models.py Task field + two SKILL.md files), bounded guard logic in task_status_hook.py, and documentation updates across 6 files. Implementation order: (1) Task model + schema + tests; (2) start-task logic + hook guard; (3) implement-feature orchestration; (4) documentation and agent guidance. Follow the Ecosystem Completeness Checklist to ensure coverage.
+Changes from snapshot:
+- Conditions 1-7: DERIVABLE → AVAILABLE (resolved by fact-checker and impact-analyst in Wave 1)
+- Conditions 8-10: new conditions added by impact-analyst, resolved by groomer in Wave 3
+AVAILABLE count: 10
+DERIVABLE count: 0
+MISSING count: 0
+Decision: APPROVED
 </div>
