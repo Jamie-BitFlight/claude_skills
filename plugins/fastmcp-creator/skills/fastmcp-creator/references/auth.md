@@ -647,7 +647,7 @@ mcp = FastMCP(name="Production API", auth=verifier)
 
 ### Connection Pooling for Token Verifiers (`http_client` parameter)
 
-CONSTRAINT: Requires FastMCP v2.18+.
+CONSTRAINT: Requires FastMCP v3.1.0+.
 
 SOURCE: <https://gofastmcp.com/servers/auth/token-verification> (accessed 2026-03-17)
 

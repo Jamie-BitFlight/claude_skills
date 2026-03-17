@@ -98,8 +98,20 @@ mcp.run(transport="http", host="0.0.0.0", port=8080)
 ```
 
 Removed kwargs: `host`, `port`, `log_level`, `debug`, `sse_path`, `streamable_http_path`,
-`json_response`, `stateless_http`, `on_duplicate_tools`, `on_duplicate_resources`,
-`on_duplicate_prompts`, `tool_serializer`, `include_tags`, `exclude_tags`, `tool_transformations`.
+`json_response`, `stateless_http`, `tool_serializer`, `include_tags`, `exclude_tags`, `tool_transformations`.
+
+The three per-type duplicate-handling kwargs (`on_duplicate_tools`, `on_duplicate_resources`,
+`on_duplicate_prompts`) were removed and replaced with a single unified `on_duplicate` parameter
+that applies uniformly to tools, resources, and prompts. Passing the old kwargs raises
+`TypeError: Use on_duplicate= instead.`
+
+```python
+# v2 — raises TypeError in v3
+mcp = FastMCP("server", on_duplicate_tools="warn", on_duplicate_resources="error")
+
+# v3 — correct
+mcp = FastMCP("server", on_duplicate="warn")
+```
 
 ### 5. Component Listing Methods Renamed
 

@@ -49,7 +49,7 @@ PATTERN: Common constructor parameters:
 - `mask_error_details` — when `True`, replaces internal errors with generic messages
 - `list_page_size` — paginate list responses (v3.0.0+, default: `None` = all)
 - `tasks` — enable background task support (default: `False`)
-- `client_log_level` — minimum log level sent to clients (v3.2.0+)
+- `client_log_level` — minimum log level sent to clients (unreleased — expected v3.2.0)
 - `dereference_schemas` — auto-dereference `$ref` in JSON schemas (default: `True`)
 
 **Handlers and Storage**
