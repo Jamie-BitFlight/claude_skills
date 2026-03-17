@@ -520,6 +520,10 @@ Over-compression risks:
 
 Balance: Compress structure and phrasing, preserve motivations and 2-3 key examples.
 
+## Real-World Examples
+
+> [Boris Cherny's CLAUDE.md](./references/example-claude-md-boris-cherny.md) — well-structured configuration demonstrating numbered workflow principles, actionable bullet points, balanced guidance with scope limiters, and self-referential learning loops.
+
 ## Sources
 
 - [Be clear and direct](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/be-clear-and-direct.md)
