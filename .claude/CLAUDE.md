@@ -56,9 +56,8 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 - No planning in "Weeks" or "Sprints" — work scales with parallelism
 - Output contains "likely", "probably", or "I think" — STOP and verify before continuing
-- Pass file paths to agents — transcribing file contents into prompts bypasses agent verification
+- **Pass file paths, let agents read** — agents perform their own Chain of Verification against actual source. Provide the path; the agent reads, verifies, and acts on it with a fresh context window. Never transcribe file contents into prompts — it bypasses agent verification.
 - Do NOT discover file paths on behalf of agents — the agent has full tool access and an empty context window; it finds what it needs itself. Pre-discovering paths wastes orchestrator context and duplicates agent work.
-- **Pass file paths, let agents read** — agents perform their own Chain of Verification against actual source. Provide the path; the agent reads, verifies, and acts on it with a fresh context window.
 - **Investigation requires hypothesis first** — when your first action on a new task is a Read/Grep/Bash investigation (not a planned delegation), load `/scientific-method:scientific-thinking` first. Investigation without hypothesis is debugging theater.
 
 **Tool Usage:**

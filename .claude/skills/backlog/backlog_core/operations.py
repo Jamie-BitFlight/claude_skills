@@ -2223,7 +2223,10 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
                 cached: dict[str, object] = json.loads(cache_file.read_text(encoding="utf-8"))
                 if cached.get("parent_issue_number") == parent_issue_number:
                     out.warn(f"  WARNING: GitHub unavailable — returning cached tasks from {cache_file.name}")
-                    cached_tasks: list[dict[str, object]] = cached.get("tasks", [])
+                    cached_tasks_raw = cached.get("tasks", [])
+                    cached_tasks: list[dict[str, object]] = (
+                        cached_tasks_raw if isinstance(cached_tasks_raw, list) else []
+                    )  # type: ignore[assignment]
                     count_raw = cached.get("count", len(cached_tasks))
                     return {
                         "tasks": cached_tasks,
