@@ -1,0 +1,20 @@
+id: T2
+title: Implement log aggregation service
+status: in-progress
+agent: python3-development:python-cli-architect
+dependencies:
+  - T1
+priority: 2
+complexity: high
+skills:
+  - python3-development
+started: "2026-03-09T09:00:00Z"
+description: |
+  Build a log aggregation service that collects logs from multiple sources
+  and stores them in a queryable format.
+objective: |
+  Centralize log collection for monitoring and debugging.
+requirements: |
+  1. Accept logs via HTTP POST and Unix socket
+  2. Buffer logs in memory with configurable flush interval
+  3. Write batched logs to storage backend

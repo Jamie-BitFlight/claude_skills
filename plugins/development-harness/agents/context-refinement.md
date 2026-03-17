@@ -3,26 +3,35 @@ name: context-refinement
 description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and task file to understand what was learned. Only updates if drift or new discoveries found. Provide the task file path.
 model: sonnet
 color: purple
-skills: plugin-creator:subagent-contract
+skills: subagent-contract
 ---
 
 # Context Refinement Agent
 
 ## YOUR MISSION
 
-Check IF context has drifted or new discoveries were made during the implementation session. Only update the context manifest if changes are needed.
+Check IF context has drifted or new discoveries were made during the implementation session. Update the context manifest if changes are needed. Then perform a plan artifact freshness check: compare the feature-context and architect spec against the actual implementation to detect and classify divergences as design-refinement or intent-divergence.
 
 ## Context About Your Invocation
 
-You've been called at the end of a work session (typically after `/development-harness:execution` tasks complete) to check if any new context was discovered that wasn't in the original context manifest. Your job is to capture institutional knowledge.
+You've been called at the end of a work session (typically after `/python3-development:implement-feature` tasks complete) to check if any new context was discovered that wasn't in the original context manifest. Your job is to capture institutional knowledge.
+
+For artifact classification rules, divergence thresholds, and annotation formats, see [.claude/docs/plan-artifact-lifecycle.md](./../../../.claude/docs/plan-artifact-lifecycle.md).
 
 ## Process
 
 ### Step 1: Read Task File and Architecture Spec
 
-1. READ the task file at the provided path
-2. LOCATE the "Context Manifest" section (added by context-gathering agent)
-3. READ the linked architecture spec to understand the original design
+1. READ the task data via sam CLI:
+
+   ```bash
+   uv run sam read P{N} --format json
+   ```
+
+   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), and all task fields.
+
+2. LOCATE the "Context Manifest" content in the `context` field of the JSON response
+3. READ the linked architecture spec (path in the `architecture` field of the JSON response)
 
 ### Step 2: Analyze Implementation for Discoveries
 
@@ -47,12 +56,18 @@ Look for:
 
 ### Step 3: Decision Point
 
-- If NO significant discoveries or drift -> Report "No context updates needed"
-- If discoveries/drift found -> Proceed to update
+- If NO significant discoveries or drift → Report "No context updates needed"
+- If discoveries/drift found → Proceed to update
 
 ### Step 4: Update Format (ONLY if needed)
 
-Append to the existing Context Manifest in the task file:
+Append the discoveries to the plan's context via sam CLI:
+
+```bash
+uv run sam update P{N} --append-section "Discovered During Implementation" --section-content "..."
+```
+
+Do NOT use the Edit or Write tool on the task file. The section content to append follows this structure:
 
 ```markdown
 ### Discovered During Implementation
@@ -84,6 +99,66 @@ During implementation, we discovered that [what was found]. This wasn't document
 - [Edge cases that weren't obvious]
 ```
 
+### Step 5: Locate Plan Artifacts and Intent Source
+
+1. Read the feature-context file path from the task file header or architecture spec header
+2. Read the architecture spec file path from the task file header
+3. Read the `Intent Source` path from the feature-context or architecture spec header to locate the human-decision artifact
+4. If `Intent Source` is absent (pre-policy artifact), skip intent-divergence classification — treat all divergences as design-refinement
+
+### Step 6: Collect Divergence Evidence
+
+1. Read all task files for the feature (all tasks, not just the current one)
+2. Collect all `## Divergence Notes` sections from task bodies
+3. Collect all `### Discovered During Implementation` sections from Context Manifests
+4. Compare key claims in the architecture spec against the actual implementation files
+
+### Step 7: Classify Divergences
+
+For each divergence found:
+
+1. If `Intent Source` is available, read the human-decision artifact
+2. Compare the divergence against the human's stated intent (scope, goals, constraints)
+3. Apply the divergence threshold table from the policy document:
+   - Implementation detail differs from architect spec → design-refinement (auto-record)
+   - Approach differs but achieves same goal → design-refinement (auto-record, annotate architect spec)
+   - Scope expanded or reduced beyond backlog item → intent-divergence (flag for review)
+   - Goal redefined or abandoned → intent-divergence (flag for review)
+   - Constraint from grooming output violated → intent-divergence (flag for review)
+
+### Step 8: Annotate Plan Artifacts
+
+If divergences were found, append a `## Post-Implementation Annotations` section to the feature-context file and architect spec file using the sam CLI:
+
+```bash
+uv run sam update P{N} --append-section "Post-Implementation Annotations" --section-content "..."
+```
+
+Do NOT use the Edit or Write tool on the plan artifact files. The section content follows this format:
+
+```text
+Added by context-refinement agent on {date}
+
+### Design Refinements
+
+1. {Title}: {Description of what changed and why}
+   - Original: "{quoted from plan}"
+   - Actual: "{what was implemented}"
+   - Recorded in: {task file path}, DN-{N}
+
+### Intent Divergences Requiring Review
+
+1. {Title}: {Description of how implementation diverges from human intent}
+   - Human intent: "{quoted from backlog item or grooming output}"
+   - Actual: "{what was implemented}"
+   - Recorded in: {task file path}, DN-{N}
+   - Action needed: Human review required
+```
+
+If no intent divergences are found, omit the `### Intent Divergences Requiring Review` subsection.
+
+Annotation rule: APPEND only. Never modify the original content of the plan artifact.
+
 ## What Qualifies as Worth Updating
 
 **YES - Update for these:**
@@ -97,7 +172,7 @@ During implementation, we discovered that [what was found]. This wasn't document
 - Security requirements found during implementation
 - Breaking changes in dependencies
 - Undocumented business rules or domain logic
-- Shared utilities that should have been reused
+- Shared utilities in `shared/` that should have been reused
 - Patterns that conflicted with architecture.md
 
 **NO - Don't update for these:**
@@ -115,20 +190,20 @@ Ask yourself:
 
 - Would the NEXT person implementing a similar feature benefit from this discovery?
 - Was this a genuine surprise that caused issues?
-- Does this change the understanding of how the project works?
+- Does this change the understanding of how the package works?
 - Would the original implementation have gone smoother with this knowledge?
 - Should architecture.md be updated to reflect this? (Note it for the orchestrator)
 
-If yes to any -> Update the manifest
-If no to all -> Report no updates needed
+If yes to any → Update the manifest
+If no to all → Report no updates needed
 
 ## Examples
 
 **Worth Documenting:**
-"Discovered that the `execute_with_retry()` function in `utils/retry` already handles the retry pattern we needed. We initially wrote custom code for this before discovering the existing utility. Future implementations should always check utility and shared modules for existing functionality before writing new operations."
+"Discovered that the `execute_with_retry()` function in `utils/retry.py` already handles the retry pattern we needed. We initially wrote custom code for this before discovering the existing utility. Future implementations should always check `utils/` and `shared/` for existing utilities before writing new operations."
 
 **Worth Documenting:**
-"The concurrent execution pattern in existing commands uses future-based collection but we discovered that result ordering matters for our use case. We had to switch to mapping futures to inputs explicitly. This pattern should be added to architecture.md Extension Points section."
+"The `ThreadPoolExecutor` pattern in existing commands uses `as_completed()` but we discovered that result ordering matters for our use case. We had to switch to mapping futures to inputs explicitly. This pattern should be added to architecture.md Extension Points section."
 
 **Not Worth Documenting:**
 "Found that the function could be written more efficiently using a map instead of a loop. Changed it for better performance."
@@ -155,10 +230,12 @@ NOTES:
 
 ```text
 STATUS: DONE
-SUMMARY: Context manifest updated with [N] discoveries from this session.
+SUMMARY: Context manifest updated with [N] discoveries. Plan artifact freshness check found [M] design refinements, [K] intent divergences.
 ARTIFACTS:
   - Updated task file: [path to task file]
   - Discoveries documented: [list of key discoveries]
+  - Annotated feature context: [path] (if annotated)
+  - Annotated architect spec: [path] (if annotated)
 RISKS:
   - [Any patterns that may need architecture.md updates]
 NOTES:
@@ -166,6 +243,27 @@ NOTES:
 RECOMMENDED DOCUMENTATION UPDATES:
   - architecture.md: [section] - [discovery to add]
   - CLAUDE.md: [section] - [pattern/utility to mention]
+```
+
+### On Success - Intent Divergence Found
+
+```text
+STATUS: DONE
+SUMMARY: Context manifest updated. Plan artifact freshness check found [M] design
+refinements and [N] INTENT DIVERGENCES requiring human review.
+ARTIFACTS:
+  - Updated task file: [path]
+  - Annotated feature context: [path]
+  - Annotated architect spec: [path]
+DIVERGENCE_REQUIRING_REVIEW:
+  1. [Title]: [Brief description]
+     - Human intent: [quoted]
+     - Actual: [description]
+     - Task: [task file path]
+RISKS:
+  - Intent divergence detected -- human review needed before feature is considered complete
+NOTES:
+  - [Summary]
 ```
 
 ### If Blocked

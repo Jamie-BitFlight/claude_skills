@@ -2,18 +2,21 @@
 
 How to connect FastMCP servers to external clients and frameworks — covers Anthropic API, OpenAI Responses API, Gemini SDK, FastAPI mounting, and Claude Code installation.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/anthropic.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/openai.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/gemini.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/fastapi.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/claude-code.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/anthropic> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/openai> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/gemini> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/fastapi> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/claude-code> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/patterns/cli> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17) — PropelAuth integration (v3.1)
+SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — Prefab Apps (v3.1)
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — Google GenAI sampling handler (v3.1)
 
 ---
 
 ## Anthropic Messages API
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/anthropic.mdx`
+SOURCE: <https://gofastmcp.com/integrations/anthropic>
 
 The Anthropic Messages API supports MCP servers as remote tool sources via the `mcp_servers` parameter.
 
@@ -81,7 +84,7 @@ mcp = FastMCP(name="My Server", auth=auth)
 
 ## OpenAI Responses API
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/openai.mdx`
+SOURCE: <https://gofastmcp.com/integrations/openai>
 
 OpenAI's Responses API (NOT Completions or Assistants API) supports MCP servers as remote tool sources.
 
@@ -136,7 +139,7 @@ resp = client.responses.create(
 
 ## Google Gemini SDK
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/gemini.mdx`
+SOURCE: <https://gofastmcp.com/integrations/gemini>
 
 Gemini's MCP integration requires a FastMCP `Client` session. Pass `mcp_client.session` directly to the Gemini SDK tools configuration.
 
@@ -183,7 +186,7 @@ mcp_client = Client(
 
 ## FastAPI Integration
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/fastapi.mdx`
+SOURCE: <https://gofastmcp.com/integrations/fastapi>
 
 FastAPI integration supports two directions:
 
@@ -283,7 +286,7 @@ combined_app = FastAPI(
 
 ## Claude Code Installation
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/claude-code.mdx`
+SOURCE: <https://gofastmcp.com/integrations/claude-code>
 
 ### Automatic Installation via CLI
 
@@ -328,9 +331,85 @@ RULE: For remote FastMCP servers (HTTP/SSE transport), use Claude Code's native 
 
 ---
 
+## PropelAuth Authentication
+
+PropelAuth is a `RemoteAuthProvider` using PropelAuth's OAuth and token introspection.
+
+RULE: Create a Backend Integration in the PropelAuth dashboard first. See
+<https://docs.propelauth.com> for dashboard setup.
+
+For `PropelAuthProvider` constructor parameters, environment variables, introspection caching
+configuration, and `get_access_token()` usage in tools, see
+[./auth.md — PropelAuth Provider](./auth.md).
+
+SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17)
+
+---
+
+## Prefab Apps — Interactive Tool UIs
+
+SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — v3.1.0
+
+Prefab is a declarative UI framework for building interactive MCP tool UIs in pure Python — no HTML or JavaScript required. Tools return Prefab components; FastMCP handles renderer registration and protocol wiring.
+
+CONSTRAINT: Requires `fastmcp[apps]` extra. Prefab is in early active development — pin `prefab-ui` to a specific version in `pyproject.toml`.
+
+```bash
+pip install "fastmcp[apps]"
+```
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Dashboard")
+
+@mcp.tool(app=True)
+def revenue_chart(year: int) -> PrefabApp:
+    """Show annual revenue as an interactive bar chart."""
+    data = [
+        {"quarter": "Q1", "revenue": 42000},
+        {"quarter": "Q2", "revenue": 51000},
+        {"quarter": "Q3", "revenue": 47000},
+        {"quarter": "Q4", "revenue": 63000},
+    ]
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f"{year} Revenue")
+        BarChart(
+            data=data,
+            series=[ChartSeries(data_key="revenue", label="Revenue")],
+            x_axis="quarter",
+        )
+
+    return PrefabApp(view=view)
+```
+
+RULE: Use `app=True` on `@mcp.tool` to enable Prefab rendering. FastMCP registers a shared `ui://prefab/renderer.html` resource automatically — no additional configuration needed.
+
+PATTERN: Wrap return in `ToolResult` when the LLM also needs to reason about the data — the component tree becomes `structured_content`; the text field is what the LLM reads.
+
+For full Prefab component reference (charts, tables, forms, state management, reactive expressions), see the [Prefab UI documentation](https://prefab.prefect.io) and the [advanced patterns reference](./advanced.md).
+
+---
+
+## Google GenAI Sampling Handler
+
+Alternative to the Anthropic and OpenAI sampling handlers, using Google's Gemini models.
+
+Install: `pip install "fastmcp[gemini]"`
+
+For `GoogleGenAISamplingHandler` usage and comparison with other handlers, see
+[./advanced.md — Google GenAI Sampling Handler](./advanced.md).
+
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17)
+
+---
+
 ## FastMCP CLI — Cross-Integration Tool
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx`
+SOURCE: <https://gofastmcp.com/patterns/cli>
 
 The `fastmcp` CLI bridges FastMCP servers with any MCP client:
 

@@ -5,9 +5,9 @@ metadata:
   topic: experiment-protocol-mcp-server-lacks-content-validation-and-
   source: Process analysis via /improve-processes
   added: '2026-03-04'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#431'
   last_synced: '2026-03-04T21:29:15Z'
   groomed: '2026-03-04'

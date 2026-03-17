@@ -5,9 +5,9 @@ metadata:
   topic: implement-feature-orchestrator-wrote-code-directly-instead-o
   source: 'session observation during #328 implementation'
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#337'
   last_synced: '2026-03-01T14:16:38Z'
   groomed: '2026-03-01'

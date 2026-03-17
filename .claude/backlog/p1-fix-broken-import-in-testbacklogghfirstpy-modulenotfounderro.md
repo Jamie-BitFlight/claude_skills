@@ -5,11 +5,11 @@ metadata:
   topic: fix-broken-import-in-testbacklogghfirstpy-modulenotfounderro
   source: 'PR #561 code review — pre-existing issue'
   added: '2026-03-10'
-  priority: P1
+  priority: completed
   type: Bug
-  status: needs-grooming
+  status: done
   issue: '#563'
-  last_synced: '2026-03-12T12:47:37Z'
+  last_synced: '2026-03-14T15:59:51Z'
 ---
 
 ## Story

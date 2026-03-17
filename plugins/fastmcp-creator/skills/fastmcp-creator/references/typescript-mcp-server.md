@@ -31,7 +31,7 @@ REQUIRED_STRUCTURE:
 │   ├── tools/            # Tool implementations (one file per domain)
 │   ├── services/         # API clients and shared utilities
 │   ├── schemas/          # Zod validation schemas
-│   └── constants.ts      # Shared constants (API_URL, CHARACTER_LIMIT, etc.)
+│   └── constants.ts      # Shared constants (API_URL, DEFAULT_LIMIT, etc.)
 └── dist/                 # Built JavaScript files (entry point: dist/index.js)
 </eg>
 
@@ -334,29 +334,46 @@ async function listItems(params: z.infer<typeof ListSchema>) {
 }
 ```
 
-## Character Limits and Truncation
+## Large Response Handling
 
-RULE: The model must prevent overwhelming responses with too much data
+RULE: The model must give callers control over response size — never silently truncate
+
+CONSTRAINT: Do NOT introduce hardcoded character limits (e.g., `CHARACTER_LIMIT = 25000`) that silently drop data. Arbitrary truncation removes the caller's ability to read what they need and causes silent data loss. This is explicitly prohibited by the repository's "No Invented Limits" policy.
+
+CORRECT APPROACH: Expose `offset` and `limit` parameters so the caller controls the window. When a response is paginated, always report `total`, `count`, `offset`, `has_more`, and `next_offset` so the caller knows how to retrieve the rest.
 
 ```typescript
 // At module level in constants.ts
-export const CHARACTER_LIMIT = 25000; // Maximum response size in characters
+export const DEFAULT_PAGE_LIMIT = 20; // Default page size — caller may override via 'limit' param
 
 async function searchTool(params: SearchInput) {
-  let result = generateResponse(data);
+  // Use caller-controlled pagination instead of silent truncation
+  const data = await fetchData({
+    limit: params.limit ?? DEFAULT_PAGE_LIMIT,
+    offset: params.offset ?? 0,
+  });
 
-  // Check character limit and truncate if needed
-  if (result.length > CHARACTER_LIMIT) {
-    const truncatedData = data.slice(0, Math.max(1, data.length / 2));
-    response.data = truncatedData;
-    response.truncated = true;
-    response.truncation_message =
-      `Response truncated from ${data.length} to ${truncatedData.length} items. ` +
-      `Use 'offset' parameter or add filters to see more results.`;
-    result = JSON.stringify(response, null, 2);
+  const response = {
+    total: data.total,
+    count: data.items.length,
+    offset: params.offset ?? 0,
+    items: data.items,
+    has_more: data.total > (params.offset ?? 0) + data.items.length,
+    next_offset:
+      data.total > (params.offset ?? 0) + data.items.length
+        ? (params.offset ?? 0) + data.items.length
+        : undefined,
+  };
+
+  // If the caller requests a very large page and the upstream API returns a
+  // partial result, surface that fact explicitly — never silently omit data.
+  if (data.items.length < (params.limit ?? DEFAULT_PAGE_LIMIT) && response.has_more) {
+    response.warning =
+      `Upstream returned ${data.items.length} of ${params.limit ?? DEFAULT_PAGE_LIMIT} requested items. ` +
+      `Use next_offset (${response.next_offset}) to continue.`;
   }
 
-  return result;
+  return JSON.stringify(response, null, 2);
 }
 ```
 
@@ -645,7 +662,7 @@ PROJECT_CONFIGURATION:
 CODE_QUALITY:
 
 - [ ] Pagination properly implemented where applicable
-- [ ] Large responses check CHARACTER_LIMIT and truncate with clear messages
+- [ ] Large responses use caller-controlled `offset`/`limit` pagination — no hardcoded truncation
 - [ ] Filtering options provided for potentially large result sets
 - [ ] All network operations handle timeouts and connection errors
 - [ ] Common functionality extracted into reusable functions

@@ -2,8 +2,9 @@
 
 How to test FastMCP v3 servers using in-memory transport and pytest — covers fixtures, assertions, mocking, and network transport testing.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/testing.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/testing> (accessed 2026-03-17) — dedicated testing page (v3.1)
+SOURCE: <https://gofastmcp.com/patterns/testing> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/development/tests> (accessed 2026-03-05)
 SOURCE: `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` (extended pytest patterns)
 
 ---
@@ -14,7 +15,7 @@ RULE: Use `Client(mcp)` (in-memory transport) for all unit tests. Do NOT use HTT
 
 The in-memory transport runs the real MCP protocol implementation without network overhead. Pass your server instance directly to the client — no deployment, no subprocess, no network. Everything runs in the same Python process with full debugger support.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "In-Memory Testing" section
+SOURCE: <https://gofastmcp.com/development/tests> — "In-Memory Testing" section
 
 ```python
 from fastmcp import FastMCP
@@ -39,7 +40,7 @@ async def test_greet_tool():
 
 RULE: Set `asyncio_mode = "auto"` in `pyproject.toml`. This eliminates `@pytest.mark.asyncio` decorators on every async test.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/testing.mdx` — "Prerequisites" section
+SOURCE: <https://gofastmcp.com/patterns/testing> — "Prerequisites" section
 
 ```toml
 [tool.pytest.ini_options]
@@ -62,7 +63,7 @@ CONSTRAINT: Do NOT add `@pytest.mark.asyncio` to individual test functions when 
 
 RULE: Use pytest fixtures to create reusable server configurations. Do NOT open FastMCP clients inside fixtures — this creates hard-to-diagnose event loop issues. Create the server in the fixture and open the client inside each test.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Using Fixtures" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Using Fixtures" section
 
 ```python
 import pytest
@@ -106,7 +107,7 @@ async def test_list_tools(main_mcp_client: Client[FastMCPTransport]):
 
 ## Assertion Patterns — Tools, Resources, Prompts
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/testing.mdx` — "Testing with Pytest Fixtures" section
+SOURCE: <https://gofastmcp.com/patterns/testing> — "Testing with Pytest Fixtures" section
 
 ```python
 from fastmcp import FastMCP
@@ -151,7 +152,7 @@ async def test_prompt_get():
 
 Use `@pytest.mark.parametrize` for variations of the same behavior. Use separate tests for different behaviors.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/testing.mdx` — "Using the pytest parametrize decorator" section
+SOURCE: <https://gofastmcp.com/patterns/testing> — "Using the pytest parametrize decorator" section
 
 ```python
 import pytest
@@ -190,7 +191,7 @@ async def test_add(x: int, y: int, expected: int, mcp_client):
 
 Use `inline-snapshot` for testing JSON schemas and complex data structures.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Inline Snapshots" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Inline Snapshots" section
 
 ```python
 from inline_snapshot import snapshot
@@ -212,15 +213,48 @@ async def test_tool_schema():
 Commands:
 
 ```bash
-pytest --inline-snapshot=create   # populate empty snapshots
-pytest --inline-snapshot=fix      # update after intentional changes
+pytest --inline-snapshot=create        # populate empty snapshots
+pytest --inline-snapshot=fix           # update after intentional changes
+pytest --inline-snapshot=fix,create    # combined: create new and fix existing
 ```
+
+For values that change between runs (timestamps, IDs, random data), use `dirty-equals` for flexible equality assertions:
+
+```python
+from dirty_equals import IsDatetime, IsStr
+from inline_snapshot import snapshot
+from fastmcp import FastMCP
+from fastmcp.client import Client
+
+mcp = FastMCP("TestServer")
+
+@mcp.tool
+def status() -> dict:
+    """Return server status."""
+    import datetime
+    return {"status": "ok", "checked_at": datetime.datetime.now().isoformat()}
+
+async def test_status_tool():
+    async with Client(mcp) as client:
+        result = await client.call_tool("status", {})
+        assert result.data == {"status": "ok", "checked_at": IsStr()}
+```
+
+Install both libraries as development dependencies:
+
+```bash
+uv add --dev inline-snapshot dirty-equals
+```
+
+SOURCE: <https://gofastmcp.com/servers/testing> (accessed 2026-03-17) — "Testing with Pytest Fixtures" section
+SOURCE: <https://github.com/15r10nk/inline-snapshot> (accessed 2026-03-17)
+SOURCE: <https://github.com/samuelcolvin/dirty-equals> (accessed 2026-03-17)
 
 ---
 
 ## Mocking External Dependencies
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Mocking External Dependencies" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Mocking External Dependencies" section
 
 ```python
 from unittest.mock import AsyncMock
@@ -253,7 +287,7 @@ RULE: Mock at the boundary — mock external services (databases, HTTP APIs), no
 
 ## Error Testing
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Self-Contained Setup" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Self-Contained Setup" section
 
 ```python
 import pytest
@@ -281,7 +315,7 @@ async def test_tool_raises_on_invalid_input():
 
 Use in-process network testing when you must test actual HTTP transport behavior.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Testing Network Transports" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Testing Network Transports" section
 
 ```python
 import pytest
@@ -333,7 +367,7 @@ Mark subprocess tests with `@pytest.mark.client_process` to isolate them in CI.
 
 ## Test Naming and Single-Behavior Rule
 
-SOURCE: `.claude/worktrees/fastmcp/docs/development/tests.mdx` — "Single Behavior Per Test" section
+SOURCE: <https://gofastmcp.com/development/tests> — "Single Behavior Per Test" section
 
 RULE: Each test verifies exactly one behavior. When it fails, the name tells you what broke.
 

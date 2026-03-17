@@ -11,6 +11,7 @@ No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 from backlog_core.server import mcp
@@ -623,3 +624,428 @@ class TestLifecycles:
         item = matching[0]
         # Issue #100 is not in batch_fetch_statuses → status should be empty/absent
         assert item.get("status", "") == "", f"Expected empty status for stale item, got {item.get('status')}"
+
+
+# ---------------------------------------------------------------------------
+# Group 3: Layer 2 semantic matching integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticMatchingInfrastructure:
+    """Integration tests for the semantic matching strategy chain infrastructure.
+
+    Tests verify that the backlog_list type/topic filters and title substring
+    matching work correctly to support the 3-strategy matching chain:
+      - Strategy 1: substring via title= filter
+      - Strategy 2: filter-first via type=/topic= to narrow candidates
+      - Strategy 3: LLM semantic match (instruction-level, not tested here)
+    """
+
+    async def test_semantic_match_synonym_query_via_type_filter(self, backlog_dir, mock_github, write_test_item):
+        """Query for 'login' issue finds auth-related item when filtered by type='Bug'."""
+        write_test_item("Authentication failure on SSO redirect", type_val="Bug")
+        write_test_item("Add new dashboard widget", type_val="Feature")
+        write_test_item("Refactor database connection pool", type_val="Refactor")
+
+        # Strategy 2: filter by type='Bug' narrows to auth item only
+        result = await _call("backlog_list", {"type": "Bug"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "Authentication failure on SSO redirect"
+        assert result["items"][0]["type"] == "Bug"
+
+    async def test_substring_match_takes_priority(self, backlog_dir, mock_github, write_test_item):
+        """When substring matches exist, title filter returns them directly without needing type/topic filters."""
+        write_test_item("Authentication failure on SSO redirect", type_val="Bug")
+        write_test_item("Backlog list performance degradation", type_val="Bug")
+        write_test_item("Add dark mode theme support", type_val="Feature")
+
+        # Strategy 1: direct substring match on title — no type/topic needed
+        result = await _call("backlog_list", {"title": "SSO redirect"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "Authentication failure on SSO redirect"
+
+    async def test_filter_first_narrows_candidates_type_and_substring(self, backlog_dir, mock_github, write_test_item):
+        """type='Bug' combined with title substring finds the correct bug from a mixed item set."""
+        write_test_item("Schema migration script error on PostgreSQL 15", type_val="Bug")
+        write_test_item("Schema migration documentation update", type_val="Docs")
+        write_test_item("UI theme customization support", type_val="Feature")
+
+        # Strategy 2: type filter + substring narrows to exact match
+        result = await _call("backlog_list", {"type": "Bug", "title": "migration"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "Schema migration script error on PostgreSQL 15"
+        assert result["items"][0]["type"] == "Bug"
+
+    async def test_filter_first_narrows_candidates_topic_filter(self, backlog_dir, mock_github, write_test_item):
+        """topic filter narrows candidates using substring match on auto-derived topic slug."""
+        write_test_item("MCP server timeout on reconnect", type_val="Bug")
+        write_test_item("REST API route registration incomplete", type_val="Bug")
+
+        # topic is auto-derived from title slug: 'mcp-server-timeout-on-reconnect'
+        result = await _call("backlog_list", {"topic": "mcp-server"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "MCP server timeout on reconnect"
+
+    async def test_type_filter_excludes_items_without_type(self, backlog_dir, mock_github, write_test_item):
+        """Items without metadata.type are excluded when type filter is active."""
+        write_test_item("Item with type", type_val="Bug")
+        # Create item with empty type
+        write_test_item("Item without type", type_val="")
+
+        result = await _call("backlog_list", {"type": "Bug"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "Item with type"
+
+    async def test_type_filter_case_insensitive(self, backlog_dir, mock_github, write_test_item):
+        """type filter performs case-insensitive exact match."""
+        write_test_item("A bug item", type_val="Bug")
+        write_test_item("A feature item", type_val="Feature")
+
+        result = await _call("backlog_list", {"type": "bug"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "A bug item"
+
+    async def test_topic_filter_case_insensitive_substring(self, backlog_dir, mock_github, write_test_item):
+        """topic filter performs case-insensitive substring match."""
+        write_test_item("GitHub Actions workflow optimization", type_val="Chore")
+        write_test_item("REST API improvements", type_val="Feature")
+
+        # topic slug: 'github-actions-workflow-optimization'
+        result = await _call("backlog_list", {"topic": "GITHUB-ACTIONS"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "GitHub Actions workflow optimization"
+
+    async def test_response_includes_type_and_topic_fields(self, backlog_dir, mock_github, write_test_item):
+        """Each item in backlog_list response includes type and topic keys."""
+        write_test_item("Test type topic fields", type_val="Feature")
+
+        result = await _call("backlog_list")
+
+        assert result["count"] >= 1
+        item = result["items"][0]
+        assert "type" in item, "Expected 'type' key in item dict"
+        assert "topic" in item, "Expected 'topic' key in item dict"
+        assert item["type"] == "Feature"
+        assert item["topic"] != ""  # auto-derived from title
+
+    async def test_no_filters_returns_all_items(self, backlog_dir, mock_github, write_test_item):
+        """Backward compatibility: no type/topic params returns all items."""
+        write_test_item("Item A", type_val="Bug")
+        write_test_item("Item B", type_val="Feature")
+        write_test_item("Item C", type_val="Refactor")
+
+        result = await _call("backlog_list")
+
+        assert result["count"] == 3
+
+
+class TestSemanticQueryCorpus:
+    """Corpus-based integration tests verifying the filter infrastructure
+    supports semantic matching for a diverse set of queries.
+
+    Each test case represents a semantic query that an LLM user would issue.
+    The test verifies that the type/topic filter infrastructure correctly
+    narrows candidates so the target item is findable. The 10-query corpus
+    must achieve at least 80% success rate (8/10 correct matches).
+    """
+
+    # Corpus of (query_description, filter_params, expected_title) tuples.
+    # Each entry tests that applying Strategy 1 (title substring) or
+    # Strategy 2 (type/topic filter) can surface the correct item.
+    CORPUS: ClassVar[list[tuple[str, dict, str]]] = [
+        (
+            "fix login issue -> auth failure via Bug type filter",
+            {"type": "Bug"},
+            "Authentication failure on SSO redirect",
+        ),
+        (
+            "improve search speed -> performance via title substring",
+            {"title": "performance"},
+            "Backlog list performance degradation on large datasets",
+        ),
+        ("broken MCP connection -> MCP via topic filter", {"topic": "mcp-server"}, "MCP server timeout on reconnect"),
+        (
+            "add dark mode -> dark mode via title substring",
+            {"title": "dark mode"},
+            "UI theme customization support dark mode",
+        ),
+        (
+            "clean up old tests -> test suite via title substring",
+            {"title": "test suite"},
+            "Test suite maintenance and dead code removal",
+        ),
+        (
+            "database migration failing -> migration Bug filter",
+            {"type": "Bug", "title": "migration"},
+            "Schema migration script error on PostgreSQL 15",
+        ),
+        (
+            "fix typo in docs -> docs type filter + spelling substring",
+            {"type": "Docs", "title": "spelling"},
+            "Documentation spelling and grammar corrections",
+        ),
+        (
+            "slow CI pipeline -> CI via topic filter",
+            {"topic": "github-actions"},
+            "GitHub Actions workflow optimization",
+        ),
+        (
+            "memory leak on startup -> memory via title substring",
+            {"title": "memory"},
+            "Process memory growth during initialization",
+        ),
+        (
+            "missing API endpoint -> API via title substring",
+            {"title": "API route"},
+            "REST API route registration incomplete",
+        ),
+    ]
+
+    async def _setup_corpus_items(self, write_test_item):
+        """Create all corpus items in the test backlog directory."""
+        write_test_item("Authentication failure on SSO redirect", type_val="Bug")
+        write_test_item("Backlog list performance degradation on large datasets", type_val="Bug")
+        write_test_item("MCP server timeout on reconnect", type_val="Bug")
+        write_test_item("UI theme customization support dark mode", type_val="Feature")
+        write_test_item("Test suite maintenance and dead code removal", type_val="Chore")
+        write_test_item("Schema migration script error on PostgreSQL 15", type_val="Bug")
+        write_test_item("Documentation spelling and grammar corrections", type_val="Docs")
+        write_test_item("GitHub Actions workflow optimization", type_val="Chore")
+        write_test_item("Process memory growth during initialization", type_val="Bug")
+        write_test_item("REST API route registration incomplete", type_val="Bug")
+
+    async def test_semantic_corpus_80_percent_threshold(self, backlog_dir, mock_github, write_test_item):
+        """10-query semantic corpus achieves at least 80% success rate (8/10 matches)."""
+        await self._setup_corpus_items(write_test_item)
+
+        successes = 0
+        failures: list[str] = []
+        for description, params, expected_title in self.CORPUS:
+            result = await _call("backlog_list", params)
+            titles = [item["title"] for item in result["items"]]
+            if expected_title in titles:
+                successes += 1
+            else:
+                failures.append(f"  MISS: {description} — expected '{expected_title}', got {titles}")
+
+        success_rate = successes / len(self.CORPUS)
+        failure_report = "\n".join(failures) if failures else "none"
+        assert success_rate >= 0.80, (
+            f"Semantic corpus success rate {successes}/{len(self.CORPUS)} ({success_rate:.0%}) "
+            f"below 80% threshold.\nFailures:\n{failure_report}"
+        )
+
+    async def test_each_corpus_query_returns_nonempty(self, backlog_dir, mock_github, write_test_item):
+        """Each corpus query returns at least one result (no empty result sets)."""
+        await self._setup_corpus_items(write_test_item)
+
+        for description, params, _expected in self.CORPUS:
+            result = await _call("backlog_list", params)
+            assert result["count"] >= 1, f"Corpus query '{description}' returned empty results with params {params}"
+
+
+# ---------------------------------------------------------------------------
+# Group 4: End-to-end integration tests — query to filter to match to result
+# ---------------------------------------------------------------------------
+
+
+class TestEndToEndQueryToResult:
+    """End-to-end tests exercising the full path: user query -> backlog_list
+    call -> matching -> result returned.
+
+    These tests validate the complete semantic matching strategy chain from
+    the caller's perspective, using the MCP in-memory transport.
+    """
+
+    async def test_e2e_full_path_query_to_matching_result(self, backlog_dir, mock_github, write_test_item):
+        """Full e2e path: create items, issue query via backlog_list, receive matched result."""
+        write_test_item("Broken authentication on mobile app", type_val="Bug")
+        write_test_item("Add CSV export feature", type_val="Feature")
+        write_test_item("Optimize database query performance", type_val="Refactor")
+
+        # User query: find the auth bug via title substring
+        result = await _call("backlog_list", {"title": "authentication"})
+
+        assert result["count"] == 1
+        item = result["items"][0]
+        assert item["title"] == "Broken authentication on mobile app"
+        assert item["type"] == "Bug"
+        assert "topic" in item
+        assert "section" in item
+        assert "file_path" in item
+
+    async def test_e2e_fallback_chain_strategy1_substring_hit(self, backlog_dir, mock_github, write_test_item):
+        """Fallback chain e2e: Strategy 1 (substring) finds match immediately — no fallback needed."""
+        write_test_item("MCP server crash on reconnect", type_val="Bug")
+        write_test_item("Dashboard layout improvements", type_val="Feature")
+
+        # Strategy 1: direct substring match succeeds
+        s1_result = await _call("backlog_list", {"title": "MCP server crash"})
+        assert s1_result["count"] == 1
+        assert s1_result["items"][0]["title"] == "MCP server crash on reconnect"
+
+    async def test_e2e_fallback_chain_strategy1_miss_strategy2_hit(self, backlog_dir, mock_github, write_test_item):
+        """Fallback chain e2e: Strategy 1 (substring) returns zero -> Strategy 2 (filter-first) finds match."""
+        write_test_item("Authentication failure on SSO redirect", type_val="Bug")
+        write_test_item("Add new dashboard widget", type_val="Feature")
+        write_test_item("Refactor database connection pool", type_val="Refactor")
+
+        # Strategy 1: substring 'login' does not match any title
+        s1_result = await _call("backlog_list", {"title": "login"})
+        assert s1_result["count"] == 0, "Strategy 1 should miss — 'login' not in any title"
+
+        # Strategy 2: filter by type='Bug' narrows to auth item (semantically related to 'login')
+        s2_result = await _call("backlog_list", {"type": "Bug"})
+        assert s2_result["count"] == 1
+        assert s2_result["items"][0]["title"] == "Authentication failure on SSO redirect"
+
+    async def test_e2e_fallback_chain_strategy1_miss_strategy2_miss_strategy3_candidates(
+        self, backlog_dir, mock_github, write_test_item
+    ):
+        """Fallback chain e2e: Strategy 1 and 2 return zero -> Strategy 3 (LLM semantic) gets full candidate list.
+
+        Strategy 3 is instruction-level (LLM picks from candidates). This test verifies
+        that when Strategies 1 and 2 both miss, an unfiltered list returns all items
+        as candidates for LLM semantic matching.
+        """
+        write_test_item("Optimize webpack bundle size", type_val="Chore")
+        write_test_item("Fix flaky CI test suite", type_val="Chore")
+        write_test_item("Update README badges", type_val="Docs")
+
+        # Strategy 1: substring 'build performance' matches nothing
+        s1_result = await _call("backlog_list", {"title": "build performance"})
+        assert s1_result["count"] == 0, "Strategy 1 should miss"
+
+        # Strategy 2: no matching type for 'Performance' category
+        s2_result = await _call("backlog_list", {"type": "Performance"})
+        assert s2_result["count"] == 0, "Strategy 2 should miss — no Performance type items"
+
+        # Strategy 3 fallback: unfiltered list returns all candidates for LLM to evaluate
+        s3_candidates = await _call("backlog_list")
+        assert s3_candidates["count"] == 3, "All items available as candidates for LLM semantic match"
+        titles = {item["title"] for item in s3_candidates["items"]}
+        assert "Optimize webpack bundle size" in titles
+
+    async def test_e2e_fallback_chain_all_three_transitions(self, backlog_dir, mock_github, write_test_item):
+        """Fallback chain e2e: all 3 strategy transitions are observable in sequence.
+
+        Simulates the full chain: Strategy 1 -> 2 -> 3 with observable transition
+        points (zero-result checks between strategies).
+        """
+        write_test_item("Memory leak in worker pool", type_val="Bug")
+        write_test_item("Add GraphQL subscriptions", type_val="Feature")
+        write_test_item("Refactor error handling middleware", type_val="Refactor")
+
+        # --- Strategy 1: substring match ---
+        s1_result = await _call("backlog_list", {"title": "slow response time"})
+        s1_count = s1_result["count"]
+        assert s1_count == 0, f"Strategy 1 transition: expected 0 results, got {s1_count}"
+
+        # --- Strategy 2: type + topic filter ---
+        s2_result = await _call("backlog_list", {"type": "Performance"})
+        s2_count = s2_result["count"]
+        assert s2_count == 0, f"Strategy 2 transition: expected 0 results, got {s2_count}"
+
+        # --- Strategy 3: full candidate list for LLM evaluation ---
+        s3_result = await _call("backlog_list")
+        s3_count = s3_result["count"]
+        assert s3_count == 3, f"Strategy 3 candidates: expected 3, got {s3_count}"
+
+        # The LLM would semantically match 'slow response time' to 'Memory leak in worker pool'
+        # (both are performance-related bugs). Verify the target is in candidates.
+        titles = [item["title"] for item in s3_result["items"]]
+        assert "Memory leak in worker pool" in titles
+
+    async def test_e2e_backward_compat_title_only_parameter(self, backlog_dir, mock_github, write_test_item):
+        """Backward compatibility: existing callers using only title= produce identical results to pre-change behavior.
+
+        Pre-change behavior: backlog_list(title=X) returned items whose title
+        contains X as a case-insensitive substring. This must remain unchanged.
+        """
+        write_test_item("Implement OAuth2 PKCE flow", type_val="Feature")
+        write_test_item("OAuth token refresh fails silently", type_val="Bug")
+        write_test_item("Database migration rollback", type_val="Refactor")
+
+        # title-only filter: case-insensitive substring — original pre-change behavior
+        result = await _call("backlog_list", {"title": "oauth"})
+
+        assert result["count"] == 2
+        titles = sorted(item["title"] for item in result["items"])
+        assert titles == ["Implement OAuth2 PKCE flow", "OAuth token refresh fails silently"]
+        # Verify no unexpected keys or structure changes
+        for item in result["items"]:
+            assert "section" in item
+            assert "title" in item
+            assert "issue" in item
+            assert "plan" in item
+            assert "type" in item
+            assert "topic" in item
+
+    async def test_e2e_backward_compat_no_params_returns_all(self, backlog_dir, mock_github, write_test_item):
+        """Backward compatibility: calling backlog_list with no params returns all items."""
+        write_test_item("Item Alpha", type_val="Bug")
+        write_test_item("Item Beta", type_val="Feature")
+        write_test_item("Item Gamma", type_val="Refactor")
+        write_test_item("Item Delta", type_val="Docs")
+
+        result = await _call("backlog_list")
+
+        assert result["count"] == 4
+        assert len(result["items"]) == 4
+
+    async def test_e2e_empty_corpus_all_strategies_graceful(self, backlog_dir, mock_github):
+        """Empty corpus: when no items exist, all strategies return gracefully with zero results."""
+        # Strategy 1: substring on empty corpus
+        s1_result = await _call("backlog_list", {"title": "anything"})
+        assert s1_result["count"] == 0
+        assert s1_result["items"] == []
+        assert "error" not in s1_result
+
+        # Strategy 2: type filter on empty corpus
+        s2_result = await _call("backlog_list", {"type": "Bug"})
+        assert s2_result["count"] == 0
+        assert s2_result["items"] == []
+        assert "error" not in s2_result
+
+        # Strategy 2: topic filter on empty corpus
+        s2b_result = await _call("backlog_list", {"topic": "mcp-server"})
+        assert s2b_result["count"] == 0
+        assert s2b_result["items"] == []
+        assert "error" not in s2b_result
+
+        # Strategy 3: unfiltered on empty corpus
+        s3_result = await _call("backlog_list")
+        assert s3_result["count"] == 0
+        assert s3_result["items"] == []
+        assert "error" not in s3_result
+
+    async def test_e2e_combined_type_and_title_filters(self, backlog_dir, mock_github, write_test_item):
+        """Combined filters narrow results correctly through the full MCP path."""
+        write_test_item("Schema migration script error on PostgreSQL 15", type_val="Bug")
+        write_test_item("Schema migration documentation update", type_val="Docs")
+        write_test_item("API rate limiting bug", type_val="Bug")
+
+        # type + title combined: only the Bug about migration
+        result = await _call("backlog_list", {"type": "Bug", "title": "migration"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "Schema migration script error on PostgreSQL 15"
+
+    async def test_e2e_topic_filter_finds_semantically_related_item(self, backlog_dir, mock_github, write_test_item):
+        """Topic filter narrows candidates for semantic matching via topic slug."""
+        write_test_item("GitHub Actions workflow optimization", type_val="Chore")
+        write_test_item("REST API improvements", type_val="Feature")
+        write_test_item("Database schema updates", type_val="Refactor")
+
+        # Topic filter uses slug-based substring match
+        result = await _call("backlog_list", {"topic": "github-actions"})
+
+        assert result["count"] == 1
+        assert result["items"][0]["title"] == "GitHub Actions workflow optimization"

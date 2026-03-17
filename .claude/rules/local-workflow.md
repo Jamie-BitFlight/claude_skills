@@ -47,6 +47,8 @@ Phase 5: plan-validator              -> PASS/BLOCKED gate
 Phase 6: context-gathering           -> Context Manifest section in task file
 ```
 
+When `acceptance-criteria-structured` is non-empty, `swarm-task-planner` also generates two bookend tasks: `T0` (baseline capture, Priority 1) and `T99`/`T{max+1}` (verification gate, Priority 5). See the "Bookend Tasks" section in Phase 2 below.
+
 ### Agent File Locations
 
 | Agent | python3-development | development-harness |
@@ -57,6 +59,8 @@ Phase 6: context-gathering           -> Context Manifest section in task file
 | `swarm-task-planner` | [plugins/python3-development/agents/swarm-task-planner.md](./../../plugins/python3-development/agents/swarm-task-planner.md) | [plugins/development-harness/agents/swarm-task-planner.md](./../../plugins/development-harness/agents/swarm-task-planner.md) |
 | `plan-validator` | [plugins/python3-development/agents/plan-validator.md](./../../plugins/python3-development/agents/plan-validator.md) | [plugins/development-harness/agents/plan-validator.md](./../../plugins/development-harness/agents/plan-validator.md) |
 | `context-gathering` | [plugins/python3-development/agents/context-gathering.md](./../../plugins/python3-development/agents/context-gathering.md) | [plugins/development-harness/agents/context-gathering.md](./../../plugins/development-harness/agents/context-gathering.md) |
+| `t0-baseline-capture` | [plugins/python3-development/agents/t0-baseline-capture.md](./../../plugins/python3-development/agents/t0-baseline-capture.md) | — |
+| `tn-verification-gate` | [plugins/python3-development/agents/tn-verification-gate.md](./../../plugins/python3-development/agents/tn-verification-gate.md) | — |
 
 ### Task File Format
 
@@ -127,8 +131,7 @@ hooks:
 
 ```text
 1. Query status:
-   uv run ./plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py \
-     status . "{slug}"
+   uv run sam status P{N}
 
 2. Query ready tasks:
    If parent story issue number is known, prefer the MCP tool:
@@ -136,15 +139,13 @@ hooks:
      Output shape: {"feature": "...", "ready_tasks": [...], "count": N}
      Falls back to local cache if GitHub unavailable.
    If parent issue number is unknown (or MCP unavailable), use CLI fallback:
-     uv run ./plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py \
-       ready-tasks . "{slug}"
+     uv run sam ready P{N}
    With GitHub flag (when parent issue is known but MCP unavailable):
-     uv run ./plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py \
-       ready-tasks . "{slug}" --github --parent-issue N
+     uv run sam ready P{N} --github --parent-issue N
 
 3. For each ready task:
    Route to the agent named in the task's **Agent** field.
-   If the task's `skills` list (from ready-tasks JSON) is non-empty,
+   If the task's `skills` list (from ready JSON) is non-empty,
    include skill-loading instructions in the delegation prompt:
      For each skill, instruct the sub-agent to call Skill(skill="{skill-name}").
    Launch the agent with:
@@ -156,6 +157,15 @@ hooks:
    Skill(skill="complete-implementation", args="{task_file_path}")
 ```
 
+### Bookend Tasks
+
+When a plan contains `acceptance-criteria-structured` entries, `swarm-task-planner` generates two bookend tasks:
+
+- **T0** (`t0-baseline-capture`, Priority 1, `dependencies: []`): Dispatched first by natural readiness — no dependencies and highest priority. Runs each `check_command` and records exit codes, stdout, and stderr to `plan/T0-baseline-{slug}.yaml`. Non-zero exits are expected and do not fail T0.
+- **T99** / **T{max+1}** (`tn-verification-gate`, Priority 5, `dependencies: [all non-bookend task IDs]`): Dispatched last after all implementation tasks complete. Reads the T0 baseline YAML, re-runs each `check_command`, and classifies each criterion using the 4-cell matrix (passed / regressed / pre-existing-fail / newly-passing). Writes `plan/TN-verification-{slug}.yaml` as a list of per-criterion `BookendVerification` records — one per criterion, each with `criterion_id`, `check_command`, `t0_exit_code`, `tn_exit_code`, `status`, and `stdout_diff_summary`. There is no top-level `verdict` field; `/complete-implementation` aggregates the verdict by scanning all records for `status: regressed` before Phase 1.
+
+No changes to the execution loop are needed — existing `DependencyGraph.get_ready_tasks()` handles T0/TN ordering automatically.
+
 ### Readiness Logic
 
 A task is "ready" when:
@@ -163,7 +173,7 @@ A task is "ready" when:
 1. Status is `NOT STARTED`
 2. All dependency tasks have status `COMPLETE`
 
-Implemented in `get_ready_tasks()` in [plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py](./../../plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py).
+Readiness evaluation is performed by the `sam` CLI via `uv run sam ready P{N}` or the MCP tool `backlog_get_ready_sam_tasks`.
 
 ---
 
@@ -189,7 +199,7 @@ hooks:
 1. Read the task file and linked architecture spec.
 2. Select the target task (by `--task {id}` or first ready task).
 2a. Load skills from task metadata: read the `skills:` field from YAML frontmatter (or `**Skills**:` from legacy format). For each skill name, invoke `Skill(skill="{name}")`. If a skill fails to load, warn and continue with remaining skills. This is intentional redundancy with the orchestrator's skill-loading instructions, ensuring skills load even when the task is started manually or by an older orchestrator.
-3. Claim the task via `claim-task` command (prevents duplicate dispatch). This is the ONLY permitted way to mark a task in-progress — do NOT edit status or started fields directly. Run `implementation_manager.py claim-task {task_file_path} {task_id}`; stop if exit code is non-zero (task already claimed or not found).
+3. Claim the task via `claim-task` command (prevents duplicate dispatch). This is the ONLY permitted way to mark a task in-progress — do NOT edit status or started fields directly. Run `uv run sam claim P{N} {task_id}`; stop if exit code is non-zero (task already claimed or not found).
 4. GitHub in-progress sync: if `parent_issue_number` is known and `github_issue` field is set in the task YAML, sync in-progress status to GitHub sub-issue (non-fatal on failure).
 5. Write active-task context file:
 
@@ -260,6 +270,8 @@ Final:   commit + push          -> Stage and commit all remaining modified files
 | `doc-drift-auditor` | [plugins/python3-development/agents/doc-drift-auditor.md](./../../plugins/python3-development/agents/doc-drift-auditor.md) | [plugins/development-harness/agents/doc-drift-auditor.md](./../../plugins/development-harness/agents/doc-drift-auditor.md) |
 | `service-docs-maintainer` | — | [plugins/development-harness/agents/service-docs-maintainer.md](./../../plugins/development-harness/agents/service-docs-maintainer.md) |
 | `context-refinement` | [plugins/python3-development/agents/context-refinement.md](./../../plugins/python3-development/agents/context-refinement.md) | [plugins/development-harness/agents/context-refinement.md](./../../plugins/development-harness/agents/context-refinement.md) |
+| `t0-baseline-capture` | [plugins/python3-development/agents/t0-baseline-capture.md](./../../plugins/python3-development/agents/t0-baseline-capture.md) | — |
+| `tn-verification-gate` | [plugins/python3-development/agents/tn-verification-gate.md](./../../plugins/python3-development/agents/tn-verification-gate.md) | — |
 
 ### Cross-Plugin Dependency
 
@@ -278,26 +290,20 @@ If Phase 1 (code review) creates follow-up task files (naming: `plan/tasks-{N}-{
 
 ---
 
-## CLI Tool: implementation_manager.py
+## CLI Tool: sam
 
-Script: [plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py](./../../plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py)
+The `sam` CLI is the canonical interface for all SAM task file operations. Use `uv run sam <command>` to query and update plan state.
 
 ### Commands
 
 | Command | Usage | Output |
 |---------|-------|--------|
-| `list-features` | `uv run {script} list-features .` | JSON: `{features: [...], count: N}` |
-| `status` | `uv run {script} status . {slug}` | JSON: task counts, ready tasks, all tasks with details |
-| `ready-tasks` | `uv run {script} ready-tasks . {slug}` | JSON: `{ready_tasks: [...], count: N}` |
-| `validate` | `uv run {script} validate . {slug}` | JSON: `{valid: bool, errors: [...], warnings: [...]}` |
-
-### Plan Directory Discovery
-
-The CLI searches for task files using `discover_plan_directory()` which checks (in order):
-
-1. `plan/`, `.claude/plan/`, `plans/`, `docs/plan/`, `docs/plans/`
-2. Package-level: `*/plan/`, `packages/*/plan/`, `src/*/plan/`
-3. Recursive search (max depth 3) for any `plan/` or `plans/` directory
+| `list` | `uv run sam list` | JSON: `{features: [...], count: N}` |
+| `status` | `uv run sam status P{N}` | JSON: task counts, ready tasks, all tasks with details |
+| `ready` | `uv run sam ready P{N}` | JSON: `{ready_tasks: [...], count: N}` |
+| `read` | `uv run sam read P{N} --format json` | JSON: full plan with task fields and context |
+| `claim` | `uv run sam claim P{N} {task_id}` | Claims task in-progress; exits non-zero if already claimed |
+| `update` | `uv run sam update P{N} --context "..."` | Updates plan context field |
 
 ---
 
@@ -305,9 +311,9 @@ The CLI searches for task files using `discover_plan_directory()` which checks (
 
 | Script | Path | Purpose |
 |--------|------|---------|
-| `implementation_manager.py` | [plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py](./../../plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py) | CLI tool for task status queries |
+| `sam` CLI | `uv run sam` | Canonical interface for all task file I/O (status, ready, read, claim, update) |
 | `task_status_hook.py` | [plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py](./../../plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py) | Hook script for automatic status/timestamp updates |
-| `task_format.py` | [plugins/python3-development/skills/implementation-manager/scripts/task_format.py](./../../plugins/python3-development/skills/implementation-manager/scripts/task_format.py) | Shared YAML frontmatter utilities |
+| `task_format.py` | [plugins/python3-development/skills/implementation-manager/scripts/task_format.py](./../../plugins/python3-development/skills/implementation-manager/scripts/task_format.py) | Shared YAML frontmatter utilities (internal to sam_schema) |
 | `get_task_context.py` | [plugins/python3-development/skills/implementation-manager/scripts/get_task_context.py](./../../plugins/python3-development/skills/implementation-manager/scripts/get_task_context.py) | Dynamic context injection for implementation-manager skill |
 | `split_task_file.py` | [plugins/python3-development/scripts/split_task_file.py](./../../plugins/python3-development/scripts/split_task_file.py) | Split monolithic task files into individual files |
 | `migrate_task_format.py` | [plugins/python3-development/scripts/migrate_task_format.py](./../../plugins/python3-development/scripts/migrate_task_format.py) | Migrate legacy markdown to YAML frontmatter format |
@@ -340,12 +346,19 @@ User
   ▼
 /implement-feature
   │
-  ├─ implementation_manager.py status    ──> JSON status
-  ├─ implementation_manager.py ready-tasks ──> JSON ready list (includes skills per task)
+  ├─ sam status P{N}       ──> JSON status
+  ├─ sam ready P{N}  ──> JSON ready list (includes skills per task)
   │
-  │  ┌── For each ready task ──────────────────────────────┐
+  │  ┌── T0 runs first (Priority 1, no dependencies) ───────┐
+  │  │  t0-baseline-capture                                  │
+  │  │    ├─ Read acceptance-criteria-structured             │
+  │  │    ├─ Run each check_command, capture results         │
+  │  │    └─ Write plan/T0-baseline-{slug}.yaml              │
+  │  └───────────────────────────────────────────────────────┘
+  │
+  │  ┌── For each implementation task (after T0 completes) ─┐
   │  │                                                      │
-  │  │  Orchestrator reads task skills from ready-tasks JSON │
+  │  │  Orchestrator reads task skills from ready JSON │
   │  │  If skills non-empty: adds Skill() instructions to   │
   │  │    delegation prompt ──> sub-agent loads skills       │
   │  │                                                      │
@@ -364,11 +377,29 @@ User
   │  │                                                      │
   │  └──────────────────────── Loop until no ready tasks ───┘
   │
+  │  ┌── TN runs last (Priority 5, all impl. tasks done) ───┐
+  │  │  tn-verification-gate                                 │
+  │  │    ├─ Read plan/T0-baseline-{slug}.yaml               │
+  │  │    ├─ Re-run each check_command, compare vs T0        │
+  │  │    ├─ Classify each criterion (4-cell matrix)         │
+  │  │    │    T0 pass + TN pass  = passed                   │
+  │  │    │    T0 pass + TN fail  = regressed (blocks)       │
+  │  │    │    T0 fail + TN fail  = pre-existing-fail        │
+  │  │    │    T0 fail + TN pass  = newly-passing            │
+  │  │    └─ Write plan/TN-verification-{slug}.yaml          │
+  │  │         verdict: PASS | FAIL                          │
+  │  └───────────────────────────────────────────────────────┘
+  │
   ▼
 /complete-implementation
   │
+  ├─ [Pre-Phase 1] Read plan/TN-verification-{slug}.yaml
+  │    ├─ verdict: FAIL ──> report regressed criteria, STOP
+  │    └─ verdict: PASS or file absent ──> continue
+  │
   ├─ code-reviewer             ──> review findings
-  ├─ feature-verifier          ──> goal verification
+  ├─ feature-verifier          ──> goal verification (structural)
+  │                                (TN provides behavioral complement)
   ├─ integration-checker       ──> integration check
   ├─ doc-drift-auditor         ──> drift findings
   ├─ service-docs-maintainer   ──> doc updates (if drift)

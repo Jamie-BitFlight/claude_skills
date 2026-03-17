@@ -1,0 +1,26 @@
+feature: auth-system
+captured_at: "2026-03-15T10:00:00Z"
+plan_path: plan/tasks-5-auth-system.md
+criteria_count: 3
+results:
+  - criterion-id: AC-1
+    check-command: "uv run pytest tests/test_auth.py -v"
+    exit-code: 1
+    stdout: "FAILED tests/test_auth.py::test_login - FileNotFoundError"
+    stderr: ""
+    timestamp: "2026-03-15T10:00:01Z"
+    duration-seconds: 0.42
+  - criterion-id: AC-2
+    check-command: "uv run pytest tests/test_roles.py -v"
+    exit-code: 0
+    stdout: "1 passed in 0.1s"
+    stderr: ""
+    timestamp: "2026-03-15T10:00:02Z"
+    duration-seconds: 0.15
+  - criterion-id: AC-3
+    check-command: "uv run ruff check src/auth/"
+    exit-code: 0
+    stdout: "All checks passed!"
+    stderr: ""
+    timestamp: "2026-03-15T10:00:03Z"
+    duration-seconds: 0.08

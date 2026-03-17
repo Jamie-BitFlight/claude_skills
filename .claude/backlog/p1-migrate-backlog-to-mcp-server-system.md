@@ -5,9 +5,9 @@ metadata:
   topic: migrate-backlog-to-mcp-server-system
   source: Agent task — auto-derived from backlog MCP server completion
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#329'
   groomed: '2026-03-01'
   last_synced: '2026-03-01T07:20:54Z'

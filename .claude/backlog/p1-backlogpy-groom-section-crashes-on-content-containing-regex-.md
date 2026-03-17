@@ -5,9 +5,9 @@ metadata:
   topic: backlogpy-groom-section-crashes-on-content-containing-regex-
   source: 'session observation during #338 implementation'
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#340'
   last_synced: '2026-03-01T14:22:15Z'
 ---

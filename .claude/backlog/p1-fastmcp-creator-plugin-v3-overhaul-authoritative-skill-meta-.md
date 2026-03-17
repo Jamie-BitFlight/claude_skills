@@ -5,9 +5,9 @@ metadata:
   topic: fastmcp-creator-plugin-v3-overhaul-authoritative-skill-meta-
   source: User request, brainstorming session 2026-03-05
   added: '2026-03-05'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#442'
   last_synced: '2026-03-05T20:37:16Z'
   plan: plan/tasks-1-fastmcp-creator-v3-overhaul.md

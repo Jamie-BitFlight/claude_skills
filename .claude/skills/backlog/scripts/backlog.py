@@ -37,10 +37,12 @@ Environment:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import sys
+from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
@@ -105,11 +107,42 @@ from backlog_core.parsing import (
 )
 
 from frontmatter_utils import dump_frontmatter, loads_frontmatter
-from state_handler import BacklogState, StateTransitionError, apply_github_transition
+from state_handler import (
+    BacklogState,
+    StateTransitionError,
+    apply_github_transition,
+    find_valid_path,
+    is_terminal_state,
+)
 
 if TYPE_CHECKING:
     from github.Issue import Issue
     from github.Repository import Repository
+
+
+@dataclass
+class ReconcileResult:
+    """Result of reconciling a single backlog item against GitHub state.
+
+    Attributes:
+        issue_number: GitHub issue number for the item.
+        action: Outcome of reconciliation. One of:
+            ``"auto_corrected"`` — DAG-valid divergence; local status updated to match GitHub.
+            ``"flagged_divergence"`` — invalid transition; local state preserved, warning emitted.
+            ``"wip_protected"`` — GitHub closed but active work detected; local state preserved.
+            ``"closed"`` — GitHub closed, no active work; local status updated to terminal state.
+            ``"no_change"`` — local and GitHub state agree; no action needed.
+        old_status: Previous local status value before reconciliation.
+        new_status: New local status value after reconciliation (same as ``old_status`` if no change).
+        warning: Human-readable warning string. Empty string if no warning.
+    """
+
+    issue_number: int
+    action: str
+    old_status: str
+    new_status: str
+    warning: str
+
 
 app = typer.Typer(help="Backlog and GitHub Issue CRUD — single interface")
 _console = Console()
@@ -202,7 +235,8 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
 
     Returns:
         Dict with ``_title``, ``_section``, ``_file_path``, ``_skip``, ``_issue``,
-        ``_raw_body``, ``_groomed``, ``_last_synced`` and ``**Key**`` metadata keys.
+        ``_raw_body``, ``_groomed``, ``_last_synced``, ``_status`` (conditional —
+        only present when ``item.status`` is non-empty) and ``**Key**`` metadata keys.
     """
     d: dict = {
         "_title": item.title,
@@ -225,6 +259,8 @@ def backlog_item_to_display_dict(item: BacklogItem) -> dict:
         d["_groomed"] = item.groomed
     if item.last_synced:
         d["_last_synced"] = item.last_synced
+    if item.status:
+        d["_status"] = item.status
     return d
 
 
@@ -761,7 +797,7 @@ def _batch_fetch_statuses(items: list[dict], repo: str) -> dict[int, dict[str, s
     if repo_obj is None:
         return {}
     try:
-        all_issues = {issue.number: issue for issue in repo_obj.get_issues(state="open") if issue.pull_request is None}
+        all_issues = {issue.number: issue for issue in repo_obj.get_issues(state="all") if issue.pull_request is None}
     except GithubException:
         return {}
     result: dict[int, dict[str, str]] = {}
@@ -872,7 +908,7 @@ def _refresh_local_cache_from_github(repo: str, label: str | None = None) -> Non
         except GithubException:
             typer.echo(f"  WARNING: label '{label}' not found — listing all issues", err=True)
 
-    issues = repo_obj.get_issues(state="open", labels=label_objs or GithubObject.NotSet)
+    issues = repo_obj.get_issues(state="all", labels=label_objs or GithubObject.NotSet)
     count = 0
     for issue in issues:
         if issue.pull_request is not None:
@@ -880,6 +916,12 @@ def _refresh_local_cache_from_github(repo: str, label: str | None = None) -> Non
         _pull_single_issue(repo_obj, issue.number)
         count += 1
     typer.echo(f"  Refreshed {count} issue(s) from GitHub into local cache.")
+
+    items = parse_backlog()
+    open_items = [it for it in items if not it.get("_skip") and it.get("_section")]
+    _, warnings = _reconcile_batch(open_items, repo)
+    for warning in warnings:
+        typer.echo(f"  RECONCILE WARNING: {warning}", err=True)
 
 
 @app.command("list")
@@ -891,12 +933,26 @@ def list_items(
     ] = False,
     label: Annotated[str | None, typer.Option("--label", help="Filter by GitHub label (e.g. 'priority:p1')")] = None,
     repo: Annotated[str, typer.Option("--repo", "-R")] = DEFAULT_REPO,
+    include_closed: Annotated[
+        bool, typer.Option("--include-closed", help="Include items with closed/done/resolved status")
+    ] = False,
+    type_filter: Annotated[
+        str | None, typer.Option("--type", help="Filter by metadata.type (e.g. 'Bug', 'Feature')")
+    ] = None,
+    topic_filter: Annotated[str | None, typer.Option("--topic", help="Filter by metadata.topic")] = None,
 ) -> None:
     """List backlog items. Default reads local cache only. Use --from-github to refresh from GH first."""
     if from_github:
         _refresh_local_cache_from_github(repo, label)
     items = parse_backlog()
     open_items = [it for it in items if not it.get("_skip") and it.get("_section")]
+    open_items = _filter_closed_items(open_items, include_closed)
+    if type_filter is not None:
+        type_lower = type_filter.lower()
+        open_items = [it for it in open_items if it.get("metadata", {}).get("type", "").lower() == type_lower]
+    if topic_filter is not None:
+        topic_lower = topic_filter.lower()
+        open_items = [it for it in open_items if topic_lower in it.get("metadata", {}).get("topic", "").lower()]
     if output_format == "json":
         _list_items_json(open_items, with_status, repo)
     else:
@@ -1608,13 +1664,16 @@ def _write_groomed_to_github(issue_ref: str, content: str, section_name: str | N
     else:
         if updated:
             typer.echo(f"  Synced to GitHub issue {issue_ref}")
-            try:
-                issue = repository.get_issue(num)
-                apply_github_transition(repository, issue, "needs-grooming", "groomed")
-            except (GithubException, StateTransitionError) as e:
-                typer.echo(f"  WARNING: Could not update grooming label: {e}", err=True)
         else:
             typer.echo(f"  No changes to sync to GitHub issue {issue_ref}")
+        try:
+            issue = repository.get_issue(num)
+            current_status = next(
+                (lbl.name.removeprefix("status:") for lbl in issue.labels if lbl.name.startswith("status:")), None
+            )
+            apply_github_transition(repository, issue, current_status, BacklogState.GROOMED.value)
+        except (GithubException, StateTransitionError) as e:
+            typer.echo(f"  WARNING: Could not update grooming label: {e}", err=True)
         return updated
 
 
@@ -1734,6 +1793,7 @@ def _view_result_from_local_item(item: dict) -> dict[str, Any]:
         "plan": item.get("**Plan**", ""),
         "file_path": item.get("_file_path", ""),
         "groomed": bool(item.get("_groomed")),
+        "status": item.get("_status", ""),
     }
     fp = item.get("_file_path")
     if fp and Path(fp).exists():
@@ -1746,8 +1806,6 @@ def _view_result_from_local_item(item: dict) -> dict[str, Any]:
         result["description"] = str(fm.get("description", ""))
         result["source"] = str(meta.get("source", fm.get("source", "")))
         result["added"] = str(meta.get("added", fm.get("added", "")))
-        # TODO(#612): status not available on item dict; re-read still needed
-        result["status"] = str(meta.get("status", fm.get("status", "")))
     return result
 
 
@@ -2413,6 +2471,266 @@ def strike_entry(
     if isinstance(messages, list):
         for msg in messages:
             typer.echo(msg)
+
+
+def _has_active_work(item: dict) -> tuple[bool, str]:
+    """Check if a backlog item has active local work that should block auto-closure.
+
+    Checks two signals (per ADR-003):
+    1. Plan files: globs for ``plan/tasks-*-{topic}*.md`` files, then parses each
+       for any task with ``**Status**: IN PROGRESS``.
+    2. Active task context files: globs for ``.claude/context/active-task-*.json``
+       and checks if any reference this item's issue number.
+
+    Args:
+        item: Parsed backlog item dict. Uses ``_topic`` and ``_issue`` fields.
+
+    Returns:
+        Tuple of ``(has_work, reason)``. ``reason`` is an empty string when
+        ``has_work`` is ``False``; otherwise a human-readable description of
+        what active work was detected.
+
+    Note:
+        All file errors are treated as "no active work" — missing files are not
+        an indication of in-progress work.
+    """
+    topic = item.get("_topic") or item.get("**Topic**") or ""
+    issue_ref = item.get("_issue", "")
+    issue_num_str = issue_ref.lstrip("#")
+
+    # Signal 1: plan files with an IN PROGRESS task
+    if topic:
+        plan_glob = f"plan/tasks-*-{topic}*.md"
+        for plan_path in _REPO_ROOT.glob(plan_glob):
+            try:
+                content = plan_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            # Match both legacy markdown and YAML frontmatter formats
+            if re.search(r"\*\*Status\*\*:\s*IN PROGRESS", content) or re.search(r"status:\s*in-progress", content):
+                return True, f"plan file {plan_path.relative_to(_REPO_ROOT)} has IN PROGRESS task"
+
+    # Signal 2: active-task context files referencing this item's issue number
+    if issue_num_str.isdigit():
+        context_dir = _REPO_ROOT / ".claude" / "context"
+        for ctx_path in context_dir.glob("active-task-*.json"):
+            try:
+                ctx = json.loads(ctx_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            # Context files may reference issue by number or by issue ref string
+            ctx_issue = ctx.get("issue_number") or ctx.get("issue")
+            if ctx_issue is not None and str(ctx_issue).lstrip("#") == issue_num_str:
+                return True, f"active task context {ctx_path.name} references issue #{issue_num_str}"
+
+    return False, ""
+
+
+def _reconcile_open_item(
+    issue_num: int, local_status: str, github_status: str, file_path_str: str | None
+) -> ReconcileResult:
+    """Handle reconciliation when the GitHub issue is open.
+
+    Extracted from ``_reconcile_item`` to keep that function within the return-
+    statement limit (PLR0911).
+
+    Args:
+        issue_num: GitHub issue number.
+        local_status: Current local frontmatter status.
+        github_status: Status derived from GitHub ``status:*`` label (may be empty).
+        file_path_str: Absolute path to the local backlog file, or ``None``.
+
+    Returns:
+        ``ReconcileResult`` with action ``"flagged_divergence"``, ``"no_change"``,
+        or ``"auto_corrected"``.
+    """
+    if not github_status:
+        return ReconcileResult(
+            issue_number=issue_num,
+            action="flagged_divergence",
+            old_status=local_status,
+            new_status=local_status,
+            warning=f"#{issue_num} divergence: local={local_status!r}, GitHub has no status label (stateless void)",
+        )
+    if local_status == github_status:
+        return ReconcileResult(
+            issue_number=issue_num, action="no_change", old_status=local_status, new_status=local_status, warning=""
+        )
+    # Divergence detected: check DAG reachability (ADR-002)
+    path = find_valid_path(local_status, github_status)
+    if path is not None:
+        if file_path_str:
+            with contextlib.suppress(Exception):
+                _update_item_metadata(Path(file_path_str), {"metadata": {"status": github_status}}, set_synced=True)
+        return ReconcileResult(
+            issue_number=issue_num,
+            action="auto_corrected",
+            old_status=local_status,
+            new_status=github_status,
+            warning="",
+        )
+    return ReconcileResult(
+        issue_number=issue_num,
+        action="flagged_divergence",
+        old_status=local_status,
+        new_status=local_status,
+        warning=(
+            f"#{issue_num} divergence: local={local_status!r}, GitHub={github_status!r}"
+            " (invalid transition — no valid path in state DAG)"
+        ),
+    )
+
+
+def _reconcile_closed_item(
+    issue_num: int, local_status: str, github_status: str, file_path_str: str | None, item: dict
+) -> ReconcileResult:
+    """Handle reconciliation when the GitHub issue is closed.
+
+    Extracted from ``_reconcile_item`` to keep that function within the return-
+    statement limit (PLR0911).
+
+    Args:
+        issue_num: GitHub issue number.
+        local_status: Current local frontmatter status.
+        github_status: Status derived from GitHub ``status:*`` label (may be empty).
+        file_path_str: Absolute path to the local backlog file, or ``None``.
+        item: Parsed backlog item dict (passed to ``_has_active_work``).
+
+    Returns:
+        ``ReconcileResult`` with action ``"wip_protected"`` or ``"closed"``.
+    """
+    has_work, reason = _has_active_work(item)
+    if has_work:
+        return ReconcileResult(
+            issue_number=issue_num,
+            action="wip_protected",
+            old_status=local_status,
+            new_status=local_status,
+            warning=f"#{issue_num} closed on GitHub but has active work: {reason}",
+        )
+    # Prefer GitHub status label if terminal; otherwise fall back to "closed"
+    terminal_status = github_status if is_terminal_state(github_status) else BacklogState.CLOSED.value
+    if file_path_str:
+        with contextlib.suppress(Exception):
+            _update_item_metadata(Path(file_path_str), {"metadata": {"status": terminal_status}}, set_synced=True)
+    return ReconcileResult(
+        issue_number=issue_num, action="closed", old_status=local_status, new_status=terminal_status, warning=""
+    )
+
+
+def _reconcile_item(item: dict, gh_issue_map: dict[int, Any], repo: str) -> ReconcileResult:
+    """Compare local cache state against GitHub for a single item.
+
+    Determines sync direction using the VALID_TRANSITIONS DAG:
+    - DAG-valid divergence: auto-correct local to match GitHub (persist via
+      ``_update_item_metadata``).
+    - Invalid divergence: flag as warning, do not modify local state.
+    - GitHub closed + no active work: update local to terminal state.
+    - GitHub closed + active work detected: warn, do not modify local state.
+    - No GitHub issue or missing from map: return ``"no_change"`` silently.
+
+    Args:
+        item: Parsed backlog item dict (from ``parse_backlog``).
+        gh_issue_map: Pre-fetched GitHub issues keyed by issue number.
+        repo: Repository slug (unused directly; kept for interface consistency).
+
+    Returns:
+        ``ReconcileResult`` describing the action taken.
+
+    Note:
+        This function never raises. All errors produce a ``"no_change"`` result.
+    """
+    issue_ref = item.get("_issue", "")
+    num_str = issue_ref.lstrip("#")
+    if not num_str.isdigit():
+        return ReconcileResult(issue_number=0, action="no_change", old_status="", new_status="", warning="")
+
+    issue_num = int(num_str)
+    local_status = item.get("**Status**") or item.get("_status") or ""
+    file_path_str = item.get("_file_path")
+
+    gh_issue = gh_issue_map.get(issue_num)
+    if gh_issue is None:
+        return ReconcileResult(
+            issue_number=issue_num,
+            action="no_change",
+            old_status=local_status,
+            new_status=local_status,
+            warning=f"#{issue_num} not found in GitHub issue map — skipping reconciliation",
+        )
+
+    status_labels = [lbl.name for lbl in gh_issue.labels if lbl.name.startswith("status:")]
+    github_status = status_labels[0].removeprefix("status:") if status_labels else ""
+
+    if gh_issue.state == "closed":
+        return _reconcile_closed_item(issue_num, local_status, github_status, file_path_str, item)
+    return _reconcile_open_item(issue_num, local_status, github_status, file_path_str)
+
+
+def _reconcile_batch(items: list[dict], repo: str) -> tuple[list[dict], list[str]]:
+    """Reconcile all local backlog items against current GitHub state.
+
+    Fetches all issues (open + closed) in a single API call, builds an
+    in-memory issue map, then reconciles each local item that has a linked
+    GitHub issue number.
+
+    Args:
+        items: All parsed backlog items from local cache.
+        repo: Repository slug.
+
+    Returns:
+        Tuple of ``(updated_items, warnings)``.
+        ``updated_items``: the same items list with local status corrections
+        applied in-place (frontmatter files are also updated for persisted
+        corrections).
+        ``warnings``: list of human-readable warning strings collected during
+        reconciliation. Auto-corrections are reported as info messages, not
+        warnings.
+
+    Note:
+        If GitHub is unavailable, returns ``(items, ["GitHub unavailable — skipping reconciliation"])``.
+    """
+    repo_obj = _try_get_github(repo)
+    if repo_obj is None:
+        return items, ["GitHub unavailable — skipping reconciliation"]
+
+    try:
+        gh_issue_map: dict[int, Any] = {
+            issue.number: issue for issue in repo_obj.get_issues(state="all") if issue.pull_request is None
+        }
+    except GithubException:
+        return items, ["GitHub API error fetching issues — skipping reconciliation"]
+
+    warnings: list[str] = []
+    for item in items:
+        result = _reconcile_item(item, gh_issue_map, repo)
+        if result.action == "auto_corrected":
+            typer.echo(f"Auto-corrected: #{result.issue_number} {result.old_status} -> {result.new_status}", err=True)
+            # Update the in-memory item status so the caller's list is current
+            item["**Status**"] = result.new_status
+        elif result.warning:
+            warnings.append(result.warning)
+
+    return items, warnings
+
+
+def _filter_closed_items(items: list[dict], include_closed: bool) -> list[dict]:
+    """Filter out items whose local status is a terminal state.
+
+    Terminal states are ``done``, ``resolved``, and ``closed`` (per
+    ``is_terminal_state()`` from state_handler).
+
+    Args:
+        items: Parsed backlog item dicts.
+        include_closed: When ``True``, return all items unfiltered.
+
+    Returns:
+        Filtered list excluding terminal-status items, or the original list
+        when ``include_closed`` is ``True``.
+    """
+    if include_closed:
+        return items
+    return [it for it in items if not is_terminal_state(it.get("**Status**") or it.get("_status") or "")]
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@
 
 Production-proven patterns for structuring, composing, and deploying FastMCP v3 servers — covers server composition, transport bridging, development workflows, CLI integration, and community examples.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/contrib.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/community/showcase.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/patterns/contrib> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/patterns/cli> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/community/showcase> (accessed 2026-03-05)
 SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — GitHub usage research (accessed 2026-03-05)
 
 ---
@@ -201,7 +201,7 @@ CONSTRAINT: No `.mcpb` packaging in v3 official docs. The Prefect Horizon deploy
 
 ## CLI-First Patterns
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx`
+SOURCE: <https://gofastmcp.com/patterns/cli>
 
 The `fastmcp` CLI enables scripting and automation around MCP servers.
 
@@ -280,7 +280,7 @@ fastmcp install stdio server.py --copy
 
 ## Contrib Modules
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/contrib.mdx`
+SOURCE: <https://gofastmcp.com/patterns/contrib>
 
 FastMCP includes a `contrib` package for community-contributed modules that extend functionality beyond the core library.
 
@@ -303,7 +303,7 @@ To contribute a module:
 
 ## Community Showcase
 
-SOURCE: `.claude/worktrees/fastmcp/docs/community/showcase.mdx`
+SOURCE: <https://gofastmcp.com/community/showcase>
 
 Community projects and learning resources:
 

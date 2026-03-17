@@ -9,7 +9,7 @@ metadata:
   type: Bug
   status: in-progress
   issue: '#552'
-  last_synced: '2026-03-12T12:47:39Z'
+  last_synced: '2026-03-14T15:59:53Z'
 ---
 
 ## Story

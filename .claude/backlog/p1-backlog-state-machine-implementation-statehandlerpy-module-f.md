@@ -5,9 +5,9 @@ metadata:
   topic: backlog-state-machine-implementation-statehandlerpy-module-f
   source: 'Session observation — state machine gap analysis during PR #418 rebase (2026-03-03)'
   added: '2026-03-03'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#426'
   last_synced: '2026-03-03T13:54:52Z'
   groomed: '2026-03-03'

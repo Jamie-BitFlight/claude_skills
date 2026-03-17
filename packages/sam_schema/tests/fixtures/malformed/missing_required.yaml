@@ -1,0 +1,12 @@
+feature: incomplete-feature
+version: "1.0"
+description: |
+  This plan has a task missing the required title field.
+tasks:
+  - id: T1
+    status: not-started
+    priority: 1
+    complexity: low
+    description: |
+      This task is missing the required 'title' field and should
+      fail validation.

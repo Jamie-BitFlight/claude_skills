@@ -9,7 +9,7 @@ metadata:
   type: Refactor
   status: open
   issue: '#581'
-  last_synced: '2026-03-12T12:47:34Z'
+  last_synced: '2026-03-14T15:59:47Z'
   groomed: '2026-03-11'
 ---
 

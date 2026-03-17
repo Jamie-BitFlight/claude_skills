@@ -4,7 +4,7 @@ Interactive UI extension for MCP tools — use this when a tool needs to return 
 
 > **WARNING: FastMCP 3.1 Python-native app framework (unreleased).** The Python-native framework described in `apps/overview.mdx` — which generates UIs without writing HTML or JavaScript — is NOT available in FastMCP 3.0. Do NOT generate code using that framework. Only the low-level HTML/JS API documented below is available in stable FastMCP 3.0.
 >
-> SOURCE: `.claude/worktrees/fastmcp/docs/apps/overview.mdx` (accessed 2026-03-05)
+> SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
 
 ---
 
@@ -20,7 +20,7 @@ Available in FastMCP 3.0:
 
 CONSTRAINT: The low-level API requires you to write HTML yourself and wire up host communication via the `@modelcontextprotocol/ext-apps` JavaScript SDK.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/overview.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
 
 ---
 
@@ -52,7 +52,7 @@ def chart_view() -> str:
     return "<html>...</html>"
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -98,7 +98,7 @@ def refresh_data() -> str:
 
 CONSTRAINT: On **resources**, `resource_uri` and `visibility` must NOT be set — the resource is the UI. Use `AppConfig` on resources only for `csp`, `permissions`, and display settings.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -140,7 +140,7 @@ JavaScript SDK methods available on the `App` object:
 - `app.onhostcontextchanged` — callback for host context changes
 - `app.getHostContext()` — get current host context
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -197,7 +197,7 @@ def my_view() -> str:
 
 CONSTRAINT: Hosts may or may not grant requested permissions. Use JavaScript feature detection as a fallback.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -217,7 +217,7 @@ async def my_tool(ctx: Context) -> str:
         return plain_text_response()
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -300,4 +300,172 @@ def view() -> str:
 </html>"""
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
+
+---
+
+## Prefab Apps (FastMCP 3.1, Experimental)
+
+> **EXPERIMENTAL — FastMCP 3.1+.** Prefab is in active early development; its API changes frequently. Pin `prefab-ui` to a specific version. Not recommended for production.
+>
+> SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17)
+
+[Prefab UI](https://prefab.prefect.io) is a declarative UI framework for Python. You describe your interface using Python components and return it from a tool — FastMCP registers the renderer, wires the protocol metadata, and delivers the component tree to the host. No HTML or JavaScript required.
+
+### Installation
+
+```bash
+pip install "fastmcp[apps]"
+```
+
+Pin `prefab-ui` to a specific version to avoid breaking changes from a routine upgrade:
+
+```toml
+# pyproject.toml
+dependencies = [
+    "fastmcp[apps]",
+    "prefab-ui==0.8.0",  # pin to a known working version
+]
+```
+
+### Basic Usage — `@mcp.tool(app=True)`
+
+Use `app=True` on the `@mcp.tool` decorator. Return a `PrefabApp` or a Prefab component directly:
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Dashboard")
+
+
+@mcp.tool(app=True)
+def revenue_chart(year: int) -> PrefabApp:
+    """Show annual revenue as an interactive bar chart."""
+    data = [
+        {"quarter": "Q1", "revenue": 42000},
+        {"quarter": "Q2", "revenue": 51000},
+        {"quarter": "Q3", "revenue": 47000},
+        {"quarter": "Q4", "revenue": 63000},
+    ]
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading(f"{year} Revenue")
+        BarChart(
+            data=data,
+            series=[ChartSeries(data_key="revenue", label="Revenue")],
+            x_axis="quarter",
+        )
+
+    return PrefabApp(view=view)
+```
+
+RULE: `app=True` is equivalent to a return type annotation of `PrefabApp` or `Component`. Explicit `app=True` is recommended for clarity and is required when the return type is `ToolResult`.
+
+### What You Can Return
+
+**Components directly** — FastMCP wraps them in a `PrefabApp` automatically:
+
+```python
+from prefab_ui.components import Column, Heading, Badge
+from fastmcp import FastMCP
+
+mcp = FastMCP("Status")
+
+
+@mcp.tool(app=True)
+def status_badge() -> Column:
+    """Show system status."""
+    with Column(gap=2) as view:
+        Heading("All Systems Operational")
+        Badge("Healthy", variant="success")
+    return view
+```
+
+**`PrefabApp`** — for explicit control over initial state and the rendering engine:
+
+```python
+from prefab_ui.components import Column, Button, If, Badge
+from prefab_ui.actions import ToggleState
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+
+mcp = FastMCP("Demo")
+
+
+@mcp.tool(app=True)
+def toggle_demo() -> PrefabApp:
+    """Interactive toggle with state."""
+    with Column(gap=4, css_class="p-6") as view:
+        Button("Toggle", on_click=ToggleState("show"))
+        with If("{{ show }}"):
+            Badge("Visible!", variant="success")
+
+    return PrefabApp(view=view, state={"show": False})
+```
+
+**`ToolResult`** — when you need the LLM to understand the result alongside the UI (both audiences served):
+
+```python
+from prefab_ui.components import Column, Heading, BarChart, ChartSeries
+from prefab_ui.app import PrefabApp
+from fastmcp import FastMCP
+from fastmcp.tools import ToolResult
+
+mcp = FastMCP("Sales")
+
+
+@mcp.tool(app=True)
+def sales_overview(year: int) -> ToolResult:
+    """Show sales data visually and summarize for the model."""
+    data = get_sales_data(year)
+    total = sum(row["revenue"] for row in data)
+
+    with Column(gap=4, css_class="p-6") as view:
+        Heading("Sales Overview")
+        BarChart(data=data, series=[ChartSeries(data_key="revenue")])
+
+    return ToolResult(
+        content=f"Total revenue for {year}: ${total:,} across {len(data)} quarters",
+        structured_content=view,
+    )
+```
+
+The user sees the chart. The LLM sees the text summary and can reason about it.
+
+### Previewing Prefab Apps Locally
+
+Use `fastmcp dev apps` to launch a browser-based preview UI for your Prefab App tools:
+
+```bash
+fastmcp dev apps server.py
+```
+
+### How It Works Internally
+
+When a tool returns a Prefab component or `PrefabApp`, FastMCP:
+
+1. Registers a shared `ui://prefab/renderer.html` resource (fetched once by the host, reused across all Prefab tools).
+2. Wires the tool metadata so the host loads the renderer iframe when displaying the result.
+3. Serializes the component tree as `structuredContent` on the tool result, which the renderer interprets and displays.
+
+No configuration is required beyond `app=True`.
+
+### Coexistence with Custom HTML Apps
+
+Prefab tools and custom HTML tools coexist in the same server. Prefab tools share a single renderer; custom tools point to their own:
+
+```python
+from fastmcp.server.apps import AppConfig
+
+@mcp.tool(app=True)
+def team_directory() -> PrefabApp:
+    ...
+
+@mcp.tool(app=AppConfig(resource_uri="ui://my-app/map.html"))
+def map_view() -> str:
+    ...
+```
+
+SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17)

@@ -5,9 +5,9 @@ metadata:
   topic: backlogpy-update-needs-title-and-description-flags
   source: Session observation — /find-cause investigation
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#322'
 ---
 

@@ -1,0 +1,14 @@
+feature: bad-status-feature
+version: "1.0"
+description: |
+  This plan has a task with an invalid status value.
+tasks:
+  - id: T1
+    title: Task with invalid status
+    status: started
+    priority: 2
+    complexity: medium
+    description: |
+      The status value "started" is not in the TaskStatus enum.
+      Valid values are: not-started, in-progress, complete, blocked,
+      deferred, skipped.

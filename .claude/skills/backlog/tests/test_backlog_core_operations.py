@@ -1088,6 +1088,270 @@ class TestListItemsFilterStatus:
 
 
 # ---------------------------------------------------------------------------
+# list_items: type_ filter
+# ---------------------------------------------------------------------------
+
+
+class TestListItemsFilterType:
+    """list_items(type_=...) filters items by case-insensitive exact match on metadata.type."""
+
+    def test_filter_type_returns_matching_items(self, mocker: MockerFixture) -> None:
+        """type_='Bug' returns only items whose metadata.type is 'Bug' (case-insensitive).
+
+        Tests: type_ exact-match filter.
+        How: Two items with type_ 'Bug' and 'Feature'; filter by 'Bug'.
+        Why: Callers need to isolate defect items from feature items.
+        """
+        bug_item = BacklogItem(title="Login crash", section="P1", skip=False, type_="Bug")
+        feature_item = BacklogItem(title="Dark mode", section="P2", skip=False, type_="Feature")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[bug_item, feature_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(type_="Bug")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "Login crash"
+
+    def test_filter_type_is_case_insensitive(self, mocker: MockerFixture) -> None:
+        """type_='bug' matches an item whose metadata.type is 'Bug'.
+
+        Tests: case-insensitive exact match.
+        How: Item has type_ 'Bug'; filter with 'bug' (lowercase).
+        Why: Type values vary in capitalisation across items; matching must be case-insensitive.
+        """
+        bug_item = BacklogItem(title="Auth error", section="P0", skip=False, type_="Bug")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[bug_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(type_="bug")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "Auth error"
+
+    def test_filter_type_excludes_items_without_type(self, mocker: MockerFixture) -> None:
+        """Items without metadata.type are excluded when type_ filter is active.
+
+        Tests: absent-type exclusion.
+        How: One item has no type_; filter by 'Feature'.
+        Why: Items missing metadata.type must not appear in typed-filter results.
+        """
+        no_type_item = BacklogItem(title="Untyped work", section="P2", skip=False, type_="")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[no_type_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(type_="Feature")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert items == []
+
+    def test_filter_invalid_type_returns_empty(self, mocker: MockerFixture) -> None:
+        """An invalid type value returns empty results with count 0, no error raised.
+
+        Tests: no-match behavior for invalid type.
+        How: Items exist but none match the bogus type 'InvalidType'.
+        Why: Callers must receive an empty list, not an exception, for unknown types.
+        """
+        item = BacklogItem(title="Some work", section="P1", skip=False, type_="Feature")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(type_="InvalidType")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert items == []
+        assert result["count"] == 0
+
+    def test_no_type_filter_returns_all_items_including_untyped(self, mocker: MockerFixture) -> None:
+        """Omitting type_ preserves pre-change behavior — all items returned regardless of type field.
+
+        Tests: backward compatibility.
+        How: Items with and without type_; call list_items with no new params.
+        Why: Existing callers must not be affected by the addition of type_ filter.
+        """
+        typed_item = BacklogItem(title="Feature X", section="P1", skip=False, type_="Feature")
+        untyped_item = BacklogItem(title="Old item", section="P2", skip=False, type_="")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[typed_item, untyped_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items()
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 2
+
+
+# ---------------------------------------------------------------------------
+# list_items: topic filter
+# ---------------------------------------------------------------------------
+
+
+class TestListItemsFilterTopic:
+    """list_items(topic=...) filters items by case-insensitive substring match on metadata.topic."""
+
+    def test_filter_topic_returns_matching_items(self, mocker: MockerFixture) -> None:
+        """topic='backlog' returns only items whose metadata.topic contains 'backlog'.
+
+        Tests: topic substring filter.
+        How: Two items with different topics; filter by 'backlog'.
+        Why: Callers need topic-scoped filtering to narrow to a subsystem.
+        """
+        backlog_item = BacklogItem(title="Backlog sync fix", section="P1", skip=False, topic="backlog-sync-fix")
+        auth_item = BacklogItem(title="Auth refactor", section="P1", skip=False, topic="auth-refactor")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[backlog_item, auth_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(topic="backlog")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "Backlog sync fix"
+
+    def test_filter_topic_is_case_insensitive(self, mocker: MockerFixture) -> None:
+        """topic='BACKLOG' matches items whose metadata.topic contains 'backlog'.
+
+        Tests: case-insensitive substring match.
+        How: Item topic is lowercase; filter with uppercase.
+        Why: Case inconsistency in stored topics must not cause misses.
+        """
+        item = BacklogItem(title="Backlog work", section="P1", skip=False, topic="backlog-matching")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(topic="BACKLOG")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+
+    def test_filter_topic_excludes_items_without_topic(self, mocker: MockerFixture) -> None:
+        """Items without metadata.topic are excluded when topic filter is active.
+
+        Tests: absent-topic exclusion.
+        How: One item has no topic; filter by 'backlog'.
+        Why: Items missing metadata.topic must not appear in topic-filter results.
+        """
+        no_topic_item = BacklogItem(title="No topic item", section="P1", skip=False, topic="")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[no_topic_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(topic="backlog")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert items == []
+
+    def test_no_topic_filter_returns_all_items(self, mocker: MockerFixture) -> None:
+        """Omitting topic preserves pre-change behavior — all items returned regardless of topic field.
+
+        Tests: backward compatibility.
+        How: Items with and without topic; call list_items with no new params.
+        Why: Existing callers must not be affected by the addition of topic filter.
+        """
+        with_topic = BacklogItem(title="Item A", section="P1", skip=False, topic="some-topic")
+        without_topic = BacklogItem(title="Item B", section="P2", skip=False, topic="")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[with_topic, without_topic])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items()
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 2
+
+
+# ---------------------------------------------------------------------------
+# list_items: type_ + topic combined AND logic
+# ---------------------------------------------------------------------------
+
+
+class TestListItemsFilterTypeTopicComposed:
+    """list_items(type_=..., topic=...) composes filters with AND logic."""
+
+    def test_combined_type_and_topic_filters_with_and_logic(self, mocker: MockerFixture) -> None:
+        """type_='Bug' AND topic='backlog' returns only the item matching both.
+
+        Tests: AND composition of type_ and topic filters.
+        How: Three items — bug+backlog, bug+auth, feature+backlog; filter by Bug+backlog.
+        Why: Filters must compose with AND to narrow results to intersection.
+        """
+        bug_backlog = BacklogItem(title="Backlog bug", section="P1", skip=False, type_="Bug", topic="backlog-sync")
+        bug_auth = BacklogItem(title="Auth bug", section="P1", skip=False, type_="Bug", topic="auth-fix")
+        feature_backlog = BacklogItem(
+            title="Backlog feature", section="P2", skip=False, type_="Feature", topic="backlog-ui"
+        )
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[bug_backlog, bug_auth, feature_backlog])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(type_="Bug", topic="backlog")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "Backlog bug"
+
+    def test_section_and_type_filter_compose(self, mocker: MockerFixture) -> None:
+        """section='P1' AND type_='Bug' returns only P1 bug items.
+
+        Tests: AND composition of pre-existing section filter with new type_ filter.
+        How: P1 bug, P2 bug, P1 feature; filter section=P1, type_=Bug.
+        Why: All filters must compose so callers can combine any pair.
+        """
+        p1_bug = BacklogItem(title="P1 Bug", section="P1", skip=False, type_="Bug")
+        p2_bug = BacklogItem(title="P2 Bug", section="P2", skip=False, type_="Bug")
+        p1_feature = BacklogItem(title="P1 Feature", section="P1", skip=False, type_="Feature")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[p1_bug, p2_bug, p1_feature])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(section="P1", type_="Bug")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "P1 Bug"
+
+
+# ---------------------------------------------------------------------------
+# _build_list_entry: type and topic fields in response dict
+# ---------------------------------------------------------------------------
+
+
+class TestBuildListEntryTypeTopicFields:
+    """_build_list_entry includes 'type' and 'topic' fields in the returned dict."""
+
+    def test_build_list_entry_includes_type_and_topic(self, mocker: MockerFixture) -> None:
+        """list_items response dicts contain 'type' and 'topic' keys sourced from metadata.
+
+        Tests: type and topic fields in _build_list_entry output.
+        How: Create item with type_='Bug' and topic='backlog-matching'; call list_items.
+        Why: MCP consumers need type/topic in the response without a separate view call.
+        """
+        item = BacklogItem(title="Bug fix", section="P1", skip=False, type_="Bug", topic="backlog-matching")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items()
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["type"] == "Bug"
+        assert items[0]["topic"] == "backlog-matching"
+
+    def test_build_list_entry_type_and_topic_empty_when_absent(self, mocker: MockerFixture) -> None:
+        """Items without metadata.type and metadata.topic have empty string values in response dict.
+
+        Tests: empty-field handling in _build_list_entry.
+        How: Create item with no type_ or topic set.
+        Why: Consumers must receive consistent dict shape regardless of metadata presence.
+        """
+        item = BacklogItem(title="Plain item", section="P2", skip=False)
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items()
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["type"] == ""
+        assert items[0]["topic"] == ""
+
+
+# ---------------------------------------------------------------------------
 # Entry block integration: groom_item with section+content
 # ---------------------------------------------------------------------------
 

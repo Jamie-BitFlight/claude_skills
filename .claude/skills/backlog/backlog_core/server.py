@@ -22,7 +22,7 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_add(
     title: Annotated[str, Field(description="Item title")],
     priority: Annotated[str, Field(description="Priority level: P0, P1, P2, or Ideas")],
@@ -61,7 +61,7 @@ async def backlog_add(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_list(
     with_status: Annotated[bool, Field(description="Include GitHub issue status for each item")] = False,
     from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
@@ -72,9 +72,32 @@ async def backlog_list(
     status: Annotated[
         str | None, Field(description="Filter by status value e.g. 'needs-grooming', 'status:in-progress'")
     ] = None,
-    title: Annotated[
-        str | None, Field(description="Filter items whose title contains this substring (case-insensitive)")
+    title_filter: Annotated[
+        str | None,
+        Field(description="Filter items whose title contains this substring (case-insensitive)", alias="title"),
     ] = None,
+    type_: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Filter by metadata.type — case-insensitive exact match (e.g. 'Bug', 'Feature'). "
+                "Items without metadata.type are excluded when this filter is active."
+            ),
+            alias="type",
+        ),
+    ] = None,
+    topic: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Filter by metadata.topic — case-insensitive substring match. "
+                "Items without metadata.topic are excluded when this filter is active."
+            )
+        ),
+    ] = None,
+    include_closed: Annotated[
+        bool, Field(description="Include items with closed/done/resolved status (excluded by default)")
+    ] = False,
 ) -> dict:
     """List all open backlog items.
 
@@ -83,9 +106,12 @@ async def backlog_list(
     Use section to filter by priority section (P0, P1, P2, Ideas).
     Use status to filter by status value (e.g. needs-grooming, status:in-progress).
     Use title to filter by title substring (case-insensitive).
+    Use type_ to filter by metadata.type exact match (e.g. Bug, Feature).
+    Use topic to filter by metadata.topic substring match.
+    Use include_closed=true to include items with terminal status (done, resolved, closed).
 
     Returns:
-        Dict with items list (each containing title, priority, issue, plan)
+        Dict with items list (each containing title, priority, issue, plan, type, topic)
         and output messages/warnings. On error, dict contains an error key.
     """
     out = Output()
@@ -97,7 +123,10 @@ async def backlog_list(
             label=label,
             section=section,
             status=status,
-            title=title,
+            title=title_filter,
+            type_=type_,
+            topic=topic,
+            include_closed=include_closed,
             output=out,
         )
         return {**result, **out.to_dict()}
@@ -105,11 +134,11 @@ async def backlog_list(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_view(
     selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
-    offset: Annotated[int, Field(ge=0, description="Skip N lines from body start (for pagination)")] = 0,
-    limit: Annotated[int, Field(ge=0, description="Show at most N body lines (0 = all, no truncation)")] = 0,
+    offset: Annotated[int, Field(ge=0, description="Skip N entry blocks from body start (for pagination)")] = 0,
+    limit: Annotated[int, Field(ge=0, description="Show at most N entry blocks (0 = all, no truncation)")] = 0,
     show: Annotated[
         str | None,
         Field(description="Entry filter: 'all', 'last', 'first', 'struck', or integer N (first N active entries)"),
@@ -152,7 +181,7 @@ async def backlog_view(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
@@ -179,7 +208,7 @@ async def backlog_sync(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_close(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     reason: Annotated[
@@ -223,7 +252,7 @@ async def backlog_close(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_resolve(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     summary: Annotated[str, Field(description="What was done — 1-2 sentence completion summary (required)")],
@@ -267,7 +296,7 @@ async def backlog_resolve(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_update(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
@@ -337,7 +366,7 @@ async def backlog_update(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_groom(
     ctx: Context,
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
@@ -390,7 +419,7 @@ async def backlog_groom(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
@@ -418,7 +447,7 @@ async def backlog_normalize(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_pull(
     ctx: Context,
     selector: Annotated[
@@ -451,7 +480,7 @@ async def backlog_pull(
     try:
         if selector is not None:
             await ctx.info(f"Pulling issue: {selector}")
-            result = await asyncio.to_thread(operations.pull_by_selector, selector, output=out)
+            result = await asyncio.to_thread(operations.pull_by_selector, selector, diff=diff, output=out)
             for w in out.warnings:
                 await ctx.warning(w)
             file_path = result.get("file_path")
@@ -468,7 +497,7 @@ async def backlog_pull(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_create_sam_task(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
     task_id: Annotated[str, Field(description="Feature-scoped task ID, e.g. 'T1'")],
@@ -511,7 +540,7 @@ async def backlog_create_sam_task(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_get_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
     refresh_cache: Annotated[bool, Field(description="Write updated cache after fetching")] = True,
@@ -532,7 +561,7 @@ async def backlog_get_sam_tasks(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (without #)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
@@ -555,7 +584,7 @@ async def backlog_update_sam_task_status(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
 ) -> dict:
@@ -577,7 +606,7 @@ async def backlog_get_ready_sam_tasks(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool()
+@mcp.tool
 async def backlog_strike_entry(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     entry_id: Annotated[str, Field(description="Timestamp ID of the entry to strike")],

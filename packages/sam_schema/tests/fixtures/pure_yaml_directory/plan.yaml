@@ -1,0 +1,5 @@
+feature: logging-pipeline
+version: "1.0"
+description: |
+  Structured logging pipeline with log aggregation, filtering, and alerting.
+issue: 88

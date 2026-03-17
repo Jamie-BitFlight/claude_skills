@@ -5,9 +5,9 @@ metadata:
   topic: investigate-should-be-epistemic-false-positive-in-hallucinat
   source: 'GitHub Issue #558'
   added: '2026-03-10'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#558'
   last_synced: '2026-03-10T20:25:12Z'
   groomed: '2026-03-10'

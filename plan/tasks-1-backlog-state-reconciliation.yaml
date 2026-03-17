@@ -1,0 +1,441 @@
+feature: backlog-state-reconciliation
+version: '1.0'
+description: |-
+  Backlog state reconciliation - detect and resolve local/GitHub state divergence
+issue: '#714'
+architecture: ./architect-backlog-state-reconciliation.md
+feature-context: ./feature-context-backlog-state-reconciliation.md
+codebase-patterns: ./codebase/backlog-state-patterns.md
+tasks:
+- id: T1
+  title: State handler helper functions
+  status: complete
+  agent: python3-development:python-cli-architect
+  priority: 1
+  complexity: low
+  skills:
+  - python3-development
+  description: |-
+    The reconciliation layer needs two pure helper functions in `state_handler.py` that do not exist yet. `is_terminal_state()` checks whether a state has no outgoing transitions. `find_valid_path()` performs BFS on the `VALID_TRANSITIONS` DAG to determine reachability between two states. Both are pure functions with no I/O. The architecture spec (Section 4.3) defines their signatures and behavior.
+  objective: |-
+    Add `is_terminal_state()` and `find_valid_path()` to `.claude/skills/backlog/scripts/state_handler.py` as public functions.
+  requirements: |-
+    1. Add `is_terminal_state(state: str) -> bool` that returns True for states with empty transition sets in `VALID_TRANSITIONS` (done, resolved, closed per the DAG)
+    2. Add `find_valid_path(from_state: str, to_state: str) -> list[str] | None` that performs BFS on `VALID_TRANSITIONS` and returns the path as a list of state strings, or None if unreachable
+    3. `find_valid_path` must handle same-state identity case (return `[state]`)
+    4. Both functions must use `BacklogState` enum values for comparison but accept plain strings as input
+    5. Both functions must be pure (no I/O, no side effects)
+  constraints: |-
+    - Do not modify existing functions (`validate_transition`, `apply_github_transition`)
+    - Do not add new dependencies
+    - Do not modify `VALID_TRANSITIONS` or `BacklogState`
+    - Place new functions after existing public functions, before private helpers
+  expected-outputs: |-
+    - File modified: `.claude/skills/backlog/scripts/state_handler.py`
+  acceptance-criteria: |-
+    1. `is_terminal_state("done")` returns True; `is_terminal_state("in-progress")` returns False
+    2. `find_valid_path("needs-grooming", "in-progress")` returns a list of 4+ states representing the valid path
+    3. `find_valid_path("done", "needs-grooming")` returns None (no backward path)
+    4. `find_valid_path("groomed", "groomed")` returns `["groomed"]` (identity)
+    5. Both functions are importable from `state_handler` without errors
+  verification-steps: |-
+    1. `uv run python -c "from state_handler import is_terminal_state; assert is_terminal_state('done'); assert is_terminal_state('resolved'); assert is_terminal_state('closed'); assert not is_terminal_state('in-progress'); print('PASS')"` (run from `.claude/skills/backlog/scripts/`)
+    2. `uv run python -c "from state_handler import find_valid_path; p = find_valid_path('needs-grooming', 'in-progress'); assert p is not None and len(p) >= 4; assert find_valid_path('done', 'needs-grooming') is None; assert find_valid_path('groomed', 'groomed') == ['groomed']; print('PASS')"` (run from `.claude/skills/backlog/scripts/`)
+    3. `uv run prek run --files .claude/skills/backlog/scripts/state_handler.py`
+
+    - Key claims to verify:
+      - `done`, `resolved`, and `closed` are the only terminal states per `VALID_TRANSITIONS`
+      - BFS on the DAG from `needs-grooming` can reach `in-progress` via `groomed -> in-milestone -> in-progress`
+    - Verification questions:
+      1. Does `VALID_TRANSITIONS[BacklogState.DONE]` map to `frozenset({BacklogState.CLOSED})` (non-empty, so `done` is NOT terminal by "empty set" definition)?
+      2. Which states have `frozenset()` as their transition set?
+    - Evidence to collect:
+      - Read `state_handler.py:54-63` and confirm which states have empty frozensets
+    - Revision rule:
+      - If `done` and `resolved` have non-empty transition sets (they transition to `closed`), then `is_terminal_state` must check for states from which no further non-closed progress is possible. Re-read the architecture spec Section 4.3: it says "True if state is done, resolved, or closed." Follow the spec definition, which treats done/resolved/closed as terminal for filtering purposes (items in these states should be excluded from default list).
+  handoff: |-
+    Report file path, function signatures, and BFS test output
+- id: T2
+  title: Core reconciliation functions in backlog.py
+  status: complete
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T1
+  priority: 2
+  complexity: high
+  skills:
+  - python3-development
+  parallelize-with:
+  - T3
+  - T6
+  description: |-
+    The reconciliation layer is the core of this feature. It detects divergence between local backlog cache and GitHub state, auto-corrects DAG-valid divergences, flags invalid ones, and protects work-in-progress items from premature closure. Four new private functions and one dataclass are added to `backlog.py`. The architecture spec (Sections 4.1, 4.5, 5) defines all signatures and the reconciliation decision matrix.
+
+    This task adds the new functions only. It does NOT modify existing functions (that is T4).
+  objective: |-
+    Add `ReconcileResult` dataclass, `_has_active_work()`, `_reconcile_item()`, `_reconcile_batch()`, and `_filter_closed_items()` to `.claude/skills/backlog/scripts/backlog.py`.
+  requirements: |-
+    1. Add `ReconcileResult` dataclass (fields: `issue_number: int`, `action: str`, `old_status: str`, `new_status: str`, `warning: str`) near existing dataclasses at module level
+    2. Add `_has_active_work(item: dict) -> tuple[bool, str]` that checks for plan files with IN PROGRESS tasks and active-task context files referencing the item
+    3. Add `_reconcile_item(item, gh_issue_map, repo) -> ReconcileResult` implementing the reconciliation decision matrix from architecture spec Section 5
+    4. Add `_reconcile_batch(items, repo) -> tuple[list[dict], list[str]]` that fetches all GitHub issues (`state="all"`) and calls `_reconcile_item` for each
+    5. Add `_filter_closed_items(items, include_closed) -> list[dict]` that filters out items with terminal status unless `include_closed=True`
+    6. `_reconcile_item` must use `find_valid_path()` (not `validate_transition()`) for DAG reachability checks (per ADR-002)
+    7. `_reconcile_item` must call `_update_item_metadata()` to persist auto-corrections (per ADR-001, ADR decision on persistence)
+    8. `_reconcile_batch` must gracefully handle GitHub unavailability (return items unchanged with warning)
+    9. `_has_active_work` must handle missing files gracefully (return `(False, "")`)
+  constraints: |-
+    - Do not modify any existing functions in `backlog.py` (that is T3 and T4)
+    - Do not add new dependencies (use existing imports)
+    - Follow existing private function naming convention (`_` prefix)
+    - Follow existing error handling patterns (soft fail for optional operations)
+    - Place `ReconcileResult` near existing dataclasses
+    - Place private functions after existing private helpers
+  expected-outputs: |-
+    - File modified: `.claude/skills/backlog/scripts/backlog.py`
+  acceptance-criteria: |-
+    1. `ReconcileResult` is importable and has all 5 fields
+    2. `_has_active_work` returns `(True, reason)` when a plan file with IN PROGRESS task exists for the item's topic
+    3. `_has_active_work` returns `(False, "")` when no plan files or context files exist
+    4. `_reconcile_item` returns `action="auto_corrected"` for DAG-valid divergences and persists the correction
+    5. `_reconcile_item` returns `action="flagged_divergence"` for invalid divergences without modifying local state
+    6. `_reconcile_item` returns `action="wip_protected"` when GitHub issue is closed but active work exists
+    7. `_filter_closed_items` excludes items with status in {done, resolved, closed} when `include_closed=False`
+    8. `_reconcile_batch` returns items unchanged with warning string when GitHub is unavailable
+  verification-steps: |-
+    1. `uv run python -c "import sys; sys.path.insert(0, '.claude/skills/backlog/scripts'); from backlog import ReconcileResult; r = ReconcileResult(1, 'no_change', 'groomed', 'groomed', ''); print(r); print('PASS')"`
+    2. Confirm new functions exist: `grep -n 'def _has_active_work\|def _reconcile_item\|def _reconcile_batch\|def _filter_closed_items\|class ReconcileResult' .claude/skills/backlog/scripts/backlog.py`
+    3. `uv run prek run --files .claude/skills/backlog/scripts/backlog.py`
+    4. `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30` (no regressions)
+
+    - Key claims to verify:
+      - `_update_item_metadata` signature and import location
+      - `_try_get_github` return value when GitHub unavailable
+      - Plan file glob pattern for WIP detection
+    - Verification questions:
+      1. What is the import path for `_update_item_metadata` -- is it in `backlog.py` directly or imported from `backlog_core.operations`?
+      2. Does `_try_get_github()` return `None` when GitHub is unavailable, or does it raise?
+      3. What is the actual glob pattern for plan files referencing a topic slug?
+    - Evidence to collect:
+      - Read `backlog.py` imports and search for `_update_item_metadata` definition
+      - Read `_try_get_github` function body
+      - Read feature context Section "Active task context files" and architecture spec Section 4.1
+    - Revision rule:
+      - If `_update_item_metadata` is imported from `backlog_core.operations`, use the imported name. If it is a local function in `backlog.py`, use the local reference.
+  handoff: |-
+    Report file path, function names added, and import verification output
+- id: T3
+  title: Fix grooming bug in backlog.py
+  status: complete
+  agent: python3-development:python-cli-architect
+  priority: 2
+  complexity: medium
+  skills:
+  - python3-development
+  parallelize-with:
+  - T2
+  - T6
+  description: |-
+    The grooming bug is the primary source of "stateless void" items. Currently, `backlog groom` removes the `status:needs-grooming` label from GitHub but never adds `status:groomed`, and never updates local frontmatter status. This leaves items with no status label on GitHub and stale status locally. The fix replaces the manual label removal with `apply_github_transition()` (the same pattern used by 4 other transitions) and adds a `_update_item_metadata()` call. Architecture spec Section 4.2 defines the change. ADR-005 explains co-delivery rationale.
+  objective: |-
+    Fix `_write_groomed_to_item_file()` and surrounding grooming code in `backlog.py` to atomically transition labels and update local frontmatter status to `groomed`.
+  requirements: |-
+    1. Replace the manual `issue.remove_from_labels("status:needs-grooming")` call with `apply_github_transition(repo, issue, "needs-grooming", "groomed")`
+    2. Add `_update_item_metadata(filepath, {"metadata": {"status": "groomed"}}, set_synced=True)` after the transition
+    3. Ensure `apply_github_transition` and `BacklogState` are already imported (verify, do not duplicate imports)
+    4. Follow the exact same pattern as `_apply_status_in_progress()` for consistency
+  constraints: |-
+    - Do not modify any other functions besides the grooming-related code
+    - Do not change the grooming decision logic (RT-ICA approval flow)
+    - Do not add new dependencies
+    - Preserve the existing `groomed` date update in `_write_groomed_to_item_file`
+  expected-outputs: |-
+    - File modified: `.claude/skills/backlog/scripts/backlog.py`
+  acceptance-criteria: |-
+    1. After grooming, GitHub issue has exactly one `status:*` label: `status:groomed`
+    2. After grooming, local frontmatter `status` field is `groomed`
+    3. No manual `issue.remove_from_labels()` call remains in grooming code path
+    4. `apply_github_transition` is called with `from_state="needs-grooming"` and `to_state="groomed"`
+  verification-steps: |-
+    1. Search for old pattern: `grep -n 'remove_from_labels.*needs-grooming' .claude/skills/backlog/scripts/backlog.py` (should return 0 results)
+    2. Search for new pattern: `grep -n 'apply_github_transition.*groomed' .claude/skills/backlog/scripts/backlog.py` (should return 1+ results)
+    3. `uv run prek run --files .claude/skills/backlog/scripts/backlog.py`
+    4. `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30` (no regressions)
+
+    - Key claims to verify:
+      - The grooming code path location (line ~1746 for label removal, line ~1576 for `_write_groomed_to_item_file`)
+      - `apply_github_transition` is already imported in `backlog.py`
+    - Verification questions:
+      1. Is `apply_github_transition` imported at the top of `backlog.py`?
+      2. Where exactly is `issue.remove_from_labels` called in the grooming code path?
+      3. Does `_write_groomed_to_item_file` have access to `repo` and `issue` objects, or does it need them passed in?
+    - Evidence to collect:
+      - `grep -n 'apply_github_transition' .claude/skills/backlog/scripts/backlog.py` (check imports)
+      - `grep -n 'remove_from_labels' .claude/skills/backlog/scripts/backlog.py` (find exact location)
+      - Read `_write_groomed_to_item_file` function signature
+    - Revision rule:
+      - If `_write_groomed_to_item_file` does not have access to `repo`/`issue` objects, the function signature must be modified to accept them, and the caller must pass them.
+  handoff: |-
+    Report exact lines changed, old vs new behavior, and verification output
+- id: T4
+  title: Modify fetch functions and add CLI flag
+  status: complete
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T2
+  - T3
+  priority: 3
+  complexity: medium
+  skills:
+  - python3-development
+  parallelize-with:
+  - T7
+  - T8
+  description: |-
+    Two existing functions query GitHub with `state="open"` only, causing closed issues to be invisible. This task changes both to `state="all"`. It also integrates the reconciliation layer (from T2) into `_refresh_local_cache_from_github` and adds the `--include-closed` flag to the `list_items` CLI command. Architecture spec Sections 4.2 and 4.6 define these changes.
+  objective: |-
+    Modify `_refresh_local_cache_from_github()`, `_batch_fetch_statuses()`, and `list_items()` in `backlog.py` to fetch all issue states and support closed item filtering.
+  requirements: |-
+    1. In `_refresh_local_cache_from_github()`: change `repo_obj.get_issues(state="open", ...)` to `repo_obj.get_issues(state="all", ...)`
+    2. In `_refresh_local_cache_from_github()`: after fetching and updating local files, call `_reconcile_batch(items, repo)` and emit collected warnings
+    3. In `_batch_fetch_statuses()`: change `repo_obj.get_issues(state="open")` to `repo_obj.get_issues(state="all")`
+    4. In `list_items()` command: add `include_closed: Annotated[bool, typer.Option("--include-closed", help="Include items with closed/done/resolved status")] = False` parameter
+    5. In `list_items()`: call `_filter_closed_items(items, include_closed)` after parsing/reconciliation but before rendering
+    6. Warnings from reconciliation must be emitted to stderr via `typer.echo(..., err=True)` after batch completes, before list output
+  constraints: |-
+    - Do not modify the reconciliation functions added by T2
+    - Do not modify the grooming fix from T3
+    - Preserve existing `--from-github` behavior (it should now also trigger reconciliation)
+    - Preserve existing `--with-status` behavior (it should now return status for closed items too)
+    - Do not filter items from `_batch_fetch_statuses` result (let the status map include all issues)
+  expected-outputs: |-
+    - File modified: `.claude/skills/backlog/scripts/backlog.py`
+  acceptance-criteria: |-
+    1. `_refresh_local_cache_from_github` calls `get_issues(state="all")` instead of `state="open"`
+    2. `_batch_fetch_statuses` calls `get_issues(state="all")` instead of `state="open"`
+    3. `list_items` command accepts `--include-closed` flag
+    4. Default `backlog list` excludes items with terminal status (done, resolved, closed)
+    5. `backlog list --include-closed` shows all items including terminal states
+    6. `backlog list --from-github` triggers `_reconcile_batch` and emits warnings to stderr
+  verification-steps: |-
+    1. `grep -n 'state="open"' .claude/skills/backlog/scripts/backlog.py` (should return 0 results in fetch functions; may remain in other contexts)
+    2. `grep -n 'state="all"' .claude/skills/backlog/scripts/backlog.py` (should return 2+ results)
+    3. `grep -n 'include.closed' .claude/skills/backlog/scripts/backlog.py` (should return 2+ results: parameter def and usage)
+    4. `uv run prek run --files .claude/skills/backlog/scripts/backlog.py`
+    5. `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30`
+
+    - Key claims to verify:
+      - `_batch_fetch_statuses` uses `repo_obj.get_issues(state="open")` at current line ~755
+      - `_refresh_local_cache_from_github` uses `repo_obj.get_issues(state="open")` at current line ~860
+      - `list_items` function uses `Annotated` syntax for existing CLI parameters
+    - Verification questions:
+      1. Does `_batch_fetch_statuses` use `repo_obj.get_issues` or a different GitHub API call pattern?
+      2. Does `_refresh_local_cache_from_github` filter out PRs with `issue.pull_request is not None`? (Must preserve this filter)
+      3. What is the existing parameter style for `list_items` -- does it use `Annotated[bool, typer.Option(...)]` or bare `typer.Option()`?
+    - Evidence to collect:
+      - Read the two functions and `list_items` command signature in backlog.py
+    - Revision rule:
+      - Match existing parameter style exactly. If existing params use bare `typer.Option()`, use that instead of `Annotated`.
+  handoff: |-
+    Report functions modified, new CLI flag, and test output
+- id: T5
+  title: MCP server include_closed parameter
+  status: in-progress
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T4
+  priority: 4
+  complexity: low
+  skills:
+  - python3-development
+  parallelize-with:
+  - T9
+  description: |-
+    The MCP server at `.claude/skills/backlog/backlog_core/server.py` exposes `backlog_list` as a FastMCP tool. It delegates to the CLI `list_items` function via `asyncio.to_thread`. The new `include_closed` parameter must propagate through this layer. Architecture spec Section 4.4 defines the change.
+  objective: |-
+    Add `include_closed: bool = False` parameter to the MCP `backlog_list` tool and pass it through to the underlying list function.
+  requirements: |-
+    1. Add `include_closed: bool = False` parameter to the `backlog_list` MCP tool function signature
+    2. Pass `include_closed` through to the delegated list function call
+    3. Update the tool's docstring to document the new parameter
+  constraints: |-
+    - Do not modify other MCP tools (backlog_view, backlog_groom, etc.)
+    - Do not change the asyncio.to_thread delegation pattern
+    - Match existing parameter naming conventions in the MCP server
+  expected-outputs: |-
+    - File modified: `.claude/skills/backlog/backlog_core/server.py`
+  acceptance-criteria: |-
+    1. `backlog_list` MCP tool accepts `include_closed` parameter
+    2. Parameter defaults to `False`
+    3. Parameter is passed through to the underlying list function
+    4. Tool docstring mentions the parameter
+  verification-steps: |-
+    1. `grep -n 'include_closed' .claude/skills/backlog/backlog_core/server.py` (should return 2+ results)
+    2. `uv run prek run --files .claude/skills/backlog/backlog_core/server.py`
+    3. `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30`
+  handoff: |-
+    Report parameter added, function signature, and verification output
+  started: '2026-03-15T14:24:44.609960+00:00'
+- id: T6
+  title: State handler unit tests
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T1
+  priority: 2
+  complexity: low
+  skills:
+  - fastmcp-python-tests
+  - python3-development
+  parallelize-with:
+  - T2
+  - T3
+  description: |-
+    T1 adds `is_terminal_state()` and `find_valid_path()` to `state_handler.py`. These pure functions need unit tests covering the cases defined in architecture spec Section 7 ("State Machine Unit Tests").
+  objective: |-
+    Create unit tests for `is_terminal_state()` and `find_valid_path()` in a new or existing test file.
+  requirements: |-
+    1. Test `is_terminal_state` returns True for "done", "resolved", "closed"
+    2. Test `is_terminal_state` returns False for "in-progress", "needs-grooming", "groomed", "blocked", "in-milestone"
+    3. Test `find_valid_path` returns a direct path for single-hop transitions (e.g., `needs-grooming -> groomed`)
+    4. Test `find_valid_path` returns a multi-hop path (e.g., `needs-grooming -> in-progress`)
+    5. Test `find_valid_path` returns None for unreachable states (e.g., `done -> needs-grooming`)
+    6. Test `find_valid_path` returns `[state]` for identity case
+  constraints: |-
+    - Follow existing test patterns in `.claude/skills/backlog/tests/`
+    - Use pytest conventions (no unittest.TestCase)
+    - Do not mock the state handler functions (they are pure)
+  expected-outputs: |-
+    - File created or modified: `.claude/skills/backlog/tests/test_state_handler_helpers.py` (or appropriate existing file)
+  acceptance-criteria: |-
+    1. At least 8 test functions covering all cases listed in Requirements
+    2. All tests pass: `uv run pytest .claude/skills/backlog/tests/test_state_handler_helpers.py -v`
+    3. Tests are self-contained (no external dependencies, no GitHub API)
+  verification-steps: |-
+    1. `uv run pytest .claude/skills/backlog/tests/test_state_handler_helpers.py -v`
+    2. `uv run pytest .claude/skills/backlog/tests/test_state_handler_helpers.py --co` (confirm test count >= 8)
+    3. `uv run prek run --files .claude/skills/backlog/tests/test_state_handler_helpers.py`
+  handoff: |-
+    Report test file path, test count, and pytest output
+- id: T7
+  title: Reconciliation unit tests
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T2
+  priority: 3
+  complexity: high
+  skills:
+  - fastmcp-python-tests
+  - python3-development
+  parallelize-with:
+  - T4
+  - T8
+  description: |-
+    T2 adds the core reconciliation functions. These need comprehensive tests covering the reconciliation decision matrix (architecture spec Section 5), WIP protection (AC#7), auto-correction (AC#5), invalid divergence flagging (AC#6), and batch behavior (AC#8). Tests must mock GitHub API calls and use the existing `_isolate_backlog_dir` fixture pattern.
+  objective: |-
+    Create unit tests for `_reconcile_item()`, `_has_active_work()`, `_reconcile_batch()`, and `_filter_closed_items()`.
+  constraints: |-
+    - Use `monkeypatch` or `pytest-mock` for GitHub API mocking
+    - Use the `_isolate_backlog_dir` fixture pattern for local file isolation
+    - Create plan files and context files in `tmp_path` for WIP tests
+    - Do not make real GitHub API calls
+  expected-outputs: |-
+    - File created: `.claude/skills/backlog/tests/test_reconciliation.py`
+  acceptance-criteria: |-
+    1. At least 12 test functions covering all requirements above
+    2. All tests pass: `uv run pytest .claude/skills/backlog/tests/test_reconciliation.py -v`
+    3. WIP protection tests create actual plan files with task status markers
+    4. No real GitHub API calls in any test
+  verification-steps: |-
+    1. `uv run pytest .claude/skills/backlog/tests/test_reconciliation.py -v`
+    2. `uv run pytest .claude/skills/backlog/tests/test_reconciliation.py --co` (confirm test count >= 12)
+    3. `uv run prek run --files .claude/skills/backlog/tests/test_reconciliation.py`
+
+    - Key claims to verify:
+      - `_isolate_backlog_dir` fixture pattern and `_write_item` helper location
+      - How to mock `_try_get_github` return value
+    - Verification questions:
+      1. Is `_isolate_backlog_dir` an autouse fixture in existing tests, or must it be explicitly requested?
+      2. What module path should be monkeypatched for `_try_get_github`?
+    - Evidence to collect:
+      - Read `test_backlog_core_operations.py` fixture definitions
+      - Search for `_try_get_github` usage in existing tests
+    - Revision rule:
+      - Match the exact monkeypatch target path used in existing tests.
+  handoff: |-
+    Report test file path, test count, and pytest output
+- id: T8
+  title: Grooming fix tests
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T3
+  priority: 3
+  complexity: medium
+  skills:
+  - fastmcp-python-tests
+  - python3-development
+  parallelize-with:
+  - T4
+  - T7
+  description: |-
+    T3 fixes the grooming bug. Tests must verify that `apply_github_transition` is called with correct arguments and that local frontmatter is updated. Architecture spec Section 7 defines the test cases for AC#4.
+  objective: |-
+    Create unit tests verifying the grooming fix produces atomic label transitions and local status updates.
+  requirements: |-
+    1. Test that after grooming approval, `apply_github_transition` is called with `from_state="needs-grooming"` and `to_state="groomed"`
+    2. Test that after grooming approval, `_update_item_metadata` is called with `status="groomed"`
+    3. Test that no manual `remove_from_labels` call occurs during grooming
+    4. Test that the issue has exactly one `status:*` label after grooming (status:groomed)
+  constraints: |-
+    - Mock `apply_github_transition` and `_update_item_metadata` to verify call arguments
+    - Mock the RT-ICA approval decision (always approve)
+    - Do not test RT-ICA logic itself (out of scope)
+    - Follow existing test fixture patterns
+  expected-outputs: |-
+    - File created or modified: `.claude/skills/backlog/tests/test_grooming_fix.py` (or appropriate existing file)
+  acceptance-criteria: |-
+    1. At least 4 test functions covering all requirements
+    2. All tests pass: `uv run pytest .claude/skills/backlog/tests/test_grooming_fix.py -v`
+    3. Tests verify function call arguments, not just absence of errors
+  verification-steps: |-
+    1. `uv run pytest .claude/skills/backlog/tests/test_grooming_fix.py -v`
+    2. `uv run pytest .claude/skills/backlog/tests/test_grooming_fix.py --co` (confirm test count >= 4)
+    3. `uv run prek run --files .claude/skills/backlog/tests/test_grooming_fix.py`
+  handoff: |-
+    Report test file path, test count, and pytest output
+- id: T9
+  title: Integration tests for CLI and MCP
+  status: in-progress
+  started: '2026-03-15T13:01:00+00:00'
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T4
+  - T5
+  priority: 4
+  complexity: medium
+  skills:
+  - fastmcp-python-tests
+  - python3-development
+  description: |-
+    T4 adds the `--include-closed` CLI flag and modifies fetch functions. T5 adds the MCP `include_closed` parameter. Integration tests verify end-to-end behavior: closed items excluded by default, included with flag, status returned for all issues, and MCP parameter propagation.
+  objective: |-
+    Create integration tests for the CLI `--include-closed` flag, `state="all"` fetch behavior, and MCP `include_closed` parameter.
+  constraints: |-
+    - Mock GitHub API (no real API calls)
+    - Use existing MCP test patterns for server tests
+    - Create test backlog items with various statuses in `tmp_path`
+  expected-outputs: |-
+    - File created: `.claude/skills/backlog/tests/test_integration_reconciliation.py`
+  acceptance-criteria: |-
+    1. At least 8 test functions covering all requirements
+    2. All tests pass: `uv run pytest .claude/skills/backlog/tests/test_integration_reconciliation.py -v`
+    3. Full test suite passes: `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30`
+  verification-steps: |-
+    1. `uv run pytest .claude/skills/backlog/tests/test_integration_reconciliation.py -v`
+    2. `uv run pytest .claude/skills/backlog/tests/test_integration_reconciliation.py --co` (confirm test count >= 8)
+    3. `uv run pytest .claude/skills/backlog/tests/ -x --timeout=30` (full suite)
+    4. `uv run prek run --files .claude/skills/backlog/tests/test_integration_reconciliation.py`
+  handoff: |-
+    Report test file path, test count, pytest output, and full suite results

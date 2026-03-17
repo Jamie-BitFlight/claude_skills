@@ -31,73 +31,49 @@ $ARGUMENTS
 
 ---
 
-## Detect Task Format
-
-Read the task file. Determine the format:
-
-- **YAML frontmatter**: File starts with `---` and contains YAML fields like `task:`, `status:`, `title:`
-- **Individual task file**: A single file with YAML frontmatter representing ONE task
-- **Inline markdown**: File contains `## Task N:` headers with `**Status**:` bold fields
-
-For individual task files (YAML frontmatter at top), the task IS the entire file.
-For monolithic files (multiple tasks), find the specific task section.
-
----
-
 ## If `--complete <task-id>` Provided
 
-1. Read the task file.
-2. Update the selected task:
-
-   **If YAML frontmatter format:**
-   - Edit `status:` field to `complete`
-   - Add `completed: {ISO timestamp}` field
-
-   **If inline markdown format:**
-   - Change `**Status**` to `✅ COMPLETE`
-   - Add/update `**Completed**: {ISO timestamp}`
-
-3. Output: `Task {ID} marked as complete`
+1. Run `uv run sam state P{N}/T{M} complete` to mark the task complete.
+2. Output: `Task {ID} marked as complete`
 
 ---
 
 ## Starting a Task
 
-1. Read the task file and the linked architecture spec.
+1. Read the task assignment via `sam read`:
+
+   ```bash
+   uv run sam read P{N}/T{M} --format json
+   ```
+
+   The response is a `TaskAssignment` JSON object containing:
+   - `plan.goal` — the overall feature goal
+   - `plan.context` — plan-level context manifest (architecture decisions, codebase notes)
+   - `task` — full task details: title, requirements, constraints, acceptance criteria, verification steps
+   - `task.skills` — skill names to load before implementing
+
+   Use the address form `P{N}/T{M}` where `N` is the plan number and `M` is the task number from the `--task` argument.
+
 2. Select the task:
    - If `--task` provided, use that ID
-   - Else pick the first task where status is `not-started` (YAML) or `NOT STARTED` (markdown) and all dependencies are resolved
+   - Else pick the first task where status is `not-started` and all dependencies are resolved (check `task.dependencies` in the TaskAssignment)
 
 2a. **Load task-level skills** (if present):
-   - Read the `skills:` field from the task's YAML frontmatter (an array of skill names).
-   - For legacy markdown format, parse the `**Skills**: skill1, skill2` line into a list by splitting on commas and trimming whitespace.
-   - If the field is absent or empty, skip this step (backward compatible with older task files).
-   - For each skill name in the list, invoke: `Skill(skill="{skill-name}")`
-   - If a skill fails to load (not found or errors), log a warning and continue with the remaining skills. Do not abort task execution due to a skill load failure.
-   - **Redundancy note**: The orchestrator (`/implement-feature`) may also include skill-loading instructions in the delegation prompt. This direct reading from task metadata is intentional redundancy -- it ensures skills are loaded even when `/start-task` is invoked manually or by an older orchestrator that does not pass skill-loading instructions. Loading a skill twice is a no-op.
-   - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter. They supplement, not replace, agent-level skills.
+   - Read `task.skills` from the `TaskAssignment` JSON (an array of skill names).
+   - If absent or empty, skip (backward compatible with older task files).
+   - For each skill name, invoke: `Skill(skill="{skill-name}")`
+   - If a skill fails to load, log a warning and continue. Do not abort task execution.
+   - **Redundancy note**: The orchestrator (`/implement-feature`) may also include skill-loading instructions in the delegation prompt. This is intentional redundancy — loading a skill twice is a no-op.
+   - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter.
 
 3. Claim the task (prevents duplicate dispatch):
 
-   Run the claim-task command. This is the ONLY permitted way to mark a task in-progress.
+   Run `sam claim`. This is the ONLY permitted way to mark a task in-progress.
    Do NOT edit status or started fields directly with the Edit tool.
 
-   Resolve the implementation_manager.py script path:
-
    ```bash
-   IMPL_MGR="${CLAUDE_SKILL_DIR}/../../implementation-manager/scripts/implementation_manager.py"
-   ```
-
-   Run claim-task:
-
-   ```bash
-   CLAIM_RESULT=$(uv run "$IMPL_MGR" claim-task "{task_file_path}" "{task_id}")
+   CLAIM_RESULT=$(uv run sam claim P{N}/T{M})
    CLAIM_EXIT=$?
-   ```
-
-   Print the result:
-
-   ```bash
    echo "$CLAIM_RESULT"
    ```
 
@@ -112,11 +88,6 @@ For monolithic files (multiple tasks), find the specific task section.
 
    - The task is claimed. `status: in-progress` and `started:` are written on disk.
    - Proceed to step 4 (write context file) and step 5 (implement).
-
-   If the task file uses legacy inline markdown format (not YAML frontmatter):
-
-   - Emit a warning: `Task {id} is in legacy markdown format. Run migrate_task_format.py before executing.`
-   - STOP. Do not proceed with implementation.
 
 4. Write the active-task context file (required for hook-driven updates):
 

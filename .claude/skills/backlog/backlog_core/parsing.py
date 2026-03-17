@@ -242,6 +242,8 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
         priority=_fm_str(fm, meta, "priority"),
         issue=_fm_str(fm, meta, "issue"),
         plan="" if plan_raw.upper() == "N/A" else plan_raw,
+        type_=meta.get("type", ""),
+        topic=meta.get("topic", ""),
         skip=status_raw.upper() in SKIP_STATUS,
         status=status_raw,
         groomed=groomed,

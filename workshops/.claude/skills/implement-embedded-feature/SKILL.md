@@ -32,29 +32,28 @@ ls plan/tasks-*${ARGUMENTS}*.md 2>/dev/null | head -1
 
 ### Step 1: Read Task File Status
 
-Parse the task file to understand current state:
+Query current plan state via sam CLI:
 
 ```bash
-# Count tasks by status
-grep -c "Status.*PENDING" plan/tasks-{slug}.md
-grep -c "Status.*IN_PROGRESS" plan/tasks-{slug}.md
-grep -c "Status.*COMPLETE" plan/tasks-{slug}.md
-grep -c "Status.*BLOCKED" plan/tasks-{slug}.md
+uv run sam status P{N}
 ```
+
+Returns JSON with task counts (`completed`, `in_progress`, `not_started`) and task list with status per entry.
 
 ### Step 2: Identify Ready Tasks
 
 A task is ready when:
 
-- Status is `PENDING`
-- All tasks in `Dependencies` list are `COMPLETE`
+- Status is `not-started`
+- All tasks in `dependencies` list are `complete`
 
-<eg>
-Parse task file for tasks where:
-  status == "PENDING" AND
-  for each dep in dependencies:
-    dep.status == "COMPLETE"
-</eg>
+Query ready tasks via sam CLI:
+
+```bash
+uv run sam ready-tasks P{N}
+```
+
+Returns JSON: `{"feature": "...", "ready_tasks": [...], "count": N}`
 
 ### Step 3: Execute Ready Tasks
 

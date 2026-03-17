@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/tasks-34-session-historian-enhance-followup-1.md
   issue: '#607'
-  last_synced: '2026-03-12T12:47:31Z'
+  last_synced: '2026-03-14T15:59:46Z'
 ---
 
 ## Story

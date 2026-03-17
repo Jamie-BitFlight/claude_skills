@@ -17,6 +17,7 @@ research/
 │   ├── liteagents.md                  # Multi-tool AI development toolkit with 11 agents and session memory
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
 │   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native (3.6K stars)
+│   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
 │   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
 │   └── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
@@ -45,7 +46,8 @@ research/
 ├── ml-infrastructure/                 # ML compute engines and model serving platforms
 │   ├── microgpt-playground.md         # Browser-native GPT training and inference, zero-dependency JS port of Karpathy's microgpt.py (65 stars)
 │   ├── ray.md                         # AI compute engine for scaling Python/ML workloads (41K+ stars)
-│   └── trainloop.md                   # Managed RL fine-tuning platform: 3-line SDK, reward model training, OpenAI-compatible deployment (YC W25)
+│   ├── trainloop.md                   # Managed RL fine-tuning platform: 3-line SDK, reward model training, OpenAI-compatible deployment (YC W25)
+│   └── zvec.md                        # Alibaba's embedded vector database: in-process Proxima engine, dense+sparse vectors (8.9K stars)
 ├── python-runtimes/                   # Alternative Python interpreters and runtimes
 │   └── rustpython.md                  # Python 3 interpreter written in Rust with WASM support (22K+ stars)
 ├── rust-python-bindings/              # Rust-Python interoperability and binding libraries
@@ -69,7 +71,8 @@ research/
 │   ├── openai-codex-cli.md            # OpenAI Codex CLI — Rust-based coding agent with OS sandbox, MCP server/client, Starlark exec policy (62.5K stars)
 │   ├── openhands.md                   # Open platform for cloud coding agents (67K+ stars)
 │   ├── pilot.md                       # Autonomous development pipeline wrapping Claude Code CLI (BSL 1.1)
-│   └── tembo.md                       # Cloud AI coding agent orchestration (Claude Code, Codex, Cursor, Amp, OpenCode)
+│   ├── tembo.md                       # Cloud AI coding agent orchestration (Claude Code, Codex, Cursor, Amp, OpenCode)
+│   └── 1code.md                       # Electron desktop app wrapping Claude Code + Codex with worktree isolation (5.2K stars)
 ├── context-management/                # Memory, context window, and RAG tools
 │   ├── claude-mem.md                  # Persistent memory compression for Claude Code (15K+ stars)
 │   ├── jina-ai.md                     # Search foundation: Reader API, multilingual embeddings, rerankers (acquired by Elastic 2025)
@@ -353,6 +356,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [softaworks-agent-toolkit.md](./skill-generation-tools/softaworks-agent-toolkit.md) | Softaworks Agent Toolkit - 43 skills, 6 agents, 7 slash commands for Claude Code with multi-platform support (621 stars) | 2026-02-20   |
 | [obsidian-skills.md](./skill-generation-tools/obsidian-skills.md)     | Obsidian Skills - 5 modular Agent Skills for Obsidian (markdown, bases, JSON Canvas, CLI, defuddle) by Steph Ango (13.3K stars) | 2026-03-12   |
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
+| [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
 
 **Key Topics**:
 
@@ -449,6 +453,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [liteagents.md](./agent-frameworks/liteagents.md)                     | Multi-tool AI development toolkit with 11 agents, 22 commands, Hot Memory pipeline, and session friction analysis for 4 AI coding tools | 2026-02-15   |
 | [micro-agent.md](./agent-frameworks/micro-agent.md)                   | Micro-Agent - lightweight Python 3.12 ReAct agent framework with MCP multi-server support, token budget enforcement, and execution visualization (MIT) | 2026-02-20   |
 | [openfang.md](./agent-frameworks/openfang.md)                         | OpenFang - Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, 16-layer security, native SKILL.md support (Apache-2.0/MIT) | 2026-02-27   |
+| [pi-mono.md](./agent-frameworks/pi-mono.md)                           | pi-mono — TypeScript monorepo with 7 npm packages: unified LLM API (pi-ai), agent runtime (pi-agent-core), interactive coding CLI, TUI framework, web UI components, Slack bot, vLLM pod manager (23.8K stars, MIT) | 2026-03-14   |
 | [superpowers.md](./agent-frameworks/superpowers.md)                   | Agentic skills framework with 14 skills for TDD, debugging, and subagent-driven development - works with Claude Code, Codex, OpenCode  | 2026-01-31   |
 | [tersa.md](./agent-frameworks/tersa.md)                               | vercel-labs/tersa — Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars) | 2026-03-06   |
 | [everything-claude-code.md](./agent-frameworks/everything-claude-code.md) | Everything Claude Code — comprehensive performance optimization system: 16 specialized agents, 65+ skills, hook-based automation, token optimization, 6-language support (50K+ stars, MIT) | 2026-03-10   |
@@ -818,6 +823,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [openai-symphony.md](./coding-agents/openai-symphony.md) | OpenAI Symphony — Elixir-based autonomous coding agent platform (Draft v1 spec) with 8-component architecture (Orchestrator, Workspace Manager, Agent Runner, etc.), issue-tracker-driven workflows, Codex stdio JSON-RPC protocol, and workspace sandboxing invariants (5.5K stars, Apache-2.0) | 2026-03-06   |
 | [claude-replay.md](./coding-agents/claude-replay.md) | claude-replay — zero-dependency CLI to convert Claude Code, Cursor, and Codex transcripts into shareable HTML players; v0.4.0 web editor with 3-panel UI, automatic secret redaction, 60-70% native browser compression, 6 themes (500 stars, MIT) | 2026-03-13   |
 | [stakpak-agent.md](./coding-agents/stakpak-agent.md) | Stakpak Agent — Rust-based DevOps AI agent (11-crate workspace); secret substitution, mTLS MCP, Warden guardrails, autopilot cron scheduling, Slack/Discord/Telegram channels, Claude/GPT/Gemini support, ACP for Zed editor (872 stars, Apache-2.0) | 2026-03-13   |
+| [1code.md](./coding-agents/1code.md) | 1Code — Electron desktop app wrapping Claude Code CLI and OpenAI Codex with git worktree isolation, tRPC router (20 namespaces), SQLite session tracking, MCP plugin management, voice input; Pro/Max tiers for background agents and sync (5.2K stars, MIT) | 2026-03-17   |
 
 **Key Topics**:
 
@@ -976,6 +982,7 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 | [ray.md](./ml-infrastructure/ray.md) | Ray - AI compute engine for scaling Python/ML applications with LLM serving and MCP server deployment (41K+ stars) | 2026-02-05   |
 | [microgpt-playground.md](./ml-infrastructure/microgpt-playground.md) | microgpt Playground - browser-native GPT training and inference demo, zero-dependency JavaScript port of Karpathy's microgpt.py (65 stars) | 2026-02-23   |
 | [trainloop.md](./ml-infrastructure/trainloop.md) | TrainLoop - managed RL fine-tuning platform: 3-line SDK for production signal collection, reward model training (DPO/GRPO), OpenAI-compatible deployment; 50x error reduction reported (YC W25) | 2026-03-12   |
+| [zvec.md](./ml-infrastructure/zvec.md) | zvec - Alibaba's embedded vector database built on Proxima engine; in-process SQLite-style deployment, dense+sparse vectors, Python/Node.js/C++, Apache 2.0 (8.9K stars) | 2026-03-15   |
 
 **Key Topics**:
 

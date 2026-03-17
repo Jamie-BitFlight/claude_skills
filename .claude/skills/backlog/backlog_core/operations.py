@@ -55,6 +55,7 @@ from .models import (
     ItemNotFoundError,
     Output,
     SamTask,
+    SamTasksResult,
     ValidationError,
     ViewItemResult,
 )
@@ -1009,8 +1010,18 @@ def _filter_open_items(
     title: str | None,
     status: str | None,
     status_map: dict[int, IssueStatus],
+    type_: str | None = None,
+    topic: str | None = None,
 ) -> list[BacklogItem]:
-    """Apply section, title, and status filters to open_items.
+    """Apply section, title, status, type, and topic filters to open_items.
+
+    type_ performs a case-insensitive exact match against metadata.type.
+    Items missing metadata.type are excluded when type_ filter is active.
+
+    topic performs a case-insensitive substring match against metadata.topic.
+    Items missing metadata.topic are excluded when topic filter is active.
+
+    Filters compose with AND logic.
 
     Returns:
         Filtered list of BacklogItem objects matching all supplied criteria.
@@ -1023,7 +1034,34 @@ def _filter_open_items(
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
         open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+    if type_:
+        type_lower = type_.lower()
+        open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
+    if topic:
+        topic_lower = topic.lower()
+        open_items = [it for it in open_items if it.topic and topic_lower in it.topic.lower()]
     return open_items
+
+
+_TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed"})
+
+
+def _filter_closed_items(items: list[BacklogItem], include_closed: bool) -> list[BacklogItem]:
+    """Filter out items whose local status is a terminal state.
+
+    Terminal states are ``done``, ``resolved``, and ``closed``.
+
+    Args:
+        items: Parsed BacklogItem objects.
+        include_closed: When ``True``, return all items unfiltered.
+
+    Returns:
+        Filtered list excluding terminal-status items, or the original list
+        when ``include_closed`` is ``True``.
+    """
+    if include_closed:
+        return items
+    return [it for it in items if it.status not in _TERMINAL_STATUSES]
 
 
 def _build_list_entry(
@@ -1032,14 +1070,16 @@ def _build_list_entry(
     """Build the result dict for a single backlog item.
 
     Returns:
-        Dict with section, title, issue, plan, and optional file_path, groomed,
-        status, and milestone fields.
+        Dict with section, title, issue, plan, type, topic, and optional
+        file_path, groomed, status, and milestone fields.
     """
     entry: dict[str, str | bool] = {
         "section": item.section,
         "title": item.title,
         "issue": item.issue,
         "plan": item.plan,
+        "type": item.type_,
+        "topic": item.topic,
     }
     if item.file_path:
         entry["file_path"] = item.file_path
@@ -1061,6 +1101,9 @@ def list_items(
     section: str | None = None,
     status: str | None = None,
     title: str | None = None,
+    type_: str | None = None,
+    topic: str | None = None,
+    include_closed: bool = False,
     repo: str = DEFAULT_REPO,
     output: Output | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
@@ -1073,11 +1116,16 @@ def list_items(
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
         title: Filter items whose title contains this substring (case-insensitive).
+        type_: Filter by metadata.type — case-insensitive exact match (e.g. 'Bug', 'Feature').
+            Items missing metadata.type are excluded when this filter is active.
+        topic: Filter by metadata.topic — case-insensitive substring match.
+            Items missing metadata.topic are excluded when this filter is active.
+        include_closed: When True, include items with terminal status (done, resolved, closed).
         repo: GitHub repo in owner/repo format.
         output: Optional Output collector.
 
     Returns:
-        Dict with items list (each item a dict with section, title, issue, plan,
+        Dict with items list (each item a dict with section, title, issue, plan, type, topic,
         file_path, groomed, and optionally status/milestone).
     """
     out = output or Output()
@@ -1085,8 +1133,9 @@ def list_items(
         refresh_local_cache_from_github(repo, label, output=out)
     items = parse_backlog()
     open_items = [it for it in items if not it.skip and it.section]
+    open_items = _filter_closed_items(open_items, include_closed)
     status_map = batch_fetch_statuses(open_items, repo) if (with_status or status) else {}
-    open_items = _filter_open_items(open_items, section, title, status, status_map)
+    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
     result_items = [_build_list_entry(it, with_status, status_map) for it in open_items]
     return {"items": result_items, "count": len(result_items), **out.to_dict()}
 
@@ -1159,24 +1208,44 @@ def _build_sections_metadata(body: str, show: str | int | None, since: str | Non
 def _paginate_body(data: dict, body: str, offset: int, limit: int) -> None:
     """Apply offset/limit pagination to the ``body`` field of *data* in-place.
 
+    Paginates by entry blocks when the body contains timestamped entry blocks
+    (``<div><sub>…</sub>…</div>``). Falls back to line-based pagination for
+    plain-text bodies that contain no entry blocks.
+
     Args:
         data: Mutable result dict whose ``body`` key will be replaced.
         body: Original (unpaginated) body text.
-        offset: Number of leading lines to skip.
-        limit: Maximum lines to keep (0 = unlimited).
+        offset: Number of leading entry blocks (or lines) to skip.
+        limit: Maximum entry blocks (or lines) to keep (0 = unlimited).
     """
-    lines = body.splitlines()
-    total = len(lines)
-    if offset > 0:
-        lines = lines[offset:]
-    if limit > 0:
-        lines = lines[:limit]
-    data["body"] = "\n".join(lines)
-    remaining = total - offset - len(lines)
-    if remaining > 0:
-        data["body_truncated"] = True
-        data["body_remaining_lines"] = remaining
-        data["body_total_lines"] = total
+    has_entry_blocks = bool(ENTRY_RE.search(body))
+    if has_entry_blocks:
+        # Entry-block aware pagination
+        entries = parse_entries(body, show="all")
+        total = len(entries)
+        sliced = entries[offset:] if offset > 0 else entries
+        if limit > 0:
+            sliced = sliced[:limit]
+        data["body"] = "\n\n".join(e.raw for e in sliced)
+        remaining = total - offset - len(sliced)
+        if remaining > 0:
+            data["body_truncated"] = True
+            data["body_remaining_entries"] = remaining
+            data["body_total_entries"] = total
+    else:
+        # Fallback: line-based pagination for plain-text bodies with no entry blocks
+        lines = body.splitlines()
+        total = len(lines)
+        if offset > 0:
+            lines = lines[offset:]
+        if limit > 0:
+            lines = lines[:limit]
+        data["body"] = "\n".join(lines)
+        remaining = total - offset - len(lines)
+        if remaining > 0:
+            data["body_truncated"] = True
+            data["body_remaining_lines"] = remaining
+            data["body_total_lines"] = total
 
 
 # ---------------------------------------------------------------------------
@@ -1198,8 +1267,10 @@ def view_item(
     Args:
         selector: Issue URL, #N, bare number, or title substring.
         repo: GitHub repo in owner/repo format.
-        offset: Skip N lines from the start of the body.
-        limit: Show at most N body lines (0 = all, no truncation).
+        offset: Skip N entry blocks from the start of the body (falls back to
+            line-based skipping for plain-text bodies with no entry blocks).
+        limit: Show at most N entry blocks (0 = all, no truncation); falls back
+            to line-based limit for plain-text bodies with no entry blocks.
         show: Entry filter forwarded to parse_entries — "all", "last", "first",
               "struck", positive int (first N active), negative int (last N active),
               or a section name string (case-insensitive section filter).
@@ -1800,14 +1871,28 @@ def normalize_items(dry_run: bool = False, output: Output | None = None) -> dict
 
 
 def pull_single_issue(
-    repo_obj: Repository, issue_num: int, filepath: Path | None = None, output: Output | None = None
-) -> Path | None:
+    repo_obj: Repository,
+    issue_num: int,
+    filepath: Path | None = None,
+    output: Output | None = None,
+    diff_mode: bool = False,
+) -> dict[str, Path | str | list[str] | None]:
     """Fetch a GitHub issue and write/update the local cache file.
 
     If filepath is None, derives it from the issue title and priority.
 
+    Args:
+        repo_obj: PyGitHub Repository object.
+        issue_num: GitHub issue number to fetch.
+        filepath: Local path to write. If None, derived from issue title and priority.
+        output: Optional Output collector for messages and warnings.
+        diff_mode: When True, computes a unified diff of old vs new body content and
+            includes it in the return dict under the ``"diff"`` key.
+
     Returns:
-        Path to the local file, or None on failure.
+        Dict with ``"file_path"`` (Path or None on failure) and, when diff_mode is True
+        and the file already existed, ``"diff"`` (unified diff string, may be empty if
+        content was unchanged).
     """
     out = output or Output()
 
@@ -1815,7 +1900,7 @@ def pull_single_issue(
         issue = repo_obj.get_issue(issue_num)
     except GithubException as e:
         out.warn(f"  WARNING: Could not fetch issue #{issue_num}: {e}")
-        return None
+        return {"file_path": None, **out.to_dict()}
 
     fields = issue_to_local_fields(issue)
     # Strip conventional-commit prefix from title (e.g., "feat: Title" -> "Title")
@@ -1829,7 +1914,13 @@ def pull_single_issue(
 
     BACKLOG_DIR.mkdir(parents=True, exist_ok=True)
 
+    diff_str = ""
     if filepath.exists():
+        # Capture old body before update when diff is requested
+        if diff_mode:
+            old_text = filepath.read_text(encoding="utf-8")
+            parts = old_text.split("---", 2)
+            old_body = parts[2].strip() if len(parts) >= MIN_FRONTMATTER_PARTS else old_text
         # Update existing file: overwrite description, body, metadata
         update_item_metadata(
             filepath,
@@ -1848,6 +1939,8 @@ def pull_single_issue(
         )
         # Overwrite body sections from GitHub issue body
         _overwrite_body_from_github(filepath, fields.body)
+        if diff_mode:
+            diff_str = generate_diff(old_body, fields.body)
     else:
         # Create new cache file from GitHub issue
         fm_str = build_backlog_frontmatter(
@@ -1863,11 +1956,14 @@ def pull_single_issue(
         filepath.write_text(fm_str.rstrip() + "\n\n" + fields.body + "\n", encoding="utf-8")
         update_item_metadata(filepath, {"metadata": {"last_synced": now_iso()}}, output=out)
 
-    return filepath
+    result: dict[str, Path | str | list[str] | None] = {"file_path": filepath, **out.to_dict()}
+    if diff_mode:
+        result["diff"] = diff_str
+    return result
 
 
 def pull_by_selector(
-    selector: str, repo: str = DEFAULT_REPO, output: Output | None = None
+    selector: str, repo: str = DEFAULT_REPO, output: Output | None = None, diff: bool = False
 ) -> dict[str, str | list[str] | None]:
     """Pull a single GitHub issue into the local cache by selector.
 
@@ -1876,8 +1972,16 @@ def pull_by_selector(
     For title substrings, finds the local item, reads its issue number,
     then fetches from GitHub.
 
+    Args:
+        selector: Issue number, URL, or title substring.
+        repo: GitHub repository slug (owner/name).
+        output: Optional Output collector for messages and warnings.
+        diff: When True, computes a unified diff of old vs new body content and
+            includes it in the return dict under the ``"diff"`` key.
+
     Returns:
-        Dict with 'file_path' (local path written) and output messages/warnings.
+        Dict with 'file_path' (local path written), output messages/warnings, and
+        optionally 'diff' (unified diff string) when diff=True.
 
     Raises:
         ItemNotFoundError: If selector matches no item in the local cache.
@@ -1886,8 +1990,12 @@ def pull_by_selector(
     out = output or Output()
     issue_num_str = parse_issue_selector(selector)
     if issue_num_str:
-        filepath = pull_single_issue(get_github(repo), int(issue_num_str), output=out)
-        return {"file_path": str(filepath) if filepath else None, **out.to_dict()}
+        result = pull_single_issue(get_github(repo), int(issue_num_str), output=out, diff_mode=diff)
+        filepath = result.get("file_path")
+        ret: dict[str, str | list[str] | None] = {"file_path": str(filepath) if filepath else None, **out.to_dict()}
+        if diff and "diff" in result:
+            ret["diff"] = str(result["diff"])
+        return ret
 
     # Title substring: find item in local cache then pull by its issue number
     items = parse_backlog()
@@ -1903,8 +2011,12 @@ def pull_by_selector(
     if not issue_num_str:
         raise BacklogError(f"Could not parse issue number from '{issue_ref}'")
 
-    filepath = pull_single_issue(get_github(repo), int(issue_num_str), output=out)
-    return {"file_path": str(filepath) if filepath else None, **out.to_dict()}
+    result = pull_single_issue(get_github(repo), int(issue_num_str), output=out, diff_mode=diff)
+    filepath = result.get("file_path")
+    ret = {"file_path": str(filepath) if filepath else None, **out.to_dict()}
+    if diff and "diff" in result:
+        ret["diff"] = str(result["diff"])
+    return ret
 
 
 def pull_items(
@@ -2083,9 +2195,7 @@ def create_sam_task(
     return {"issue_number": issue.number, "title": issue.title, "url": issue.html_url, **out.to_dict()}
 
 
-def get_sam_tasks(
-    parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None
-) -> dict[str, list[dict[str, object]] | int | list[str]]:
+def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None) -> SamTasksResult:
     """Fetch all SAM task sub-issues for a parent story issue.
 
     When GitHub is unavailable, falls back to the local cache file
@@ -2101,11 +2211,6 @@ def get_sam_tasks(
         and output messages.
     """
     out = output or Output()
-    empty: dict[str, list[dict[str, object]] | int] = {
-        "tasks": [],
-        "count": 0,
-        "parent_issue_number": parent_issue_number,
-    }
 
     repo = try_get_github()
     if repo is None:
@@ -2118,23 +2223,43 @@ def get_sam_tasks(
                 cached: dict[str, object] = json.loads(cache_file.read_text(encoding="utf-8"))
                 if cached.get("parent_issue_number") == parent_issue_number:
                     out.warn(f"  WARNING: GitHub unavailable — returning cached tasks from {cache_file.name}")
-                    cached_tasks: list[dict[str, object]] = cached.get("tasks", [])
+                    cached_tasks_raw = cached.get("tasks", [])
+                    cached_tasks: list[dict[str, object]] = (
+                        cached_tasks_raw if isinstance(cached_tasks_raw, list) else []
+                    )  # type: ignore[assignment]
+                    count_raw = cached.get("count", len(cached_tasks))
                     return {
                         "tasks": cached_tasks,
-                        "count": cached.get("count", len(cached_tasks)),
+                        "count": int(count_raw) if isinstance(count_raw, int) else len(cached_tasks),
                         "parent_issue_number": parent_issue_number,
-                        **out.to_dict(),
+                        "messages": out.messages,
+                        "warnings": out.warnings,
+                        "errors": out.errors,
                     }
             except (json.JSONDecodeError, OSError):
                 continue
         out.warn(f"  WARNING: GitHub unavailable and no cache found for parent #{parent_issue_number}")
-        return {**empty, **out.to_dict()}
+        return {
+            "tasks": [],
+            "count": 0,
+            "parent_issue_number": parent_issue_number,
+            "messages": out.messages,
+            "warnings": out.warnings,
+            "errors": out.errors,
+        }
 
     sub_issues = get_task_issues(repo, parent_issue_number, output=out)
     tasks = _sub_issues_to_task_dicts(sub_issues)
     if refresh_cache and tasks and not _write_sam_task_cache(tasks, parent_issue_number):
         out.warn("  WARNING: Could not write SAM task cache — no feature slug found in tasks")
-    return {"tasks": tasks, "count": len(tasks), "parent_issue_number": parent_issue_number, **out.to_dict()}
+    return {
+        "tasks": tasks,
+        "count": len(tasks),
+        "parent_issue_number": parent_issue_number,
+        "messages": out.messages,
+        "warnings": out.warnings,
+        "errors": out.errors,
+    }
 
 
 def update_sam_task_status(

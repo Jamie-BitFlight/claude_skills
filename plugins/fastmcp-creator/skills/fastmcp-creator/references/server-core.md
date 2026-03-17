@@ -2,7 +2,7 @@
 
 How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/server.mdx`, `.claude/worktrees/fastmcp/docs/servers/tools.mdx`, `.claude/worktrees/fastmcp/docs/servers/resources.mdx`, `.claude/worktrees/fastmcp/docs/servers/prompts.mdx`, `.claude/worktrees/fastmcp/docs/servers/context.mdx`, `.claude/worktrees/fastmcp/docs/servers/lifespan.mdx`, `.claude/worktrees/fastmcp/docs/servers/logging.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/server>, <https://gofastmcp.com/servers/tools>, <https://gofastmcp.com/servers/resources>, <https://gofastmcp.com/servers/prompts>, <https://gofastmcp.com/servers/context>, <https://gofastmcp.com/servers/lifespan>, <https://gofastmcp.com/servers/logging> (accessed 2026-03-05); <https://gofastmcp.com/servers/versioning> (accessed 2026-03-17, v3.1 features)
 
 ---
 
@@ -25,14 +25,69 @@ mcp = FastMCP(
 
 PATTERN: Common constructor parameters:
 
+**Identity**
+
 - `name` — human-readable server name (default: `"FastMCP"`)
 - `instructions` — describes the server's purpose to clients
 - `version` — server version string; defaults to FastMCP library version
+- `website_url` — URL to a website with more information (v2.13.0+)
+- `icons` — list of `Icon` representations for the server (v2.13.0+)
+
+**Composition**
+
+- `tools` — list of `Tool | Callable` to register programmatically (alternative to `@mcp.tool`)
 - `auth` — `OAuthProvider | TokenVerifier | None` for HTTP auth
+- `middleware` — list of `Middleware` for cross-cutting concerns (logging, rate limiting, etc.)
+- `providers` — list of `Provider` that supply components dynamically at request time
+- `transforms` — server-level list of `Transform` applied to all components (v3.1.0+)
 - `lifespan` — async context manager for setup/teardown
-- `include_tags` / `exclude_tags` — tag-based component filtering
-- `on_duplicate_tools` — `"error"` (default) | `"warn"` | `"replace"` | `"ignore"`
+
+**Behavior**
+
+- `on_duplicate` — `"warn"` (default) | `"error"` | `"replace"` | `"ignore"`
+- `strict_input_validation` — when `True`, rejects type mismatches instead of coercing (v2.13.0+)
+- `mask_error_details` — when `True`, replaces internal errors with generic messages
 - `list_page_size` — paginate list responses (v3.0.0+, default: `None` = all)
+- `tasks` — enable background task support (default: `False`)
+- `client_log_level` — minimum log level sent to clients (unreleased — expected v3.2.0)
+- `dereference_schemas` — auto-dereference `$ref` in JSON schemas (default: `True`)
+
+**Handlers and Storage**
+
+- `sampling_handler` — custom handler for MCP sampling requests
+- `sampling_handler_behavior` — `"fallback"` (default) | `"always"`
+- `session_state_store` — persistent `AsyncKeyValue` backend for session state (v3.0.0+)
+
+### `transforms=` Parameter (v3.1.0+)
+
+RULE: Pass server-level transforms via the `transforms=` constructor argument rather than calling `add_transform()` after construction when all transforms are known upfront.
+
+```python
+from fastmcp import FastMCP
+from fastmcp.server.transforms.search import BM25SearchTransform
+
+mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
+```
+
+Server-level transforms apply to all components from all providers and run after provider-level transforms. This is distinct from provider-level transforms, which apply only to components from that specific provider.
+
+SOURCE: <https://gofastmcp.com/servers/server> (accessed 2026-03-17)
+
+### `session_state_store` Parameter (v3.0.0+)
+
+By default, session state uses an in-memory store suitable for single-server deployments. For distributed or serverless deployments where multiple machines handle requests, provide a custom `AsyncKeyValue` backend:
+
+```python
+from key_value.aio.stores.redis import RedisStore
+
+mcp = FastMCP("distributed-app", session_state_store=RedisStore(...))
+```
+
+Any backend compatible with the [py-key-value-aio](https://github.com/strawgate/py-key-value) `AsyncKeyValue` protocol works. Supported backends include Redis, DynamoDB, and MongoDB.
+
+CONSTRAINT: State set during `on_initialize` middleware persists to subsequent tool calls when using the same session object (STDIO, SSE, single-server HTTP). For distributed HTTP deployments, state is isolated by the `mcp-session-id` header.
+
+SOURCE: <https://gofastmcp.com/servers/context> (accessed 2026-03-17)
 
 ---
 
@@ -76,6 +131,52 @@ def search_products(query: str, category: str | None = None) -> list[dict]:
 ```
 
 CONSTRAINT: `*args` and `**kwargs` are not supported. FastMCP requires a complete parameter schema.
+
+### Context-Aware Tool Factory Pattern
+
+PATTERN: Use a `Context`-injecting factory function to create per-user tool customizations at request time. This enables user-specific behavior without registering separate tools per user.
+
+```python
+from fastmcp import FastMCP, Context
+from fastmcp.dependencies import CurrentContext
+
+mcp = FastMCP("PersonalizedServer")
+
+@mcp.tool
+async def get_user_tools(ctx: Context = CurrentContext()) -> list[str]:
+    """Return the list of tools available to the current user."""
+    user_id = ctx.client_id or "anonymous"
+    # Customize behavior based on session identity
+    if user_id.startswith("admin:"):
+        return ["search", "delete", "export"]
+    return ["search"]
+
+@mcp.tool
+async def search(query: str, ctx: Context = CurrentContext()) -> list[dict]:
+    """Search with per-user result filtering."""
+    user_id = ctx.client_id or "anonymous"
+    await ctx.info(f"User {user_id} searching: {query}")
+    # Results filtered based on user identity
+    all_results = run_search(query)
+    return [r for r in all_results if user_can_see(user_id, r)]
+```
+
+PATTERN: Use `ctx.get_state()` to build per-session personalization that accumulates across calls.
+
+```python
+@mcp.tool
+async def set_user_preference(key: str, value: str, ctx: Context) -> str:
+    """Store a user preference for this session."""
+    await ctx.set_state(f"pref:{key}", value)
+    return f"Preference '{key}' saved"
+
+@mcp.tool
+async def get_user_preference(key: str, ctx: Context) -> str | None:
+    """Retrieve a user preference for this session."""
+    return await ctx.get_state(f"pref:{key}")
+```
+
+SOURCE: <https://gofastmcp.com/servers/context> (accessed 2026-03-17)
 
 ### Async Tools
 
@@ -417,6 +518,57 @@ mcp = FastMCP(include_tags={"admin"}, exclude_tags={"deprecated"})
 ```
 
 RULE: Exclude tags always take priority over include tags.
+
+---
+
+## Component Versioning (v3.0.0+)
+
+Register multiple implementations of the same tool, resource, or prompt under one identifier. Clients see the highest version by default. Use `VersionFilter` to expose specific ranges.
+
+```python
+from fastmcp import FastMCP
+from fastmcp.server.providers import LocalProvider
+from fastmcp.server.transforms import VersionFilter
+
+components = LocalProvider()
+
+@components.tool(version="1.0")
+def calculate(x: int, y: int) -> int:
+    """Add two numbers."""
+    return x + y
+
+@components.tool(version="2.0")
+def calculate(x: int, y: int, z: int = 0) -> int:
+    """Add two or three numbers."""
+    return x + y + z
+
+# Serve different version ranges to different clients
+api_v1 = FastMCP("API v1", providers=[components])
+api_v1.add_transform(VersionFilter(version_lt="2.0"))
+
+api_v2 = FastMCP("API v2", providers=[components])
+api_v2.add_transform(VersionFilter(version_gte="2.0"))
+```
+
+RULE: For any given component name, either version all implementations or version none. Mixing versioned and unversioned components with the same name raises a `ValueError` at registration time.
+
+### `VersionFilter` Parameters
+
+- `version_gte` — include components at or above this version (inclusive)
+- `version_lt` — include components below this version (exclusive)
+- `include_unversioned` — whether to include unversioned components (default: `True`)
+
+PATTERN: Use `include_unversioned=False` to produce a strictly versioned API surface that excludes any components that have not been given a version tag.
+
+```python
+# Only expose versioned components — unversioned components are hidden
+api_v2 = FastMCP("API v2", providers=[components])
+api_v2.add_transform(VersionFilter(version_gte="2.0", include_unversioned=False))
+```
+
+CONSTRAINT: By default (`include_unversioned=True`), unversioned components pass through all `VersionFilter` instances unaffected. This prevents accidentally hiding existing components when adding version filtering to a mixed codebase. Set `include_unversioned=False` explicitly when you want a clean versioned-only surface.
+
+SOURCE: <https://gofastmcp.com/servers/versioning> (accessed 2026-03-17)
 
 ---
 

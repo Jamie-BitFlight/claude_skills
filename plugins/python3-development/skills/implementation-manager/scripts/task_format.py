@@ -14,6 +14,7 @@ Source references:
 from __future__ import annotations
 
 import re
+import warnings
 from typing import Any
 
 from ruamel.yaml import YAML
@@ -132,6 +133,11 @@ def has_yaml_frontmatter(content: str) -> bool:
 def parse_yaml_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     """Extract YAML frontmatter and markdown body from content.
 
+    .. deprecated::
+        Use ``sam_schema.core.query.load_plan()`` instead.
+        ``parse_yaml_frontmatter`` is superseded by the sam_schema unified reader
+        and will be removed in a future cleanup phase (Phase 4).
+
     Splits content on ``---`` delimiters and parses the YAML section
     between them.
 
@@ -145,6 +151,11 @@ def parse_yaml_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         ValueError: If frontmatter format is invalid or YAML parsing fails.
         TypeError: If parsed YAML is not a mapping.
     """
+    warnings.warn(
+        "parse_yaml_frontmatter is deprecated; use sam_schema.core.query.load_plan() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     parts = content.split("---\n", 2)
     if len(parts) < 3:  # noqa: PLR2004
         msg = "Invalid frontmatter format: expected opening and closing '---' delimiters"
@@ -179,6 +190,12 @@ def parse_yaml_frontmatter(content: str) -> tuple[dict[str, Any], str]:
 def update_yaml_field(content: str, field: str, value: str | int | list[str]) -> str:
     """Update a single field in YAML frontmatter without re-serializing.
 
+    .. deprecated::
+        Use ``sam_schema.core.query.update_status()`` or
+        ``sam_schema.writers.yaml_writer.update_field()`` instead.
+        ``update_yaml_field`` is superseded by the sam_schema writer layer
+        and will be removed in a future cleanup phase (Phase 4).
+
     Uses regex-based line replacement to preserve YAML formatting, field
     ordering, and body content.
 
@@ -193,6 +210,11 @@ def update_yaml_field(content: str, field: str, value: str | int | list[str]) ->
     Raises:
         ValueError: If content does not contain valid YAML frontmatter.
     """
+    warnings.warn(
+        "update_yaml_field is deprecated; use sam_schema.writers.yaml_writer.update_field() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not has_yaml_frontmatter(content):
         msg = "Content does not contain YAML frontmatter"
         raise ValueError(msg)
@@ -275,6 +297,12 @@ def _format_yaml_value(field: str, value: str | int | list[str]) -> str:
 def normalize_status(old_status: str) -> str:
     """Convert any old-format status string to the new hyphenated lowercase format.
 
+    .. deprecated::
+        Use ``sam_schema.core.models.STATUS_MAP`` for status normalization or
+        ``sam_schema.core.query.load_plan()`` which normalizes status during reading.
+        ``normalize_status`` is superseded by sam_schema's normalization layer
+        and will be removed in a future cleanup phase (Phase 4).
+
     Strips emoji characters, checks against STATUS_MAP, and falls back to
     ``not-started`` for unrecognized values.
 
@@ -284,6 +312,11 @@ def normalize_status(old_status: str) -> str:
     Returns:
         Normalized status in new format (one of VALID_STATUSES).
     """
+    warnings.warn(
+        "normalize_status is deprecated; use sam_schema.core.models.STATUS_MAP instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     status_clean = old_status.strip()
 
     # Fast path: already a valid normalized status (e.g. "in-progress", "not-started")

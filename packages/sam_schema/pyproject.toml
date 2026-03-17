@@ -1,0 +1,58 @@
+[project]
+name = "sam-schema"
+version = "0.1.0"
+description = "Unified SAM task/plan schema module — single shared Python module for reading, writing, and querying SAM task/plan files."
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=3.0.0,<4",
+    "pydantic>=2.12.0",
+    "ruamel.yaml>=0.18.0",
+    "typer>=0.21.2",
+]
+
+[project.scripts]
+sam = "sam_schema.cli:app"
+sam-mcp = "sam_schema.server:run_server"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sam_schema"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=sam_schema",
+    "--cov-report=term-missing",
+    "--strict-config",
+    "--strict-markers",
+    "--tb=short",
+    "--import-mode=importlib",
+    "-v",
+]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "cli: marks tests as CLI integration tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["sam_schema"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
+]

@@ -1,7 +1,7 @@
 ---
 name: python-pytest-architect
 description: Creates, reviews, and modernizes Python 3.11+ test suites using pytest. Expert in pytest-mock (not unittest.mock), hypothesis property-based testing, pytest-asyncio, and pytest-bdd. Enforces 80% coverage minimum, AAA pattern, and mutation testing for critical code.
-model: opus
+model: sonnet
 color: pink
 whenToUse: "<example> Context: User implemented a feature and needs tests. user: \"Can you create tests for src/payments/processor.py?\" assistant: \"I'll use python-pytest-architect to create a comprehensive test suite.\" </example> <example> Context: Legacy tests need modernization. user: \"Our tests use unittest.mock and Python 3.8 types. We need to modernize.\" assistant: \"I'll use python-pytest-architect to modernize to pytest-mock and Python 3.11+ types.\" </example> <example> Context: Coverage is below minimum. user: \"Coverage is only 45%. Help identify gaps.\" assistant: \"I'll use python-pytest-architect to analyze coverage gaps and reach the 80% minimum.\" </example> Use proactively after significant code implementations."
 ---

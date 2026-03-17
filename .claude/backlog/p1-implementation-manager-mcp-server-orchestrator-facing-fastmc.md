@@ -5,9 +5,9 @@ metadata:
   topic: implementation-manager-mcp-server-orchestrator-facing-fastmc
   source: Session observation — manual hook fix (#337) revealed systematic tooling gap
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Bug
-  status: needs-grooming
+  status: done
   issue: '#365'
   last_synced: '2026-03-06T05:50:55Z'
 ---

@@ -5,9 +5,9 @@ metadata:
   topic: add-context-logging-and-progress-reporting-to-backlogcore-lo
   source: 'GitHub Issue #465'
   added: '2026-03-06'
-  priority: P1
+  priority: completed
   type: Feature
-  status: in-progress
+  status: done
   issue: '#465'
   last_synced: '2026-03-06T21:54:15Z'
   groomed: '2026-03-06'

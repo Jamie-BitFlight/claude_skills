@@ -22,9 +22,16 @@ For artifact classification rules, divergence thresholds, and annotation formats
 
 ### Step 1: Read Task File and Architecture Spec
 
-1. READ the task file at the provided path
-2. LOCATE the "Context Manifest" section (added by context-gathering agent)
-3. READ the linked architecture spec to understand the original design
+1. READ the task data via sam CLI:
+
+   ```bash
+   uv run sam read P{N} --format json
+   ```
+
+   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), and all task fields.
+
+2. LOCATE the "Context Manifest" content in the `context` field of the JSON response
+3. READ the linked architecture spec (path in the `architecture` field of the JSON response)
 
 ### Step 2: Analyze Implementation for Discoveries
 
@@ -54,7 +61,13 @@ Look for:
 
 ### Step 4: Update Format (ONLY if needed)
 
-Append to the existing Context Manifest in the task file:
+Append the discoveries to the plan's context via sam CLI:
+
+```bash
+uv run sam update P{N} --append-section "Discovered During Implementation" --section-content "..."
+```
+
+Do NOT use the Edit or Write tool on the task file. The section content to append follows this structure:
 
 ```markdown
 ### Discovered During Implementation
@@ -115,28 +128,32 @@ For each divergence found:
 
 ### Step 8: Annotate Plan Artifacts
 
-If divergences were found, append a `## Post-Implementation Annotations` section to the feature-context file and architect spec file. Use the annotation format:
+If divergences were found, append a `## Post-Implementation Annotations` section to the feature-context file and architect spec file using the sam CLI:
 
-````markdown
-## Post-Implementation Annotations
+```bash
+uv run sam update P{N} --append-section "Post-Implementation Annotations" --section-content "..."
+```
 
-_Added by context-refinement agent on {date}_
+Do NOT use the Edit or Write tool on the plan artifact files. The section content follows this format:
+
+```text
+Added by context-refinement agent on {date}
 
 ### Design Refinements
 
-1. **{Title}**: {Description of what changed and why}
+1. {Title}: {Description of what changed and why}
    - Original: "{quoted from plan}"
    - Actual: "{what was implemented}"
    - Recorded in: {task file path}, DN-{N}
 
 ### Intent Divergences Requiring Review
 
-1. **{Title}**: {Description of how implementation diverges from human intent}
+1. {Title}: {Description of how implementation diverges from human intent}
    - Human intent: "{quoted from backlog item or grooming output}"
    - Actual: "{what was implemented}"
    - Recorded in: {task file path}, DN-{N}
-   - **Action needed**: Human review required
-````
+   - Action needed: Human review required
+```
 
 If no intent divergences are found, omit the `### Intent Divergences Requiring Review` subsection.
 

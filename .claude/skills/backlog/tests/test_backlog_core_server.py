@@ -188,6 +188,28 @@ async def test_backlog_list_passes_new_filter_params():
     assert call_kwargs["title"] == "auth"
 
 
+async def test_backlog_list_passes_type_and_topic_params():
+    """backlog_list forwards type_ and topic filter params to list_items."""
+    op_result = {"items": []}
+    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+        await _call("backlog_list", {"type": "Bug", "topic": "auth"})
+
+    call_kwargs = mock_list.call_args.kwargs
+    assert call_kwargs["type_"] == "Bug"
+    assert call_kwargs["topic"] == "auth"
+
+
+async def test_backlog_list_type_and_topic_default_to_none():
+    """backlog_list passes type_ and topic as None when not provided."""
+    op_result = {"items": []}
+    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+        await _call("backlog_list", {})
+
+    call_kwargs = mock_list.call_args.kwargs
+    assert call_kwargs["type_"] is None
+    assert call_kwargs["topic"] is None
+
+
 async def test_backlog_list_backlog_error_returns_error_key():
     """backlog_list catches BacklogError and includes error key in response."""
     with patch("backlog_core.operations.list_items", side_effect=BacklogError("backlog dir missing")):
@@ -600,6 +622,33 @@ async def test_backlog_pull_selector_error_returns_error_key():
     assert response["error"] == "item not found"
 
 
+async def test_backlog_pull_single_diff_true_returns_diff_field():
+    """backlog_pull with diff=True on a single item returns non-empty 'diff' field."""
+    op_result = {"file_path": "/tmp/p1-item.md", "diff": "- old line\n+ new line\n"}
+    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+        response = await _call("backlog_pull", {"selector": "#42", "diff": True})
+
+    # Arrange: pull_by_selector called with diff=True
+    call_kwargs = mock_pull.call_args.kwargs
+    assert call_kwargs["diff"] is True
+    # Assert: diff key present and non-empty in response
+    assert "diff" in response
+    assert response["diff"] == "- old line\n+ new line\n"
+
+
+async def test_backlog_pull_single_diff_false_omits_diff_field():
+    """backlog_pull with diff=False (default) returns no 'diff' field."""
+    op_result = {"file_path": "/tmp/p1-item.md"}
+    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+        response = await _call("backlog_pull", {"selector": "#42"})
+
+    # Arrange: pull_by_selector called with diff=False (default)
+    call_kwargs = mock_pull.call_args.kwargs
+    assert call_kwargs.get("diff", False) is False
+    # Assert: no diff key in response
+    assert "diff" not in response
+
+
 async def test_backlog_pull_no_selector_uses_bulk_pull():
     """backlog_pull without selector calls pull_items (bulk), not pull_by_selector."""
     op_result = {"pulled": 3}
@@ -659,6 +708,41 @@ def test_backlog_view_show_string_int_conversion():
 
     sig = inspect.signature(backlog_view)
     assert "show" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# backlog_list: type and topic parameter schema presence
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_list_type_param_schema():
+    """backlog_list MCP tool schema includes a 'type_' parameter for type filtering.
+
+    Tests: MCP tool parameter schema completeness for type filter.
+    How: Inspect backlog_list function signature for type_ parameter.
+    Why: MCP consumers discover available filters through tool schema introspection.
+    """
+    import inspect
+
+    from backlog_core.server import backlog_list
+
+    sig = inspect.signature(backlog_list)
+    assert "type_" in sig.parameters
+
+
+def test_backlog_list_topic_param_schema():
+    """backlog_list MCP tool schema includes a 'topic' parameter for topic filtering.
+
+    Tests: MCP tool parameter schema completeness for topic filter.
+    How: Inspect backlog_list function signature for topic parameter.
+    Why: MCP consumers discover available filters through tool schema introspection.
+    """
+    import inspect
+
+    from backlog_core.server import backlog_list
+
+    sig = inspect.signature(backlog_list)
+    assert "topic" in sig.parameters
 
 
 # ---------------------------------------------------------------------------

@@ -5,9 +5,9 @@ metadata:
   topic: backloglist-mcp-tool-needs-server-side-filtering-params-titl
   source: Session observation — agents piping JSON through python3 -c
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#330'
   last_synced: '2026-03-01T07:29:05Z'
 ---

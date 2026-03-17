@@ -5,9 +5,9 @@ metadata:
   topic: backlog-system-redesign-github-issues-as-source-of-truth-wit
   source: Session observation — identified during work-backlog-item close workflow for CI failures item
   added: '2026-02-26'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#282'
   groomed: '2026-02-27'
   last_synced: '2026-02-27T12:14:59Z'

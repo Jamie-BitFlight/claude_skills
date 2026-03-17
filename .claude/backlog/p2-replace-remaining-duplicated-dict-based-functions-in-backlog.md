@@ -7,9 +7,9 @@ metadata:
   added: '2026-03-12'
   priority: P2
   type: Refactor
-  status: needs-grooming
+  status: in-progress
   issue: '#669'
-  last_synced: '2026-03-12T12:47:28Z'
+  last_synced: '2026-03-14T15:59:43Z'
   plan: plan/tasks-35-backlog-cli-dedup-followup-1.md
 ---
 

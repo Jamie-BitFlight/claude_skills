@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, TypedDict
 
 import typer
 from rich.console import Console
@@ -41,14 +41,21 @@ _BACKLOG_CORE = Path(__file__).resolve().parents[5] / ".claude" / "skills" / "ba
 if _BACKLOG_CORE.exists():
     sys.path.insert(0, str(_BACKLOG_CORE.parent))
 
-from task_format import (
-    VALID_STATUSES,
-    has_yaml_frontmatter,
-    normalize_status,
-    parse_yaml_frontmatter,
-    resolve_task_id,
-    update_yaml_field,
-)
+# sam_schema is the canonical task/plan schema package.
+# Installed as a workspace dependency in the project venv.
+# Fallback: add packages/ to sys.path for direct-script execution outside the venv.
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+_SAM_PACKAGES_DIR = str(_REPO_ROOT / "packages")
+if _SAM_PACKAGES_DIR not in sys.path:
+    sys.path.insert(0, _SAM_PACKAGES_DIR)
+
+# Import directly from submodules so static type checkers resolve concrete types
+# instead of the lazy ``object`` returned by sam_schema.__getattr__.
+from sam_schema.core.models import STATUS_MAP
+from sam_schema.core.query import claim_task as sam_claim_task, load_plan as sam_load_plan
+
+if TYPE_CHECKING:
+    from sam_schema.core.models import Task as SamTask
 
 app = typer.Typer(
     name="implementation-manager", help="Query and manage feature implementation task status.", no_args_is_help=True
@@ -228,6 +235,28 @@ class TaskDict(TypedDict):
 # =============================================================================
 
 
+def _normalize_status(raw: str) -> str:
+    """Normalize a raw status string to its canonical hyphenated form.
+
+    Checks STATUS_MAP from sam_schema.core.models for known variants
+    (uppercase space-separated, emoji tokens, title markers), then falls
+    back to lowercasing and replacing spaces with hyphens.
+
+    Args:
+        raw: Raw status string (e.g., "NOT STARTED", "in progress", "complete").
+
+    Returns:
+        Canonical hyphenated status string (e.g., "not-started", "in-progress").
+    """
+    stripped = raw.strip()
+    # Direct lookup in sam_schema STATUS_MAP (handles uppercase, emoji, bracket variants)
+    mapped = STATUS_MAP.get(stripped.upper()) or STATUS_MAP.get(stripped)
+    if mapped:
+        return mapped
+    # Fallback: lowercase and replace spaces/underscores with hyphens
+    return stripped.lower().replace(" ", "-").replace("_", "-")
+
+
 def parse_status(status_text: str) -> TaskStatus:
     """Parse task status from various formats.
 
@@ -243,7 +272,7 @@ def parse_status(status_text: str) -> TaskStatus:
     status_stripped = status_text.strip()
 
     # Check YAML frontmatter format first (e.g., "not-started", "in-progress")
-    normalized = normalize_status(status_stripped)
+    normalized = _normalize_status(status_stripped)
     if normalized in _YAML_STATUS_TO_ENUM:
         return _YAML_STATUS_TO_ENUM[normalized]
 
@@ -300,11 +329,6 @@ def parse_dependencies(dep_text: str) -> list[str]:
     return re.findall(bare_pattern, dep_text)
 
 
-# =============================================================================
-# YAML Frontmatter Parsing
-# =============================================================================
-
-
 def _parse_yaml_status(raw_status: str) -> TaskStatus:
     """Convert a YAML frontmatter status string to TaskStatus enum.
 
@@ -314,7 +338,7 @@ def _parse_yaml_status(raw_status: str) -> TaskStatus:
     Returns:
         Corresponding TaskStatus enum member.
     """
-    normalized = normalize_status(raw_status)
+    normalized = _normalize_status(raw_status)
     if normalized in _YAML_STATUS_TO_ENUM:
         return _YAML_STATUS_TO_ENUM[normalized]
     return TaskStatus.NOT_STARTED
@@ -398,204 +422,6 @@ def _status_from_title(title: str, current_status: TaskStatus) -> TaskStatus:
     if "[SKIPPED]" in title_upper or "[WONTFIX]" in title_upper:
         return TaskStatus.SKIPPED
     return current_status
-
-
-def parse_task_from_frontmatter(content: str) -> Task:
-    """Parse a single task from YAML frontmatter content.
-
-    Extracts metadata from the YAML frontmatter block and maps fields
-    to a Task dataclass. Falls back to defaults for missing optional fields.
-
-    Field mapping (YAML field -> Task attribute):
-    - task -> id
-    - title -> name
-    - status -> status (via normalize_status)
-    - agent -> agent
-    - dependencies -> dependencies
-    - priority -> priority
-    - complexity -> complexity
-    - started -> started
-    - completed -> completed
-    - skills -> skills (optional; defaults to [])
-
-    Args:
-        content: File content with YAML frontmatter delimiters.
-
-    Returns:
-        Task object populated from frontmatter metadata.
-
-    Raises:
-        ValueError: If frontmatter is missing required fields (task, title, status).
-    """
-    frontmatter, _body = parse_yaml_frontmatter(content)
-
-    # Normalize task_id -> task for backward compatibility
-    if "task_id" in frontmatter and "task" not in frontmatter:
-        frontmatter["task"] = frontmatter["task_id"]
-
-    # Validate required fields
-    missing = [f for f in ("task", "title", "status") if f not in frontmatter]
-    if missing:
-        msg = f"Missing required YAML frontmatter fields: {', '.join(missing)}"
-        raise ValueError(msg)
-
-    task_id = str(frontmatter["task"])
-    title = str(frontmatter["title"])
-    status = _status_from_title(title, _parse_yaml_status(str(frontmatter["status"])))
-    dependencies = _parse_yaml_dependencies(frontmatter.get("dependencies"))
-    agent = frontmatter.get("agent")
-    if agent is not None:
-        agent = str(agent)
-        if agent.lower() in {"none", "n/a", "-", ""}:
-            agent = None
-
-    raw_priority = frontmatter.get("priority")
-    priority = TaskPriority(int(raw_priority)) if raw_priority is not None else TaskPriority.MEDIUM
-    complexity = str(frontmatter.get("complexity", "medium")).capitalize()
-
-    started = _coerce_timestamp(frontmatter.get("started"))
-    completed = _coerce_timestamp(frontmatter.get("completed"))
-    skills = _parse_yaml_skills(frontmatter.get("skills"))
-
-    return Task(
-        id=task_id,
-        name=title,
-        status=status,
-        dependencies=dependencies,
-        agent=agent,
-        priority=priority,
-        complexity=complexity,
-        started=started,
-        completed=completed,
-        skills=skills,
-    )
-
-
-# =============================================================================
-# Task Parsing
-# =============================================================================
-
-
-def parse_task_content(content: str) -> list[Task]:
-    """Parse task content and extract all tasks.
-
-    Handles two YAML frontmatter formats:
-    - **Single-task**: One ``---`` frontmatter block with ``task:`` and ``status:`` fields.
-    - **Multi-task**: A global manifest block (has ``feature:``, lacks ``task:``/``status:``)
-      followed by embedded per-task frontmatter blocks in the body.
-
-    Returns an empty list if frontmatter is absent or parsing fails.
-
-    Args:
-        content: Raw text content of task file.
-
-    Returns:
-        List of Task objects parsed from the content.
-    """
-    if not has_yaml_frontmatter(content):
-        return []
-
-    try:
-        frontmatter, body = parse_yaml_frontmatter(content)
-    except (ValueError, TypeError) as exc:
-        sys.stderr.write(f"WARNING: YAML frontmatter parsing failed: {exc}\n")
-        return []
-
-    # Detect multi-task file: global manifest block has 'feature:' or 'feature_slug:' but not a task identifier.
-    # Support both 'task:' and 'task_id:' as task identifier fields.
-    has_feature = "feature" in frontmatter or "feature_slug" in frontmatter
-    if has_feature and "task" not in frontmatter and "task_id" not in frontmatter:
-        return _parse_multi_task_body(body)
-
-    # Single-task file: the leading frontmatter IS the task
-    try:
-        task = parse_task_from_frontmatter(content)
-    except (ValueError, TypeError) as exc:
-        sys.stderr.write(f"WARNING: YAML frontmatter parsing failed: {exc}\n")
-        return []
-    return [task]
-
-
-def _parse_multi_task_body(body: str) -> list[Task]:
-    r"""Parse embedded task blocks from body content after a global manifest.
-
-    Splits body on ``\\n---\\n`` boundaries to isolate each YAML block.
-    Only segments containing both ``task:`` and ``status:`` field markers
-    are parsed as tasks; all other segments (markdown prose, HTML comments)
-    are silently skipped.
-
-    Args:
-        body: Content after the global manifest's closing ``---`` delimiter.
-
-    Returns:
-        List of Task objects sorted by natural task ID order.
-    """
-    tasks: list[Task] = []
-    for segment in re.split(r"\n---\n", body):
-        has_task_field = "task:" in segment or "task_id:" in segment
-        if not has_task_field or "status:" not in segment:
-            continue
-        try:
-            task = parse_task_from_frontmatter(f"---\n{segment}\n---\n")
-            tasks.append(task)
-        except (ValueError, TypeError):
-            continue
-    tasks.sort(key=_task_sort_key)
-    return tasks
-
-
-def parse_task_file(file_path: Path) -> list[Task]:
-    """Parse a task file or task directory and extract all tasks.
-
-    Handles both single files and directories:
-    - **File**: Reads content and delegates to parse_task_content.
-    - **Directory**: Discovers all ``.md`` files with YAML frontmatter,
-      parses each as a single task.
-
-    Follows DIP by separating file I/O from parsing logic.
-
-    Args:
-        file_path: Path to the task file or task directory.
-
-    Returns:
-        List of Task objects parsed from the file(s).
-
-    Raises:
-        FileNotFoundError: If the task file does not exist.
-    """
-    if file_path.is_dir():
-        return _parse_task_directory(file_path)
-
-    content = file_path.read_text(encoding="utf-8")
-    return parse_task_content(content)
-
-
-def _parse_task_directory(dir_path: Path) -> list[Task]:
-    """Parse all task files in a directory.
-
-    Each ``.md`` file in the directory is expected to contain a single task
-    with YAML frontmatter. Files without YAML frontmatter are skipped.
-
-    Tasks are sorted by ID using natural sort order (T1, T2, T10, not T1, T10, T2).
-
-    Args:
-        dir_path: Path to directory containing individual task files.
-
-    Returns:
-        List of Task objects from all parseable files in the directory.
-    """
-    tasks: list[Task] = []
-
-    for md_file in sorted(dir_path.glob("*.md")):
-        if not md_file.is_file():
-            continue
-        content = md_file.read_text(encoding="utf-8")
-        parsed = parse_task_content(content)
-        tasks.extend(parsed)
-
-    # Sort tasks by ID using natural sort (numeric part extraction)
-    tasks.sort(key=_task_sort_key)
-    return tasks
 
 
 def _task_sort_key(task: Task) -> tuple[str, int, int]:
@@ -982,6 +808,82 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
 
 
 # =============================================================================
+# sam_schema Adapters
+# =============================================================================
+# These adapter functions convert sam_schema.Task objects to the TaskDict
+# shape expected by CLI JSON output. The key mapping is:
+#   sam_schema.Task.title  ->  TaskDict["name"]   (backward compat)
+#   sam_schema.Task.status ->  TaskDict["status"] (already str via use_enum_values)
+
+
+def _sam_task_to_dict(task: SamTask) -> TaskDict:
+    """Convert a sam_schema Task to a TaskDict for JSON output.
+
+    Preserves the ``name`` key in the output dict for backward compatibility
+    with existing orchestration scripts that parse ``ready_tasks[].name``.
+
+    Args:
+        task: A sam_schema.Task model instance.
+
+    Returns:
+        TaskDict with fields matching the legacy implementation_manager format.
+    """
+    try:
+        priority_val = int(task.priority)
+    except (TypeError, ValueError):
+        priority_val = 3  # TaskPriority.MEDIUM default
+
+    return TaskDict(
+        id=task.id,
+        name=task.title,
+        status=str(task.status),
+        dependencies=list(task.dependencies),
+        agent=task.agent,
+        priority=priority_val,
+        complexity=str(task.complexity).capitalize(),
+        started=task.started.isoformat() if task.started else None,
+        completed=task.completed.isoformat() if task.completed else None,
+        skills=list(task.skills),
+    )
+
+
+def _load_tasks_via_sam(task_file: Path) -> list[Task]:
+    """Load tasks from a plan file via sam_schema and convert to internal Task objects.
+
+    Uses sam_load_plan for parsing, then converts each sam_schema.Task
+    to the internal Task dataclass for use by existing CLI commands.
+
+    Args:
+        task_file: Path to the task file or directory.
+
+    Returns:
+        List of internal Task dataclass objects.
+    """
+    result = sam_load_plan(task_file)
+    tasks: list[Task] = []
+    for st in result.plan.tasks:
+        try:
+            priority = TaskPriority(int(st.priority))
+        except (TypeError, ValueError):
+            priority = TaskPriority.MEDIUM
+        tasks.append(
+            Task(
+                id=st.id,
+                name=st.title,
+                status=_parse_yaml_status(str(st.status)),
+                dependencies=list(st.dependencies),
+                agent=st.agent,
+                priority=priority,
+                complexity=str(st.complexity).capitalize(),
+                started=st.started.isoformat() if st.started else None,
+                completed=st.completed.isoformat() if st.completed else None,
+                skills=list(st.skills),
+            )
+        )
+    return tasks
+
+
+# =============================================================================
 # CLI Commands
 # =============================================================================
 
@@ -1047,7 +949,7 @@ def status(
             }
             console.print(json.dumps(error_output, indent=2))
             raise typer.Exit(1)
-        tasks = parse_task_file(task_file)
+        tasks = _load_tasks_via_sam(task_file)
 
     ready = get_ready_tasks(tasks)
 
@@ -1117,7 +1019,7 @@ def ready_tasks(
             }
             console.print(json.dumps(error_output, indent=2))
             raise typer.Exit(1)
-        tasks = parse_task_file(task_file)
+        tasks = _load_tasks_via_sam(task_file)
 
     ready = get_ready_tasks(tasks)
 
@@ -1132,10 +1034,10 @@ def ready_tasks(
 
 @app.command(name="validate")
 def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
-    """Validate task file frontmatter and structure.
+    """Validate task file structure via sam_schema.
 
-    Supports both YAML frontmatter and legacy markdown formats.
-    Validates required fields, dependency references, and duplicate IDs.
+    Delegates to sam_load_plan for parsing. A file that loads without error
+    passes structural validation. Reports dependency and duplicate-ID errors.
 
     Args:
         project_path: Path to the project root directory.
@@ -1151,7 +1053,13 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
         console.print(json.dumps(error_output, indent=2))
         raise typer.Exit(1)
 
-    tasks = parse_task_file(task_file)
+    try:
+        tasks = _load_tasks_via_sam(task_file)
+    except Exception as exc:
+        output = {"valid": False, "errors": [str(exc)], "warnings": [], "task_count": 0}
+        console.print(json.dumps(output, indent=2))
+        raise typer.Exit(1) from exc
+
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -1162,13 +1070,6 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
         if not task.agent:
             warnings.append(f"Task {task.id} missing Agent field")
 
-        # Validate status is a recognized value
-        normalized = normalize_status(task.status.value)
-        if normalized not in VALID_STATUSES:
-            warnings.append(f"Task {task.id} has non-standard status: {task.status.value}")
-
-        # Priority validation happens at parse time via TaskPriority enum constructor
-
         # Validate dependencies exist
         errors.extend(
             f"Task {task.id} has unknown dependency: Task {dep_id}"
@@ -1177,9 +1078,8 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
         )
 
     # Check for duplicate task IDs
-    task_ids_list = [t.id for t in tasks]
     seen: set[str] = set()
-    for task_id in task_ids_list:
+    for task_id in (t.id for t in tasks):
         if task_id in seen:
             errors.append(f"Duplicate task ID: {task_id}")
         seen.add(task_id)
@@ -1190,158 +1090,6 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
 
     if errors:
         raise typer.Exit(1)
-
-
-def _find_task_section_in_file(content: str, task_id: str) -> tuple[int, int] | None:
-    r"""Locate the byte offsets of the frontmatter block for a given task_id.
-
-    Splits content on ``\\n---\\n`` boundaries and searches each candidate
-    section for a frontmatter block that contains ``task: {task_id}``.
-
-    Args:
-        content: Full file content, potentially containing multiple frontmatter blocks.
-        task_id: Task ID to find (e.g., "T1", "1.1").
-
-    Returns:
-        Tuple of (start, end) character offsets for the entire section
-        (including its ``---\\n`` prefix and ``\\n---\\n`` suffix), or None
-        if no matching section is found.
-    """
-    # Split on "\n---\n" to get candidate sections.
-    # The file starts with "---\n" so parts[0] is empty.
-    separator = "\n---\n"
-    parts = content.split(separator)
-
-    # Reconstruct offsets for each part.
-    offset = 0
-    for part in parts:
-        # The part content is everything between separators.
-        # Reconstruct what the original slice looks like.
-        part_start = offset
-        part_end = offset + len(part)
-
-        # Only consider sections that look like standalone YAML blocks
-        # (i.e., start with a key: value line, not a comment or blank line).
-        stripped = part.strip()
-        if stripped and not stripped.startswith("#") and not stripped.startswith("<!--"):
-            # If the part already starts with "---" it is a self-contained
-            # frontmatter block (first section of a standard single-frontmatter
-            # file).  Wrap only parts that lack their own opening delimiter.
-            if part.startswith(("---\n", "---\r\n")):
-                candidate_content = part if part.endswith("\n---\n") else f"{part}\n---\n"
-            else:
-                candidate_content = f"---\n{part}\n---\n"
-            if has_yaml_frontmatter(candidate_content):
-                try:
-                    fm, _ = parse_yaml_frontmatter(candidate_content)
-                    if resolve_task_id(fm) == task_id:
-                        return (part_start, part_end)
-                except (ValueError, TypeError):
-                    pass
-
-        # Advance offset past this part + the separator.
-        offset = part_end + len(separator)
-
-    return None
-
-
-def _resolve_write_target(task_file_path: Path, task_id: str) -> tuple[Path, str] | None:
-    """Resolve the write target file and its content for a given task_id.
-
-    For directory-based task files, locates the individual ``.md`` file
-    containing the task. For single-file task files with multiple frontmatter
-    blocks, returns the single file.
-
-    Args:
-        task_file_path: Path to the task file or directory.
-        task_id: Task ID to locate.
-
-    Returns:
-        Tuple of (write_target_path, file_content) if the task is found,
-        or None if no file containing the task is found.
-    """
-    if task_file_path.is_dir():
-        # Directory: scan individual .md files for the matching task.
-        for md_file in sorted(task_file_path.glob("*.md")):
-            if not md_file.is_file():
-                continue
-            file_content = md_file.read_text(encoding="utf-8")
-            parsed = parse_task_content(file_content)
-            for task in parsed:
-                if task.id == task_id:
-                    return (md_file, file_content)
-        return None
-
-    # Single file: read once, locate the section containing task_id.
-    file_content = task_file_path.read_text(encoding="utf-8")
-    return (task_file_path, file_content)
-
-
-def _try_claim_part(part: str, task_id: str, timestamp: str) -> str | None:
-    r"""Try to claim task_id in a single frontmatter part.
-
-    Args:
-        part: One section split from the file on ``\\n---\\n``.
-        task_id: Task ID to match.
-        timestamp: UTC ISO 8601 timestamp for the ``started`` field.
-
-    Returns:
-        Updated part string if task_id matched, else None.
-    """
-    if part.startswith(("---\n", "---\r\n")):
-        candidate = part if part.endswith("\n---\n") else f"{part}\n---\n"
-        prefix_len = 0
-    else:
-        candidate = f"---\n{part}\n---\n"
-        prefix_len = len("---\n")
-    if not has_yaml_frontmatter(candidate):
-        return None
-    try:
-        fm, _ = parse_yaml_frontmatter(candidate)
-    except (ValueError, TypeError):
-        return None
-    if resolve_task_id(fm) != task_id:
-        return None
-    updated = update_yaml_field(candidate, "status", "in-progress")
-    if fm.get("started") is None:
-        updated = update_yaml_field(updated, "started", timestamp)
-    return updated[prefix_len : -len("\n---\n")]
-
-
-def _apply_claim_to_content(content: str, task_id: str, timestamp: str) -> str | None:
-    """Apply status and started fields to the section matching task_id.
-
-    For a single-task file (one frontmatter block), updates the block in place.
-    For a multi-task file (multiple frontmatter blocks), locates and updates
-    only the block matching task_id.
-
-    Args:
-        content: Full file content.
-        task_id: Task ID whose frontmatter should be updated.
-        timestamp: UTC ISO 8601 timestamp for the ``started`` field.
-
-    Returns:
-        Updated file content string, or None if task_id was not found.
-    """
-    separator = "\n---\n"
-    parts = content.split(separator)
-    updated_parts: list[str] = []
-    found = False
-
-    for part in parts:
-        stripped = part.strip()
-        if not found and stripped and not stripped.startswith("#") and not stripped.startswith("<!--"):
-            claimed = _try_claim_part(part, task_id, timestamp)
-            if claimed is not None:
-                updated_parts.append(claimed)
-                found = True
-                continue
-        updated_parts.append(part)
-
-    if not found:
-        return None
-
-    return separator.join(updated_parts)
 
 
 def _claim_fail(payload: dict[str, object], exc: BaseException | None = None) -> None:
@@ -1357,49 +1105,6 @@ def _claim_fail(payload: dict[str, object], exc: BaseException | None = None) ->
     raise typer.Exit(1) from exc
 
 
-def _resolve_task_status(file_content: str, task_id: str, task_file_str: str) -> Task:
-    """Parse the task matching task_id and return it, or exit 1.
-
-    Args:
-        file_content: Full text of the task file.
-        task_id: Task ID to locate.
-        task_file_str: File path string for error payloads.
-
-    Returns:
-        Matching Task object with ``status`` populated.
-    """
-    try:
-        tasks = parse_task_content(file_content)
-        if not tasks:
-            section_result = _find_task_section_in_file(file_content, task_id)
-            if section_result is None:
-                _claim_fail({
-                    "claimed": False,
-                    "task_id": task_id,
-                    "reason": "task-not-found",
-                    "task_file": task_file_str,
-                })
-            start_idx, end_idx = section_result  # type: ignore[misc]
-            tasks = parse_task_content(f"---\n{file_content[start_idx:end_idx]}\n---\n")
-        matching_task = next((t for t in tasks if t.id == task_id), None)
-    except (ValueError, TypeError) as exc:
-        _claim_fail(
-            {
-                "claimed": False,
-                "task_id": task_id,
-                "reason": "parse-error",
-                "error": str(exc),
-                "task_file": task_file_str,
-            },
-            exc,
-        )
-        return None  # type: ignore[return-value]  # unreachable
-
-    if matching_task is None:
-        _claim_fail({"claimed": False, "task_id": task_id, "reason": "task-not-found", "task_file": task_file_str})
-    return matching_task  # type: ignore[return-value]
-
-
 @app.command(name="claim-task")
 def claim_task(
     task_file_path: Annotated[
@@ -1409,47 +1114,46 @@ def claim_task(
 ) -> None:
     """Claim a task by atomically transitioning it from not-started to in-progress.
 
-    Performs a read-check-write sequence: reads the task file, verifies the
-    task status is ``not-started``, writes ``status: in-progress`` and
-    ``started: <timestamp>``, then exits 0 with JSON output on success.
-
-    Exits 1 with ``claimed: false`` JSON when the task is not found, already
-    claimed, or the file cannot be parsed or written.
+    Delegates to sam_schema.core.query.claim_task for the atomic read-check-write.
+    Exits 0 with JSON output on success. Exits 1 with ``claimed: false`` JSON
+    when the task is not found, already claimed, or the file cannot be written.
 
     Args:
-        task_file_path: Path to the task file (``.md``) or task directory.
+        task_file_path: Path to the task file (``.md`` or ``.yaml``) or task directory.
         task_id: Task identifier to claim (e.g., ``T1``, ``1.1``).
     """
     task_file_str = str(task_file_path)
-    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    resolved = _resolve_write_target(task_file_path, task_id)
-    if resolved is None:
-        _claim_fail({"claimed": False, "task_id": task_id, "reason": "task-not-found", "task_file": task_file_str})
-
-    write_target, file_content = resolved  # type: ignore[misc]
-    matching_task = _resolve_task_status(file_content, task_id, task_file_str)
-
-    if matching_task.status != TaskStatus.NOT_STARTED:
-        current_status_str = normalize_status(matching_task.status.value)
-        _claim_fail({
-            "claimed": False,
-            "task_id": task_id,
-            "reason": f"already-{current_status_str}",
-            "current_status": current_status_str,
-            "task_file": task_file_str,
-        })
-
-    updated_content = _apply_claim_to_content(file_content, task_id, timestamp)
-    if updated_content is None:
-        _claim_fail({"claimed": False, "task_id": task_id, "reason": "task-not-found", "task_file": task_file_str})
 
     try:
-        write_target.write_text(updated_content, encoding="utf-8")  # type: ignore[union-attr]
+        claimed_task = sam_claim_task(task_file_path, task_id)
+    except KeyError:
+        _claim_fail({"claimed": False, "task_id": task_id, "reason": "task-not-found", "task_file": task_file_str})
+        return  # unreachable; satisfies type checker
+    except ValueError as exc:
+        # sam_claim_task raises ValueError when task is not in not-started status.
+        # Extract the current status from the error message if possible.
+        current_status_str = _normalize_status(str(exc).split("'")[-2]) if "'" in str(exc) else "in-progress"
+        _claim_fail(
+            {
+                "claimed": False,
+                "task_id": task_id,
+                "reason": f"already-{current_status_str}",
+                "current_status": current_status_str,
+                "task_file": task_file_str,
+            },
+            exc,
+        )
+        return  # unreachable; satisfies type checker
     except OSError as exc:
         _claim_fail({"claimed": False, "reason": "write-error", "error": str(exc), "task_file": task_file_str}, exc)
+        return  # unreachable; satisfies type checker
 
-    print(json.dumps({"claimed": True, "task_id": task_id, "started": timestamp, "task_file": task_file_str}))
+    started_str = (
+        claimed_task.started.isoformat()
+        if claimed_task.started
+        else datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    print(json.dumps({"claimed": True, "task_id": task_id, "started": started_str, "task_file": task_file_str}))
     raise typer.Exit(0)
 
 

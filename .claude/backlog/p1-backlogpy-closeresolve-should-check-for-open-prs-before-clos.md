@@ -5,9 +5,9 @@ metadata:
   topic: backlogpy-closeresolve-should-check-for-open-prs-before-clos
   source: Session observation
   added: '2026-02-27'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#312'
 ---
 

@@ -125,14 +125,56 @@ Proceed to Step 2.7 (Set In-Progress Label) with the assembled item, then contin
 
 ### Step 1: Find the Backlog Item
 
-Call the `mcp__backlog__backlog_list` tool and search the `title` field of each entry in the returned dict for a case-insensitive match against the title. Title = `<item_ref/>`+ joined (args after the mode flag `<mode/>`). In interactive mode, title = full `<invocation_args/>`.
+**Bypass:** If `<mode/>` is `#N`, a bare number, or a GitHub issue URL — skip this step entirely and go to Step 1b. Issue-number and URL inputs resolve via `backlog_view` directly; no matching strategy is needed.
+
+Title = `<item_ref/>`+ joined (args after the mode flag `<mode/>`). In interactive mode, title = full `<invocation_args/>`.
 
 **AUTO_MODE with no title (`<item_ref/>` is empty):** apply the "No title given" substitution from the `--auto mode rules` table — scan P0 then P1 sections for the first open item, log and use its title. Skip items with `status: done` or `status: resolved` in their entry (these are filtered out by `backlog_list` already).
 
-- **Zero matches (interactive mode):** report "No backlog item found matching: {title}" and offer to create one via `/create-backlog-item`.
-- **Zero matches (AUTO_MODE):** log `[AUTO] No item found — invoking create-backlog-item --auto {title}`, invoke `Skill(skill: "create-backlog-item", args: "--auto {title}")`, then re-run Step 1.
-- **Multiple matches (interactive mode):** list all matches and ask the user to pick one.
-- **Multiple matches (AUTO_MODE):** log `[AUTO] Multiple matches — picking first: {title}`, proceed with first match.
+Apply the following 3-strategy fallback chain. Move to the next strategy only when the current strategy returns zero matches.
+
+```mermaid
+flowchart TD
+    Start([Title query]) --> S1
+
+    S1["Strategy 1: Substring Match<br>backlog_list(title=query)"] --> R1{Results?}
+    R1 -->|1 match| Done([Use matched item])
+    R1 -->|Multiple matches| Pick[Present list to user<br>or pick first in AUTO_MODE]
+    R1 -->|0 matches| S2
+
+    S2["Strategy 2: Filter-First<br>Derive type_hint and topic_hint from query"] --> Call2["backlog_list(type=type_hint, topic=topic_hint)<br>then substring-match query against returned titles"]
+    Call2 --> R2{Results?}
+    R2 -->|1+ matches| Done2([Use best match])
+    R2 -->|0 matches| S3
+
+    S3["Strategy 3: LLM Semantic Match<br>backlog_list() — all open items"] --> Batch["Present all titles + types + topics to LLM<br>Token budget: 245 items x ~25 tokens/item = ~6125 tokens under 10K"]
+    Batch --> LLM["LLM selects best semantic match<br>from candidate titles"]
+    LLM --> R3{Match found?}
+    R3 -->|Yes| Done3([Use LLM-selected item])
+    R3 -->|No| NoMatch([No match — offer to create via /create-backlog-item])
+```
+
+#### Strategy 2 — Type and Topic Derivation
+
+Derive filter hints from the query before calling `backlog_list`:
+
+- `type_hint`: scan query words for keyword groups (case-insensitive):
+  - `bug`, `fix`, `broken`, `error` → `Bug`
+  - `feature`, `add`, `new`, `implement` → `Feature`
+  - `refactor`, `clean`, `restructure` → `Refactor`
+  - no match → `None` (omit `type` parameter)
+- `topic_hint`: longest non-stop-word from the query, converted to kebab-case slug. If none can be derived, omit the `topic` parameter.
+
+Call `backlog_list(type=type_hint, topic=topic_hint)` (omit any `None` parameters). Then perform a case-insensitive substring match of the original query against the `title` field of each returned entry. Items whose titles contain the query substring are candidates.
+
+#### Strategy 3 — LLM Semantic Match
+
+Call `backlog_list()` with no filters to load all open items. The response includes `title`, `type`, and `topic` per item. Read the full list in the current context and select the item whose title, type, and topic best match the intent of the query. The token cost is bounded: **245 items × ~25 tokens/item ≈ 6,125 tokens (under 10K budget)**. If two or more candidates are plausible, read their per-item files via `backlog_view` before choosing.
+
+#### Zero-match handling after all 3 strategies
+
+- **Interactive mode:** report "No backlog item found matching: {title}" and offer to create one via `/create-backlog-item`.
+- **AUTO_MODE:** log `[AUTO] No item found — invoking create-backlog-item --auto {title}`, invoke `Skill(skill: "create-backlog-item", args: "--auto {title}")`, then re-run Step 1.
 
 Record the priority section (P0, P1, P2, Ideas) the item belongs to.
 
@@ -181,6 +223,7 @@ The groom skill writes groomed content into the per-item file. Capture the groom
 ### Step 4: RT-ICA Checkpoint
 
 <rtica_gate>
+
 Before composing the feature request, verify the groomed content (from item file or groom-backlog-item output) contains an RT-ICA summary. If absent, perform RT-ICA now:
 
 1. **Goal statement** — What completing this item achieves.
@@ -188,32 +231,87 @@ Before composing the feature request, verify the groomed content (from item file
 3. **Availability check** — For each condition: AVAILABLE / DERIVABLE / MISSING.
 4. **Decision** — APPROVED or BLOCKED.
 
-**If BLOCKED:**
+#### Categorization Rule
 
-When RT-ICA blocks, optionally offer ARL human-probing questions (e.g., "What went wrong in the past?", "What references are essential?") to capture invisible knowledge. Add answers to `.claude/domain-knowledge/` with staleness tracking. See [.claude/docs/sdlc-layers/arl-human-probing-design.md](../../docs/sdlc-layers/arl-human-probing-design.md).
+RT-ICA assesses INFORMATION completeness — "do we know enough to plan?"
 
-Present a structured summary to the user:
+- **AVAILABLE** — information exists and is verified
+- **DERIVABLE** — information can be obtained from the codebase using tools
+- **MISSING** — information we lack that cannot be obtained with tools and requires a human decision
+
+MISSING means "we lack information that prevents planning." Implementation deliverables are NOT MISSING conditions. A condition like "sam create command exists" is a deliverable — it belongs in acceptance criteria. The RT-ICA question is "do we know what sam create needs to do?" — and if yes, it is AVAILABLE.
+
+#### Self-Resolution Pass (run before marking anything MISSING)
+
+ARL principle: resolve autonomously first, then batch the remainder to the human.
+
+For each DERIVABLE or unknown condition, attempt to resolve using tools (Grep, Read, WebSearch, Bash). Every resolution must cite the tool result. Training data answers are banned for project-specific questions — they produce hallucinations.
+
+```text
+Resolution pass:
+1. For each condition not yet AVAILABLE:
+   a. Attempt tool-based resolution (file read, grep, web fetch, command output)
+   b. Tool result found → AVAILABLE (cite the tool result)
+   c. Only training data available → condition stays on question stack
+   d. No answer found → condition stays on question stack, note what was tried
+2. Conditions resolved → proceed to APPROVED if none remain
+3. Conditions unresolved → proceed to BLOCKED batch presentation
+```
+
+**Training data asymmetry:**
+
+- Generating questions from training data: welcomed — "what are common trade-offs for X?" is a valid question to put on the stack
+- Answering project-specific questions from training data: banned — answers must come from tool results or the human
+
+#### If BLOCKED (unresolved conditions remain after self-resolution pass)
+
+Batch all remaining questions into a single presentation. For each question: include what was tried, what options were found from tool results, and trade-offs derived from those results.
 
 ```text
 RT-ICA: BLOCKED
 
-Missing inputs that prevent SAM planning:
-- {missing condition 1}
-- {missing condition 2}
+The following inputs are needed before SAM planning can proceed.
+I searched for each but could not resolve them autonomously.
 
-Provide these inputs before proceeding. SAM planning will not be invoked with known gaps.
+[Category]:
+- Question: {what is unknown}
+  Tried: {tools used, what they returned}
+  Options found: {a) option with trade-off | b) option with trade-off | c) open-ended}
+
+[Category]:
+- Question: {what is unknown}
+  Tried: {tools used, what they returned}
+  Options found: {a) ... | b) ... | open-ended}
+
+Answer what you can — skip what you don't know. I will continue with whatever arrives.
+SAM planning will not be invoked with unresolved gaps.
 ```
 
-Wait for user response. Do not invoke Step 5 until BLOCKED is resolved.
+After receiving answers: re-check whether remaining conditions can now be derived from the new information. If any remain unresolved, present another batch. Continue until all conditions are AVAILABLE or DERIVABLE.
 
-**If APPROVED:**
+Do not invoke Step 5 until BLOCKED is resolved.
+
+#### If APPROVED
 
 Proceed to Step 5. Carry DERIVABLE items forward as "Assumptions to confirm" in the RT-ICA section of the feature request.
+
 </rtica_gate>
 
 ### Step 5: Compose Feature Request
 
 Build the feature request string for `add-new-feature`. If `--stack` was specified, append a "Stack profile" line. If `--language` is not `python`, invoke the corresponding language plugin (e.g., `/typescript-development:add-new-feature`).
+
+**Impact Radius requirement**: Before composing, read the `## Impact Radius` section from the groomed item file (populated by `groom-backlog-item` Step 3.5). Include it in the feature request so the planner creates tasks for every affected component.
+
+**Ecosystem Completeness Constraint**: The plan produced by `add-new-feature` MUST include tasks for every item listed in the Impact Radius, or explicitly document why an item is excluded. A feature is not complete when the core code works — it is complete when:
+
+- Every upstream producer of the changed interface is updated or verified compatible
+- Every downstream consumer is migrated to use the new interface
+- Every document listed as "will become stale" is updated
+- The old interface is deprecated or removed (if this item replaces something)
+- CI/config files listed in Impact Radius are updated and validated
+
+If the groomed item has no `## Impact Radius` section, trigger `groom-backlog-item` for that item before continuing (Step 3 already handles this for ungroomed items — this handles the case where grooming ran before Step 3.5 existed). Do not skip to Step 6 with a missing impact radius — the planner will produce an incomplete plan.
 
 Template: [step-procedures.md](./references/step-procedures.md#step-5-feature-request-template)
 

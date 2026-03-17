@@ -59,10 +59,22 @@ Parameters:
   section       str|null  optional  Filter by section name  (default: null)
   status        str|null  optional  Filter by status string (e.g. "resolved")  (default: null)
   title         str|null  optional  Filter by title substring  (default: null)
+  type          str|null  optional  Filter by metadata.type — case-insensitive exact match
+                                    e.g. "Bug", "Feature", "Refactor", "Docs", "Chore"
+                                    Items missing metadata.type are excluded when active.
+                                    (default: null)
+  topic         str|null  optional  Filter by metadata.topic — case-insensitive substring match
+                                    Items missing metadata.topic are excluded when active.
+                                    (default: null)
 
-Returns: {items: [{title, priority, issue, plan}], messages, warnings}
+Returns: {items: [{title, priority, issue, plan, type, topic}], messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py list --format json [--with-status]
+         [--type Bug] [--topic matching]
 ```
+
+`type` and `topic` filters compose with AND logic. All active filters must match for an item to
+appear. The `type` and `topic` fields are always present in each returned item dict (may be
+`null` if not set in frontmatter).
 
 ### backlog_view
 

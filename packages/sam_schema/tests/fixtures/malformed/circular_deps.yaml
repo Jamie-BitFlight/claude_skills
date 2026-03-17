@@ -1,0 +1,24 @@
+feature: circular-deps-feature
+version: "1.0"
+description: |
+  This plan has circular dependencies between tasks.
+tasks:
+  - id: T1
+    title: First task in cycle
+    status: not-started
+    dependencies:
+      - T2
+    priority: 1
+    complexity: medium
+    description: |
+      T1 depends on T2, which depends on T1, forming a cycle.
+
+  - id: T2
+    title: Second task in cycle
+    status: not-started
+    dependencies:
+      - T1
+    priority: 1
+    complexity: medium
+    description: |
+      T2 depends on T1, which depends on T2, forming a cycle.

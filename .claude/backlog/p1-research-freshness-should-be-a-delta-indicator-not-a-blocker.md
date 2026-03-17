@@ -5,9 +5,9 @@ metadata:
   topic: research-freshness-should-be-a-delta-indicator-not-a-blocker
   source: User observation during /research-curator session 2026-03-06
   added: '2026-03-06'
-  priority: P1
+  priority: completed
   type: Feature
-  status: in-progress
+  status: done
   issue: '#444'
   last_synced: '2026-03-06T05:50:49Z'
   plan: plan/tasks-24-research-freshness-delta.md

@@ -816,14 +816,20 @@ class TestBuildIssueBodyFromFileDict:
         added = str(scripts_dir) not in sys.path
         if added:
             sys.path.insert(0, str(scripts_dir))
+        MOD_NAME = "backlog_script"
         try:
-            spec = importlib.util.spec_from_file_location("backlog_script", script)
+            spec = importlib.util.spec_from_file_location(MOD_NAME, script)
             assert spec is not None
             assert spec.loader is not None
             mod = importlib.util.module_from_spec(spec)
+            # Register in sys.modules before exec_module so that @dataclass on
+            # Python 3.11 can resolve sys.modules[cls.__module__] during class
+            # construction (AttributeError: 'NoneType' has no attribute '__dict__').
+            sys.modules[MOD_NAME] = mod
             spec.loader.exec_module(mod)
             return mod._build_issue_body_from_file
         finally:
+            sys.modules.pop(MOD_NAME, None)
             if added and str(scripts_dir) in sys.path:
                 sys.path.remove(str(scripts_dir))
 

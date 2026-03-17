@@ -2,7 +2,7 @@
 
 How to run, configure, and deploy FastMCP servers — covers transport selection, CLI usage, HTTP deployment, `fastmcp.json` project configuration, horizontal scaling, and managed hosting via Prefect Horizon.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
@@ -27,7 +27,7 @@ CONSTRAINT: STDIO is correct for local development, Claude Desktop integration, 
 
 CONSTRAINT: SSE transport (`transport="sse"`) exists only for backward compatibility. Use HTTP transport for all new projects.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ### HTTP Transport
 
@@ -53,13 +53,13 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
 ## FastMCP CLI
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 PATTERN: Run a server without modifying source — the CLI automatically finds instances named `mcp`, `server`, or `app`:
 
@@ -97,7 +97,7 @@ fastmcp run server.py --reload --transport http --port 8080
 
 CONSTRAINT: Auto-reload uses stateless mode. For HTTP transport, some bidirectional features like elicitation are not available during reload mode. SSE transport does not support auto-reload.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
@@ -123,13 +123,13 @@ async def status(request: Request) -> JSONResponse:
 
 CONSTRAINT: Custom routes are served by the same web server as the MCP endpoint. The MCP endpoint is at `/mcp/`; custom routes are at the root domain.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
 ## HTTP Deployment
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Direct HTTP Server
 
@@ -208,7 +208,7 @@ CONSTRAINT: `expose_headers=["mcp-session-id"]` is required for browser-based MC
 
 CONSTRAINT: Most MCP clients (Claude Code, Cursor, ChatGPT) do NOT need CORS configuration — they connect server-to-server, not from a browser. Only enable CORS for browser-based debugging tools like MCP Inspector.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Mounting in Web Frameworks
 
@@ -255,7 +255,7 @@ api.mount("/mcp", mcp_app)
 
 CONSTRAINT: Always pass the lifespan from `mcp.http_app()` to the enclosing application. Without it, the session manager does not initialize and requests fail.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Horizontal Scaling
 
@@ -278,7 +278,7 @@ FASTMCP_STATELESS_HTTP=true uvicorn app:app --host 0.0.0.0 --port 8000 --workers
 
 CONSTRAINT: Stateless mode eliminates server-side sessions. Stateful MCP features (elicitation, sampling) are not available in stateless mode.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### SSE Polling for Long-Running Operations
 
@@ -322,13 +322,13 @@ event_store = EventStore(
 app = mcp.http_app(event_store=event_store)
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ---
 
 ## `fastmcp.json` Project Configuration
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/server-configuration.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
 
 RULE: `fastmcp.json` is the canonical way to configure FastMCP projects — prefer it over CLI arguments for reproducible deployments. Available in v2.12.0+.
 
@@ -405,13 +405,224 @@ Deployment configuration fields:
 - `cwd` — working directory for the server process
 - `args` — command-line arguments passed after `--` to the server
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/server-configuration.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
+
+---
+
+## nginx Reverse Proxy
+
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-17)
+
+In production, run your FastMCP server behind nginx for TLS termination, domain routing, and security.
+
+### Running FastMCP as a Linux Service
+
+Create `/etc/systemd/system/fastmcp.service`:
+
+```ini
+[Unit]
+Description=FastMCP Server
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/fastmcp
+ExecStart=/opt/fastmcp/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+Environment="PATH=/opt/fastmcp/.venv/bin"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable fastmcp
+sudo systemctl start fastmcp
+```
+
+### nginx Configuration
+
+Create `/etc/nginx/sites-available/fastmcp`:
+
+```nginx
+server {
+    listen 80;
+    server_name mcp.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name mcp.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/mcp.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mcp.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Required for SSE (Server-Sent Events) streaming
+        proxy_buffering off;
+        proxy_cache off;
+
+        # Allow long-lived connections for streaming responses
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+```
+
+Enable the site:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/fastmcp /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+CONSTRAINT: `proxy_buffering off` is the most critical SSE setting. Without it, nginx buffers the entire event stream and delivers it only when the connection closes, breaking real-time communication. If clients connect but never receive progress updates or streaming tool results, this is the first setting to check.
+
+CONSTRAINT: `proxy_http_version 1.1` and `proxy_set_header Connection ''` are both required. They enable keep-alive connections and prevent clients from sending `Connection: close` to the upstream, which would terminate SSE streams.
+
+CONSTRAINT: Default nginx `proxy_read_timeout` is 60 seconds. Long-running MCP tools will drop the connection. Set to at least 300 seconds; use [SSE Polling](#sse-polling-for-long-running-operations) for tools that may exceed any fixed timeout.
+
+### Subpath Mounting via nginx
+
+To serve the MCP server at a subpath (e.g., `https://example.com/api/mcp`) instead of the root domain, use a trailing slash on both the `location` block and `proxy_pass` — nginx strips the prefix before forwarding:
+
+```nginx
+location /api/ {
+    proxy_pass http://127.0.0.1:8000/;
+    proxy_http_version 1.1;
+    proxy_set_header Connection '';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+}
+```
+
+CONSTRAINT: The trailing `/` on both `location /api/` and `proxy_pass http://127.0.0.1:8000/` is required for prefix stripping. If you omit it from either side, nginx forwards the `/api/` prefix to your server, causing 404 errors on the MCP endpoint.
+
+---
+
+## `FASTMCP_TRANSPORT` Environment Variable
+
+SOURCE: <https://gofastmcp.com/more/settings> (accessed 2026-03-17)
+
+PATTERN: Set `FASTMCP_TRANSPORT` to select the default transport without passing `--transport` on every CLI invocation:
+
+```bash
+export FASTMCP_TRANSPORT=http
+fastmcp run server.py  # Uses HTTP transport by default
+```
+
+Accepted values: `"stdio"` (default), `"http"`, `"sse"`, `"streamable-http"`.
+
+PATTERN: Combine with other environment variables for a fully config-driven deployment:
+
+```bash
+FASTMCP_TRANSPORT=http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=9000 fastmcp run server.py
+```
+
+| Variable | Type | Default | Description |
+| --- | --- | --- | --- |
+| `FASTMCP_TRANSPORT` | `"stdio"`, `"http"`, `"sse"`, `"streamable-http"` | `stdio` | Default transport |
+| `FASTMCP_HOST` | `str` | `127.0.0.1` | Bind address for HTTP |
+| `FASTMCP_PORT` | `int` | `8000` | Bind port for HTTP |
+
+---
+
+## `fastmcp run` — Module Mode (`-m` / `--module`)
+
+SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+
+PATTERN: Run a FastMCP server packaged as a Python module using `-m`/`--module` — equivalent to `python -m my_package.server`:
+
+```bash
+fastmcp run -m my_package.server
+fastmcp run --module my_package.server
+```
+
+CONSTRAINT: Module mode bypasses server object discovery. FastMCP does not import the module to find an `mcp`, `server`, or `app` variable — it delegates entirely to `python -m <module>`. The module is responsible for calling `mcp.run()` itself.
+
+CONSTRAINT: `--transport`, `--host`, `--port`, and `--path` flags are ignored in module mode. The module manages its own server startup. FastMCP logs a warning if these options are passed alongside `-m`.
+
+PATTERN: Use `--reload` with module mode for development auto-reload:
+
+```bash
+fastmcp run -m my_package.server --reload
+```
+
+PATTERN: Inspector support with module mode — the `fastmcp dev inspector` command also accepts `-m`:
+
+```bash
+fastmcp dev inspector -m my_package.server
+```
+
+---
+
+## `fastmcp project prepare` — Pre-Building uv Environments
+
+SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+
+PATTERN: Pre-build a uv environment from a `fastmcp.json` file to separate slow dependency resolution from fast server startup:
+
+```bash
+# Step 1: Build the environment (one-time, performs dependency resolution)
+fastmcp project prepare fastmcp.json --output-dir ./env
+
+# Step 2: Run using the prepared environment (fast, no install step)
+fastmcp run fastmcp.json --project ./env
+```
+
+The prepared directory contains a `pyproject.toml`, `.venv` with all packages installed, and a `uv.lock` for reproducibility.
+
+CONSTRAINT: This is particularly useful in production and CI/CD where you want deterministic, pre-built environments and zero install latency on each run.
+
+---
+
+## `--reload` — Development Auto-Reload
+
+SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+
+PATTERN: Auto-reload watches for file changes and restarts the server automatically (available in FastMCP 3.0.0+):
+
+```bash
+fastmcp run server.py --reload
+
+# Watch specific directories
+fastmcp run server.py --reload --reload-dir ./src --reload-dir ./lib
+
+# Combine with HTTP transport
+fastmcp run server.py --reload --transport http --port 8080
+```
+
+CONSTRAINT: Auto-reload runs the server in stateless mode. For HTTP transport, bidirectional features like elicitation are unavailable during reload mode. SSE transport does not support auto-reload.
+
+CONSTRAINT: `--reload` also works with module mode (`-m`) and the Inspector (`fastmcp dev inspector`). The Inspector has auto-reload enabled by default.
 
 ---
 
 ## Prefect Horizon — Managed Deployment
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/prefect-horizon.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)
 
 PATTERN: [Prefect Horizon](https://horizon.prefect.io) is the fastest path from a FastMCP server to a production URL with built-in OAuth authentication. Free personal tier available.
 
@@ -447,4 +658,4 @@ Horizon features:
 - **Gateway** — role-based access control and audit logs at the tool level
 - **Registry** — catalog of servers across your organization
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/prefect-horizon.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)

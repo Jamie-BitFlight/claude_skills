@@ -5,9 +5,9 @@ metadata:
   topic: migrate-sam-task-tracking-from-local-markdown-files-to-githu
   source: Architecture discussion — session 2026-03-06
   added: '2026-03-06'
-  priority: P1
+  priority: completed
   type: Refactor
-  status: in-progress
+  status: done
   issue: '#480'
   last_synced: '2026-03-06T21:54:09Z'
   groomed: '2026-03-06'

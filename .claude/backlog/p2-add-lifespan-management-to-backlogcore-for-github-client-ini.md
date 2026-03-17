@@ -9,7 +9,7 @@ metadata:
   type: Refactor
   status: needs-grooming
   issue: '#468'
-  last_synced: '2026-03-12T12:48:17Z'
+  last_synced: '2026-03-14T16:00:31Z'
 ---
 
 ## Story

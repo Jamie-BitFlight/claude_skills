@@ -5,9 +5,9 @@ metadata:
   topic: enhance-skill-research-process-for-cli-tool-skills
   source: Session observation
   added: '2026-02-25'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   groomed: '2026-02-25'
   issue: '#197'
   plan: plan/tasks-6-enhance-skill-research-process.md
@@ -134,4 +134,3 @@ The gaps are reproducible and currently present:
 5. **Flat layout absence** — References use subdirectory structure, not flat named files
 
 Evidence files: `.claude/skills/skill-research-process/SKILL.md` (line 4: argument-hint is tool-or-library-name), `agent-prompts.md` (lines 34-39: only web-based sources; lines 63-69: only category/index.md structure)
-

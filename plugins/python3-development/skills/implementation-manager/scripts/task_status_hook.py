@@ -5,8 +5,8 @@ This hook script handles multiple hook events:
 - SubagentStop: Parse prompt for task info, set status to COMPLETE, add Completed timestamp
 - PostToolUse (Write|Edit|Bash): Update LastActivity timestamp using context file
 
-Task files use YAML frontmatter format (detected via ``---`` delimiters),
-updated with update_yaml_field().
+All task file I/O routes through sam_schema (ADR-001 exception: Python API, not CLI
+subprocess, because hooks fire on every tool call and latency matters).
 
 Context File Mechanism:
 - The /start-task command writes task context to .claude/context/active-task-{session_id}.json
@@ -31,12 +31,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from task_format import (
-    has_yaml_frontmatter,
-    normalize_status,
-    parse_yaml_frontmatter,
-    resolve_task_id,
-    update_yaml_field,
+# sam_schema is the canonical task/plan schema package.
+# Installed as a workspace dependency in the project venv.
+# Fallback: add packages/ to sys.path for direct-script execution outside the venv.
+_HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
+_HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
+if _HOOK_SAM_PACKAGES_DIR not in sys.path:
+    sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
+
+# Import directly from submodules for concrete types (avoids lazy __getattr__ object).
+import contextlib
+
+from sam_schema.core.models import TaskStatus as SamTaskStatus
+from sam_schema.core.query import (
+    get_task as sam_get_task,
+    update_plan_fields as sam_update_plan_fields,
+    update_status as sam_update_status,
 )
 
 # Conditionally add backlog_core to sys.path for GitHub sync.
@@ -91,8 +101,8 @@ def extract_task_info_from_args(args: str) -> tuple[Path | None, str | None]:
     task_file_path: Path | None = None
     task_id: str | None = None
 
-    # First part should be the task file path
-    if parts[0].endswith(".md"):
+    # First part should be the task file path (.md or .yaml)
+    if parts[0].endswith((".md", ".yaml")):
         task_file_path = Path(parts[0])
 
     # Look for --task flag or task ID pattern
@@ -122,7 +132,8 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
 
     # Look for /start-task invocation pattern in the prompt
     # Pattern 1: /start-task <path> --task <id>  (literal slash-command)
-    match = re.search(rf"/start-task\s+([^\s]+\.md)(?:\s+--task\s+({_TASK_ID_RE}))?", prompt)
+    # Matches both .md and .yaml task file extensions.
+    match = re.search(rf"/start-task\s+([^\s]+\.(?:md|yaml))(?:\s+--task\s+({_TASK_ID_RE}))?", prompt)
     if match:
         task_file = Path(match.group(1))
         task_id = match.group(2)
@@ -130,9 +141,10 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
 
     # Pattern 2: Skill(skill="start-task", args="<path> --task <id>")
     # The orchestrator invokes start-task via the Skill tool, not as a literal command.
+    # Matches both .md and .yaml task file extensions.
     skill_match = re.search(
         rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
-        rf"([^\s\"']+\.md)(?:\s+--task\s+({_TASK_ID_RE}))?"
+        rf"([^\s\"']+\.(?:md|yaml))(?:\s+--task\s+({_TASK_ID_RE}))?"
         rf'["\']',
         prompt,
     )
@@ -212,154 +224,6 @@ def delete_task_context(cwd: Path, session_id: str) -> None:
         context_file.unlink()
 
 
-def _find_yaml_task_file(directory: Path, task_id: str) -> Path | None:
-    """Find an individual task file whose YAML frontmatter matches a task ID.
-
-    Scans ``.md`` files in the given directory for one whose ``task`` frontmatter
-    field equals *task_id*.
-
-    Args:
-        directory: Directory to search for task files.
-        task_id: Task ID to match against the ``task`` frontmatter field.
-
-    Returns:
-        Path to the matching file, or None if no match found.
-    """
-    for md_file in sorted(directory.glob("*.md")):
-        try:
-            file_content = md_file.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if not has_yaml_frontmatter(file_content):
-            continue
-        try:
-            frontmatter, _ = parse_yaml_frontmatter(file_content)
-        except (ValueError, TypeError):
-            continue
-        # COMPAT(issue=#497, remove_when="all task files migrated to task_id: field", added=2026-03-07)
-        if (resolve_task_id(frontmatter) or "") == task_id:
-            return md_file
-    return None
-
-
-def find_task_section(content: str, task_id: str) -> tuple[int, int] | None:
-    """Find the start and end line indices for a task section.
-
-    For YAML frontmatter files, checks the ``task`` field in frontmatter.
-    For legacy markdown files, searches for ``## Task <id>:`` headers.
-
-    Args:
-        content: Full content of the task file.
-        task_id: Task ID to find (e.g., "1.1", "T1", "P0-T01").
-
-    Returns:
-        Tuple of (start_line, end_line) indices, or None if not found.
-    """
-    # --- YAML frontmatter format ---
-    if has_yaml_frontmatter(content):
-        try:
-            frontmatter, _ = parse_yaml_frontmatter(content)
-        except (ValueError, TypeError):
-            return None
-        # For individual task files the entire file IS the task
-        # COMPAT(issue=#497, remove_when="all task files migrated to task_id: field", added=2026-03-07)
-        if (resolve_task_id(frontmatter) or "") == task_id:
-            lines = content.split("\n")
-            return 0, len(lines)
-        return None
-
-    # --- Legacy markdown format ---
-    lines = content.split("\n")
-    task_pattern = rf"^##\s+Task\s+{re.escape(task_id)}:\s*"
-
-    start_idx: int | None = None
-    end_idx: int | None = None
-
-    for i, line in enumerate(lines):
-        if re.match(task_pattern, line):
-            start_idx = i
-            continue
-
-        # If we found the start, look for the next task header or end of file
-        if start_idx is not None and re.match(rf"^##\s+Task\s+{_TASK_ID_RE}:", line):
-            end_idx = i
-            break
-
-    if start_idx is not None:
-        # If no next task found, end at file end
-        if end_idx is None:
-            end_idx = len(lines)
-        return start_idx, end_idx
-
-    return None
-
-
-def add_timestamp_to_task(content: str, task_id: str, field_name: str, timestamp: str) -> str:
-    """Add or update a timestamp field in a task section.
-
-    Uses ``update_yaml_field`` to set the field in YAML frontmatter,
-    converting PascalCase field names (e.g., "LastActivity") to snake_case
-    YAML keys (e.g., "last_activity").
-
-    Args:
-        content: Full content of the task file.
-        task_id: Task ID to update.
-        field_name: PascalCase field name (e.g., "Started", "Completed",
-            "LastActivity").
-        timestamp: ISO timestamp string.
-
-    Returns:
-        Updated content with timestamp field added/updated.
-
-    Raises:
-        ValueError: If task section not found or file is not YAML frontmatter format.
-    """
-    # --- YAML frontmatter format ---
-    if has_yaml_frontmatter(content):
-        section = find_task_section(content, task_id)
-        if section is None:
-            raise ValueError(f"Task {task_id} not found in file")
-        field_map: dict[str, str] = {
-            "LastActivity": "last_activity",
-            "Started": "started",
-            "Completed": "completed",
-            "Status": "status",
-        }
-        yaml_field = field_map.get(field_name, field_name.lower())
-        return update_yaml_field(content, yaml_field, timestamp)
-
-    raise ValueError(f"Task {task_id} not found in file")
-
-
-def update_task_status(content: str, task_id: str, new_status: str) -> str:
-    """Update the status field in a task section.
-
-    Normalizes the status value and uses ``update_yaml_field`` to write it
-    to the YAML frontmatter.
-
-    Args:
-        content: Full content of the task file.
-        task_id: Task ID to update.
-        new_status: New status value; normalized by ``normalize_status``
-            before writing (e.g., "complete").
-
-    Returns:
-        Updated content with status changed.
-
-    Raises:
-        ValueError: If task section not found or file is not YAML frontmatter format.
-    """
-    # --- YAML frontmatter format ---
-    if has_yaml_frontmatter(content):
-        section = find_task_section(content, task_id)
-        if section is None:
-            raise ValueError(f"Task {task_id} not found in file")
-        normalized = normalize_status(new_status)
-        return update_yaml_field(content, "status", normalized)
-
-    raise ValueError(f"Task {task_id} not found in file")
-
-
 def get_iso_timestamp() -> str:
     """Get current UTC timestamp in ISO format.
 
@@ -367,30 +231,6 @@ def get_iso_timestamp() -> str:
         ISO formatted timestamp string.
     """
     return datetime.now(UTC).isoformat(timespec="seconds")
-
-
-def _resolve_task_file(full_path: Path, task_id: str) -> tuple[Path, str] | None:
-    """Resolve a task file path, handling both file and directory targets.
-
-    When *full_path* is a directory, searches for an individual ``.md`` file
-    whose YAML ``task`` field matches *task_id*.  When it is a file, returns
-    the path and its content directly.
-
-    Args:
-        full_path: Path that may be a file or directory.
-        task_id: Task ID to locate.
-
-    Returns:
-        Tuple of (resolved_path, file_content), or None if not found.
-    """
-    if full_path.is_dir():
-        resolved = _find_yaml_task_file(full_path, task_id)
-        if resolved is None:
-            return None
-        return resolved, resolved.read_text(encoding="utf-8")
-    if full_path.is_file():
-        return full_path, full_path.read_text(encoding="utf-8")
-    return None
 
 
 def _fallback_to_context_file(hook_input: dict[str, Any]) -> tuple[Path | None, str | None]:
@@ -440,30 +280,22 @@ def get_parent_issue_number(hook_input: dict[str, Any]) -> int | None:
 def sync_completion_to_github(task_file_path: Path, task_id: str, parent_issue_number: int | None) -> None:
     """Sync task completion status to GitHub sub-issue.
 
-    Reads github_issue field from the task YAML frontmatter. If absent, logs
-    a warning to stderr and returns without making any GitHub API call.
+    Reads github_issue field from the task model via sam_schema. If absent,
+    logs a warning to stderr and returns without making any GitHub API call.
     Wraps all GitHub operations in try/except — failure logs a warning to stderr
     and returns without raising. This function is always called after the local
     write succeeds; GitHub failure does not affect hook exit code.
 
     Args:
-        task_file_path: Resolved path to the task YAML file.
+        task_file_path: Path to the plan file or directory.
         task_id: Task ID being completed.
         parent_issue_number: Optional parent story issue number from context file.
     """
     try:
-        # Read github_issue from task YAML frontmatter
+        # Read github_issue from the task model via sam_schema.
         github_issue: int | None = None
-        if task_file_path.is_file():
-            try:
-                file_content = task_file_path.read_text(encoding="utf-8")
-                if has_yaml_frontmatter(file_content):
-                    frontmatter, _ = parse_yaml_frontmatter(file_content)
-                    raw = frontmatter.get("github_issue")
-                    if raw is not None:
-                        github_issue = int(raw)
-            except (ValueError, TypeError, OSError):
-                pass
+        with contextlib.suppress(KeyError, FileNotFoundError, ValueError, OSError):
+            github_issue = sam_get_task(task_file_path, task_id).github_issue
 
         if github_issue is None:
             print(f"[hook] No github_issue field in {task_file_path} — skipping GitHub sync", file=sys.stderr)
@@ -497,7 +329,8 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> None:
     """Handle SubagentStop event - mark task COMPLETE with timestamp.
 
     Parses the sub-agent's prompt to find the /start-task invocation
-    and extracts task file path and task ID.
+    and extracts task file path and task ID. Delegates all file writes
+    to sam_schema.core.query.update_status (handles both .yaml and .md formats).
 
     Args:
         hook_input: Parsed hook input from stdin.
@@ -523,21 +356,14 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> None:
     cwd = Path(hook_input.get("cwd", "."))
     full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path
 
-    resolved = _resolve_task_file(full_path, task_id)
-    if resolved is None:
+    if not full_path.exists():
         print(f"Task file not found: {full_path}", file=sys.stderr)
         sys.exit(2)
 
-    resolved_path, content = resolved
-    timestamp = get_iso_timestamp()
-
     try:
-        # Update status to COMPLETE (normalize_status handles YAML normalization)
-        updated_content = update_task_status(content, task_id, "\u2705 COMPLETE")
-        # Add Completed timestamp
-        updated_content = add_timestamp_to_task(updated_content, task_id, "Completed", timestamp)
-        resolved_path.write_text(updated_content, encoding="utf-8")
-    except ValueError as e:
+        # Single code path for all formats: sam_schema handles .yaml and .md uniformly.
+        sam_update_status(full_path, task_id, SamTaskStatus.COMPLETE, timestamp_field="completed")
+    except (ValueError, KeyError, FileNotFoundError) as e:
         print(str(e), file=sys.stderr)
         sys.exit(2)
 
@@ -547,13 +373,15 @@ def handle_subagent_stop(hook_input: dict[str, Any]) -> None:
         delete_task_context(cwd, session_id)
 
     # Step 5: sync_completion_to_github — best-effort, never changes exit code
-    sync_completion_to_github(resolved_path, task_id, get_parent_issue_number(hook_input))
+    sync_completion_to_github(full_path, task_id, get_parent_issue_number(hook_input))
 
 
 def handle_activity_update(hook_input: dict[str, Any]) -> None:
     """Handle PostToolUse event - update LastActivity timestamp.
 
-    Reads task info from context file and updates the LastActivity field.
+    Reads task info from context file and updates the last-activity field.
+    Delegates all file writes to sam_schema.core.query.update_plan_fields
+    (handles both .yaml and .md formats via a single code path).
 
     Args:
         hook_input: Parsed hook input from stdin.
@@ -574,30 +402,26 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     # Resolve path relative to cwd
     full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path
 
-    resolved = _resolve_task_file(full_path, task_id)
-    if resolved is None:
+    if not full_path.exists():
         # Task file doesn't exist, exit silently
         sys.exit(0)
 
-    resolved_path, content = resolved
-
-    # Guard: skip silently if task is already complete
-    if has_yaml_frontmatter(content):
-        try:
-            frontmatter, _ = parse_yaml_frontmatter(content)
-            current_status = normalize_status(str(frontmatter.get("status", "")))
-            if current_status == "complete":
-                return
-        except (ValueError, TypeError):
-            pass
+    # Guard: skip silently if task is already complete.
+    # sam_get_task raises KeyError if task not found — treat as "not active", exit silently.
+    try:
+        current_task = sam_get_task(full_path, task_id)
+        if current_task.status == SamTaskStatus.COMPLETE:
+            return
+    except (KeyError, FileNotFoundError, ValueError, OSError):
+        sys.exit(0)
 
     timestamp = get_iso_timestamp()
 
     try:
-        updated_content = add_timestamp_to_task(content, task_id, "LastActivity", timestamp)
-        resolved_path.write_text(updated_content, encoding="utf-8")
-    except ValueError:
-        # Task section not found, exit silently
+        # Single code path for all formats: sam_schema handles .yaml and .md uniformly.
+        sam_update_plan_fields(full_path, task_id, set_fields={"last-activity": timestamp})
+    except (ValueError, KeyError, FileNotFoundError):
+        # Task section not found or file unavailable, exit silently
         sys.exit(0)
 
 

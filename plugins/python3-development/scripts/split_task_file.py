@@ -37,15 +37,28 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "skills" / "implementation-manager" / "scripts"))
+_SCRIPTS_DIR = Path(__file__).parent.parent / "skills" / "implementation-manager" / "scripts"
+sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from implementation_manager import Task, parse_task_file
+# sam_schema is the canonical task/plan schema package.
+# Installed as a workspace dependency in the project venv.
+# Fallback: add packages/ to sys.path for direct-script execution outside the venv.
+_SPLIT_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SPLIT_SAM_PACKAGES_DIR = str(_SPLIT_REPO_ROOT / "packages")
+if _SPLIT_SAM_PACKAGES_DIR not in sys.path:
+    sys.path.insert(0, _SPLIT_SAM_PACKAGES_DIR)
+
+from sam_schema.core.query import load_plan as sam_load_plan
+
 from task_format import has_yaml_frontmatter
+
+if TYPE_CHECKING:
+    from sam_schema.core.models import Task as SamTask
 
 app = typer.Typer(
     name="split_task_file", help="Split multi-task file into one-task-per-file directory", no_args_is_help=True
@@ -81,7 +94,7 @@ class TaskWithBody:
         body: Original body content from the monolithic file.
     """
 
-    task: Task
+    task: SamTask
     body: str = ""
 
 
@@ -97,7 +110,7 @@ def _is_metadata_line(line: str) -> bool:
     return any(pat.match(line) for pat in _METADATA_PATTERNS)
 
 
-def _parse_legacy_bodies(content: str, tasks: list[Task]) -> list[TaskWithBody]:
+def _parse_legacy_bodies(content: str, tasks: list[SamTask]) -> list[TaskWithBody]:
     """Extract body content for each task from legacy markdown format.
 
     The body starts after all ``**Field**: value`` metadata lines and continues
@@ -148,7 +161,7 @@ def _parse_legacy_bodies(content: str, tasks: list[Task]) -> list[TaskWithBody]:
     return result
 
 
-def _parse_yaml_multidoc_bodies(content: str, tasks: list[Task]) -> list[TaskWithBody]:
+def _parse_yaml_multidoc_bodies(content: str, tasks: list[SamTask]) -> list[TaskWithBody]:
     """Extract body content for each task from YAML frontmatter format.
 
     Handles files with multiple YAML frontmatter documents concatenated together,
@@ -224,7 +237,7 @@ def parse_tasks_with_body(file_path: Path) -> list[TaskWithBody]:
         FileNotFoundError: If file_path does not exist.
     """
     content = file_path.read_text(encoding="utf-8")
-    tasks = parse_task_file(file_path)
+    tasks = sam_load_plan(file_path).plan.tasks
 
     if not tasks:
         return []
@@ -263,32 +276,32 @@ def slugify(text: str, max_length: int = 50) -> str:
     return slug
 
 
-def generate_task_filename(task: Task) -> str:
+def generate_task_filename(task: SamTask) -> str:
     """Generate filename for task file.
 
     Args:
-        task: Task object with id and name
+        task: SamTask object with id and name
 
     Returns:
         Filename in format: {task-id}-{slug}.md
         Example: T1-data-models.md
     """
-    slug = slugify(task.name)
+    slug = slugify(task.title)
     return f"{task.id}-{slug}.md"
 
 
-def _generate_skeleton_body(task: Task) -> str:
+def _generate_skeleton_body(task: SamTask) -> str:
     """Generate placeholder body content for a task with no body.
 
     Args:
-        task: Task object to generate skeleton for.
+        task: SamTask object to generate skeleton for.
 
     Returns:
         Skeleton markdown body with placeholder sections.
     """
     return (
         "## Context\n\n"
-        f"Task {task.id}: {task.name}\n\n"
+        f"Task {task.id}: {task.title}\n\n"
         "## Objective\n\n"
         "[Task objective to be filled in]\n\n"
         "## Requirements\n\n"
@@ -300,17 +313,17 @@ def _generate_skeleton_body(task: Task) -> str:
     )
 
 
-def write_task_file(task: Task, output_path: Path, body: str = "") -> None:
+def write_task_file(task: SamTask, output_path: Path, body: str = "") -> None:
     """Write single task to file with YAML frontmatter and body content.
 
     Args:
-        task: Task object to write.
+        task: SamTask object to write.
         output_path: Path to output file.
         body: Original body content to preserve. Falls back to skeleton if empty.
     """
     # Build YAML frontmatter
     frontmatter_lines = ["---"]
-    frontmatter_lines.extend((f'task: "{task.id}"', f'title: "{task.name}"'))
+    frontmatter_lines.extend((f'task: "{task.id}"', f'title: "{task.title}"'))
 
     # Status (convert enum value back to hyphenated format)
     status_value = task.status.value.lower().replace(" ", "-")

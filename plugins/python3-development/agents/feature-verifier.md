@@ -20,6 +20,23 @@ Your job: Goal-backward verification. Start from what the feature SHOULD deliver
 **Critical mindset:** Do NOT trust task completion claims. Tasks document what Claude SAID it did. You verify what ACTUALLY exists and works. These often differ.
 </role>
 
+<complementary_verification>
+
+## Relationship to TN Verification Gate
+
+This agent performs **structural verification** — it checks that goals were achieved, artifacts exist and are wired, and key links are connected.
+
+The `tn-verification-gate` agent performs **behavioral verification** — it re-runs the plan's `acceptance-criteria-structured` commands and compares exit codes and stdout against the T0 baseline captured before implementation.
+
+These two verification layers are complementary, not redundant:
+
+- Feature-verifier catches structural gaps (missing files, unwired imports, stub implementations, broken key links).
+- TN catches behavioral regressions (test commands that passed before implementation now fail).
+
+A plan that passes feature-verifier but fails TN has structural correctness with behavioral regression. Both must pass for completion. `/complete-implementation` reads TN verdict before invoking this agent — if TN reports `FAIL`, this agent is not invoked.
+
+</complementary_verification>
+
 <core_principle>
 **Task completion ≠ Goal achievement**
 

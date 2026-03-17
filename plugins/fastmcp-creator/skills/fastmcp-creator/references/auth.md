@@ -2,7 +2,7 @@
 
 How to authenticate requests to FastMCP HTTP servers and authorize access at the component level.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/auth/authentication.mdx`, `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, `.claude/worktrees/fastmcp/docs/servers/authorization.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/auth/authentication>, `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, <https://gofastmcp.com/servers/authorization> (accessed 2026-03-05)
 
 ---
 
@@ -22,7 +22,7 @@ Configure an auth provider by passing it to the `FastMCP` constructor's `auth` p
 mcp = FastMCP(name="My Server", auth=your_auth_provider)
 ```
 
-FastMCP provides four authentication classes:
+FastMCP provides five authentication classes:
 
 | Class | Use Case |
 |-------|----------|
@@ -30,6 +30,7 @@ FastMCP provides four authentication classes:
 | `RemoteAuthProvider` | Identity providers WITH Dynamic Client Registration (DCR) |
 | `OAuthProxy` / `OIDCProxy` | Identity providers WITHOUT DCR (GitHub, Google, Azure, etc.) |
 | `OAuthProvider` | Full self-hosted OAuth 2.1 server (advanced, avoid unless necessary) |
+| `MultiAuth` | Compose multiple token sources (OAuth proxy + JWT verifiers) — v3.1+ |
 
 ---
 
@@ -100,6 +101,18 @@ verifier = IntrospectionTokenVerifier(
 mcp = FastMCP(name="Protected API", auth=verifier)
 ```
 
+PATTERN: Configure client authentication method for introspection. Two methods defined in RFC 6749 are supported — `client_secret_basic` (default, HTTP Basic Auth header) and `client_secret_post` (credentials in POST body):
+
+```python
+verifier = IntrospectionTokenVerifier(
+    introspection_url="https://auth.yourcompany.com/oauth/introspect",
+    client_id="mcp-resource-server",
+    client_secret="your-client-secret",
+    client_auth_method="client_secret_post",  # Default: client_secret_basic
+    required_scopes=["api:read", "api:write"],
+)
+```
+
 ### Development Token Verifiers
 
 ```python
@@ -121,10 +134,23 @@ from fastmcp.server.auth.providers.debug import DebugTokenVerifier
 # Accept any non-empty token (rapid prototyping only)
 verifier = DebugTokenVerifier()
 
-# Or custom validation logic
+# Or custom validation logic (sync)
 verifier = DebugTokenVerifier(
     validate=lambda token: token.startswith("dev-"),
     scopes=["read", "write"],
+)
+```
+
+PATTERN: The `validate` callable can be `async` for database lookups or external service checks:
+
+```python
+async def validate_token(token: str) -> bool:
+    return await redis.exists(f"valid_tokens:{token}")
+
+verifier = DebugTokenVerifier(
+    validate=validate_token,
+    client_id="api-client",
+    scopes=["api:access"],
 )
 ```
 
@@ -215,6 +241,24 @@ auth = OIDCProxy(
 mcp = FastMCP(name="My Server", auth=auth)
 ```
 
+### `verify_id_token` Option for OIDCProxy
+
+PATTERN: Some providers (e.g., certain Azure AD configurations) issue opaque access tokens but standard JWT id_tokens. Use `verify_id_token=True` to verify identity via the id_token while using the access_token for upstream API calls.
+
+SOURCE: <https://gofastmcp.com/changelog> (accessed 2026-03-17)
+
+```python
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
+
+auth = OIDCProxy(
+    config_url="https://login.microsoftonline.com/tenant-id/.well-known/openid-configuration",
+    client_id="your-client-id",
+    client_secret="your-client-secret",
+    base_url="https://your-server.com",
+    verify_id_token=True,  # Use JWT id_token for verification when access_token is opaque
+)
+```
+
 ---
 
 ## Remote OAuth (Providers With DCR)
@@ -234,6 +278,173 @@ mcp = FastMCP(name="Enterprise Server", auth=auth)
 ```
 
 PATTERN: `RemoteAuthProvider` extends `JWTVerifier` with OAuth discovery metadata. MCP clients examine `/.well-known/oauth-protected-resource` to discover which identity provider to use, then authenticate directly with that provider via DCR.
+
+---
+
+## MultiAuth (Multiple Token Sources)
+
+CONSTRAINT: Requires FastMCP v3.1+.
+
+SOURCE: <https://gofastmcp.com/servers/auth/multi-auth> (accessed 2026-03-17)
+
+`MultiAuth` composes an optional OAuth server with one or more `TokenVerifier` instances. When a request arrives, `MultiAuth` tries each source in order and accepts the first successful verification.
+
+**Use case**: Interactive OAuth clients authenticate through the OAuth proxy; backend machine-to-machine services send JWT tokens directly. Both paths validate without separate server instances.
+
+```python
+from fastmcp import FastMCP
+from fastmcp.server.auth import MultiAuth, OAuthProxy
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+auth = MultiAuth(
+    server=OAuthProxy(
+        issuer_url="https://login.example.com/...",
+        client_id="my-app",
+        client_secret="secret",
+        base_url="https://my-server.com",
+    ),
+    verifiers=[
+        JWTVerifier(
+            jwks_uri="https://internal-issuer.example.com/.well-known/jwks.json",
+            issuer="https://internal-issuer.example.com",
+            audience="my-mcp-server",
+        ),
+    ],
+)
+
+mcp = FastMCP("My Server", auth=auth)
+```
+
+PATTERN: The `server` (if provided) owns all OAuth routes and metadata and is tried first. Verifiers contribute only token verification logic — no routes, no metadata. The first match wins; if every source returns `None`, the request receives 401.
+
+**Verification order**:
+1. Server's `verify_token` (if `server` is provided)
+2. Each verifier in `verifiers` list order
+
+### Verifiers-Only Mode (No OAuth Server)
+
+When you only need to accept tokens from multiple JWT issuers and do not need OAuth routes:
+
+```python
+from fastmcp import FastMCP
+from fastmcp.server.auth import MultiAuth
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+auth = MultiAuth(
+    verifiers=[
+        JWTVerifier(
+            jwks_uri="https://issuer-a.example.com/.well-known/jwks.json",
+            issuer="https://issuer-a.example.com",
+            audience="my-server",
+        ),
+        JWTVerifier(
+            jwks_uri="https://issuer-b.example.com/.well-known/jwks.json",
+            issuer="https://issuer-b.example.com",
+            audience="my-server",
+        ),
+    ],
+)
+
+mcp = FastMCP("Multi-Issuer Server", auth=auth)
+```
+
+CONSTRAINT: Without a `server`, no OAuth routes or metadata are served. Appropriate for internal systems where clients already know how to obtain tokens.
+
+### MultiAuth API Reference
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `server` | `AuthProvider \| None` | Optional auth provider that owns routes and OAuth metadata. Tried first for verification. |
+| `verifiers` | `list[TokenVerifier] \| TokenVerifier` | One or more verifiers tried after the server. |
+| `base_url` | `str \| None` | Override base URL. Defaults to the server's `base_url`. |
+| `required_scopes` | `list[str] \| None` | Override required scopes. Defaults to the server's scopes. |
+
+---
+
+## PropelAuth Provider
+
+CONSTRAINT: Requires FastMCP v3.1+.
+
+SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17)
+
+`PropelAuthProvider` is a `RemoteAuthProvider` using PropelAuth's OAuth and token introspection. PropelAuth handles user login, consent management, and Dynamic Client Registration; the FastMCP server validates tokens via introspection.
+
+```python
+import os
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.propelauth import PropelAuthProvider
+
+auth_provider = PropelAuthProvider(
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],                            # From PropelAuth Backend Integration page
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],     # From MCP > Request Validation
+    introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
+    base_url=os.environ["SERVER_URL"],
+    required_scopes=["read:user_data"],  # Optional
+)
+
+mcp = FastMCP(name="My PropelAuth Protected Server", auth=auth_provider)
+```
+
+### PropelAuth Environment Variables
+
+```bash
+PROPELAUTH_AUTH_URL=https://auth.yourdomain.com          # From Backend Integration page
+PROPELAUTH_INTROSPECTION_CLIENT_ID=your-client-id        # From MCP > Request Validation
+PROPELAUTH_INTROSPECTION_CLIENT_SECRET=your-client-secret
+SERVER_URL=http://localhost:8000                          # Your server's base URL
+```
+
+### PropelAuth Advanced Configuration
+
+`token_introspection_overrides` controls in-memory caching of introspection results and request timeouts:
+
+```python
+auth = PropelAuthProvider(
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],
+    introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
+    base_url=os.environ.get("BASE_URL", "https://your-server.com"),
+    required_scopes=["read:user_data"],
+    resource="https://your-server.com/mcp",  # Restrict to tokens for this server (RFC 8707)
+    token_introspection_overrides={
+        "cache_ttl_seconds": 300,    # Cache introspection results for 5 minutes
+        "max_cache_size": 1000,      # Maximum number of cached tokens
+        "timeout_seconds": 15,       # HTTP request timeout
+    },
+)
+```
+
+PATTERN: `cache_ttl_seconds` enables in-memory caching of token introspection results, avoiding a network call on every request for recently-seen tokens.
+
+### PropelAuth: Accessing User Information
+
+Use `get_access_token()` inside tools to identify the authenticated user via their token claims:
+
+```python
+import os
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.propelauth import PropelAuthProvider
+from fastmcp.server.dependencies import get_access_token
+
+auth = PropelAuthProvider(
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],
+    introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
+    base_url=os.environ["SERVER_URL"],
+    required_scopes=["read:user_data"],
+)
+
+mcp = FastMCP(name="My PropelAuth Protected Server", auth=auth)
+
+@mcp.tool
+def whoami() -> dict:
+    """Return the authenticated user's ID."""
+    token = get_access_token()
+    if token is None:
+        return {"error": "Not authenticated"}
+    user_id = token.claims.get("sub")
+    return {"user_id": user_id}
+```
 
 ---
 
@@ -434,7 +645,15 @@ verifier = JWTVerifier(
 mcp = FastMCP(name="Production API", auth=verifier)
 ```
 
-### Connection Pooling for Token Verifiers
+### Connection Pooling for Token Verifiers (`http_client` parameter)
+
+CONSTRAINT: Requires FastMCP v3.1.0+.
+
+SOURCE: <https://gofastmcp.com/servers/auth/token-verification> (accessed 2026-03-17)
+
+All token verifiers that make HTTP calls (`JWTVerifier` with JWKS, `IntrospectionTokenVerifier`, and the convenience providers `GitHubProvider`, `GoogleProvider`, `DiscordProvider`, `WorkOSProvider`, `AzureProvider`) accept an optional `http_client` parameter.
+
+By default, each verification call creates a fresh HTTP connection. Under load, this means repeated TCP connections and TLS handshakes. A shared client enables connection pooling across calls.
 
 PATTERN: Provide a shared `httpx.AsyncClient` to verifiers that make HTTP calls, to enable connection pooling.
 
@@ -455,7 +674,44 @@ verifier = IntrospectionTokenVerifier(
 )
 ```
 
-CONSTRAINT: When you provide `http_client`, you are responsible for its lifecycle. Use the server's `lifespan` to close it on shutdown.
+The same parameter works for `JWTVerifier` with a JWKS endpoint:
+
+```python
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+
+verifier = JWTVerifier(
+    jwks_uri="https://auth.yourcompany.com/.well-known/jwks.json",
+    issuer="https://auth.yourcompany.com",
+    http_client=http_client,
+)
+```
+
+CONSTRAINT: When you provide `http_client`, you are responsible for its lifecycle. The verifier will not close it. Use the server's `lifespan` to close it on shutdown.
+
+```python
+from contextlib import asynccontextmanager
+import httpx
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.introspection import IntrospectionTokenVerifier
+
+http_client = httpx.AsyncClient(timeout=10)
+
+verifier = IntrospectionTokenVerifier(
+    introspection_url="https://auth.example.com/introspect",
+    client_id="my-service",
+    client_secret="secret",
+    http_client=http_client,
+)
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    await http_client.aclose()
+
+mcp = FastMCP(name="My API", auth=verifier, lifespan=lifespan)
+```
+
+CONSTRAINT: `JWTVerifier` does not support `http_client` when `ssrf_safe=True`. SSRF-safe mode uses a hardened transport that cannot be overridden by a user-provided client. Passing both raises `ValueError`.
 
 ---
 
@@ -464,14 +720,20 @@ CONSTRAINT: When you provide `http_client`, you are responsible for its lifecycl
 ```mermaid
 flowchart TD
     Start([Choose auth approach]) --> Q1{Have existing JWT infrastructure?}
-    Q1 -->|Yes| JWT[Use JWTVerifier with JWKS endpoint]
+    Q1 -->|Yes| Q1b{Need tokens from multiple issuers?}
+    Q1b -->|No| JWT[Use JWTVerifier with JWKS endpoint]
+    Q1b -->|Yes| Multi[Use MultiAuth with multiple JWTVerifiers]
     Q1 -->|No| Q2{Using OAuth provider?}
-    Q2 -->|Provider supports DCR<br>Descope / WorkOS AuthKit| Remote[Use RemoteAuthProvider]
-    Q2 -->|Provider does NOT support DCR<br>GitHub / Google / Azure / AWS| Proxy[Use OAuthProxy or OIDCProxy]
+    Q2 -->|Provider supports DCR<br>Descope / WorkOS AuthKit / PropelAuth| Remote[Use RemoteAuthProvider<br>or PropelAuthProvider]
+    Q2 -->|Provider does NOT support DCR<br>GitHub / Google / Azure / AWS| Q2b{Also need JWT for M2M?}
+    Q2b -->|No| Proxy[Use OAuthProxy or OIDCProxy]
+    Q2b -->|Yes| MultiOAuth[Use MultiAuth<br>server=OAuthProxy + verifiers=[JWTVerifier]]
     Q2 -->|Air-gapped or specialized| Full[Use OAuthProvider<br>advanced — avoid]
     JWT --> Done([Configure auth parameter])
+    Multi --> Done
     Remote --> Done
     Proxy --> Done
+    MultiOAuth --> Done
     Full --> Done
 ```
 

@@ -2,7 +2,7 @@
 name: plan-validator
 description: Validates implementation plans BEFORE execution begins. Checks for completeness, contradictions, missing dependencies, and executability. Returns READY or BLOCKED with specific gaps. Prevents wasted effort from flawed plans.
 tools: Read, Grep, Glob, Bash, mcp__sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
-model: opus
+model: haiku
 skills: subagent-contract
 color: green
 ---
@@ -301,6 +301,62 @@ SOURCE: Adapted from gsd-plan-checker.md (Scope Sanity dimension)
 
 **Reference:** Architectural plans should specify interfaces/contracts, leaving implementation details to specialist agents.
 
+## Dimension 10: Impact Radius Coverage
+
+**Question:** Does the task plan cover every file listed in the groomed backlog item's Impact Radius?
+
+**Process:**
+
+1. Locate the backlog item file:
+   - Check the task plan's `issue` frontmatter field for a backlog item path or GitHub issue number
+   - If a path is present, read it directly
+   - If a GitHub issue number is present, search `.claude/backlog/` for a file containing that issue number
+   - If neither is present, skip this dimension and record as `skipped — no backlog item reference`
+2. Extract the Impact Radius section from the backlog item:
+   - Find the section headed `## Impact Radius` or `**Impact Radius**`
+   - Extract the Systems Inventory and all categorized lists: Code Producers, Code Consumers, Documentation, Configuration/CI, Agent Instructions
+   - Each list entry is a file path, glob pattern, or descriptive scope item
+3. For each Impact Radius entry, determine coverage:
+   - **Direct match** — a task's Required Inputs, Expected Outputs, or acceptance criteria explicitly names that file or path
+   - **Category-level match** — a task explicitly states it covers an entire category (e.g., "sync all development-harness agent copies" covers every harness agent file listed under Agent Instructions)
+   - **UNMATCHED** — no task addresses the entry by name or by a covering category task
+4. Apply severity rules:
+   - Entries marked `MUST` or with no qualifier: UNMATCHED → **blocker**
+   - Entries marked `MAYBE`: UNMATCHED → **warning** (must have a verification task OR an exclusion note explaining why it was intentionally skipped)
+5. Report all UNMATCHED entries in the structured issues list
+
+**Red flags:**
+
+- File appears in Impact Radius but no task names it or a covering category
+- MAYBE entry has neither a verification task nor an exclusion note
+- Impact Radius section is present in the backlog item but completely unaddressed in the plan
+
+**Pass criteria:**
+
+- Every MUST/unqualified Impact Radius entry is covered by at least one task (direct or category-level)
+- Every MAYBE entry either has a verification task or an explicit exclusion note in the plan
+- OR: backlog item has no Impact Radius section (dimension not applicable — record as `n/a`)
+
+**Example issue:**
+
+```yaml
+issue:
+  task: null
+  dimension: "impact_radius_coverage"
+  severity: "blocker"
+  description: "Impact Radius lists plugins/development-harness/agents/plan-validator.md but no task covers it"
+  fix_hint: "Add the harness copy to the sync task's Expected Outputs, or add a dedicated sync task"
+```
+
+```yaml
+issue:
+  task: null
+  dimension: "impact_radius_coverage"
+  severity: "warning"
+  description: "MAYBE entry docs/architecture.md has no verification task and no exclusion note"
+  fix_hint: "Add a verification task to confirm docs/architecture.md needs no update, or add exclusion note: 'excluded — doc is auto-generated'"
+```
+
 </validation_dimensions>
 
 <verification_process>
@@ -348,6 +404,7 @@ Execute all dimensions:
 7. Testability
 8. Scope sanity
 9. Boundary compliance
+10. Impact radius coverage
 
 For each check, record:
 
@@ -384,6 +441,7 @@ ARTIFACTS:
   - Tasks validated: {count}
   - Dependencies verified: {count}
   - Agents confirmed: {count}
+  - Impact radius entries checked: {count|skipped|n/a}
 WARNINGS:
   - {warning 1 if any}
 NOTES:
@@ -414,6 +472,7 @@ VALIDATION_RESULTS:
   - Testability: {pass/fail}
   - Scope sanity: {pass/fail}
   - Boundary compliance: {pass/fail}
+  - Impact radius coverage: {pass/fail/skipped/n-a}
 STRUCTURED_ISSUES:
   (See <issue_structure> section for YAML format)
 NEXT_STEP: Plan author should fix blockers, then re-run validation
@@ -437,6 +496,7 @@ Use these categories for gap reporting:
 | **SCOPE**              | Task exceeds feature scope                          |
 | **STRUCTURE**          | Missing required fields                             |
 | **BOUNDARY_VIOLATION** | Plan includes implementation code, not architecture |
+| **IMPACT_RADIUS**      | File in backlog Impact Radius has no covering task  |
 
 </gap_categories>
 
@@ -544,6 +604,7 @@ SOURCE: Adapted from gsd-plan-checker.md (Issue Structure section)
 - [ ] No orphaned outputs (created but never used)
 - [ ] Scope within thresholds (tasks/phase, files/task)
 - [ ] Plans don't include implementation code (interfaces and contracts only)
+- [ ] Every Impact Radius entry covered by a task or marked n/a (no backlog item reference)
 
 **Level 3: Wired - Integration Verification**
 

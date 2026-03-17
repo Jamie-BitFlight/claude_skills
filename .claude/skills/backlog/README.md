@@ -194,17 +194,56 @@ mcp__backlog__backlog_list(
     section="P1",               # filter by priority: P0, P1, P2, Ideas
     status="needs-grooming",    # filter by status value
     title="duplicate",          # filter by title substring
+    type="Bug",                 # filter by metadata.type — case-insensitive exact match
+    topic="matching",           # filter by metadata.topic — case-insensitive substring match
 )
-# Returns: {items: [{title, priority, issue, plan}], messages, warnings}
+# Returns: {items: [{title, priority, issue, plan, type, topic}], messages, warnings}
 ```
+
+`type` and `topic` filters compose with AND logic. Items missing the filtered field are excluded
+when that filter is active. The returned `type` and `topic` fields enable downstream semantic
+matching without a second `backlog_view` call per item.
+
+#### Matching Behavior — 3-Strategy Fallback Chain
+
+`/work-backlog-item` Step 1 uses `backlog_list` as the backing store for a 3-strategy fallback
+chain when resolving a user query to a backlog item:
+
+```mermaid
+flowchart TD
+    Start([Title query]) --> S1["Strategy 1: Substring<br>backlog_list(title=query)"]
+    S1 --> R1{Results?}
+    R1 -->|1 match| Done([Use matched item])
+    R1 -->|Multiple| Pick[Present list to user]
+    R1 -->|0 matches| S2
+
+    S2["Strategy 2: Filter-First<br>Derive type_hint and topic_hint from query"] --> Call2["backlog_list(type=type_hint, topic=topic_hint)<br>then substring-match query against returned titles"]
+    Call2 --> R2{Results?}
+    R2 -->|1+ matches| Done2([Use best match])
+    R2 -->|0 matches| S3
+
+    S3["Strategy 3: LLM Semantic<br>backlog_list() — all open items"] --> LLM["LLM selects best match<br>from all titles, types, topics"]
+    LLM --> R3{Match found?}
+    R3 -->|Yes| Done3([Use LLM-selected item])
+    R3 -->|No| NoMatch([Offer to create via /create-backlog-item])
+```
+
+Strategy 2 derives `type_hint` from keyword groups in the query (`bug`/`fix`/`error` → `Bug`,
+`feature`/`add`/`new` → `Feature`, etc.) and `topic_hint` from the longest non-stop-word.
+Strategy 3 loads all open items and uses the LLM to pick the best semantic match (bounded cost:
+~245 items × ~25 tokens/item ≈ 6,125 tokens).
+
+`/complete-implementation` follow-up routing uses Strategies 1 and 2 only — Strategy 3 is
+excluded because follow-up filenames are machine-derived slugs with low semantic fidelity against
+human-authored backlog titles.
 
 ### `backlog_view` — View one item
 
 ```python
 mcp__backlog__backlog_view(
     selector="#142",            # GitHub issue URL, #N, bare number, or title substring
-    offset=0,                   # skip N lines (pagination)
-    limit=0,                    # show at most N lines (0 = all)
+    offset=0,                   # skip N entry blocks (for pagination)
+    limit=0,                    # show at most N entry blocks (0 = all, no truncation)
 )
 # Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
 ```

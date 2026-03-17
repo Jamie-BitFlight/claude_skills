@@ -60,8 +60,8 @@ View a single backlog item in detail. Supports pagination for long bodies.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `selector` | `str` | required | GitHub issue URL, `#N`, bare number, or title substring |
-| `offset` | `int` | `0` | Skip N lines from body start (pagination) |
-| `limit` | `int` | `0` | Show at most N body lines (`0` = all) |
+| `offset` | `int` | `0` | Skip N entry blocks from body start (for pagination) |
+| `limit` | `int` | `0` | Show at most N entry blocks (`0` = all, no truncation) |
 
 Returns `{title, priority, issue, plan, file_path, body, groomed, messages, warnings}`.
 

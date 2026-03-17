@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Performs holistic code review and validation after feature implementation. Checks that code follows project development standards, utilizes shared utilities instead of reinventing, takes advantage of installed dependencies, and identifies gaps requiring additional tasks. Creates follow-up task files when issues are found. Use after implementation is complete.
-model: opus
+model: sonnet
 permissionMode: acceptEdits
 color: yellow
 skills: python3-development:subagent-contract, python3-development, python3-development:validation-protocol, holistic-linting:holistic-linting
@@ -121,7 +121,8 @@ Look for:
 
 ### Step 6: Create Follow-up Tasks
 
-For each significant issue found, create a task file in `{project_path}/plan/` following the existing task format.
+For each significant issue found, create a follow-up plan file using `sam create --stdin` as
+described in the Task File Format section. Do NOT use the Write tool to create task files.
 </workflow>
 
 ## Review Checklist
@@ -172,70 +173,52 @@ For each significant issue found, create a task file in `{project_path}/plan/` f
 
 ## Task File Format
 
-### Naming Convention (CRITICAL)
+### Creating Follow-up Files with `sam create`
 
-Follow-up task files MUST use this naming pattern for the recursive implementation loop to detect them:
+Use `sam create --stdin` to create follow-up task files. This produces a versioned YAML plan file
+in `plan/` with an auto-assigned plan number.
 
+**Command:**
+
+```bash
+printf 'tasks:\n  - task: "T1"\n    title: "{Brief Title}"\n    status: not-started\n    agent: python-cli-architect\n    dependencies: []\n    priority: {1-5}\n    complexity: {low|medium|high}\n' \
+  | uv run sam create "{feature-slug}-followup-{issue-number}" \
+      --goal "{one-sentence goal describing the fix}" \
+      --stdin \
+      --format json
 ```
-{project_path}/plan/tasks-{N}-{feature-slug}-followup-{issue-number}.md
+
+**Output:** JSON with the created file path:
+
+```json
+{"path": "plan/P005-{feature-slug}-followup-{issue-number}.yaml", "plan_number": 5, "task_count": 1}
 ```
 
-**To determine the naming:**
+**To determine the slug:**
 
-1. READ the original task file path (e.g., `tasks-4-data-validation.md`)
+1. READ the original task file path (e.g., `plan/tasks-4-data-validation.md` or `plan/P004-data-validation.yaml`)
 2. EXTRACT the feature slug (e.g., `data-validation`)
-3. FIND the next available task number N by GLOBbing existing files
-4. CREATE file: `tasks-{N}-{feature-slug}-followup-{issue-number}.md`
+3. PASS `{feature-slug}-followup-{issue-number}` as the slug argument to `sam create`
 
-**Example:** If reviewing `tasks-4-data-validation.md` and finding 2 issues:
+**Example:** If reviewing a `data-validation` plan and finding 2 issues:
 
-- `tasks-5-data-validation-followup-1.md` (first issue)
-- `tasks-6-data-validation-followup-2.md` (second issue)
+```bash
+# Issue 1
+printf 'tasks:\n  - task: "T1"\n    title: "Add missing unit tests for validator"\n    status: not-started\n    agent: python-pytest-architect\n    dependencies: []\n    priority: 2\n    complexity: low\n' \
+  | uv run sam create "data-validation-followup-1" \
+      --goal "Add missing unit tests for the data validation module" \
+      --stdin --format json
 
-### Task File Structure
-
-```yaml
----
-tasks:
-  - task: "Brief description of the fix needed"
-    status: pending
-    parent_task: "{original_task_file_path}"
----
+# Issue 2
+printf 'tasks:\n  - task: "T1"\n    title: "Fix error handling in edge cases"\n    status: not-started\n    agent: python-cli-architect\n    dependencies: []\n    priority: 2\n    complexity: medium\n' \
+  | uv run sam create "data-validation-followup-2" \
+      --goal "Fix error handling in data validation edge cases" \
+      --stdin --format json
 ```
 
-```markdown
-# Task: {Brief Title}
+**Priority values:** 1 (critical) through 5 (low). Complexity: `low`, `medium`, or `high` (lowercase).
 
-## Parent Task
-- Original: `{original_task_file_path}`
-- Review Date: {YYYY-MM-DD}
-
-## Status
-- [ ] Pending
-
-## Priority
-{High/Medium/Low}
-
-## Description
-{What needs to be done and why}
-
-## Acceptance Criteria
-- [ ] {Specific criterion 1}
-- [ ] {Specific criterion 2}
-- [ ] {Specific criterion 3}
-
-## Files to Modify
-- `{file_path}:{line_numbers}` - {what to change}
-
-## Verification Steps
-1. {Command to verify criterion 1}
-2. {Command to verify criterion 2}
-3. {Command to verify criterion 3}
-
-## References
-- Original review: {link to this review}
-- Related code: `{file_path}`
-```
+**IMPORTANT:** Use the `path` value from the JSON output in your ARTIFACTS `Task files:` list.
 
 ## Output Format (MANDATORY)
 

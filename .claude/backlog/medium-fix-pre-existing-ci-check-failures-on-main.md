@@ -5,9 +5,9 @@ metadata:
   topic: fix-pre-existing-ci-check-failures-on-main
   source: Not specified
   added: '2026-02-26'
-  priority: medium
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#281'
   groomed: '2026-02-28'
   last_synced: '2026-02-28T05:33:17Z'

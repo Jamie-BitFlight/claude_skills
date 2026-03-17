@@ -254,70 +254,156 @@ Revision Protocol:
 3. Version Bumping: Update version in YAML frontmatter
 4. Respond to Feedback: Incorporate user corrections to align with evolving vision
 
-## Task Structure Requirements (UPDATED)
+## Task Structure Requirements
 
-Every task in the plan MUST use YAML frontmatter for metadata fields followed by CLEAR-ordered body sections:
+For task field definitions, see [TASK_FILE_FORMAT.md](./../../../.claude/docs/TASK_FILE_FORMAT.md). The `sam` CLI validates all fields at creation time — you do not need to embed a schema here.
 
-````markdown
+**Creating the plan file**: Generate task definitions as YAML, then pipe to `sam create`:
+
+```bash
+echo "$YAML_CONTENT" | uv run sam create {slug} --goal "{goal}" --stdin
+```
+
+Where `$YAML_CONTENT` is a YAML document with the structure:
+
+```yaml
+tasks:
+  - task: T01
+    title: "..."
+    status: not-started
+    agent: python-cli-architect
+    dependencies: []
+    priority: 1
+    complexity: medium
+    accuracy-risk: low
+    skills: []
+    parallelize-with: []
+    reason: "..."
+    handoff: "..."
+acceptance_criteria:
+  - "AC1: ..."
+context: ""
+```
+
+Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering. `sam create` validates required fields and writes the plan file atomically.
+
+## Bookend Task Generation
+
+When the plan's `acceptance-criteria-structured` field is non-empty, automatically generate two bookend tasks: T0 (baseline capture) and TN (verification gate). These bracket all implementation work.
+
+### Condition
+
+Generate bookend tasks when and only when the plan YAML contains a non-empty `acceptance-criteria-structured` list. Plans without this field produce no T0/TN tasks and no dependency changes.
+
+### T0 Task Template
+
+```yaml
 ---
-task: [Task ID]
-title: [Descriptive Name]
+task: T0
+title: "T0: Capture baseline state"
 status: not-started
-agent: [agent-name from architecture spec or inferred from task type]
+agent: t0-baseline-capture
 dependencies: []
-priority: [1-5 based on dependency depth]
-complexity: [low/medium/high based on scope, not time]
-accuracy-risk: [low/medium/high]
+priority: 1
+complexity: low
+is-bookend: true
+bookend-type: t0-baseline
 skills: []
-parallelize-with: []
-reason: [Why parallelization is safe; avoid file conflicts]
-handoff: [What the worker must report back: summary, evidence, blockers]
 ---
 
 ## Context
-[Only what the worker needs; reference specific files/sections]
+T0 runs before any implementation work. It captures the current pass/fail state of every structured acceptance criterion so TN can detect regressions after implementation.
 
 ## Objective
-[One sentence definition of success]
+Run all structured acceptance criteria commands and record baseline results in `plan/T0-baseline-{slug}.yaml`.
 
-## Required Inputs
-- [Architecture doc sections]
-- [Existing code files to reference]
-- [Config/spec/API sources]
-- [Assumptions and how to confirm them]
+## Inputs
+- Plan file: the task file containing `acceptance-criteria-structured` entries
 
 ## Requirements
-1. [Must do]
-2. [Must do]
-
-## Constraints
-- [Must not do]
-- [Guardrails, scope boundaries]
+1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
+2. Record exit code, stdout, stderr, and timestamp per criterion
+3. Write results to `plan/T0-baseline-{slug}.yaml` (one entry per criterion)
 
 ## Expected Outputs
-- [Files created/modified with paths]
-- [Artifacts produced]
+- `plan/T0-baseline-{slug}.yaml`
 
 ## Acceptance Criteria
-1. [Specific, measurable criterion]
-2. [Another verifiable requirement]
+1. `plan/T0-baseline-{slug}.yaml` exists
+2. File contains one entry per structured criterion with exit code, stdout, stderr, timestamp
 
 ## Verification Steps
-1. [How to verify criterion 1]
-2. [How to verify criterion 2]
+1. `cat plan/T0-baseline-{slug}.yaml` and confirm `criteria_count` matches plan
+```
 
-## CoVe Checks (ONLY if accuracy-risk is medium or high)
-- Key claims to verify:
-  - [Claim 1]
-  - [Claim 2]
-- Verification questions (falsifiable):
-  1. [Question 1]
-  2. [Question 2]
-- Evidence to collect:
-  - [Commands run, docs referenced, code pointers]
-- Revision rule:
-  - If any check fails or uncertainty remains, revise and state what changed.
-````
+### TN Task Template
+
+```yaml
+---
+task: T99  # or T{max_task_number + 1} if 99 conflicts with an existing task ID
+title: "TN: Verify implementation against baseline"
+status: not-started
+agent: tn-verification-gate
+dependencies: []  # REQUIRED: populated with all non-bookend task IDs at generation time
+priority: 5
+complexity: low
+is-bookend: true
+bookend-type: tn-verification
+skills: []
+---
+
+## Context
+TN runs after all implementation tasks complete. It re-runs every structured acceptance criterion and compares results against the T0 baseline to detect regressions.
+
+## Objective
+Re-run acceptance criteria and compare against T0 baseline; write verdict to `plan/TN-verification-{slug}.yaml`.
+
+## Inputs
+- Plan file: the task file containing `acceptance-criteria-structured` entries
+- T0 baseline: `plan/T0-baseline-{slug}.yaml`
+
+## Requirements
+1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
+2. Compare exit code against T0 baseline using the 4-cell status matrix
+3. Write per-criterion verdict and overall verdict to `plan/TN-verification-{slug}.yaml`
+4. Overall verdict is PASS only when no criterion has status `regressed`
+
+## Expected Outputs
+- `plan/TN-verification-{slug}.yaml`
+
+## Acceptance Criteria
+1. `plan/TN-verification-{slug}.yaml` exists with overall `verdict: PASS`
+2. No criterion has status `regressed`
+
+## Verification Steps
+1. `cat plan/TN-verification-{slug}.yaml` and confirm `verdict` is `PASS`
+```
+
+### Dependency Rule
+
+Every non-bookend implementation task (any task where `is-bookend` is absent or false) **must include `T0` in its `dependencies` list**. TN's `dependencies` must list all non-bookend task IDs.
+
+When computing TN's dependency list: collect all task IDs in the plan where `is-bookend` is not `true`, then assign that list to TN's `dependencies`.
+
+### ID Assignment Rule
+
+- T0 uses literal ID `T0` (matches the `^[A-Za-z]?\d+(\.\d+)?[A-Za-z]?$` pattern).
+- TN uses ID `T99` by default. If a task with ID `T99` already exists, compute `T{max_numeric_id + 1}` where `max_numeric_id` is the largest integer extracted from existing task IDs.
+- Use `bookend-type` field (`"t0-baseline"` or `"tn-verification"`) for semantic identification — code that needs to find TN should query by `bookend-type`, not by ID.
+
+### Phase 5 Bookend Check
+
+Add to the Phase 5 Plan Validation checklist (check 11):
+
+11. **Bookend presence check** (when `acceptance-criteria-structured` is non-empty):
+    - Exactly one task with `bookend-type: t0-baseline` exists
+    - Exactly one task with `bookend-type: tn-verification` exists
+    - T0 task has `dependencies: []`
+    - TN task's `dependencies` list includes all non-bookend task IDs
+    - Every non-bookend task includes `T0` in its `dependencies`
+    - If any check fails, add or correct the bookend tasks before emitting the plan
+
+---
 
 ## Agent Assignment Rules
 
@@ -332,6 +418,8 @@ Map task types to appropriate specialist agents:
 | Skill creation                                 | agent-creator               |
 | Agent creation                                 | subagent-refactorer         |
 | Orchestration/coordination                     | orchestrator                |
+| Bookend baseline capture (is-bookend: t0-baseline) | t0-baseline-capture     |
+| Bookend verification gate (is-bookend: tn-verification) | tn-verification-gate |
 
 If architecture spec specifies an agent, use that. Otherwise infer from file paths and task type.
 
@@ -463,6 +551,7 @@ In addition to existing requirements:
 - Every task MUST have Verification Steps that are executable or unambiguous
 - If `accuracy-risk` is `medium` or `high`, include CoVe Checks with falsifiable questions
 - Prefer primary sources: repo code, tests, official docs, config schemas
+- **Bookend generation**: After decomposing implementation tasks, check whether the plan's `acceptance-criteria-structured` field is non-empty. If yes, apply the templates and dependency rules defined in the **Bookend Task Generation** section above. Insert T0 before any implementation task and TN after all implementation tasks. Add `T0` to the `dependencies` list of every non-bookend task.
 
 ### Phase 4: Plan Creation (UPDATED)
 

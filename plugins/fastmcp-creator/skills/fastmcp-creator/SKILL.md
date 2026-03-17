@@ -1,7 +1,7 @@
 ---
 name: fastmcp-creator
-description: "Use when building, extending, or debugging FastMCP v3 Python MCP servers — covers tools, resources, prompts, providers, transforms, auth, client SDK, deployment, and testing. Grounded in local v3 docs — zero speculation."
-version: "3.0.0"
+description: "Use when building, extending, or debugging FastMCP v3 Python MCP servers — covers tools, resources, prompts, providers, transforms (including CodeMode and Tool Search), auth (MultiAuth, PropelAuth), client SDK, deployment (nginx reverse proxy), Prefab Apps, and testing. Grounded in local v3.1 docs — zero speculation."
+version: "3.1.0"
 ---
 
 ## Current Environment
@@ -28,15 +28,22 @@ When user intent matches, load the reference file listed — do not rely on trai
 | Serve files or skills as resources | `FileSystemProvider`, `SkillsProvider` | [./references/providers.md](./references/providers.md) |
 | Rename or filter tools from sub-server | `ToolTransform`, `Namespace` | [./references/transforms.md](./references/transforms.md) |
 | Expose resources as tools | `ResourcesAsTools` | [./references/transforms.md](./references/transforms.md) |
+| Search/discover tools in large catalogs | `BM25SearchTransform`, `RegexSearchTransform` | [./references/transforms.md](./references/transforms.md) |
+| Sandbox tool execution via Python scripts | `CodeMode` (experimental) | [./references/transforms.md](./references/transforms.md) |
 | Add authentication to a server | `require_scopes`, OAuth variants | [./references/auth.md](./references/auth.md) |
+| Mix OAuth + JWT token verifiers | `MultiAuth` | [./references/auth.md](./references/auth.md) |
+| Use PropelAuth for auth | `PropelAuthProvider` | [./references/auth.md](./references/auth.md) |
 | Write a FastMCP client | `Client`, transports, `BearerAuth` | [./references/client-sdk.md](./references/client-sdk.md) |
 | Run long tasks without blocking | `@mcp.tool(task=True)` | [./references/advanced.md](./references/advanced.md) |
 | Add multi-turn user input to a tool | Elicitation API | [./references/advanced.md](./references/advanced.md) |
-| Deploy to production | Prefect Horizon, HTTP, stdio | [./references/deployment.md](./references/deployment.md) |
+| Deploy to production | Prefect Horizon, HTTP, stdio, nginx | [./references/deployment.md](./references/deployment.md) |
+| Deploy behind nginx reverse proxy | SSE config, TLS, subpath mounting | [./references/deployment.md](./references/deployment.md) |
 | Write tests for a FastMCP server | In-memory Client, pytest patterns | [./references/testing.md](./references/testing.md) |
 | Integrate with Anthropic/OpenAI/FastAPI | Integration patterns | [./references/integrations.md](./references/integrations.md) |
 | Migrate from FastMCP v2 | Breaking changes, syntax fixes | [./references/migration.md](./references/migration.md) |
-| Add web UI to a server | Apps low-level HTML API | [./references/apps.md](./references/apps.md) |
+| Add web UI to a server | Apps HTML API, Prefab Apps | [./references/apps.md](./references/apps.md) |
+| Return interactive UI from tools | `@mcp.tool(app=True)`, `PrefabApp` | [./references/advanced.md](./references/advanced.md) |
+| Add request/response middleware | `Middleware`, built-in middleware | [./references/middleware.md](./references/middleware.md) |
 | Find real-world usage patterns | ProxyProvider, mount(), showcase | [./references/real-world-patterns.md](./references/real-world-patterns.md) |
 | Evaluate MCP server quality | Evaluation harness, QA pairs | [./references/evaluation-guide.md](./references/evaluation-guide.md) |
 
@@ -79,6 +86,8 @@ flowchart TD
     Q1 -->|Validate bearer tokens per tool| RS["require_scopes('scope')<br>@mcp.tool(auth=require_scopes('write'))<br>Source: servers/auth/token-verification.mdx"]
     Q1 -->|Full OAuth2 server built-in| FO["Full OAuth server<br>Source: servers/auth/full-oauth-server.mdx"]
     Q1 -->|Delegate to external IdP — Auth0, Azure| OP["OIDC proxy / OAuth proxy<br>Source: servers/auth/oidc-proxy.mdx"]
+    Q1 -->|Mix OAuth + JWT for hybrid clients| MA["MultiAuth — compose OAuth server<br>+ token verifiers (v3.1)<br>Source: servers/auth/multi-auth.mdx"]
+    Q1 -->|Use PropelAuth| PA["PropelAuthProvider<br>OAuth + token introspection (v3.1)<br>Source: integrations/propelauth.mdx"]
     Q1 -->|Client calling protected server| CA["Client auth — BearerAuth / CIMDAuth / OAuthAuth<br>Source: clients/auth/*.mdx"]
 ```
 
@@ -148,36 +157,47 @@ CONSTRAINT: These v2 patterns are deprecated or removed. Generate only the v3 fo
 
 ## Version Gating
 
-### FastMCP 3.0 — Available Now
+### FastMCP 3.0 — Available
 
-All features documented in this skill and its reference files are available in FastMCP 3.0
-unless explicitly marked otherwise.
+All core features (tools, resources, prompts, providers, transforms, auth, tasks, elicitation,
+client SDK, deployment) are available in FastMCP 3.0.
 
-### FastMCP 3.1 — NOT YET RELEASED
+### FastMCP 3.1 — Available (current)
 
-The following features appear in local docs but are NOT available in 3.0:
+The following features were added in FastMCP 3.1.0 and require `fastmcp>=3.1.0`:
 
-- **Python-native App framework** (`apps/overview.mdx`) — do not generate code for this
-- **CodeMode** (dynamic BM25 tool search + Python execution) — do not document as available
+- **Tool Search transforms** — `BM25SearchTransform`, `RegexSearchTransform` for large tool catalogs
+- **CodeMode transform** (experimental) — sandboxed Python execution for tool invocation (`fastmcp[code-mode]`)
+- **`transforms=` kwarg** — server-level `FastMCP("name", transforms=[...])` constructor parameter
+- **MultiAuth** — compose OAuth server + multiple token verifiers
+- **PropelAuth provider** — `PropelAuthProvider` for PropelAuth OAuth + token introspection
+- **Prefab Apps** (experimental) — `@mcp.tool(app=True)` with declarative UI components (`fastmcp[apps]`)
+- **Google GenAI sampling handler** — alternative to Anthropic/OpenAI sampling
+- **`-m/--module` flag** — `fastmcp run -m my_package.server` for module mode
+- **`FASTMCP_TRANSPORT`** env var — default transport selection without CLI flag
+- **`http_client` parameter** — connection pooling for token verifiers
+- **`include_unversioned`** option in VersionFilter
+- **`Tool.from_tool()`** — immediate transformation at registration time
 
-SOURCE: `apps/overview.mdx` states 3.1 features are unreleased (accessed 2026-03-05)
+SOURCE: <https://github.com/PrefectHQ/fastmcp> releases v3.1.0, v3.1.1 (accessed 2026-03-17)
 
 ---
 
 ## Reference Files
 
-All 12 v3 reference files sourced from `.claude/worktrees/fastmcp/docs/`:
+All 13 v3 reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/PrefectHQ/fastmcp> (source code):
 
-- [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan
+- [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan, `transforms=` kwarg
 - [./references/providers.md](./references/providers.md) — LocalProvider, FastMCPProvider, ProxyProvider, FileSystemProvider, SkillsProvider
-- [./references/transforms.md](./references/transforms.md) — Namespace, ToolTransform, Enabled, ResourcesAsTools, PromptsAsTools
-- [./references/auth.md](./references/auth.md) — `require_scopes`, OAuth variants, token verification
-- [./references/client-sdk.md](./references/client-sdk.md) — `Client`, transports, BearerAuth, CIMD, OAuth, sampling, elicitation
-- [./references/apps.md](./references/apps.md) — v3.0 low-level HTML API only (v3.1 Python-native framework unreleased)
-- [./references/advanced.md](./references/advanced.md) — tasks, elicitation, storage backends, middleware, dependency injection, versioning, visibility
-- [./references/deployment.md](./references/deployment.md) — stdio, HTTP, server config, Prefect Horizon
-- [./references/testing.md](./references/testing.md) — in-memory Client, pytest patterns
-- [./references/integrations.md](./references/integrations.md) — Anthropic, OpenAI, Gemini, FastAPI, GitHub, Auth0, Azure, Claude Code
+- [./references/transforms.md](./references/transforms.md) — Namespace, ToolTransform, Enabled, ResourcesAsTools, PromptsAsTools, BM25SearchTransform, RegexSearchTransform, CodeMode
+- [./references/auth.md](./references/auth.md) — `require_scopes`, OAuth variants, token verification, MultiAuth, PropelAuth, `http_client` pooling
+- [./references/client-sdk.md](./references/client-sdk.md) — `Client`, transports, BearerAuth, CIMD, OAuth, sampling, elicitation, `fastmcp discover`, fuzzy matching
+- [./references/apps.md](./references/apps.md) — low-level HTML API, Prefab Apps (experimental)
+- [./references/advanced.md](./references/advanced.md) — tasks, elicitation, storage backends, dependency injection, versioning, visibility, Prefab Apps, Google GenAI sampling
+- [./references/middleware.md](./references/middleware.md) — Middleware base class, hook hierarchy, 11 built-in middleware, tag-based access control
+- [./references/deployment.md](./references/deployment.md) — stdio, HTTP, server config, Prefect Horizon, nginx reverse proxy, module mode, `FASTMCP_TRANSPORT`
+- [./references/testing.md](./references/testing.md) — in-memory Client, FastMCPTransport, pytest patterns, inline-snapshot
+- [./references/integrations.md](./references/integrations.md) — Anthropic, OpenAI, Gemini, Google GenAI, FastAPI, GitHub, Auth0, Azure, PropelAuth, Claude Code
 - [./references/migration.md](./references/migration.md) — v2 → v3 breaking changes, from MCP SDK
 - [./references/real-world-patterns.md](./references/real-world-patterns.md) — ProxyProvider, mount(), SkillsProvider, showcase
 

@@ -5,9 +5,9 @@ metadata:
   topic: implement-feature-orchestrator-bypasses-start-task-hooks-whe
   source: 'Session observation — observed during #128 validate-agent-browser implementation'
   added: '2026-02-28'
-  priority: P1
+  priority: completed
   type: Bug
-  status: groomed
+  status: done
   issue: '#315'
   last_synced: '2026-03-03T03:53:41Z'
   groomed: '2026-03-03'

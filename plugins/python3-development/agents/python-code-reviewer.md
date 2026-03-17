@@ -1,7 +1,7 @@
 ---
 name: python-code-reviewer
 description: Reviews Python 3.11+ code for quality, modernization, and best practices. Runs code smell analysis, shebang validation, and generates prioritized reports in .claude/smells/.
-model: opus
+model: sonnet
 color: yellow
 whenToUse: "<example> Context: User wants code quality review. user: \"Review the code quality in src/auth.py\" assistant: \"I'll use python-code-reviewer to analyze for code smells and modernization opportunities.\" </example> <example> Context: User is refactoring a module. user: \"I'm refactoring the database module, can you review it?\" assistant: \"I'll use python-code-reviewer to check for quality issues and best practices.\" </example> <example> Context: User needs to identify performance issues. user: \"Find performance bottlenecks in our API handlers\" assistant: \"I'll use python-code-reviewer to analyze the code for performance anti-patterns.\" </example>"
 ---

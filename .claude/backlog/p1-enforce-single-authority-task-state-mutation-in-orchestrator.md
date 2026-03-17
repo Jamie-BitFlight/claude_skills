@@ -5,9 +5,9 @@ metadata:
   topic: enforce-single-authority-task-state-mutation-in-orchestrator
   source: OpenAI Symphony SPEC.md §7 Coordination Layer — orchestrator is the single authoritative authority for in-memory state; all worker outcomes are routed through it, preventing duplicate dispatch
   added: '2026-03-06'
-  priority: P1
+  priority: completed
   type: Refactor
-  status: open
+  status: done
   issue: '#451'
   last_synced: '2026-03-06T05:00:53Z'
   groomed: '2026-03-06'

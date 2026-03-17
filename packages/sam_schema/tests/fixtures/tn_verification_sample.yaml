@@ -1,0 +1,27 @@
+feature: auth-system
+verified_at: "2026-03-15T14:00:00Z"
+plan_path: plan/tasks-5-auth-system.md
+t0_baseline_path: plan/T0-baseline-auth-system.yaml
+verdict: PASS
+criteria_count: 3
+regressions: 0
+newly_passing: 1
+results:
+  - criterion-id: AC-1
+    check-command: "uv run pytest tests/test_auth.py -v"
+    t0-exit-code: 1
+    tn-exit-code: 0
+    status: newly-passing
+    stdout-diff-summary: "T0: FAILED (FileNotFoundError) -> TN: 3 passed"
+  - criterion-id: AC-2
+    check-command: "uv run pytest tests/test_roles.py -v"
+    t0-exit-code: 0
+    tn-exit-code: 0
+    status: passed
+    stdout-diff-summary: ""
+  - criterion-id: AC-3
+    check-command: "uv run ruff check src/auth/"
+    t0-exit-code: 0
+    tn-exit-code: 0
+    status: passed
+    stdout-diff-summary: ""

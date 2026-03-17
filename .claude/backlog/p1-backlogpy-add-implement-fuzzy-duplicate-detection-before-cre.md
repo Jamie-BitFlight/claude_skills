@@ -5,9 +5,9 @@ metadata:
   topic: backlogpy-add-implement-fuzzy-duplicate-detection-before-cre
   source: Session observation
   added: '2026-02-27'
-  priority: P1
+  priority: completed
   type: Bug
-  status: open
+  status: done
   issue: '#311'
 ---
 

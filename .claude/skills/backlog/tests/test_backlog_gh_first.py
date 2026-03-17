@@ -191,7 +191,9 @@ class TestListFromGithub:
 
         # Assert
         assert result.exit_code == 0
-        mock_repo.get_issues.assert_called_once()
+        # _refresh_local_cache_from_github calls get_issues once (state="all"),
+        # then _reconcile_batch calls it again — assert at least one call occurred.
+        mock_repo.get_issues.assert_called()
         mock_pull.assert_called_once_with(mock_repo, 999)
 
     def test_list_from_github_offline_fallback(self, mocker: MockerFixture) -> None:

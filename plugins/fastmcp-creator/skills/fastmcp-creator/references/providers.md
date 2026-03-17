@@ -2,7 +2,7 @@
 
 How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/providers/overview.mdx`, `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/providers/overview>, `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
 
 ---
 
@@ -20,6 +20,7 @@ Every FastMCP server has one or more component providers. A provider is a source
 |----------|--------------|----------------|
 | `LocalProvider` | Stores components defined in code | `@mcp.tool`, `mcp.add_tool()` |
 | `FastMCPProvider` | Wraps another FastMCP server | `mcp.mount(server)` |
+| `OpenAPIProvider` | Generates tools/resources from an OpenAPI spec | `FastMCP.from_openapi(spec, client)` |
 | `ProxyProvider` | Connects to remote MCP servers | `create_proxy(client)` |
 | `FileSystemProvider` | Discovers components in `.py` files | `FastMCP(providers=[FileSystemProvider(...)])` |
 | `SkillsDirectoryProvider` | Exposes skill directories as resources | `mcp.add_provider(SkillsDirectoryProvider(...))` |
@@ -189,6 +190,87 @@ mcp.mount(create_proxy(github_config), namespace="github")
 RULE: Each request to a proxy created with `create_proxy()` gets its own isolated backend session. Shared sessions (passing an already-connected client) risk context mixing in concurrent scenarios.
 
 PATTERN: Proxies forward MCP features automatically — sampling, elicitation, logging, and progress notifications all pass through to the upstream server.
+
+---
+
+## OpenAPIProvider
+
+`OpenAPIProvider` parses an OpenAPI specification and creates MCP components from it. Each component makes live HTTP calls to the described API endpoints. Components are created eagerly at initialization time.
+
+Import path: `fastmcp.server.providers.openapi.OpenAPIProvider`
+
+```python
+import httpx
+from fastmcp import FastMCP
+from fastmcp.server.providers.openapi import OpenAPIProvider
+
+spec = httpx.get("https://api.example.com/openapi.json").json()
+client = httpx.AsyncClient(base_url="https://api.example.com")
+
+provider = OpenAPIProvider(openapi_spec=spec, client=client)
+
+mcp = FastMCP("API Server")
+mcp.add_provider(provider)
+```
+
+PATTERN: Use `FastMCP.from_openapi()` as a shorthand that creates the provider and wraps it in a server in one call.
+
+```python
+mcp = FastMCP.from_openapi(
+    openapi_spec=spec,
+    client=client,
+    name="My API Server",
+)
+```
+
+### Constructor Parameters
+
+| Parameter | Type | Default | Purpose |
+|-----------|------|---------|---------|
+| `openapi_spec` | `dict[str, Any]` | required | OpenAPI schema dictionary |
+| `client` | `httpx.AsyncClient \| None` | `None` | HTTP client; auto-created from spec's first `servers[].url` if omitted |
+| `route_maps` | `list[RouteMap] \| None` | `None` | Ordered rules mapping routes to MCP component types; checked before defaults |
+| `route_map_fn` | `RouteMapFn \| None` | `None` | Callable for per-route override after `route_maps` matching |
+| `mcp_component_fn` | `ComponentFn \| None` | `None` | Called on each created component for in-place customization |
+| `mcp_names` | `dict[str, str] \| None` | `None` | Maps `operationId` to explicit component names |
+| `tags` | `set[str] \| None` | `None` | Tags added to every component |
+| `validate_output` | `bool` | `True` | Use OpenAPI response schema for output validation; set `False` for permissive |
+
+RULE: If `client` is omitted and the spec has no `servers[].url`, initialization raises `ValueError`. Pass an explicit client when the spec lacks server entries.
+
+### Route Mapping
+
+By default every endpoint becomes a `TOOL`. Use `RouteMap` objects to override this:
+
+```python
+from fastmcp.server.providers.openapi import OpenAPIProvider, RouteMap, MCPType
+
+provider = OpenAPIProvider(
+    openapi_spec=spec,
+    client=client,
+    route_maps=[
+        # GET with path params → ResourceTemplate
+        RouteMap(methods=["GET"], pattern=r".*\{.*\}.*", mcp_type=MCPType.RESOURCE_TEMPLATE),
+        # All other GETs → Resource
+        RouteMap(methods=["GET"], pattern=r".*", mcp_type=MCPType.RESOURCE),
+        # Exclude admin routes
+        RouteMap(pattern=r"^/admin/.*", mcp_type=MCPType.EXCLUDE),
+    ],
+)
+```
+
+Custom `route_maps` are checked first; FastMCP's default catch-all (`all routes → TOOL`) runs after. A `RouteMap(mcp_type=MCPType.EXCLUDE)` catch-all at the end of your list will suppress the default.
+
+### Key Constraints
+
+- Produces tools, resources, and resource templates — **never prompts** (OpenAPI has no prompt concept)
+- Component names are derived from `operationId`, slugified, and truncated to 56 characters; collisions get a numeric suffix
+- Name overrides via `mcp_names` map `operationId` → desired name (still slugified and truncated)
+- `mcp_component_fn` modifies components in-place; its return value is ignored
+- When the provider owns the `httpx.AsyncClient` (i.e., `client` was not passed), it is closed on server shutdown via `lifespan()`
+- Output validation uses the response schema from the OpenAPI spec; set `validate_output=False` to accept any JSON response structure
+
+SOURCE: <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/provider.py>, <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/__init__.py>, <https://gofastmcp.com/integrations/openapi> (accessed 2026-03-17)
 
 ---
 

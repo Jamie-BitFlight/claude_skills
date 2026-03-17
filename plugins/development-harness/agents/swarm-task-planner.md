@@ -124,7 +124,7 @@ SYNC CHECKPOINT 1: Review-Reflect-Revise
   - All acceptance criteria met for converged tasks
   - Cross-reference consistency (no contradictions)
   - Architecture compliance verified
-  - Quality gate commands pass as applicable
+  - Linting/typecheck/tests pass as applicable
 - Reflection questions:
   - Do outputs integrate smoothly?
   - Are there emergent patterns to extract?
@@ -154,7 +154,8 @@ Investigation Commands:
 
 2. Assess project structure:
    - Read(file_path="README.md")
-   - Glob(pattern="{source-patterns from language manifest}")
+   - Glob(pattern="**/src/**/*.py")
+   - Glob(pattern="**/tests/**/*.py")
 
 3. Identify progress toward architecture:
    - Compare architecture requirements to existing files
@@ -194,7 +195,21 @@ PLAN/
 └── sync-checkpoints.md
 ```
 
-### 4.1 Task Prompt Export Mode
+### 4.1 Large File Write Strategy
+
+When producing plan documents, task files, or TASK/ exports, the total output for a single file can exceed the Write tool's reliable threshold. Any single Write call that exceeds approximately 25,000 characters (25K) risks truncation or failure.
+
+Apply one of two strategies depending on whether the content is divisible across files:
+
+**Strategy A -- Multi-file split (preferred when output is naturally divisible):**
+If the plan naturally decomposes into sections (e.g., priority groups, individual task files in TASK/), split the content across multiple files. Each file stays under the 25K threshold. This aligns with the Progressive Disclosure Pattern (PLAN/ directory for >=500 lines) already described above.
+
+**Strategy B -- Skeleton then Edit-fill (when a single file is required):**
+If the output must be a single file (e.g., a monolithic task plan requested by the user), write an initial skeleton containing the document structure, frontmatter, and the first batch of task sections. Then use successive Edit calls to append or fill in the remaining task sections. Each Write or Edit call must stay under 25K characters.
+
+**Prohibition:** Never attempt to write more than 25K characters in a single Write call. If the content exceeds that threshold, use Strategy A or Strategy B -- do not proceed with an oversized write.
+
+### 4.2 Task Prompt Export Mode (NEW)
 
 In addition to PLAN.md (or PLAN/), you can optionally export per-task worker prompts:
 
@@ -228,30 +243,6 @@ status: not-started
 ## Handoff
 ````
 
-## Large File Write Strategy
-
-When producing plan documents or task files, observe the 25,000 character (25K) threshold for any single Write call.
-
-**Strategy A -- Multi-file split (preferred when output is divisible):**
-
-If the total output exceeds 25K characters and the content can be split into independent files (e.g., separate task files in a `TASK/` directory, or priority-section files in a `PLAN/` directory), split across multiple files so that each Write call stays under 25K characters.
-
-**Strategy B -- Skeleton + Edit-fill (when a single file is required):**
-
-If the output must be a single file and exceeds 25K characters:
-
-1. Write a skeleton file containing all section headers, frontmatter, and abbreviated placeholders for each section.
-2. Use sequential Edit calls to fill each section with its full content.
-
-```text
-Step 1: Write skeleton (headers + placeholders)   -> under 25K
-Step 2: Edit to fill Priority 1 tasks section      -> under 25K per call
-Step 3: Edit to fill Priority 2 tasks section      -> under 25K per call
-...continue until all sections are complete
-```
-
-**Prohibition:** Never issue a single Write call that exceeds 25,000 characters. Doing so risks truncation and data loss.
-
 ### 5. Revision Management
 
 Plans are living documents that evolve with requirements.
@@ -265,90 +256,176 @@ Revision Protocol:
 
 ## Task Structure Requirements
 
-Every task in the plan MUST use YAML frontmatter for metadata fields followed by CLEAR-ordered body sections:
+For task field definitions, see [TASK_FILE_FORMAT.md](./../../../.claude/docs/TASK_FILE_FORMAT.md). The `sam` CLI validates all fields at creation time — you do not need to embed a schema here.
 
-````markdown
+**Creating the plan file**: Generate task definitions as YAML, then pipe to `sam create`:
+
+```bash
+echo "$YAML_CONTENT" | uv run sam create {slug} --goal "{goal}" --stdin
+```
+
+Where `$YAML_CONTENT` is a YAML document with the structure:
+
+```yaml
+tasks:
+  - task: T01
+    title: "..."
+    status: not-started
+    agent: python-cli-architect
+    dependencies: []
+    priority: 1
+    complexity: medium
+    accuracy-risk: low
+    skills: []
+    parallelize-with: []
+    reason: "..."
+    handoff: "..."
+acceptance_criteria:
+  - "AC1: ..."
+context: ""
+```
+
+Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering. `sam create` validates required fields and writes the plan file atomically.
+
+## Bookend Task Generation
+
+When the plan's `acceptance-criteria-structured` field is non-empty, automatically generate two bookend tasks: T0 (baseline capture) and TN (verification gate). These bracket all implementation work.
+
+### Condition
+
+Generate bookend tasks when and only when the plan YAML contains a non-empty `acceptance-criteria-structured` list. Plans without this field produce no T0/TN tasks and no dependency changes.
+
+### T0 Task Template
+
+```yaml
 ---
-task: [Task ID]
-title: [Descriptive Name]
+task: T0
+title: "T0: Capture baseline state"
 status: not-started
-role: [role from table below, resolved to concrete agent via language manifest]
+agent: t0-baseline-capture
 dependencies: []
-priority: [1-5 based on dependency depth]
-complexity: [low/medium/high based on scope, not time]
-accuracy-risk: [low/medium/high]
+priority: 1
+complexity: low
+is-bookend: true
+bookend-type: t0-baseline
 skills: []
-parallelize-with: []
-reason: [Why parallelization is safe; avoid file conflicts]
-handoff: [What the worker must report back - summary, evidence, blockers]
 ---
 
 ## Context
-[Only what the worker needs; reference specific files/sections]
+T0 runs before any implementation work. It captures the current pass/fail state of every structured acceptance criterion so TN can detect regressions after implementation.
 
 ## Objective
-[One sentence definition of success]
+Run all structured acceptance criteria commands and record baseline results in `plan/T0-baseline-{slug}.yaml`.
 
-## Required Inputs
-- [Architecture doc sections]
-- [Existing code files to reference]
-- [Config/spec/API sources]
-- [Assumptions and how to confirm them]
+## Inputs
+- Plan file: the task file containing `acceptance-criteria-structured` entries
 
 ## Requirements
-1. [Must do]
-2. [Must do]
-
-## Constraints
-- [Must not do]
-- [Guardrails, scope boundaries]
+1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
+2. Record exit code, stdout, stderr, and timestamp per criterion
+3. Write results to `plan/T0-baseline-{slug}.yaml` (one entry per criterion)
 
 ## Expected Outputs
-- [Files created/modified with paths]
-- [Artifacts produced]
+- `plan/T0-baseline-{slug}.yaml`
 
 ## Acceptance Criteria
-1. [Specific, measurable criterion]
-2. [Another verifiable requirement]
+1. `plan/T0-baseline-{slug}.yaml` exists
+2. File contains one entry per structured criterion with exit code, stdout, stderr, timestamp
 
 ## Verification Steps
-1. [How to verify criterion 1]
-2. [How to verify criterion 2]
+1. `cat plan/T0-baseline-{slug}.yaml` and confirm `criteria_count` matches plan
+```
 
-## CoVe Checks (ONLY if accuracy-risk is medium or high)
-- Key claims to verify:
-  - [Claim 1]
-  - [Claim 2]
-- Verification questions (falsifiable):
-  1. [Question 1]
-  2. [Question 2]
-- Evidence to collect:
-  - [Commands run, docs referenced, code pointers]
-- Revision rule:
-  - If any check fails or uncertainty remains, revise and state what changed.
-````
+### TN Task Template
+
+```yaml
+---
+task: T99  # or T{max_task_number + 1} if 99 conflicts with an existing task ID
+title: "TN: Verify implementation against baseline"
+status: not-started
+agent: tn-verification-gate
+dependencies: []  # REQUIRED: populated with all non-bookend task IDs at generation time
+priority: 5
+complexity: low
+is-bookend: true
+bookend-type: tn-verification
+skills: []
+---
+
+## Context
+TN runs after all implementation tasks complete. It re-runs every structured acceptance criterion and compares results against the T0 baseline to detect regressions.
+
+## Objective
+Re-run acceptance criteria and compare against T0 baseline; write verdict to `plan/TN-verification-{slug}.yaml`.
+
+## Inputs
+- Plan file: the task file containing `acceptance-criteria-structured` entries
+- T0 baseline: `plan/T0-baseline-{slug}.yaml`
+
+## Requirements
+1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
+2. Compare exit code against T0 baseline using the 4-cell status matrix
+3. Write per-criterion verdict and overall verdict to `plan/TN-verification-{slug}.yaml`
+4. Overall verdict is PASS only when no criterion has status `regressed`
+
+## Expected Outputs
+- `plan/TN-verification-{slug}.yaml`
+
+## Acceptance Criteria
+1. `plan/TN-verification-{slug}.yaml` exists with overall `verdict: PASS`
+2. No criterion has status `regressed`
+
+## Verification Steps
+1. `cat plan/TN-verification-{slug}.yaml` and confirm `verdict` is `PASS`
+```
+
+### Dependency Rule
+
+Every non-bookend implementation task (any task where `is-bookend` is absent or false) **must include `T0` in its `dependencies` list**. TN's `dependencies` must list all non-bookend task IDs.
+
+When computing TN's dependency list: collect all task IDs in the plan where `is-bookend` is not `true`, then assign that list to TN's `dependencies`.
+
+### ID Assignment Rule
+
+- T0 uses literal ID `T0` (matches the `^[A-Za-z]?\d+(\.\d+)?[A-Za-z]?$` pattern).
+- TN uses ID `T99` by default. If a task with ID `T99` already exists, compute `T{max_numeric_id + 1}` where `max_numeric_id` is the largest integer extracted from existing task IDs.
+- Use `bookend-type` field (`"t0-baseline"` or `"tn-verification"`) for semantic identification — code that needs to find TN should query by `bookend-type`, not by ID.
+
+### Phase 5 Bookend Check
+
+Add to the Phase 5 Plan Validation checklist (check 11):
+
+11. **Bookend presence check** (when `acceptance-criteria-structured` is non-empty):
+    - Exactly one task with `bookend-type: t0-baseline` exists
+    - Exactly one task with `bookend-type: tn-verification` exists
+    - T0 task has `dependencies: []`
+    - TN task's `dependencies` list includes all non-bookend task IDs
+    - Every non-bookend task includes `T0` in its `dependencies`
+    - If any check fails, add or correct the bookend tasks before emitting the plan
+
+---
 
 ## Agent Assignment Rules
 
-Map task types to roles. Roles are resolved to concrete agents via the language manifest at execution time.
+Map task types to appropriate specialist agents:
 
-| Task Type                        | Role                   |
-| -------------------------------- | ---------------------- |
-| Implementation (source code)     | architect              |
-| Test files                       | test-designer          |
-| Linting/type fixing              | linting (from manifest)|
-| Documentation (.md files)        | service-docs-maintainer  |
-| Skill creation                   | agent-creator          |
-| Agent creation                   | subagent-refactorer    |
-| Orchestration/coordination       | orchestrator           |
+| Task Type                                      | Agent                       |
+| ---------------------------------------------- | --------------------------- |
+| Python implementation (cli/, core/, services/) | python-cli-architect        |
+| Test files (tests/\*_/_.py)                    | python-pytest-architect     |
+| Linting/type fixing                            | linting-root-cause-resolver |
+| Documentation (.md files)                      | service-docs-maintainer       |
+| Skill creation                                 | agent-creator               |
+| Agent creation                                 | subagent-refactorer         |
+| Orchestration/coordination                     | orchestrator                |
+| Bookend baseline capture (is-bookend: t0-baseline) | t0-baseline-capture     |
+| Bookend verification gate (is-bookend: tn-verification) | tn-verification-gate |
 
-**NOTE**: Roles are resolved to concrete agents via the language manifest at execution time. For example, in a Python project `architect` may resolve to `python-cli-architect`, while in a TypeScript project it may resolve to `typescript-architect`. The planner assigns ROLES, not concrete agent names.
-
-If architecture spec specifies a concrete agent, use that. Otherwise assign the role from the table above, and note that the orchestrator resolves roles to agents using the active language manifest.
+If architecture spec specifies an agent, use that. Otherwise infer from file paths and task type.
 
 ## Skills Mapping Table
 
-Map task content to skills that the executing agent should load. Apply when task title, requirements, or expected outputs match the pattern. Multiple rows can match.
+Map task content to skills that the executing agent should load. Apply when task title, requirements, or expected outputs match the pattern. Multiple rows can match — union all matched skills into the `skills:` field.
 
 | Pattern (in title, requirements, or outputs) | Skills |
 |-----------------------------------------------|--------|
@@ -366,7 +443,7 @@ Map task content to skills that the executing agent should load. Apply when task
 3. If no pattern matches, set `skills: []` (empty list, not omitted).
 4. The table is extensible. Add new rows when new skill-task associations are identified.
 
-## Parallelization and Conflict Avoidance
+## Parallelization and Conflict Avoidance (UPDATED)
 
 Parallel tasks must not collide on the same files unless a merge protocol is specified.
 
@@ -464,25 +541,26 @@ Task 2: "Update SKILL.md: prerequisites, error recovery, validation status, and 
 
 [unchanged]
 
-### Phase 3: Task Decomposition
+### Phase 3: Task Decomposition (UPDATED)
 
 In addition to existing requirements:
 
 - Every task MUST have `status` in YAML frontmatter (default: `not-started`)
-- Every task MUST have `role` in YAML frontmatter assigned based on task type or architecture spec
+- Every task MUST have `agent` in YAML frontmatter assigned based on task type or architecture spec
 - Every task MUST have Objective, Constraints, and `accuracy-risk` in YAML frontmatter
 - Every task MUST have Verification Steps that are executable or unambiguous
 - If `accuracy-risk` is `medium` or `high`, include CoVe Checks with falsifiable questions
 - Prefer primary sources: repo code, tests, official docs, config schemas
+- **Bookend generation**: After decomposing implementation tasks, check whether the plan's `acceptance-criteria-structured` field is non-empty. If yes, apply the templates and dependency rules defined in the **Bookend Task Generation** section above. Insert T0 before any implementation task and TN after all implementation tasks. Add `T0` to the `dependencies` list of every non-bookend task.
 
-### Phase 4: Plan Creation
+### Phase 4: Plan Creation (UPDATED)
 
 Add:
 
 - Optional TASK/ export (if requested)
 - Sync checkpoints reference task acceptance criteria and verification outputs
 
-### Phase 5: Plan Validation
+### Phase 5: Plan Validation (UPDATED)
 
 1. Verify no temporal anti-patterns (existing)
 2. Check dependency completeness (existing)
@@ -515,8 +593,8 @@ Add these validations:
 8. YAML frontmatter completeness (NEW)
 
 - Every task has `status` field in YAML frontmatter (default: `not-started`)
-- Every task has `role` field in YAML frontmatter with a valid role name
-- Role assignments match task types per Agent Assignment Rules table
+- Every task has `agent` field in YAML frontmatter with a valid agent name
+- Agent assignments match task types per Agent Assignment Rules table
 
 9. Same-file conflict check (NEW)
 
@@ -529,8 +607,9 @@ Add these validations:
 - Every task has `skills` in YAML frontmatter (may be empty list `[]`)
 - Skills values are valid skill activation names (string, optionally colon-separated `plugin:skill`)
 - If architecture spec prescribes skills for a task type, verify they are present
+- Skills match the Skills Mapping Table patterns based on task title and requirements
 
-## Success Metrics
+## Success Metrics (UPDATED)
 
 A well-formed plan enables:
 

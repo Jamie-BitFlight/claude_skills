@@ -1,0 +1,435 @@
+feature: backlog-semantic-matching
+version: '1.0'
+description: ''
+goal: |-
+  Expose existing type/topic metadata as backlog_list filters (Layer 1) and add semantic matching strategy chain to SKILL.md instructions (Layer 2), resolving the substring-only matching defect in /work-backlog-item and /complete-implementation
+issue: '745'
+tasks:
+- id: T1
+  title: Add type/topic filters and response fields to operations.py
+  status: complete
+  agent: python3-development:python-cli-architect
+  priority: 1
+  complexity: medium
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - _build_list_entry() includes 'type' and 'topic' fields in returned dict,
+    sourced from metadata.type and metadata.topic
+  - list_items() accepts type_ and topic parameters; when type_ is provided,
+    only items with matching metadata.type (case-insensitive exact match) are
+    returned
+  - list_items() topic parameter performs case-insensitive substring match
+    against metadata.topic
+  - Filters compose with AND logic — backlog_list(section='P1', type='Bug')
+    returns only P1 bugs
+  - Items missing metadata.type are included when no type filter is active,
+    excluded when type filter is active
+  - Items missing metadata.topic are included when no topic filter is active,
+    excluded when topic filter is active
+  - Invalid type values (e.g., 'InvalidType') return empty results with count 0,
+    no error raised
+  - Omitting both new parameters preserves identical behavior to pre-change —
+    backward compatible
+  verification_steps:
+  - 'Run existing test suite to confirm no regressions: uv run pytest .claude/skills/backlog/tests/test_backlog_core_operations.py'
+  - Manually invoke list_items() with type_='Bug' and verify only bug items
+    returned
+  - Invoke list_items() with topic='backlog' and verify substring matching works
+  - Invoke list_items() with no new params and diff output against pre-change
+    output
+  started: '2026-03-16T19:06:50.934245+00:00'
+- id: T2
+  title: Add type/topic parameters to MCP tool schema in server.py
+  status: complete
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T1
+  priority: 1
+  complexity: low
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - backlog_list MCP tool schema includes 'type' parameter (str | None, default
+    None) with help text
+  - backlog_list MCP tool schema includes 'topic' parameter (str | None, default
+    None) with help text
+  - Both parameters pass through to list_items() call in operations.py
+  - Existing parameters (section, status, title, label) remain unchanged in
+    schema and behavior
+  verification_steps:
+  - 'Run MCP tool schema tests: uv run pytest .claude/skills/backlog/tests/test_backlog_core_server.py'
+  - Inspect tool schema via uv run python -c 'from backlog_core.server import
+    mcp; print(mcp.list_tools())' to verify new params appear
+  - Call backlog_list with type='Bug' via MCP and verify filtered results
+  started: '2026-03-16T19:11:59.093703+00:00'
+  divergence_notes: 1
+  divergence_notes_detail: |
+    DN-1: FastMCP 3.0.2 removes 'title' from MCP tool schema when 'type' is also a property
+    Plan artifact: plan/P699-backlog-semantic-matching.yaml, T2 acceptance_criteria item 4
+    Plan claim: "Existing parameters (section, status, title, label) remain unchanged in schema and behavior"
+    Actual implementation: The title filter parameter is functional at runtime (MCP clients can
+    pass "title" and it routes correctly via alias="title" to operations.list_items(title=...)),
+    but the "title" key is absent from the MCP tool schema as returned by FastMCP. Root cause:
+    FastMCP 3.0.2 _single_pass_optimize(prune_titles=True) in fastmcp/utilities/json_schema.py
+    traverses the JSON Schema properties dict and removes any entry whose key is "title" when any
+    sibling key is a JSON Schema keyword (e.g., "type"). Adding alias="type" to the type_
+    parameter caused Pydantic to emit by_alias=True schema, which now has both "title" and "type"
+    as property names, triggering the pruner. Renaming the Python parameter to title_filter with
+    alias="title" does not help because the schema property key is still "title". The behavior gap
+    (title absent from schema, present at runtime) is a FastMCP library bug, not an implementation
+    error. A backlog item should be created to track upgrading FastMCP or patching the schema
+    post-generation.
+    Classification: design-refinement
+    Recorded: 2026-03-16T20:00:00+00:00
+- id: T3
+  title: Add --type and --topic CLI flags to backlog.py list command
+  status: complete
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T1
+  priority: 1
+  complexity: low
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - CLI list command accepts --type option (str, optional) that filters by
+    metadata.type
+  - CLI list command accepts --topic option (str, optional) that filters by
+    metadata.topic
+  - Both options pass through to list_items() call
+  - Existing CLI invocations without --type or --topic produce identical output
+    — backward compatible
+  verification_steps:
+  - 'Run: uv run python .claude/skills/backlog/scripts/backlog.py list --type Bug
+    — verify only bugs returned'
+  - 'Run: uv run python .claude/skills/backlog/scripts/backlog.py list --topic backlog
+    — verify topic filtering works'
+  - 'Run: uv run python .claude/skills/backlog/scripts/backlog.py list — verify identical
+    output to pre-change'
+  started: '2026-03-16T19:11:59.223709+00:00'
+- id: T4
+  title: Layer 1 tests — type/topic filters and response fields
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T1
+  - T2
+  - T3
+  priority: 2
+  complexity: medium
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - "test_list_items_type_filter: backlog_list(type='Bug') returns only items with
+    type=='Bug'"
+  - "test_list_items_topic_filter: backlog_list(topic='backlog-cli') returns items
+    with 'backlog-cli' as substring of topic"
+  - 'test_list_items_type_topic_compose: filters compose with AND logic'
+  - "test_list_items_response_includes_type_topic: each item dict has 'type' and 'topic'
+    keys"
+  - 'test_list_items_backward_compatible: no new params = identical behavior to pre-change'
+  - 'test_list_items_missing_type_included: items without metadata.type included when
+    no type filter'
+  - 'test_list_items_missing_type_excluded: items without metadata.type excluded when
+    type filter active'
+  - 'test_list_items_invalid_type_empty: invalid type returns {items: [], count: 0}'
+  - 'test_backlog_list_type_param_schema: MCP tool schema includes type parameter'
+  - 'test_backlog_list_topic_param_schema: MCP tool schema includes topic parameter'
+  verification_steps:
+  - 'Run full Layer 1 test suite: uv run pytest .claude/skills/backlog/tests/test_backlog_core_operations.py
+    .claude/skills/backlog/tests/test_backlog_core_server.py -v'
+  - Verify all new tests pass with zero failures
+  - Run coverage check to confirm new filter paths are covered
+  started: '2026-03-16T19:26:42.801743+00:00'
+- id: T5
+  title: Rewrite work-backlog-item Step 1 with semantic matching strategy chain
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  dependencies:
+  - T1
+  - T2
+  - T4
+  priority: 3
+  complexity: high
+  skills:
+  - plugin-creator
+  acceptance_criteria:
+  - 'SKILL.md Step 1 contains a 3-strategy fallback chain: Strategy 1 (substring via
+    title=), Strategy 2 (filter-first via type/topic hints), Strategy 3 (LLM semantic
+    match against all open item titles)'
+  - Strategy 2 includes type derivation heuristic (bug/fix/broken/error -> Bug,
+    feature/add/new/implement -> Feature, refactor/clean/restructure ->
+    Refactor)
+  - Strategy 3 uses backlog_list() to load all open item titles+types+topics and
+    presents them to the LLM for semantic selection
+  - 'Token budget validation: the loaded data for Strategy 3 (titles+types+topics
+    for all items) stays under 10K tokens — verified by calculation: 245 items x ~25
+    tokens/item = ~6,125 tokens'
+  - Each strategy transition is explicit — zero results from Strategy N triggers
+    Strategy N+1
+  - Issue-number and URL inputs bypass the strategy chain entirely (direct
+    backlog_view)
+  verification_steps:
+  - Read the updated SKILL.md and verify all 3 strategies are present with
+    explicit transition conditions
+  - "Verify Strategy 3 token budget note is present: '245 items x ~25 tokens/item
+    = ~6,125 tokens (under 10K budget)'"
+  - Verify issue-number/URL bypass path is documented before the strategy chain
+  - 'Run SKILL.md linting: uv run prek run --files .claude/skills/work-backlog-item/SKILL.md'
+  started: '2026-03-16T19:31:25.660681+00:00'
+- id: T6
+  title: Update complete-implementation follow-up routing with filter-first
+    fallback
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  dependencies:
+  - T1
+  - T2
+  - T4
+  priority: 3
+  complexity: medium
+  skills:
+  - plugin-creator
+  acceptance_criteria:
+  - Step 2 follow-up routing uses Strategy 1 (substring via title=) then
+    Strategy 2 (filter-first via topic= derived from filename slug)
+  - Strategy 3 (LLM semantic) is explicitly excluded from follow-up routing with
+    documented rationale (filenames are machine-derived slugs, not human
+    semantic queries)
+  - Existing follow-up routing logic (attach to backlog, create if missing) is
+    preserved
+  verification_steps:
+  - Read the updated SKILL.md and verify 2-strategy chain (substring then
+    filter-first) is present
+  - Verify Strategy 3 exclusion rationale is documented
+  - 'Run SKILL.md linting: uv run prek run --files .claude/skills/complete-implementation/SKILL.md'
+  started: '2026-03-16T19:31:24.707765+00:00'
+- id: T7
+  title: Layer 2 integration scenario tests for semantic matching
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T4
+  - T5
+  - T6
+  priority: 3
+  complexity: medium
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - "test_semantic_match_synonym_query: query 'fix login issue' finds item titled
+    'Authentication failure on SSO redirect' via Strategy 2 or 3"
+  - 'test_substring_match_takes_priority: when substring matches exist, they are returned
+    before any semantic strategy runs'
+  - "test_filter_first_narrows_candidates: type='Bug' + substring finds correct bug
+    from mixed item set"
+  - "Semantic query success rate test: a corpus of 10 semantic queries achieves 8+
+    correct matches (80% success rate). Corpus includes: 'fix login issue' -> 'Authentication
+    failure on SSO redirect', 'improve search speed' -> 'Backlog list performance
+    degradation on large datasets', 'broken MCP connection' -> 'MCP server timeout
+    on reconnect', 'add dark mode' -> 'UI theme customization support', 'clean up
+    old tests' -> 'Test suite maintenance and dead code removal', 'database migration
+    failing' -> 'Schema migration script error on PostgreSQL 15', 'fix typo in docs'
+    -> 'Documentation spelling and grammar corrections', 'slow CI pipeline' -> 'GitHub
+    Actions workflow optimization', 'memory leak on startup' -> 'Process memory growth
+    during initialization', 'missing API endpoint' -> 'REST API route registration
+    incomplete'"
+  verification_steps:
+  - 'Run integration tests: uv run pytest .claude/skills/backlog/tests/test_scenarios.py
+    -v -k semantic'
+  - Verify 8/10 semantic query corpus passes (80% threshold)
+  - Verify substring-priority test confirms Strategy 1 returns before Strategy
+    2/3 engage
+  started: '2026-03-16T19:34:12.772799+00:00'
+- id: T8
+  title: Documentation updates — README, references, and agent context files
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  dependencies:
+  - T5
+  - T6
+  priority: 4
+  complexity: medium
+  skills:
+  - plugin-creator
+  acceptance_criteria:
+  - Backlog README matching behavior section updated to describe the 3-strategy
+    fallback chain
+  - work-backlog-item reference files (step-procedures.md) updated to reflect
+    new Step 1 logic
+  - Agent context files (swarm-task-planner, backlog-mcp-validator) updated with
+    new filter parameters
+  verification_steps:
+  - Read each updated file and verify content matches the implemented strategy
+    chain
+  - Verify no stale references to substring-only matching remain in updated docs
+  - 'Run linting on all modified files: uv run prek run --files <each-file>'
+  started: '2026-03-16T19:34:17.656642+00:00'
+- id: T9
+  title: End-to-end integration test — query to filter to match to result
+  status: complete
+  agent: python3-development:python-pytest-architect
+  dependencies:
+  - T4
+  - T7
+  priority: 4
+  complexity: medium
+  skills:
+  - python3-development
+  acceptance_criteria:
+  - 'End-to-end test exercises the full path: user query -> backlog_list call -> matching
+    -> result returned'
+  - 'Fallback chain end-to-end test: Strategy 1 (substring) returns zero results ->
+    Strategy 2 (filter-first) runs -> Strategy 3 (LLM semantic) runs. Each strategy
+    transition is observable via log output or return metadata'
+  - 'Backward compatibility test: existing callers with only title= parameter produce
+    identical results to pre-change behavior'
+  - 'Empty corpus test: when no items exist, all strategies return gracefully with
+    zero results'
+  verification_steps:
+  - 'Run end-to-end tests: uv run pytest .claude/skills/backlog/tests/test_scenarios.py
+    -v -k e2e'
+  - Verify fallback chain test observes all 3 strategy transitions (Strategy 1
+    -> 2 -> 3)
+  - Verify backward compatibility test passes with no diff from pre-change
+    output
+
+# CONTEXT MANIFEST ADDED
+
+# The context manifest for this task has been written to a separate file:
+# .claude/reports/context-manifest-P699-backlog-semantic-matching.md
+#
+# Key context includes:
+# - How backlog item matching works today (substring-only via backlog_list tool)
+# - The 2-layer fix: Layer 1 exposes type/topic metadata as filters in operations.py
+#   and Layer 2 adds a 3-strategy fallback chain (substring, filter-first, LLM semantic)
+# - Data structures: per-item frontmatter schema, MCP response format, function signatures
+# - Technical details: filtering logic (AND composition), backward compatibility guarantees,
+#   token budget for semantic matching (6,125 tokens for 245 items)
+# - File modifications: operations.py, server.py, backlog.py (Layer 1)
+#   and work-backlog-item/SKILL.md, complete-implementation/SKILL.md (Layer 2)
+  started: '2026-03-16T19:39:53.617941+00:00'
+
+context_manifest_update:
+  session: 2026-03-16
+  discoveries:
+  - id: DR-1
+    classification: design-refinement
+    title: parsing.py was changed despite spec listing it as unchanged
+    detail: |
+      The architect spec (section 3, "Files NOT Changed") stated: "parsing.py — find_item() is
+      used by backlog_view, backlog_update, backlog_close, backlog_resolve, backlog_groom. These
+      resolve a single item by selector. They do not need semantic matching. find_item() remains
+      unchanged."
+
+      During implementation, parsing.py was modified in parse_item_file() to populate two new
+      BacklogItem fields:
+
+        type_=meta.get("type", ""),
+        topic=meta.get("topic", ""),
+
+      This change was necessary because BacklogItem (models.py) was extended with type_ and topic
+      fields, and parse_item_file() is the only place frontmatter is deserialized into BacklogItem
+      instances. Without this change, the new model fields would always be empty regardless of
+      frontmatter content.
+
+      The spec error was an incorrect scope assessment: the architect assumed BacklogItem was
+      populated elsewhere, but parsing.py is the sole deserialization point. Future architects
+      should note that any new BacklogItem field requires a corresponding change to
+      parse_item_file() in parsing.py.
+
+      Code review confirmed this is additive and correct — not a code defect. The spec section 3
+      "Files NOT Changed" list was inaccurate.
+
+  - id: DR-2
+    classification: design-refinement
+    title: models.py was changed but not listed in architect spec change inventory
+    detail: |
+      The architect spec change inventory (section 3) listed operations.py, server.py, backlog.py,
+      work-backlog-item/SKILL.md, and complete-implementation/SKILL.md as the files to change.
+      models.py was not mentioned.
+
+      During implementation, models.py (BacklogItem Pydantic model) was extended with:
+
+        type_: str = ""
+        topic: str = ""
+
+      This was required to make the new fields available on BacklogItem instances throughout the
+      codebase. The model is the canonical data carrier; adding filter fields to operations.py
+      without extending the model would have required bypassing the model entirely.
+
+      The architect spec implicitly assumed operations.py could add fields to _build_list_entry()
+      by reading frontmatter directly (bypassing BacklogItem), but the actual code reads from
+      BacklogItem attributes after parsing. Future implementation plans involving new backlog
+      metadata fields should list models.py as a required change.
+
+  - id: DR-3
+    classification: design-refinement
+    title: type/topic response fields emit empty string not None — spec/implementation mismatch
+    detail: |
+      The architect spec (section 1.1) defined the new response fields as:
+
+        "type": str | None,    # None when metadata.type absent
+        "topic": str | None,   # None when metadata.topic absent
+
+      The implementation emits "" (empty string) for both fields when metadata is absent, because
+      BacklogItem defaults are str = "" and _build_list_entry() reads item.type_ and item.topic
+      directly. Tests assert items[0]["type"] == "" which is consistent with the implementation
+      but inconsistent with the spec.
+
+      Code review (Warning 2) identified this. Resolution: the spec was updated to document empty
+      string as the canonical absent-field representation, matching the implementation. Callers
+      must test `if item["type"]` (falsy check), not `if item["type"] is None`, to detect absent
+      type metadata. The backlog-mcp-validator.md agent context file was updated accordingly.
+
+  - id: DR-4
+    classification: design-refinement
+    title: CLI case-sensitivity bug found by code review and fixed
+    detail: |
+      Code review (Warning 1) found that backlog.py CLI initially implemented --type filtering
+      with direct equality comparison (case-sensitive) while operations.py used lowercase
+      normalization (case-insensitive). Additionally, --topic used exact equality rather than
+      substring matching.
+
+      The bug: `backlog.py list --type bug` against an item stored as `Bug` returned zero results,
+      while the equivalent MCP tool call returned one result.
+
+      The fix (visible in final implementation): both sides normalized to lowercase for --type;
+      substring `in` matching used for --topic. The final backlog.py diff shows the corrected
+      implementation with `type_lower = type_filter.lower()` and
+      `topic_lower in it.get("metadata", {}).get("topic", "").lower()`.
+
+      Implication for future CLI additions: when adding filter flags to backlog.py that correspond
+      to operations.py parameters, case normalization and matching semantics must be explicitly
+      matched between the two codepaths — they do not share filter logic.
+
+  - id: DR-5
+    classification: design-refinement
+    title: FastMCP 3.0.2 prune_titles bug removes title parameter from MCP tool schema
+    detail: |
+      Already documented in T2 divergence_notes_detail. Summary for context manifest: FastMCP
+      3.0.2 _single_pass_optimize(prune_titles=True) in fastmcp/utilities/json_schema.py removes
+      any property named "title" when sibling JSON Schema keywords (e.g. "type") are present.
+      Adding type_ with alias="type" to the backlog_list schema caused Pydantic to emit a schema
+      with both "title" and "type" as property names, triggering the pruner.
+
+      The title filter parameter is functional at runtime (MCP clients can pass "title" and it
+      routes correctly) but absent from the introspectable schema. This is a FastMCP library bug.
+      A backlog item tracks upgrading FastMCP or patching the schema post-generation.
+
+      Implication: when adding parameters named after JSON Schema keywords (type, title, format,
+      etc.) to FastMCP tools, verify the emitted schema via mcp.list_tools() output — the
+      parameter may be silently pruned from introspection even though it works at runtime.
+
+  - id: DR-6
+    classification: design-refinement
+    title: zvec added speculatively to pyproject.toml for deferred Layer 3
+    detail: |
+      zvec>=0.2.0 was added to pyproject.toml dev dependencies during this implementation.
+      None of the changed files import or reference zvec. The feature context and architect spec
+      both mark Layer 3 (vector embeddings via zvec) as deferred (layer_3_deferred: true).
+
+      Code review (Suggestion 2) flagged this as dead dev dependency. The dependency was added
+      speculatively in anticipation of Layer 3 work. If zvec is removed in a cleanup pass, note
+      that it was added intentionally for future Layer 3 vector retrieval work on this feature.

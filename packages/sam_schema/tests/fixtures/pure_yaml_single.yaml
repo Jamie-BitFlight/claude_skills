@@ -1,0 +1,81 @@
+feature: auth-system
+version: "1.0"
+description: |
+  Authentication system with token-based auth, role-based access control,
+  and session management.
+issue: 42
+tasks:
+  - id: T1
+    title: Define auth data models
+    status: complete
+    agent: python3-development:python-cli-architect
+    dependencies: []
+    priority: 1
+    complexity: medium
+    skills:
+      - python3-development
+    blocked-by: []
+    parallelize-with: []
+    started: "2026-03-10T10:00:00Z"
+    completed: "2026-03-10T14:30:00Z"
+    description: |
+      Create Pydantic models for User, Session, and Token entities.
+    objective: |
+      Define the core data models used by all auth components.
+    acceptance-criteria: |
+      - Models validate email format
+      - Token has configurable expiry
+      - Session tracks last activity timestamp
+
+  - id: T2
+    title: Implement token validation
+    status: in-progress
+    agent: python3-development:python-cli-architect
+    dependencies:
+      - T1
+    priority: 2
+    complexity: high
+    skills:
+      - python3-development
+    blocked-by: []
+    parallelize-with:
+      - T3
+    started: "2026-03-11T09:00:00Z"
+    issue-classification: defect
+    analysis-method: 5-whys
+    description: |
+      Implement JWT token generation, validation, and refresh logic.
+    objective: |
+      Provide a secure token lifecycle for API authentication.
+    requirements: |
+      1. Generate RS256 signed JWT tokens
+      2. Validate token signature and expiry
+      3. Support token refresh within grace period
+    acceptance-criteria: |
+      - Expired tokens are rejected
+      - Refresh tokens extend session by configured duration
+    github-issue: 101
+
+  - id: T3
+    title: Add role-based access control
+    status: not-started
+    agent: python3-development:python-cli-architect
+    dependencies:
+      - T1
+    priority: 2
+    complexity: medium
+    skills:
+      - python3-development
+    blocked-by:
+      - T2
+    parallelize-with:
+      - T2
+    divergence-notes: 0
+    description: |
+      Implement RBAC middleware that checks user roles against endpoint
+      permission requirements.
+    objective: |
+      Gate API endpoints by required role membership.
+    constraints: |
+      - Must support hierarchical roles (admin > editor > viewer)
+      - Must not introduce per-request database lookups for role checks

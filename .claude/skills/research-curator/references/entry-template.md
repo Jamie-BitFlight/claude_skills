@@ -180,7 +180,28 @@ How the resource works internally. Include diagrams if helpful.
 | Last Verified | YYYY-MM-DD |
 | Version at Verification | vX.Y.Z |
 | Next Review Recommended | YYYY-MM-DD |
+| Confidence Map | `section: level (qualifier)` |
 ````
+
+> **Confidence qualifiers**: When a section's claims derive from code analysis rather than
+> documentation, append `(code-read)` to the confidence level — e.g., `Architecture: medium
+> (code-read)`. This distinguishes entries where architectural claims come from source code
+> inspection (verifiable but potentially incomplete) versus official documentation (authoritative
+> but potentially outdated). Sections with mixed sources use the lower confidence level and
+> note both qualifiers: `Architecture: medium (doc + code-read)`.
+
+> **Architecture section citations**: When Technical Architecture or Key Features items derive
+> from code analysis, cite the source inline using the format:
+> `Source: {relative-path} — {exported-name}`
+>
+> Examples:
+>
+> - `Source: src/core/engine.py — class TaskEngine`
+> - `Source: src/api/routes.py — register_routes()`
+> - `Source: proto/schema.proto — message EventPayload`
+>
+> When multiple code files corroborate a single architectural claim, list sources comma-separated:
+> `Source: src/core/engine.py — class TaskEngine, src/core/graph.py — class DependencyGraph`
 
 > **Note**: The `## Cross-References` section is populated automatically by
 > `@research-cross-referencer` after entry creation. For manually created entries, add it

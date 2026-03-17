@@ -5,13 +5,13 @@ metadata:
   topic: add-ux-impact-assessment-to-sam-task-template-grooming-and-c
   source: 'Post-implementation critique of backlog #311/#312 + user refinement on process quality discipline — session 2026-03-01'
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#314'
   last_synced: '2026-03-01T23:00:47Z'
   groomed: '2026-03-01'
-  plan: plan/tasks-15-process-quality-discipline.md
+  plan: plan/tasks-15-process-quality-discipline.md.original
 ---
 
 ## Story

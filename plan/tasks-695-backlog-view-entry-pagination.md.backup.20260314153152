@@ -1,0 +1,70 @@
+# Plan: backlog_view offset/limit operates on body lines not entry blocks
+
+**Fixes**: #695
+**Effort**: Small
+**Stack**: Python, FastMCP, backlog_core
+
+## Root Cause (from groomer)
+
+`_paginate_body` in `operations.py` (line ~1159) calls `body.splitlines()` unconditionally and slices the resulting line array. Entry blocks are multi-line HTML structures (`<div><sub>timestamp</sub>\n\ncontent\n</div>`) — a line-based slice cuts through them arbitrarily.
+
+The `show`/`since` parameters on the same `backlog_view` tool ARE correctly entry-aware (via `_build_sections_metadata` → `parse_entries`). `offset`/`limit` are the only parameters still operating on lines.
+
+`parse_entries` in `entry_blocks.py` already exists and correctly parses entry blocks from section content.
+
+## Files to change
+
+- `.claude/skills/backlog/backlog_core/operations.py` — `_paginate_body`, `view_item`
+- `.claude/skills/backlog/backlog_core/server.py` — `backlog_view` parameter docstrings for `offset`/`limit`
+- `.claude/skills/backlog/tests/test_entry_blocks.py` or `test_entry_blocks_integration.py`
+
+---
+
+## Task 2.1: Replace _paginate_body with entry-aware pagination
+
+**Status**: NOT STARTED
+**Priority**: 1
+**Complexity**: Low
+**Agent**: python-cli-architect
+**Dependencies**: none
+
+**Acceptance criteria**:
+
+- `_paginate_body` (or its replacement) uses `parse_entries` to split body into entry blocks before slicing
+- `offset=N` skips the first N entry blocks (not lines)
+- `limit=N` returns at most N entry blocks (not lines)
+- A body with no entry blocks falls back to line-based pagination (backward compatibility for non-entry content)
+- Result is concatenated entry block text (not a list), so callers receive a string as before
+
+---
+
+## Task 2.2: Update server docstrings for offset/limit
+
+**Status**: NOT STARTED
+**Priority**: 2
+**Complexity**: Low
+**Agent**: python-cli-architect
+**Dependencies**: Task 2.1
+
+**Acceptance criteria**:
+
+- `backlog_view` tool in `server.py` — `offset` docstring updated from "body lines" to "entry blocks"
+- `backlog_view` tool in `server.py` — `limit` docstring updated from "body lines" to "entry blocks"
+- No functional changes in this task
+
+---
+
+## Task 2.3: Add tests for entry-based pagination
+
+**Status**: NOT STARTED
+**Priority**: 2
+**Complexity**: Low
+**Agent**: python-cli-architect
+**Dependencies**: Task 2.1
+
+**Acceptance criteria**:
+
+- Test: body containing 5 entry blocks with `offset=2, limit=2` returns blocks 3 and 4 intact (not split)
+- Test: body with no entry blocks with `offset=1, limit=2` falls back to line-based behaviour (no regression)
+- Test: entry block boundary is never broken mid-block by pagination
+- All 582+ existing tests continue to pass

@@ -27,6 +27,7 @@ GitHub label update (requires PyGithub repo + issue objects):
 
 from __future__ import annotations
 
+from collections import deque
 from enum import StrEnum
 from typing import Any
 
@@ -175,3 +176,73 @@ def apply_github_transition(repo: Any, issue: Any, from_state: str | None, to_st
 
     except GithubException as exc:
         raise StateTransitionError(f"Could not update GitHub labels for issue #{issue.number}: {exc}") from exc
+
+
+def is_terminal_state(state: str) -> bool:
+    """Return True if state is a terminal lifecycle state.
+
+    Terminal states are done, resolved, and closed — items in these states
+    have reached a final outcome and are excluded from default list views.
+
+    This follows the architecture spec Section 4.3 definition: terminal states
+    are those representing final outcomes, not solely those with empty transition
+    sets in the DAG (done and resolved both transition to closed, yet are
+    treated as terminal for filtering purposes).
+
+    Args:
+        state: State string to check (e.g., "done", "in-progress").
+
+    Returns:
+        True if state is done, resolved, or closed; False otherwise.
+
+    Note:
+        This function is pure (no I/O, no side effects).
+    """
+    TERMINAL_STATES = frozenset({BacklogState.DONE, BacklogState.RESOLVED, BacklogState.CLOSED})
+    try:
+        return BacklogState(state) in TERMINAL_STATES
+    except ValueError:
+        return False
+
+
+def find_valid_path(from_state: str, to_state: str) -> list[str] | None:
+    """Find a valid path between two states using BFS on the transition DAG.
+
+    Args:
+        from_state: Starting state value (e.g., "needs-grooming").
+        to_state: Target state value (e.g., "in-progress").
+
+    Returns:
+        Ordered list of state strings representing the path from from_state
+        to to_state (inclusive), or None if no path exists in the DAG.
+        Returns ``[from_state]`` when from_state equals to_state (identity).
+
+    Note:
+        This function is pure (no I/O, no side effects).
+        Returns None for unknown state values.
+    """
+    try:
+        start = BacklogState(from_state)
+        end = BacklogState(to_state)
+    except ValueError:
+        return None
+
+    # Identity case
+    if start == end:
+        return [start.value]
+
+    # BFS
+    queue: deque[tuple[BacklogState, list[str]]] = deque()
+    queue.append((start, [start.value]))
+    visited: set[BacklogState] = {start}
+
+    while queue:
+        current, path = queue.popleft()
+        for neighbour in VALID_TRANSITIONS.get(current, frozenset()):
+            if neighbour == end:
+                return [*path, neighbour.value]
+            if neighbour not in visited:
+                visited.add(neighbour)
+                queue.append((neighbour, [*path, neighbour.value]))
+
+    return None

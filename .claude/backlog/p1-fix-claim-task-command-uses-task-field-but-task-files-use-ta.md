@@ -5,9 +5,9 @@ metadata:
   topic: fix-claim-task-command-uses-task-field-but-task-files-use-ta
   source: Observed during T5 execution in migrate-sam-task-github-subissues feature
   added: '2026-03-06'
-  priority: P1
+  priority: completed
   type: Bug
-  status: needs-grooming
+  status: done
   issue: '#497'
   last_synced: '2026-03-07T18:29:28Z'
 ---

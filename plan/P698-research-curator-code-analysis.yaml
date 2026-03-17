@@ -1,0 +1,122 @@
+feature: research-curator-code-analysis
+version: '1.0'
+description: ''
+goal: |-
+  Add code-analysis phase to research-curator agent for repository targets with thin documentation
+context: |-
+  Feature context: plan/feature-context-research-curator-code-analysis.md | Architecture spec: plan/architect-research-curator-code-analysis.md
+issue: '717'
+tasks:
+- id: T1
+  title: Add Doc-Sufficiency Gate to Phase 1
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  priority: 1
+  complexity: medium
+  description: |
+    Modify .claude/agents/research-curator.md to add a doc-sufficiency check at the end of Phase 1 (Extract).
+    The check evaluates three binary questions against extracted passages:
+    1. Do extracts name specific component/module names?
+    2. Do extracts describe data flow between named components?
+    3. Do extracts name extension points with interfaces?
+    If ANY is NO, flag for Phase 1b. Record the check result as a working note.
+    Reference: plan/architect-research-curator-code-analysis.md section D1.
+  acceptance-criteria: |
+    - Phase 1 instructions in the agent file include the three-question doc-sufficiency check
+    - Check result is recorded as a working note (not in the entry)
+    - Instructions are Haiku-compatible (binary yes/no, no qualitative judgment)
+  verification-steps: |
+    - Read .claude/agents/research-curator.md and confirm the check appears after Phase 1
+    - Verify the three questions match the architect spec D1
+    - Confirm instructions use imperative language appropriate for Haiku
+- id: T2
+  title: Add Phase 1b Code Analysis Instructions
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  dependencies:
+  - T1
+  priority: 1
+  complexity: high
+  description: |
+    Add Phase 1b (Code Analysis) to .claude/agents/research-curator.md between Phase 1 and Phase 2.
+    Phase 1b triggers only when doc-sufficiency check fails. Uses three-tier file selection with
+    explicit glob patterns. Reads up to 12 source files (depth budget). Adds findings to extracted
+    passages pool with file-path citations. Notes unread remainder if budget exhausted.
+    Reference: plan/architect-research-curator-code-analysis.md sections D2, D3, and Phase 1b.
+  acceptance-criteria: |
+    - Phase 1b appears in the agent file between Phase 1 and Phase 2
+    - Three-tier file selection with glob patterns for Python, Node/TS, Go, Rust ecosystems
+    - Depth budget of 12 files is enforced with explicit stop instruction
+    - Findings cite source files using the format from D4
+    - Phase 1b is conditional — only runs when doc-sufficiency check fails
+  verification-steps: |
+    - Read agent file and confirm Phase 1b appears in correct position
+    - Verify glob patterns match architect spec D3
+    - Confirm depth budget and stop condition are explicit
+    - Verify citation format matches D4
+- id: T3
+  title: Update Entry Template for Code-Level Citations
+  status: complete
+  agent: contextual-ai-documentation-optimizer
+  priority: 2
+  complexity: low
+  description: |
+    Review and update .claude/skills/research-curator/references/entry-template.md to support
+    code-level citations in the Architecture section. Add Confidence Map field to Freshness Tracking
+    table. Add note explaining code-read confidence qualifier. Ensure no breaking changes to validation.
+    Reference: plan/architect-research-curator-code-analysis.md section D4 and Entry Template Changes.
+  acceptance-criteria: |
+    - Entry template Architecture section explicitly supports source-file citations
+    - Citation format is documented (Source: {path} — {name})
+    - code-read confidence qualifier is documented in Freshness Tracking guidance
+    - No breaking changes to existing entry validation
+  verification-steps: |
+    - Read updated template and confirm citation guidance exists
+    - Run validate_research.py --all to confirm no validation regressions
+    - Verify Confidence Map field appears in Freshness Tracking table
+- id: T4
+  title: Verify Downstream Agent Compatibility
+  status: complete
+  agent: general-purpose
+  dependencies:
+  - T2
+  - T3
+  priority: 3
+  complexity: low
+  description: |
+    Verify that .claude/agents/research-insight-extractor.md and .claude/agents/research-utilization-assessor.md
+    can handle entries with code-level Architecture content. Read both agent files and confirm their
+    instructions do not filter out or break on source-file citations.
+  acceptance-criteria: |
+    - research-insight-extractor handles code-level architecture content (confirmed or fixed)
+    - research-utilization-assessor handles code-level architecture content (confirmed or fixed)
+    - Compatibility check documented
+  verification-steps: |
+    - Read both downstream agent files
+    - Confirm no instructions that would reject worktree file paths in Architecture sections
+    - Document findings
+- id: T5
+  title: Integration Verification
+  status: complete
+  agent: general-purpose
+  dependencies:
+  - T1
+  - T2
+  - T3
+  - T4
+  priority: 4
+  complexity: medium
+  description: |
+    Run validation to ensure the modified agent file and entry template pass all existing checks:
+    1. Run uv run prek run --files .claude/agents/research-curator.md
+    2. Run uv run .claude/skills/research-curator/scripts/validate_research.py --all
+    3. Review the modified agent file for instruction coherence
+  acceptance-criteria: |
+    - prek passes on modified agent file
+    - validate_research.py --all passes with no new errors
+    - Phase flow is coherent when read sequentially
+  verification-steps: |
+    - Run prek and capture output
+    - Run validator and capture output
+    - Read agent file sequentially and confirm flow
+  started: '2026-03-15T15:26:01.111313+00:00'

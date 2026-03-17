@@ -1,1046 +1,383 @@
-# Task File Format Specification v2.0
+# SAM Task File Format
 
-**Status**: Design Document
-**Created**: 2026-02-04
-**Purpose**: Define YAML frontmatter-based task file format to replace regex-based parsing
+**Status**: Current specification (updated 2026-03-15)
+**Purpose**: Canonical reference for SAM task file structure and the `sam` CLI as the sole interface
 
----
-
-## Problem Statement
-
-### Current Issues
-
-The existing task file format uses markdown with bold field markers that require complex regex parsing:
-
-```markdown
-## Task 1.1: Create Skill Directory Structure
-
-**Status**: NOT STARTED
-**Dependencies**: None
-**Priority**: 1
-**Complexity**: Low
-```
-
-**Problems**:
-
-1. **Fragile parsing**: Regex patterns break with formatting variations
-2. **Multiple heading levels**: Parser fails when task sections use different heading depths
-3. **No schema validation**: Fields can have any value without type checking
-4. **Ambiguous structure**: Hard to distinguish task metadata from content
-5. **Error-prone editing**: Easy to break format accidentally
-
-### Requirements
-
-1. **YAML frontmatter**: Store structured metadata in validated YAML block
-2. **Standard parsing**: Use YAML parser library instead of regex
-3. **Type safety**: Validate field types and values with schema
-4. **Human-readable**: Maintain easy editing in text editors
-5. **Backwards compatibility**: Support migration from old format
-6. **SAM methodology**: Continue supporting Stateless Agent Methodology workflows
+All task file I/O routes through the `sam` CLI or `sam_schema` Python API. No component reads or writes task files directly via Read/Edit/Write tools.
 
 ---
 
-## Format Specification
+## Quick Reference
 
-### File Organization Options
-
-**Option 1: Single File (Multi-Task)**
-
-All tasks in one file, each with YAML frontmatter separated by `---` delimiters.
-Use for small projects or when tasks have simple dependencies.
-
-**Option 2: Directory (One-Task-Per-File)**
-
-Each task is a separate `.md` file in a directory.
-Recommended for larger projects with many tasks or complex parallel workflows.
-
-File naming convention: `{task-id}-{slug}.md`
-- Examples: `T1-data-models.md`, `1.1-prepare-host.md`, `T15-cli-tests.md`
-- Slug is derived from task title (lowercase, hyphens, max 50 chars)
-
-The parser automatically detects and supports both formats.
-
-### Task File Structure
-
-```markdown
----
-task: T1
-title: Data Models and Error Codes
-status: complete
-agent: python-cli-architect
-dependencies: []
-priority: 1
-complexity: medium
-created: 2026-02-02T15:00:00Z
-started: 2026-02-02T15:15:00Z
-completed: 2026-02-02T15:30:00Z
----
-
-## Context
-
-Implement core data structures for validation results, issues, and error codes.
-
-## Objective
-
-Create type-safe data models for ValidationResult, ValidationIssue, ComplexityMetrics.
-
-## Requirements
-
-1. Create ValidationResult dataclass with passed/errors/warnings/info
-2. Create ValidationIssue dataclass with field/severity/message/code
-3. All dataclasses must be frozen or use __post_init__ validation
-
-## Constraints
-
-- Use Python 3.11+ syntax (str | None, not Optional[str])
-- Error codes must remain stable (no code reuse)
-
-## Expected Outputs
-
-- File created: plugins/plugin-creator/scripts/plugin_validator.py
-- Models: ValidationResult, ValidationIssue, ComplexityMetrics
-
-## Acceptance Criteria
-
-1. All dataclasses type-check with ty
-2. ValidationIssue.format() produces expected output format
-
-## Verification Steps
+### sam CLI Commands
 
 ```bash
-uv run ty check plugins/plugin-creator/scripts/plugin_validator.py
-uv run pytest tests/test_data_models.py -v
+# Create a new plan from YAML piped via stdin
+echo "$YAML_CONTENT" | uv run sam create {slug} --goal "Goal description" --stdin
+
+# Read a task (returns TaskAssignment with plan context)
+uv run sam read P{N}/T{M} --format json
+
+# Read a plan summary
+uv run sam read P{N} --format json
+
+# Update plan or task fields
+uv run sam update P{N} --context "Shared context for all tasks"
+uv run sam update P{N}/T{M} --append-section "Divergence Notes" --section-content "..."
+uv run sam update P{N} --set acceptance-criteria-structured=true
+
+# Transition task status
+uv run sam state P{N}/T{M} {status}
+
+# Claim a task (mark in-progress, set started timestamp)
+uv run sam claim P{N}/T{M}
+
+# List ready tasks (status=not-started with all dependencies complete)
+uv run sam ready P{N} --format json
+
+# Show plan progress summary
+uv run sam status P{N}
+
+# Validate a plan against schema
+uv run sam validate P{N} --format json
+
+# Migrate legacy markdown format to pure YAML
+uv run sam migrate plan/tasks-{N}-{slug}.md
 ```
 
-## Can Parallelize With
+### MCP Tools
 
-T2 (after data models complete)
-
-## Handoff
-
-Report:
-- Data model file path
-- All error codes implemented (count 23)
-- ty type check status
+```text
+sam_create(slug, goal, tasks_yaml, ...)   -- mirrors sam create
+sam_read(address, format)                 -- mirrors sam read; returns TaskAssignment for task addresses
+sam_update(address, fields, ...)          -- mirrors sam update
+sam_claim(address)                        -- mirrors sam claim
+sam_state(address, status)                -- mirrors sam state
+sam_ready(address, format)                -- mirrors sam ready
+sam_status(address)                       -- mirrors sam status
 ```
 
-### Field Definitions
+---
 
-#### Required Fields
+## Naming Convention
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `task` | string | Unique task identifier | `"T1"`, `"1.1"`, `"T15"` |
-| `title` | string | Brief task description | `"Create Data Models"` |
-| `status` | enum | Task state | `"not-started"`, `"in-progress"`, `"complete"`, `"blocked"` |
+### File Names
 
-#### Optional Fields
+```text
+plan/P{NNN}-{slug}.yaml            # single-file plan (under 500 lines)
+plan/P{NNN}-{slug}/                # directory plan (500+ lines)
+    P{NNN}-PLAN.yaml               # plan-level metadata, goal, context, task list
+    P{NNN}-ARCHITECT.md            # architecture spec
+    P{NNN}-CONTEXT.md              # feature context
+    tasks/
+        T01.yaml
+        T02.yaml
+```
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `agent` | string | Agent responsible for task | `"python-cli-architect"` |
-| `dependencies` | array | Task IDs that must complete first | `["T1", "T2"]` |
-| `priority` | integer | Priority level (1-5, 1=highest) | `1` |
-| `complexity` | enum | Complexity estimate | `"low"`, `"medium"`, `"high"` |
-| `created` | datetime | ISO 8601 timestamp when created | `"2026-02-02T15:00:00Z"` |
-| `started` | datetime | ISO 8601 timestamp when started | `"2026-02-02T15:15:00Z"` |
-| `completed` | datetime | ISO 8601 timestamp when completed | `"2026-02-02T15:30:00Z"` |
-| `blocked-by` | array | External blockers (not task IDs) | `["API access", "Design approval"]` |
-| `parallelize-with` | array | Tasks that can run concurrently | `["T2", "T3"]` |
-| `skills` | array | Skills for the sub-agent to load | `["fastmcp-python-tests", "python3-development"]` |
-| `issue-classification` | enum | `procedural`, `defect`, `recurring-pattern`, `missing-guardrail`, `unbounded-design` — analytical depth classification | `"defect"` |
-| `scenario-target` | string | `"{scenario that exposed the problem} -> {what should improve}"` | `"Hook did not fire -> fires regardless of invocation method"` |
-| `analysis-method` | enum | `none`, `5-whys`, `6-sigma`, `design-framing` — root-cause method applied during grooming. Default: `none` | `"5-whys"` |
-| `divergence-notes` | integer | Count of divergence notes recorded during implementation. Default: `0` | `2` |
+`{NNN}` is a zero-padded sequential number assigned by `sam create`. `{slug}` is lowercase-hyphenated from the feature name.
 
-#### Status Values
+### Addressing
 
-| Status | Description | Usage |
-|--------|-------------|-------|
-| `not-started` | Task not yet begun | Default for new tasks |
-| `in-progress` | Task actively being worked on | Set when agent claims task |
-| `complete` | Task finished successfully | Set after verification passes |
-| `blocked` | Task cannot proceed | Set when waiting on external dependency |
+```text
+P{N}/T{M}     -- task M in plan N (numeric match, leading zeros ignored)
+P719/T04      -- task T04 in plan P719
+my-slug/T1    -- task T1 in plan matching slug "my-slug"
+```
 
-#### Complexity Values
+`sam read P1/T3` globs `plan/P001-*/` and finds `T03.yaml` (or the T03 section in a single-file plan).
 
-| Complexity | Description | Typical Duration |
-|------------|-------------|------------------|
-| `low` | Simple, well-defined task | <1 hour |
-| `medium` | Moderate complexity | 1-4 hours |
-| `high` | Complex, requires significant work | >4 hours |
+### Legacy Names
+
+Plans created before this specification use `tasks-{N}-{slug}.md` naming. The addressing module resolves both patterns. Migrate using `sam migrate`. See [Legacy Format Support](#legacy-format-support).
+
+---
+
+## Plan Schema
+
+Plan-level fields are defined in the `Plan` Pydantic model (`packages/sam_schema/sam_schema/core/models.py`).
+
+Key plan fields:
+
+```yaml
+plan_number: 1
+slug: my-feature
+goal: "Implement the feature"
+context: "Background context shared across all tasks"
+acceptance_criteria:
+  - "Criterion 1"
+  - "Criterion 2"
+issue: 719                    # GitHub issue number (optional)
+feature: "My Feature Name"
+status: in-progress           # not-started | in-progress | complete
+created: "2026-03-15T00:00:00Z"
+tasks:
+  - task: T01
+    title: "First task"
+    status: not-started
+    ...
+```
+
+For the complete field specification:
+
+- [Plan Schema](./plan-schema.json) — generated by `uv run sam schema --model Plan`
+
+---
+
+## Task Schema
+
+Task-level fields are defined in the `Task` Pydantic model.
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task` | `str` | Task ID — `T01`, `T02`, etc. (local to plan) |
+| `title` | `str` | Human-readable task title |
+| `status` | `str` | See [Status Values](#status-values) |
+| `agent` | `str` | Agent name for execution |
+| `dependencies` | `list[str]` | Task IDs this task depends on |
+| `priority` | `int` | 1-5 (1=critical) |
+| `complexity` | `str` | `low`, `medium`, `high` |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skills` | `list[str]` | Skills the executing sub-agent loads |
+| `accuracy-risk` | `str` | `low`, `medium`, `high` |
+| `started` | `str` | ISO 8601 timestamp — set by `sam claim` |
+| `completed` | `str` | ISO 8601 timestamp — set by SubagentStop hook |
+| `last-activity` | `str` | ISO 8601 timestamp — set by PostToolUse hook |
+| `github_issue` | `int` | Linked GitHub sub-issue number |
+| `issue-classification` | `str` | `procedural`, `defect`, `recurring-pattern`, `missing-guardrail`, `unbounded-design` |
+| `scenario-target` | `str` | `"{scenario} -> {improvement}"` |
+| `analysis-method` | `str` | `none`, `5-whys`, `6-sigma`, `design-framing` |
+| `divergence-notes` | `int` | Count of `## Divergence Notes` sections in body |
+| `is-bookend` | `bool` | `true` for T0 baseline or TN verification tasks |
+| `bookend-type` | `str` | `t0-baseline` or `tn-verification` |
+| `body` | `str` | Markdown body: Objective, Requirements, Acceptance Criteria, Verification Steps |
+
+### Status Values
+
+| Status | Description | Written By |
+|--------|-------------|-----------|
+| `not-started` | Default for new tasks | `swarm-task-planner` at creation |
+| `in-progress` | Agent has claimed the task | `sam claim` via `start-task` skill |
+| `complete` | Task finished successfully | `task_status_hook.py` SubagentStop handler |
+| `blocked` | Cannot proceed — external dependency | Agent via `sam state` |
+| `deferred` | Postponed to a later session | Orchestrator |
+| `skipped` | Intentionally not executed | Orchestrator |
+
+For the complete field specification:
+
+- [Task Schema](./task-schema.json) — generated by `uv run sam schema --model Task`
 
 ---
 
 ## Authorized Writers
 
-Task metadata fields are owned by specific components. Only the designated component for
-a field may write that field. No other component (including LLM agents acting via Edit
-tool calls) may write lifecycle fields (`status`, `started`, `completed`, `last_activity`) except
-through the designated path.
+Task metadata fields are owned by specific components. The `sam` CLI and `sam_schema` API are the sole write interfaces. No component writes task fields directly via Edit/Write tools.
 
-This prevents the following observed failure modes:
-
-- Dual-dispatch (two agents claiming the same task)
-- Overwritten `started` timestamps on agent retry
-- `last_activity` updates written to completed tasks
-
-The table below lists every writeable field, its authorized writer, and the trigger that
-fires the write.
-
-| Field | Authorized Writer | Trigger | Guard | Notes |
-|-------|-----------------|---------|-------|-------|
-| `status: not-started` | `swarm-task-planner` agent (file creation) | Task file generation | N/A — initial write only | Set once at file creation. Never written again by any component. |
-| `status: in-progress` | `implementation_manager.py claim-task` | `start-task` skill step 3 (agent invokes CLI) | Read-check-write: refuses if current status is not `not-started` | Agent must NOT write this field directly via Edit tool. |
-| `status: complete` | `task_status_hook.py` SubagentStop handler | Claude Code `SubagentStop` hook event | None — SubagentStop fires once per sub-agent | May also be written by `start-task` `--complete` path; hook overwrites with later timestamp. |
-| `status: blocked` | Human operator or `start-task` agent | Manual intervention or acceptance criteria failure | None | Agent may set this when blocked on external dependency. |
-| `started` | `implementation_manager.py claim-task` | Same as `status: in-progress` | Conditional: written only if field is absent. Existing value preserved on retry. | Preserving the original timestamp maintains accurate audit trail on agent retry. |
-| `completed` | `task_status_hook.py` SubagentStop handler | Claude Code `SubagentStop` hook event | None | Also writable by `start-task --complete` path; hook overwrites. |
-| `last_activity` | `task_status_hook.py` PostToolUse handler | Claude Code `PostToolUse` hook (Write, Edit, Bash tools) | Added guard: skip write if task status is `complete` | Prevents stale activity stamps on completed tasks (Gap 4). |
-| `divergence-notes` (count) | `start-task` skill (agent direct write via Edit) | Agent detects implementation divergence from architect spec | None | Appended integer count. Body content (`## Divergence Notes`) is also agent-written. |
-| `task`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`, `issue-classification`, `scenario-target`, `analysis-method` | `swarm-task-planner` agent (file creation) | Task file generation | N/A — set at creation | These fields describe task intent and scheduling. No lifecycle component writes them after creation. |
+| Field | Written By | Via |
+|-------|-----------|-----|
+| All task fields at creation | `swarm-task-planner` agent | `sam create {slug} --goal "..." --stdin` |
+| `status: in-progress`, `started` | `start-task` skill | `sam claim P{N}/T{M}` |
+| `status: complete`, `completed` | `task_status_hook.py` SubagentStop handler | `sam state P{N}/T{M} complete` |
+| `status: blocked` | Agent or human operator | `sam state P{N}/T{M} blocked` |
+| `last-activity` | `task_status_hook.py` PostToolUse handler | `sam_schema` API — skipped if status is `complete` |
+| `context` | `context-gathering` agent | `sam update P{N} --context "..."` |
+| Plan metadata | orchestrator or `add-new-feature` skill | `sam update P{N} --set field=value` |
+| `divergence-notes`, body sections | executing agent via `start-task` skill | `sam update P{N}/T{M} --append-section "..."` |
 
 ### Field Ownership Rules
 
-1. `status: in-progress` and `started` are written ONLY by `implementation_manager.py claim-task`.
-   LLM agents in the `start-task` skill must invoke `claim-task` via `uv run` and check exit code.
-   Direct Edit of these fields by agents is an architectural violation.
+1. `status: in-progress` and `started` are written only by `sam claim`. Agents in `start-task` must invoke `sam claim` and check exit code. Direct Edit of these fields is an architectural violation.
 
-2. `status: complete` and `completed` are written ONLY by `task_status_hook.py` SubagentStop handler.
-   The `start-task --complete` path also writes these fields as a convenience, but the hook
-   always overwrites them at SubagentStop time. If both paths fire, the hook timestamp wins.
+2. `status: complete` and `completed` are written only by `task_status_hook.py` SubagentStop handler.
 
-3. `last_activity` is written ONLY by `task_status_hook.py` PostToolUse handler, and only when
-   the task status is not `complete`. Writing `last_activity` to a completed task is a no-op.
+3. `last-activity` is written only by `task_status_hook.py` PostToolUse handler, and only when task status is not `complete`.
 
-4. `divergence-notes` (count) and the `## Divergence Notes` body section are written ONLY by the
-   executing agent via the `start-task` skill. These are not lifecycle fields.
+4. `divergence-notes` count and `## Divergence Notes` body content are written by the executing agent via `sam update --append-section`.
 
-5. All other fields (`task`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`,
-   and analytical metadata fields) are written ONCE at task file creation by `swarm-task-planner`.
-   No component modifies them after creation.
-
-### Scripts
-
-| Script | Role | Writes |
-|--------|------|--------|
-| `implementation_manager.py` | CLI for status queries AND `claim-task` | `status: in-progress`, `started` (via `claim-task` only) |
-| `task_status_hook.py` | Hook handler for Claude Code events | `status: complete`, `completed`, `last_activity` |
-| `swarm-task-planner` (agent) | Task file generator | All fields at creation |
-| `split_task_file.py` | Structural: splits monolithic task files into per-task files | Full frontmatter (preserved from source, not lifecycle transition) |
-| `migrate_task_format.py` | Structural: converts legacy markdown to YAML frontmatter | Full frontmatter (format migration, not lifecycle transition) |
-
-Task data files MUST contain raw YAML frontmatter starting with `---`. Agents generating task
-files SHOULD produce content matching this format directly. When the generator is an LLM agent
-(e.g., `swarm-task-planner`), the agent's template MUST show raw frontmatter without code fence
-wrappers.
-
-### Anti-Pattern: Fenced YAML Frontmatter
-
-**Wrong** — wrapping frontmatter in a code fence causes parser failure:
-
-````markdown
-```yaml
----
-task: T1
-title: Create Data Models
-status: not-started
----
-```
-
-## Context
-
-Task body here.
-````
-
-**Correct** — raw frontmatter starting on the first line of the file:
-
-```text
----
-task: T1
-title: Create Data Models
-status: not-started
----
-
-## Context
-
-Task body here.
-```
-
-The `detect_fenced_yaml()` function in `task_format.py` auto-strips fences with a warning, but
-this is a fallback for human-edited files. Generators (agents, scripts) must produce correct
-output without relying on this recovery path.
+5. All other fields (`task`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`, and analytical metadata) are written once at plan creation by `swarm-task-planner`. No component modifies them after creation.
 
 ---
 
-## Markdown Body Sections
+## sam CLI Usage Guide
 
-### Recommended Sections
-
-The markdown body SHOULD include these sections for SAM methodology compliance:
-
-1. **Context**: Why this task exists, background information
-2. **Objective**: Clear statement of what this task achieves
-3. **Requirements**: Numbered list of specific requirements
-4. **Constraints**: Technical or policy constraints that must be respected
-5. **Expected Outputs**: Files, artifacts, or deliverables produced
-6. **Acceptance Criteria**: Testable conditions for task completion
-7. **Verification Steps**: Commands or procedures to verify completion
-8. **Can Parallelize With**: Tasks that can run concurrently (optional)
-9. **Handoff**: What information to report to orchestrator (optional)
-
-### Section Guidelines
-
-**Context** - Provides historical and situational awareness:
-
-```markdown
-## Context
-
-Implement core data structures for validation results, issues, and error codes. These models are used by all validators and reporters.
-```
-
-**Objective** - Single sentence describing the goal:
-
-```markdown
-## Objective
-
-Create type-safe data models for ValidationResult, ValidationIssue, and ComplexityMetrics with complete error code catalog.
-```
-
-**Requirements** - Numbered list of specific deliverables:
-
-```markdown
-## Requirements
-
-1. Create ValidationResult dataclass with passed/errors/warnings/info
-2. Create ValidationIssue dataclass with field/severity/message/code/line
-3. Create ComplexityMetrics dataclass with token counts and thresholds
-```
-
-**Constraints** - Hard limits and non-negotiable requirements:
-
-```markdown
-## Constraints
-
-- Use Python 3.11+ syntax (str | None, not Optional[str])
-- All dataclasses must be frozen or use __post_init__ validation
-- Error codes must remain stable (no code reuse)
-```
-
-**Expected Outputs** - Concrete artifacts:
-
-```markdown
-## Expected Outputs
-
-- File created: plugins/plugin-creator/scripts/plugin_validator.py
-- Models: ValidationResult, ValidationIssue, ComplexityMetrics
-- Constants: ERROR_CODE_BASE_URL, token thresholds
-```
-
-**Acceptance Criteria** - Testable pass/fail conditions:
-
-```markdown
-## Acceptance Criteria
-
-1. All dataclasses type-check with ty
-2. Error code constants match architecture catalog exactly
-3. ValidationIssue.format() produces expected output format
-```
-
-**Verification Steps** - Executable commands:
-
-````markdown
-## Verification Steps
+### sam create — Create a new plan
 
 ```bash
-# Type checking
-uv run ty check plugins/plugin-creator/scripts/plugin_validator.py
+# Pipe YAML task definitions via stdin
+echo "$YAML_CONTENT" | uv run sam create my-feature \
+  --goal "Route all SAM workflow I/O through sam CLI" \
+  --issue 719 \
+  --stdin \
+  --format json
 
-# Unit test data models
-uv run pytest tests/test_data_models.py -v
+# Output: { "path": "plan/P719-my-feature.yaml", "plan_number": 719, "task_count": 14 }
 ```
-````
 
----
+Stdin YAML structure:
 
-## YAML Schema
+```yaml
+tasks:
+  - task: T01
+    title: "First task"
+    status: not-started
+    agent: python-cli-architect
+    dependencies: []
+    priority: 1
+    complexity: medium
+    skills: ["python3-development"]
+    body: |
+      ## Objective
+      ...
+acceptance_criteria:
+  - "AC1: criterion one"
+context: "Shared context"
+```
 
-### JSON Schema Definition
+### sam read — Read task or plan
+
+```bash
+# Read a task — returns TaskAssignment (plan context + task details)
+uv run sam read P719/T04 --format json
+
+# Read a plan — returns Plan JSON
+uv run sam read P719 --format json
+```
+
+TaskAssignment response shape (see [TaskAssignment Schema](./assignment-schema.json)):
 
 ```json
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["task", "title", "status"],
-  "properties": {
-    "task": {
-      "type": "string",
-      "pattern": "^[A-Z]?\\d+(\\.\\d+)?$",
-      "description": "Unique task identifier (e.g., T1, 1.1, T15)"
-    },
-    "title": {
-      "type": "string",
-      "minLength": 5,
-      "maxLength": 100,
-      "description": "Brief task description"
-    },
-    "status": {
-      "type": "string",
-      "enum": ["not-started", "in-progress", "complete", "blocked"],
-      "description": "Current task state"
-    },
-    "agent": {
-      "type": "string",
-      "description": "Agent responsible for executing this task"
-    },
-    "dependencies": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Z]?\\d+(\\.\\d+)?$"
-      },
-      "default": [],
-      "description": "Task IDs that must complete before this task"
-    },
-    "priority": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 5,
-      "default": 3,
-      "description": "Priority level (1=highest, 5=lowest)"
-    },
-    "complexity": {
-      "type": "string",
-      "enum": ["low", "medium", "high"],
-      "default": "medium",
-      "description": "Complexity estimate"
-    },
-    "created": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp when task created"
-    },
-    "started": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp when work began"
-    },
-    "completed": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp when task finished"
-    },
-    "blocked-by": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": [],
-      "description": "External blockers preventing progress"
-    },
-    "parallelize-with": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Z]?\\d+(\\.\\d+)?$"
-      },
-      "default": [],
-      "description": "Tasks that can run concurrently with this one"
-    },
-    "skills": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": [],
-      "description": "Skills the sub-agent should load before executing this task"
-    },
-    "issue-classification": {
-      "type": "string",
-      "enum": ["procedural", "defect", "recurring-pattern", "missing-guardrail", "unbounded-design"],
-      "description": "Analytical depth classification for the issue this task addresses"
-    },
-    "scenario-target": {
-      "type": "string",
-      "description": "What scenario exposed this issue and what specifically should improve"
-    },
-    "analysis-method": {
-      "type": "string",
-      "enum": ["none", "5-whys", "6-sigma", "design-framing"],
-      "default": "none",
-      "description": "Root-cause analysis method applied during grooming"
-    },
-    "divergence-notes": {
-      "type": "integer",
-      "minimum": 0,
-      "default": 0,
-      "description": "Count of divergence notes recorded during implementation"
-    }
+  "plan_number": 719,
+  "plan_slug": "my-feature",
+  "plan_goal": "Route all SAM workflow I/O through sam CLI",
+  "plan_context": "Background context shared across all tasks",
+  "plan_acceptance_criteria": ["AC1: criterion one"],
+  "task": {
+    "task": "T04",
+    "title": "TASK_FILE_FORMAT.md rewrite",
+    "status": "in-progress",
+    "agent": "contextual-ai-documentation-optimizer",
+    "dependencies": [],
+    "priority": 1,
+    "complexity": "medium",
+    "body": "## Objective\n..."
   }
 }
 ```
 
-### Validation Rules
-
-1. **task**: Must match pattern `^[A-Z]?\d+(\.\d+)?$` (e.g., `"T1"`, `"1.1"`, `"15"`)
-2. **status**: Must be one of: `"not-started"`, `"in-progress"`, `"complete"`, `"blocked"`
-3. **priority**: Integer 1-5 (1=highest, 5=lowest)
-4. **complexity**: Must be one of: `"low"`, `"medium"`, `"high"`
-5. **dependencies**: Array of task IDs matching task pattern
-6. **timestamps**: ISO 8601 format with timezone (e.g., `"2026-02-02T15:00:00Z"`)
-
----
-
-## Directory-Based Task Organization
-
-### When to Use Directory Structure
-
-Use one-task-per-file organization when:
-- Project has >10 tasks
-- Tasks can run in parallel
-- Multiple agents work on different tasks concurrently
-- Need granular git history per task
-- Tasks may be reorganized or reprioritized frequently
-
-### File Naming Convention
-
-Format: `{task-id}-{slug}.md`
-
-Components:
-- `{task-id}`: Matches the `task:` field in frontmatter (e.g., T1, 1.1, T15)
-- `{slug}`: URL-friendly version of task title (lowercase, hyphens, max 50 chars)
-
-Examples:
-- `T1-data-models.md` (task T1: "Data Models and Error Codes")
-- `1.1-prepare-host.md` (task 1.1: "Prepare Host Environment")
-- `T15-cli-tests.md` (task T15: "CLI Integration Tests")
-
-### Parser Behavior
-
-The `implementation_manager.py` parser automatically detects format:
-
-**Single File**: Parses all tasks from one file
-```bash
-implementation_manager.py status /path/to/project plugin-validator-tasks.md
-```
-
-**Directory**: Discovers all .md files, parses each as one task
-```bash
-implementation_manager.py status /path/to/project tasks/
-```
-
-**Task Ordering**: Tasks are sorted numerically by ID (T1, T2, T10, not T1, T10, T2)
-
-### Splitting Multi-Task Files
-
-Convert existing multi-task files to directory structure:
+### sam update — Update plan or task fields
 
 ```bash
-# Split into tasks/ subdirectory
-split_task_file.py plugin-validator-tasks.md
+# Set plan context
+uv run sam update P719 --context "Background context for all tasks"
 
-# Split into custom directory
-split_task_file.py tasks.md ./my-tasks/
+# Set a specific field
+uv run sam update P719 --set acceptance-criteria-structured=true
 
-# Force overwrite existing files
-split_task_file.py --force tasks.md
+# Append a section to a task body
+uv run sam update P719/T04 \
+  --append-section "Divergence Notes" \
+  --section-content "### DN-1: Brief title\n..."
 ```
 
-The script:
-1. Parses tasks from input file (supports both YAML and markdown formats)
-2. Creates output directory if needed
-3. Generates one file per task with naming convention
-4. Preserves all frontmatter metadata
-5. Creates basic body structure (Context, Objective, Requirements sections)
-
-After splitting, update task content in individual files.
-
-## Migration Guide
-
-### Migration Strategy
-
-**Phase 1: Parser Update** (✅ COMPLETE)
-
-1. ✅ Updated `implementation_manager.py` to parse YAML frontmatter
-2. ✅ Maintained backwards compatibility with markdown format
-3. ✅ Added directory discovery for one-task-per-file organization
-4. ✅ Return same Task dataclass regardless of format
-
-**Phase 2: Template Creation** (✅ COMPLETE)
-
-1. ✅ Created task template at `plugins/python3-development/templates/sam-task-template.md`
-2. ✅ Documented frontmatter fields and body sections
-3. ✅ Provided examples for common task types
-
-**Phase 3: Migration Script** (✅ COMPLETE)
-
-1. ✅ Created `plugins/python3-development/scripts/split_task_file.py`
-2. ✅ Converts existing markdown tasks to YAML frontmatter
-3. ✅ Preserves all metadata and content
-4. ✅ Supports directory-based organization
-
-**Phase 4: Adoption** (in progress)
-
-1. ✅ Update task creation workflows to use new format (swarm-task-planner, generate-task, start-task updated 2026-02-13)
-2. ✅ Migrated `plan/tasks-1-plugin-linter.md` to `plan/tasks-1-plugin-linter/` directory (proof-of-concept, 2026-02-13)
-3. ⏳ Migrate remaining task files to YAML format or directories
-4. ⏳ Mark old format as deprecated in documentation
-5. ⏳ Remove markdown parsing support after migration complete
-
-### Conversion Example
-
-**Old Format** (markdown with bold fields):
-
-```markdown
-## Task T1: Data Models and Error Codes
-
-**Status**: COMPLETE
-**Started**: 2026-02-02T15:15:00Z
-**Completed**: 2026-02-02T15:30:00Z
-**Agent**: python-cli-architect
-**Dependencies**: None
-**Priority**: 1 (Foundational)
-**Complexity**: Medium
-**Skills**: fastmcp-python-tests, python3-development
-
-Implement core data structures...
-```
-
-**New Format** (YAML frontmatter):
-
-```markdown
----
-task: T1
-title: Data Models and Error Codes
-status: complete
-started: 2026-02-02T15:15:00Z
-completed: 2026-02-02T15:30:00Z
-agent: python-cli-architect
-dependencies: []
-priority: 1
-complexity: medium
-skills:
-  - fastmcp-python-tests
-  - python3-development
----
-
-## Context
-
-Implement core data structures...
-```
-
-### Field Mapping
-
-| Old Format | New Format | Transformation |
-|------------|------------|----------------|
-| `**Status**: COMPLETE` | `status: complete` | Lowercase, hyphenated |
-| `**Dependencies**: None` | `dependencies: []` | Empty array instead of "None" |
-| `**Priority**: 1 (Foundational)` | `priority: 1` | Integer only, drop description |
-| `**Complexity**: Medium` | `complexity: medium` | Lowercase |
-| `**Agent**: python-cli-architect` | `agent: python-cli-architect` | No change |
-| `**Started**: <timestamp>` | `started: <timestamp>` | No change |
-| `**Completed**: <timestamp>` | `completed: <timestamp>` | No change |
-| `**Skills**: skill1, skill2` | `skills: [skill1, skill2]` | Comma-separated to array |
-
-### Status Value Mapping
-
-| Old Status | New Status |
-|------------|------------|
-| `NOT STARTED` | `not-started` |
-| `IN PROGRESS` | `in-progress` |
-| `COMPLETE` | `complete` |
-| `:x:` (emoji) | `not-started` |
-| `:white_check_mark:` (emoji) | `complete` |
-| `:arrows_counterclockwise:` (emoji) | `in-progress` |
-
----
-
-## Implementation Changes
-
-### Parser Updates Required
-
-**File**: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py`
-
-**Changes**:
-
-1. Add YAML parser import: `from ruamel.yaml import YAML`
-2. Add frontmatter detection function
-3. Create YAML parsing path
-4. Maintain backwards compatibility with markdown parsing
-5. Update validation to use schema
-
-**Functions to Add**:
-
-```python
-def has_yaml_frontmatter(content: str) -> bool:
-    """Detect if file uses YAML frontmatter format."""
-    return content.strip().startswith('---\n')
-
-def parse_yaml_frontmatter(content: str) -> tuple[dict[str, object], str]:
-    """Extract YAML frontmatter and markdown body.
-
-    Returns:
-        Tuple of (frontmatter_dict, body_content)
-    """
-    # Split on frontmatter delimiters
-    parts = content.split('---\n', 2)
-    if len(parts) < 3:
-        raise ValueError("Invalid frontmatter format")
-
-    yaml = YAML(typ='safe')
-    frontmatter = yaml.load(parts[1])
-    body = parts[2].strip()
-
-    return frontmatter, body
-
-def parse_task_with_frontmatter(task_section: str) -> Task:
-    """Parse task from YAML frontmatter format."""
-    frontmatter, body = parse_yaml_frontmatter(task_section)
-
-    # Validate against schema
-    validate_task_frontmatter(frontmatter)
-
-    # Convert to Task dataclass
-    return Agent(
-        id=frontmatter['task'],
-        name=frontmatter['title'],
-        status=TaskStatus(frontmatter['status'].upper().replace('-', '_')),
-        dependencies=frontmatter.get('dependencies', []),
-        agent=frontmatter.get('agent'),
-        priority=TaskPriority(frontmatter.get('priority', 3)),
-        complexity=frontmatter.get('complexity', 'medium').capitalize(),
-        started=frontmatter.get('started'),
-        completed=frontmatter.get('completed'),
-    )
-```
-
-**Schema Validation**:
-
-```python
-import jsonschema
-
-TASK_SCHEMA = {
-    "type": "object",
-    "required": ["task", "title", "status"],
-    "properties": {
-        "task": {"type": "string", "pattern": "^[A-Z]?\\d+(\\.\\d+)?$"},
-        "title": {"type": "string", "minLength": 5, "maxLength": 100},
-        "status": {
-            "type": "string",
-            "enum": ["not-started", "in-progress", "complete", "blocked"]
-        },
-        "priority": {"type": "integer", "minimum": 1, "maximum": 5},
-        "complexity": {"type": "string", "enum": ["low", "medium", "high"]},
-        "dependencies": {"type": "array", "items": {"type": "string"}},
-        # ... rest of schema
-    }
-}
-
-def validate_task_frontmatter(frontmatter: dict[str, object]) -> None:
-    """Validate frontmatter against JSON schema."""
-    try:
-        jsonschema.validate(instance=frontmatter, schema=TASK_SCHEMA)
-    except jsonschema.ValidationError as e:
-        raise ValueError(f"Invalid task frontmatter: {e.message}") from e
-```
-
----
-
-## Template File
-
-**Location**: `plugins/python3-development/templates/sam-task-template.md`
-
-**Purpose**: Provide reusable template for creating new SAM-compliant task files
-
-**Template Contents**:
-
-```markdown
----
-task: ""  # REQUIRED: Unique identifier (e.g., T1, 1.1, T15)
-title: ""  # REQUIRED: Brief task description (5-100 chars)
-status: not-started  # REQUIRED: not-started | in-progress | complete | blocked
-agent: ""  # OPTIONAL: Agent responsible for execution
-dependencies: []  # OPTIONAL: Task IDs that must complete first
-priority: 3  # OPTIONAL: 1-5 (1=highest, 5=lowest)
-complexity: medium  # OPTIONAL: low | medium | high
-created: ""  # OPTIONAL: ISO 8601 timestamp
-started: ""  # OPTIONAL: ISO 8601 timestamp
-completed: ""  # OPTIONAL: ISO 8601 timestamp
-blocked-by: []  # OPTIONAL: External blockers
-parallelize-with: []  # OPTIONAL: Tasks that can run concurrently
-skills: []  # OPTIONAL: Skills for sub-agent to load
-# issue-classification: ""  # OPTIONAL: procedural | defect | recurring-pattern | missing-guardrail | unbounded-design
-# scenario-target: ""  # OPTIONAL: "{scenario} -> {improvement}"
-# analysis-method: none  # OPTIONAL: none | 5-whys | 6-sigma | design-framing
-# divergence-notes: 0   # OPTIONAL: integer count of ## Divergence Notes sections in body
----
-
-## Context
-
-Provide background and rationale for this task. Explain why it exists and what problem it solves.
-
-## Objective
-
-Single clear sentence describing what this task achieves.
-
-## Requirements
-
-1. First specific requirement
-2. Second specific requirement
-3. Third specific requirement
-
-## Constraints
-
-- Technical constraint or limitation
-- Policy or architectural constraint
-- Performance or quality constraint
-
-## Expected Outputs
-
-- File created: path/to/file.py
-- Artifact generated: description
-- Configuration updated: description
-
-## Acceptance Criteria
-
-1. First testable pass/fail condition
-2. Second testable pass/fail condition
-3. Third testable pass/fail condition
-
-## Verification Steps
+### sam state — Transition task status
 
 ```bash
-# Command to verify first criterion
-command1 --verify
-
-# Command to verify second criterion
-command2 --test
+uv run sam state P719/T04 complete
+uv run sam state P719/T04 blocked
+# Valid values: not-started | in-progress | complete | blocked | deferred | skipped
 ```
 
-## Can Parallelize With
-
-List task IDs that can run concurrently: T2, T3, T4
-
-**Reason**: Explanation of why parallelization is safe
-
-## Handoff
-
-Report to orchestrator:
-- Key information needed for next phase
-- Artifacts produced and their locations
-- Any blockers or issues encountered
-```
-
----
-
-## Migration Script Specification
-
-**Script**: `plugins/python3-development/scripts/migrate_task_format.py`
-
-**Purpose**: Convert existing markdown-format task files to YAML frontmatter format
-
-**Requirements**:
-
-1. Read task file
-2. Parse using existing regex-based parser
-3. Extract all Task objects
-4. Convert to YAML frontmatter format
-5. Preserve markdown body content
-6. Validate output against schema
-7. Write updated file
-8. Report conversion statistics
-
-**CLI Interface**:
+### sam claim — Claim a task (mark in-progress)
 
 ```bash
-# Migrate single file
-uv run plugins/python3-development/scripts/migrate_task_format.py tasks-refactor-plugin.md
-
-# Migrate all task files in directory
-uv run plugins/python3-development/scripts/migrate_task_format.py .claude/plan/
-
-# Dry run (report changes without writing)
-uv run plugins/python3-development/scripts/migrate_task_format.py --dry-run tasks.md
-
-# Validate migrated files
-uv run plugins/python3-development/scripts/migrate_task_format.py --validate tasks.md
+uv run sam claim P719/T04 --format json
+# Output: { "claimed": true, "task_id": "T04", "started": "2026-03-15T13:00:00Z" }
+# Exit code 1: already claimed, not found, or status != not-started
 ```
 
-**Output**:
+### sam ready — List ready tasks
 
-```text
-Migrating: tasks-refactor-plugin.md
-  ✅ Task T1: Data Models and Error Codes
-  ✅ Task T2: Validator Protocol Definition
-  ✅ Task T3: Port FrontmatterValidator
+```bash
+uv run sam ready P719 --format json
+# Output: { "feature": "my-feature", "ready_tasks": [...], "count": 3 }
+# A task is ready when status=not-started and all dependencies are complete.
+```
 
-✅ Migrated 3 tasks successfully
-✅ All tasks validated against schema
-✅ File written: tasks-refactor-plugin.md
+### sam status — Plan progress summary
+
+```bash
+uv run sam status P719
+# Output: plan progress with task counts by status, blocked tasks, next ready tasks
+```
+
+### sam validate — Validate plan against schema
+
+```bash
+uv run sam validate P719 --format json
+# Output: { "valid": true/false, "errors": [...], "warnings": [...] }
+```
+
+### sam migrate — Convert legacy format to pure YAML
+
+```bash
+uv run sam migrate plan/tasks-3-integrate-sam-schema.md
+# Converts YAML frontmatter .md file to pure YAML .yaml file
+# Output: plan/P719-integrate-sam-schema.yaml
 ```
 
 ---
 
-## Benefits Summary
+## Legacy Format Support
 
-### Developer Benefits
+### Supported Legacy Patterns (Read-Only)
 
-1. **Easier Parsing**: Use `YAML(typ='safe').load()` instead of complex regex
-2. **Type Safety**: Validate fields with JSON schema
-3. **Better Errors**: Schema validation provides clear error messages
-4. **Extensibility**: Add new fields without breaking parser
-5. **Standard Tools**: YAML editors provide syntax highlighting and validation
+The `sam` CLI reads but does not write these legacy formats:
 
-### Agent Benefits
+| Pattern | Example | Support |
+|---------|---------|---------|
+| `tasks-{N}-{slug}.md` with YAML frontmatter | `plan/tasks-3-my-feature.md` | Read via `sam read`, `sam ready`, `sam status` |
+| `tasks-{N}-{slug}/` directory with `.md` files | `plan/tasks-3-my-feature/T01.md` | Read only |
+| Bold markdown fields (`**Status**: NOT STARTED`) | legacy `.md` files | Read via `sam migrate` preprocessing |
 
-1. **Reliable Parsing**: No regex edge cases or formatting variations
-2. **Schema Validation**: Catch invalid data before processing
-3. **Clear Structure**: Frontmatter vs body separation is explicit
-4. **Maintainability**: Easier to extend with new fields
-5. **Debugging**: YAML syntax errors are clear and specific
+### Migration Path
 
-### Orchestrator Benefits
+Migrate a legacy plan to the canonical format:
 
-1. **Consistency**: All tasks use identical metadata format
-2. **Validation**: Schema ensures all required fields present
-3. **Automation**: Easier to generate tasks programmatically
-4. **Querying**: Parse once, query many times efficiently
-5. **Migration**: Clear migration path from old format
+```bash
+# 1. Migrate format (YAML frontmatter .md -> pure YAML .yaml)
+uv run sam migrate plan/tasks-3-my-feature.md
 
----
+# 2. Rename to P{NNN} convention (dry run first)
+uv run python scripts/rename_plan_files.py plan/ --dry-run
+uv run python scripts/rename_plan_files.py plan/
 
-## Validation Examples
-
-### Valid Task File
-
-```markdown
----
-task: T1
-title: Create Data Models
-status: in-progress
-agent: python-cli-architect
-dependencies: []
-priority: 1
-complexity: medium
-created: 2026-02-02T15:00:00Z
-started: 2026-02-02T15:15:00Z
----
-
-## Context
-
-This task creates foundational data models.
-
-## Requirements
-
-1. Create ValidationResult dataclass
-2. Create ValidationIssue dataclass
+# 3. Update backlog plan references (handled by rename script with --update-backlog)
 ```
 
-✅ Valid - all required fields present, valid values
+### Deprecation Timeline
 
-### Invalid Task Files
+- **2026-Q1**: `tasks-{N}-{slug}` naming deprecated. New plans use `P{NNN}-{slug}.yaml`.
+- **2026-Q2**: Legacy markdown bold-field format (`**Status**: ...`) removed from read path after all plans migrated.
+- **Future**: `task_format.py` and `implementation_manager.py` fallback parsers removed once all consumers use `sam` CLI.
 
-**Missing required field**:
-
-```markdown
 ---
-task: T1
-status: in-progress
----
+
+## TaskAssignment Schema Reference
+
+- [Plan Schema](./plan-schema.json) — generated by `uv run sam schema --model Plan`
+- [Task Schema](./task-schema.json) — generated by `uv run sam schema --model Task`
+- [TaskAssignment Schema](./assignment-schema.json) — generated by `uv run sam schema --model TaskAssignment`
+
+Generate current schema files:
+
+```bash
+uv run sam schema --model Plan > .claude/docs/plan-schema.json
+uv run sam schema --model Task > .claude/docs/task-schema.json
+uv run sam schema --model TaskAssignment > .claude/docs/assignment-schema.json
 ```
-
-❌ Invalid - missing required `title` field
-
-**Invalid status value**:
-
-```markdown
----
-task: T1
-title: Create Models
-status: STARTED
----
-```
-
-❌ Invalid - status must be one of: not-started, in-progress, complete, blocked
-
-**Invalid priority**:
-
-```markdown
----
-task: T1
-title: Create Models
-status: not-started
-priority: 10
----
-```
-
-❌ Invalid - priority must be 1-5
-
-**Invalid task ID pattern**:
-
-```markdown
----
-task: Task-1
-title: Create Models
-status: not-started
----
-```
-
-❌ Invalid - task ID must match pattern `^[A-Z]?\d+(\.\d+)?$`
-
-**Invalid timestamp format**:
-
-```markdown
----
-task: T1
-title: Create Models
-status: complete
-completed: 2026-02-02
----
-```
-
-❌ Invalid - timestamp must be ISO 8601 with timezone (e.g., 2026-02-02T15:30:00Z)
-
----
-
-## Next Steps
-
-1. **Parser Implementation**: Update `implementation_manager.py` to parse YAML frontmatter
-2. **Template Creation**: Create `sam-task-template.md` with documentation
-3. **Migration Script**: Implement `migrate_task_format.py` converter
-4. **Testing**: Validate migration on existing task files
-5. **Documentation**: Update SAM methodology docs to reference new format
-
----
-
-## References
-
-- **SAM Methodology**: `plugins/python3-development/skills/implementation-manager/SKILL.md`
-- **Current Parser**: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py`
-- **Existing Task Files**: `.claude/plan/tasks-*.md`, `plugins/*/planning/*-tasks.md`
-- **YAML Specification**: <https://yaml.org/spec/1.2.2/>
-- **JSON Schema**: <https://json-schema.org/draft/2020-12/schema>
-
----
-
-## Appendix: Field Evolution
-
-### Possible Future Fields
-
-> **Note**: The fields `issue-classification`, `scenario-target`, and `analysis-method` were defined in Issue #314 and are now part of the Optional Fields specification above.
-
-These fields may be added in future versions without breaking existing parsers:
-
-- `estimate-hours`: Estimated effort in hours
-- `actual-hours`: Actual time spent
-- `assignee`: Person or team assigned (vs agent)
-- `labels`: Tags for categorization
-- `epic`: Parent epic or feature ID
-- `sprint`: Sprint or iteration ID
-- `verification-agent`: Agent responsible for validation
-- `retry-count`: Number of execution attempts
-- `last-error`: Most recent error message
-
-### Version Compatibility
-
-All parsers MUST ignore unknown fields to maintain forward compatibility. New fields added in future versions will be optional and will not break existing task files.

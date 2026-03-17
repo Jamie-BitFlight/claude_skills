@@ -5,9 +5,9 @@ metadata:
   topic: streamline-backlog-urlissue-number-handling-to-use-backlogpy
   source: User request
   added: '2026-02-28'
-  priority: P0
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#300'
   last_synced: '2026-02-28T16:55:11Z'
 ---

@@ -1,0 +1,21 @@
+id: T3
+title: Add alerting rules engine
+status: not-started
+agent: python3-development:python-cli-architect
+dependencies:
+  - T1
+  - T2
+priority: 3
+complexity: medium
+skills:
+  - python3-development
+blocked-by:
+  - T2
+description: |
+  Implement a rules engine that evaluates log patterns against
+  configurable alert conditions and dispatches notifications.
+objective: |
+  Enable automated alerting based on log content and frequency.
+constraints: |
+  - Rules must be defined in YAML configuration
+  - Alert deduplication window must be configurable

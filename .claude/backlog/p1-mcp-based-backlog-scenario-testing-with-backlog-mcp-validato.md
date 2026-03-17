@@ -5,9 +5,9 @@ metadata:
   topic: mcp-based-backlog-scenario-testing-with-backlog-mcp-validato
   source: Session observation
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#328'
   groomed: '2026-03-01'
   last_synced: '2026-03-01T08:20:49Z'

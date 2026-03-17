@@ -1,5 +1,11 @@
 # Test Coverage Gaps
 
+## Gap: sam_schema CLI new commands (T01)
+
+**Files**: `packages/sam_schema/sam_schema/cli.py`, `packages/sam_schema/sam_schema/core/query.py`
+**Behavior to cover**: `create`, `update`, `claim`, `validate` commands; `status --all` flag; `create_plan()`, `update_plan_fields()`, `_next_plan_number()`, `append_section()`, `create_plan_file()` functions
+**Reason not written**: T06 is the designated test task for new CLI commands and addressing. T01 is a Foundation task — tests are scoped to T06 per the dependency graph.
+
 ## Gap: implementation_manager.py — --github flag and fetch_tasks_from_github
 
 **Files**: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py`
@@ -104,6 +110,25 @@ validator from scratch exceeds the stated constraint of a surgical change only.
 - Duplicate keys in `additional_frozen_artefacts` that already exist in `step.frozen_artefacts` are deduplicated (base key wins position)
 **Reason not written**: T4 scope is integration wiring only. Test creation is assigned to T6 per the task plan.
 
+## Gap: sam_schema/writers/yaml_writer.py
+
+**Files**: `packages/sam_schema/sam_schema/writers/yaml_writer.py`
+**Behavior to cover**:
+- `write_plan()` single-file output: correct YAML structure, tasks list included, multiline fields as `|` scalars
+- `write_plan()` directory output: `plan.yaml` + `task-{id}.yaml` files created, `task_files` list in `plan.yaml`
+- `write_plan()` line count threshold: plans under 500 lines write single file, plans over threshold write directory
+- `write_plan(force_single=True)`: always writes single file regardless of line count
+- `write_plan()` path traversal rejection: raises `ValueError` when `..` in path parts
+- `update_field()` single-task file: modifies field, preserves comments and field order
+- `update_field()` multi-task file: locates correct task by ID, modifies only that task
+- `update_field()` markdown field with newline: wraps value in `LiteralScalarString`
+- `update_field()` raises `FileNotFoundError` for missing file
+- `update_field()` raises `KeyError` for unknown task ID
+- `update_field()` raises `ValueError` for unknown field name
+- `_atomic_write()` temp file cleanup on write failure
+- Round-trip: `write_plan()` then `ruamel.yaml.load()` returns equivalent data
+**Reason not written**: T3 scope is implementation only; test suite creation is assigned to T6 per the task plan architecture spec section 12.
+
 ## Gap: frustration-analyzer MCP server
 
 **Files**: `plugins/frustration-analyzer/mcp/server.py`
@@ -118,3 +143,38 @@ validator from scratch exceeds the stated constraint of a surgical change only.
 - `_build_hashtags()`: category-specific hashtag, #ClaudeCode conditional on model name
 - `_fetch_insult_for_post()`: ToolError on missing insult
 **Reason not written**: New plugin created in this session; sub-agent scope limited to implementation. Test suite creation is a separate task.
+
+## Gap: sam_schema/server.py and sam_schema/__main__.py
+
+**Files**: `packages/sam_schema/sam_schema/server.py`, `packages/sam_schema/sam_schema/__main__.py`
+**Behavior to cover**:
+- `sam_read`: success path returns task dict; `AddressingError` on unknown plan address returns `{"error": ...}`; `KeyError` on unknown task ID returns `{"error": ...}`; `FileNotFoundError` on missing plan dir returns `{"error": ...}`
+- `sam_state`: success path with valid status returns updated task dict; `ValueError` on invalid status string returns `{"error": ...}`; error path for unknown plan/task returns `{"error": ...}`
+- `sam_ready`: success path returns `{"ready_tasks": [...], "count": N}`; error path returns `{"error": ...}`
+- `sam_status`: success path returns `PlanStatus` dict with all fields; error path returns `{"error": ...}`
+- `__main__.py`: `mcp.run()` is called when script is run as `__main__`
+**Reason not written**: T9 scope is server implementation only. Test authoring for the MCP server is assigned to T10a per the task plan architecture spec.
+
+## Gap: backlog.py — ReconcileResult and reconciliation functions (T2)
+
+**Files**: `.claude/skills/backlog/scripts/backlog.py`
+**Behavior to cover**:
+- `_has_active_work(item)`: returns `(True, reason)` when a plan file contains an IN PROGRESS task for the item's topic; returns `(True, reason)` when `.claude/context/active-task-*.json` contains matching task; returns `(False, "")` when no plan files exist; returns `(False, "")` when plan file regex finds no IN PROGRESS task
+- `_reconcile_open_item(issue_num, local_status, github_status, file_path_str)`: returns `no_change` when local == github and both non-terminal; returns `auto_corrected` when `find_valid_path` finds a route from local to github; returns `flagged_divergence` when no valid path exists from local to github status
+- `_reconcile_closed_item(issue_num, local_status, github_status, file_path_str, item)`: returns `wip_protected` when `_has_active_work` detects active work; returns `closed` (updating metadata) when no active work; calls `_update_item_metadata` with `status="closed"` on the closed path
+- `_reconcile_item(item, gh_issue_map, repo)`: returns `no_change` when issue_number not in map; delegates to `_reconcile_open_item` for open GitHub issues; delegates to `_reconcile_closed_item` for closed GitHub issues
+- `_reconcile_batch(items, repo)`: calls `repo.get_issues(state="all")`; builds gh_issue_map keyed by issue number; collects warnings from ReconcileResult objects; returns `(updated_items, warnings)` tuple
+- `_filter_closed_items(items, include_closed=False)`: excludes items whose local status is terminal when `include_closed=False`; returns all items when `include_closed=True`
+**Reason not written**: T2 scope is implementation only. T7 (reconciliation unit tests) is the designated test task per the task plan dependency graph.
+
+## Gap: test_backlog_core_parsing.py — pre-existing collection errors
+
+**Files**: `.claude/skills/backlog/tests/test_backlog_core_parsing.py`
+**Behavior to cover**: `TestBuildIssueBodyFromFileDict` class — 5 tests fail at collection time with `AttributeError: 'NoneType' has no attribute '__dict__'`. The tests appear to depend on a dataclass or object that is `None` at import time.
+**Reason not written**: Pre-existing errors confirmed by running `pytest .claude/skills/backlog/tests/test_backlog_core_parsing.py` with and without T2 changes (git stash verification). Both runs produce identical 5 errors. Root cause investigation and fix are out of scope for T2.
+
+## Gap: sam_schema state/writer T07 lookup failure
+
+**Files**: `packages/sam_schema/sam_schema/writers/yaml_writer.py`, `packages/sam_schema/sam_schema/cli.py`
+**Behavior to cover**: `update_field(path, 'T07', ...)` and `sam state integrate-sam-schema/T07 complete` both raise "Task ID 'T07' not found" on the `tasks-3-integrate-sam-schema.md` plan file, even though `implementation_manager.py claim-task` succeeded on the same file using the deprecated regex writer. Test should verify that `update_field` and `sam state` can update status on a multi-document YAML-frontmatter plan where the task ID is `T07` (two-digit numeric suffix).
+**Reason not written**: Discovered during T07 execution; root cause requires investigation into the sam_schema reader's task ID parsing for two-digit suffixes. Outside T07 scope (T07 creates a migration script, does not fix sam_schema internals).

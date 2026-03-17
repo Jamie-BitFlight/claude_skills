@@ -18,39 +18,104 @@ $ARGUMENTS
 
 ---
 
+## Resolve Plan Address
+
+Extract the plan address `P{N}` from the task file path:
+
+- `plan/tasks-3-integrate-sam-schema.md` → plan number `3` → address `P3`
+- Strip `plan/tasks-` prefix, take the leading integer N, format as `P{N}`
+
+Use `P{N}` in all `sam` CLI calls below.
+
+---
+
+## Pre-Phase 1: TN Verification Check
+
+Before invoking Phase 1, check for a TN verification report produced by `tn-verification-gate` (which reads the T0 baseline written by `t0-baseline-capture`).
+
+Extract `{slug}` from the task file path (`plan/tasks-{N}-{slug}.md` — strip the `tasks-{N}-` prefix and `.md` suffix).
+
+Read `plan/TN-verification-{slug}.yaml`.
+
+The file contains a list of per-criterion `BookendVerification` records — one per `acceptance-criteria-structured` entry. There is no top-level `verdict` field. Aggregate the verdict by scanning all records: the overall result is FAIL if any record has `status: regressed`; otherwise PASS.
+
+```mermaid
+flowchart TD
+    Read["Read plan/TN-verification-{slug}.yaml"] --> Exists{File exists?}
+    Exists -->|No| Proceed["No structured criteria — proceed to Phase 1"]
+    Exists -->|Yes| Scan["Scan all per-criterion records<br>for status: regressed"]
+    Scan --> AnyRegressed{Any criterion<br>has status: regressed?}
+    AnyRegressed -->|No| Proceed
+    AnyRegressed -->|Yes| Stop["STOP — report regressions and block completion"]
+    Stop --> Report["Display each criterion with status: regressed<br>Show check_command, T0 stdout, TN stdout<br>Instruct: fix regressions before re-running"]
+```
+
+If any criterion has `status: regressed`:
+
+1. List each criterion where `status: regressed` with its `check_command`, T0 captured stdout, and TN captured stdout.
+2. Output:
+
+```text
+COMPLETION BLOCKED — TN Verification Failed
+
+Regressed criteria:
+  {criterion-id}: {description}
+    command: {check_command}
+    T0 result: exit {code}, stdout: {stdout}
+    TN result: exit {code}, stdout: {stdout}
+
+Fix the regressions, then re-run /complete-implementation.
+```
+
+3. Stop. Do not proceed to Phase 1.
+
+---
+
 ## Phase 1: Code Review
 
-Launch `code-reviewer` with the task file path.
+Query plan status and pass `TaskAssignment` JSON to `code-reviewer`:
+
+```bash
+uv run sam status P{N} --format json
+```
+
+Launch `code-reviewer` with the `TaskAssignment` JSON output (not the raw file path).
 
 ---
 
 ## Phase 2: Feature Verification (goal-backward)
 
-Launch `feature-verifier` with the task file path. If the task file contains `issue-classification` metadata, include it in the agent prompt so the feature verifier can apply proportional verification checks.
+Read task data via sam CLI:
+
+```bash
+uv run sam read P{N}/T{M} --format json
+```
+
+Launch `feature-verifier` with the `TaskAssignment` JSON. If the `TaskAssignment` contains `issue-classification` metadata, include it in the agent prompt so the feature verifier can apply proportional verification checks.
 
 ---
 
 ## Phase 3: Integration Check
 
-Launch `integration-checker` with the task file path.
+Launch `integration-checker` with the `TaskAssignment` JSON from `uv run sam read P{N}/T{M} --format json`.
 
 ---
 
 ## Phase 4: Documentation Drift Audit
 
-Launch `doc-drift-auditor` with the task file path (audit-only).
+Launch `doc-drift-auditor` with the `TaskAssignment` JSON from `uv run sam read P{N}/T{M} --format json` (audit-only).
 
 ---
 
 ## Phase 5: Documentation Update (if drift found)
 
-If drift exists or docs must be updated for the feature, launch `service-docs-maintainer`.
+If drift exists or docs must be updated for the feature, launch `service-docs-maintainer` with the `TaskAssignment` JSON from `uv run sam read P{N}/T{M} --format json`.
 
 ---
 
 ## Phase 6: Context Refinement
 
-Launch `context-refinement` to update the task file Context Manifest with discoveries from implementation AND perform a plan artifact freshness check against the feature-context and architect spec. The agent compares key claims in plan artifacts against the actual implementation and classifies findings as design-refinement or intent-divergence (see [.claude/docs/plan-artifact-lifecycle.md](./../../../../.claude/docs/plan-artifact-lifecycle.md)).
+Launch `context-refinement` with the `TaskAssignment` JSON from `uv run sam read P{N}/T{M} --format json` to update the Context Manifest with discoveries from implementation AND perform a plan artifact freshness check against the feature-context and architect spec. The agent compares key claims in plan artifacts against the actual implementation and classifies findings as design-refinement or intent-divergence (see [.claude/docs/plan-artifact-lifecycle.md](./../../../../.claude/docs/plan-artifact-lifecycle.md)).
 
 ---
 
@@ -94,7 +159,7 @@ If both ARTIFACTS and glob return empty: skip the entire routing section (no fol
 
 ### Step 2: Search Backlog by Title Keywords
 
-For each follow-up file, derive a search title from the filename using this algorithm:
+For each follow-up file, derive a search slug from the filename using this algorithm:
 
 ```text
 Input:  plan/tasks-8-data-validation-followup-1.md
@@ -106,15 +171,56 @@ Step 5: Replace hyphens with spaces --> data validation
 Output: "data validation"
 ```
 
-Search the backlog for an existing item matching these keywords:
+Search the backlog using a 2-strategy fallback chain. Strategy 3 (LLM semantic match) is
+**explicitly excluded** from follow-up routing: follow-up filenames are machine-derived slugs,
+not human semantic queries, so LLM semantic selection would have low fidelity against
+human-authored backlog titles.
 
-```text
-mcp__backlog__backlog_list()
+```mermaid
+flowchart TD
+    Derive["Derive slug from filename<br>(hyphens → spaces)"] --> S1["Strategy 1 — substring<br>backlog_list(title='{slug}')"]
+    S1 --> R1{Results?}
+    R1 -->|One or more matches| UseS1["Use Strategy 1 result"]
+    R1 -->|Zero results| S2["Strategy 2 — filter-first<br>backlog_list(topic='{slug}')"]
+    S2 --> R2{Results?}
+    R2 -->|One or more matches| UseS2["Use Strategy 2 result"]
+    R2 -->|Zero results| NoMatch["No match found<br>→ proceed to Step 3 (create new item)"]
+    UseS1 --> Step3["Step 3: Link or Create"]
+    UseS2 --> Step3
+    NoMatch --> Step3
 ```
 
-Parse the JSON output. For each item, check if the derived title keywords appear (case-insensitive substring match) in the item's `title` field.
+**Strategy 1 — substring via `title=`**
 
-**Error handling**: If `mcp__backlog__backlog_list` fails, log the error, skip the search, and proceed to Step 3 as "no match found" for each follow-up. If the follow-up filename does not match the expected `tasks-{N}-{slug}-followup-{k}.md` pattern, log a warning and use the full filename (without directory prefix and `.md` extension) as the derived title.
+```text
+mcp__backlog__backlog_list(title="{derived_slug}")
+```
+
+Parse the JSON output. For each item, check if the derived slug appears (case-insensitive
+substring match) in the item's `title` field. If one or more items match, use the first
+match as the result and skip Strategy 2.
+
+**Strategy 2 — filter-first via `topic=`**
+
+If Strategy 1 returns zero matches, run:
+
+```text
+mcp__backlog__backlog_list(topic="{derived_slug}")
+```
+
+The `topic` parameter performs a case-insensitive substring match against `metadata.topic`.
+Follow-up slugs often correspond to the topic area recorded in backlog item metadata, making
+this an effective second-pass filter when title substring fails.
+
+If Strategy 2 returns one or more items, use the first match.
+
+If both strategies return zero results, treat as "no match found" and proceed to Step 3.
+
+**Error handling**: If either `mcp__backlog__backlog_list` call fails, log the error, skip
+that strategy, and continue to the next strategy (or to Step 3 as "no match found" if all
+strategies fail). If the follow-up filename does not match the expected
+`tasks-{N}-{slug}-followup-{k}.md` pattern, log a warning and use the full filename (without
+directory prefix and `.md` extension) as the derived slug.
 
 ### Step 3: Link or Create Backlog Item
 

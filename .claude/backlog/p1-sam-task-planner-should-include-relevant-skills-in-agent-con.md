@@ -5,9 +5,9 @@ metadata:
   topic: sam-task-planner-should-include-relevant-skills-in-agent-con
   source: 'session observation during #328 implementation'
   added: '2026-03-01'
-  priority: P1
+  priority: completed
   type: Enhancement
-  status: open
+  status: done
   issue: '#338'
   last_synced: '2026-03-01T13:34:07Z'
   groomed: '2026-03-01'

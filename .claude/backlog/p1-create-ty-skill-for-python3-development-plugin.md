@@ -5,9 +5,9 @@ metadata:
   topic: create-ty-skill-for-python3-development-plugin
   source: Session observation
   added: '2026-02-25'
-  priority: P1
+  priority: completed
   type: Feature
-  status: open
+  status: done
   issue: '#210'
   groomed: '2026-02-28'
   last_synced: '2026-02-28T05:43:01Z'

@@ -9,7 +9,7 @@ metadata:
   type: Chore
   status: needs-grooming
   issue: '#539'
-  last_synced: '2026-03-12T12:47:47Z'
+  last_synced: '2026-03-14T16:00:01Z'
 ---
 
 ## Story
