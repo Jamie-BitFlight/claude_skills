@@ -43,6 +43,7 @@ When user intent matches, load the reference file listed — do not rely on trai
 | Migrate from FastMCP v2 | Breaking changes, syntax fixes | [./references/migration.md](./references/migration.md) |
 | Add web UI to a server | Apps HTML API, Prefab Apps | [./references/apps.md](./references/apps.md) |
 | Return interactive UI from tools | `@mcp.tool(app=True)`, `PrefabApp` | [./references/advanced.md](./references/advanced.md) |
+| Add request/response middleware | `Middleware`, built-in middleware | [./references/middleware.md](./references/middleware.md) |
 | Find real-world usage patterns | ProxyProvider, mount(), showcase | [./references/real-world-patterns.md](./references/real-world-patterns.md) |
 | Evaluate MCP server quality | Evaluation harness, QA pairs | [./references/evaluation-guide.md](./references/evaluation-guide.md) |
 
@@ -184,7 +185,7 @@ SOURCE: <https://github.com/PrefectHQ/fastmcp> releases v3.1.0, v3.1.1 (accessed
 
 ## Reference Files
 
-All 12 v3 reference files sourced from <https://github.com/PrefectHQ/fastmcp> docs/:
+All 13 v3 reference files sourced from <https://github.com/PrefectHQ/fastmcp> docs/:
 
 - [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan, `transforms=` kwarg
 - [./references/providers.md](./references/providers.md) — LocalProvider, FastMCPProvider, ProxyProvider, FileSystemProvider, SkillsProvider
@@ -192,7 +193,8 @@ All 12 v3 reference files sourced from <https://github.com/PrefectHQ/fastmcp> do
 - [./references/auth.md](./references/auth.md) — `require_scopes`, OAuth variants, token verification, MultiAuth, PropelAuth, `http_client` pooling
 - [./references/client-sdk.md](./references/client-sdk.md) — `Client`, transports, BearerAuth, CIMD, OAuth, sampling, elicitation, `fastmcp discover`, fuzzy matching
 - [./references/apps.md](./references/apps.md) — low-level HTML API, Prefab Apps (experimental)
-- [./references/advanced.md](./references/advanced.md) — tasks, elicitation, storage backends, middleware, dependency injection, versioning, visibility, Prefab Apps, Google GenAI sampling
+- [./references/advanced.md](./references/advanced.md) — tasks, elicitation, storage backends, dependency injection, versioning, visibility, Prefab Apps, Google GenAI sampling
+- [./references/middleware.md](./references/middleware.md) — Middleware base class, hook hierarchy, 11 built-in middleware, tag-based access control
 - [./references/deployment.md](./references/deployment.md) — stdio, HTTP, server config, Prefect Horizon, nginx reverse proxy, module mode, `FASTMCP_TRANSPORT`
 - [./references/testing.md](./references/testing.md) — in-memory Client, FastMCPTransport, pytest patterns, inline-snapshot
 - [./references/integrations.md](./references/integrations.md) — Anthropic, OpenAI, Gemini, Google GenAI, FastAPI, GitHub, Auth0, Azure, PropelAuth, Claude Code
