@@ -2,7 +2,7 @@
 
 How transforms modify components as they flow from providers to clients. Covers all five built-in transforms and custom transform authoring.
 
-SOURCE: `.worktrees/fastmcp/docs/servers/transforms/transforms.mdx`, `namespace.mdx`, `tool-transformation.mdx`, `resources-as-tools.mdx`, `prompts-as-tools.mdx`, `tool-search.mdx`, `code-mode.mdx`, `.worktrees/fastmcp/docs/servers/authorization.mdx` (visibility/Enabled), `.worktrees/fastmcp/src/fastmcp/server/transforms/search/base.py` (search_result_serializer) (accessed 2026-03-17)
+SOURCE: <https://gofastmcp.com/servers/transforms/transforms>, `namespace.mdx`, `tool-transformation.mdx`, `resources-as-tools.mdx`, `prompts-as-tools.mdx`, `tool-search.mdx`, `code-mode.mdx`, <https://gofastmcp.com/servers/authorization> (visibility/Enabled), <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/transforms/search/base.py> (search_result_serializer) (accessed 2026-03-17)
 
 ---
 

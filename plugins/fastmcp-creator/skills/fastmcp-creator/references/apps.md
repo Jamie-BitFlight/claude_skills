@@ -4,7 +4,7 @@ Interactive UI extension for MCP tools — use this when a tool needs to return 
 
 > **WARNING: FastMCP 3.1 Python-native app framework (unreleased).** The Python-native framework described in `apps/overview.mdx` — which generates UIs without writing HTML or JavaScript — is NOT available in FastMCP 3.0. Do NOT generate code using that framework. Only the low-level HTML/JS API documented below is available in stable FastMCP 3.0.
 >
-> SOURCE: `.claude/worktrees/fastmcp/docs/apps/overview.mdx` (accessed 2026-03-05)
+> SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
 
 ---
 
@@ -20,7 +20,7 @@ Available in FastMCP 3.0:
 
 CONSTRAINT: The low-level API requires you to write HTML yourself and wire up host communication via the `@modelcontextprotocol/ext-apps` JavaScript SDK.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/overview.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
 
 ---
 
@@ -52,7 +52,7 @@ def chart_view() -> str:
     return "<html>...</html>"
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -98,7 +98,7 @@ def refresh_data() -> str:
 
 CONSTRAINT: On **resources**, `resource_uri` and `visibility` must NOT be set — the resource is the UI. Use `AppConfig` on resources only for `csp`, `permissions`, and display settings.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -140,7 +140,7 @@ JavaScript SDK methods available on the `App` object:
 - `app.onhostcontextchanged` — callback for host context changes
 - `app.getHostContext()` — get current host context
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -197,7 +197,7 @@ def my_view() -> str:
 
 CONSTRAINT: Hosts may or may not grant requested permissions. Use JavaScript feature detection as a fallback.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -217,7 +217,7 @@ async def my_tool(ctx: Context) -> str:
         return plain_text_response()
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -300,7 +300,7 @@ def view() -> str:
 </html>"""
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/apps/low-level.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 

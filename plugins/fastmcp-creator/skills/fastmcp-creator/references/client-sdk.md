@@ -2,7 +2,7 @@
 
 Programmatic client for connecting to MCP servers — use this when building test harnesses, deterministic integrations, or agentic systems that call FastMCP tools programmatically.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
 
 ---
 
@@ -176,13 +176,13 @@ async def main():
         print(result)
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
 
 ---
 
 ## Transport Selection
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ### In-Memory Transport
 
@@ -205,7 +205,7 @@ async with client:
 
 CONSTRAINT: Unlike STDIO transports, in-memory servers share the same memory space and environment variables as your client code.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ### STDIO Transport
 
@@ -243,7 +243,7 @@ PATTERN: Session persistence — STDIO transports keep the subprocess alive acro
 transport = StdioTransport(command="python", args=["server.py"], keep_alive=False)
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ### HTTP Transport
 
@@ -265,7 +265,7 @@ client = Client(transport)
 
 CONSTRAINT: SSE transport (`SSETransport`) is maintained for backward compatibility only. Use `StreamableHttpTransport` for all new projects.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ### Multi-Server Configuration
 
@@ -311,13 +311,13 @@ config = {
 
 CONSTRAINT: `MCPConfigTransport` (multi-server config) maintains session persistence across tool calls — each server connection is reused within a single `async with client:` block. This is the correct behavior for multi-tool workflows; do NOT create a new client per tool call when using config-based multi-server setups.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/transports.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ---
 
 ## Client Operations
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
 
 ### Tools
 
@@ -361,7 +361,7 @@ async with Client(mcp) as client:
     print(f"Capabilities: {client.initialize_result.capabilities.tools}")
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
 
 ---
 
@@ -369,7 +369,7 @@ SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05
 
 ### Bearer Token Auth
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/bearer.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/bearer> (accessed 2026-03-05)
 
 CONSTRAINT: Bearer token authentication applies only to HTTP-based transports.
 
@@ -413,11 +413,11 @@ async with Client(
     await client.ping()
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/bearer.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/bearer> (accessed 2026-03-05)
 
 ### OAuth Authentication
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/oauth.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/oauth> (accessed 2026-03-05)
 
 CONSTRAINT: OAuth authentication applies only to HTTP-based transports and requires user browser interaction.
 
@@ -470,11 +470,11 @@ encrypted_storage = FernetEncryptionWrapper(
 oauth = OAuth(token_storage=encrypted_storage)
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/oauth.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/oauth> (accessed 2026-03-05)
 
 ### CIMD Authentication
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/cimd.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/cimd> (accessed 2026-03-05)
 
 PATTERN: Available in FastMCP 3.0.0+. CIMD (Client ID Metadata Documents) provides domain-verified client identity. Host a JSON document at an HTTPS URL — that URL becomes your `client_id`.
 
@@ -508,13 +508,13 @@ PATTERN: Validate your hosted document before connecting clients:
 fastmcp auth cimd validate https://myapp.example.com/oauth/client.json
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/auth/cimd.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/auth/cimd> (accessed 2026-03-05)
 
 ---
 
 ## Sampling
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/sampling.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-05)
 
 PATTERN: Implement a `sampling_handler` to respond to server-initiated LLM completion requests. The server delegates AI reasoning to the client.
 
@@ -562,13 +562,13 @@ client = Client(
 
 RULE: When you provide a `sampling_handler`, FastMCP automatically advertises full sampling capabilities (including tool support) to the server.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/sampling.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-05)
 
 ---
 
 ## Elicitation
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/elicitation> (accessed 2026-03-05)
 
 PATTERN: Implement an `elicitation_handler` to respond to server requests for structured user input during tool execution.
 
@@ -617,7 +617,7 @@ async def elicitation_handler(message, response_type, params, context):
 
 RULE: Action types — `accept` (include data in `content`), `decline` (omit `content`), `cancel` (omit `content`, abort operation).
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/elicitation> (accessed 2026-03-05)
 
 ---
 
@@ -636,4 +636,4 @@ client = Client(
 )
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/clients/client.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)

@@ -2,7 +2,7 @@
 
 How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/server.mdx`, `.claude/worktrees/fastmcp/docs/servers/tools.mdx`, `.claude/worktrees/fastmcp/docs/servers/resources.mdx`, `.claude/worktrees/fastmcp/docs/servers/prompts.mdx`, `.claude/worktrees/fastmcp/docs/servers/context.mdx`, `.claude/worktrees/fastmcp/docs/servers/lifespan.mdx`, `.claude/worktrees/fastmcp/docs/servers/logging.mdx` (accessed 2026-03-05); `.claude/worktrees/fastmcp/docs/servers/versioning.mdx` (accessed 2026-03-17, v3.1 features)
+SOURCE: <https://gofastmcp.com/servers/server>, <https://gofastmcp.com/servers/tools>, <https://gofastmcp.com/servers/resources>, <https://gofastmcp.com/servers/prompts>, <https://gofastmcp.com/servers/context>, <https://gofastmcp.com/servers/lifespan>, <https://gofastmcp.com/servers/logging> (accessed 2026-03-05); <https://gofastmcp.com/servers/versioning> (accessed 2026-03-17, v3.1 features)
 
 ---
 
@@ -64,7 +64,7 @@ RULE: Pass server-level transforms via the `transforms=` constructor argument ra
 
 ```python
 from fastmcp import FastMCP
-from fastmcp.server.transforms import BM25SearchTransform
+from fastmcp.server.transforms.search import BM25SearchTransform
 
 mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
 ```

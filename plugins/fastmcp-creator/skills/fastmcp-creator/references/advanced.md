@@ -2,13 +2,13 @@
 
 Background tasks, server-side elicitation, and advanced execution patterns — use this when building tools that run for seconds or minutes, require multi-turn user interaction, or need fine-grained execution control.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 ---
 
 ## Background Tasks
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 CONSTRAINT: Background tasks require the `tasks` optional extra. Install with:
 
@@ -34,7 +34,7 @@ async def slow_computation(duration: int) -> str:
 
 CONSTRAINT: Background tasks require async functions. Using `task=True` with a sync function raises `ValueError` at registration time.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 PATTERN: Enable background tasks globally for all server components:
 
@@ -44,7 +44,7 @@ mcp = FastMCP("MyServer", tasks=True)
 
 CONSTRAINT: If any synchronous tools exist on a server with `tasks=True`, those must explicitly set `task=False` to avoid errors.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 ### Progress Reporting
 
@@ -76,7 +76,7 @@ Progress API:
 
 RULE: Progress works in both immediate and background execution modes — use the same code regardless of how the client invokes the function.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 ### Task Backends
 
@@ -105,7 +105,7 @@ fastmcp tasks worker server.py
 
 CONSTRAINT: Task-enabled components must be defined at server startup. Components added dynamically after the server starts are not available for background execution.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 ### Advanced Docket Dependencies
 
@@ -130,13 +130,13 @@ async def my_task(
     return "Done"
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/tasks.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
 
 ---
 
 ## Server-Side Elicitation
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 PATTERN: Use `ctx.elicit()` to request structured input from users mid-execution. The tool pauses until the client provides a response.
 
@@ -173,7 +173,7 @@ Elicitation result actions:
 - `decline` — user chose not to provide information
 - `cancel` — user cancelled the entire operation
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 ### Pattern Matching
 
@@ -199,7 +199,7 @@ async def pattern_example(ctx: Context) -> str:
             return "Operation cancelled"
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 ### Multi-Turn Elicitation
 
@@ -227,7 +227,7 @@ async def plan_meeting(ctx: Context) -> str:
     return f"Meeting '{title_result.data}' for {duration_result.data} minutes (Urgent: {urgent})"
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 ### Elicitation Response Types
 
@@ -330,7 +330,7 @@ else:
 
 CONSTRAINT: Elicitation requires the client to implement an elicitation handler. If the client does not support elicitation, calls to `ctx.elicit()` raise an error. See [./client-sdk.md](./client-sdk.md) for client-side elicitation handler implementation.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/elicitation.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 ---
 
@@ -395,7 +395,7 @@ server composition scope — see [./middleware.md](./middleware.md).
 
 ## Dependency Injection
 
-SOURCE: `.worktrees/fastmcp/docs/servers/dependency-injection.mdx` (accessed 2026-03-17)
+SOURCE: <https://gofastmcp.com/servers/dependency-injection> (accessed 2026-03-17)
 
 PATTERN: Declare what you need as parameter defaults — FastMCP resolves values automatically at runtime. Dependency parameters are excluded from the MCP schema; clients never see them as callable parameters.
 
@@ -666,4 +666,4 @@ PATTERN: Core DI features (`Depends()`, `CurrentContext()`) work without install
 
 The underlying library [uncalled-for](https://github.com/chrisguidry/uncalled-for) is also available as a standalone package for use outside FastMCP. For advanced patterns — `TaskArgument()`, custom `Dependency` subclasses — see the [Docket dependency documentation](https://chrisguidry.github.io/docket/dependencies/).
 
-SOURCE: `.worktrees/fastmcp/docs/servers/dependency-injection.mdx` (accessed 2026-03-17)
+SOURCE: <https://gofastmcp.com/servers/dependency-injection> (accessed 2026-03-17)

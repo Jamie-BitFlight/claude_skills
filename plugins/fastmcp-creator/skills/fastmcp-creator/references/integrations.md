@@ -2,12 +2,12 @@
 
 How to connect FastMCP servers to external clients and frameworks — covers Anthropic API, OpenAI Responses API, Gemini SDK, FastAPI mounting, and Claude Code installation.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/anthropic.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/openai.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/gemini.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/fastapi.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/claude-code.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/anthropic> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/openai> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/gemini> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/fastapi> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/integrations/claude-code> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/patterns/cli> (accessed 2026-03-05)
 SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17) — PropelAuth integration (v3.1)
 SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — Prefab Apps (v3.1)
 SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — Google GenAI sampling handler (v3.1)
@@ -16,7 +16,7 @@ SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — Googl
 
 ## Anthropic Messages API
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/anthropic.mdx`
+SOURCE: <https://gofastmcp.com/integrations/anthropic>
 
 The Anthropic Messages API supports MCP servers as remote tool sources via the `mcp_servers` parameter.
 
@@ -84,7 +84,7 @@ mcp = FastMCP(name="My Server", auth=auth)
 
 ## OpenAI Responses API
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/openai.mdx`
+SOURCE: <https://gofastmcp.com/integrations/openai>
 
 OpenAI's Responses API (NOT Completions or Assistants API) supports MCP servers as remote tool sources.
 
@@ -139,7 +139,7 @@ resp = client.responses.create(
 
 ## Google Gemini SDK
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/gemini.mdx`
+SOURCE: <https://gofastmcp.com/integrations/gemini>
 
 Gemini's MCP integration requires a FastMCP `Client` session. Pass `mcp_client.session` directly to the Gemini SDK tools configuration.
 
@@ -186,7 +186,7 @@ mcp_client = Client(
 
 ## FastAPI Integration
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/fastapi.mdx`
+SOURCE: <https://gofastmcp.com/integrations/fastapi>
 
 FastAPI integration supports two directions:
 
@@ -286,7 +286,7 @@ combined_app = FastAPI(
 
 ## Claude Code Installation
 
-SOURCE: `.claude/worktrees/fastmcp/docs/integrations/claude-code.mdx`
+SOURCE: <https://gofastmcp.com/integrations/claude-code>
 
 ### Automatic Installation via CLI
 
@@ -409,7 +409,7 @@ SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17)
 
 ## FastMCP CLI — Cross-Integration Tool
 
-SOURCE: `.claude/worktrees/fastmcp/docs/patterns/cli.mdx`
+SOURCE: <https://gofastmcp.com/patterns/cli>
 
 The `fastmcp` CLI bridges FastMCP servers with any MCP client:
 

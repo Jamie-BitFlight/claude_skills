@@ -2,9 +2,9 @@
 
 Breaking changes and migration steps for upgrading to FastMCP v3 — covers v2 to v3 changes, migration from the bundled MCP SDK FastMCP, and migration from the low-level `mcp.server.Server` class.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-fastmcp-2.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-mcp-sdk.mdx` (accessed 2026-03-05)
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-low-level-sdk.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk> (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk> (accessed 2026-03-05)
 
 ---
 
@@ -27,7 +27,7 @@ dependencies = ["fastmcp>=3.0.0,<4"]
 
 ## FastMCP v2 to v3 — Breaking Changes
 
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-fastmcp-2.mdx`
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2>
 
 ### 1. Decorator Syntax — Parentheses Removed
 
@@ -254,7 +254,7 @@ git remote set-url origin https://github.com/PrefectHQ/fastmcp.git
 
 ## v2 Deprecations (Still Work, Emit Warnings)
 
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-fastmcp-2.mdx` — "Deprecated Features" section
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2> — "Deprecated Features" section
 
 Update these when convenient — they still work in v3 but will be removed in a future release.
 
@@ -320,7 +320,7 @@ proxy = create_proxy("http://example.com/mcp")
 
 ## Migrating from MCP SDK FastMCP (v1 Bundled)
 
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-mcp-sdk.mdx`
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk>
 
 If your server starts with `from mcp.server.fastmcp import FastMCP`, you are using FastMCP 1.0 bundled in the `mcp` package.
 
@@ -369,7 +369,7 @@ FastMCP equivalents (prefer these when available):
 
 ## Migrating from Low-Level `mcp.server.Server`
 
-SOURCE: `.claude/worktrees/fastmcp/docs/getting-started/upgrading/from-low-level-sdk.mdx`
+SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk>
 
 The `Server` class requires manual handler registration, hand-written JSON Schema, and transport boilerplate. FastMCP replaces all of it with decorator-based registration.
 

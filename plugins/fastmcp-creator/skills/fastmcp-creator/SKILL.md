@@ -185,7 +185,7 @@ SOURCE: <https://github.com/PrefectHQ/fastmcp> releases v3.1.0, v3.1.1 (accessed
 
 ## Reference Files
 
-All 13 v3 reference files sourced from <https://github.com/PrefectHQ/fastmcp> docs/:
+All 13 v3 reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/PrefectHQ/fastmcp> (source code):
 
 - [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan, `transforms=` kwarg
 - [./references/providers.md](./references/providers.md) — LocalProvider, FastMCPProvider, ProxyProvider, FileSystemProvider, SkillsProvider

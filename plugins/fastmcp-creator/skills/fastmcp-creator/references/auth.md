@@ -2,7 +2,7 @@
 
 How to authenticate requests to FastMCP HTTP servers and authorize access at the component level.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/auth/authentication.mdx`, `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, `.claude/worktrees/fastmcp/docs/servers/authorization.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/auth/authentication>, `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, <https://gofastmcp.com/servers/authorization> (accessed 2026-03-05)
 
 ---
 

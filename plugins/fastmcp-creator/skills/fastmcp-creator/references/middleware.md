@@ -2,7 +2,7 @@
 
 ## Middleware
 
-SOURCE: `.worktrees/fastmcp/docs/servers/middleware.mdx` (accessed 2026-03-17)
+SOURCE: <https://gofastmcp.com/servers/middleware> (accessed 2026-03-17)
 
 CONSTRAINT: Middleware is a FastMCP-specific concept — it is not part of the MCP protocol specification. Available since FastMCP 2.9.0.
 
@@ -438,4 +438,4 @@ mcp.add_middleware(PingMiddleware(interval_ms=5000))
 
 Keeps long-lived connections alive with periodic pings. Has no effect on stateless connections.
 
-SOURCE: `.worktrees/fastmcp/docs/servers/middleware.mdx` (accessed 2026-03-17)
+SOURCE: <https://gofastmcp.com/servers/middleware> (accessed 2026-03-17)

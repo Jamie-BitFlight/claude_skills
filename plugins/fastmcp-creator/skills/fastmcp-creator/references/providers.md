@@ -2,7 +2,7 @@
 
 How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/servers/providers/overview.mdx`, `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/servers/providers/overview>, `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
 
 ---
 
@@ -270,7 +270,7 @@ Custom `route_maps` are checked first; FastMCP's default catch-all (`all routes 
 - When the provider owns the `httpx.AsyncClient` (i.e., `client` was not passed), it is closed on server shutdown via `lifespan()`
 - Output validation uses the response schema from the OpenAPI spec; set `validate_output=False` to accept any JSON response structure
 
-SOURCE: `.worktrees/fastmcp/src/fastmcp/server/providers/openapi/provider.py`, `.worktrees/fastmcp/src/fastmcp/server/providers/openapi/__init__.py`, `.worktrees/fastmcp/docs/integrations/openapi.mdx` (accessed 2026-03-17)
+SOURCE: <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/provider.py>, <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/__init__.py>, <https://gofastmcp.com/integrations/openapi> (accessed 2026-03-17)
 
 ---
 

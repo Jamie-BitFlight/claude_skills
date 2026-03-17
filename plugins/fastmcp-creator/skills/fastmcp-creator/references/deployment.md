@@ -2,7 +2,7 @@
 
 How to run, configure, and deploy FastMCP servers — covers transport selection, CLI usage, HTTP deployment, `fastmcp.json` project configuration, horizontal scaling, and managed hosting via Prefect Horizon.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
@@ -27,7 +27,7 @@ CONSTRAINT: STDIO is correct for local development, Claude Desktop integration, 
 
 CONSTRAINT: SSE transport (`transport="sse"`) exists only for backward compatibility. Use HTTP transport for all new projects.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ### HTTP Transport
 
@@ -53,13 +53,13 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
 ## FastMCP CLI
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 PATTERN: Run a server without modifying source — the CLI automatically finds instances named `mcp`, `server`, or `app`:
 
@@ -97,7 +97,7 @@ fastmcp run server.py --reload --transport http --port 8080
 
 CONSTRAINT: Auto-reload uses stateless mode. For HTTP transport, some bidirectional features like elicitation are not available during reload mode. SSE transport does not support auto-reload.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
@@ -123,13 +123,13 @@ async def status(request: Request) -> JSONResponse:
 
 CONSTRAINT: Custom routes are served by the same web server as the MCP endpoint. The MCP endpoint is at `/mcp/`; custom routes are at the root domain.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/running-server.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
 
 ---
 
 ## HTTP Deployment
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Direct HTTP Server
 
@@ -208,7 +208,7 @@ CONSTRAINT: `expose_headers=["mcp-session-id"]` is required for browser-based MC
 
 CONSTRAINT: Most MCP clients (Claude Code, Cursor, ChatGPT) do NOT need CORS configuration — they connect server-to-server, not from a browser. Only enable CORS for browser-based debugging tools like MCP Inspector.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Mounting in Web Frameworks
 
@@ -255,7 +255,7 @@ api.mount("/mcp", mcp_app)
 
 CONSTRAINT: Always pass the lifespan from `mcp.http_app()` to the enclosing application. Without it, the session manager does not initialize and requests fail.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### Horizontal Scaling
 
@@ -278,7 +278,7 @@ FASTMCP_STATELESS_HTTP=true uvicorn app:app --host 0.0.0.0 --port 8000 --workers
 
 CONSTRAINT: Stateless mode eliminates server-side sessions. Stateful MCP features (elicitation, sampling) are not available in stateless mode.
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ### SSE Polling for Long-Running Operations
 
@@ -322,13 +322,13 @@ event_store = EventStore(
 app = mcp.http_app(event_store=event_store)
 ```
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/http.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
 
 ---
 
 ## `fastmcp.json` Project Configuration
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/server-configuration.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
 
 RULE: `fastmcp.json` is the canonical way to configure FastMCP projects — prefer it over CLI arguments for reproducible deployments. Available in v2.12.0+.
 
@@ -405,7 +405,7 @@ Deployment configuration fields:
 - `cwd` — working directory for the server process
 - `args` — command-line arguments passed after `--` to the server
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/server-configuration.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
 
 ---
 
@@ -622,7 +622,7 @@ CONSTRAINT: `--reload` also works with module mode (`-m`) and the Inspector (`fa
 
 ## Prefect Horizon — Managed Deployment
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/prefect-horizon.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)
 
 PATTERN: [Prefect Horizon](https://horizon.prefect.io) is the fastest path from a FastMCP server to a production URL with built-in OAuth authentication. Free personal tier available.
 
@@ -658,4 +658,4 @@ Horizon features:
 - **Gateway** — role-based access control and audit logs at the tool level
 - **Registry** — catalog of servers across your organization
 
-SOURCE: `.claude/worktrees/fastmcp/docs/deployment/prefect-horizon.mdx` (accessed 2026-03-05)
+SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)
