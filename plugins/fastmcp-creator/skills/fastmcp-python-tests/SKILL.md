@@ -105,8 +105,10 @@ def greet(name: str) -> str:
 async def test_greet_tool():
     async with Client(mcp) as client:
         result = await client.call_tool("greet", {"name": "World"})
-        assert result[0].text == "Hello, World!"
+        assert result.data == "Hello, World!"
 ```
+
+> **CONSTRAINT — API version**: `result.data` is the FastMCP v3 accessor. The legacy v2 pattern `result[0].text` is incorrect for v3 and will raise an `AttributeError`. Never use `result[0].text` in new tests.
 
 Only use HTTP transport when explicitly testing network features.
 
