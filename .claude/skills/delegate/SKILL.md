@@ -35,9 +35,9 @@ CONTEXT:
 - Scope: [Boundaries]
 - Constraints: [Hard requirements vs Preferences]
 
-AVAILABLE RESOURCES:
-- [List available MCP tools]
-- [Reference docs with @filepath]
+ECOSYSTEM CONTEXT:
+- [Session-specific facts the agent cannot find in CLAUDE.md or tool descriptions]
+- [Authenticated CLIs, non-obvious doc locations, task-specific access]
 
 YOUR TASK:
 1. Run /verify (as completion criteria guide)

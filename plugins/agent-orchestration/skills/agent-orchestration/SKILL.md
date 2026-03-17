@@ -437,9 +437,9 @@ flowchart TD
     Q4 -->|"Reports observations — OBSERVATION"| Q5
     Fix4 --> Q5
 
-    Q5{"Does the prompt constrain agent<br>to specific docs, or make all<br>available resources visible?"}
-    Q5 -->|"Constrains to specific docs — DISTRUST"| Fix5["Rewrite — list available resources;<br>let agent select which to consult"]
-    Q5 -->|"Lists available resources — TRUST"| Send(["Send delegation"])
+    Q5{"Does the prompt constrain agent<br>to specific docs, or describe the<br>ecosystem context?"}
+    Q5 -->|"Constrains to specific docs — DISTRUST"| Fix5["Rewrite — describe ecosystem context;<br>let agent select which to consult"]
+    Q5 -->|"Describes ecosystem context — TRUST"| Send(["Send delegation"])
     Fix5 --> Send
 ```
 
