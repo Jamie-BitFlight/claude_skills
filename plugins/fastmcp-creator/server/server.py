@@ -161,8 +161,7 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
 
     if "auth" in feature_set:
         lines += [
-            "@mcp.tool",
-            "@require_scopes('read')",
+            "@mcp.tool(auth=require_scopes('read'))  # auth= kwarg, NOT stacked decorator",
             "async def protected_tool(ctx: Context) -> str:",
             '    """Tool requiring read scope — v3 auth pattern."""',
             "    return 'Authenticated!'",
@@ -181,14 +180,23 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
 
     if "elicitation" in feature_set:
         lines += [
+            "from dataclasses import dataclass",
+            "",
+            "@dataclass",
+            "class UserInfo:",
+            '    """Schema for elicitation response."""',
+            "    name: str",
+            "",
             "@mcp.tool",
             "async def elicit_example(ctx: Context) -> str:",
             '    """Demonstrate multi-turn elicitation."""',
             "    result = await ctx.elicit(",
             "        message='What is your name?',",
-            "        schema={'type': 'object', 'properties': {'name': {'type': 'string'}}}",
+            "        response_type=UserInfo,  # v3: response_type, NOT schema=",
             "    )",
-            "    return f'Hello, {result.data[\"name\"]}!'",
+            "    if hasattr(result, 'data') and result.data:",
+            "        return f'Hello, {result.data.name}!'",
+            "    return 'Elicitation was declined or cancelled.'",
             "",
         ]
 
@@ -485,7 +493,7 @@ After validation, apply this migration checklist:
 
 - [ ] `@mcp.tool()` → `@mcp.tool` (remove empty parentheses — v3 canonical syntax)
 - [ ] `task=TaskConfig(mode="required")` → `task=True` (TaskConfig removed in v3)
-- [ ] `require_auth(...)` → `require_scopes(...)` from `fastmcp.server.auth` (require_auth removed)
+- [ ] `require_auth(...)` → `@mcp.tool(auth=require_scopes('scope'))` from `fastmcp.server.auth` (require_auth removed; use auth= kwarg, not stacked decorator)
 - [ ] Provider imports: update from `fastmcp.server.providers` (v3 module path)
 
 ## Recommended changes
