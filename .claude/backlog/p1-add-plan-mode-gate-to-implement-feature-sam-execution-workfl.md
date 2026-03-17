@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#758'
-  last_synced: '2026-03-17T01:08:29Z'
+  last_synced: '2026-03-17T01:08:48Z'
   groomed: '2026-03-17'
 ---
 
@@ -41,4 +41,34 @@ MISSING count: 0
 Type: missing-guardrail
 Confidence: high
 Rationale: The item describes a safety mechanism that should exist but doesn't — a human review/approval gate before destructive operations (file edits, bash commands). Current state directly dispatches agents to execution without plan review. Target state adds an optional --plan-first mode with structured plan output and approval step before execution proceeds. This mirrors the established swarm-patterns Pattern 5 plan_approval_response mechanism, confirming the pattern is proven and bounded. Design is not open-ended because it has clear precedent, specific task-level flag (plan_review: true), specific output file path convention (plan/task-plan-{task_id}.md), and defined approval loop. This is a guardrail (preventing unreviewed agent actions) that is currently absent.
+</div>
+
+## Fact-Check
+
+<div><sub>2026-03-17T01:08:48Z</sub>
+
+Claims checked: 5
+VERIFIED: 5
+REFUTED: 0
+INCONCLUSIVE: 0
+
+1. CLAIM: "implement-feature dispatches task agents directly into full execution mode via Skill(skill='start-task', ...)"
+   VERDICT: VERIFIED
+   EVIDENCE: File: plugins/python3-development/skills/implement-feature/SKILL.md, lines 71-75 — exact quote: "Launch the agent with a prompt that invokes `start-task`: `Skill(skill="start-task", args="{task_file_path} --task {task_id}")`"
+
+2. CLAIM: "No mechanism exists for the agent to surface a structured plan for human review before the sub-agent executes file edits"
+   VERDICT: VERIFIED
+   EVIDENCE: File: plugins/python3-development/skills/start-task/SKILL.md — task execution flow (steps 1-6) shows no plan-review gate. Step 6 proceeds directly: "Implement against the task acceptance criteria and run its verification steps." No intermediate plan-approval step exists in either implement-feature or start-task SKILL.md.
+
+3. CLAIM: "start-task claims the task and proceeds immediately to implementation in step 3 without a plan-first gate"
+   VERDICT: VERIFIED
+   EVIDENCE: File: plugins/python3-development/skills/start-task/SKILL.md, steps 3-6 — step 3 (lines 69-90): claim task via `sam claim`. Step 4 (lines 92-105): write context file. Step 5 (lines 107-138): record divergence notes. Step 6 (line 140): "Implement against the task acceptance criteria...". No plan-approval step exists between task claim and implementation start.
+
+4. CLAIM: "This mirrors the swarm-patterns Pattern 5 plan_approval_response mechanism"
+   VERDICT: VERIFIED
+   EVIDENCE: File: .claude/skills/swarm-patterns/SKILL.md, lines 182-218 — Pattern 5 titled "Plan Approval Workflow" documents: (line 196) `mode: "plan"` parameter, (line 201) plan_approval_request message handling, (lines 204-217) plan_approval_response mechanism with approve/reject logic. The pattern is proven and documented.
+
+5. CLAIM: "Agent tool has a plan mode parameter for delegated agents"
+   VERDICT: VERIFIED
+   EVIDENCE: File: .claude/skills/swarm-patterns/SKILL.md, lines 191-198 — Agent call with explicit parameter: `mode: "plan",  // Requires plan approval`. This is used in Pattern 5 to control whether the agent enters plan-only mode (requiring explicit approval) vs. direct execution mode. The mechanism is documented and instantiated in working example code.
 </div>
