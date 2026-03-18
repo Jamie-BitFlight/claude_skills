@@ -1,0 +1,9 @@
+{
+  "name": "spawn-tasks",
+  "description": "Spawn parallel Claude Code sessions from confirmed subtasks. Each session gets its own isolated git worktree and tmux pane with full task context. Use after breaking down a project into independent subtasks.",
+  "version": "1.0.0",
+  "author": {
+    "name": "theradengai",
+    "url": "https://github.com/theradengai/spawn-tasks"
+  }
+}

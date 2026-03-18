@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Professional development workflow extensions for Python engineers, DevOps practitioners, and AI agent developers. Covers modern Python toolchains, GitLab CI/CD automation, code quality enforcement, MCP server creation, and plugin/agent development patterns.",
-    "version": "6.0.43"
+    "version": "6.1.0"
   },
   "plugins": [
     {
@@ -115,6 +115,10 @@
     {
       "name": "scientific-method",
       "source": "./plugins/scientific-method"
+    },
+    {
+      "name": "spawn-tasks",
+      "source": "./plugins/spawn-tasks"
     }
   ]
 }
