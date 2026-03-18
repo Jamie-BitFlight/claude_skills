@@ -282,6 +282,9 @@ response = client.chat.completions.create(
 | [Claude Opus](../llm-infrastructure/claude-opus.md) | llm-infrastructure | Primary Claude Code model; comparison baseline for coding benchmarks (Opus 4.5 vs. GLM-5 on SWE-bench, Terminal-Bench) |
 | [OpenRouter](../llm-infrastructure/openrouter.md) | llm-infrastructure | Unified API provider for GLM-5:exacto access; Exacto routing mechanism |
 | [MCP-Atlas Benchmark](../evaluation-testing/mcp-atlas-benchmark.md) | evaluation-testing | GLM-5 scores 67.8% on MCP-Atlas Public Set; reference benchmark for agentic capability |
+| [Bifrost AI Gateway](./bifrost.md) | llm-infrastructure | Multi-provider LLM gateway with 22+ providers; comparable unified API abstraction for provider variance mitigation and MCP integration |
+| [LocalAI](./localai.md) | llm-infrastructure | Self-hosted LLM alternative with MCP support and function calling; contrasts cloud-hosted GLM-5 with on-premises open-source option |
+| [TensorZero](./tensorzero.md) | llm-infrastructure | LLMOps platform for optimization and evaluation; complementary infrastructure for benchmarking GLM-5 in production workflows |
 
 ---
 
