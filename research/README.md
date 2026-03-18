@@ -64,6 +64,7 @@ research/
 │   ├── google-stitch.md              # Google Stitch - AI UI design tool generating app frontends from text/images using Gemini 2.5
 │   └── diode.md                      # Diode - Browser-based 3D hardware simulator for circuit building, programming, and simulation
 ├── ai-research-tools/                 # AI research tools and newsletters
+│   ├── merly-mentor.md               # Logic-based AI code quality tool: deterministic analysis of 1M LOC/min, 15 languages, REST API (Seed $6.8M)
 │   └── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
 ├── coding-agents/                     # Autonomous AI coding agent platforms
 │   ├── accomplish.md                  # Local-first AI desktop agent with MCP tools, 15 providers, permission-gated execution (9K+ stars)
@@ -150,7 +151,8 @@ research/
 │   ├── google-adk-context-engineering.md  # Google ADK context engineering: tiered storage, compiled views, scoped multi-agent handoffs (17.9K stars)
 │   ├── tinyclaw.md                    # Multi-agent multi-channel 24/7 AI assistant with peer-to-peer handoffs
 │   ├── ollama-subagents-web-search-claude-code.md  # Ollama native subagents and web search for Claude Code (163K+ stars)
-│   └── oh-my-opencode.md              # code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months)
+│   ├── oh-my-opencode.md              # code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months)
+│   └── the-delegation.md             # Embodied 3D multi-agent orchestration: spatial office, NavMesh pathfinding, PM orchestrator, WebGPU (v0.1.0)
 ├── skill-generation-tools/            # Tools that create AI skills/prompts
 │   ├── claude-code-skills-alirezarezvani.md # 170 modular skill packages for Claude Code, Codex, Gemini CLI across 9 domains (2.5K+ stars)
 │   ├── clawhub.md                     # Skill registry for AI agents with vector search
@@ -219,6 +221,7 @@ Research on multi-agent architectures, orchestration patterns, and research work
 | [ollama-subagents-web-search-claude-code.md](./research-agent-patterns/ollama-subagents-web-search-claude-code.md) | Ollama v0.16.2 native subagents and web search for Claude Code with Anthropic API compatibility (163K+ stars) | 2026-02-19   |
 | [ai-data-science-team.md](./research-agent-patterns/ai-data-science-team.md) | AI Data Science Team — LangGraph supervisor + 9 specialist agents (wrangling, cleaning, visualization, SQL, H2O ML, MLflow, EDA, feature engineering, loader) with sandboxed code execution and AI Pipeline Studio Streamlit app (5K+ stars, MIT) | 2026-03-04   |
 | [oh-my-opencode.md](./research-agent-patterns/oh-my-opencode.md) | code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months) | 2026-03-06   |
+| [the-delegation.md](./research-agent-patterns/the-delegation.md) | The Delegation — Embodied 3D multi-agent orchestration: spatial office simulation with NavMesh pathfinding, PM orchestrator, LLM function calling, client approval workflow, WebGPU rendering (v0.1.0) | 2026-03-18   |
 
 **Key Topics**:
 
@@ -1088,6 +1091,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | Document                                                  | Description                                                                                                                    | Last Updated |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | [awesome-ai-apps.md](./ai-research-tools/awesome-ai-apps.md) | Awesome AI Apps — curated collection of 76 AI agent projects across 6 categories (Starter, Simple, MCP, Memory, RAG, Advanced Agents); 8-lesson AWS Strands course; 10+ frameworks (Agno, LangChain, CrewAI, PydanticAI); 9,278 stars | 2026-03-17   |
+| [merly-mentor.md](./ai-research-tools/merly-mentor.md) | Merly Mentor - Logic-based AI code quality tool: deterministic analysis of 1M LOC/min across 15 languages, REST API, Docker/K8s deployment (Seed $6.8M) | 2026-03-18   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
 
 **Key Topics**:
