@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/ba80f780-b9e2-4c94-9f92-894741b04ce1" alt="Backlog Skill" width="800" />
+</p>
+
 # Backlog Skill
 
 A unified interface for managing backlog items and GitHub Issues from inside Claude Code sessions. Every item lives in two places at once: a local Markdown file in `.claude/backlog/` that Claude can read instantly, and a GitHub Issue that humans can browse, comment on, and track. The skill keeps them in sync automatically.
