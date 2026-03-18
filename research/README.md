@@ -674,6 +674,9 @@ Developer productivity tools and workflow automation for software engineering wi
 | [scrapling-skill.md](./developer-tools/scrapling-skill.md) | Scrapling — Claude Code web scraping skill with 5-fetcher decision tree (Selector/Fetcher/FetcherSession/StealthyFetcher/DynamicFetcher), Cloudflare bypass via Camoufox, site pattern templates, cookie vault, bilingual EN/ZH (MIT) | 2026-03-13   |
 | [sidecar.md](./developer-tools/sidecar.md)             | Sidecar v0.78.0 — local-first terminal UI companion for AI coding agents (Claude Code, Cursor, Gemini CLI, Copilot CLI, 10+ adapters); Go/Bubbletea TUI with git status diffs, conversation history, task monitoring, file browser, and tmux workspace management; zero telemetry (843 stars, MIT) | 2026-03-17   |
 | [agent-deck.md](./developer-tools/agent-deck.md)       | Agent Deck v0.26.3 — terminal session manager for AI coding agents (Claude Code, Gemini CLI, OpenCode, Codex); unified TUI with smart status detection, session forking, MCP management, socket pooling (85-90% memory reduction), conductor auto-response, Docker sandboxing, and git worktree isolation (1,568 stars, MIT) | 2026-03-17   |
+| [stoat.md](./developer-tools/stoat.md)                 | Stoat — Go-based TUI database browser for SQLite and PostgreSQL with vim keybindings, themes, and SQL syntax highlighting | 2026-03-18   |
+| [tori-cli.md](./developer-tools/tori-cli.md)           | Go-based SSH-tunneled Docker monitoring TUI with declarative alerts, multi-server dashboard, and zero network exposure | 2026-03-18   |
+| [emqutiti.md](./developer-tools/emqutiti.md)           | Go-based MQTT TUI client with multi-broker profiles, trace recording/replay, and OS keyring credential management | 2026-03-18   |
 
 **Key Topics**:
 
@@ -1092,6 +1095,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | [awesome-ai-apps.md](./ai-research-tools/awesome-ai-apps.md) | Awesome AI Apps — curated collection of 76 AI agent projects across 6 categories (Starter, Simple, MCP, Memory, RAG, Advanced Agents); 8-lesson AWS Strands course; 10+ frameworks (Agno, LangChain, CrewAI, PydanticAI); 9,278 stars | 2026-03-17   |
 | [merly-mentor.md](./ai-research-tools/merly-mentor.md) | Merly Mentor - Logic-based AI code quality tool: deterministic analysis of 1M LOC/min across 15 languages, REST API, Docker/K8s deployment (Seed $6.8M) | 2026-03-18   |
+| [codewiki-google.md](./ai-research-tools/codewiki-google.md) | CodeWiki (Google) - AI-powered documentation platform: auto-generates wikis, diagrams, and Gemini chat for code repos after every commit (public preview, Nov 2025) | 2026-03-18   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
 
 **Key Topics**:
