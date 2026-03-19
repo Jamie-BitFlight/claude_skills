@@ -284,6 +284,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | [spec-workflow-mcp.md](./mcp-ecosystem/spec-workflow-mcp.md) | Spec Workflow MCP - spec-driven development with Requirements→Design→Tasks approval gates, real-time React dashboard on port 5000 (3.9K stars) | 2026-03-02   |
 | [cocoindex-code.md](./mcp-ecosystem/cocoindex-code.md)       | CocoIndex Code — embedded MCP server for semantic code search via AST analysis and embeddings; zero-config, 30+ languages, ~70% token savings, incremental indexing (Apache-2.0) | 2026-03-10   |
 | [mcpskills-cli.md](./mcp-ecosystem/mcpskills-cli.md)         | mcpskills-cli — CLI converting MCP server tools to static SKILL.md files in bash/python/node/go/rust; credential storage, Jinja2 templates, single or per-tool output (14 stars) | 2026-03-13   |
+| [gitnexus.md](./mcp-ecosystem/gitnexus.md)                   | GitNexus — graph-based code intelligence MCP server with 7 tools (query, context, impact, detect_changes, rename, cypher), 13-language support, precomputed clustering, Claude Code hooks integration (17.5K stars) | 2026-03-19   |
 
 **Key Topics**:
 
