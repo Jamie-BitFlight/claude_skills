@@ -11,6 +11,7 @@ metadata:
   issue: '#845'
   last_synced: '2026-03-19T02:24:26Z'
   groomed: '2026-03-19'
+  plan: plan/tasks-6-verify-citations-validate-mode.md
 ---
 
 ## RT-ICA
