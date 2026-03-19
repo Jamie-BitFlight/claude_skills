@@ -62,7 +62,8 @@ research/
 │   ├── jimeng.md                      # ByteDance SeedDance 2.0 AI video/image generation with cinematic camera control
 │   ├── ui-ux-pro-max-skill.md        # AI design skill for 16 coding assistants with BM25 search over 67 styles, 96 palettes, 57 font pairings (34.9K stars)
 │   ├── google-stitch.md              # Google Stitch - AI UI design tool generating app frontends from text/images using Gemini 2.5
-│   └── diode.md                      # Diode - Browser-based 3D hardware simulator for circuit building, programming, and simulation
+│   ├── diode.md                      # Diode - Browser-based 3D hardware simulator for circuit building, programming, and simulation
+│   └── open-pencil.md                # OpenPencil v0.10.0 - Open-source Figma alt: native .fig I/O, 87+ AI tools, MCP server, P2P collab (2.8K stars)
 ├── ai-research-tools/                 # AI research tools and newsletters
 │   ├── merly-mentor.md               # Logic-based AI code quality tool: deterministic analysis of 1M LOC/min, 15 languages, REST API (Seed $6.8M)
 │   └── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
@@ -1123,6 +1124,7 @@ AI-powered visual creation platforms and design intelligence tools for video, im
 | [ui-ux-pro-max-skill.md](./ai-design-tools/ui-ux-pro-max-skill.md) | UI UX Pro Max - AI design skill injecting 67 styles, 96 palettes, 57 font pairings into 16 coding assistants via BM25+regex search (34.9K stars) | 2026-02-26   |
 | [google-stitch.md](./ai-design-tools/google-stitch.md) | Google Stitch - AI-powered UI design tool generating app frontends (HTML/CSS, React) from text prompts or images using Gemini 2.5 models; launched Google I/O 2025 (proprietary) | 2026-03-04   |
 | [diode.md](./ai-design-tools/diode.md) | Diode - Browser-based 3D hardware simulator for building, programming, and simulating circuits with Arduino support; shut down 2022, site still operational | 2026-03-12   |
+| [open-pencil.md](./ai-design-tools/open-pencil.md) | OpenPencil v0.10.0 - Open-source Figma alternative: native .fig read/write, 87+ AI design tools, MCP server (stdio+HTTP), P2P collaboration via WebRTC+Yjs, CanvasKit WASM renderer (2.8K stars) | 2026-03-19   |
 
 **Key Topics**:
 
