@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#845'
-  last_synced: '2026-03-19T02:20:14Z'
+  last_synced: '2026-03-19T02:21:46Z'
   groomed: '2026-03-19'
 ---
 
@@ -32,4 +32,235 @@ Conditions:
 AVAILABLE count: 2
 DERIVABLE count: 5
 MISSING count: 0
+</div>
+
+## Groomed (2026-03-19)
+
+### Impact Radius
+
+<div><sub>2026-03-19T02:21:29Z</sub>
+
+## Impact Radius
+
+### Code Producers
+
+**File**: `.claude/skills/research-curator/scripts/validate_research.py`
+
+**Impact of adding `--verify-citations` flag**:
+
+1. **Will it break?** No. Flag is new, defaults to off. Existing `--json`, `--verbose` flags unaffected. Backward compatible.
+2. **Will it become stale?** No. Script is the implementation source; documentation derives from it.
+3. **Code change needed?** Yes. Add `--verify-citations` CLI option, `_verify_citations()` function(s), new HTTP request logic for URL/arXiv/DOI checks.
+4. **Content update needed?** No (code-only change).
+5. **Test coverage?** Unknown. No test file found. Recommend adding test suite: `tests/test_validate_research.py` with cases for reachable/unreachable URLs, valid/invalid arXiv IDs, DOI resolution.
+
+---
+
+### Code Consumers
+
+#### 1. `.claude/skills/research-curator/SKILL.md` — Validate Mode orchestration (lines 275–350)
+
+**Impact of feature addition**:
+
+1. **Will it break?** No. Existing `--validate` invocation unaffected (new flag is optional).
+2. **Will it become stale?** Yes. Documentation describes current behavior (structural checks only). Once `--verify-citations` is live, examples and JSON output schema must be updated to show the new citation_verification section and warning-severity findings.
+3. **Code change needed?** No (documentation file).
+4. **Content update needed?** Yes. Update:
+   - "What Gets Checked" section: add bullet for citation verification (off by default)
+   - Validation Workflow diagram: cite new flag option in script invocation
+   - JSON output schema in references/validation-rules.md: extend Issue TypedDict with optional citation verification fields
+   - Example JSON output: show citation_verification issues in entries
+5. **Test coverage?** Not applicable (documentation).
+
+**Stale risks**: If SKILL.md is not updated when `--verify-citations` is added, users will not know the flag exists or how to use it. Documentation drift will prevent feature adoption.
+
+---
+
+#### 2. `.claude/agents/research-curator.md` — Fix agent (receives validation issues)
+
+**Impact of feature addition**:
+
+1. **Will it break?** Possibly. Agent currently receives error-severity issues only (e.g., missing sections, empty fields). When `--verify-citations` runs, citation-verification warnings may be included in the fix request. Agent must handle new issue types.
+2. **Will it become stale?** Yes. Agent instructions must note how to handle citation verification issues (e.g., update References with live URLs, add access dates, validate arXiv IDs).
+3. **Code change needed?** Yes. Agent prompt must be updated to:
+   - Recognize citation verification warnings (new issue type)
+   - Know how to respond (update URL, add access date, verify arXiv ID format, check DOI exists)
+   - Distinguish mechanical fixes (missing access date) from research-required fixes (update stale URL)
+4. **Content update needed?** Yes. Add section describing how agent responds to citation verification issues.
+5. **Test coverage?** Unknown. Depends on agent test setup (not found in standard locations).
+
+**Stale risks**: If agent is not updated, it will reject citation verification issues as unknown, or attempt to fix them without understanding they require research/verification.
+
+---
+
+### Documentation
+
+#### 1. `.claude/skills/research-curator/references/validation-rules.md` — Check definitions
+
+**Impact of feature addition**:
+
+1. **Will it break?** No. Reference file is descriptive, not executable.
+2. **Will it become stale?** Yes. Must document the new citation verification checks: URL reachability (HTTP HEAD), arXiv ID format, DOI resolution. These are new checks, not currently listed.
+3. **Code change needed?** No.
+4. **Content update needed?** Yes. Add new section:
+   - **citation_verification** (warning severity): Documents URL reachability check, arXiv format validation, DOI API lookup, expected JSON schema for results.
+   - Update JSON Output Schema to include `citation_verification` field in Issue TypedDict.
+   - Add rule: citation verification warnings are reported but not auto-fixed (user decides whether to update).
+5. **Test coverage?** Not applicable.
+
+**Stale risks**: Critical. If validation rules are not updated, the orchestrator (SKILL.md Validate Mode section) will not know how to interpret citation verification issues from the JSON output.
+
+---
+
+#### 2. `.claude/skills/research-curator/SKILL.md` — Validate Mode section (lines 275–350)
+
+*Already covered above under Code Consumers.*
+
+---
+
+### Configuration / CI
+
+**Finding**: No CI workflows directly invoke `validate_research.py`. Validation is orchestrator-driven via `/research-curator --validate` skill invocation, which is manual or backlog-triggered, not automated.
+
+**Impact of feature addition**:
+
+1. **Will it break?** No. No CI dependencies.
+2. **Will it become stale?** N/A.
+3. **Code change needed?** No. (Recommendation: Consider adding optional CI job to validate research entries on PRs, but not required for this feature.)
+4. **Content update needed?** No.
+5. **Test coverage?** N/A.
+
+---
+
+### Agent Instructions
+
+#### `.claude/agents/research-curator.md` — Already analyzed above under Code Consumers.
+
+---
+
+### Systems Inventory
+
+| System | File | Role | Impact | Stale Risk |
+|--------|------|------|--------|-----------|
+| Validator script | `.claude/skills/research-curator/scripts/validate_research.py` | Producer | Add citation verification logic | Low (code is source) |
+| SKILL.md Validate Mode | `.claude/skills/research-curator/SKILL.md` lines 275–350 | Consumer (orchestrator) | Update workflow docs & examples | High (must document new flag) |
+| Validation rules reference | `.claude/skills/research-curator/references/validation-rules.md` | Consumer (documentation) | Add citation verification check definitions | High (orchestrator depends on it) |
+| research-curator agent | `.claude/agents/research-curator.md` | Consumer (fix implementation) | Handle new citation verification issue types | High (must know new issue types) |
+| CI workflows | `.github/workflows/*.yml` | Not directly used | No change required | N/A |
+
+---
+
+### Ecosystem Completeness Checklist
+
+- [x] **1. Will `--verify-citations` break existing code?** No. Flag is additive; defaults to off.
+- [x] **2. Will documentation become stale?** Yes (HIGH). SKILL.md, validation-rules.md, and research-curator.md must be updated to document flag, new checks, and agent fix logic.
+- [x] **3. Does the script need code changes?** Yes. Add CLI flag, citation verification functions (HTTP HEAD, arXiv format check, DOI API lookup).
+- [x] **4. Does the orchestrator (SKILL.md) need content updates?** Yes. Update "What Gets Checked", workflow diagram, JSON schema, example output.
+- [x] **5. Does the agent need to be updated?** Yes. Must handle citation verification issues; distinguish mechanical fixes from research-required ones.
+- [x] **6. Is there test coverage for the interaction?** No tests found. Recommend adding `tests/test_validate_research.py` and agent fix test cases.
+- [x] **7. Are there downstream systems that depend on validator output?** Yes. research-curator agent receives JSON output; orchestrator (SKILL.md) parses JSON. Both must understand new citation_verification issues.
+- [ ] **8. Are there rollback concerns?** No. Feature is additive and off-by-default.
+
+**Completeness Score**: 3/3 critical updates required (script, SKILL.md, validation-rules.md); 1 high recommendation (agent); 1 test gap.
+
+**Critical Path**:
+1. Implement script changes + new CLI flag
+2. Update validation-rules.md with new check definitions and JSON schema
+3. Update SKILL.md Validate Mode section with flag documentation and updated examples
+4. Update research-curator agent prompt to handle citation verification issues
+5. Add test suite covering citation verification behavior
+</div>
+
+## Fact-Check
+
+<div><sub>2026-03-19T02:21:46Z</sub>
+
+## Fact-Check Results (2026-03-19)
+
+### Claim 1: CrossRef provides a DOI resolution API
+**Status**: PARTIALLY VERIFIED
+
+**Evidence**: CrossRef provides a REST API that retrieves metadata for specific DOIs via the `/works/{doi}` endpoint (e.g., `https://api.crossref.org/works/doi/10.1128/mbio.01735-25`), not a traditional DOI resolution service. Traditional DOI resolution uses `https://doi.org/{doi}` which redirects to landing pages. For citation verification purposes, the metadata retrieval API is sufficient.
+
+**Sources**:
+- [CrossRef REST API Documentation](https://www.crossref.org/documentation/retrieve-metadata/rest-api/)
+- [GitHub CrossRef REST API Docs](https://github.com/CrossRef/rest-api-doc)
+
+**Note**: DataCite also provides similar metadata retrieval via `/dois/{id}` endpoint at `https://api.datacite.org`.
+
+---
+
+### Claim 2: arXiv IDs follow format `YYMM.NNNNN` (4-digit year-month + 4-5 digit number)
+**Status**: PARTIALLY INACCURATE
+
+**Evidence**: The arXiv identifier format is `YYMM.number` where:
+- YY = 2-digit year
+- MM = 2-digit month (01-12)
+- number = **4 digits (0001-9999) from April 2007 through December 2014**
+- number = **5 digits (00001-99999) from January 2015 onward**
+
+The claim states "4-digit year-month + 4-5 digit number" which correctly describes `YYMM` (4 chars) but is ambiguous about the sequence number format. **The sequence number varies by era: 4 digits for pre-2015, 5 digits for 2015 onward.**
+
+**Source**: [arXiv Identifier Help Page](https://info.arxiv.org/help/arxiv_identifier.html) (accessed 2026-03-19)
+
+**Recommendation**: Update specification to clarify dual format or use 5-digit format as the canonical modern representation.
+
+---
+
+### Claim 3: HTTP HEAD requests are sufficient to check URL reachability without downloading content
+**Status**: VERIFIED
+
+**Evidence**: HTTP HEAD requests return only headers without the response body, making them efficient for checking URL reachability. They are used by URL validation tools, uptime monitors, and link checkers to verify resource availability and metadata (status code, headers) without bandwidth overhead.
+
+**Sources**:
+- [MDN: HEAD HTTP Method](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/HEAD)
+- [DEV Community: HTTP HEAD Requests Guide](https://dev.to/mdhabibur/mastering-http-head-requests-with-curl-developers-guide-to-efficiency-automation-5gin)
+
+---
+
+### Claim 4: Python `httpx` and `requests` can perform HTTP HEAD requests
+**Status**: VERIFIED
+
+**Evidence**:
+- **httpx**: Provides `httpx.head()` method for both sync and async operations. HEAD requests do not support request body (per HTTP spec).
+- **requests**: Provides `requests.head()` method with full parameter support (headers, auth, timeouts, proxies, cookies).
+
+Both libraries fully support HEAD requests as a first-class method.
+
+**Sources**:
+- [HTTPX API Documentation](https://www.python-httpx.org/api/)
+- [Python requests HEAD Method - Real Python](https://realpython.com/python-requests/)
+- [W3Schools: Python Requests head Method](https://www.w3schools.com/python/ref_requests_head.asp)
+
+---
+
+### Claim 5: Opt-in network validation flag pattern is correct for network-dependent validators
+**Status**: VERIFIED
+
+**Evidence**: Existing Python validation tools use opt-in patterns for network operations:
+- **Sphinx linkcheck builder**: Invoked explicitly via `-b linkcheck` command (not enabled by default). Configuration supports `linkcheck_ignore`, `linkcheck_workers`, and timeout tuning.
+- **MkDocs**: Configuration for validation.links with warn/info/ignore levels, invoked with `mkdocs build` (network checks can be made fail-fast with `--strict`).
+- **lychee**: Supports `--offline` flag to disable network requests; by default performs network validation.
+
+The opt-in pattern (explicit flag or command, not always-on) is standard practice to avoid surprising users with network I/O or dependency on external services during validation.
+
+**Sources**:
+- [Sphinx Builders Documentation](https://www.sphinx-doc.org/en/master/usage/builders/index.html)
+- [Sphinx Configuration Options](https://www.sphinx-doc.org/en/master/usage/configuration.html)
+- [MkDocs Configuration](https://www.mkdocs.org/user-guide/configuration/)
+- [lychee Link Checker GitHub](https://github.com/lycheeverse/lychee)
+
+---
+
+## Summary
+
+| Claim | Status | Confidence | Action |
+|-------|--------|-----------|--------|
+| CrossRef DOI API | ✓ VERIFIED | High | Use `/works/{doi}` endpoint for metadata retrieval |
+| arXiv format | ⚠ PARTIALLY INACCURATE | Medium | Clarify 4-digit (pre-2015) vs 5-digit (2015+) sequence number |
+| HTTP HEAD efficiency | ✓ VERIFIED | High | Use as specified |
+| httpx/requests HEAD support | ✓ VERIFIED | High | Both libraries supported; no dependency issue |
+| Opt-in flag pattern | ✓ VERIFIED | High | Pattern is standard; `--verify-citations` flag is appropriate |
+
+**Recommendation**: Update arXiv identifier specification in design doc to explicitly note the date-dependent sequence number format. All other claims are sound.
 </div>
