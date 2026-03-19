@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#845'
-  last_synced: '2026-03-19T02:22:33Z'
+  last_synced: '2026-03-19T02:24:26Z'
   groomed: '2026-03-19'
 ---
 
@@ -39,6 +39,106 @@ MISSING count: 0
 ### Impact Radius
 
 <div><sub>2026-03-19T02:21:29Z</sub>
+
+### Scope
+
+<div><sub>2026-03-19T02:23:25Z</sub>
+
+**In scope:**
+- `--verify-citations` flag added to `validate_research.py` (off by default)
+- URL reachability check via HTTP HEAD request (report non-2xx status)
+- arXiv ID format validation via regex (`\d{4}\.\d{4,5}(v\d+)?`)
+- DOI resolution via CrossRef public API (`https://api.crossref.org/works/{doi}`)
+- Warning-severity JSON output in a new `citation_verification` section
+- `SKILL.md` validate mode section update to document the new flag and output schema
+- `references/validation-rules.md` update with new check definitions and severity mapping
+- `research-curator.md` agent instruction update to handle `citation_verification` issue type
+
+**Out of scope:**
+- Auto-fixing dead or hallucinated citations (warnings only; user decides)
+- Email or ORCID verification
+- Authenticated API calls (CrossRef public API is used unauthenticated)
+- Changes to existing error-severity checks or the existing `--validate` output schema
+</div>
+
+### Acceptance Criteria
+
+<div><sub>2026-03-19T02:23:35Z</sub>
+
+- [ ] Running `uv run .claude/skills/research-curator/scripts/validate_research.py --json --verify-citations ./research/agent-frameworks/AutoResearchClaw.md` produces JSON output containing a `citation_verification` section with per-URL status entries (each entry includes: URL, status (`reachable` / `unreachable` / `invalid-format`), and HTTP status code or error reason where applicable).
+- [ ] At least one entry with a fabricated or dead URL in the target file produces a warning-severity finding in the `citation_verification` section.
+- [ ] The `--verify-citations` flag is off by default: running without it makes no network calls and produces no `citation_verification` section in output.
+- [ ] Existing `--validate` behavior is unchanged: all structural checks (missing fields, broken local links, malformed frontmatter) continue to produce identical output when `--verify-citations` is absent.
+- [ ] Valid arXiv IDs matching `\d{4}\.\d{4,5}(v\d+)?` pass format validation; malformed IDs produce a warning-severity finding.
+- [ ] Valid DOIs return 200 from CrossRef `/works/{doi}` and are recorded as `reachable`; DOIs returning 404 are recorded as `unreachable` with a warning-severity finding.
+- [ ] `SKILL.md` validate mode section documents the `--verify-citations` flag, its effect, and includes an updated JSON output example showing the `citation_verification` section.
+- [ ] `references/validation-rules.md` contains a `citation_verification` check definition with severity mapping (warning) and expected JSON schema.
+- [ ] `research-curator.md` agent instructions cover how to handle `citation_verification` warning issues (distinguish mechanical fixes from research-required fixes).
+</div>
+
+### Files
+
+<div><sub>2026-03-19T02:23:47Z</sub>
+
+- `.claude/skills/research-curator/scripts/validate_research.py` — add `--verify-citations` CLI flag; implement `_check_url_reachability()` (HTTP HEAD), `_check_arxiv_id()` (regex validation), `_check_doi()` (CrossRef API lookup); extend JSON output with `citation_verification` section containing per-URL status entries
+- `.claude/skills/research-curator/SKILL.md` — document `--verify-citations` flag in validate mode section; update "What Gets Checked" bullet list; update JSON output schema examples to show `citation_verification` section and warning-severity findings
+- `.claude/skills/research-curator/references/validation-rules.md` — add `citation_verification` check definitions (URL reachability, arXiv format, DOI resolution); document severity mapping (warning); document expected JSON schema for `citation_verification` entries; add rule that citation verification warnings are reported but not auto-fixed
+- `.claude/agents/research-curator.md` — update fix-mode instructions to recognize and handle `citation_verification` issue type; distinguish mechanical fixes (add access date, fix arXiv format) from research-required fixes (locate replacement URL, verify DOI exists)
+</div>
+
+### Dependencies
+
+<div><sub>2026-03-19T02:23:51Z</sub>
+
+- `httpx>=0.27.0` — add as PEP 723 inline dependency in `validate_research.py`. Preferred over `requests`: async-capable, modern API, widely used in Python tooling. Both `httpx.head()` and `httpx.get()` are available for sync use.
+- CrossRef public API (`https://api.crossref.org/works/{doi}`) — no authentication required; rate limit is generous for validation use.
+- arXiv ID format validation — stdlib `re` module; no external dependency.
+- No new infrastructure dependencies (no database, no secrets, no CI job changes required).
+</div>
+
+### Effort
+
+<div><sub>2026-03-19T02:24:01Z</sub>
+
+**Estimate**: Medium
+
+- Script changes are self-contained: one file (`validate_research.py`), one new CLI flag, three verification functions (URL HEAD check, arXiv regex, DOI CrossRef lookup). No existing logic is altered.
+- Documentation updates are mechanical: SKILL.md validate section and validation-rules.md both have clear, bounded update targets.
+- Agent instruction update is small: one new issue type and its handling rules added to `research-curator.md`.
+- No migration required: feature is additive and backward-compatible (flag off by default).
+- No new infrastructure: single PEP 723 dep addition (`httpx`), public API (no auth).
+
+**Estimated**: 1 focused implementation session.
+</div>
+
+### Research
+
+<div><sub>2026-03-19T02:24:14Z</sub>
+
+Key findings from Wave 1 fact-check (2026-03-19):
+
+**CrossRef DOI API**: Use `https://api.crossref.org/works/{doi}` — returns 200 on valid DOI, 404 on invalid. No authentication required. DataCite provides a parallel endpoint at `https://api.datacite.org/dois/{id}` as fallback. SOURCE: [CrossRef REST API Docs](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) (accessed 2026-03-19).
+
+**arXiv ID regex**: Era-dependent format — 4-digit sequence pre-2015 (`YYMM.NNNN`), 5-digit from January 2015 onward (`YYMM.NNNNN`). Combined regex: `\d{4}\.\d{4,5}(v\d+)?`. Optional version suffix `vN` is valid. SOURCE: [arXiv Identifier Help](https://info.arxiv.org/help/arxiv_identifier.html) (accessed 2026-03-19).
+
+**HTTP HEAD reachability**: Standard practice for link checking (used by Sphinx linkcheck, MkDocs, lychee). Returns headers only — no body download. Reports 2xx (reachable), non-2xx (unreachable), connection error (unreachable). SOURCE: [MDN HEAD method](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods/HEAD).
+
+**httpx preference**: `httpx.head()` available sync and async; `httpx.get()` as fallback for servers that reject HEAD. Preferred over `requests`: async-capable, modern API. Both verified to support HEAD as a first-class method. SOURCE: [HTTPX API Docs](https://www.python-httpx.org/api/).
+
+**Opt-in flag pattern**: Standard in Python validation tooling. Sphinx uses `-b linkcheck` (explicit invocation), lychee uses `--offline` to disable, MkDocs uses configuration-gated link validation. `--verify-citations` (off by default) follows this established convention.
+</div>
+
+### Prior Work
+
+<div><sub>2026-03-19T02:24:26Z</sub>
+
+**Self-healing / auto-fix**: Tracked separately in backlog items #449, #448, #87, #85. Citation verification (this item) is distinct — it detects and reports dead/hallucinated citations as warnings; it does not auto-fix them. No prior overlap.
+
+**Citation verification specifically**: No prior backlog item found for automated citation checking in research-curator validate mode. This is a net-new capability.
+
+**Source pattern**: The 4-layer citation verification model in `./research/agent-frameworks/AutoResearchClaw.md` (arXiv lookup → CrossRef/DOI → Semantic Scholar → LLM relevance) was the direct inspiration. This item implements layers 1–3 (format/reachability checks) as a static validator; layer 4 (LLM relevance) is explicitly out of scope.
+</div>
+
 
 ## Impact Radius
 
