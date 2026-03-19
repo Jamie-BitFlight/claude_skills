@@ -77,7 +77,8 @@ research/
 │   ├── claude-mem.md                  # Persistent memory compression for Claude Code (15K+ stars)
 │   ├── jina-ai.md                     # Search foundation: Reader API, multilingual embeddings, rerankers (acquired by Elastic 2025)
 │   ├── local-memory.md               # Persistent memory infrastructure for AI agents (MCP + REST + CLI)
-│   └── sourcesyncai.md               # Managed RAG platform with auto-syncing connectors and hybrid search
+│   ├── sourcesyncai.md               # Managed RAG platform with auto-syncing connectors and hybrid search
+│   └── simplemem-cross.md            # Persistent cross-conversation memory for LLM agents (SQLite + LanceDB, 8 MCP tools)
 ├── data-infrastructure/               # Real-time data platforms for analytics
 │   ├── cocoindex.md                   # Ultra-performant AI data transformation framework with Rust core, incremental processing, and dataflow model (Apache 2.0)
 │   ├── dolt.md                        # MySQL-compatible version-controlled SQL database — branch, merge, diff, clone via SQL (20.3K stars)
@@ -920,6 +921,7 @@ Memory systems, context window optimization tools, and RAG solutions for maintai
 | [straion.md](./context-management/straion.md)             | Straion - SaaS rules-management platform that dynamically injects relevant engineering standards into AI coding agents (Claude Code, Cursor, Copilot) at task time; validates agent plans against rules before code is written | 2026-03-04   |
 | [slimcontext.md](./context-management/slimcontext.md)     | SlimContext — zero-dependency TypeScript library for chat history compression; TrimCompressor (token-based drop) and SummarizeCompressor (AI-powered); BYOM model interface; preserves system messages and recent messages by default (v2.1.3, 22 stars) | 2026-03-17   |
 | [unblocked.md](./context-management/unblocked.md)         | Unblocked — context engine augmenting AI coding agents with org knowledge (27+ integrations: GitHub, Slack, Confluence, Jira, Linear); 5-component retrieval, MCP server, 48% token reduction, 83% faster task completion; $29/user/mo Platform tier (SOC 2 Type II) | 2026-03-13   |
+| [simplemem-cross.md](./context-management/simplemem-cross.md) | SimpleMem-Cross — persistent cross-conversation memory for LLM agents; SQLite + LanceDB storage, 8 MCP tools, 8 REST endpoints, automatic observation extraction, 3-tier secret redaction, memory consolidation; LoCoMo score 48 (64% over Claude-Mem); MIT License | 2026-03-19   |
 
 **Key Topics**:
 
