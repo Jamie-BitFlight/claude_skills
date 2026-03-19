@@ -9,5 +9,27 @@ metadata:
   type: Feature
   status: open
   issue: '#845'
-  last_synced: '2026-03-19T02:13:15Z'
+  last_synced: '2026-03-19T02:20:14Z'
+  groomed: '2026-03-19'
 ---
+
+## RT-ICA
+
+<div><sub>2026-03-19T02:20:14Z</sub>
+
+RT-ICA Snapshot: Add automated citation verification to research-curator validate mode
+Goal: Add `--verify-citations` flag to `validate_research.py` that checks URL reachability, arXiv ID format, and DOI resolution, flagging dead/hallucinated references as warning-severity issues in JSON output.
+
+Conditions:
+1. `validate_research.py` CLI interface, Issue TypedDict, JSON output schema | Status: DERIVABLE
+2. Citation formats in research entries (URL/arXiv/DOI patterns in .md files) | Status: DERIVABLE
+3. CrossRef/DataCite API endpoints and response format | Status: DERIVABLE
+4. arXiv ID format spec (`\d{4}\.\d{4,5}(v\d+)?`) | Status: AVAILABLE
+5. HTTP library in script dependencies (currently `typer` only; new dep needed) | Status: DERIVABLE
+6. `--verify-citations` flag integration with existing `--json` and validate workflow | Status: DERIVABLE
+7. Warning-severity issues are reported but not auto-fixed (from SKILL.md spec) | Status: AVAILABLE
+
+AVAILABLE count: 2
+DERIVABLE count: 5
+MISSING count: 0
+</div>
