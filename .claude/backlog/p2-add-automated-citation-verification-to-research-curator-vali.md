@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#845'
-  last_synced: '2026-03-19T02:21:46Z'
+  last_synced: '2026-03-19T02:22:33Z'
   groomed: '2026-03-19'
 ---
 
@@ -263,4 +263,27 @@ The opt-in pattern (explicit flag or command, not always-on) is standard practic
 | Opt-in flag pattern | ✓ VERIFIED | High | Pattern is standard; `--verify-citations` flag is appropriate |
 
 **Recommendation**: Update arXiv identifier specification in design doc to explicitly note the date-dependent sequence number format. All other claims are sound.
+</div>
+
+## RT-ICA
+
+<div><sub>2026-03-19T02:22:33Z</sub>
+
+RT-ICA Final: Add automated citation verification to research-curator validate mode
+Goal: Add `--verify-citations` flag to `validate_research.py` that checks URL reachability, arXiv ID format, and DOI resolution, flagging dead/hallucinated references as warning-severity issues in JSON output.
+
+Conditions:
+1. `validate_research.py` CLI interface, Issue TypedDict, JSON output schema | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: impact-analyst read file, mapped Issue TypedDict, CLI flags, and JSON schema
+2. Citation formats in research entries (URL/arXiv/DOI patterns) | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker verified arXiv format (4-digit seq pre-2015, 5-digit 2015+); CrossRef DOI pattern confirmed
+3. CrossRef/DataCite API endpoints | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker verified `/works/{doi}` endpoint (CrossRef), accessed 2026-03-19
+4. arXiv ID format spec | Snapshot: AVAILABLE → Final: AVAILABLE | Clarified: sequence numbers are 4-digit pre-2015, 5-digit from 2015 onward
+5. HTTP library for script | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker verified both `httpx` and `requests` provide `.head()` method; either can be added as PEP 723 dep
+6. `--verify-citations` flag integration with existing workflow | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: impact-analyst identified 4 critical systems and documented backward-compatible (off by default) integration pattern
+7. Warning-severity issues are reported but not auto-fixed | Snapshot: AVAILABLE → Final: AVAILABLE | Source: SKILL.md validate mode spec
+
+Changes from snapshot:
+- Conditions 1, 2, 3, 5, 6: DERIVABLE → AVAILABLE (resolved by Wave 1 swarm)
+- Condition 4: arXiv format clarified with era-dependent digit count
+
+Decision: APPROVED — 7/7 AVAILABLE, 0 MISSING, 0 BLOCKED
 </div>
