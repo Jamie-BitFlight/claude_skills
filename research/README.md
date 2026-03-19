@@ -512,6 +512,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [pinchtab.md](./agent-infrastructure/pinchtab.md) | PinchTab — 12MB Go binary HTTP server for AI agent browser control via a11y tree snapshots (~800 tokens/page, 5-13x cheaper than screenshots), multi-instance Chrome orchestration with isolated profiles, stealth injection (2.3K stars, MIT) | 2026-03-01   |
 | [zeroclaw.md](./agent-infrastructure/zeroclaw.md) | Rust autonomous AI assistant — sub-5MB RAM, 28+ AI providers, 15+ channels, trait-driven swappable subsystems (14.9K stars) | 2026-02-19   |
 | [happycapy.md](./agent-infrastructure/happycapy.md) | HappyCapy — browser-based agent-native computer (Claude Code → Clawdbot → GUI); isolated sandbox execution, 170K+ pre-built skills via SkillsMP, multi-agent teams (Max tier), 150+ AI models; Free/Pro $20/Max $200 per month (launched 2026-02-11) | 2026-03-13   |
+| [AutoResearchClaw.md](./agent-infrastructure/AutoResearchClaw.md) | AutoResearchClaw — 23-stage autonomous research pipeline with 4-layer citation verification, self-healing experiments (10 repair cycles), MetaClaw cross-run learning (+18.3% robustness), ACP support for Claude Code/OpenCode/Codex (6.2K stars) | 2026-03-19   |
 
 **Key Topics**:
 
