@@ -14,7 +14,7 @@ import sys
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException, GithubObject
@@ -2879,6 +2879,119 @@ def comment_issue(
 
 
 # ---------------------------------------------------------------------------
+# Projects V2 (GraphQL) — TypedDicts for response shapes
+# ---------------------------------------------------------------------------
+
+
+class _ProjectsV2Node(TypedDict):
+    id: str
+    number: int
+    title: str
+    url: str
+    closed: bool
+    shortDescription: NotRequired[str | None]
+
+
+class _ProjectsV2Data(TypedDict):
+    nodes: list[_ProjectsV2Node | None]
+    totalCount: int
+
+
+class _RepositoryOwner(TypedDict):
+    projectsV2: _ProjectsV2Data
+
+
+class _ProjectsV2QueryData(TypedDict):
+    repositoryOwner: _RepositoryOwner | None
+
+
+class _CreatedProjectV2(TypedDict):
+    id: str
+    number: int
+    title: str
+    url: str
+
+
+class _CreateProjectV2Result(TypedDict):
+    projectV2: _CreatedProjectV2
+
+
+class _CreateProjectV2MutationData(TypedDict):
+    createProjectV2: _CreateProjectV2Result
+
+
+class _OwnerIdNode(TypedDict):
+    id: str
+
+
+class _OwnerIdQueryData(TypedDict):
+    repositoryOwner: _OwnerIdNode | None
+
+
+def _parse_projects_v2_node(item: dict[str, object]) -> _ProjectsV2Node:
+    """Parse a single raw projectsV2 node dict into a typed _ProjectsV2Node.
+
+    Returns:
+        A _ProjectsV2Node with all fields populated; missing or wrongly-typed
+        fields fall back to safe defaults.
+    """
+    node_id = item.get("id")
+    node_number = item.get("number")
+    node_title = item.get("title")
+    node_url = item.get("url")
+    node_closed = item.get("closed")
+    node_short_desc = item.get("shortDescription")
+    return _ProjectsV2Node(
+        id=node_id if isinstance(node_id, str) else "",
+        number=node_number if isinstance(node_number, int) else 0,
+        title=node_title if isinstance(node_title, str) else "",
+        url=node_url if isinstance(node_url, str) else "",
+        closed=node_closed if isinstance(node_closed, bool) else False,
+        shortDescription=node_short_desc if isinstance(node_short_desc, str) else None,
+    )
+
+
+def _parse_projects_v2_data(owner_dict: dict[str, object]) -> _ProjectsV2Data:
+    """Parse the projectsV2 sub-dict from a repositoryOwner dict.
+
+    Args:
+        owner_dict: The repositoryOwner dict from a projectsV2 GraphQL response.
+
+    Returns:
+        A _ProjectsV2Data with nodes and totalCount populated from the dict.
+    """
+    pv2_val = owner_dict.get("projectsV2")
+    pv2_dict: dict[str, object] = {str(k): v for k, v in pv2_val.items()} if isinstance(pv2_val, dict) else {}
+    nodes_val = pv2_dict.get("nodes")
+    nodes_list: list[object] = list(nodes_val) if isinstance(nodes_val, list) else []
+    total_val = pv2_dict.get("totalCount")
+    total: int = total_val if isinstance(total_val, int) else 0
+    parsed_nodes: list[_ProjectsV2Node | None] = [
+        _parse_projects_v2_node({str(k): v for k, v in item.items()}) if isinstance(item, dict) else None
+        for item in nodes_list
+    ]
+    return _ProjectsV2Data(nodes=parsed_nodes, totalCount=total)
+
+
+def _parse_projects_v2_response(raw: dict[str, object]) -> _ProjectsV2QueryData:
+    """Safely construct a typed _ProjectsV2QueryData from a raw GraphQL response dict.
+
+    Args:
+        raw: The top-level dict returned by _graphql_request for a projectsV2 query.
+
+    Returns:
+        A _ProjectsV2QueryData with all required fields populated; missing or
+        wrongly-typed fields from the raw response fall back to safe defaults.
+    """
+    owner_val = raw.get("repositoryOwner")
+    if not isinstance(owner_val, dict):
+        return _ProjectsV2QueryData(repositoryOwner=None)
+    owner_dict: dict[str, object] = {str(k): v for k, v in owner_val.items()}
+    owner: _RepositoryOwner = _RepositoryOwner(projectsV2=_parse_projects_v2_data(owner_dict))
+    return _ProjectsV2QueryData(repositoryOwner=owner)
+
+
+# ---------------------------------------------------------------------------
 # Projects V2 (GraphQL)
 # ---------------------------------------------------------------------------
 
@@ -2908,23 +3021,87 @@ def list_projects(
     gh_repo = get_github(repo)
     resolved_owner = owner or gh_repo.owner.login
     query, variables = _projects_v2_list_query(resolved_owner, limit)
-    data = _graphql_request(gh_repo, query, variables)
-    owner_node = cast("dict[str, object]", data.get("repositoryOwner") or {})
-    projects_data = cast("dict[str, object]", owner_node.get("projectsV2") or {})
-    nodes = cast("list[dict[str, object] | None]", projects_data.get("nodes") or [])
+    raw_data = _graphql_request(gh_repo, query, variables)
+    query_data: _ProjectsV2QueryData = _parse_projects_v2_response(raw_data)
+    owner_node: _RepositoryOwner | None = query_data["repositoryOwner"]
+    nodes: list[_ProjectsV2Node | None] = owner_node["projectsV2"]["nodes"] if owner_node is not None else []
     projects: list[dict[str, object]] = []
     for node in nodes:
         if node is None:
             continue
         projects.append({
-            "id": node.get("id", ""),
-            "title": node.get("title", ""),
-            "number": node.get("number", 0),
-            "url": node.get("url", ""),
-            "closed": node.get("closed", False),
+            "id": node["id"],
+            "title": node["title"],
+            "number": node["number"],
+            "url": node["url"],
+            "closed": node["closed"],
             "short_description": node.get("shortDescription") or "",
         })
     return {"projects": projects, "count": len(projects), **out.to_dict()}
+
+
+def _resolve_owner_node_id(gh_repo: Repository, resolved_owner: str) -> str:
+    """Resolve a GitHub owner login to its GraphQL node ID.
+
+    Args:
+        gh_repo: Authenticated PyGitHub Repository object.
+        resolved_owner: GitHub owner login (org or user).
+
+    Returns:
+        The GraphQL node ID string for the owner.
+
+    Raises:
+        BacklogError: If the owner is not found via GraphQL.
+    """
+    id_query = "query GetOwnerId($owner: String!) { repositoryOwner(login: $owner) { id } }"
+    id_raw = _graphql_request(gh_repo, id_query, {"owner": resolved_owner})
+    owner_id_val = id_raw.get("repositoryOwner")
+    if not owner_id_val or not isinstance(owner_id_val, dict):
+        raise BacklogError(f"Owner '{resolved_owner}' not found via GraphQL")
+    owner_id_dict: dict[str, object] = {str(k): v for k, v in owner_id_val.items()}
+    owner_id_query_data: _OwnerIdQueryData = _OwnerIdQueryData(
+        repositoryOwner=_OwnerIdNode(id=str(owner_id_dict.get("id", "")))
+    )
+    owner_id_node = owner_id_query_data["repositoryOwner"]
+    if owner_id_node is None:
+        raise BacklogError(f"Owner '{resolved_owner}' not found via GraphQL")
+    return owner_id_node["id"]
+
+
+def _create_project_v2_node(gh_repo: Repository, owner_id: str, title: str) -> _CreatedProjectV2:
+    """Run the createProjectV2 mutation and return the typed project node.
+
+    Args:
+        gh_repo: Authenticated PyGitHub Repository object.
+        owner_id: GraphQL node ID of the owner (org or user).
+        title: Project title.
+
+    Returns:
+        A _CreatedProjectV2 typed dict with id, number, title, and url.
+
+    Raises:
+        BacklogError: If the GraphQL response is missing expected fields.
+    """
+    mutation, variables = _projects_v2_create_mutation(owner_id, title)
+    create_raw = _graphql_request(gh_repo, mutation, variables)
+    create_pv2_val = create_raw.get("createProjectV2")
+    if not create_pv2_val or not isinstance(create_pv2_val, dict):
+        raise BacklogError(f"Unexpected GraphQL response for createProjectV2: {create_raw!r}")
+    create_pv2_dict: dict[str, object] = {str(k): v for k, v in create_pv2_val.items()}
+    project_node_val = create_pv2_dict.get("projectV2")
+    if not project_node_val or not isinstance(project_node_val, dict):
+        raise BacklogError(f"Unexpected GraphQL response for createProjectV2: {create_raw!r}")
+    project_node_dict: dict[str, object] = {str(k): v for k, v in project_node_val.items()}
+    pn_number = project_node_dict.get("number")
+    created_pv2: _CreatedProjectV2 = _CreatedProjectV2(
+        id=str(project_node_dict.get("id", "")),
+        number=pn_number if isinstance(pn_number, int) else 0,
+        title=str(project_node_dict.get("title", "")),
+        url=str(project_node_dict.get("url", "")),
+    )
+    return _CreateProjectV2MutationData(createProjectV2=_CreateProjectV2Result(projectV2=created_pv2))[
+        "createProjectV2"
+    ]["projectV2"]
 
 
 def create_project(
@@ -2956,29 +3133,14 @@ def create_project(
         raise ValidationError("title must not be empty")
     gh_repo = get_github(repo)
     resolved_owner = owner or gh_repo.owner.login
-
-    # Step 1: resolve owner node ID
-    id_query = "query GetOwnerId($owner: String!) { repositoryOwner(login: $owner) { id } }"
-    id_data = _graphql_request(gh_repo, id_query, {"owner": resolved_owner})
-    owner_node_raw = id_data.get("repositoryOwner")
-    if not owner_node_raw:
-        raise BacklogError(f"Owner '{resolved_owner}' not found via GraphQL")
-    owner_node = cast("dict[str, object]", owner_node_raw)
-    owner_id = str(owner_node["id"])
-
-    # Step 2: create the project
-    mutation, variables = _projects_v2_create_mutation(owner_id, title)
-    create_data = _graphql_request(gh_repo, mutation, variables)
-    create_pv2 = cast("dict[str, object]", create_data.get("createProjectV2") or {})
-    project_node = cast("dict[str, object]", create_pv2.get("projectV2") or {})
-    if not project_node:
-        raise BacklogError(f"Unexpected GraphQL response for createProjectV2: {create_data!r}")
-    out.info(f"  Created project '{project_node.get('title')}' (#{project_node.get('number')})")
+    owner_id = _resolve_owner_node_id(gh_repo, resolved_owner)
+    project_node = _create_project_v2_node(gh_repo, owner_id, title)
+    out.info(f"  Created project '{project_node['title']}' (#{project_node['number']})")
     return {
-        "project_id": str(project_node.get("id", "")),
-        "title": str(project_node.get("title", "")),
-        "url": str(project_node.get("url", "")),
-        "number": int(cast("int", project_node.get("number", 0))),
+        "project_id": project_node["id"],
+        "title": project_node["title"],
+        "url": project_node["url"],
+        "number": project_node["number"],
         **out.to_dict(),
     }
 
