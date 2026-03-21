@@ -1,5 +1,11 @@
 # Zeroboot
 
+**Research Date**: 2026-03-21
+**Last Verified**: 2026-03-21
+**Category**: agent-infrastructure
+**Source**: <https://github.com/zeroboot-dev/zeroboot>
+**Next Review**: 2026-06-21
+
 ## Overview
 
 Zeroboot is a sub-millisecond VM sandbox engine for AI agents using copy-on-write (CoW) forking via Firecracker and KVM. It achieves 0.79ms median spawn latency with only ~265KB memory per fork, compared to competitors' 27–300ms latencies and 50–128MB memory overhead. Each sandbox is a real KVM virtual machine with hardware-enforced memory isolation, not containers or namespaces.
@@ -162,12 +168,12 @@ SOURCE: ARCHITECTURE.md, Implementation Details section (accessed 2026-03-21)
 
 ### Managed API (Easiest)
 
-Use the hosted service at <https://api.zeroboot.dev>. Example request (requires API key):
+Use the hosted service at <https://api.zeroboot.dev>. Obtain an API key from the Zeroboot dashboard and set it as `ZEROBOOT_API_KEY` in your environment. Example request:
 
 ```bash
 curl -X POST https://api.zeroboot.dev/v1/exec \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer zb_demo_hn2026' \
+  -H "Authorization: Bearer ${ZEROBOOT_API_KEY}" \
   -d '{"code":"import numpy as np; print(np.random.rand(3))"}'
 ```
 
@@ -301,14 +307,14 @@ Zeroboot directly addresses the execution sandbox requirement for Claude Code's 
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Fly.io](../fly-io.md) | agent-infrastructure | Uses Firecracker microVMs like zeroboot; Sprites product provides persistent agent sandboxes with checkpoint/restore; both optimize for sub-second startup and hardware isolation |
-| [Kernel (kernel-sh)](../kernel-sh.md) | agent-infrastructure | Browser-as-a-service with VM-per-instance isolation; complements zeroboot by handling web automation while zeroboot handles untrusted code execution |
-| [TinyFish](../tinyfish.md) | agent-infrastructure | Serverless web agent platform; agent execution workload that could use zeroboot as backend for isolated code execution within web automation workflows |
-| [PinchTab](../pinchtab.md) | agent-infrastructure | Browser control infrastructure for agents; shares agent infrastructure pattern with zeroboot for providing isolated execution to agent workflows |
-| [OpenHands](../../coding-agents/openhands.md) | coding-agents | Open-source agent platform with sandboxed execution environment; zeroboot provides alternative ultra-low-latency sandbox backend for agent code execution |
-| [OpenAI Codex CLI](../../coding-agents/openai-codex-cli.md) | coding-agents | Terminal coding agent with OS-enforced sandbox isolation; zeroboot provides similar untrusted code execution guarantees via KVM-based VMs |
-| [OpenFang](../../agent-frameworks/openfang.md) | agent-frameworks | Agent OS with WASM sandbox for tool execution; both zeroboot and OpenFang address agent security boundaries—zeroboot via hardware VMs, OpenFang via WASM metering |
-| [Micro-Agent](../../agent-frameworks/micro-agent.md) | agent-frameworks | ReAct agent framework with Docker container sandbox for shell execution; zeroboot offers lighter-weight alternative with 0.79ms fork latency vs. container startup |
+| [Fly.io](./fly-io.md) | agent-infrastructure | Uses Firecracker microVMs like zeroboot; Sprites product provides persistent agent sandboxes with checkpoint/restore; both optimize for sub-second startup and hardware isolation |
+| [Kernel (kernel-sh)](./kernel-sh.md) | agent-infrastructure | Browser-as-a-service with VM-per-instance isolation; complements zeroboot by handling web automation while zeroboot handles untrusted code execution |
+| [TinyFish](./tinyfish.md) | agent-infrastructure | Serverless web agent platform; agent execution workload that could use zeroboot as backend for isolated code execution within web automation workflows |
+| [PinchTab](./pinchtab.md) | agent-infrastructure | Browser control infrastructure for agents; shares agent infrastructure pattern with zeroboot for providing isolated execution to agent workflows |
+| [OpenHands](../coding-agents/openhands.md) | coding-agents | Open-source agent platform with sandboxed execution environment; zeroboot provides alternative ultra-low-latency sandbox backend for agent code execution |
+| [OpenAI Codex CLI](../coding-agents/openai-codex-cli.md) | coding-agents | Terminal coding agent with OS-enforced sandbox isolation; zeroboot provides similar untrusted code execution guarantees via KVM-based VMs |
+| [OpenFang](../agent-frameworks/openfang.md) | agent-frameworks | Agent OS with WASM sandbox for tool execution; both zeroboot and OpenFang address agent security boundaries—zeroboot via hardware VMs, OpenFang via WASM metering |
+| [Micro-Agent](../agent-frameworks/micro-agent.md) | agent-frameworks | ReAct agent framework with Docker container sandbox for shell execution; zeroboot offers lighter-weight alternative with 0.79ms fork latency vs. container startup |
 
 ---
 
