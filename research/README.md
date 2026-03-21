@@ -30,7 +30,8 @@ research/
 │   ├── tinyfish.md                    # Serverless web agent API: 1,000 parallel ops, AgentQL MCP, all-in pricing at $0.04/op (148 stars)
 │   ├── picoclaw.md                    # Go AI assistant — <10MB RAM, 6 channels, runs on $10 RISC-V hardware, 18K stars
 │   ├── pinchtab.md                    # Browser control for AI agents — 12MB Go binary, HTTP API, a11y tree snapshots at 800 tokens/page (2.3K stars)
-│   └── zeroclaw.md                    # Rust AI assistant infrastructure — sub-5MB RAM, 28+ providers, trait-driven (14.9K stars)
+│   ├── zeroclaw.md                    # Rust AI assistant infrastructure — sub-5MB RAM, 28+ providers, trait-driven (14.9K stars)
+│   └── zeroboot.md                    # Sub-millisecond VM fork sandbox (0.79ms p50) — Firecracker+KVM, ~265KB RSS, Python/Node SDKs, REST API (1.4K stars)
 ├── api-frameworks/                    # High-performance API frameworks for backend services
 │   ├── fastapi.md                     # Modern Python web framework with Pydantic (95K+ stars)
 │   ├── motia.md                       # Unified backend framework replacing APIs/queues/workflows/AI agents with one Step primitive (15K+ stars)
@@ -520,6 +521,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [zeroclaw.md](./agent-infrastructure/zeroclaw.md) | Rust autonomous AI assistant — sub-5MB RAM, 28+ AI providers, 15+ channels, trait-driven swappable subsystems (14.9K stars) | 2026-02-19   |
 | [happycapy.md](./agent-infrastructure/happycapy.md) | HappyCapy — browser-based agent-native computer (Claude Code → Clawdbot → GUI); isolated sandbox execution, 170K+ pre-built skills via SkillsMP, multi-agent teams (Max tier), 150+ AI models; Free/Pro $20/Max $200 per month (launched 2026-02-11) | 2026-03-13   |
 | [AutoResearchClaw.md](./agent-infrastructure/AutoResearchClaw.md) | AutoResearchClaw — 23-stage autonomous research pipeline with 4-layer citation verification, self-healing experiments (10 repair cycles), MetaClaw cross-run learning (+18.3% robustness), ACP support for Claude Code/OpenCode/Codex (6.2K stars) | 2026-03-19   |
+| [zeroboot.md](./agent-infrastructure/zeroboot.md) | Zeroboot — sub-millisecond Firecracker+KVM fork sandbox: 0.79ms p50, ~265KB RSS, 4-endpoint REST API, Python/Node SDKs, managed + self-hosted deployment (1,394 stars, v0.1.0) | 2026-03-21   |
 
 **Key Topics**:
 
