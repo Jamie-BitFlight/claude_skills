@@ -103,7 +103,7 @@ async def backlog_add(
 
 
 @mcp.tool
-async def backlog_list(
+async def backlog_list(  # noqa: PLR0914
     with_status: Annotated[bool, Field(description="Include GitHub issue status for each item")] = False,
     from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
@@ -202,7 +202,8 @@ async def backlog_list(
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
-    all_items: list[dict] = result.get("items", [])  # type: ignore[invalid-assignment]
+    raw = result.get("items", [])
+    all_items: list[dict] = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
 
     # Apply cross-field search filter when requested.
     if search is not None:
