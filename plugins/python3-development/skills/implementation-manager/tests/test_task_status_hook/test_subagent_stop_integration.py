@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 _TASK_YAML_IN_PROGRESS_WITH_GITHUB = """\
 ---
+feature: test-feature
 task: T1
 title: Integration Test Task
 status: in-progress

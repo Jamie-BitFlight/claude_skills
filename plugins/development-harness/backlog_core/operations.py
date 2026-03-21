@@ -1249,14 +1249,12 @@ def list_items(
     if from_github:
         refresh_local_cache_from_github(repo, label, output=out)
     items = parse_backlog()
-    # When include_closed is True, also admit items whose skip flag was set
-    # solely because their status is a terminal value (done/resolved/closed).
-    # Those items still have a valid section and should be visible to callers
-    # that explicitly opt in to seeing closed items.
-    if include_closed:
-        open_items = [it for it in items if it.section]
-    else:
-        open_items = [it for it in items if not it.skip and it.section]
+    # Start with non-skipped items that have a section. The skip flag may be set
+    # for reasons other than terminal status (e.g. malformed entries), so we
+    # always exclude skip=True items regardless of include_closed. The
+    # _filter_closed_items call below then decides whether terminal-status items
+    # are included based on include_closed.
+    open_items = [it for it in items if not it.skip and it.section]
     open_items = _filter_closed_items(open_items, include_closed)
     status_map = batch_fetch_statuses(open_items, repo) if (with_status or status) else {}
     open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)

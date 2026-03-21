@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 _TASK_YAML_WITH_GITHUB_ISSUE = """\
 ---
+feature: test-feature
 task: T1
 title: Test Task
 status: in-progress
@@ -51,6 +52,7 @@ github_issue: 481
 
 _TASK_YAML_WITHOUT_GITHUB_ISSUE = """\
 ---
+feature: test-feature
 task: T1
 title: Test Task
 status: in-progress
@@ -63,6 +65,7 @@ dependencies: []
 
 _TASK_YAML_COMPLETE_STATUS = """\
 ---
+feature: test-feature
 task: T1
 title: Test Task
 status: complete

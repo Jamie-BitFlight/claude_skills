@@ -1202,13 +1202,13 @@ class TestNonComponentFileTracking:
         assert component_changes["foo"]["modified"][0]["component_type"] == "other"
         assert component_changes["foo"]["modified"][0]["component_path"] == "README.md"
 
-    def test_plugin_json_modification_not_recorded_as_component(self) -> None:
-        """Verify plugin.json modifications are NOT tracked as non-component changes.
+    def test_plugin_json_modification_recorded_as_other_component(self) -> None:
+        """Verify plugin.json modifications ARE tracked as 'other' component changes.
 
-        Tests: _process_file_changes excludes plugin.json from non-component tracking
+        Tests: _process_file_changes records plugin.json modifications as component changes
         How: Pass status with a modified .claude-plugin/plugin.json path
-        Why: plugin.json is already handled separately for marketplace add/delete
-             detection and should not appear in the modified list
+        Why: plugin.json modification (not add/delete) triggers a patch version bump via
+             the 'other' component type, so it must appear in component_changes
         """
         status: dict[str, list[str]] = {
             "added": [],
@@ -1218,8 +1218,10 @@ class TestNonComponentFileTracking:
 
         component_changes, _ = auto_sync._process_file_changes(status)
 
-        # plugin.json should NOT create a component change entry
-        assert "foo" not in component_changes
+        # plugin.json modification creates an 'other' component change entry
+        assert "foo" in component_changes
+        assert len(component_changes["foo"]["modified"]) == 1
+        assert component_changes["foo"]["modified"][0]["component_type"] == "other"
 
     def test_added_non_component_file_recorded(self) -> None:
         """Verify adding a non-component file inside a plugin triggers tracking.

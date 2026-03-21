@@ -789,11 +789,21 @@ class TestBuildIssueBodyFromFile:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(
+    reason=(
+        "scripts/backlog.py does not exist in this repository. The dict-based "
+        "_build_issue_body_from_file was planned but never implemented. "
+        "backlog_core.parsing.build_issue_body_from_file takes BacklogItem, not dict. "
+        "See plan/tasks-1-backlog-state-reconciliation.md"
+    )
+)
 class TestBuildIssueBodyFromFileDict:
     """Tests for _build_issue_body_from_file(item: dict) -> str | None.
 
-    This is the dict-based version in scripts/backlog.py. It uses '_raw_body'
-    key instead of BacklogItem.raw_body attribute, but has identical logic.
+    This is the dict-based version that was planned for scripts/backlog.py. It
+    uses '_raw_body' key instead of BacklogItem.raw_body attribute.
+    NOTE: scripts/backlog.py was never created; these tests are skipped until
+    the dict-based variant is implemented in backlog_core.
     """
 
     @pytest.fixture
