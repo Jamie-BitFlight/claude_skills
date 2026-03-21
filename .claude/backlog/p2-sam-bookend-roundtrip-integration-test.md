@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/tasks-697-sam-bookend-validation-followup-2.md
   issue: '#722'
-  last_synced: '2026-03-21T16:00:24Z'
+  last_synced: '2026-03-21T08:07:43Z'
 ---
 
 ## Story

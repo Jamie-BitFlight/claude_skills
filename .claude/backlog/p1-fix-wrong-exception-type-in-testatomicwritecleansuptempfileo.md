@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/P779-deduplicate-agents-phase4-followup-1.yaml
   issue: '#936'
-  last_synced: '2026-03-21T16:00:00Z'
+  last_synced: '2026-03-21T08:07:21Z'
 ---
 
 ## Story

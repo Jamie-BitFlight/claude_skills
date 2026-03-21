@@ -7,10 +7,9 @@ metadata:
   added: '2026-03-21'
   priority: P0
   type: Feature
-  status: in-progress
+  status: open
   issue: '#933'
-  last_synced: '2026-03-21T16:00:01Z'
-  plan: plan/tasks-699-workflow-architecture-diagram.md
+  last_synced: '2026-03-21T08:07:22Z'
 ---
 
 ## Story

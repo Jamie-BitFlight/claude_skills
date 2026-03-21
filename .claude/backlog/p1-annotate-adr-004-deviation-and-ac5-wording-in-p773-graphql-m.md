@@ -10,7 +10,7 @@ metadata:
   status: needs-grooming
   plan: plan/P774-migrate-backlog-github-rest-to-graphql-followup-1.yaml
   issue: '#835'
-  last_synced: '2026-03-21T16:00:15Z'
+  last_synced: '2026-03-21T08:07:34Z'
 ---
 
 ## Story

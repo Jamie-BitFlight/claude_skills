@@ -10,7 +10,7 @@ metadata:
   status: in-progress
   issue: '#610'
   groomed: '2026-03-11'
-  last_synced: '2026-03-21T16:00:27Z'
+  last_synced: '2026-03-21T08:07:46Z'
   plan: plan/tasks-5-irritation-llm-fix.md
 ---
 

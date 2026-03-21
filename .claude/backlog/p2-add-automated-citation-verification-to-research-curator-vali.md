@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: in-progress
   issue: '#845'
-  last_synced: '2026-03-21T16:00:12Z'
+  last_synced: '2026-03-21T08:07:31Z'
   groomed: '2026-03-19'
   plan: plan/tasks-6-verify-citations-validate-mode.md
 ---

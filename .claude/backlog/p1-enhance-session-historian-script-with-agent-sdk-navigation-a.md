@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: in-progress
   issue: '#599'
-  last_synced: '2026-03-21T16:00:29Z'
+  last_synced: '2026-03-21T08:07:47Z'
   groomed: '2026-03-11'
   plan: plan/tasks-6-session-historian-enhance.md
 ---
