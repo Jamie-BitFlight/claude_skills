@@ -5,27 +5,27 @@ github_issue: 845
 parent_issue_number: 845
 total_tasks: 8
 acceptance_criteria_structured:
-  - id: AC1
+  - criterion-id: AC1
     description: "--verify-citations flag exists and appears in --help output"
     check_command: "uv run .claude/skills/research-curator/scripts/validate_research.py --help"
     pass_condition: "output contains --verify-citations"
-  - id: AC2
+  - criterion-id: AC2
     description: "Without flag: no network calls, existing behaviour unchanged"
     check_command: "uv run .claude/skills/research-curator/scripts/validate_research.py --json ./research/agent-frameworks/AutoResearchClaw.md"
     pass_condition: "exit 0, output does not contain citation_verification"
-  - id: AC3
+  - criterion-id: AC3
     description: "With flag: JSON output includes citation_verification section"
     check_command: "uv run .claude/skills/research-curator/scripts/validate_research.py --json --verify-citations ./research/agent-frameworks/AutoResearchClaw.md"
     pass_condition: "output contains citation_verification"
-  - id: AC4
+  - criterion-id: AC4
     description: "SKILL.md documents --verify-citations flag"
     check_command: "grep -c 'verify-citations' .claude/skills/research-curator/SKILL.md"
     pass_condition: "exit 0, count >= 1"
-  - id: AC5
+  - criterion-id: AC5
     description: "validation-rules.md defines citation verification rules"
     check_command: "grep -c 'citation' .claude/skills/research-curator/references/validation-rules.md"
     pass_condition: "exit 0, count >= 3"
-  - id: AC6
+  - criterion-id: AC6
     description: "research-curator agent documents citation_verification as non-fixable"
     check_command: "grep -c 'citation_verification' .claude/agents/research-curator.md"
     pass_condition: "exit 0, count >= 1"
@@ -36,7 +36,7 @@ acceptance_criteria_structured:
 ## Task T0: Baseline Capture
 
 ---
-id: T0
+task: T0
 status: NOT STARTED
 dependencies: []
 priority: 1
@@ -63,7 +63,7 @@ Run each check_command from acceptance_criteria_structured and record results to
 ## Task T1: Add CitationResult TypedDict and _extract_citations function
 
 ---
-id: T1
+task: T1
 status: NOT STARTED
 dependencies: [T0]
 priority: 1
@@ -156,7 +156,7 @@ Implement `_extract_citations(content: str) -> list[dict[str, str]]` that:
 ## Task T2: Add three citation checker functions
 
 ---
-id: T2
+task: T2
 status: NOT STARTED
 dependencies: [T1]
 priority: 2
@@ -213,7 +213,7 @@ Add `_check_url_reachability`, `_check_arxiv_id`, and `_check_doi` to `validate_
 ## Task T3: Integrate citation verification into validate_file and main
 
 ---
-id: T3
+task: T3
 status: NOT STARTED
 dependencies: [T2]
 priority: 2
@@ -342,7 +342,7 @@ finally:
 ## Task T4: Update SKILL.md validate mode documentation
 
 ---
-id: T4
+task: T4
 status: NOT STARTED
 dependencies: [T3]
 priority: 3
@@ -394,7 +394,7 @@ Add a note confirming that citation verification warnings (`citation_verificatio
 ## Task T5: Update validation-rules.md with citation verification rules
 
 ---
-id: T5
+task: T5
 status: NOT STARTED
 dependencies: [T3]
 priority: 3
@@ -447,7 +447,7 @@ Include a note that the key is absent from the entry dict when `--verify-citatio
 ## Task T6: Update research-curator agent with citation_verification non-fixable rule
 
 ---
-id: T6
+task: T6
 status: NOT STARTED
 dependencies: [T3]
 priority: 3
@@ -497,7 +497,7 @@ via an alternative registry. The agent surfaces the findings; the human decides 
 ## Task T7: Verification Gate
 
 ---
-id: T7
+task: T7
 status: NOT STARTED
 dependencies: [T4, T5, T6]
 priority: 4

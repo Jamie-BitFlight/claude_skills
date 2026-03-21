@@ -1,0 +1,79 @@
+feature: verify-citations-validate-mode
+version: '1.0'
+description: ''
+goal: |-
+  Add --verify-citations flag to validate_research.py that checks URL reachability, arXiv ID format, and DOI resolution via CrossRef
+issue: '845'
+tasks:
+- id: T0
+  title: Baseline Capture
+  status: not-started
+  agent: python3-development:t0-baseline-capture
+  priority: 1
+  complexity: low
+  is-bookend: true
+  bookend-type: t0-baseline
+- id: T1
+  title: Add CitationResult TypedDict and _extract_citations function
+  status: not-started
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T0
+  priority: 1
+  complexity: medium
+- id: T2
+  title: Add three citation checker functions
+  status: not-started
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T1
+  priority: 2
+  complexity: medium
+- id: T3
+  title: Integrate citation verification into validate_file and main
+  status: not-started
+  agent: python3-development:python-cli-architect
+  dependencies:
+  - T2
+  priority: 2
+  complexity: high
+- id: T4
+  title: Update SKILL.md validate mode documentation
+  status: not-started
+  agent: plugin-creator:contextual-ai-documentation-optimizer
+  dependencies:
+  - T3
+  priority: 3
+  complexity: low
+- id: T5
+  title: Update validation-rules.md with citation verification rules
+  status: not-started
+  agent: plugin-creator:contextual-ai-documentation-optimizer
+  dependencies:
+  - T3
+  priority: 3
+  complexity: low
+- id: T6
+  title: Update research-curator agent with citation_verification non-fixable
+    rule
+  status: not-started
+  agent: plugin-creator:contextual-ai-documentation-optimizer
+  dependencies:
+  - T3
+  priority: 3
+  complexity: low
+- id: T7
+  title: Verification Gate
+  status: not-started
+  agent: python3-development:tn-verification-gate
+  dependencies:
+  - T1
+  - T2
+  - T3
+  - T4
+  - T5
+  - T6
+  priority: 4
+  complexity: low
+  is-bookend: true
+  bookend-type: tn-verification
