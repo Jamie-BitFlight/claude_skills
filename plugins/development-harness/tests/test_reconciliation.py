@@ -71,6 +71,7 @@ class TestReconcileResultDataclass:
 
 
 @_RECONCILIATION_NOT_IMPLEMENTED
+@_RECONCILIATION_NOT_IMPLEMENTED
 class TestHasActiveWork:
     """Verify _has_active_work detects plan files and context files correctly."""
 
@@ -208,6 +209,7 @@ class TestHasActiveWork:
 
 
 @_RECONCILIATION_NOT_IMPLEMENTED
+@_RECONCILIATION_NOT_IMPLEMENTED
 class TestReconcileOpenItem:
     """Verify _reconcile_open_item handles divergence scenarios for open GitHub issues."""
 
@@ -293,6 +295,7 @@ class TestReconcileOpenItem:
 
 
 @_RECONCILIATION_NOT_IMPLEMENTED
+@_RECONCILIATION_NOT_IMPLEMENTED
 class TestReconcileClosedItem:
     """Verify _reconcile_closed_item handles closed GitHub issues correctly."""
 
@@ -355,6 +358,7 @@ class TestReconcileClosedItem:
         assert result.new_status == "done"
 
 
+@_RECONCILIATION_NOT_IMPLEMENTED
 @_RECONCILIATION_NOT_IMPLEMENTED
 class TestReconcileItem:
     """Verify _reconcile_item dispatches correctly based on item and GitHub state."""
@@ -440,9 +444,8 @@ class TestReconcileBatch:
 
     def test_returns_warning_on_github_api_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When GitHub API raises GithubException, returns items unchanged with warning."""
-        from github import GithubException
-
         import backlog as backlog_mod
+        from github import GithubException
 
         mock_repo = MagicMock()
         mock_repo.get_issues.side_effect = GithubException(500, "Server Error", None)

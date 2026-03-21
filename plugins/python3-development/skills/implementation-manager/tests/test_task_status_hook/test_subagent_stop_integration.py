@@ -47,7 +47,7 @@ title: Integration Test Task
 status: in-progress
 agent: general-purpose
 priority: 2
-complexity: Low
+complexity: low
 dependencies: []
 github_issue: 481
 ---
@@ -64,7 +64,7 @@ def _write_task_file(tmp_path: Path, content: str = _TASK_YAML_IN_PROGRESS_WITH_
     Returns:
         Path to the created task file.
     """
-    task_file = tmp_path / "task.md"
+    task_file = tmp_path / "tasks-1-test-feature.md"
     task_file.write_text(content, encoding="utf-8")
     return task_file
 
@@ -179,9 +179,12 @@ class TestSubagentStopFullPathWithGithubSync:
         mock_update = MagicMock(return_value=True)
         mock_bc, mock_bc_github = _make_mock_backlog_core_github(mock_repo, mock_update)
 
+        mock_hook_path = MagicMock()
+        mock_hook_path.exists.return_value = True
         with pytest.MonkeyPatch.context() as mp:
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
+            mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
 
             # Act
             hook.handle_subagent_stop(hook_input)
@@ -228,9 +231,12 @@ class TestSubagentStopFullPathWithGithubSync:
         mock_update = MagicMock(side_effect=RuntimeError("GitHub API unreachable"))
         mock_bc, mock_bc_github = _make_mock_backlog_core_github(mock_repo, mock_update)
 
+        mock_hook_path = MagicMock()
+        mock_hook_path.exists.return_value = True
         with pytest.MonkeyPatch.context() as mp:
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
+            mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
 
             # Act — must not raise
             result = hook.handle_subagent_stop(hook_input)

@@ -808,40 +808,18 @@ class TestBuildIssueBodyFromFileDict:
 
     @pytest.fixture
     def build_fn(self) -> object:
-        """Import the dict-based _build_issue_body_from_file via importlib.
+        """Skip — scripts/backlog.py was intentionally deleted; class is skipped.
 
-        The scripts/ directory must be on sys.path so that backlog.py's
-        sibling imports (state_handler, frontmatter_utils) resolve correctly.
+        The dict-based _build_issue_body_from_file was planned for
+        scripts/backlog.py which no longer exists. All functionality moved to
+        backlog_core/. This fixture skips rather than raising FileNotFoundError
+        so that pytest's fixture collection does not fail even if the class-level
+        skip marker is bypassed.
 
         Returns:
-            The _build_issue_body_from_file function from scripts/backlog.py.
+            Never returns; always skips.
         """
-        import importlib.util
-        import sys
-        from pathlib import Path as _Path
-
-        scripts_dir = _Path(__file__).parent.parent / "scripts"
-        script = scripts_dir / "backlog.py"
-        # backlog.py does top-level imports from sibling modules in scripts/
-        added = str(scripts_dir) not in sys.path
-        if added:
-            sys.path.insert(0, str(scripts_dir))
-        MOD_NAME = "backlog_script"
-        try:
-            spec = importlib.util.spec_from_file_location(MOD_NAME, script)
-            assert spec is not None
-            assert spec.loader is not None
-            mod = importlib.util.module_from_spec(spec)
-            # Register in sys.modules before exec_module so that @dataclass on
-            # Python 3.11 can resolve sys.modules[cls.__module__] during class
-            # construction (AttributeError: 'NoneType' has no attribute '__dict__').
-            sys.modules[MOD_NAME] = mod
-            spec.loader.exec_module(mod)
-            return mod._build_issue_body_from_file
-        finally:
-            sys.modules.pop(MOD_NAME, None)
-            if added and str(scripts_dir) in sys.path:
-                sys.path.remove(str(scripts_dir))
+        pytest.skip("scripts/backlog.py does not exist. Functionality moved to backlog_core/.")
 
     def test_returns_none_when_no_groomed_section(self, build_fn: object) -> None:
         """Dict item without '## Groomed' in _raw_body returns None.
