@@ -9,7 +9,7 @@ metadata:
   type: Bug
   status: needs-grooming
   issue: '#249'
-  last_synced: '2026-03-21T08:19:05Z'
+  last_synced: '2026-03-21T08:20:58Z'
   groomed: '2026-03-21'
 ---
 
@@ -34,18 +34,26 @@ The evaluate-sdlc-layers skill exists with six checks (cross-refs, doc completen
 
 ## RT-ICA
 
-<div><sub>2026-03-21T08:14:52Z</sub>
+<div><sub>2026-03-21T08:20:58Z</sub>
 
-RT-ICA Snapshot: evaluate-sdlc-layers: Run and fix findings
+RT-ICA Final: evaluate-sdlc-layers: Run and fix findings
 Goal: Run the six-check evaluate-sdlc-layers skill and fix all findings with --fix where applicable.
 Conditions:
-1. Skill file exists at .claude/skills/evaluate-sdlc-layers/SKILL.md | AVAILABLE (confirmed by Glob — 2026-03-21)
-2. Six checks the skill runs (cross-refs, doc completeness, knowledge-explorer, research metadata, integration points, plan consistency) | DERIVABLE (read skill file)
-3. Target directory .claude/docs/sdlc-layers/ exists and has content | DERIVABLE
-4. --fix flag supported by the skill | DERIVABLE
-5. Success criteria: all checks pass | AVAILABLE (description: "all checks pass with --fix applied where applicable")
-AVAILABLE: 2, DERIVABLE: 3, MISSING: 0
-Decision: APPROVED (pending DERIVABLE resolution in swarm)
+1. Skill file exists at .claude/skills/evaluate-sdlc-layers/SKILL.md | Snapshot: AVAILABLE → Final: AVAILABLE | Citation: Glob confirmed, Read verified frontmatter name: evaluate-sdlc-layers
+2. Six checks match description (cross-refs, doc completeness, knowledge-explorer, research metadata, integration points, plan consistency) | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker read SKILL.md, confirmed exactly 6 numbered sections matching all names
+3. Target directory .claude/docs/sdlc-layers/ exists and has content | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker confirmed Layer 0 (9 files), Layer 1 (6 files) present; Layer 2 MISSING (expected gap the skill will flag)
+4. --fix flag supported by the skill | Snapshot: DERIVABLE → Final: AVAILABLE | Citation: fact-checker found argument-hint: '[--dry-run | --fix]' at SKILL.md line 4
+5. Success criteria: all checks pass | Snapshot: AVAILABLE → Final: AVAILABLE | Citation: description states "Success: all checks pass with --fix applied where applicable"
+
+Changes from snapshot:
+- Condition 2: DERIVABLE → AVAILABLE (resolved by fact-checker reading SKILL.md directly)
+- Condition 3: DERIVABLE → AVAILABLE (resolved by fact-checker; Layer 2 missing is a known expected finding, not a blocker)
+- Condition 4: DERIVABLE → AVAILABLE (resolved by fact-checker finding --fix in argument-hint)
+
+New conditions discovered by swarm:
+- Layer 2 directory (.claude/docs/sdlc-layers/layer-2/) is missing — this is the primary finding the skill will report; not a grooming blocker, it IS the work
+
+Decision: APPROVED — all conditions AVAILABLE. Item is ready for planning phase.
 </div>
 
 ## Fact-Check
@@ -285,9 +293,29 @@ Justification:
 Risk: Low. The skill runs read-only checks by default (`--dry-run`) and applies only safe, reversible fixes (`--fix`). No breaking changes anticipated.
 </div>
 
+<div><sub>2026-03-21T08:19:21Z</sub>
+
+**Estimate: Medium (4–8 hours)**
+
+**Breakdown**:
+- **Skill execution and report generation** (1–2 hours): Run the skill, parse findings, document observations for each of the 6 checks. Findings may be scattered across multiple files, requiring careful cross-referencing.
+- **Cross-reference and path validation** (1–2 hours): Verify each of 6+ linked paths exists and contains expected content. If paths are broken, research correct locations or file the finding.
+- **Metadata fixes** (1–2 hours): Add missing `layer:` frontmatter fields to research entries. Update `language` and `stack` tags where missing or incorrect. Validate syntax.
+- **Documentation updates** (1 hour): Update SKILL docs to reference layer architecture if not already done. Ensure cross-links between work-backlog-item, groom-backlog-item, and layer docs are correct.
+- **Verification and re-run** (1 hour): Re-run `/evaluate-sdlc-layers --dry-run` to confirm all fixes applied and zero findings remain. Spot-check a few key files for correctness.
+
+**Complexity factors**:
+- **Low-Medium risk**: The skill is designed to auto-fix "safe" issues (paths, metadata, typos). Breaking changes are unlikely unless docs are substantially reorganized.
+- **Parallelizable**: Cross-reference checking, metadata audits, and skill doc updates can be done in parallel by an agent.
+- **Tool-assisted**: The skill already knows what to check; most work is applying the skill's suggestions and verifying results.
+
+**Success criterion**: All 6 checks PASS, zero findings, zero regression in existing docs.
+</div>
+
 ### Impact Radius
 
 <div><sub>2026-03-21T08:19:03Z</sub>
+
 
 
 ## Impact Radius
