@@ -423,9 +423,8 @@ class TestReconcileBatch:
 
     def test_returns_warning_on_github_api_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When GitHub API raises GithubException, returns items unchanged with warning."""
-        from github import GithubException
-
         import backlog as backlog_mod
+        from github import GithubException
 
         mock_repo = MagicMock()
         mock_repo.get_issues.side_effect = GithubException(500, "Server Error", None)

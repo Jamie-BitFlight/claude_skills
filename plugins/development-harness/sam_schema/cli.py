@@ -465,7 +465,7 @@ def create(
             if isinstance(parsed, dict) and "tasks" in parsed:
                 tasks = list(parsed["tasks"])
             elif isinstance(parsed, list):
-                tasks = list(parsed)
+                tasks = [item for item in parsed if isinstance(item, dict)]
             else:
                 _err("stdin must be YAML with a top-level 'tasks:' list or a bare list")
 

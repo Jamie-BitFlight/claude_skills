@@ -99,7 +99,21 @@ pythonpath = [
     "./plugins/summarizer/scripts",
     "./plugins/frustration-analyzer/tests",
 ]
-testpaths = ["**/tests"]
+testpaths = [
+    # Explicit list excludes plugins/scientific-method/mcp/experiment-registry/tests,
+    # which is a standalone sub-project with its own pyproject.toml and pytest config.
+    # That sub-project must be tested independently: cd into its directory and run pytest.
+    # Including it here causes a conftest module name collision because uv adds the
+    # experiment-registry package root to sys.path, making tests/conftest.py resolve
+    # as "tests.conftest" — the same name as plugins/development-harness/tests/conftest.py.
+    "plugins/agentskill-kaizen/tests",
+    "plugins/development-harness/tests",
+    "plugins/development-harness/tests_sam",
+    "plugins/frustration-analyzer/tests",
+    "plugins/plugin-creator/tests",
+    "plugins/python3-development/skills/implementation-manager/tests",
+    "plugins/summarizer/tests",
+]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -114,6 +128,11 @@ exclude_lines = [
 [tool.coverage.run]
 omit = ["tests/*", "*/tests/*", "**/test_*.py"]
 source = ["**/scripts"]
+
+[tool.ty.analysis]
+# `backlog` is a runtime module loaded via sys.path manipulation in tests
+# (tests insert ../scripts at runtime); no static backlog.py exists on disk.
+allowed-unresolved-imports = ["backlog"]
 
 [tool.ty.environment]
 # Order matters: real task_format.py (python3-development) must precede symlinked copy (development-harness)

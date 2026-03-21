@@ -202,12 +202,12 @@ async def backlog_list(
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
-    all_items: list[dict] = result.get("items", [])
+    all_items: list[dict[str, object]] = cast("list[dict[str, object]]", result.get("items", []))
 
     # Apply cross-field search filter when requested.
     if search is not None:
         needle = search.casefold()
-        filtered: list[dict] = []
+        filtered: list[dict[str, object]] = []
         for item in all_items:
             haystack = " ".join(
                 str(item.get(field, "") or "") for field in ("title", "description", "topic", "type")
