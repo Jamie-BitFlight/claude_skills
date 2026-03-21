@@ -9,7 +9,7 @@ metadata:
   type: Chore
   status: needs-grooming
   issue: '#918'
-  last_synced: '2026-03-21T08:07:27Z'
+  last_synced: '2026-03-21T03:45:08Z'
   plan: plan/P782-backlog-mcp-github-tools-followup-2.yaml
 ---
 

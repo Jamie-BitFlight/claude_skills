@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#437'
-  last_synced: '2026-03-21T08:08:32Z'
+  last_synced: '2026-03-21T03:46:14Z'
   groomed: '2026-03-05'
 ---
 

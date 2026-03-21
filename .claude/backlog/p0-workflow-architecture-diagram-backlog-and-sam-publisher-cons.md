@@ -7,9 +7,10 @@ metadata:
   added: '2026-03-21'
   priority: P0
   type: Feature
-  status: open
+  status: needs-grooming
   issue: '#933'
-  last_synced: '2026-03-21T08:07:22Z'
+  last_synced: '2026-03-21T03:53:07Z'
+  groomed: '2026-03-21'
 ---
 
 ## Story
@@ -34,6 +35,8 @@ Create a comprehensive workflow architecture diagram that maps the full backlog 
 
 ## RT-ICA
 
+<div><sub>2026-03-21T03:51:04Z</sub>
+
 ## Information Completeness Assessment
 
 **AVAILABLE** (exists in codebase, directly readable):
@@ -56,10 +59,13 @@ Create a comprehensive workflow architecture diagram that maps the full backlog 
 - No document maps the publisher-consumer relationships (who produces each artifact, who consumes it)
 - No explicit cross-system dependency map showing how `backlog_add` output feeds `swarm-task-planner` input
 - T0/TN bookend data structures (`BookendVerification` YAML schema) not documented outside code comments
+</div>
 
 ## Groomed (2026-03-21)
 
 ### Impact Radius
+
+<div><sub>2026-03-21T03:51:21Z</sub>
 
 Files that need updating when the diagram is created or updated:
 
@@ -82,16 +88,22 @@ Files that need updating when the diagram is created or updated:
 - `plugins/development-harness/agents/swarm-task-planner.md` — task file generation
 - `plugins/python3-development/agents/t0-baseline-capture.md` — T0 baseline YAML schema
 - `plugins/python3-development/agents/tn-verification-gate.md` — TN verification YAML schema
+</div>
 
 ### Issue Classification
+
+<div><sub>2026-03-21T03:51:35Z</sub>
 
 - **Type:** Docs / Architecture documentation
 - **Label:** `type:docs`
 - **Category:** Developer tooling — internal workflow documentation
 - **Scope:** Cross-system (backlog system + SAM execution system)
 - **Audience:** AI agents consuming local-workflow.md and orchestrator-level skills
+</div>
 
 ### Acceptance Criteria
+
+<div><sub>2026-03-21T03:52:05Z</sub>
 
 All criteria must be verifiable by reading the produced diagram file.
 
@@ -135,8 +147,11 @@ Both hook events in `task_status_hook.py` are shown with their trigger condition
 
 **AC7 — Diagram is in Mermaid or structured text**
 The diagram uses either Mermaid `flowchart TD` syntax or the existing structured text-tree style already used in `local-workflow.md`. Must render correctly in GitHub markdown (verified by viewing the issue after commit).
+</div>
 
 ### Priority
+
+<div><sub>2026-03-21T03:52:22Z</sub>
 
 **P0 — justified.**
 
@@ -145,8 +160,11 @@ AI agents that orchestrate the SAM workflow (e.g., `/implement-feature`, `/start
 The gap is not theoretical: without publisher-consumer documentation, any agent that reads a task file or calls `backlog_get_ready_sam_tasks` must infer field names from incomplete context. The `SamTask` model fields (`task_id`, `feature`, `agent`, `skills`, `dependencies`, `priority`, `status`) and the `SamTasksResult` wrapper shape are only defined in source code, not in agent-facing documentation.
 
 P0 because every implementation task that uses the SAM workflow runs with incomplete information until this is resolved.
+</div>
 
 ### Effort
+
+<div><sub>2026-03-21T03:52:37Z</sub>
 
 **Medium** — 3–5 hours of focused agent work.
 
@@ -160,8 +178,11 @@ Breakdown:
 Single agent can complete in one session. No parallelism required — the work is sequential (read → extract → compose → verify).
 
 No code changes. Output is one new documentation file plus one link update in `local-workflow.md`.
+</div>
 
 ### Dependencies
+
+<div><sub>2026-03-21T03:52:52Z</sub>
 
 **No blocking dependencies.** All source files exist and are readable today.
 
@@ -172,8 +193,11 @@ No code changes. Output is one new documentation file plus one link update in `l
 
 **Upstream reference:**
 - `.claude/docs/TASK_FILE_FORMAT.md` must exist and be current (verify before starting)
+</div>
 
 ### Files
+
+<div><sub>2026-03-21T03:53:07Z</sub>
 
 **Create:**
 - `.claude/docs/workflow-architecture-diagram.md` — primary deliverable: full pipeline diagram with labeled data-structure edges, publisher-consumer table, state lifecycle, and cross-system dependency map
@@ -190,3 +214,4 @@ No code changes. Output is one new documentation file plus one link update in `l
 - `plugins/development-harness/agents/swarm-task-planner.md`
 - `plugins/python3-development/agents/t0-baseline-capture.md`
 - `plugins/python3-development/agents/tn-verification-gate.md`
+</div>

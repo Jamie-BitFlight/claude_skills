@@ -8,7 +8,7 @@ import dataclasses
 import json as _json
 import re as _re
 import sys
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import dispatch_schema as _ds
 import tiktoken
@@ -203,8 +203,9 @@ async def backlog_list(  # noqa: PLR0914
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
-    raw = result.get("items", [])
-    all_items: list[dict] = [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+    # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
+    # cast() narrows from the heterogeneous value union (int | list[str] | list[dict[...]]).
+    all_items = cast("list[dict[str, str | bool]]", result.get("items", []))
 
     # Apply cross-field search filter when requested.
     if search is not None:

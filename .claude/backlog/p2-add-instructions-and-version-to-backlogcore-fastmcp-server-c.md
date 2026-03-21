@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: in-progress
   issue: '#464'
-  last_synced: '2026-03-21T08:08:28Z'
+  last_synced: '2026-03-21T03:46:10Z'
 ---
 
 ## Story

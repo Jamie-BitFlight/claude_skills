@@ -10,7 +10,7 @@ metadata:
   status: in-progress
   issue: '#117'
   groomed: '2026-03-02'
-  last_synced: '2026-03-21T08:08:52Z'
+  last_synced: '2026-03-21T03:46:34Z'
   plan: plan/tasks-6-plan-artifact-lifecycle.md
 ---
 

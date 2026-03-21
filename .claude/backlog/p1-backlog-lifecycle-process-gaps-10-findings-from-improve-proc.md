@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: open
   issue: '#398'
-  last_synced: '2026-03-21T08:08:35Z'
+  last_synced: '2026-03-21T03:46:18Z'
   plan: .claude/docs/process-audit-backlog-lifecycle-2026-03-02.md
   groomed: '2026-03-06'
 ---

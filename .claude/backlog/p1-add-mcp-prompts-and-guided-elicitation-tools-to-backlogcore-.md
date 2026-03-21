@@ -9,7 +9,7 @@ metadata:
   type: Feature
   status: in-progress
   issue: '#473'
-  last_synced: '2026-03-21T08:08:23Z'
+  last_synced: '2026-03-21T03:46:05Z'
   groomed: '2026-03-06'
   plan: plan/tasks-1-mcp-prompts-elicitation.md
 ---
