@@ -89,7 +89,10 @@ def run_quality_gates(
                 )
             except subprocess.TimeoutExpired:
                 result = CommandResult(
-                    command=command, exit_code=124, stdout="", stderr=f"command timed out after {timeout}s"
+                    command=command,
+                    exit_code=124,
+                    stdout="",
+                    stderr=f"command timed out after {timeout:.0f}s: {command}",
                 )
 
         results.append(result)
