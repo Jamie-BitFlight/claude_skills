@@ -467,6 +467,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [everything-claude-code.md](./agent-frameworks/everything-claude-code.md) | Everything Claude Code — comprehensive performance optimization system: 16 specialized agents, 65+ skills, hook-based automation, token optimization, 6-language support (50K+ stars, MIT) | 2026-03-10   |
 | [gstack.md](./agent-frameworks/gstack.md)                             | gstack — role-specific cognition switching for Claude Code with 8 specialized skills (CEO review, eng review, paranoid code review, shipping, browser QA), compiled Bun browser binary (~100-200ms commands), accessibility-based element selection (6K+ stars, MIT) | 2026-03-13   |
 | [AutoResearchClaw.md](./agent-frameworks/AutoResearchClaw.md)         | AutoResearchClaw — fully autonomous 23-stage research pipeline converting ideas into conference-ready papers; multi-agent orchestration, 4-layer citation verification, self-healing experiments, PIVOT/REFINE/PROCEED decision logic, MetaClaw cross-run learning (MIT) | 2026-03-19   |
+| [composure.md](./agent-frameworks/composure.md)                       | Composure — multi-language code quality plugin for Claude Code: 8 skills, 8 hooks, tree-sitter + SQLite MCP knowledge graph, severity-tracked task queue, 7-language anti-pattern blocking (PolyForm Noncommercial 1.0.0) | 2026-03-23   |
 
 **Key Topics**:
 
