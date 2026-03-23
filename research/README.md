@@ -75,7 +75,8 @@ research/
 │   ├── openhands.md                   # Open platform for cloud coding agents (67K+ stars)
 │   ├── pilot.md                       # Autonomous development pipeline wrapping Claude Code CLI (BSL 1.1)
 │   ├── tembo.md                       # Cloud AI coding agent orchestration (Claude Code, Codex, Cursor, Amp, OpenCode)
-│   └── 1code.md                       # Electron desktop app wrapping Claude Code + Codex with worktree isolation (5.2K stars)
+│   ├── 1code.md                       # Electron desktop app wrapping Claude Code + Codex with worktree isolation (5.2K stars)
+│   └── maverick.md                    # Claude Code plugin + CLI with enforcement chain, 3 workflow modes, upskill auto-generation, AWS worker fleet (alpha)
 ├── context-management/                # Memory, context window, and RAG tools
 │   ├── claude-mem.md                  # Persistent memory compression for Claude Code (15K+ stars)
 │   ├── jina-ai.md                     # Search foundation: Reader API, multilingual embeddings, rerankers (acquired by Elastic 2025)
@@ -839,6 +840,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [claude-replay.md](./coding-agents/claude-replay.md) | claude-replay — zero-dependency CLI to convert Claude Code, Cursor, and Codex transcripts into shareable HTML players; v0.4.0 web editor with 3-panel UI, automatic secret redaction, 60-70% native browser compression, 6 themes (500 stars, MIT) | 2026-03-13   |
 | [stakpak-agent.md](./coding-agents/stakpak-agent.md) | Stakpak Agent — Rust-based DevOps AI agent (11-crate workspace); secret substitution, mTLS MCP, Warden guardrails, autopilot cron scheduling, Slack/Discord/Telegram channels, Claude/GPT/Gemini support, ACP for Zed editor (872 stars, Apache-2.0) | 2026-03-13   |
 | [1code.md](./coding-agents/1code.md) | 1Code — Electron desktop app wrapping Claude Code CLI and OpenAI Codex with git worktree isolation, tRPC router (20 namespaces), SQLite session tracking, MCP plugin management, voice input; Pro/Max tiers for background agents and sync (5.2K stars, MIT) | 2026-03-17   |
+| [maverick.md](./coding-agents/maverick.md) | Maverick — Claude Code plugin (28 skills + 4 agents) + CLI with enforcement chain (best-practice → project skill → local verify → CI → agent review → human review), three workflow modes (do-issue-solo, do-issue-guided, do-task-solo), upskill auto-generation from codebase, and AWS EC2/SQS/Lambda worker fleet for autonomous issue resolution (alpha) | 2026-03-23   |
 
 **Key Topics**:
 
