@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import sys
 import types
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock, patch
 
 if TYPE_CHECKING:
@@ -239,8 +239,8 @@ class TestSyncCompletionToGithub:
         task_file = tmp_path / "task.md"
         task_file.write_text(_TASK_YAML_WITHOUT_GITHUB_ISSUE, encoding="utf-8")
 
-        mock_bc = types.ModuleType("backlog_core")
-        mock_bc_github = types.ModuleType("backlog_core.github")
+        mock_bc = cast("Any", types.ModuleType("backlog_core"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
         mock_update = MagicMock(return_value=True)
         vars(mock_bc_github).update({"update_task_status": mock_update, "get_github": MagicMock()})
 
@@ -271,8 +271,8 @@ class TestSyncCompletionToGithub:
         task_file.write_text(_TASK_YAML_WITH_GITHUB_ISSUE, encoding="utf-8")
 
         mock_repo = MagicMock()
-        mock_bc = types.ModuleType("backlog_core")
-        mock_bc_github = types.ModuleType("backlog_core.github")
+        mock_bc = cast("Any", types.ModuleType("backlog_core"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(return_value=True)
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
@@ -307,8 +307,8 @@ class TestSyncCompletionToGithub:
         task_file.write_text(_TASK_YAML_WITH_GITHUB_ISSUE, encoding="utf-8")
 
         mock_repo = MagicMock()
-        mock_bc = types.ModuleType("backlog_core")
-        mock_bc_github = types.ModuleType("backlog_core.github")
+        mock_bc = cast("Any", types.ModuleType("backlog_core"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(side_effect=RuntimeError("GitHub API error"))
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
@@ -337,8 +337,8 @@ class TestSyncCompletionToGithub:
         task_file = tmp_path / "task.md"
         task_file.write_text(_TASK_YAML_WITH_GITHUB_ISSUE, encoding="utf-8")
 
-        mock_bc = types.ModuleType("backlog_core")
-        mock_bc_github = types.ModuleType("backlog_core.github")
+        mock_bc = cast("Any", types.ModuleType("backlog_core"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
         mock_get_github = MagicMock(side_effect=RuntimeError("No token"))
         mock_update = MagicMock()
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
