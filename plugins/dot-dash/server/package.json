@@ -11,10 +11,12 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "chokidar": "^4.0.3",
-    "hono": "^4.7.7"
+    "hono": "^4.7.7",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.14",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0"
   }
