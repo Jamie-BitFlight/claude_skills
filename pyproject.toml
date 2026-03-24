@@ -159,7 +159,6 @@ extra-paths = [
     "./plugins/holistic-linting/skills/holistic-linting/scripts",
     "./plugins/plugin-creator/scripts",
     "./plugins/plugin-creator/skills/skill-creator/scripts",
-    "./plugins/python3-development/skills/implementation-manager/scripts",
     "./plugins/python3-development/skills/mkdocs/scripts",
     "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
