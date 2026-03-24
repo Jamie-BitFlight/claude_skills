@@ -1,0 +1,19 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "script": "hooks/session-start.cjs",
+      "description": "Register new Claude Code session with dot-dash server"
+    },
+    {
+      "event": "SessionEnd",
+      "script": "hooks/session-stop.cjs",
+      "description": "Deregister session from dot-dash server"
+    },
+    {
+      "event": "UserPromptSubmit",
+      "script": "hooks/prompt-injector.cjs",
+      "description": "Check injection queue and prepend queued message to user prompt"
+    }
+  ]
+}
