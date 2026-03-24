@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { openSync, readSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import chokidar from 'chokidar';
@@ -21,28 +21,59 @@ export function createWatcher(
   function readNewLines(filePath: string) {
     try {
       const stat = statSync(filePath);
-      const pos = positions.get(filePath) ?? stat.size;
+
+      const prevPos = positions.get(filePath);
+
+      // First time seeing this file — start tracking from current end, ignore history.
+      if (prevPos === undefined) {
+        positions.set(filePath, stat.size);
+        return;
+      }
+
+      // Handle truncation (log rotation or file reset).
+      const pos = stat.size < prevPos ? 0 : prevPos;
+
       if (stat.size <= pos) return;
-      const buf = readFileSync(filePath);
-      const newContent = buf.slice(pos).toString('utf8');
-      positions.set(filePath, stat.size);
+
+      // Read only the new bytes using offset-based I/O.
+      const length = stat.size - pos;
+      const buf = Buffer.allocUnsafe(length);
+      const fd = openSync(filePath, 'r');
+      try {
+        readSync(fd, buf, 0, length, pos);
+      } finally {
+        // fs.closeSync is not imported to keep the import list minimal; use require inline.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require('node:fs').closeSync(fd);
+      }
+
+      positions.set(filePath, pos + length);
+
+      const newContent = buf.toString('utf8');
       const lines = newContent.split('\n').filter((l) => l.trim().length > 0);
-      // Find which session owns this file
+
+      // Find which session owns this file.
       const allSessions = sessions.getAll();
       const owningSession = allSessions.find((s) => s.jsonlPath === filePath);
       if (!owningSession) return;
+
       for (const line of lines) {
-        let parsed: unknown;
+        let parsedRecord: unknown;
         try {
-          parsed = JSON.parse(line);
+          parsedRecord = JSON.parse(line);
         } catch {
           continue;
         }
+        const timestampField = (parsedRecord as Record<string, unknown>)?.timestamp;
+        const timestamp =
+          typeof timestampField === 'string' && timestampField.length > 0
+            ? timestampField
+            : new Date().toISOString();
         const evt: TranscriptEvent = {
           sessionId: owningSession.id,
-          timestamp: new Date().toISOString(),
-          type: (parsed as Record<string, string>)?.type ?? 'unknown',
-          content: parsed,
+          timestamp,
+          type: (parsedRecord as Record<string, string>)?.type ?? 'unknown',
+          content: parsedRecord,
           raw: line,
         };
         sessions.updateLastEvent(owningSession.id);

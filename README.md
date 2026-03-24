@@ -1,6 +1,6 @@
 <p align="center">
   <a href="#available-plugins"><img src="https://img.shields.io/badge/Claude_Code-Plugin_Marketplace-6B4FBB?style=for-the-badge&logo=anthropic&logoColor=white" alt="Claude Code Plugin Marketplace"></a>
-  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Plugins-26-blue?style=for-the-badge" alt="26 Plugins"></a>
+  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Plugins-27-blue?style=for-the-badge" alt="27 Plugins"></a>
   <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Agents-56-orange?style=for-the-badge" alt="56 Agents"></a>
   <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Skills-119-green?style=for-the-badge" alt="119 Skills"></a>
 </p>
@@ -74,6 +74,7 @@ Comprehensive frameworks with multiple skills, commands, and specialized agents.
 | [the-rewrite-room](./plugins/the-rewrite-room) | Documentation workflow router — routes tasks like drift audits, doc sync, prompt optimization, and summarization to canonical workflows with validation (install name: `rwr`). Includes MCP file-reader server. |
 | [process-siren](./plugins/process-siren) | Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents, with process quality methodology for improving ambiguous or incomplete processes before conversion |
 | [fastmcp-creator](./plugins/fastmcp-creator) | Build production-ready MCP servers with FastMCP 3.x — covers provider/transform architecture, authorization, session state, async patterns, STDIO/HTTP transports, and deployment. Includes a live FastMCP reference MCP server. |
+| [dot-dash](./plugins/dot-dash) | Real-time browser dashboard for monitoring every active Claude Code session — live transcript streaming, prompt injection, and session termination from a single React UI. Node.js/Hono backend with WebSocket updates and token-based authentication. |
 
 ### Lightweight Knowledge Clip-Ins
 
@@ -177,6 +178,52 @@ Run after sessions to identify what went wrong, what tooling Claude was missing,
 Covers the full FastMCP 3.x development surface: provider/transform architecture (CodeMode, Tool Search, server-level transforms), component versioning, session state, MultiAuth authorization, PropelAuth integration, Pydantic validation, async patterns, STDIO/HTTP transports, nginx reverse proxy deployment, background tasks, Prefab Apps UI, security patterns, client SDK usage, testing, and migration from FastMCP v2.
 
 Includes a live FastMCP reference MCP server that provides `search_docs`, `scaffold_server`, `validate_server`, and `version_check` tools.
+
+### dot-dash
+
+A browser-based control panel for Claude Code. When you are running multiple sessions simultaneously — across projects, worktrees, or machines — dot-dash gives you a single place to watch what each session is doing and to interact with it.
+
+**What it does:**
+
+- **Live transcript view** — streams JSONL transcript events from each session to the browser in real time via WebSocket, so you can read Claude's reasoning and tool calls as they happen
+- **Session list** — shows all active and recently stopped sessions with project name, working directory, PID, and last-event timestamp
+- **Prompt injection** — lets you queue a message in the browser that will be prepended to the next prompt the user submits in a specific session, without interrupting the current turn
+- **Session termination** — send a stop signal to any session from the dashboard
+
+**How it works:**
+
+Three hooks wire each Claude Code session into the server automatically:
+
+- `SessionStart` — registers the session (ID, CWD, PID) with the local server
+- `SessionEnd` — marks the session stopped and cleans up
+- `UserPromptSubmit` — checks the injection queue before every prompt; if a message is queued, prepends it transparently
+
+The server runs locally at `http://127.0.0.1:7765` by default. A React/TypeScript frontend (built with Vite) is served from the same process. Authentication uses a token stored at `~/.claude/dot-dash/token` (generated on first run, file-permissions 600).
+
+**Starting the server:**
+
+```bash
+cd plugins/dot-dash/server
+npm install
+npm run build
+node dist/main.js
+```
+
+Or use the bundled script:
+
+```bash
+bash plugins/dot-dash/scripts/start-server.sh
+```
+
+Then open `http://127.0.0.1:7765` in a browser. The server must be running before Claude Code sessions start for those sessions to appear in the dashboard.
+
+**Configuration:**
+
+Set `DOT_DASH_PORT` in your environment to use a port other than `7765`:
+
+```bash
+DOT_DASH_PORT=8080 node dist/main.js
+```
 
 ## How Plugins Work
 

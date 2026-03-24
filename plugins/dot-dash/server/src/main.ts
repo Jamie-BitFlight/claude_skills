@@ -39,8 +39,13 @@ app.use('/api/*', async (c, next) => {
 
 // Internal routes (localhost only, no auth)
 app.post('/internal/session/register', async (c) => {
-  const body = await c.req.json<{ session_id: string; cwd: string; pid?: number }>();
-  const session = sessions.register(body.session_id, body.cwd, body.pid ?? 0);
+  const body = await c.req.json<{
+    session_id: string;
+    cwd: string;
+    pid?: number;
+    transcript_path?: string;
+  }>();
+  const session = sessions.register(body.session_id, body.cwd, body.pid ?? 0, body.transcript_path);
   broadcaster.send({ type: 'session_registered', payload: session });
   return c.json({ ok: true, session });
 });
@@ -97,10 +102,15 @@ app.use('/*', serveStatic({ root: FRONTEND_DIR }));
 
 // Start HTTP server
 const server = serve({ fetch: app.fetch, port: PORT }, () => {
+  const tokenFilePath = '~/.claude/dot-dash/token';
   console.log(`dot-dash server running at http://localhost:${PORT}`);
-  console.log(`Token: ${token}`);
   console.log(`Dashboard: http://localhost:${PORT}`);
-  console.log(`WebSocket: ws://localhost:${PORT}/ws?token=${token}`);
+  console.log(`Token file: ${tokenFilePath}`);
+  if (process.env.DOT_DASH_PRINT_TOKEN === '1') {
+    console.log(`Token: ${token}`);
+  } else {
+    console.log('Token: <redacted> (set DOT_DASH_PRINT_TOKEN=1 to reveal)');
+  }
 });
 
 // WebSocket server attached to same HTTP server, path-filtered to /ws
