@@ -31,7 +31,11 @@ def get_available_features() -> dict[str, Any]:
         return {"features": [], "count": 0, "message": f"Could not resolve plan dir: {e}"}
 
     if not plan_path.exists():
-        return {"features": [], "count": 0, "message": f"Not in a project with task files (no plan/ directory at {plan_path})"}
+        return {
+            "features": [],
+            "count": 0,
+            "message": f"Not in a project with task files (no plan/ directory at {plan_path})",
+        }
 
     try:
         # Run implementation_manager.py list-features
