@@ -537,6 +537,8 @@ def _has_task_content(directory: Path) -> bool:
 
     A directory qualifies if it contains either:
     - ``tasks-*.md`` files (monolithic task files)
+    - ``tasks-*.yaml`` files (monolithic YAML task files)
+    - ``P*.yaml`` files (canonical SAM plan files, e.g. ``P001-my-feature.yaml``)
     - ``tasks-*/`` subdirectories (directory-based task organization)
 
     Args:
@@ -546,6 +548,10 @@ def _has_task_content(directory: Path) -> bool:
         True if the directory contains task files or task subdirectories.
     """
     if list(directory.glob("tasks-*.md")):
+        return True
+    if list(directory.glob("tasks-*.yaml")):
+        return True
+    if list(directory.glob("P*.yaml")):
         return True
     for child in directory.iterdir():
         if child.is_dir() and child.name.startswith("tasks-") and list(child.glob("*.md")):
@@ -643,11 +649,23 @@ def find_task_files(project_path: Path) -> list[Feature]:
 
     # Pattern for monolithic task files: tasks-001-feature-name.yaml (or .md legacy)
     file_pattern = re.compile(r"tasks-(\d+)-(.+)\.(yaml|md)$")
+    # Pattern for canonical SAM plan files: P001-feature-name.yaml
+    p_file_pattern = re.compile(r"P(\d+)-(.+)\.yaml$")
     seen_slugs: set[str] = set()
-    for file_path in sorted(list(plan_dir.glob("tasks-*.yaml")) + list(plan_dir.glob("tasks-*.md"))):
+    all_yaml_md = (
+        list(plan_dir.glob("tasks-*.yaml")) + list(plan_dir.glob("tasks-*.md")) + list(plan_dir.glob("P*.yaml"))
+    )
+    for file_path in sorted(all_yaml_md):
         match = file_pattern.match(file_path.name)
         if match:
             slug = match.group(2)
+            if slug not in seen_slugs:
+                seen_slugs.add(slug)
+                features.append(Feature(slug=slug, task_file=file_path.name, path=file_path))
+            continue
+        p_match = p_file_pattern.match(file_path.name)
+        if p_match:
+            slug = p_match.group(2)
             if slug not in seen_slugs:
                 seen_slugs.add(slug)
                 features.append(Feature(slug=slug, task_file=file_path.name, path=file_path))
