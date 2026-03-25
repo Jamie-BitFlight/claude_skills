@@ -68,7 +68,8 @@ research/
 │   └── open-pencil.md                # OpenPencil v0.10.0 - Open-source Figma alt: native .fig I/O, 87+ AI tools, MCP server, P2P collab (2.8K stars)
 ├── ai-research-tools/                 # AI research tools and newsletters
 │   ├── merly-mentor.md               # Logic-based AI code quality tool: deterministic analysis of 1M LOC/min, 15 languages, REST API (Seed $6.8M)
-│   └── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
+│   ├── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
+│   └── samuraizer.md                 # Samuraizer - Full-stack AI knowledge base: semantic search, RAG chat, knowledge graph, Telegram bot (Flask+React+Gemini)
 ├── coding-agents/                     # Autonomous AI coding agent platforms
 │   ├── accomplish.md                  # Local-first AI desktop agent with MCP tools, 15 providers, permission-gated execution (9K+ stars)
 │   ├── cline.md                       # Open-source autonomous coding agent with human-in-the-loop approvals (Apache-2.0)
@@ -1114,6 +1115,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | [merly-mentor.md](./ai-research-tools/merly-mentor.md) | Merly Mentor - Logic-based AI code quality tool: deterministic analysis of 1M LOC/min across 15 languages, REST API, Docker/K8s deployment (Seed $6.8M) | 2026-03-18   |
 | [codewiki-google.md](./ai-research-tools/codewiki-google.md) | CodeWiki (Google) - AI-powered documentation platform: auto-generates wikis, diagrams, and Gemini chat for code repos after every commit (public preview, Nov 2025) | 2026-03-18   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
+| [samuraizer.md](./ai-research-tools/samuraizer.md) | Samuraizer - Full-stack AI knowledge base for security research: URL/PDF analysis via Gemini 2.5 Flash, semantic search, RAG chat, knowledge graph (D3.js), Telegram bot (Flask+React+SQLite, MIT) | 2026-03-25   |
 
 **Key Topics**:
 
