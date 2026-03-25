@@ -641,13 +641,16 @@ def find_task_files(project_path: Path) -> list[Feature]:
 
     features: list[Feature] = []
 
-    # Pattern for monolithic task files: tasks-001-feature-name.md
-    file_pattern = re.compile(r"tasks-(\d+)-(.+)\.md$")
-    for file_path in sorted(plan_dir.glob("tasks-*.md")):
+    # Pattern for monolithic task files: tasks-001-feature-name.yaml (or .md legacy)
+    file_pattern = re.compile(r"tasks-(\d+)-(.+)\.(yaml|md)$")
+    seen_slugs: set[str] = set()
+    for file_path in sorted(list(plan_dir.glob("tasks-*.yaml")) + list(plan_dir.glob("tasks-*.md"))):
         match = file_pattern.match(file_path.name)
         if match:
             slug = match.group(2)
-            features.append(Feature(slug=slug, task_file=file_path.name, path=file_path))
+            if slug not in seen_slugs:
+                seen_slugs.add(slug)
+                features.append(Feature(slug=slug, task_file=file_path.name, path=file_path))
 
     # Pattern for task directories: tasks-feature-name/
     dir_pattern = re.compile(r"tasks-(.+)$")

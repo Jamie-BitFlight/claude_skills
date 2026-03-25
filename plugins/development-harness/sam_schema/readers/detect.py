@@ -51,7 +51,7 @@ class FormatDetectionError(Exception):
 
 
 # Compiled patterns for format detection
-_TASK_FIELD_RE = re.compile(r"^task\s*:", re.MULTILINE)
+_TASK_FIELD_RE = re.compile(r"^task(?:_id)?\s*:", re.MULTILINE)
 _FEATURE_FIELD_RE = re.compile(r"^(?:feature|slug)\s*:", re.MULTILINE)
 _TASKS_LIST_RE = re.compile(r"^tasks\s*:", re.MULTILINE)
 _LEGACY_HEADING_RE = re.compile(r"^##\s+Task\s+\d", re.MULTILINE)
@@ -64,7 +64,7 @@ def _classify_frontmatter(frontmatter_text: str) -> FormatType | None:
     frontmatter-based format (caller falls through to legacy heading check).
 
     Detection order:
-    1. ``task:`` field present -> ``YAML_FRONTMATTER`` (single-task)
+    1. ``task:`` or ``task_id:`` field present -> ``YAML_FRONTMATTER`` (single-task)
     2. ``feature:``/``slug:`` + ``tasks:`` present -> ``GLOBAL_MANIFEST``
     3. ``feature:``/``slug:`` without ``tasks:`` -> ``YAML_FRONTMATTER``
        (multi-task; per-task blocks are embedded in the body)
