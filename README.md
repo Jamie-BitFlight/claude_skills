@@ -269,14 +269,6 @@ claude --plugin-dir ./plugins/python3-development --plugin-dir ./plugins/holisti
 /plugin enable python3-development@jamie-bitflight-skills
 ```
 
-## Workshops
-
-The `workshops/` directory contains hands-on workshop materials for teaching AI-assisted development in specific domains:
-
-- **[Embedded Engineers (General)](./workshops/ai-agents-skills-for-embedded-engineers.md)** — 1-hour workshop covering skills, agents, and orchestration for firmware development with MISRA-C, FreeRTOS, and Zigbee patterns
-- **[Embedded Engineers (Claude)](./workshops/ai-agents-skills-for-embedded-engineers-claude.md)** — Claude Code-specific version with skills, agents, and orchestration
-- **[Embedded Engineers (Cursor)](./workshops/ai-agents-skills-for-embedded-engineers-cursor.md)** — Equivalent workshop adapted for Cursor with custom agents and embedded skills
-
 ## Troubleshooting
 
 **Plugin commands not found after install?**
