@@ -26,7 +26,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -315,9 +315,9 @@ def _load_registry(registry_path: Path) -> list[dict[str, Any]] | None:
 
     # Registry can be a dict (name → entry) or a list of entries
     if isinstance(data, dict):
-        return list(data.values())
+        return cast("list[dict[str, Any]]", list(data.values()))
     if isinstance(data, list):
-        return data
+        return cast("list[dict[str, Any]]", data)
     return None
 
 

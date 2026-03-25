@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import sys
@@ -30,6 +31,7 @@ from typing import TYPE_CHECKING, Annotated, TypedDict
 
 import typer
 from rich.console import Console
+from ruamel.yaml import YAML as _YAML
 
 # task_format.py is a sibling module in the same scripts/ directory.
 # Ensure the script directory is on sys.path for direct execution.
@@ -467,6 +469,67 @@ def _create_task_from_dict(task_data: TaskData) -> Task:
         completed=task_data["completed"],
         skills=task_data["skills"],
     )
+
+
+def parse_task_content(content: str) -> list[Task]:
+    """Parse a raw YAML frontmatter string into a list of Task objects.
+
+    Parses bare ``---`` delimited YAML frontmatter blocks from a content string.
+    Each block produces one Task.  Title-based status overrides ([DEFERRED],
+    [SKIPPED]) are applied after YAML status parsing.
+
+    Args:
+        content: Raw string containing one or more ``---``-delimited YAML
+            frontmatter blocks (e.g., the full text of a task file).
+
+    Returns:
+        List of Task objects parsed from the frontmatter blocks.  Returns an
+        empty list when no valid frontmatter is found.
+    """
+    yaml = _YAML(typ="safe")
+    tasks: list[Task] = []
+
+    # Match bare ---\n...\n--- blocks (no fenced code path).
+    pattern = re.compile(r"^---\n(.*?)\n---\s*$", re.DOTALL | re.MULTILINE)
+    for match in pattern.finditer(content):
+        raw_block = match.group(1)
+        try:
+            parsed = yaml.load(io.StringIO(raw_block))
+        except Exception:  # noqa: BLE001 S112
+            continue
+        if not isinstance(parsed, dict):
+            continue
+
+        task_id = str(parsed.get("task", "")).strip()
+        title = str(parsed.get("title", "")).strip()
+        if not task_id:
+            continue
+
+        raw_status = str(parsed.get("status", "not-started"))
+        status = _parse_yaml_status(raw_status)
+        status = _status_from_title(title, status)
+
+        raw_priority = parsed.get("priority", 3)
+        try:
+            priority = TaskPriority(int(raw_priority))
+        except (ValueError, KeyError):
+            priority = TaskPriority.MEDIUM
+
+        task_data: TaskData = {
+            "id": task_id,
+            "name": title,
+            "status": status,
+            "dependencies": _parse_yaml_dependencies(parsed.get("dependencies")),
+            "agent": parsed.get("agent") or None,
+            "priority": priority,
+            "complexity": str(parsed.get("complexity", "Medium")),
+            "started": _coerce_timestamp(parsed.get("started")),
+            "completed": _coerce_timestamp(parsed.get("completed")),
+            "skills": _parse_yaml_skills(parsed.get("skills")),
+        }
+        tasks.append(_create_task_from_dict(task_data))
+
+    return tasks
 
 
 def _has_task_content(directory: Path) -> bool:
