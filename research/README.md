@@ -915,6 +915,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 | [claude-task-master.md](./task-management/claude-task-master.md) | Task Master - PRD parsing, task tracking, and MCP integration for Cursor, Windsurf, Claude Code | 2026-01-26   |
 | [vibe-kanban.md](./task-management/vibe-kanban.md)               | Vibe Kanban - Kanban-style orchestration UI for parallel AI coding agent sessions with git worktree isolation | 2026-03-03   |
 | [artifact-manifest-backend-providers.md](./task-management/artifact-manifest-backend-providers.md) | Cross-platform comparison of structured metadata capabilities (GitHub, Linear, GitLab, Supabase) for ArtifactBackend provider implementations | 2026-03-22   |
+| [xyops.md](./task-management/xyops.md)                                                             | xyOps - distributed job orchestration and fleet management platform with visual workflow editor, real-time monitoring, alerting, and remote satellite agent system | 2026-03-26   |
 
 **Key Topics**:
 
