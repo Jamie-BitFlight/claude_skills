@@ -22,21 +22,43 @@ Environment override
 --------------------
 Set DH_STATE_HOME to relocate all DH state (useful for tests and CI):
     DH_STATE_HOME=/tmp/test-dh uv run ...
+
+Set a project path when the process cwd is not inside the repo (MCP servers,
+plugin cache cwd, IDEs). Checked in order by :func:`infer_project_root` when
+:func:`git_project_root` is called with no *cwd* argument:
+
+    DH_PROJECT_ROOT=/path/to/repo          # explicit override (any host)
+    WORKSPACE_FOLDER_PATHS=["/path"]       # VS Code / Cursor (JSON array)
+    CURSOR_PROJECT_ROOT=/path/to/repo      # when the Cursor host sets it
+    CLAUDE_PROJECT_DIR=/path/to/repo       # when the Claude Code host sets it
+
+MCP layout: **Claude Code** uses ``.claude-plugin/plugin.json`` (and may merge
+``.mcp.json``) with ``${CLAUDE_PLUGIN_ROOT}`` in script paths. **Cursor** uses
+``.cursor-plugin/plugin.json`` with the **same** script path variable:
+``${CLAUDE_PLUGIN_ROOT}/scripts/...`` — Cursor resolves ``./scripts/...`` against
+``${workspaceFolder}``, not the plugin install dir. **Cursor** sets
+``DH_PROJECT_ROOT`` to ``${workspaceFolder}`` for the open repo. Shared
+``infer_project_root()`` consumes whichever env the active host sets.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
 # Module-level cache: maps cwd (as str) -> resolved project root Path.
-# git_project_root() populates this on first call per cwd.
+# _git_rev_parse_root() populates this on first call per cwd.
 _root_cache: dict[str, Path] = {}
 
+# IDE-specific env vars (after WORKSPACE_FOLDER_PATHS). Cursor before Claude so
+# competing hosts do not prefer the other's convention when both are present.
+_IDE_DISCOVERY_ENV_VARS: tuple[str, ...] = ("CURSOR_PROJECT_ROOT", "CLAUDE_PROJECT_DIR")
 
-def git_project_root(cwd: Path | None = None) -> Path:
-    """Resolve the main worktree root via git.
+
+def _git_rev_parse_root(resolved_cwd: Path) -> Path:
+    """Resolve the main worktree root via ``git rev-parse --git-common-dir``.
 
     Uses ``git rev-parse --path-format=absolute --git-common-dir`` which
     returns the common git dir (identical to .git/ for main worktrees; the
@@ -44,7 +66,7 @@ def git_project_root(cwd: Path | None = None) -> Path:
     the parent of that directory.
 
     Args:
-        cwd: Directory from which to run git.  Defaults to ``Path.cwd()``.
+        resolved_cwd: Directory from which to run git (absolute or relative).
 
     Returns:
         Absolute path to the project root (main worktree root).
@@ -54,23 +76,185 @@ def git_project_root(cwd: Path | None = None) -> Path:
         subprocess.CalledProcessError: If the directory is not inside a
             git repository.
     """
-    resolved_cwd = str(cwd or Path.cwd())
-    if resolved_cwd in _root_cache:
-        return _root_cache[resolved_cwd]
+    cwd_key = str(resolved_cwd.resolve())
+    if cwd_key in _root_cache:
+        return _root_cache[cwd_key]
 
     result = subprocess.run(
         ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
         capture_output=True,
         text=True,
         check=True,
-        cwd=resolved_cwd,
+        cwd=cwd_key,
     )
     # Strip trailing whitespace / newline from git output.
     git_common_dir = Path(result.stdout.strip())
     # .git/ (or bare common dir) → parent is the project root.
     project_root = git_common_dir.parent
-    _root_cache[resolved_cwd] = project_root
+    _root_cache[cwd_key] = project_root
     return project_root
+
+
+def _first_git_ancestor(start: Path) -> Path | None:
+    """Return the nearest ancestor of *start* that contains a ``.git`` entry.
+
+    Args:
+        start: Directory to walk upward from (typically ``Path.cwd()``).
+
+    Returns:
+        That ancestor directory, or ``None`` if no ``.git`` exists on the path.
+    """
+    cur = start.resolve()
+    for d in (cur, *cur.parents):
+        if (d / ".git").exists():
+            return d
+    return None
+
+
+def _git_root_if_directory(path: Path) -> Path | None:
+    """Run git common-dir resolution for *path* if it is a directory.
+
+    Returns:
+        The resolved project root, or ``None`` if *path* is not a directory or
+        git rev-parse fails.
+    """
+    if not path.is_dir():
+        return None
+    try:
+        return _git_rev_parse_root(path)
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _infer_dh_project_root_env() -> Path | None:
+    """Try ``DH_PROJECT_ROOT`` only (explicit host/user override).
+
+    Returns:
+        Resolved git root, or ``None`` if unset or not a valid repo.
+    """
+    raw = os.environ.get("DH_PROJECT_ROOT", "").strip()
+    if not raw:
+        return None
+    return _git_root_if_directory(Path(raw).expanduser().resolve())
+
+
+def _infer_from_ide_env_vars() -> Path | None:
+    """Try ``CURSOR_PROJECT_ROOT`` then ``CLAUDE_PROJECT_DIR``.
+
+    Returns:
+        Resolved git root, or ``None`` if neither yields a valid repo.
+    """
+    for var in _IDE_DISCOVERY_ENV_VARS:
+        raw = os.environ.get(var, "").strip()
+        if not raw:
+            continue
+        resolved = _git_root_if_directory(Path(raw).expanduser().resolve())
+        if resolved is not None:
+            return resolved
+    return None
+
+
+def _infer_from_workspace_folder_paths() -> Path | None:
+    """Try ``WORKSPACE_FOLDER_PATHS`` JSON array (VS Code / Cursor).
+
+    Returns:
+        Resolved git root, or ``None`` if the variable is missing or invalid.
+    """
+    wfp = os.environ.get("WORKSPACE_FOLDER_PATHS", "").strip()
+    if not wfp.startswith("["):
+        return None
+    try:
+        folders = json.loads(wfp)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(folders, list):
+        return None
+    for item in folders:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        resolved = _git_root_if_directory(Path(item.strip()).expanduser().resolve())
+        if resolved is not None:
+            return resolved
+    return None
+
+
+def infer_project_root(cwd: Path | None = None) -> Path:
+    """Resolve the git project root when the process cwd may be wrong (MCP, plugins).
+
+    MCP servers and IDE-hosted stdio processes often start with a cwd outside
+    the user's repository (for example the plugin cache).  This function tries,
+    in order:
+
+    #. ``DH_PROJECT_ROOT`` — explicit override.
+    #. ``WORKSPACE_FOLDER_PATHS`` — JSON array (VS Code / Cursor); first folder
+       that resolves as a git worktree.
+    #. ``CURSOR_PROJECT_ROOT``, then ``CLAUDE_PROJECT_DIR`` — only if the host
+       sets them (Cursor before Claude when both are present).
+    #. Walk upward from *cwd* (default ``Path.cwd()``) for a ``.git`` entry,
+       then git-resolve from that directory (preserves worktree semantics).
+    #. Run git from *cwd* itself.
+
+    Args:
+        cwd: Directory to use for walk-up and final git attempt.  Defaults to
+            ``Path.cwd()``.
+
+    Returns:
+        Absolute path to the main worktree root.
+
+    Raises:
+        FileNotFoundError: If the ``git`` binary is not found.
+        RuntimeError: If resolution fails; chained from
+            :exc:`subprocess.CalledProcessError` with an actionable message.
+    """
+    start = (cwd or Path.cwd()).resolve()
+
+    for resolved in (_infer_dh_project_root_env(), _infer_from_workspace_folder_paths(), _infer_from_ide_env_vars()):
+        if resolved is not None:
+            return resolved
+
+    ancestor = _first_git_ancestor(start)
+    if ancestor is not None:
+        resolved = _git_root_if_directory(ancestor)
+        if resolved is not None:
+            return resolved
+
+    try:
+        return _git_rev_parse_root(start)
+    except subprocess.CalledProcessError as exc:
+        msg = (
+            "Could not resolve the git project root: process cwd is not inside a repository "
+            "and no project path was found. If you use Cursor, ensure the backlog MCP entry "
+            "is merged from config that expands ${workspaceFolder} (see .cursor/mcp.json or "
+            "plugin .mcp.json env). Otherwise set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, "
+            "CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass --project-dir."
+        )
+        raise RuntimeError(msg) from exc
+
+
+def git_project_root(cwd: Path | None = None) -> Path:
+    """Resolve the main worktree root via git.
+
+    When *cwd* is ``None`` (the typical MCP / CLI default), uses
+    :func:`infer_project_root` so environment and workspace hints are applied
+    before ``Path.cwd()``.  When *cwd* is explicit, runs git only from that
+    directory (stable for tests and callers that pin the working directory).
+
+    Args:
+        cwd: Directory from which to run git.  ``None`` enables
+            :func:`infer_project_root`; a path uses git from that directory only.
+
+    Returns:
+        Absolute path to the project root (main worktree root).
+
+    Raises:
+        FileNotFoundError: If the ``git`` binary is not found.
+        subprocess.CalledProcessError: If *cwd* was explicit and is not inside a
+            git repository.
+        RuntimeError: If *cwd* was ``None`` and all resolution strategies failed.
+    """
+    if cwd is not None:
+        return _git_rev_parse_root(Path(cwd))
+    return infer_project_root()
 
 
 def compute_slug(project_root: Path) -> str:

@@ -12,7 +12,7 @@ Navigation and reference index for Hatchling's comprehensive release notes docum
 
 ### Core Documentation
 
-#### [RELEASE_NOTES.md](./RELEASE_NOTES.md)
+#### `RELEASE_NOTES.md`
 
 **Complete version history with all releases**
 
@@ -38,7 +38,7 @@ The main release notes document covering:
 
 ### Feature-Specific Guides
 
-#### [PEP_639_LICENSE_METADATA.md](./PEP_639_LICENSE_METADATA.md)
+#### `PEP_639_LICENSE_METADATA.md`
 
 **PEP 639 license metadata support implementation guide**
 
@@ -64,7 +64,7 @@ Comprehensive coverage of license metadata evolution:
 
 ---
 
-#### [METADATA_HOOKS_AND_VERSION_SOURCES.md](./METADATA_HOOKS_AND_VERSION_SOURCES.md)
+#### `METADATA_HOOKS_AND_VERSION_SOURCES.md`
 
 **Metadata hooks and dynamic version source implementation**
 
@@ -92,7 +92,7 @@ Detailed guide to dynamic metadata and version management:
 
 ---
 
-#### [BUILD_HOOKS_AND_PERFORMANCE.md](./BUILD_HOOKS_AND_PERFORMANCE.md)
+#### `BUILD_HOOKS_AND_PERFORMANCE.md`
 
 **Build hooks and performance optimization features**
 
@@ -127,53 +127,53 @@ Comprehensive performance and extensibility guide:
 
 **Very Latest (v1.26-1.27)**
 
-- [RELEASE_NOTES.md - Era 1](./RELEASE_NOTES.md#era-1-recent-releases-v1241-27)
-- [PEP_639_LICENSE_METADATA.md - Full Implementation](./PEP_639_LICENSE_METADATA.md#v1260-2024-11-10---full-pep-639-implementation)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Pixi Support](./BUILD_HOOKS_AND_PERFORMANCE.md#latest-updates-v1260)
+- `RELEASE_NOTES.md#era-1-recent-releases-v1241-27`
+- `PEP_639_LICENSE_METADATA.md#v1260-2024-11-10---full-pep-639-implementation`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#latest-updates-v1260`
 
 **Python 3.12 Era (v1.15-1.23)**
 
-- [RELEASE_NOTES.md - Era 3](./RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Hook Enhancements](./BUILD_HOOKS_AND_PERFORMANCE.md#build-hook-categories)
+- `RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#build-hook-categories`
 
 **Core Features Era (v1.4-1.14)**
 
-- [RELEASE_NOTES.md - Era 4](./RELEASE_NOTES.md#era-4-core-features--major-enhancements-v1414)
-- [METADATA_HOOKS_AND_VERSION_SOURCES.md - Early Features](./METADATA_HOOKS_AND_VERSION_SOURCES.md)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Foundation](./BUILD_HOOKS_AND_PERFORMANCE.md#build-hooks-evolution)
+- `RELEASE_NOTES.md#era-4-core-features--major-enhancements-v1414`
+- `METADATA_HOOKS_AND_VERSION_SOURCES.md`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#build-hooks-evolution`
 
 **Initial Release (v1.0-1.3)**
 
-- [RELEASE_NOTES.md - Era 5](./RELEASE_NOTES.md#era-5-initial-release--foundation-v101-3)
+- `RELEASE_NOTES.md#era-5-initial-release--foundation-v101-3`
 
 ### By Feature
 
 **License & Metadata**
 
-- [PEP_639_LICENSE_METADATA.md](./PEP_639_LICENSE_METADATA.md) - License metadata evolution
-- [METADATA_HOOKS_AND_VERSION_SOURCES.md - Metadata Hooks](./METADATA_HOOKS_AND_VERSION_SOURCES.md#metadata-hooks-history)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Metadata Optimization](./BUILD_HOOKS_AND_PERFORMANCE.md#metadata-optimization)
+- `PEP_639_LICENSE_METADATA.md` - License metadata evolution
+- `METADATA_HOOKS_AND_VERSION_SOURCES.md#metadata-hooks-history`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#metadata-optimization`
 
 **Version Management**
 
-- [METADATA_HOOKS_AND_VERSION_SOURCES.md - Version Sources](./METADATA_HOOKS_AND_VERSION_SOURCES.md#version-sources-implementation)
-- [RELEASE_NOTES.md - Feature Highlights](./RELEASE_NOTES.md#feature-highlights-by-topic)
+- `METADATA_HOOKS_AND_VERSION_SOURCES.md#version-sources-implementation`
+- `RELEASE_NOTES.md#feature-highlights-by-topic`
 
 **Build System**
 
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Build Hooks](./BUILD_HOOKS_AND_PERFORMANCE.md#build-hooks-evolution)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Performance](./BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations)
-- [RELEASE_NOTES.md - Era 3 & 4](./RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519)
+- `BUILD_HOOKS_AND_PERFORMANCE.md#build-hooks-evolution`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations`
+- `RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519`
 
 **Performance**
 
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Optimizations](./BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Performance Metrics](./BUILD_HOOKS_AND_PERFORMANCE.md#build-performance-metrics)
+- `BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#build-performance-metrics`
 
 **Python Support**
 
-- [RELEASE_NOTES.md - Python 3.12](./RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519)
-- [BUILD_HOOKS_AND_PERFORMANCE.md - Python 3.7 Removal](./BUILD_HOOKS_AND_PERFORMANCE.md#v1180-2023-06-12---python-37-end-of-support)
+- `RELEASE_NOTES.md#era-3-python-312-support--build-system-improvements-v1519`
+- `BUILD_HOOKS_AND_PERFORMANCE.md#v1180-2023-06-12---python-37-end-of-support`
 
 ### By Standards Compliance
 
@@ -182,7 +182,7 @@ Comprehensive performance and extensibility guide:
 - **PEP 517** - Build system interface (v1.0.0)
 - **PEP 560** - Type hints support (v1.4.0)
 - **PEP 639** - License metadata
-  - [PEP_639_LICENSE_METADATA.md](./PEP_639_LICENSE_METADATA.md)
+  - `PEP_639_LICENSE_METADATA.md`
   - Initial: v1.5.0
   - Current: v1.26.0+
 - **PEP 660** - Editable installs (v1.0.0)
@@ -196,38 +196,38 @@ Comprehensive performance and extensibility guide:
 
 **Users needing specific version's changes**
 
-- Reference [RELEASE_NOTES.md](./RELEASE_NOTES.md)
+- Reference `RELEASE_NOTES.md`
 - Help them search for version number (e.g., "1.22.0")
 - All releases linked to GitHub with detailed notes
 
 **Users configuring license metadata**
 
-- Guide them to [PEP_639_LICENSE_METADATA.md](./PEP_639_LICENSE_METADATA.md)
+- Guide them to `PEP_639_LICENSE_METADATA.md`
 - Provide configuration examples from the document
 - Share documented migration paths
 
 **Users exploring dynamic versioning options**
 
-- Direct them to [METADATA_HOOKS_AND_VERSION_SOURCES.md](./METADATA_HOOKS_AND_VERSION_SOURCES.md)
+- Direct them to `METADATA_HOOKS_AND_VERSION_SOURCES.md`
 - Help compare regex, code, and environment variable sources
 - Show examples for each approach
 
 **Users implementing build hooks**
 
-- Reference [BUILD_HOOKS_AND_PERFORMANCE.md](./BUILD_HOOKS_AND_PERFORMANCE.md)
-- Also point to [METADATA_HOOKS_AND_VERSION_SOURCES.md](./METADATA_HOOKS_AND_VERSION_SOURCES.md)
+- Reference `BUILD_HOOKS_AND_PERFORMANCE.md`
+- Also point to `METADATA_HOOKS_AND_VERSION_SOURCES.md`
 - Provide examples and best practices
 
 **Users optimizing build performance**
 
-- Guide to [BUILD_HOOKS_AND_PERFORMANCE.md - Performance Section](./BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations)
+- Guide to `BUILD_HOOKS_AND_PERFORMANCE.md#performance-optimizations`
 - Explain optimization timeline and strategies
 - Share applicable best practices
 
 **Users understanding backward compatibility**
 
-- Reference [PEP_639_LICENSE_METADATA.md - Backward Compatibility](./PEP_639_LICENSE_METADATA.md#backward-compatibility)
-- Also check [RELEASE_NOTES.md - Deprecations](./RELEASE_NOTES.md#deprecations--breaking-changes)
+- Reference `PEP_639_LICENSE_METADATA.md#backward-compatibility`
+- Also check `RELEASE_NOTES.md#deprecations--breaking-changes`
 
 ---
 

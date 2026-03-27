@@ -41,7 +41,7 @@ mcp__plugin_dh_sam__sam_status(plan="<feature_input/>")
 mcp__plugin_dh_sam__sam_status(plan="P{N}")
 ```
 
-2. If tasks remain, query ready tasks:
+2. If tasks remain, query ready tasks **once** and store the result as the current batch:
 
 If parent story issue number is known, prefer the MCP tool:
 
@@ -56,6 +56,13 @@ If parent issue number is unknown, use the SAM MCP tool:
 ```text
 mcp__plugin_dh_sam__sam_ready(plan="P{N}")
 ```
+
+> **Call `sam_ready` (or `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned
+> task list. Loop over the stored list — do NOT call `sam_ready` again within the loop.
+> After all tasks in the current batch are dispatched and completed, use
+> `mcp__plugin_dh_sam__sam_status` (~270 chars) to check whether more tasks remain.
+> Only call `sam_ready` again when the previous batch is fully dispatched and you need the
+> next batch of ready tasks.
 
 3. For each ready task (or batch of ready tasks):
 
@@ -102,7 +109,9 @@ mcp__plugin_dh_backlog__backlog_groom(
 
 Concerns accumulate across all task agents. They feed into the validation stage in `/complete-implementation` — each verified concern becomes a new backlog item.
 
-5. Repeat until no tasks remain ready.
+5. After all tasks in the current batch complete, call `mcp__plugin_dh_sam__sam_status` to
+   check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
+   tasks. Do NOT call `sam_ready` again until the previous batch is fully dispatched.
 
 > **Hook behavior on SubagentStop**: When a sub-agent finishes, `task_status_hook.py` marks
 > the task complete in the local task file. After marking the task complete locally, the hook

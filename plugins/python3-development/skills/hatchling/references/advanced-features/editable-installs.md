@@ -263,6 +263,6 @@ __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
 ## See Also
 
-- [Build Context](./build-context.md) - Access to build environment during editable installs
-- [Build Data Passing](./build-data-passing.md) - Modifying editable behavior in hooks
-- [Dynamic Dependencies in Hooks](./dynamic-dependencies.md) - Dev dependencies for editable installs
+- `build-context.md` - Access to build environment during editable installs
+- `build-data-passing.md` - Modifying editable behavior in hooks
+- `dynamic-dependencies.md` - Dev dependencies for editable installs

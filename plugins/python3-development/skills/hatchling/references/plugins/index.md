@@ -11,8 +11,8 @@ This directory contains comprehensive reference documentation for Hatchling's pl
 
 **New to Hatchling plugins?** Start with these guides in order:
 
-1. [Plugin Development Guide](./PLUGIN-GUIDE.md) - Complete overview of plugin types, development workflow, and best practices
-2. [Plugin System Overview](./index.md) - Core architecture, registration patterns, and configuration concepts
+1. `PLUGIN-GUIDE.md` - Complete overview of plugin types, development workflow, and best practices
+2. `index.md` - Core architecture, registration patterns, and configuration concepts
 
 ## Documentation Files
 
@@ -20,24 +20,24 @@ This directory contains comprehensive reference documentation for Hatchling's pl
 
 | Document                                      | Purpose                                                                                                  |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| [Plugin Development Guide](./PLUGIN-GUIDE.md) | **Start here** - Comprehensive guide covering all plugin types, development workflow, and best practices |
-| [Plugin System Overview](./index.md)          | Plugin architecture, registration mechanisms, lifecycle management, and configuration patterns           |
+| `PLUGIN-GUIDE.md` | **Start here** - Comprehensive guide covering all plugin types, development workflow, and best practices |
+| `index.md`          | Plugin architecture, registration mechanisms, lifecycle management, and configuration patterns           |
 
 ### Plugin Type References
 
 | Plugin Type     | Reference                                             | Use Case                                                                  |
 | --------------- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| Builders        | [Builder Plugins](./builder-plugins.md)               | Create distributable package formats (wheels, sdists, custom)             |
-| Build Hooks     | [Build Hook Plugins](./build-hook-plugins.md)         | Execute code during build phases (initialize, finalize, clean)            |
-| Metadata Hooks  | [Metadata Hook Plugins](./metadata-hook-plugins.md)   | Dynamically generate project metadata (version, description, classifiers) |
-| Version Sources | [Version Source Plugins](./version-source-plugins.md) | Determine project version from various sources                            |
-| Version Schemes | [Version Scheme Plugins](./version-scheme-plugins.md) | Validate and normalize version numbers                                    |
+| Builders        | `builder-plugins.md`               | Create distributable package formats (wheels, sdists, custom)             |
+| Build Hooks     | `build-hook-plugins.md`         | Execute code during build phases (initialize, finalize, clean)            |
+| Metadata Hooks  | `metadata-hook-plugins.md`   | Dynamically generate project metadata (version, description, classifiers) |
+| Version Sources | `version-source-plugins.md` | Determine project version from various sources                            |
+| Version Schemes | `version-scheme-plugins.md` | Validate and normalize version numbers                                    |
 
 ### Plugin Implementations
 
 | Plugin    | Reference                                       | Features                                                           |
 | --------- | ----------------------------------------------- | ------------------------------------------------------------------ |
-| hatch-vcs | [hatch-vcs Plugin Guide](./hatch-vcs-plugin.md) | VCS-based versioning (Git, Mercurial), auto-generate version files |
+| hatch-vcs | `hatch-vcs-plugin.md` | VCS-based versioning (Git, Mercurial), auto-generate version files |
 
 ## Plugin Types at a Glance
 
@@ -69,13 +69,13 @@ This directory contains comprehensive reference documentation for Hatchling's pl
 
 ### "I want to..."
 
-- **Auto-generate version files** → See [hatch-vcs Plugin Guide](./hatch-vcs-plugin.md)
-- **Read version from VCS tags** → See [Version Source Plugins](./version-source-plugins.md)
-- **Customize the build process** → See [Build Hook Plugins](./build-hook-plugins.md)
-- **Generate metadata dynamically** → See [Metadata Hook Plugins](./metadata-hook-plugins.md)
-- **Create a custom builder** → See [Builder Plugins](./builder-plugins.md)
-- **Enforce version format rules** → See [Version Scheme Plugins](./version-scheme-plugins.md)
-- **Build a reusable plugin** → See [Plugin Development Guide](./PLUGIN-GUIDE.md)
+- **Auto-generate version files** → See `hatch-vcs-plugin.md`
+- **Read version from VCS tags** → See `version-source-plugins.md`
+- **Customize the build process** → See `build-hook-plugins.md`
+- **Generate metadata dynamically** → See `metadata-hook-plugins.md`
+- **Create a custom builder** → See `builder-plugins.md`
+- **Enforce version format rules** → See `version-scheme-plugins.md`
+- **Build a reusable plugin** → See `PLUGIN-GUIDE.md`
 
 ## Key Concepts
 
@@ -168,8 +168,8 @@ Each reference document includes:
 
 These documentation files are organized for progressive discovery:
 
-1. **Start with overview**: [Plugin Development Guide](./PLUGIN-GUIDE.md) covers the complete workflow
-2. **Learn architecture**: [Plugin System Overview](./index.md) explains how plugins work internally
+1. **Start with overview**: `PLUGIN-GUIDE.md` covers the complete workflow
+2. **Learn architecture**: `index.md` explains how plugins work internally
 3. **Deep dive by type**: Use specific plugin type references for detailed interface documentation
 4. **Real-world implementation**: See PLUGIN-GUIDE for complete working examples
 
@@ -177,4 +177,4 @@ Each reference includes code examples, configuration patterns, and best practice
 
 ---
 
-**Next step**: Read [Plugin Development Guide](./PLUGIN-GUIDE.md) to begin learning how to create and use plugins
+**Next step**: Read `PLUGIN-GUIDE.md` to begin learning how to create and use plugins

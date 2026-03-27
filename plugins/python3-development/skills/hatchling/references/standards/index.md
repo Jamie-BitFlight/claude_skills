@@ -10,7 +10,7 @@ This directory contains comprehensive reference documentation on Python packagin
 
 ## Quick Navigation
 
-### [Python Packaging Overview](./python-packaging-overview.md)
+### `python-packaging-overview.md`
 
 Starting point for understanding the landscape of Python packaging standards. Covers:
 
@@ -19,7 +19,7 @@ Starting point for understanding the landscape of Python packaging standards. Co
 - Historical evolution of packaging standards
 - Links to detailed specifications
 
-### [PEP References and Compliance](./pep-references.md)
+### `pep-references.md`
 
 Detailed reference to Python Enhancement Proposals (PEPs) directly applicable to hatchling:
 
@@ -33,7 +33,7 @@ Detailed reference to Python Enhancement Proposals (PEPs) directly applicable to
 - **PEP 660** - Editable installs
 - **PEP 440** - Version identification schemes
 
-### [Core Metadata Specifications](./core-metadata.md)
+### `core-metadata.md`
 
 Complete reference for package metadata format used in wheels and sdists:
 
@@ -43,7 +43,7 @@ Complete reference for package metadata format used in wheels and sdists:
 - Hatchling integration points
 - Best practices for consumption
 
-### [Package Distribution Formats](./distribution-formats.md)
+### `distribution-formats.md`
 
 Technical specifications for distributable packages:
 
@@ -60,7 +60,7 @@ Technical specifications for distributable packages:
 - Distribution selection guidance
 - Hatchling build process
 
-### [Dependency Specification Formats](./dependency-formats.md)
+### `dependency-formats.md`
 
 How dependencies are declared and constrained:
 
@@ -75,7 +75,7 @@ How dependencies are declared and constrained:
 - Best practices for dependency management
 - Complex dependency examples
 
-### [Version Control System Integration](./vcs-integration.md)
+### `vcs-integration.md`
 
 Integration between VCS and packaging:
 
@@ -189,7 +189,7 @@ When assisting users, reference these standards to explain and validate their Ha
 
 ### When Users Declare Project Metadata
 
-Reference [PEP 621](./pep-references.md#project-metadata-specification-pep-621) and [Core Metadata](./core-metadata.md) to explain:
+Reference `pep-references.md#project-metadata-specification-pep-621` and `core-metadata.md` to explain:
 
 - How to structure `[project]` table in `pyproject.toml`
 - Why version must follow PEP 440 format
@@ -198,7 +198,7 @@ Reference [PEP 621](./pep-references.md#project-metadata-specification-pep-621) 
 
 ### When Users Configure Build System
 
-Reference [PEP 517](./pep-references.md#build-system-interface-pep-517) and [PEP 518](./pep-references.md#build-system-requirements-pep-518) to explain:
+Reference `pep-references.md#build-system-interface-pep-517` and `pep-references.md#build-system-requirements-pep-518` to explain:
 
 - What the `[build-system]` table defines
 - Why Hatchling must be listed in `requires`
@@ -207,7 +207,7 @@ Reference [PEP 517](./pep-references.md#build-system-interface-pep-517) and [PEP
 
 ### When Users Manage Versions
 
-Reference [PEP 440](./core-metadata.md) and [VCS Integration](./vcs-integration.md) to explain:
+Reference `core-metadata.md` and `vcs-integration.md` to explain:
 
 - How to format versions for PEP 440 compliance
 - How `hatch-vcs` derives versions from Git tags
@@ -216,7 +216,7 @@ Reference [PEP 440](./core-metadata.md) and [VCS Integration](./vcs-integration.
 
 ### When Users Build and Distribute
 
-Reference [Wheel format](./distribution-formats.md) and [Sdist format](./distribution-formats.md) to explain:
+Reference `distribution-formats.md` and `distribution-formats.md` to explain:
 
 - What Hatchling creates when running `build`
 - The difference between wheels and sdists
@@ -248,9 +248,9 @@ Reference [Wheel format](./distribution-formats.md) and [Sdist format](./distrib
 
 For comprehensive hatchling documentation, see:
 
-- [@skill-name: hatchling skill](../SKILL.md) - Complete hatchling usage guide
-- [Advanced Features](../advanced-features/index.md) - Detailed build customization
-- [Build System Configuration](../build-system/) - Build system setup
+- `../SKILL.md` - Complete hatchling usage guide
+- `../advanced-features/index.md` - Detailed build customization
+- `../build-system/` - Build system setup
 
 ## Document Maintenance
 

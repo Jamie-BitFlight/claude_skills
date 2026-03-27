@@ -26,7 +26,7 @@ Event handling, message system, custom messages, the `@on` decorator, actions, a
 Every `App` and `Widget` has a message queue. Messages are processed one at a time in order. The widget cannot pick up a new message until the current handler returns.
 
 - Slow handlers block the UI. Keep handlers fast (under ~50ms).
-- For slow operations (network, disk, CPU), use workers — see [testing-and-workers.md](./testing-and-workers.md).
+- For slow operations (network, disk, CPU), use workers — see `testing-and-workers.md`.
 - Textual calls handler methods in *all* base classes automatically (no need for `super()` calls).
 
 ---

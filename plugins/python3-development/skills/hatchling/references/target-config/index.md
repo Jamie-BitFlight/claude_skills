@@ -20,30 +20,30 @@ When assisting users with Hatchling build system configuration, reference this g
 
 ### Core Configuration
 
-- [Target-Specific Hooks](./target-specific-hooks.md) - Execute code at specific stages of each target's build process
-- [Target-Specific Dependencies](./target-dependencies.md) - Declare dependencies needed only for specific build targets
-- [Versions Option](./versions-option.md) - Build multiple variations of the same target using different strategies
+- `target-specific-hooks.md` - Execute code at specific stages of each target's build process
+- `target-dependencies.md` - Declare dependencies needed only for specific build targets
+- `versions-option.md` - Build multiple variations of the same target using different strategies
 
 ### Dependency Management
 
-- [Runtime Dependency Requirements](./runtime-dependencies.md) - Include or require project runtime dependencies during builds
-- [Optional Feature Requirements](./feature-dependencies.md) - Depend on specific optional features of the project
+- `runtime-dependencies.md` - Include or require project runtime dependencies during builds
+- `feature-dependencies.md` - Depend on specific optional features of the project
 
 ### Configuration Patterns
 
-- [Target Config Precedence](./config-precedence.md) - Understand how target settings override global build configuration
-- [Default Target Selection](./default-targets.md) - Control which targets are built when not explicitly specified
+- `config-precedence.md` - Understand how target settings override global build configuration
+- `default-targets.md` - Control which targets are built when not explicitly specified
 
 ## All Reference Files
 
-1. [index.md](./index.md) - This overview document
-2. [target-specific-hooks.md](./target-specific-hooks.md) - Hooks for individual targets
-3. [target-dependencies.md](./target-dependencies.md) - Target-specific build dependencies
-4. [runtime-dependencies.md](./runtime-dependencies.md) - Using project runtime dependencies in builds
-5. [feature-dependencies.md](./feature-dependencies.md) - Using optional features in builds
-6. [versions-option.md](./versions-option.md) - Multi-version build strategies
-7. [config-precedence.md](./config-precedence.md) - Configuration hierarchy and precedence
-8. [default-targets.md](./default-targets.md) - Default target selection behavior
+1. `index.md` - This overview document
+2. `target-specific-hooks.md` - Hooks for individual targets
+3. `target-dependencies.md` - Target-specific build dependencies
+4. `runtime-dependencies.md` - Using project runtime dependencies in builds
+5. `feature-dependencies.md` - Using optional features in builds
+6. `versions-option.md` - Multi-version build strategies
+7. `config-precedence.md` - Configuration hierarchy and precedence
+8. `default-targets.md` - Default target selection behavior
 
 ## Quick Reference
 
@@ -90,6 +90,6 @@ hatch build -t wheel -t sdist
 
 ## Related Documentation
 
-- [Build Targets Index](../build-targets/index.md) - Detailed builder implementations (wheel, sdist, custom, binary)
-- [Build Hooks Configuration](../build-hooks/index.md) - Hook system and available hooks
-- [Build System Overview](../core-concepts/INDEX.md) - PEP 517 and build system fundamentals
+- `../build-targets/index.md` - Detailed builder implementations (wheel, sdist, custom, binary)
+- `../build-hooks/index.md` - Hook system and available hooks
+- `../core-concepts/INDEX.md` - PEP 517 and build system fundamentals

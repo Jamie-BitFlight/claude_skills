@@ -5,7 +5,9 @@ tools: Read, Grep, Glob, WebFetch, WebSearch
 disallowedTools: Bash, Write, Edit
 model: sonnet
 permissionMode: default
-skills: python3-development, claude-skills-overview-2026
+skills:
+  - python3-development
+  - claude-skills-overview-2026
 hooks:
   PreToolUse:
   - matcher: Read

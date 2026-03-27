@@ -6,7 +6,7 @@ AI-generated code commonly creates a catastrophic anti-pattern where every funct
 
 **Example of the problem:**
 
-**Full example:** [nested-typer-exception-explosion.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion.py)
+**Full example:** `../assets/nested-typer-exceptions/nested-typer-exception-explosion.py`
 
 ```python
 # From: nested-typer-exception-explosion.py (simplified - see full file for all 7 layers)
@@ -41,7 +41,7 @@ Based on Typer's official documentation and best practices:
 
 ### Pattern 1: Custom Exit Exception with typer.echo
 
-**Full example:** [nested-typer-exception-explosion_corrected_typer_echo.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py)
+**Full example:** `../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py`
 
 Create a custom exception class that handles user-friendly output:
 
@@ -94,7 +94,7 @@ def load_json_file(file_path: Path) -> dict:
 
 ### Pattern 2: Custom Exit Exception with Rich Console
 
-**Full example:** [nested-typer-exception-explosion_corrected_rich_console.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_rich_console.py)
+**Full example:** `../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_rich_console.py`
 
 For applications using Rich for output:
 
@@ -145,7 +145,7 @@ def validate_config(data: dict) -> dict:
 
 ## Complete Example: Correct Pattern
 
-**Full example:** [nested-typer-exception-explosion_corrected_typer_echo.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py)
+**Full example:** `../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py`
 
 ```python
 # From: nested-typer-exception-explosion_corrected_typer_echo.py
@@ -335,11 +335,11 @@ Official Typer guidance on exits and exceptions:
 
 ## Demonstration Scripts
 
-See [assets/nested-typer-exceptions/](../assets/nested-typer-exceptions/) for complete working examples.
+See `../assets/nested-typer-exceptions/` for complete working examples.
 
-**Quick start:** See [README.md](../assets/nested-typer-exceptions/README.md) for script overview and running instructions.
+**Quick start:** See `../assets/nested-typer-exceptions/README.md` for script overview and running instructions.
 
-### [nested-typer-exception-explosion.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion.py) - The Anti-Pattern
+### `../assets/nested-typer-exceptions/nested-typer-exception-explosion.py` - The Anti-Pattern
 
 **What you'll find:**
 
@@ -357,7 +357,7 @@ See [assets/nested-typer-exceptions/](../assets/nested-typer-exceptions/) for co
 
 **Run it:** `./nested-typer-exception-explosion.py broken.json`
 
-### [nested-typer-exception-explosion_naive_workaround.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_naive_workaround.py) - The isinstance Band-Aid
+### `../assets/nested-typer-exceptions/nested-typer-exception-explosion_naive_workaround.py` - The isinstance Band-Aid
 
 **What you'll find:**
 
@@ -374,7 +374,7 @@ See [assets/nested-typer-exceptions/](../assets/nested-typer-exceptions/) for co
 
 **Run it:** `./nested-typer-exception-explosion_naive_workaround.py broken.json`
 
-### [nested-typer-exception-explosion_corrected_typer_echo.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py) - Correct Pattern with typer.echo
+### `../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_typer_echo.py` - Correct Pattern with typer.echo
 
 **What you'll find:**
 
@@ -392,7 +392,7 @@ See [assets/nested-typer-exceptions/](../assets/nested-typer-exceptions/) for co
 
 **Run it:** `./nested-typer-exception-explosion_corrected_typer_echo.py broken.json`
 
-### [nested-typer-exception-explosion_corrected_rich_console.py](../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_rich_console.py) - Correct Pattern with Rich Console
+### `../assets/nested-typer-exceptions/nested-typer-exception-explosion_corrected_rich_console.py` - Correct Pattern with Rich Console
 
 **What you'll find:**
 

@@ -268,15 +268,15 @@ Select the appropriate type construct for each `Any` replacement:
 - **TypedDict** — dicts with known keys and specific value types
 - **Dataclass/Pydantic** — structured data with optional validation
 
-See [Type Pattern Examples](./references/type-patterns.md) for before/after code samples and library modernization reference table.
+See `references/type-patterns.md` for before/after code samples and library modernization reference table.
 
 ### Step 3.3: Plan Library Modernization
 
-See the library modernization reference table in [Type Pattern Examples](./references/type-patterns.md#library-modernization-reference).
+See the library modernization reference table in `references/type-patterns.md#library-modernization-reference`.
 
 ### Step 3.4: Create Modernization Plan Document
 
-Resolve the plan directory at runtime: `uv run python -c 'from dh_paths import plan_dir; print(plan_dir())'` (typically `~/.dh/projects/{slug}/plan/`). Create the plan at `{plan_dir}/stinkysnake-plan.md` using the template in [Plan Templates](./references/plan-templates.md#modernization-plan-template-phase-3-output).
+Resolve the plan directory at runtime: `uv run python -c 'from dh_paths import plan_dir; print(plan_dir())'` (typically `~/.dh/projects/{slug}/plan/`). Create the plan at `{plan_dir}/stinkysnake-plan.md` using the template in `references/plan-templates.md#modernization-plan-template-phase-3-output`.
 
 ---
 
@@ -286,11 +286,11 @@ Delegate to a review agent with context fork to critique the plan.
 
 ### Step 4.1: Launch Plan Review Agent
 
-Delegate to `code-reviewer` using the prompt in [Agent Prompts](./references/agent-prompts.md#phase-4-plan-review).
+Delegate to `code-reviewer` using the prompt in `references/agent-prompts.md#phase-4-plan-review`.
 
 ### Step 4.2: Review Report Structure
 
-The reviewer produces a report following the template in [Plan Templates](./references/plan-templates.md#plan-review-report-template-phase-4-output).
+The reviewer produces a report following the template in `references/plan-templates.md#plan-review-report-template-phase-4-output`.
 
 ---
 
@@ -323,7 +323,7 @@ For each suggestion:
 
 ### Step 5.4: Update Plan Document
 
-Update `{plan_dir}/stinkysnake-plan.md` (resolve `plan_dir` as in Step 3.4) using the revised plan format in [Plan Templates](./references/plan-templates.md#revised-plan-template-phase-5-output).
+Update `{plan_dir}/stinkysnake-plan.md` (resolve `plan_dir` as in Step 3.4) using the revised plan format in `references/plan-templates.md#revised-plan-template-phase-5-output`.
 
 ---
 
@@ -343,7 +343,7 @@ uv run rg "^\s+\"\"\"" $ARGUMENTS
 
 ### Step 6.2: Map Code to Docs
 
-Create documentation update plan using the template in [Plan Templates](./references/plan-templates.md#documentation-update-plan-template-phase-6-output).
+Create documentation update plan using the template in `references/plan-templates.md#documentation-update-plan-template-phase-6-output`.
 
 ---
 
@@ -407,7 +407,7 @@ Delegate to python-pytest-architect to write failing tests against the interface
 
 ### Step 8.1: Launch Test Writing Agent
 
-Delegate to `python-pytest-architect` using the prompt in [Agent Prompts](./references/agent-prompts.md#phase-8-test-writing-agent).
+Delegate to `python-pytest-architect` using the prompt in `references/agent-prompts.md#phase-8-test-writing-agent`.
 
 ### Step 8.2: Verify Tests Fail
 
@@ -520,7 +520,7 @@ A quality improvement workflow is NOT a candidate for agent teams when:
 
 ### Reference
 
-See [Agent Teams Documentation](./../../../plugin-creator/skills/claude-skills-overview-2026/resources/agent-teams.md) for complete criteria, architecture, and usage patterns.
+See `../../../plugin-creator/skills/claude-skills-overview-2026/resources/agent-teams.md` for complete criteria, architecture, and usage patterns.
 
 SOURCE: Lines 27-39 of agent-teams.md (accessed 2026-02-06)
 
@@ -528,9 +528,9 @@ SOURCE: Lines 27-39 of agent-teams.md (accessed 2026-02-06)
 
 ### Skill Reference Files
 
-- [Python 3 Standards](../python3-development/references/python3-standards.md) — Shared development standards, knowledge graph, and process graph
-- [Plan Templates](./references/plan-templates.md) — document formats for modernization plan, review report, revised plan, and documentation update plan
-- [Agent Prompts](./references/agent-prompts.md) — pre-built delegation prompts for Phase 4 review agent and Phase 8 test writing agent
+- `../python3-development/references/python3-standards.md` — Shared development standards, knowledge graph, and process graph
+- `references/plan-templates.md` — document formats for modernization plan, review report, revised plan, and documentation update plan
+- `references/agent-prompts.md` — pre-built delegation prompts for Phase 4 review agent and Phase 8 test writing agent
 
 ### External Documentation
 

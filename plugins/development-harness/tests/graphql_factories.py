@@ -364,19 +364,37 @@ def make_add_sub_issue_response(
 
 
 def make_issue_comment_node(
-    comment_id: str = "IC_001", body: str = "comment body", url: str = "https://github.com/test/issues/1#issuecomment-1"
+    comment_id: str = "IC_001",
+    body: str = "comment body",
+    url: str = "https://github.com/test/issues/1#issuecomment-1",
+    author: str = "test-user",
+    created_at: str = "2026-01-01T00:00:00Z",
+    updated_at: str = "2026-01-02T00:00:00Z",
 ) -> dict[str, Any]:
     """Return an IssueCommentNode-shaped dict for comment listing responses.
+
+    The ``author`` field is nested under ``{"login": ...}`` to match the raw
+    GraphQL shape that ``_parse_comment_node`` expects.
 
     Args:
         comment_id: GraphQL node ID for the comment.
         body: Comment body text.
         url: HTML URL for the comment.
+        author: Login of the comment author.
+        created_at: ISO 8601 creation timestamp.
+        updated_at: ISO 8601 last-update timestamp.
 
     Returns:
-        Dict matching IssueCommentNode TypedDict shape.
+        Dict matching raw GraphQL IssueCommentNode shape (before parsing).
     """
-    return {"id": comment_id, "body": body, "url": url}
+    return {
+        "id": comment_id,
+        "body": body,
+        "url": url,
+        "author": {"login": author},
+        "createdAt": created_at,
+        "updatedAt": updated_at,
+    }
 
 
 def make_issue_comments_response(
@@ -396,6 +414,39 @@ def make_issue_comments_response(
         comments = []
     page_info: dict[str, Any] = {"hasNextPage": has_next, "endCursor": end_cursor}
     return {"repository": {"issue": {"comments": {"nodes": comments, "pageInfo": page_info}}}}
+
+
+def make_comment_by_id_response(
+    comment_id: str = "IC_001",
+    body: str = "comment body",
+    url: str = "https://github.com/test/issues/1#issuecomment-1",
+    author: str = "test-user",
+    created_at: str = "2026-01-01T00:00:00Z",
+    updated_at: str = "2026-01-02T00:00:00Z",
+) -> dict[str, Any]:
+    """Return a GetComment (node query) response envelope.
+
+    Args:
+        comment_id: GraphQL node ID for the comment.
+        body: Comment body text.
+        url: HTML URL for the comment.
+        author: Login of the comment author.
+        created_at: ISO 8601 creation timestamp.
+        updated_at: ISO 8601 last-update timestamp.
+
+    Returns:
+        Full ``data`` dict as returned by _graphql_request for _COMMENT_BY_ID_QUERY.
+    """
+    return {
+        "node": {
+            "id": comment_id,
+            "body": body,
+            "url": url,
+            "author": {"login": author},
+            "createdAt": created_at,
+            "updatedAt": updated_at,
+        }
+    }
 
 
 def make_update_comment_response(comment_id: str = "IC_001", body: str = "updated body") -> dict[str, Any]:

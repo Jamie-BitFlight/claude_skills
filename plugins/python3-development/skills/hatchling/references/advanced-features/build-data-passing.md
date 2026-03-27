@@ -204,6 +204,6 @@ class DebugHook(BuildHookInterface):
 
 ## See Also
 
-- [Force Include Permissions and Symlinks](./force-include.md) - File inclusion mechanism
-- [Dynamic Dependencies in Hooks](./dynamic-dependencies.md) - Build-time dependency specification
-- [Build Context](./build-context.md) - Accessing build environment information
+- `force-include.md` - File inclusion mechanism
+- `dynamic-dependencies.md` - Build-time dependency specification
+- `build-context.md` - Accessing build environment information

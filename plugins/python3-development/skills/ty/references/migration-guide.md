@@ -148,7 +148,7 @@ Adjust fields if your editor reads other keys; goal is **no second full-project 
 
 Prefer the same idea: **`typeCheckingMode = "off"`** (or disable type checking in the JSON equivalent) while **ty** is canonical. If the team keeps a file for editor metadata only, document that **ty** enforces types in CI.
 
-**Automation** must still decide which tool to run from **hooks and CI** (`ty check` vs `mypy` vs `basedpyright`). **Stub `[tool.mypy]` / `[tool.basedpyright]` / pyright config does not mean** those tools run in CI — same rule as [python3-standards.md](../../python3-development/references/python3-standards.md): do not infer the primary checker from stub tables alone.
+**Automation** must still decide which tool to run from **hooks and CI** (`ty check` vs `mypy` vs `basedpyright`). **Stub `[tool.mypy]` / `[tool.basedpyright]` / pyright config does not mean** those tools run in CI — same rule as `../../python3-development/references/python3-standards.md`: do not infer the primary checker from stub tables alone.
 
 ### mypy Flag to ty Equivalent
 

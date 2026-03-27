@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import anthropic
+from anthropic.types import TextBlock, ThinkingBlock
 
 from scripts.utils import parse_skill_md
 
@@ -143,9 +144,9 @@ def _call_claude(client: anthropic.Anthropic, model: str, messages: list[Message
     thinking_text = ""
     text = ""
     for block in response.content:
-        if block.type == "thinking":
+        if isinstance(block, ThinkingBlock):
             thinking_text = block.thinking
-        elif block.type == "text":
+        elif isinstance(block, TextBlock):
             text = block.text
     return thinking_text, text
 

@@ -49,16 +49,16 @@ jobs:
       # Enables commit-msg and pre-commit hooks for the coding agent
       # ---------------------------------------------------------------
       - name: Install prek git hooks
-        run: uv run prek install
+        run: uv run -q prek install
 
       # ---------------------------------------------------------------
       # Verify environment is functional
       # ---------------------------------------------------------------
       - name: Verify Python toolchain
         run: |
-          uv run python --version
-          uv run ruff --version
-          uv run basedpyright --version
+          uv run -q python --version
+          uv run -q ruff --version
+          uv run -q basedpyright --version
 
       - name: Verify Node toolchain
         run: |

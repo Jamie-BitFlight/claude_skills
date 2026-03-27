@@ -17,12 +17,12 @@ flowchart TB
     subgraph CONTEXT["2. CONTEXT GATHERING ✅"]
         C1["context-gathering agent"]
         C2["context-refinement agent"]
-        C3["/plugin-creator:rt-ica skill"]
+        C3["/dh:rt-ica skill"]
         C4["Reference Skills<br/>(4 skills)"]
     end
 
     subgraph PLANNING["3. PLANNING ✅"]
-        P1["/plugin-creator:rt-ica skill"]
+        P1["/dh:rt-ica skill"]
         P2["delegate skill"]
         P3["/how-to-delegate"]
         P4["/think command"]

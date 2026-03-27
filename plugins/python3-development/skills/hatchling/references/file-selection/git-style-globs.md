@@ -266,6 +266,6 @@ Hatchling's Git-style patterns differ from standard Unix glob:
 
 ## See Also
 
-- [Include and Exclude Patterns](./include-exclude-patterns.md)
-- [Pattern Precedence](./pattern-precedence.md)
-- [VCS Integration](./vcs-integration.md)
+- `include-exclude-patterns.md`
+- `pattern-precedence.md`
+- `vcs-integration.md`

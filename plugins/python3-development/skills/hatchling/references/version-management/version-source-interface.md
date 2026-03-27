@@ -534,7 +534,7 @@ class ExpensiveSource(VersionSourceInterface):
 
 ## See Also
 
-- [Dynamic Version Sources Overview](./dynamic-version-overview.md)
-- [Creating Custom Plugins](./custom-plugins.md)
-- [Version Scheme Interface](./version-scheme-interface.md)
-- [Plugin Best Practices](./plugin-best-practices.md)
+- `dynamic-version-overview.md`
+- `custom-plugins.md`
+- `version-scheme-interface.md`
+- `plugin-best-practices.md`

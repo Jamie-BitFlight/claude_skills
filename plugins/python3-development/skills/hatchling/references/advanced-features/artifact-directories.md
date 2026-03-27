@@ -395,6 +395,6 @@ hatch build -d /absolute/path/to/dist
 
 ## See Also
 
-- [Distributed Artifacts](./distributed-artifacts.md) - Understanding artifact content and structure
-- [Build Context](./build-context.md) - Accessing build information in hooks
-- [Build Data Passing](./build-data-passing.md) - Modifying what goes in artifacts
+- `distributed-artifacts.md` - Understanding artifact content and structure
+- `build-context.md` - Accessing build information in hooks
+- `build-data-passing.md` - Modifying what goes in artifacts

@@ -424,6 +424,6 @@ def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
 
 ## Related Topics
 
-- [Build Data](./build-data.md) - Understanding build data
-- [Hook Execution Order](./execution-order.md) - How hooks execute in sequence
-- [Custom Build Hooks](./custom-build-hooks.md) - Writing hooks that communicate
+- `build-data.md` - Understanding build data
+- `execution-order.md` - How hooks execute in sequence
+- `custom-build-hooks.md` - Writing hooks that communicate

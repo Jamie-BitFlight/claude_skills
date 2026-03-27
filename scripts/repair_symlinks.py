@@ -234,6 +234,29 @@ def _normalize_one(path: Path, repo_root: Path, repo_root_resolved: Path) -> boo
     return _replace_symlink(path, target, rel)
 
 
+def _content_matches_blob_target(path: Path, expected_target: str) -> bool:
+    """Return True only if the file content is exactly the symlink target path.
+
+    On Windows with core.symlinks=false, a destroyed symlink is stored as a
+    plain file containing only the target path — no newline, no carriage
+    return.  A real file intentionally replacing a symlink always contains
+    embedded newlines (code, comments, etc.) and will not match.
+
+    Args:
+        path: Path to the regular file to inspect.
+        expected_target: Symlink target string read from the Git blob.
+
+    Returns:
+        True if the file contains only ``expected_target`` with no newlines,
+        False otherwise or on read error.
+    """
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return "\n" not in content and "\r" not in content and content == expected_target
+
+
 def main() -> int:
     """Repair destroyed Git symlinks and normalize absolute targets.
 
@@ -263,7 +286,8 @@ def main() -> int:
     absolute: list[Path] = []
     for blob, path in _iter_symlink_blobs(repo, repo_root):
         if path.exists() and not path.is_symlink():
-            destroyed.append((blob, path))
+            if _content_matches_blob_target(path, _get_symlink_target_from_blob(repo, blob)):
+                destroyed.append((blob, path))
         elif path.is_symlink() and path.readlink().is_absolute():
             absolute.append(path)
 

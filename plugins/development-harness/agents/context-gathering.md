@@ -4,7 +4,8 @@ description: Use when creating a new task OR when starting/switching to a task t
 tools: Read, Grep, Glob, Bash, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam__sam_update
 model: haiku
 color: cyan
-skills: subagent-contract
+skills:
+  - subagent-contract
 ---
 
 # Context-Gathering Agent

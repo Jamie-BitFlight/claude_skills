@@ -66,7 +66,11 @@ Parameters:
                                     Items missing metadata.topic are excluded when active.
                                     (default: null)
 
-Returns: {items: [{title, priority, issue, plan, type, topic}], messages, warnings}
+Returns: {items: [{title, priority, issue, plan, type, topic}],
+          backend: {name, availability, open_count, total_count,
+                    cache_open_count, cache_total_count, last_sync, error},
+          messages, warnings}
+          availability values: "reachable" | "not_checked" | "needs_authentication" | "rate_limited" | "error"
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py list --format json [--with-status]
          [--type Bug] [--topic matching]
 ```

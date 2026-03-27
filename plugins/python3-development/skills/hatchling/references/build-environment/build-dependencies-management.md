@@ -501,7 +501,7 @@ allow-direct-references = true
 
 ## Related Topics
 
-- [Build Environment Configuration](./build-environment-configuration.md)
-- [UV vs Pip Installer](./uv-vs-pip-installer.md)
-- [Cython and Build Tools](./cython-build-tools.md)
-- [Environment Isolation](./environment-isolation.md)
+- `build-environment-configuration.md`
+- `uv-vs-pip-installer.md`
+- `cython-build-tools.md`
+- `environment-isolation.md`

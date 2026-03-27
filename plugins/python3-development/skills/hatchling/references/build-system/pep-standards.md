@@ -284,6 +284,6 @@ When users ask why PEP compliance matters:
 
 ## Navigation
 
-- [Build System Declaration](./build-system-declaration.md) - Configure build-system table
-- [Build Options](./build-options.md) - Backend-specific options
-- [Reproducible Builds](./reproducible-builds.md) - Deterministic builds
+- `build-system-declaration.md` - Configure build-system table
+- `build-options.md` - Backend-specific options
+- `reproducible-builds.md` - Deterministic builds

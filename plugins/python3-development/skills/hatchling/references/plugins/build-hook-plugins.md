@@ -431,7 +431,7 @@ HATCH_BUILD_HOOKS_ONLY=1 hatch build
 
 ## See Also
 
-- [Builder Plugins](./builder-plugins.md) - Custom builder implementations
+- `builder-plugins.md` - Custom builder implementations
 - [BuildHookInterface Reference](https://hatch.pypa.io/latest/plugins/build-hook/reference/)
 - [Hatchling Build Hook Documentation](https://hatch.pypa.io/latest/plugins/build-hook/)
-- [hatch-vcs Plugin](./hatch-vcs-plugin.md) - Example plugin with build hook
+- `hatch-vcs-plugin.md` - Example plugin with build hook

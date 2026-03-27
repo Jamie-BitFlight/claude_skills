@@ -341,6 +341,6 @@ Common issues:
 
 ## See Also
 
-- [Pattern Precedence](./pattern-precedence.md)
-- [Git-style Glob Patterns](./git-style-globs.md)
-- [Artifacts](./artifacts.md)
+- `pattern-precedence.md`
+- `git-style-globs.md`
+- `artifacts.md`

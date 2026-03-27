@@ -452,6 +452,6 @@ def dependencies(self) -> list[str]:
 
 ## Related Topics
 
-- [Configuration Basics](./configuration.md) - Hook configuration
-- [BuildHookInterface Reference](./buildhook-interface.md) - `dependencies()` method
-- [Custom Build Hooks](./custom-build-hooks.md) - Writing hooks with dependencies
+- `configuration.md` - Hook configuration
+- `buildhook-interface.md` - `dependencies()` method
+- `custom-build-hooks.md` - Writing hooks with dependencies

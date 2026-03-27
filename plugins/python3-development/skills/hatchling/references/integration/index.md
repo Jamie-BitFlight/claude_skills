@@ -10,11 +10,11 @@ Reference documentation for helping users understand hatchling's integration wit
 
 ## Quick Navigation
 
-- [PEP Standards Compatibility](./pep-standards.md) - Coverage of PEP 517, 660, 621, 639, 440, 518
-- [Legacy setup.py Migration](./legacy-setup-py.md) - Transitioning from setuptools setup.py to hatchling
-- [Setuptools Compatibility](./setuptools-compatibility.md) - Interoperability with setuptools
-- [CMake & scikit-build Integration](./cmake-scikit-build.md) - Building C extensions and compiled modules
-- [Extension Modules](./extension-modules.md) - Packaging C/C++/Rust extensions
+- `pep-standards.md` - Coverage of PEP 517, 660, 621, 639, 440, 518
+- `legacy-setup-py.md` - Transitioning from setuptools setup.py to hatchling
+- `setuptools-compatibility.md` - Interoperability with setuptools
+- `cmake-scikit-build.md` - Building C extensions and compiled modules
+- `extension-modules.md` - Packaging C/C++/Rust extensions
 
 ## Overview
 

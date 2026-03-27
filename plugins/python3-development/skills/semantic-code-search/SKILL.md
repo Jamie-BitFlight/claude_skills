@@ -1,6 +1,6 @@
 ---
 name: semantic-code-search
-description: Teaches agents to use the CocoIndex Code MCP server for semantic code search — find code by meaning, concept, or natural language description. Use when searching by behavior or intent rather than exact identifiers, exploring unfamiliar codebases, or locating implementations without knowing exact names.
+description: Use when searching a codebase by behavior, intent, or natural language description rather than exact identifiers. Activates the CocoIndex Code MCP server for semantic code search — finding implementations without knowing exact names, exploring unfamiliar codebases, or locating code by concept.
 user-invocable: false
 ---
 

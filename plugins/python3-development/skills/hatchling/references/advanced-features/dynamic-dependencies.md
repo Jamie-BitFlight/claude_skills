@@ -110,5 +110,5 @@ This ensures all dependencies are available before any hook code executes.
 
 ## See Also
 
-- [Build Context](./build-context.md) - Access to build environment information
-- [Build Data Passing](./build-data-passing.md) - Communicating between hooks and the build process
+- `build-context.md` - Access to build environment information
+- `build-data-passing.md` - Communicating between hooks and the build process

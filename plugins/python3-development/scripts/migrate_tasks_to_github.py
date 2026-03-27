@@ -19,11 +19,11 @@ task issue creation. It is idempotent: tasks that already have a
 
 Usage:
     # Dry-run (no API calls, no writes)
-    uv run migrate_tasks_to_github.py --task-file plan/tasks-001-my-feature.md \\
+    uv run migrate_tasks_to_github.py --task-file ~/.dh/projects/{slug}/plan/tasks-001-my-feature.md \\
         --parent-issue 480 --dry-run
 
     # Live migration
-    uv run migrate_tasks_to_github.py --task-file plan/tasks-001-my-feature/ \\
+    uv run migrate_tasks_to_github.py --task-file ~/.dh/projects/{slug}/plan/tasks-001-my-feature/ \\
         --parent-issue 480 --label sam-task
 """
 

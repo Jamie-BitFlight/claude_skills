@@ -290,6 +290,6 @@ class PathValidationHook(BuildHookInterface):
 
 ## Related Documentation
 
-- [File Selection](./wheel-file-selection.md)
-- [Build Hooks](./build-validation.md)
-- [Version Validation](./version-validation.md)
+- `wheel-file-selection.md`
+- `build-validation.md`
+- `version-validation.md`

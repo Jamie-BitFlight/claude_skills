@@ -419,6 +419,6 @@ The `^` anchor ensures it matches at the line start.
 
 ## Related Topics
 
-- [Configuration Basics](./configuration.md) - How to configure version hooks
-- [Version Management](../version-management.md) - Understanding version sources
-- [Custom Build Hooks](./custom-build-hooks.md) - Writing custom hooks that work with versions
+- `configuration.md` - How to configure version hooks
+- `../version-management.md` - Understanding version sources
+- `custom-build-hooks.md` - Writing custom hooks that work with versions

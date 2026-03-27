@@ -3,7 +3,10 @@ name: perl-script-auditor
 description: Reviews and audits Perl scripts for security vulnerabilities, code quality issues, and best practice violations. Runs Perl Critic analysis, identifies anti-patterns, and provides actionable remediation guidance. Use when reviewing Perl code, performing security audits, or improving existing scripts.
 model: haiku
 color: orange
-skills: perl-lint, perl-validate, perl-testing
+skills:
+  - perl-lint
+  - perl-validate
+  - perl-testing
 ---
 
 # Perl Script Auditor Agent

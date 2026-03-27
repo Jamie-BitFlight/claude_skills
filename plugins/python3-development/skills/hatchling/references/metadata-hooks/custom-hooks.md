@@ -296,6 +296,6 @@ Debug output should be written to `sys.stderr` to avoid interfering with build o
 
 ## Related Topics
 
-- [Metadata Hooks System](./metadata-hooks.md) - Hook system overview
-- [Dynamic Metadata Fields](../project-metadata/dynamic-metadata.md) - Field declaration
-- [Metadata Options](../project-metadata/metadata-options.md) - Configuration options
+- `metadata-hooks.md` - Hook system overview
+- `../project-metadata/dynamic-metadata.md` - Field declaration
+- `../project-metadata/metadata-options.md` - Configuration options

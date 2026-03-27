@@ -1,6 +1,6 @@
 ---
 name: plugin-creator
-description: 'Orchestrate plugin creation through a comprehensive agentic workflow: prerequisite check, user discussion, parallel research, design with verification, atomic implementation, multi-layer validation, documentation, and final verification. Use when creating a new Claude Code plugin from scratch. For existing plugin improvement, use /plugin-creator:plugin-lifecycle instead.'
+description: Use when creating a new Claude Code plugin from scratch — orchestrates prerequisite check, user discussion, parallel research, design with verification, atomic implementation, multi-layer validation, documentation, and final verification. For existing plugin improvement, use /plugin-creator:plugin-lifecycle instead.
 argument-hint: <plugin-concept>
 model: sonnet
 user-invocable: true
@@ -10,7 +10,7 @@ user-invocable: true
 
 This skill orchestrates specialized agents through a comprehensive plugin creation workflow. The orchestrator (you) delegates to sub-agents for research, discovery, validation, and implementation — never performing these tasks directly.
 
-**Workflow Diagram**: See [workflow-diagram.md](./references/workflow-diagram.md) for mermaid flowcharts of the complete plugin creation flow.
+**Workflow Diagram**: See `references/workflow-diagram.md` for mermaid flowcharts of the complete plugin creation flow.
 
 ---
 
@@ -55,6 +55,10 @@ flowchart TD
 4. Enables parallel work and thoroughness
 
 </orchestration_rules>
+
+### Component Selection Guidance
+
+When deciding which component type to create (skill, agent, hook, MCP server, or command), use `/plugin-creator:component-patterns` for the complete decision framework covering component lifecycle, discovery and activation phases, and organization patterns.
 
 ---
 
@@ -512,7 +516,7 @@ The script self-validates created files.
 
 ### 3e. Advanced Features
 
-See [Advanced Plugin Features Reference](./references/advanced-features.md) for:
+See `references/advanced-features.md` for:
 
 - Dynamic context injection (`!`command`` syntax)
 - String substitutions (`$ARGUMENTS`, `${CLAUDE_SESSION_ID}`, `${CLAUDE_PLUGIN_ROOT}`)

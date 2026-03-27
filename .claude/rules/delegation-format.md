@@ -1,37 +1,8 @@
 # Delegation Format Standard
 
-This file defines the canonical format for delegation instructions in workflow documentation
-(SKILL.md, agent files, reference files). AI agents reading workflow docs act deterministically
-when instructions name the agent, the inputs, and the expected output — without inference.
+Canonical format for delegation instructions in workflow documentation (SKILL.md, agent files, reference files).
 
----
-
-## Scope: Who This File Is For
-
-**The Agent tool is only available to the orchestrator** — the main Claude Code context running
-the session. Subagents spawned via `subagent_type`, or skills loaded with `context: fork`, do
-NOT have the Agent tool and cannot delegate further.
-
-This means:
-
-- Delegation instructions written in this format apply only to workflow documentation read by
-  the orchestrator
-- Skills and reference files loaded by subagents should contain task instructions — not
-  orchestration instructions — because the subagent cannot act on them
-- If a skill is designed to be read by the orchestrator (not a subagent), state that in its
-  frontmatter or opening section so the reader knows delegation steps are actionable
-
----
-
-## Purpose
-
-Delegation instructions fail when they are:
-
-- Ambiguous about which agent to use
-- Silent about what context to pass
-- Vague about what the agent should produce
-
-This standard eliminates those failure modes.
+**Scope**: Delegation steps are only actionable when read by the orchestrator. Subagents spawned via `subagent_type` cannot delegate further — write task instructions in files they load, not orchestration steps.
 
 ---
 
@@ -162,14 +133,3 @@ Colons inside Mermaid quoted strings can break rendering. Use `=` for assignment
 Fix["subagent_type='plugin-creator:subagent-refactorer'"]
 ```
 
----
-
-## Relationship to CLAUDE.md
-
-The `## Task Delegation Standards` section in `.claude/CLAUDE.md` references the delegation
-template from the `agent-orchestration:agent-orchestration` skill. This file defines the
-*format* of individual workflow steps within that template — it is a formatting standard, not
-a replacement for the orchestration skill.
-
-This file stands alone as a reference for authors of SKILL.md, agent files, and reference
-documents. When writing delegation steps in any of those file types, follow this standard.

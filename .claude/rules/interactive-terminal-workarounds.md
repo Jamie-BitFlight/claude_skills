@@ -65,8 +65,6 @@ Output is pixel blocks (▄)?
 └─ NO → Parse terminal output directly
 ```
 
-## Never Do
+## Prohibited Interactive Commands
 
-- Skip a task because "no TTY available"
-- Report "blocked" on TTY without trying workarounds
-- Use `git rebase -i` or `git add -i` (these require real interactive input — use non-interactive equivalents instead)
+`git rebase -i` and `git add -i` require real interactive input — use non-interactive equivalents. For all other TTY-blocked tasks, apply one of the providers above before reporting blocked.

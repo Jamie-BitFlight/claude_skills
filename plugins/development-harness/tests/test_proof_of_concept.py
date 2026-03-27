@@ -57,7 +57,7 @@ class TestProofOfConcept:
             quality_gates:
               format: "uv run ruff format {files}"
               lint: "uv run ruff check {files}"
-              typecheck: "uv run mypy {files}"
+              typecheck: "uv run ty check {files}"
               test: "uv run pytest tests/ --tb=short"
               standards: "/python3-development:modernpython"
         """)
@@ -125,7 +125,7 @@ class TestProofOfConcept:
         # Input 5: Quality gates
         assert "uv run ruff format" in prompt
         assert "uv run ruff check" in prompt
-        assert "uv run mypy" in prompt
+        assert "uv run ty check" in prompt
         assert "uv run pytest" in prompt
 
         # Verify metadata

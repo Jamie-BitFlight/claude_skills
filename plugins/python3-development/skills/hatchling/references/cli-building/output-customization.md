@@ -448,6 +448,6 @@ output_dir.mkdir(exist_ok=True)
 
 ## See Also
 
-- [Building All Targets](./building-all-targets.md)
-- [CI/CD Integration](./ci-cd-integration.md)
+- `building-all-targets.md`
+- `ci-cd-integration.md`
 - [Build Configuration](https://hatch.pypa.io/latest/config/build/)

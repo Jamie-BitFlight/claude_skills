@@ -1,9 +1,10 @@
+import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { createNodeWebSocket } from '@hono/node-server/ws';
 import { Hono } from 'hono';
+import { type WebSocket, WebSocketServer } from 'ws';
 import { loadOrCreateToken, validateToken } from './auth.js';
 import { Broadcaster } from './broadcast.js';
 import { SessionManager } from './sessions.js';
@@ -24,7 +25,6 @@ createWatcher(sessions, (_sessionId, event) => {
 });
 
 const app = new Hono();
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 // Auth middleware for /api/*
 app.use('/api/*', async (c, next) => {
@@ -37,10 +37,15 @@ app.use('/api/*', async (c, next) => {
   return next();
 });
 
-// Internal routes (localhost only)
+// Internal routes (localhost only, no auth)
 app.post('/internal/session/register', async (c) => {
-  const body = await c.req.json<{ session_id: string; cwd: string; pid?: number }>();
-  const session = sessions.register(body.session_id, body.cwd, body.pid ?? 0);
+  const body = await c.req.json<{
+    session_id: string;
+    cwd: string;
+    pid?: number;
+    transcript_path?: string;
+  }>();
+  const session = sessions.register(body.session_id, body.cwd, body.pid ?? 0, body.transcript_path);
   broadcaster.send({ type: 'session_registered', payload: session });
   return c.json({ ok: true, session });
 });
@@ -92,43 +97,39 @@ app.post('/api/sessions/:id/inject', async (c) => {
   return c.json({ ok: true });
 });
 
-// WebSocket
-app.get(
-  '/ws',
-  upgradeWebSocket((c) => {
-    const queryToken = c.req.query('token') ?? '';
-    return {
-      onOpen(_, ws) {
-        if (!validateToken(queryToken)) {
-          ws.close(1008, 'Unauthorized');
-          return;
-        }
-        broadcaster.add(ws as unknown as Parameters<typeof broadcaster.add>[0]);
-        const snapshot: WsMessage = {
-          type: 'sessions_snapshot',
-          payload: sessions.getAll(),
-        };
-        ws.send(JSON.stringify(snapshot));
-      },
-      onClose(_, ws) {
-        broadcaster.remove(ws as unknown as Parameters<typeof broadcaster.remove>[0]);
-      },
-      onError(_, ws) {
-        broadcaster.remove(ws as unknown as Parameters<typeof broadcaster.remove>[0]);
-      },
-    };
-  }),
-);
-
-// Static files — serve frontend build
+// Static files — serve frontend build from absolute path
 app.use('/*', serveStatic({ root: FRONTEND_DIR }));
 
-// Start server
+// Start HTTP server
 const server = serve({ fetch: app.fetch, port: PORT }, () => {
+  const tokenFilePath = '~/.claude/dot-dash/token';
   console.log(`dot-dash server running at http://localhost:${PORT}`);
-  console.log(`Token: ${token}`);
   console.log(`Dashboard: http://localhost:${PORT}`);
-  console.log(`WebSocket: ws://localhost:${PORT}/ws?token=${token}`);
+  console.log(`Token file: ${tokenFilePath}`);
+  if (process.env.DOT_DASH_PRINT_TOKEN === '1') {
+    console.log(`Token: ${token}`);
+  } else {
+    console.log('Token: <redacted> (set DOT_DASH_PRINT_TOKEN=1 to reveal)');
+  }
 });
 
-injectWebSocket(server);
+// WebSocket server attached to same HTTP server, path-filtered to /ws
+const wss = new WebSocketServer({ server: server as HttpServer, path: '/ws' });
+
+wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+  const url = new URL(req.url ?? '', `http://localhost:${PORT}`);
+  const queryToken = url.searchParams.get('token') ?? '';
+
+  if (!validateToken(queryToken)) {
+    ws.close(1008, 'Unauthorized');
+    return;
+  }
+
+  broadcaster.add(ws);
+
+  const snapshot: WsMessage = { type: 'sessions_snapshot', payload: sessions.getAll() };
+  ws.send(JSON.stringify(snapshot));
+
+  ws.on('close', () => broadcaster.remove(ws));
+  ws.on('error', () => broadcaster.remove(ws));
+});

@@ -14,7 +14,7 @@ Orchestrate adding automated documentation updater to target Claude skills. Foll
 
 **Purpose**: Create a self-maintaining documentation pipeline that downloads upstream docs, processes markdown for AI consumption, transforms links for local navigation, and enforces cooldown periods between updates.
 
-**Template**: [doc-updater-template.md](./references/doc-updater-template.md)
+**Template**: `references/doc-updater-template.md`
 
 **Process**: Collect 6 template variables from the user, substitute into template, delegate implementation through 5-phase workflow with quality gates at each stage.
 
@@ -109,7 +109,7 @@ Invoke `/python3-development` skill to load Python development orchestration sta
 
 **Prepare substituted template**
 
-1. Read [doc-updater-template.md](./references/doc-updater-template.md)
+1. Read `references/doc-updater-template.md`
 2. Extract content from `## Full Prompt Template` section (between 5-backtick code fence delimiters)
 3. Substitute all 6 `{VARIABLE}` placeholders with collected values:
    - `{SKILL_NAME}` → collected SKILL_NAME

@@ -8,7 +8,7 @@ related: [metadata-hooks, custom-hooks, basic-metadata]
 
 Dynamic metadata fields are declared in the `dynamic` list when values are determined at build time rather than statically in pyproject.toml. This enables reading versions from code, generating classifiers, or customizing metadata based on environment.
 
-When Claude helps users implement dynamic metadata, explain that any field can be declared as dynamic by listing it in the `dynamic` array. Each dynamic field requires corresponding configuration in the `[tool.hatch.*]` section or a metadata hook. Common use cases include reading version from source code files (via `[tool.hatch.version]`) or generating metadata dynamically (via metadata hooks). See [./metadata-hooks.md](./metadata-hooks.md) for hook-based approaches.
+When Claude helps users implement dynamic metadata, explain that any field can be declared as dynamic by listing it in the `dynamic` array. Each dynamic field requires corresponding configuration in the `[tool.hatch.*]` section or a metadata hook. Common use cases include reading version from source code files (via `[tool.hatch.version]`) or generating metadata dynamically (via metadata hooks). See `metadata-hooks.md` for hook-based approaches.
 
 ## Declaring Dynamic Fields
 
@@ -121,6 +121,6 @@ dynamic = ["version", "description"]
 
 ## Related Configuration
 
-- [Custom Metadata Hooks](./custom-hooks.md) - Implementing dynamic metadata
-- [Metadata Hooks](./metadata-hooks.md) - Hook system overview
-- [Basic Metadata Fields](./basic-metadata.md) - Static field definitions
+- `custom-hooks.md` - Implementing dynamic metadata
+- `metadata-hooks.md` - Hook system overview
+- `basic-metadata.md` - Static field definitions

@@ -65,6 +65,6 @@ allow-ambiguous-features = false
 
 ## Related Configuration
 
-- [Direct References](./direct-references.md) - VCS and local dependencies
-- [Dependencies](./dependencies.md) - Dependency specification
-- [Dynamic Metadata Fields](./dynamic-metadata.md) - Dynamic field handling
+- `direct-references.md` - VCS and local dependencies
+- `dependencies.md` - Dependency specification
+- `dynamic-metadata.md` - Dynamic field handling

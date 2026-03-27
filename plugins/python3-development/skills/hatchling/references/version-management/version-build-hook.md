@@ -568,7 +568,7 @@ def test_version():
 
 ## See Also
 
-- [Dynamic Version Sources](./dynamic-version-overview.md)
-- [Build Configuration](./build-configuration.md)
-- [Custom Build Hooks](./custom-build-hooks.md)
-- [Version CLI Commands](./version-cli.md)
+- `dynamic-version-overview.md`
+- `build-configuration.md`
+- `custom-build-hooks.md`
+- `version-cli.md`

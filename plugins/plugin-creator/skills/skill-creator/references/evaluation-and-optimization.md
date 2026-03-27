@@ -57,7 +57,7 @@ Save test cases to `evals/evals.json`. Don't write assertions yet — just the p
 }
 ```
 
-See [schemas.md](./schemas.md) for the full schema (including the `assertions` field, which you'll add later).
+See `schemas.md` for the full schema (including the `assertions` field, which you'll add later).
 
 ### Cross-Model Testing
 
@@ -332,15 +332,15 @@ Review the `best_description` from the optimization output. Update the SKILL.md 
 
 The `agents/` directory contains instructions for specialized subagents. Read them when you need to spawn the relevant subagent.
 
-- [agents/grader.md](../agents/grader.md) — How to evaluate assertions against outputs
-- [agents/comparator.md](../agents/comparator.md) — How to do blind A/B comparison between two outputs
-- [agents/analyzer.md](../agents/analyzer.md) — How to analyze why one version beat another
+- `../agents/grader.md` — How to evaluate assertions against outputs
+- `../agents/comparator.md` — How to do blind A/B comparison between two outputs
+- `../agents/analyzer.md` — How to analyze why one version beat another
 
 The `references/` directory has additional documentation:
 
-- [schemas.md](./schemas.md) — JSON structures for evals.json, grading.json, etc.
-- [claude-code-skills-official.md](./claude-code-skills-official.md) — Official Claude Code skills specification
-- [workflows.md](./workflows.md) — Workflow design patterns for multi-step skills
+- `schemas.md` — JSON structures for evals.json, grading.json, etc.
+- `claude-code-skills-official.md` — Official Claude Code skills specification
+- `workflows.md` — Workflow design patterns for multi-step skills
 
 The `eval-viewer/` directory contains the interactive eval review viewer:
 

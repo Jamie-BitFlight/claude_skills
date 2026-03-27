@@ -8,7 +8,7 @@ related: [version-specifiers, direct-references, metadata-options]
 
 Dependencies specify packages and libraries required by a project. Hatchling supports required dependencies, optional dependencies organized by feature, and detailed version constraints.
 
-When Claude helps users define dependencies, explain that required dependencies are installed automatically while optional dependencies (extras) are installed only when explicitly requested by the user. Show PEP 508 syntax for version constraints and environment markers. For version constraints, refer to [./version-specifiers.md](./version-specifiers.md) for comprehensive PEP 440 syntax documentation.
+When Claude helps users define dependencies, explain that required dependencies are installed automatically while optional dependencies (extras) are installed only when explicitly requested by the user. Show PEP 508 syntax for version constraints and environment markers. For version constraints, refer to `version-specifiers.md` for comprehensive PEP 440 syntax documentation.
 
 ## Required Dependencies
 
@@ -147,7 +147,7 @@ dependencies = [
 
 ## Direct References
 
-Direct references (Git URLs, local paths) are allowed only when enabled. See [Direct References](./direct-references.md) for comprehensive documentation.
+Direct references (Git URLs, local paths) are allowed only when enabled. See `direct-references.md` for comprehensive documentation.
 
 ## Dependency Best Practices
 
@@ -224,7 +224,7 @@ performance = [
 
 ## Version Specifier Syntax Reference
 
-For comprehensive version specifier documentation, see [PEP 440 Version Specifiers](./version-specifiers.md).
+For comprehensive version specifier documentation, see `version-specifiers.md`.
 
 ### Common Operators
 
@@ -239,6 +239,6 @@ For comprehensive version specifier documentation, see [PEP 440 Version Specifie
 
 ## Related Configuration
 
-- [Version Specifiers](./version-specifiers.md) - Complete version syntax guide
-- [Direct References](./direct-references.md) - VCS and local path dependencies
-- [Optional Dependencies](./dependencies.md#optional-dependencies-extras) - Feature-based dependency groups
+- `version-specifiers.md` - Complete version syntax guide
+- `direct-references.md` - VCS and local path dependencies
+- `dependencies.md#optional-dependencies-extras` - Feature-based dependency groups

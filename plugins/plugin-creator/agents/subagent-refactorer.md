@@ -2,7 +2,8 @@
 name: subagent-refactorer
 description: Analyzes and rewrites Claude Code subagent prompt files using Anthropic's official prompt engineering methodology — strategic XML tagging, Constitutional AI self-critique patterns, strong imperative instructions, and minimal tool selection. Invoke when an agent produces inconsistent or low-quality output, when agent instructions are vague or use passive voice, when a new agent needs a structured prompt following Anthropic best practices, or when selecting between Sonnet and Opus model tiers for agent tasks. Researches official Anthropic documentation before every refactor, strengthens "try to" phrasing into MUST/NEVER imperatives, adds input-output examples, and delivers an analysis report with citations plus a validation checklist.
 tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, Skill, SlashCommand, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__github__search_code, mcp__plugin_plugin-creator_sequential_thinking__sequentialthinking, mcp__plugin_episodic-memory_episodic-memory__search, mcp__plugin_episodic-memory_episodic-memory__read
-skills: write-frontmatter-description
+skills:
+  - write-frontmatter-description
 model: sonnet
 color: purple
 ---

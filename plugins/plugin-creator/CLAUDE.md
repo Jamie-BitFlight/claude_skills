@@ -59,7 +59,7 @@ flowchart TD
 
 ## Component Inventory
 
-### Skills (15)
+### Skills (19)
 
 | Skill | User-Invocable | Purpose |
 |-------|---------------|---------|
@@ -80,6 +80,10 @@ flowchart TD
 | `/start-refactor-task` | Yes | Execute individual refactoring tasks |
 | `/audit-agent-lifecycle` | Yes | Audit agent lifecycle patterns and write findings to `.claude/audits/patterns.md` |
 | `/agent-capability-analyzer` | Yes | Analyze agent capability gaps and generate improvement recommendations |
+| `/command-development` | Yes | Legacy `.claude/commands/` format reference — command frontmatter, arguments, bash execution, AskUserQuestion |
+| `/mcp-integration` | Yes | MCP server configuration within plugins — stdio, SSE, HTTP, WebSocket types, authentication, tool naming |
+| `/plugin-settings` | Yes | Per-project plugin configuration via `.local.md` pattern — YAML frontmatter parsing, implementation patterns |
+| `/component-patterns` | Yes | Component lifecycle, decision framework (commands vs skills vs agents vs hooks vs MCP servers), organization patterns |
 
 ### Agents (6)
 

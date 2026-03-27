@@ -13,6 +13,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,6 +28,7 @@ from dh_paths import (
     context_dir,
     ensure_dirs,
     git_project_root,
+    infer_project_root,
     milestones_dir,
     plan_dir,
     project_dh_dir,
@@ -322,6 +324,98 @@ class TestGitProjectRoot:
         # Assert — two distinct roots resolved
         assert result_a != result_b
         assert call_count["n"] == 2
+
+
+# ---------------------------------------------------------------------------
+# infer_project_root — MCP / env hints
+# ---------------------------------------------------------------------------
+
+
+class TestInferProjectRoot:
+    """Tests for infer_project_root(): env and workspace hints before cwd."""
+
+    def setup_method(self) -> None:
+        """Clear module-level root cache before each test."""
+        dh_paths._root_cache.clear()
+
+    def test_infer_respects_dh_project_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """DH_PROJECT_ROOT pointing at a repo resolves via git common dir."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        fake_git = repo / ".git"
+        fake_git.mkdir()
+        monkeypatch.setenv("DH_PROJECT_ROOT", str(repo))
+        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
+
+        assert infer_project_root() == repo
+
+    def test_git_project_root_without_cwd_uses_infer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """git_project_root(None) applies DH_PROJECT_ROOT like infer_project_root."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        fake_git = repo / ".git"
+        fake_git.mkdir()
+        monkeypatch.setenv("DH_PROJECT_ROOT", str(repo))
+        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
+
+        assert git_project_root() == repo
+
+    def test_infer_workspace_folder_paths_json(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """WORKSPACE_FOLDER_PATHS JSON array first folder is used."""
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        repo = tmp_path / "ws"
+        repo.mkdir()
+        fake_git = repo / ".git"
+        fake_git.mkdir()
+        monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(repo)]))
+        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
+
+        assert infer_project_root() == repo
+
+    def test_infer_workspace_folder_paths_precedes_claude_project_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """VS Code/Cursor WORKSPACE_FOLDER_PATHS is used before CLAUDE_PROJECT_DIR."""
+        claude_side = tmp_path / "claude-path"
+        ws_side = tmp_path / "workspace-path"
+        claude_side.mkdir()
+        ws_side.mkdir()
+        (claude_side / ".git").mkdir()
+        (ws_side / ".git").mkdir()
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(claude_side))
+        monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(ws_side)]))
+
+        def _side_effect(args: list[str], **kwargs: object) -> object:
+            cwd = str(kwargs.get("cwd", ""))
+            git_dir = ws_side / ".git" if str(ws_side) in cwd else claude_side / ".git"
+            return type("CP", (), {"stdout": str(git_dir) + "\n", "returncode": 0})()
+
+        mocker.patch("subprocess.run", side_effect=_side_effect)
+
+        assert infer_project_root() == ws_side
+
+    def test_infer_fails_with_runtime_error_wrapping_git_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """When all strategies fail, raise RuntimeError with chained CalledProcessError."""
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(128, "git"))
+
+        with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
+            infer_project_root(tmp_path)
 
 
 # ---------------------------------------------------------------------------

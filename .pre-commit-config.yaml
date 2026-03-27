@@ -8,6 +8,9 @@
 # - https://hugovk.dev/blog/2025/ready-prek-go/
 # - https://pydevtools.com/blog/prek-pre-commit-but-fast/
 
+# Global exclude: scratch/temp files are never project-quality — skip all hooks
+exclude: '^\.tmp/'
+
 default_stages:
   - commit-msg
   - pre-commit

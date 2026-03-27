@@ -568,7 +568,7 @@ $ hatch run test
 
 ## See Also
 
-- [Static Version Configuration](./static-version.md)
-- [Dynamic Version Sources](./dynamic-version-overview.md)
-- [Version Schemes](./version-schemes.md)
-- [Version Validation](./version-validation.md)
+- `static-version.md`
+- `dynamic-version-overview.md`
+- `version-schemes.md`
+- `version-validation.md`

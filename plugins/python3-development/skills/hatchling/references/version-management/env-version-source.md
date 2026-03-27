@@ -639,7 +639,7 @@ variable = "SETUPTOOLS_SCM_PRETEND_VERSION"
 
 ## See Also
 
-- [Dynamic Version Sources Overview](./dynamic-version-overview.md)
-- [Code Version Source](./code-version-source.md) - For programmatic version logic
-- [Regex Version Source](./regex-version-source.md) - For file-based versions
-- [CI/CD Best Practices](./cicd-integration.md) - Advanced CI/CD patterns
+- `dynamic-version-overview.md`
+- `code-version-source.md` - For programmatic version logic
+- `regex-version-source.md` - For file-based versions
+- `cicd-integration.md` - Advanced CI/CD patterns

@@ -251,6 +251,6 @@ ln -s ~/company-standards/security.md .claude/rules/security.md
 
 ### Detailed Reference
 
-For comprehensive details on all memory types, import behavior, glob patterns, and configuration options, see [memory-reference.md](./references/memory-reference.md).
+For comprehensive details on all memory types, import behavior, glob patterns, and configuration options, see `references/memory-reference.md`.
 
 SOURCE: [Claude Code Memory Documentation](https://code.claude.com/docs/en/memory.md) (accessed 2026-02-17)

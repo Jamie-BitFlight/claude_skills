@@ -14,49 +14,49 @@ This comprehensive reference is designed to help you assist users with Hatchling
 
 ### Core Error Categories
 
-1. **[Path Validation](./path-validation.md)**
+1. **`path-validation.md`**
 
    - Force-include path existence validation
    - Path normalization and case sensitivity
    - URI formatting and space escaping
    - Symlink resolution in dev mode
 
-2. **[Wheel File Selection Errors](./wheel-file-selection.md)**
+2. **`wheel-file-selection.md`**
 
    - "At least one file selection option must be defined" error
    - File selection options (packages, include, only-include)
    - Default heuristics and when they fail
    - Bypass selection for metadata-only wheels
 
-3. **[Version Validation & Bumping](./version-validation.md)**
+3. **`version-validation.md`**
 
    - PEP 440 version format validation
    - Standard version scheme and bumping
    - Version epoch handling
    - Dynamic version configuration
 
-4. **[SPDX License Validation](./spdx-validation.md)**
+4. **`spdx-validation.md`**
 
    - SPDX expression validation
    - LicenseRef custom identifiers
    - PEP 639 compliance
    - License file configuration
 
-5. **[Core Metadata Compatibility](./metadata-compatibility.md)**
+5. **`metadata-compatibility.md`**
 
    - Metadata version 2.1-2.4 compatibility
    - Field mapping across versions
    - PEP 517/660 compliance
    - Backward compatibility strategies
 
-6. **[Heuristic Failure Handling](./heuristic-failures.md)**
+6. **`heuristic-failures.md`**
 
    - Default detection mechanisms
    - Common heuristic failures
    - Package name normalization
    - Namespace package detection
 
-7. **[Build-Time Validation](./build-validation.md)**
+7. **`build-validation.md`**
    - Build hook validation
    - Artifact validation
    - Metadata field validation
@@ -68,11 +68,11 @@ This comprehensive reference is designed to help you assist users with Hatchling
 
 | Error                                                | Quick Fix                                | Documentation                                     |
 | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
-| `At least one file selection option must be defined` | Add `packages = ["src/mypackage"]`       | [Wheel File Selection](./wheel-file-selection.md) |
-| `Force-included path does not exist`                 | Ensure path exists or remove from config | [Path Validation](./path-validation.md)           |
-| `Invalid version: x.y.z`                             | Use PEP 440 format: `1.0.0`              | [Version Validation](./version-validation.md)     |
-| `Unknown license: [id]`                              | Use SPDX identifier or `LicenseRef-`     | [SPDX Validation](./spdx-validation.md)           |
-| `Invalid classifier`                                 | Check against PyPI classifiers           | [Build Validation](./build-validation.md)         |
+| `At least one file selection option must be defined` | Add `packages = ["src/mypackage"]`       | `wheel-file-selection.md` |
+| `Force-included path does not exist`                 | Ensure path exists or remove from config | `path-validation.md`           |
+| `Invalid version: x.y.z`                             | Use PEP 440 format: `1.0.0`              | `version-validation.md`     |
+| `Unknown license: [id]`                              | Use SPDX identifier or `LicenseRef-`     | `spdx-validation.md`           |
+| `Invalid classifier`                                 | Check against PyPI classifiers           | `build-validation.md`         |
 
 ## Version Compatibility Matrix
 

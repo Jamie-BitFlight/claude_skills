@@ -321,7 +321,7 @@ def update(self, desired_version: str, original_version: str, version_data: dict
 
 ## See Also
 
-- [Version Source Plugins](./version-source-plugins.md) - Retrieve version data
+- `version-source-plugins.md` - Retrieve version data
 - [VersionSchemeInterface Reference](https://hatch.pypa.io/latest/plugins/version-scheme/reference/)
 - [Hatchling Version Scheme Documentation](https://hatch.pypa.io/latest/plugins/version-scheme/)
 - [PEP 440 - Version Identification](https://peps.python.org/pep-0440/)

@@ -57,8 +57,6 @@ def live_items(tmp_path_factory, monkeypatch_class):
     bd = tmp_path_factory.mktemp("live_backlog") / ".claude" / "backlog"
     bd.mkdir(parents=True)
     monkeypatch_class.setattr("backlog_core.models.BACKLOG_DIR", bd)
-    monkeypatch_class.setattr("backlog_core.operations.BACKLOG_DIR", bd)
-    monkeypatch_class.setattr("backlog_core.parsing.BACKLOG_DIR", bd)
 
     test_id = str(uuid.uuid4())[:8]
     ctx: dict = {

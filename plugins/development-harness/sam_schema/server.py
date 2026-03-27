@@ -166,21 +166,51 @@ def sam_state(
 def sam_ready(
     plan: Annotated[str, Field(description="Plan address")],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+    full: Annotated[bool, Field(description="Return full Task model dump instead of routing manifest")] = False,
 ) -> dict:
     """List tasks ready for dispatch.
+
+    By default returns a compact 7-field routing manifest per task so the
+    orchestrator can decide which agent to dispatch next without receiving the
+    full task body (25+ fields).  Pass ``full=True`` to get the complete model
+    dump (preserves backward compatibility for callers that need all fields).
 
     Args:
         plan: Plan address component.
         plan_dir: Path to the directory containing plan files.
+        full: When True, return full Task model dump instead of routing manifest.
 
     Returns:
-        Dict with ``ready_tasks`` list of task field dicts and ``count``, or
-        a dict with an ``error`` key on failure.
+        Dict with ``ready_tasks`` list, ``count``, ``feature``, ``source_path``,
+        and ``issue`` envelope fields, or a dict with an ``error`` key on failure.
     """
     try:
         plan_path = resolve_plan_address(plan, _resolve_plan_dir(plan_dir))
+        read_result = load_plan(plan_path)
+        loaded_plan = read_result.plan
         tasks = get_ready_tasks(plan_path)
-        return {"ready_tasks": [t.model_dump(mode="json") for t in tasks], "count": len(tasks)}
+        if full:
+            ready_tasks: list[dict[str, Any]] = [t.model_dump(mode="json") for t in tasks]
+        else:
+            ready_tasks = [
+                {
+                    "id": t.id,
+                    "task": t.title,
+                    "agent": t.agent,
+                    "skills": t.skills or [],
+                    "dependencies": t.dependencies or [],
+                    "status": str(t.status),
+                    "priority": int(t.priority),
+                }
+                for t in tasks
+            ]
+        return {
+            "ready_tasks": ready_tasks,
+            "count": len(tasks),
+            "feature": loaded_plan.feature,
+            "source_path": str(loaded_plan.source_path or plan_path),
+            "issue": loaded_plan.issue,
+        }
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
 

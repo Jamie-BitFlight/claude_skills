@@ -211,6 +211,6 @@ Use `/permissions` during a session to view and manage all permission rules and 
 
 ### Detailed Reference
 
-For comprehensive rule examples, Bash pattern edge cases, and hook-based permission extension, see [permissions-reference.md](./references/permissions-reference.md).
+For comprehensive rule examples, Bash pattern edge cases, and hook-based permission extension, see `references/permissions-reference.md`.
 
 SOURCE: [Claude Code Permissions Documentation](https://code.claude.com/docs/en/permissions.md) (accessed 2026-02-17)

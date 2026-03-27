@@ -26,25 +26,25 @@ Build hooks can be:
 
 ### Configuration & Execution
 
-- [Configuration Basics](./configuration.md) - How to configure build hooks globally and per-target
-- [Hook Execution Order](./execution-order.md) - Understanding global vs target-specific hooks and execution sequence
-- [Conditional Execution](./conditional-execution.md) - Using `enable-by-default` to control hook activation
+- `configuration.md` - How to configure build hooks globally and per-target
+- `execution-order.md` - Understanding global vs target-specific hooks and execution sequence
+- `conditional-execution.md` - Using `enable-by-default` to control hook activation
 
 ### Build Hook Interfaces
 
-- [BuildHookInterface Reference](./buildhook-interface.md) - The base interface all build hooks implement
-- [Custom Build Hooks](./custom-build-hooks.md) - Creating custom hooks in `hatch_build.py`
-- [Version Build Hook](./version-build-hook.md) - Built-in hook for writing version information to files
+- `buildhook-interface.md` - The base interface all build hooks implement
+- `custom-build-hooks.md` - Creating custom hooks in `hatch_build.py`
+- `version-build-hook.md` - Built-in hook for writing version information to files
 
 ### Data & Dependencies
 
-- [Build Data](./build-data.md) - Understanding how to modify and use build data
-- [Hook Dependencies](./hook-dependencies.md) - Declaring dependencies for build hooks
-- [Passing Data Between Hooks](./hook-data-passing.md) - Sharing information across multiple hooks
+- `build-data.md` - Understanding how to modify and use build data
+- `hook-dependencies.md` - Declaring dependencies for build hooks
+- `hook-data-passing.md` - Sharing information across multiple hooks
 
 ### Environment & Control
 
-- [Environment Variables](./environment-variables.md) - Controlling hook behavior via `HATCH_BUILD_*` variables
+- `environment-variables.md` - Controlling hook behavior via `HATCH_BUILD_*` variables
 
 ## Built-in Build Hooks
 
@@ -173,7 +173,7 @@ build-hooks/
 
 ## Next Steps
 
-- **Getting Started**: See [Configuration Basics](./configuration.md)
-- **Writing Custom Logic**: See [Custom Build Hooks](./custom-build-hooks.md)
-- **Managing Versions**: See [Version Build Hook](./version-build-hook.md)
-- **Understanding Execution**: See [Hook Execution Order](./execution-order.md)
+- **Getting Started**: See `configuration.md`
+- **Writing Custom Logic**: See `custom-build-hooks.md`
+- **Managing Versions**: See `version-build-hook.md`
+- **Understanding Execution**: See `execution-order.md`

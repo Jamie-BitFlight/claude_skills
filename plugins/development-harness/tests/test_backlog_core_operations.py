@@ -7,6 +7,7 @@ by an autouse fixture that redirects BACKLOG_DIR to tmp_path.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -1946,9 +1947,11 @@ class TestRefreshLocalCacheIncrementalSync:
         ops.refresh_local_cache_from_github()
 
         # Assert — incremental call uses since= and combined states
+        # Production code converts the ISO string from .last_sync to a datetime
+        # before passing it to sync_issues_graphql, so compare as datetime.
         fetch_mock.assert_called_once()
         _, kwargs = fetch_mock.call_args
-        assert kwargs.get("since") == ts
+        assert kwargs.get("since") == datetime.fromisoformat(ts)
 
     def test_refresh_local_cache_does_full_fetch_when_no_last_sync(self, mocker: MockerFixture) -> None:
         """Full two-pass fetch is performed when no .last_sync file exists.

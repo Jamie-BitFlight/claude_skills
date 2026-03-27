@@ -374,7 +374,7 @@ Tools consuming metadata should:
 
 ## Related Standards
 
-- [PEP 440 - Version Identification](./pep-references.md#version-identification-pep-440)
-- [PEP 508 - Dependency Specification](./dependency-formats.md)
-- [PEP 639 - License Metadata](./pep-references.md#license-metadata-pep-639)
-- [Distribution Formats](./distribution-formats.md)
+- `pep-references.md#version-identification-pep-440`
+- `dependency-formats.md`
+- `pep-references.md#license-metadata-pep-639`
+- `distribution-formats.md`

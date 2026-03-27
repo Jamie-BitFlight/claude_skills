@@ -51,12 +51,12 @@ Load `/python3-development:specialist-skill-routing` when the task involves uv, 
 
 **Reference Documentation:**
 
-- [Python 3 Standards](./references/python3-standards.md) — Unified Python 3.11+ standards, knowledge graph, process graph, and how to amend them (consult when enforcing plugin-wide rules)
-- [User Project Conventions](./references/user-project-conventions.md) — Conventions from production projects; consult when starting or matching an existing project style
-- [Modern Python Modules](./references/modern-modules.md) - 50+ library guides with usage patterns and best practices
-- [Tool & Library Registry](./references/tool-library-registry.md) - Development tools catalog for linting, testing, and build automation
-- [API Reference](./references/api_reference.md) - API specifications and integration guides
-- [Python Development Orchestration](./references/python-development-orchestration.md) - Detailed workflow patterns for TDD, feature addition, refactoring, and code review
+- `references/python3-standards.md` — Unified Python 3.11+ standards, knowledge graph, process graph, and how to amend them (consult when enforcing plugin-wide rules)
+- `references/user-project-conventions.md` — Conventions from production projects; consult when starting or matching an existing project style
+- `references/modern-modules.md` - 50+ library guides with usage patterns and best practices
+- `references/tool-library-registry.md` - Development tools catalog for linting, testing, and build automation
+- `references/api_reference.md` - API specifications and integration guides
+- `references/python-development-orchestration.md` - Detailed workflow patterns for TDD, feature addition, refactoring, and code review
 
 **Specialist Skills** (routing commands — see **Domain-Specific Skill Routing**):
 
@@ -93,7 +93,7 @@ Load `/python3-development:specialist-skill-routing` when the task involves uv, 
 
 This skill provides modern Python 3.11+ standards, quality gates, and reference documentation for Python development.
 
-Consult [Python 3 Standards](./references/python3-standards.md) when applying shared rules for:
+Consult `references/python3-standards.md` when applying shared rules for:
 - Architecture Standards (Layered architecture, Separation of concerns)
 - Python Standards (Native type hints, Google-style docstrings, Fail-fast error handling)
 - CLI Standards (Typer/Rich)
@@ -102,69 +102,13 @@ Consult [Python 3 Standards](./references/python3-standards.md) when applying sh
 
 ### Python Development Process Graph
 
-The following flowchart illustrates exactly where and why each skill/agent is used in the Python development lifecycle:
+For the canonical development lifecycle, see `references/python3-standards.md` (Section 3).
 
-```mermaid
-flowchart TD
-    %% Define Styles
-    classDef trigger fill:#e1f5fe,stroke:#3b82f6,stroke-width:2px;
-    classDef plan fill:#fff3e0,stroke:#ff9800,stroke-width:2px;
-    classDef implement fill:#e8f5e9,stroke:#4caf50,stroke-width:2px;
-    classDef verify fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px;
-
-    %% Nodes
-    Start([Feature Request / Tech Debt]) ::: trigger
-
-    subgraph Planning Phase
-        DesignSpec[python-cli-design-spec<br/>Create Architecture & Interfaces] ::: plan
-        StinkySnake[stinkysnake<br/>Analyze & Plan Refactoring] ::: plan
-    end
-
-    subgraph Test-Driven Phase
-        TestArch[python-pytest-architect<br/>Write Failing Tests] ::: implement
-    end
-
-    subgraph Implementation Phase
-        CliArch[python-cli-architect<br/>Implement Core Logic] ::: implement
-        SnakePolish[snakepolish<br/>Iterative Implement & Test Loop] ::: implement
-    end
-
-    subgraph Verification Phase
-        StaticAnalysis[Ruff + type checker<br/>ty default; mypy if configured] ::: verify
-        Review[code-reviewer / python3-review<br/>Holistic Quality & Pattern Check] ::: verify
-    end
-
-    Done([Ready for Merge]) ::: trigger
-
-    %% Edges
-    Start -->|New Feature| DesignSpec
-    Start -->|Refactor Legacy| StinkySnake
-
-    DesignSpec --> TestArch
-    StinkySnake --> TestArch
-
-    TestArch -->|Tests Fail| CliArch
-    TestArch -->|Tests Fail| SnakePolish
-
-    CliArch --> StaticAnalysis
-    SnakePolish --> StaticAnalysis
-
-    StaticAnalysis -->|Pass| Review
-    StaticAnalysis -->|Fail| CliArch
-
-    Review -->|Issues Found| CliArch
-    Review -->|Approved| Done
-```
-
-**Reference documentation**
-
-- [Python 3 Standards](./references/python3-standards.md) — Same as above; load when the process graph or standards need detail.
-
-**Docstring standard** Google style (Args/Returns/Raises sections). See [User Project Conventions](./references/user-project-conventions.md) for ruff pydocstyle configuration (`convention = "google"`).
+**Docstring standard** Google style (Args/Returns/Raises sections). See `references/user-project-conventions.md` for ruff pydocstyle configuration (`convention = "google"`).
 
 **Pyproject.toml template variables**
 
-All `pyproject.toml` examples use explicit template variables (e.g., `{{project_name_from_directory_or_git_remote}}`) instead of generic placeholders. Replace every template variable with actual values before writing files. See [Tool & Library Registry sections 18–19](./references/tool-library-registry.md#18-pyprojecttoml-template-variable-reference) for variable reference, sourcing methods, and verification steps.
+All `pyproject.toml` examples use explicit template variables (e.g., `{{project_name_from_directory_or_git_remote}}`) instead of generic placeholders. Replace every template variable with actual values before writing files. See `references/tool-library-registry.md#18-pyprojecttoml-template-variable-reference` for variable reference, sourcing methods, and verification steps.
 
 ## Command Usage
 
@@ -228,7 +172,7 @@ Research tool preference for PEP documentation:
 - **Package executables**: `#!/usr/bin/env python3` (dependencies via package manager)
 - **Library modules**: No shebang (not directly executable)
 
-**See**: [PEP 723 Reference](./references/PEP723.md) for details on inline script metadata
+**See**: `references/PEP723.md` for details on inline script metadata
 
 **Pattern**:
 
@@ -245,6 +189,10 @@ Research tool preference for PEP documentation:
 ## Quality Gates
 
 For the mandatory quality gate sequence (linting, type checking, tests, full-file review, shebang validation), activate the `/python3-development:python-cli-architect` skill.
+
+## Diagnostic Rules
+
+**`error[unresolved-import]: Cannot resolve imported module 'X'`** — Add the directory containing module `X` to `[tool.ty.environment] extra-paths` in `pyproject.toml`; run `uv run ty check <path>` to verify; if errors persist, confirm `pyproject.toml` is the config ty is reading (a `ty.toml` in the project root takes precedence and `pyproject.toml` will be ignored).
 
 ## Standard Project Structure
 
@@ -311,21 +259,21 @@ When creating new Python projects, copy standard configuration files from the sk
    cp "${CLAUDE_PLUGIN_ROOT}/skills/python3-development/assets/.editorconfig" "."
    ```
 
-These templates implement the patterns documented in [User Project Conventions](./references/user-project-conventions.md) and ensure all projects follow the same standards for version management, linting, formatting, and build configuration.
+These templates implement the patterns documented in `references/user-project-conventions.md` and ensure all projects follow the same standards for version management, linting, formatting, and build configuration.
 
 ## Detailed Documentation
 
 ### Reference Documentation
 
-**PEP 723 Specification**: [PEP 723 - Inline Script Metadata](./references/PEP723.md) - User-friendly guide to PEP 723 inline script metadata with examples and migration patterns
+**PEP 723 Specification**: `references/PEP723.md` - User-friendly guide to PEP 723 inline script metadata with examples and migration patterns
 
 **Exception Handling and Typer/Rich Examples**: Load `Skill(skill="python3-development:typer-and-rich")` — covers exception chain prevention, Typer exit patterns, Rich non-TTY display solutions, and working executable examples including `typer_examples/` scripts and `python-cli-demo.py`.
 
-**Module Reference**: [Modern Python Modules](./references/modern-modules.md) - Comprehensive guide to 50+ modern Python libraries with deep-dive documentation for each module including usage patterns and best practices
+**Module Reference**: `references/modern-modules.md` - Comprehensive guide to 50+ modern Python libraries with deep-dive documentation for each module including usage patterns and best practices
 
-**Tool Registry**: [Tool & Library Registry](./references/tool-library-registry.md) - Catalog of development tools, their purposes, and usage patterns for linting, testing, and build automation
+**Tool Registry**: `references/tool-library-registry.md` - Catalog of development tools, their purposes, and usage patterns for linting, testing, and build automation
 
-**API Documentation**: [API Reference](./references/api_reference.md) - API specifications, integration guides, and programmatic interface documentation
+**API Documentation**: `references/api_reference.md` - API specifications, integration guides, and programmatic interface documentation
 
 #### Navigating Large References
 
@@ -351,8 +299,8 @@ grep -i "^## " references/python-development-orchestration.md
 
 These skills are bundled with this plugin and available as slash commands:
 
-- [/python3-development:modernpython](../modernpython/SKILL.md) - Python 3.11+ patterns and PEP references
-- [/python3-development:shebangpython](../shebangpython/SKILL.md) - PEP 723 validation and shebang standards
+- `../modernpython/SKILL.md` - Python 3.11+ patterns and PEP references
+- `../shebangpython/SKILL.md` - PEP 723 validation and shebang standards
 
 ## Summary
 

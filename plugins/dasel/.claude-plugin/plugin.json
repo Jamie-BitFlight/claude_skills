@@ -1,6 +1,6 @@
 {
   "name": "dasel",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Query, transform, and convert structured data files (JSON, YAML, TOML, XML, CSV, HCL, INI) using dasel v3. Provides reference syntax, exploration workflows, transformation patterns, and cross-platform installation.",
   "author": {
     "name": "Jamie Nelson",

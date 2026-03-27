@@ -322,12 +322,12 @@ requires = [
 
 For comprehensive information on specific topics, see:
 
-- [Sdist Target Deep Dive](../sdist-target/index.md) - Complete reference covering all aspects
-- [Core Metadata Versions](../sdist-target/core-metadata-versions.md) - Metadata version selection and PEP 639
-- [VCS Integration](../sdist-target/vcs-integration.md) - File selection via .gitignore and .hgignore
-- [Legacy Setup.py Support](../sdist-target/legacy-setup-py.md) - Backward compatibility configuration
-- [UNIX Socket Handling](../sdist-target/unix-socket-handling.md) - Special file handling
-- [Reproducible Builds](../sdist-target/reproducible-builds.md) - Deterministic distribution creation
+- `../sdist-target/index.md` - Complete reference covering all aspects
+- `../sdist-target/core-metadata-versions.md` - Metadata version selection and PEP 639
+- `../sdist-target/vcs-integration.md` - File selection via .gitignore and .hgignore
+- `../sdist-target/legacy-setup-py.md` - Backward compatibility configuration
+- `../sdist-target/unix-socket-handling.md` - Special file handling
+- `../sdist-target/reproducible-builds.md` - Deterministic distribution creation
 
 ## External References
 

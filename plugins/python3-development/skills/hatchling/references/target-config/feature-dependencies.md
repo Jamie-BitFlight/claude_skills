@@ -373,7 +373,7 @@ require-runtime-features = ["empty"]  # No packages installed
 
 ## See Also
 
-- [Runtime Dependency Requirements](./runtime-dependencies.md) - Including all runtime dependencies
-- [Target Dependencies](./target-dependencies.md) - Direct target dependencies
-- [Build Targets Index](../build-targets/index.md) - Available build targets
-- [Hook Dependencies](../build-hooks/hook-dependencies.md) - Hook-specific dependencies
+- `runtime-dependencies.md` - Including all runtime dependencies
+- `target-dependencies.md` - Direct target dependencies
+- `../build-targets/index.md` - Available build targets
+- `../build-hooks/hook-dependencies.md` - Hook-specific dependencies

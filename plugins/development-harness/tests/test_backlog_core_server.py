@@ -18,7 +18,7 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from backlog_core.models import BacklogError, Output
+from backlog_core.models import BackendAvailability, BackendStatus, BacklogError, Output
 from backlog_core.server import mcp
 from fastmcp.client import Client
 
@@ -341,6 +341,123 @@ async def test_backlog_list_search_combined_with_section_filter():
     assert len(response["items"]) == 2
 
 
+async def test_backlog_list_search_or_operator_matches_either_term():
+    """backlog_list search='auth OR deploy' matches items containing either term."""
+    items = [
+        {"title": "Auth service", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Deploy pipeline", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Refactor models", "description": "", "topic": "", "type": "Refactor"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "auth OR deploy"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth service" in returned_titles
+    assert "Deploy pipeline" in returned_titles
+    assert "Refactor models" not in returned_titles
+
+
+async def test_backlog_list_search_and_operator_requires_both_terms():
+    """backlog_list search='auth AND bug' only matches items containing both terms."""
+    items = [
+        {"title": "Auth bug", "description": "", "topic": "", "type": "Bug"},
+        {"title": "Auth feature", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Deploy bug", "description": "", "topic": "", "type": "Bug"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "auth AND bug"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth bug" in returned_titles
+    assert "Auth feature" not in returned_titles
+    assert "Deploy bug" not in returned_titles
+
+
+async def test_backlog_list_search_regex_slash_form_matches_pattern():
+    """backlog_list search='/auth.*bug/' matches items via regex."""
+    items = [
+        {"title": "Auth token bug", "description": "", "topic": "", "type": "Bug"},
+        {"title": "Auth feature", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Unrelated", "description": "", "topic": "", "type": "Refactor"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "/auth.*bug/"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth token bug" in returned_titles
+    assert "Auth feature" not in returned_titles
+    assert "Unrelated" not in returned_titles
+
+
+async def test_backlog_list_search_regex_prefix_form_matches_pattern():
+    """backlog_list search='regex:auth.*bug' matches items via regex: prefix form."""
+    items = [
+        {"title": "Auth token bug", "description": "", "topic": "", "type": "Bug"},
+        {"title": "Auth feature", "description": "", "topic": "", "type": "Feature"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "regex:auth.*bug"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth token bug" in returned_titles
+    assert "Auth feature" not in returned_titles
+
+
+async def test_backlog_list_search_field_specific_title_prefix():
+    """backlog_list search='title:auth' restricts match to the title field only."""
+    items = [
+        {"title": "Auth service", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Unrelated", "description": "", "topic": "auth", "type": "Feature"},
+        {"title": "Deploy", "description": "", "topic": "", "type": "Bug"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "title:auth"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth service" in returned_titles
+    # "Unrelated" has auth in topic, not title — must not match title:auth
+    assert "Unrelated" not in returned_titles
+    assert "Deploy" not in returned_titles
+
+
+async def test_backlog_list_search_field_specific_type_prefix():
+    """backlog_list search='type:bug' restricts match to the type field only."""
+    items = [
+        {"title": "Auth bug fix", "description": "", "topic": "", "type": "Bug"},
+        {"title": "Bug tracker", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Deploy", "description": "", "topic": "", "type": "Feature"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "type:bug"})
+
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "Auth bug fix" in returned_titles
+    # "Bug tracker" has "bug" in title but type is Feature — must not match type:bug
+    assert "Bug tracker" not in returned_titles
+
+
+async def test_backlog_list_search_invalid_regex_falls_back_to_plain_text():
+    """backlog_list search='/[invalid/' falls back to plain substring match on the raw term."""
+    items = [
+        {"title": "/[invalid/ literal", "description": "", "topic": "", "type": "Feature"},
+        {"title": "Unrelated", "description": "", "topic": "", "type": "Feature"},
+    ]
+    op_result = {"items": items}
+    with patch("backlog_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "/[invalid/"})
+
+    # Falls back to substring match on the literal string "/[invalid/"
+    returned_titles = [item["title"] for item in response["items"]]
+    assert "/[invalid/ literal" in returned_titles
+    assert "Unrelated" not in returned_titles
+
+
 async def test_backlog_list_response_includes_pagination_key_always():
     """backlog_list always includes a pagination key in a successful response."""
     op_result = {"items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}]}
@@ -352,6 +469,144 @@ async def test_backlog_list_response_includes_pagination_key_always():
     assert "limit" in response["pagination"]
     assert "total" in response["pagination"]
     assert "has_more" in response["pagination"]
+
+
+async def test_backlog_list_response_includes_backend_key():
+    """backlog_list always includes a 'backend' key in the response root.
+
+    Tests: backend dict is present in every successful response.
+    How: Call backlog_list with mocked list_items and probe_backend_status.
+    Why: Consumers rely on backend availability signal to diagnose empty results.
+    """
+    op_result = {"items": []}
+    reachable_status = BackendStatus(
+        availability=BackendAvailability.REACHABLE,
+        open_count=47,
+        total_count=203,
+        cache_open_count=0,
+        cache_total_count=0,
+    )
+    with (
+        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("backlog_core.server._probe_backend_status", return_value=reachable_status),
+    ):
+        response = await _call("backlog_list", {})
+
+    assert "backend" in response
+    assert response["backend"]["name"] == "GitHub"
+    assert response["backend"]["availability"] == "reachable"
+    assert response["backend"]["open_count"] == 47
+    assert response["backend"]["total_count"] == 203
+
+
+async def test_backlog_list_backend_reachable_message_format():
+    """backlog_list messages includes a formatted backend status line when reachable.
+
+    Tests: human-readable backend status string with live counts.
+    How: Mock probe_backend_status to return reachable status with known counts.
+    Why: Users should see 'Backend: GitHub, Backend availability: reachable, Backend items (N open / M total)'.
+    """
+    op_result = {"items": []}
+    reachable_status = BackendStatus(
+        availability=BackendAvailability.REACHABLE,
+        open_count=178,
+        total_count=245,
+        cache_open_count=0,
+        cache_total_count=0,
+    )
+    with (
+        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("backlog_core.server._probe_backend_status", return_value=reachable_status),
+    ):
+        response = await _call("backlog_list", {})
+
+    status_messages = [m for m in response["messages"] if m.startswith("Backend:")]
+    assert len(status_messages) == 1
+    assert (
+        status_messages[0] == "Backend: GitHub, Backend availability: reachable, Backend items (178 open / 245 total)"
+    )
+
+
+async def test_backlog_list_backend_unavailable_message_format():
+    """backlog_list messages includes a formatted backend status line when unavailable.
+
+    Tests: human-readable backend status string with cache fallback counts.
+    How: Mock probe_backend_status to return needs_authentication status with cache counts.
+    Why: Users should see 'Backend: GitHub, Backend availability: needs_authentication, Backend items (--- open / --- total)[cache: N open / M total]'.
+    """
+    op_result = {"items": [{"title": "Cached item", "priority": "P1", "issue": "", "plan": ""}]}
+    unavailable_status = BackendStatus(
+        availability=BackendAvailability.NEEDS_AUTHENTICATION,
+        open_count=None,
+        total_count=None,
+        cache_open_count=0,
+        cache_total_count=300,
+        error="GITHUB_TOKEN not set",
+    )
+    with (
+        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
+    ):
+        response = await _call("backlog_list", {})
+
+    assert response["backend"]["availability"] == "needs_authentication"
+    assert response["backend"]["open_count"] is None
+    status_messages = [m for m in response["messages"] if m.startswith("Backend:")]
+    assert len(status_messages) == 1
+    assert "--- open / --- total" in status_messages[0]
+    assert "[cache:" in status_messages[0]
+
+
+async def test_backlog_list_backend_unavailable_cache_open_count_reflects_filtered_total():
+    """backlog_list sets cache_open_count to the filtered item total even when GitHub is unavailable.
+
+    Tests: cache_open_count reflects the list result, not a stale probe value.
+    How: Return 2 items from list_items with unavailable probe_backend_status.
+    Why: cache_open_count is the count of what was actually served, independent of GitHub.
+    """
+    op_result = {"items": [{"title": "Item A"}, {"title": "Item B"}]}
+    unavailable_status = BackendStatus(
+        availability=BackendAvailability.NEEDS_AUTHENTICATION,
+        open_count=None,
+        total_count=None,
+        cache_open_count=0,
+        cache_total_count=50,
+        error="GITHUB_TOKEN not set",
+    )
+    with (
+        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
+    ):
+        response = await _call("backlog_list", {})
+
+    # cache_open_count is updated to reflect the filtered item count (2)
+    assert response["backend"]["cache_open_count"] == 2
+
+
+async def test_backlog_list_backend_error_path_includes_backend_key():
+    """backlog_list BacklogError path also includes a 'backend' key.
+
+    Tests: backend field present even in error responses.
+    How: Raise BacklogError from list_items; probe_backend_status runs independently.
+    Why: Callers must always find backend availability, even when listing fails.
+    """
+    unavailable_status = BackendStatus(
+        availability=BackendAvailability.ERROR,
+        open_count=None,
+        total_count=None,
+        cache_open_count=0,
+        cache_total_count=0,
+        error="connection refused",
+    )
+    with (
+        patch("backlog_core.operations.list_items", side_effect=BacklogError("backlog dir missing")),
+        patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
+    ):
+        response = await _call("backlog_list", {})
+
+    assert "error" in response
+    assert "backend" in response
+    assert response["backend"]["availability"] == "error"
 
 
 # ---------------------------------------------------------------------------
@@ -379,7 +634,7 @@ async def test_backlog_view_success_returns_item_detail():
         "milestone": "",
     }
     with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
-        response = await _call("backlog_view", {"selector": "#42"})
+        response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     mock_view.assert_called_once()
     call_kwargs = mock_view.call_args.kwargs
@@ -437,7 +692,7 @@ async def test_backlog_view_default_includes_content():
 
     # Act
     with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
-        response = await _call("backlog_view", {"selector": "#42"})
+        response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     # Assert
     call_kwargs = mock_view.call_args.kwargs
@@ -473,7 +728,7 @@ async def test_backlog_view_compact_mode_omits_body():
 
     # Act
     with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
-        response = await _call("backlog_view", {"selector": "#42", "include_content": False})
+        response = await _call("backlog_view", {"selector": "#42", "include_content": False, "summary": False})
 
     # Assert
     call_kwargs = mock_view.call_args.kwargs
@@ -509,7 +764,7 @@ async def test_backlog_view_compact_mode_includes_sections_metadata():
 
     # Act
     with patch("backlog_core.operations.view_item", return_value=op_result):
-        response = await _call("backlog_view", {"selector": "#42", "include_content": False})
+        response = await _call("backlog_view", {"selector": "#42", "include_content": False, "summary": False})
 
     # Assert
     assert "sections_metadata" in response
@@ -526,6 +781,227 @@ async def test_backlog_view_compact_mode_includes_sections_metadata():
     assert second["name"] == "Concerns"
     assert second["num_entries"] == 3
     assert second["num_struck"] == 0
+
+
+# ---------------------------------------------------------------------------
+# backlog_view — summary mode (summary=True / summary=False)
+# ---------------------------------------------------------------------------
+
+
+async def test_backlog_view_summary_true_returns_compact_manifest():
+    """backlog_view with summary=True (default) returns 5-field routing manifest.
+
+    Tests: summary=True response shape — issue_number, title, labels, status, plan_path.
+    How: Mock operations.view_item to return a full-detail dict with body containing
+         a plan: line, labels list, issue string, and state field.
+         Call backlog_view without summary parameter (defaults to True).
+         Assert all 5 routing fields plus _summary, _full_chars, _hint are present.
+    Why: The summary manifest is the contract for token-efficient routing — agents
+         receive just enough metadata to decide whether to fetch the full body.
+    """
+    # Arrange
+    op_result = {
+        "title": "SAM Ready Feature",
+        "priority": "P1",
+        "issue": "#36",
+        "state": "open",
+        "labels": ["priority:p1", "sam-ready"],
+        "body": "## Description\nSome content\nplan: plan/P036-sam-ready.yaml\nMore content",
+        "sections": {},
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#36"})
+
+    # Assert — compact fields present
+    assert response["issue_number"] == 36
+    assert response["title"] == "SAM Ready Feature"
+    assert response["labels"] == ["priority:p1", "sam-ready"]
+    assert response["status"] == "open"
+    assert response["plan_path"] == "plan/P036-sam-ready.yaml"
+    assert response["_summary"] is True
+    assert isinstance(response["_full_chars"], int)
+    assert response["_full_chars"] > 0
+    assert "summary=False" in response["_hint"]
+    assert "#36" in response["_hint"]
+
+
+async def test_backlog_view_summary_true_hint_contains_selector():
+    """backlog_view summary=True _hint embeds the exact selector the caller passed.
+
+    Tests: _hint fidelity — caller can copy-paste the suggested call.
+    How: Call backlog_view with selector='My Feature Title' and summary=True.
+         Assert _hint contains that exact selector string.
+    Why: The hint is actionable only if the selector is correct for the caller's context.
+    """
+    # Arrange
+    op_result = {
+        "title": "My Feature Title",
+        "issue": "#99",
+        "state": "open",
+        "labels": [],
+        "body": "",
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "My Feature Title"})
+
+    # Assert
+    assert "My Feature Title" in response["_hint"]
+
+
+async def test_backlog_view_summary_true_plan_path_none_when_absent():
+    """backlog_view summary=True sets plan_path=None when no plan: line in body.
+
+    Tests: plan_path extraction when body has no plan: annotation.
+    How: Mock operations.view_item with body containing no plan: line.
+         Assert plan_path is None in the summary response.
+    Why: Callers must distinguish "has a plan" from "no plan" without parsing body.
+    """
+    # Arrange
+    op_result = {
+        "title": "No Plan Yet",
+        "issue": "#10",
+        "state": "open",
+        "labels": [],
+        "body": "## Description\nThis item has no plan file yet.",
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#10"})
+
+    # Assert
+    assert response["plan_path"] is None
+
+
+async def test_backlog_view_summary_true_closed_issue_status_is_closed():
+    """backlog_view summary=True maps state='closed' to status='closed'.
+
+    Tests: status field derivation for closed issues.
+    How: Mock operations.view_item with state='closed'.
+         Assert status == 'closed' in the summary response.
+    Why: Callers use status to skip further processing on closed items.
+    """
+    # Arrange
+    op_result = {
+        "title": "Resolved Item",
+        "issue": "#5",
+        "state": "closed",
+        "labels": ["resolved"],
+        "body": "",
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#5"})
+
+    # Assert
+    assert response["status"] == "closed"
+
+
+async def test_backlog_view_summary_false_returns_full_response():
+    """backlog_view with summary=False returns the full operations result unchanged.
+
+    Tests: summary=False pass-through — existing callers unaffected.
+    How: Mock operations.view_item to return a dict with body and sections.
+         Call backlog_view with summary=False.
+         Assert body and sections are present and _summary key is absent.
+    Why: summary=False must be a strict pass-through to preserve backward compat
+         for callers that need the full body, comments, and timeline.
+    """
+    # Arrange
+    op_result = {
+        "title": "My Feature",
+        "issue": "#42",
+        "state": "open",
+        "labels": ["priority:p1"],
+        "body": "## Groomed (2026-03-22)\n- [ ] entry one",
+        "sections": {
+            "Groomed (2026-03-22)": {
+                "num_entries": 1,
+                "num_struck": 0,
+                "entries": [{"id": "e1", "struck": False, "content": "entry one"}],
+            }
+        },
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#42", "summary": False})
+
+    # Assert — full response keys present
+    assert "body" in response
+    assert "sections" in response
+    assert response["body"] == "## Groomed (2026-03-22)\n- [ ] entry one"
+    # _summary sentinel must be absent — this is a full response
+    assert "_summary" not in response
+
+
+async def test_backlog_view_summary_true_full_chars_reflects_full_response_size():
+    """backlog_view summary=True _full_chars equals len(json.dumps(full_response)).
+
+    Tests: _full_chars accuracy — caller can rely on it for token budget decisions.
+    How: Mock operations.view_item with a known body. Compute expected _full_chars
+         by serialising the merged dict the same way the handler does.
+         Assert _full_chars matches.
+    Why: An inaccurate _full_chars defeats the purpose of the hint — callers would
+         not know whether fetching the full body is worth the token cost.
+    """
+    import json as _json_test
+
+    # Arrange
+    op_result = {
+        "title": "Budget Item",
+        "issue": "#7",
+        "state": "open",
+        "labels": [],
+        "body": "x" * 500,
+        "sections": {},
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+    expected_full_chars = len(_json_test.dumps({**op_result}))
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#7"})
+
+    # Assert
+    assert response["_full_chars"] == expected_full_chars
+
+
+def test_backlog_view_summary_param_in_signature():
+    """backlog_view signature includes 'summary' parameter.
+
+    Tests: MCP tool schema completeness — 'summary' is discoverable by callers.
+    How: Inspect backlog_view function signature for summary parameter.
+    Why: MCP consumers discover available parameters through tool schema introspection.
+    """
+    import inspect
+
+    from backlog_core.server import backlog_view
+
+    sig = inspect.signature(backlog_view)
+    assert "summary" in sig.parameters
 
 
 # ---------------------------------------------------------------------------
@@ -1035,7 +1511,7 @@ async def test_backlog_view_show_non_numeric_string_passed_as_str():
             {"file_path": "f"},
         ),
         ("backlog_list", {}, "backlog_core.operations.list_items", {"items": []}),
-        ("backlog_view", {"selector": "#1"}, "backlog_core.operations.view_item", {"title": "T"}),
+        ("backlog_view", {"selector": "#1", "summary": False}, "backlog_core.operations.view_item", {"title": "T"}),
         ("backlog_sync", {}, "backlog_core.operations.sync_items", {"created": 0}),
         ("backlog_normalize", {}, "backlog_core.operations.normalize_items", {"normalized": 0}),
         ("backlog_pull", {}, "backlog_core.operations.pull_items", {"pulled": 0}),

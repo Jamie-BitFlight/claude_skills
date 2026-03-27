@@ -164,6 +164,6 @@ class CustomMetadataHook(MetadataHookInterface):
 
 ## Related Configuration
 
-- [Basic Metadata Fields](./basic-metadata.md) - Name, version, description
-- [Custom Metadata Hooks](./custom-hooks.md) - Dynamic metadata injection
-- [Dynamic Metadata Fields](./dynamic-metadata.md) - Marking fields as dynamic
+- `basic-metadata.md` - Name, version, description
+- `custom-hooks.md` - Dynamic metadata injection
+- `dynamic-metadata.md` - Marking fields as dynamic

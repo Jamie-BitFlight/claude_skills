@@ -435,6 +435,6 @@ done
 
 ## Navigation
 
-- [Output Directory](./output-directory.md) - HATCH_BUILD_LOCATION details
-- [Reproducible Builds](./reproducible-builds.md) - SOURCE_DATE_EPOCH usage
-- [Build Hooks](../build-hooks/environment-variables.md) - Hook-specific variables
+- `output-directory.md` - HATCH_BUILD_LOCATION details
+- `reproducible-builds.md` - SOURCE_DATE_EPOCH usage
+- `../build-hooks/environment-variables.md` - Hook-specific variables

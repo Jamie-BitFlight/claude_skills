@@ -460,7 +460,7 @@ def set_version(new_version):
 
 ## See Also
 
-- [Regex Version Source](./regex-version-source.md) - Simpler alternative for file-based versions
-- [Environment Version Source](./env-version-source.md) - For CI/CD integration
-- [Search Paths Configuration](./search-paths.md) - Configuring search locations
-- [Version Source Interface](./version-source-interface.md) - Plugin API reference
+- `regex-version-source.md` - Simpler alternative for file-based versions
+- `env-version-source.md` - For CI/CD integration
+- `search-paths.md` - Configuring search locations
+- `version-source-interface.md` - Plugin API reference

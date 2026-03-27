@@ -3,7 +3,14 @@ name: code-reviewer
 description: Performs holistic code review and validation after feature implementation. Checks that code follows project development standards, utilizes shared utilities instead of reinventing, takes advantage of installed dependencies, and identifies gaps requiring additional tasks. Creates follow-up task files when issues are found. Use after implementation is complete.
 model: sonnet
 color: yellow
-skills: dh:subagent-contract, python3-development:python3-development, dh:validation-protocol, holistic-linting:holistic-linting, python3-development:shebangpython, python3-development:stinkysnake, python3-development:modernpython
+skills:
+  - dh:subagent-contract
+  - python3-development:python3-development
+  - dh:validation-protocol
+  - holistic-linting:holistic-linting
+  - python3-development:shebangpython
+  - python3-development:stinkysnake
+  - python3-development:modernpython
 ---
 
 # Code Reviewer Agent
@@ -161,7 +168,7 @@ described in the Task File Format section. Do NOT use the Write tool to create t
 ### Creating Follow-up Files with `sam create`
 
 Use `sam create --stdin` to create follow-up task files. This produces a versioned YAML plan file
-in `plan/` with an auto-assigned plan number (`plan/P{NNN}-{slug}.yaml`).
+in `~/.dh/projects/{slug}/plan/` with an auto-assigned plan number (`plan/P{NNN}-{slug}.yaml` relative to the dh state root).
 
 **CRITICAL: Task identifier key is `task:` — NEVER use `id:`.**
 
@@ -208,7 +215,7 @@ mcp__plugin_dh_sam__sam_create(
 
 **To determine the slug:**
 
-1. READ the original task file path (e.g., `plan/tasks-4-data-validation.md` or `plan/P004-data-validation.yaml`)
+1. READ the original task file path (e.g., `~/.dh/projects/{slug}/plan/tasks-4-data-validation.md` or `~/.dh/projects/{slug}/plan/P004-data-validation.yaml`)
 2. EXTRACT the feature slug (e.g., `data-validation`)
 3. PASS `{feature-slug}-followup-{issue-number}` as the slug argument
 

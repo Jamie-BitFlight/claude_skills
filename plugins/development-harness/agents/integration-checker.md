@@ -3,7 +3,9 @@ name: integration-checker
 description: Verifies cross-module integration and end-to-end flows. Checks that new code connects properly with existing modules - exports used, imports work, data flows complete. Existence is not integration.
 model: haiku
 tools: Read, Bash, Grep, Glob, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
-skills: subagent-contract, dh:validation-protocol
+skills:
+  - subagent-contract
+  - dh:validation-protocol
 color: blue
 ---
 

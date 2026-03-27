@@ -97,8 +97,8 @@ Major shifts in packaging standards:
 
 ## Related Standards Documents
 
-- [PEP References and Compliance](./pep-references.md)
-- [Core Metadata Specifications](./core-metadata.md)
-- [Package Distribution Formats](./distribution-formats.md)
-- [Dependency Specification Formats](./dependency-formats.md)
-- [Version Control System Integration](./vcs-integration.md)
+- `pep-references.md`
+- `core-metadata.md`
+- `distribution-formats.md`
+- `dependency-formats.md`
+- `vcs-integration.md`

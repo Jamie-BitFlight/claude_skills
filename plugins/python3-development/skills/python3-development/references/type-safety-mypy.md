@@ -19,7 +19,7 @@ Use generics for type-safe container classes and functions that work with multip
 - Decorators and factory methods
 - Reusable protocols and type aliases
 
-**MUST read examples before implementing**: [Mypy Generics Documentation](./mypy-docs/generics.rst)
+**MUST read examples before implementing**: `mypy-docs/generics.rst`
 
 **Python 3.11 Generic Pattern** (TypeVar with Generic):
 
@@ -103,7 +103,7 @@ Use protocols for structural subtyping when you need duck typing with type safet
 - Create flexible callback types
 - Ensure compatibility without tight coupling
 
-**MUST read examples before implementing**: [Mypy Protocols Documentation](./mypy-docs/protocols.rst)
+**MUST read examples before implementing**: `mypy-docs/protocols.rst`
 
 **Basic Protocol Pattern**:
 
@@ -176,7 +176,7 @@ Use TypedDict for dictionaries with fixed schemas and string keys where each key
 - Configuration dictionaries
 - API request/response payloads
 
-**MUST read examples before implementing**: [Mypy TypedDict Documentation](./mypy-docs/typed_dict.rst)
+**MUST read examples before implementing**: `mypy-docs/typed_dict.rst`
 
 **Required Fields Pattern** (all keys required):
 
@@ -245,7 +245,7 @@ Use type narrowing to refine broad union types to specific types based on runtim
 - Validating input types
 - Control flow-based type refinement
 
-**MUST read examples before implementing**: [Mypy Type Narrowing Documentation](./mypy-docs/type_narrowing.rst)
+**MUST read examples before implementing**: `mypy-docs/type_narrowing.rst`
 
 **isinstance() Narrowing**:
 
@@ -324,7 +324,7 @@ class User:
     email: str | None = None
 ```
 
-**MUST read examples**: [Mypy Additional Features - Attrs](./mypy-docs/additional_features.rst)
+**MUST read examples**: `mypy-docs/additional_features.rst`
 
 **dataclasses Pattern** (stdlib-only):
 
@@ -370,7 +370,7 @@ class User(BaseModel):
 
 ## Additional Mypy Features
 
-**MUST read before using advanced patterns**: [Mypy Additional Features](./mypy-docs/additional_features.rst)
+**MUST read before using advanced patterns**: `mypy-docs/additional_features.rst`
 
 **Generic Dataclasses**:
 
@@ -438,4 +438,4 @@ module = "legacy_code.*"
 disallow_untyped_defs = false
 ```
 
-**See**: [Tool & Library Registry - Mypy Configuration](./tool-library-registry.md) for complete configuration examples.
+**See**: `tool-library-registry.md` for complete configuration examples.

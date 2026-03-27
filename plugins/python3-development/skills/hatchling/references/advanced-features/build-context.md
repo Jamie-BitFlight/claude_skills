@@ -300,6 +300,6 @@ class DebugContextHook(BuildHookInterface):
 
 ## See Also
 
-- [Build Data Passing](./build-data-passing.md) - Modifying build_data in hooks
-- [Dynamic Dependencies in Hooks](./dynamic-dependencies.md) - Build-time dependencies
-- [Force Include Permissions and Symlinks](./force-include.md) - Including external files
+- `build-data-passing.md` - Modifying build_data in hooks
+- `dynamic-dependencies.md` - Build-time dependencies
+- `force-include.md` - Including external files

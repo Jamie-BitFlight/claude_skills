@@ -46,7 +46,7 @@ Users then implement a metadata hook to set these values based on external sourc
 
 ## Documentation Structure
 
-### [Global Context Formatting Fields](./global-fields.md)
+### `global-fields.md`
 
 Core fields available everywhere in Hatchling configuration:
 
@@ -57,7 +57,7 @@ Core fields available everywhere in Hatchling configuration:
 
 **Reference this to help users with**: Any configuration that needs filesystem paths or environment variables.
 
-### [Environment-Specific Context Fields](./environment-fields.md)
+### `environment-fields.md`
 
 Fields available in Hatch environment configurations. Reference this when helping users with:
 
@@ -67,7 +67,7 @@ Fields available in Hatch environment configurations. Reference this when helpin
 
 **Use to assist with**: `[tool.hatch.envs.<ENV>]` scripts, dependencies, and environment variables.
 
-### [Context Formatting for Optional Dependencies](./optional-dependencies.md)
+### `optional-dependencies.md`
 
 Using context formatting in optional dependency groups (Hatchling v1.2.0+). Guide users through:
 
@@ -78,7 +78,7 @@ Using context formatting in optional dependency groups (Hatchling v1.2.0+). Guid
 
 **Reference this when helping users with**: Defining `[project.optional-dependencies]` with local or computed URLs.
 
-### [Dynamic Configuration and Field Resolution](./dynamic-configuration.md)
+### `dynamic-configuration.md`
 
 Programmatically setting project metadata. Help users understand:
 
@@ -89,7 +89,7 @@ Programmatically setting project metadata. Help users understand:
 
 **Use when users need to**: Set metadata from external sources or computed at build time.
 
-### [Configuration Interpolation and Advanced Patterns](./configuration-interpolation.md)
+### `configuration-interpolation.md`
 
 Advanced techniques for complex configurations. Reference this to guide users through:
 

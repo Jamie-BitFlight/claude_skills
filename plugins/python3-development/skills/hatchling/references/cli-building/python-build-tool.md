@@ -352,5 +352,5 @@ The build module ensures PEP 517 compliance:
 
 - [PEP 517 - Build System Interface](https://www.python.org/dev/peps/pep-0517/)
 - [Python Build Documentation](https://build.pypa.io/)
-- [Building with Hatch](./overview.md)
-- [Build Output Customization](./output-customization.md)
+- `overview.md`
+- `output-customization.md`

@@ -1,5 +1,5 @@
 Features added in Python 3.12. Available when `requires-python >= '3.12'`. For baseline 3.11
-features, see [python311-features.md](./python311-features.md).
+features, see `python311-features.md`.
 
 SOURCE: Python 3.12 What's New (<https://docs.python.org/3.12/whatsnew/3.12.html>)
 

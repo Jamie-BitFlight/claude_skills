@@ -3,7 +3,10 @@ name: perl-script-developer
 description: Creates Perl 5.30+ scripts following modern best practices. Specializes in secure, maintainable automation scripts with proper error handling, CPAN integration, and POD documentation. Use when writing new Perl scripts, implementing automation tasks, or modernizing legacy Perl code.
 model: sonnet
 color: pink
-skills: perl-development, perl-cpan-ecosystem, perl-environment-setup
+skills:
+  - perl-development
+  - perl-cpan-ecosystem
+  - perl-environment-setup
 ---
 
 # Perl Script Developer Agent

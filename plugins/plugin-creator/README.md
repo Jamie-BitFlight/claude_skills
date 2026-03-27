@@ -191,7 +191,9 @@ Defines a plugin mission statement — purpose, values, anti-patterns, and trade
 /mission-statement <plugin-path>
 ```
 
-#### `/rt-ica`
+#### `/rt-ica` (moved to development-harness)
+
+This skill has moved to the `development-harness` plugin. Use `/dh:rt-ica` instead.
 
 Mandatory pre-planning checkpoint (Reverse Thinking — Information Completeness Assessment). Blocks planning until all prerequisites are verified. Use before creating plans, delegating to agents, or defining acceptance criteria.
 
@@ -217,6 +219,10 @@ These load automatically when Claude needs them, or you can invoke them directly
 | `/hooks-patterns` | Hook recipes and working examples in Python and Node.js |
 | `/agentskills` | Agent Skills Open Standard (agentskills.io) — portable skill format for Claude Code, Cursor, Gemini CLI, and 20+ other agents |
 | `/prompt-optimization` | Principles for optimizing CLAUDE.md files and skills for Claude Code |
+| `/command-development` | Legacy `.claude/commands/` format — frontmatter fields, argument syntax, bash execution, AskUserQuestion patterns, workflow locking |
+| `/mcp-integration` | MCP server configuration within plugins — stdio/SSE/HTTP/WebSocket types, authentication, tool naming, lifecycle, security |
+| `/plugin-settings` | Per-project plugin configuration via `.local.md` — YAML frontmatter parsing from hooks, configuration-driven behavior patterns |
+| `/component-patterns` | Component lifecycle and decision framework — when to use commands vs skills vs agents vs hooks vs MCP servers |
 
 ### Claude Improvements
 

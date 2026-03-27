@@ -457,6 +457,6 @@ python -c "from mypackage.test import TEST; assert TEST == 'modified'"
 
 ## Navigation
 
-- [Build Options](./build-options.md) - General build configuration
-- [Editable Installs](../advanced-features/editable-installs.md) - Advanced editable installation
-- [Build Environment](../build-environment/README.md) - Environment setup
+- `build-options.md` - General build configuration
+- `../advanced-features/editable-installs.md` - Advanced editable installation
+- `../build-environment/README.md` - Environment setup

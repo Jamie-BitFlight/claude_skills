@@ -410,6 +410,6 @@ jobs:
 
 ## Related Documentation
 
-- [Build Validation](./build-validation.md)
-- [Metadata Validation](./metadata-validation.md)
-- [SPDX License Validation](./spdx-validation.md)
+- `build-validation.md`
+- `metadata-validation.md`
+- `spdx-validation.md`

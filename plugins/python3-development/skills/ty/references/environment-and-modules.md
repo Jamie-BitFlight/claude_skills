@@ -14,7 +14,7 @@ How ty discovers Python environments, resolves first-party and third-party modul
 
 ## Environment Discovery Flow
 
-See [environment-discovery.md](../resources/workflows/environment-discovery.md) for the full decision flowchart.
+See `../resources/workflows/environment-discovery.md` for the full decision flowchart.
 
 Summary of precedence:
 
@@ -111,7 +111,7 @@ replace-imports-with-any = ["pandas.**", "numpy.**"]
 
 ## Python Version Resolution
 
-See [python-version-resolution.md](../resources/workflows/python-version-resolution.md) for the full decision flowchart.
+See `../resources/workflows/python-version-resolution.md` for the full decision flowchart.
 
 The target Python version affects:
 - Allowed syntax (e.g., `match` statements require Python 3.10+)

@@ -527,7 +527,7 @@ __版本__ = "1.2.3"  # Chinese
 
 ## See Also
 
-- [Code Version Source](./code-version-source.md) - For complex version logic
-- [Environment Version Source](./env-version-source.md) - For CI/CD workflows
-- [Version Build Hook](./version-build-hook.md) - Write versions during build
-- [Version CLI Commands](./version-cli.md) - Command-line version management
+- `code-version-source.md` - For complex version logic
+- `env-version-source.md` - For CI/CD workflows
+- `version-build-hook.md` - Write versions during build
+- `version-cli.md` - Command-line version management

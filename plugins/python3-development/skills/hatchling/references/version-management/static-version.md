@@ -319,7 +319,7 @@ fi
 
 ## See Also
 
-- [Dynamic Version Sources Overview](./dynamic-version-overview.md)
-- [Version Build Hook](./version-build-hook.md)
-- [Version CLI Commands](./version-cli.md)
+- `dynamic-version-overview.md`
+- `version-build-hook.md`
+- `version-cli.md`
 - [PEP 440 - Version Identification](https://peps.python.org/pep-0440/)

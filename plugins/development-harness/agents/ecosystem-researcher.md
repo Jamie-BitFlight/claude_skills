@@ -1,8 +1,9 @@
 ---
 name: ecosystem-researcher
 description: Researches domain ecosystems and technology landscapes before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, and Comparison analysis. Use when exploring new domains, evaluating technology choices, or comparing implementation approaches. Requires MCP research servers (Ref, exa, context7, or firecrawl) - BLOCKs if none available.
-tools: Read, Grep, Glob, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs
-skills: subagent-contract
+tools: Read, Grep, Glob, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam__sam_create, mcp__plugin_dh_sam__sam_update
+skills:
+  - subagent-contract
 model: haiku
 color: blue
 ---
@@ -282,7 +283,19 @@ def generate_slug(topic: str, mode: str) -> str:
 
 ## Step 5: Write Output Document
 
-Write to: `plan/research/{mode}-{slug}.md`
+Create the research document using the SAM MCP tool:
+
+```text
+mcp__plugin_dh_sam__sam_create(slug="research-{mode}-{slug}", goal="{mode} research for {topic}", tasks_yaml="")
+```
+
+Then append the document content as a markdown section using:
+
+```text
+mcp__plugin_dh_sam__sam_update(plan_slug="research-{mode}-{slug}", task_id=None, section="{MODE}", content="{document body}")
+```
+
+`sam_create` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. The document is stored under `plan/research/` via the SAM plan directory conventions.
 
 Use the appropriate output template for the research mode.
 

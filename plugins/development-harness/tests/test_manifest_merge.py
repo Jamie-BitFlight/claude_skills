@@ -109,6 +109,7 @@ class TestMergeManifests:
             ),
         )
         merged = merge_manifests(parent, child)
+        assert merged.quality_gates is not None
         assert merged.quality_gates.lint == "uv run ruff check {files}"
         assert merged.quality_gates.test == "uv run pytest tests/ --tb=short"
         assert merged.quality_gates.standards == "/python3-development:modernpython"

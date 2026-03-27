@@ -562,6 +562,6 @@ class EnvironmentAwareBuilder(BuilderInterface):
 
 ## See Also
 
-- [Custom Builder](./custom-builder.md) - Creating your own builders
+- `custom-builder.md` - Creating your own builders
 - [Build Hooks](https://hatch.pypa.io/latest/plugins/build-hook/reference/) - Extending build process
 - [Hatch Plugins](https://hatch.pypa.io/latest/plugins/about/) - Plugin development guide

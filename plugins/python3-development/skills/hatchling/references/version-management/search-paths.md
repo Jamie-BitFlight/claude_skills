@@ -527,7 +527,7 @@ def find_version():
 
 ## See Also
 
-- [Code Version Source](./code-version-source.md)
-- [Monorepo Configuration](./monorepo-setup.md)
-- [Version Build Hook](./version-build-hook.md)
-- [Dynamic Version Sources](./dynamic-version-overview.md)
+- `code-version-source.md`
+- `monorepo-setup.md`
+- `version-build-hook.md`
+- `dynamic-version-overview.md`

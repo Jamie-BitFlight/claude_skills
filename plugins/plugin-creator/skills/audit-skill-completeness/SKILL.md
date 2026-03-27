@@ -50,7 +50,7 @@ skill-path/
 
 ### Step 2: Evaluate Quality Categories
 
-Run through each of the 8 categories using the detailed checklist in [Skill Completeness Checklist](./references/skill-completeness-checklist.md).
+Run through each of the 8 categories using the detailed checklist in `references/skill-completeness-checklist.md`.
 
 **Quality Categories:**
 
@@ -69,7 +69,7 @@ Run through each of the 8 categories using the detailed checklist in [Skill Comp
 
 For each category:
 
-1. Read the category definition from [Skill Completeness Checklist](./references/skill-completeness-checklist.md)
+1. Read the category definition from `references/skill-completeness-checklist.md`
 2. Review checklist items for that category
 3. Search SKILL.md and supporting files for evidence
 4. Score 0-3 based on rubric (below)
@@ -224,7 +224,7 @@ Report sections:
 
 ## Quality Categories Reference
 
-All 8 categories are detailed in [Skill Completeness Checklist](./references/skill-completeness-checklist.md) with:
+All 8 categories are detailed in `references/skill-completeness-checklist.md` with:
 
 - Checklist items for each category
 - Examples from Anthropic's official skills
@@ -233,4 +233,4 @@ All 8 categories are detailed in [Skill Completeness Checklist](./references/ski
 
 ## Additional Resources
 
-- [Skill Completeness Checklist](./references/skill-completeness-checklist.md) - detailed quality categories, checklist items, and examples from Anthropic's official skills repository
+- `references/skill-completeness-checklist.md` - detailed quality categories, checklist items, and examples from Anthropic's official skills repository

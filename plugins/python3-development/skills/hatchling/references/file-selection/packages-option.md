@@ -427,6 +427,6 @@ packages = ["src/myapp"]
 
 ## See Also
 
-- [Only-Include Option](./only-include-option.md)
-- [Sources Option](./sources-option.md)
-- [Explicit Path Selection](./explicit-path-selection.md)
+- `only-include-option.md`
+- `sources-option.md`
+- `explicit-path-selection.md`

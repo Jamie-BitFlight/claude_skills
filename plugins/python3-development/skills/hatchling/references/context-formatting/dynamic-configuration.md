@@ -458,7 +458,7 @@ class ConditionalMetadataHook(MetadataHookInterface):
 
 ## Related Topics
 
-- [Global Context Formatting Fields](./global-fields.md) — Fields used in dynamic configuration
-- [Configuration Interpolation](./configuration-interpolation.md) — Advanced field nesting and fallbacks
-- [Optional Dependencies Formatting](./optional-dependencies.md) — Dynamic optional dependency groups
-- [Building and Publishing](../build-system/publishing.md) — How dynamic metadata affects build/publish workflows
+- `global-fields.md` — Fields used in dynamic configuration
+- `configuration-interpolation.md` — Advanced field nesting and fallbacks
+- `optional-dependencies.md` — Dynamic optional dependency groups
+- `../build-system/publishing.md` — How dynamic metadata affects build/publish workflows

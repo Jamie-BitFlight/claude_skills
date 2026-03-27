@@ -18,36 +18,36 @@ Project metadata in Hatchling is stored entirely in the `[project]` table of `py
 
 ### Essential Metadata
 
-- [Basic Metadata Fields](./basic-metadata.md) - Name, version, description, readme, and Python version requirements
-- [Project Ownership](./ownership.md) - Authors and maintainers configuration
-- [Keywords & Classifiers](./keywords-classifiers.md) - Discovery aids and Trove classifier configuration
+- `basic-metadata.md` - Name, version, description, readme, and Python version requirements
+- `ownership.md` - Authors and maintainers configuration
+- `keywords-classifiers.md` - Discovery aids and Trove classifier configuration
 
 ### Dependencies & Features
 
-- [Dependency Specifications](./dependencies.md) - Required and optional dependencies with version specifiers
-- [PEP 440 Version Specifiers](./version-specifiers.md) - Complete guide to version constraint syntax
-- [Direct References](./direct-references.md) - Git, VCS, and local path dependencies
+- `dependencies.md` - Required and optional dependencies with version specifiers
+- `version-specifiers.md` - Complete guide to version constraint syntax
+- `direct-references.md` - Git, VCS, and local path dependencies
 
 ### Project Information
 
-- [Project URLs](./urls.md) - Homepage, documentation, repository, bug tracker, and custom URLs
-- [License Configuration](./licenses.md) - SPDX expressions and license files (PEP 639)
+- `urls.md` - Homepage, documentation, repository, bug tracker, and custom URLs
+- `licenses.md` - SPDX expressions and license files (PEP 639)
 
 ### Entry Points & Plugins
 
-- [Entry Points: CLI Scripts](./entry-points-cli.md) - Command-line tool configuration
-- [Entry Points: GUI Scripts](./entry-points-gui.md) - GUI application entry points
-- [Plugin Namespaces](./entry-points-plugins.md) - Plugin discovery and registration
+- `entry-points-cli.md` - Command-line tool configuration
+- `entry-points-gui.md` - GUI application entry points
+- `entry-points-plugins.md` - Plugin discovery and registration
 
 ### Dynamic Configuration
 
-- [Dynamic Metadata Fields](./dynamic-metadata.md) - Overview of dynamic field declaration
-- [Metadata Hooks System](./metadata-hooks.md) - Hook system overview and built-in hooks
-- [Custom Metadata Hooks](./custom-hooks.md) - Implementing MetadataHookInterface
+- `dynamic-metadata.md` - Overview of dynamic field declaration
+- `metadata-hooks.md` - Hook system overview and built-in hooks
+- `custom-hooks.md` - Implementing MetadataHookInterface
 
 ### Advanced Topics
 
-- [Metadata Options](./metadata-options.md) - Direct references, ambiguous features, and configuration flags
+- `metadata-options.md` - Direct references, ambiguous features, and configuration flags
 
 ## Quick Start Example
 
@@ -101,8 +101,8 @@ Repository = "https://github.com/user/my-package"
 
 For build-specific metadata and configuration:
 
-- [Build Hooks Reference](../build-hooks/index.md) - Dynamic code execution during build
-- [Version Management](../version-management.md) - Version sources and automatic injection
+- `../build-hooks/index.md` - Dynamic code execution during build
+- `../version-management.md` - Version sources and automatic injection
 
 ## Validation & Checking
 

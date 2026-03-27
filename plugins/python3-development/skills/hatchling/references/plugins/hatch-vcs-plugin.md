@@ -451,8 +451,8 @@ __version__ = version('myproject')
 ## See Also
 
 - [hatch-vcs GitHub Repository](https://github.com/ofek/hatch-vcs)
-- [Version Source Plugins](./version-source-plugins.md)
-- [Build Hook Plugins](./build-hook-plugins.md)
+- `version-source-plugins.md`
+- `build-hook-plugins.md`
 - [setuptools-scm Documentation](https://github.com/pypa/setuptools_scm)
 - [Hatchling Version Documentation](https://hatch.pypa.io/latest/plugins/version-source/)
 - [Hatch Version Command](https://hatch.pypa.io/latest/cli/reference/#hatch-version)

@@ -469,7 +469,7 @@ if __name__ == "__main__":
 
 ## Related Documentation
 
-- [Path Validation](./path-validation.md)
-- [Wheel File Selection](./wheel-file-selection.md)
-- [Version Validation](./version-validation.md)
-- [Metadata Compatibility](./metadata-compatibility.md)
+- `path-validation.md`
+- `wheel-file-selection.md`
+- `version-validation.md`
+- `metadata-compatibility.md`

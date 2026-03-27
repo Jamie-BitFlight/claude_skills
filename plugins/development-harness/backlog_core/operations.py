@@ -34,6 +34,8 @@ from .entry_blocks import (
 from .github import (
     IssueNode,
     _add_comment_graphql,
+    _fetch_comment_by_id_graphql,
+    _fetch_issue_comments_graphql,
     _fetch_issue_graphql,
     _fetch_milestones_graphql,
     _graphql_request,
@@ -107,6 +109,8 @@ from .parsing import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from github.Repository import Repository
 
 
@@ -150,6 +154,25 @@ class ListItemsResult(TypedDict):
 
     items: list[BacklogListItem]
     count: int
+    messages: list[str]
+    warnings: list[str]
+    errors: list[str]
+
+
+class _SectionMetadata(TypedDict):
+    """Per-section entry counts and row metadata for view/issue body parsing."""
+
+    num_entries: int
+    num_struck: int
+    entries: list[dict[str, str | bool]]
+
+
+class ListCommentsResult(TypedDict):
+    """Result shape returned by list_comments()."""
+
+    comments: list[dict[str, str]]
+    count: int
+    has_more: bool
     messages: list[str]
     warnings: list[str]
     errors: list[str]
@@ -211,7 +234,7 @@ _CHANGES_KEY_MAP: dict[str, str] = {
 }
 
 
-def _extract_changes(result: dict[str, object]) -> dict[str, str | int | bool]:
+def _extract_changes(result: Mapping[str, object]) -> dict[str, str | int | bool]:
     """Build a changes summary from update_item result keys.
 
     Returns:
@@ -1509,19 +1532,19 @@ def list_items(
 _ENTRY_FILTER_KEYWORDS: frozenset[str] = frozenset({"all", "struck", "last", "first"})
 
 
-def _merge_section_entries(existing: dict[str, object], new_entries: list[dict[str, str | bool]]) -> dict[str, object]:
+def _merge_section_entries(existing: _SectionMetadata, new_entries: list[dict[str, str | bool]]) -> _SectionMetadata:
     """Merge *new_entries* into *existing* section metadata dict.
 
     Returns:
         Updated section metadata dict.
     """
-    all_entries: list[dict[str, str | bool]] = list(existing["entries"]) + new_entries  # type: ignore[assignment]
+    all_entries: list[dict[str, str | bool]] = list(existing["entries"]) + new_entries
     active_count = sum(1 for e in all_entries if not e.get("struck"))
     struck_count = sum(1 for e in all_entries if e.get("struck"))
     return {"num_entries": active_count, "num_struck": struck_count, "entries": all_entries}
 
 
-def _build_sections_metadata(body: str, show: str | int | None, since: str | None) -> dict[str, dict]:
+def _build_sections_metadata(body: str, show: str | int | None, since: str | None) -> dict[str, _SectionMetadata]:
     """Extract ``### ``-delimited sections from *body* into a metadata dict.
 
     Args:
@@ -1547,7 +1570,7 @@ def _build_sections_metadata(body: str, show: str | int | None, since: str | Non
     elif show is not None:
         entry_show = show
 
-    sections: dict[str, dict] = {}
+    sections: dict[str, _SectionMetadata] = {}
     for i, hdr in enumerate(section_headers):
         sec_name = hdr.group(1).strip()
         start = hdr.end()
@@ -2078,7 +2101,7 @@ def update_item(
     reason: str | None = None,
     verified: bool = False,
     append: bool = False,
-) -> dict[str, str | int | bool | list[str]]:
+) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Update item: add Plan, set status:in-progress, create issue, apply verified label, or write groomed content.
 
     Returns:
@@ -2138,9 +2161,8 @@ def update_item(
 
     _apply_issue_status_labels(item, status, verified, repo, result, out)
 
-    result["changes"] = _extract_changes(result)  # type: ignore[assignment]
-
-    return {**result, **out.to_dict()}
+    changes = _extract_changes(result)
+    return {**result, "changes": changes, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -2161,7 +2183,7 @@ def groom_item(
     replace_section: bool = False,
     reason: str | None = None,
     append: bool = False,
-) -> dict[str, str | int | bool | list[str]]:
+) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Write groomed content into per-item file. Delegates to update_item.
 
     Returns:
@@ -3222,6 +3244,124 @@ def comment_issue(
     except (GithubException, BacklogError) as e:
         raise BacklogError(f"GitHub API error adding comment: {e}") from e
     return {"issue_number": issue_number, "comment_id": comment_node_id, "comment_url": "", **out.to_dict()}
+
+
+_COMMENT_PREVIEW_LENGTH = 200
+
+
+def list_comments(
+    repo: str = "", issue_number: int = 0, limit: int = 20, offset: int = 0, output: Output | None = None
+) -> ListCommentsResult:
+    """List comments on a GitHub issue.
+
+    Args:
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        issue_number: GitHub issue number (without ``#``). Must be positive.
+        limit: Maximum number of comments to return. Defaults to 20.
+        offset: Number of comments to skip before returning results. Defaults to 0.
+        output: Optional Output collector.
+
+    Returns:
+        Dict with:
+          - ``comments``: list of ``{id, author, created_at, updated_at, preview}``
+          - ``count``: total comments in the result window
+          - ``has_more``: True if more comments exist beyond the current window
+          - ``messages``, ``warnings``, ``errors``: output lists
+
+    Raises:
+        ValidationError: If ``issue_number`` is not positive.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        BacklogError: On GitHub API errors.
+    """
+    out = output or Output()
+    if issue_number <= 0:
+        raise ValidationError("issue_number must be a positive integer")
+    try:
+        gh_repo = get_github(repo)
+        owner, repo_name = gh_repo.full_name.split("/", 1)
+        all_comments = _fetch_issue_comments_graphql(gh_repo, owner, repo_name, issue_number)
+    except (GithubException, BacklogError) as e:
+        raise BacklogError(f"GitHub API error fetching comments: {e}") from e
+
+    window = all_comments[offset : offset + limit]
+    has_more = len(all_comments) > offset + limit
+    comment_list = [
+        {
+            "id": c["id"],
+            "author": c["author"],
+            "created_at": c["created_at"],
+            "updated_at": c["updated_at"],
+            "preview": c["body"][:_COMMENT_PREVIEW_LENGTH],
+        }
+        for c in window
+    ]
+    out_d = out.to_dict()
+    return {
+        "comments": comment_list,
+        "count": len(comment_list),
+        "has_more": has_more,
+        "messages": out_d["messages"],
+        "warnings": out_d["warnings"],
+        "errors": out_d["errors"],
+    }
+
+
+def read_comment(
+    repo: str = "", issue_number: int = 0, comment_id: int = 0, output: Output | None = None
+) -> dict[str, str | list[str]]:
+    """Read a single comment's full body from a GitHub issue.
+
+    ``comment_id`` is the integer REST comment database ID as returned by the
+    GitHub REST API (e.g., the ``id`` field from ``GET /repos/{owner}/{repo}/
+    issues/comments``).  The ``id`` values returned by ``list_comments`` are
+    GraphQL node IDs (strings like ``IC_kwDO...``) and cannot be used here
+    directly — use a REST comment ID instead.  This function resolves the node
+    ID automatically via PyGithub before fetching the full body via GraphQL.
+
+    Args:
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        issue_number: GitHub issue number (without ``#``). Must be positive.
+        comment_id: REST comment database ID (positive integer). Obtained from
+            ``list_comments`` by looking up the comment in the issue's comment
+            list, or from the GitHub REST API directly.
+        output: Optional Output collector.
+
+    Returns:
+        Dict with:
+          - ``id``: GraphQL node ID string
+          - ``author``: login of the comment author
+          - ``created_at``: ISO 8601 timestamp
+          - ``updated_at``: ISO 8601 timestamp
+          - ``body``: full Markdown content — no truncation
+          - ``messages``, ``warnings``, ``errors``: output lists
+
+    Raises:
+        ValidationError: If ``issue_number`` or ``comment_id`` is not positive.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        BacklogError: On GitHub API errors or if the comment is not found.
+    """
+    out = output or Output()
+    if issue_number <= 0:
+        raise ValidationError("issue_number must be a positive integer")
+    if comment_id <= 0:
+        raise ValidationError("comment_id must be a positive integer")
+    try:
+        gh_repo = get_github(repo)
+        # Resolve the REST integer comment ID to a GraphQL node ID.
+        pygithub_issue = gh_repo.get_issue(issue_number)
+        pygithub_comment = pygithub_issue.get_comment(comment_id)
+        node_id: str = str(pygithub_comment.node_id)
+        comment = _fetch_comment_by_id_graphql(gh_repo, node_id)
+    except (GithubException, BacklogError) as e:
+        raise BacklogError(f"GitHub API error reading comment: {e}") from e
+    return {
+        "id": comment["id"],
+        "author": comment["author"],
+        "created_at": comment["created_at"],
+        "updated_at": comment["updated_at"],
+        "body": comment["body"],
+        **out.to_dict(),
+    }
 
 
 # ---------------------------------------------------------------------------

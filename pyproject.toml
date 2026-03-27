@@ -17,6 +17,7 @@ dev = [
     "claude-code-sdk>=0.0.25",
     "defusedxml>=0.7.1",
     "duckdb>=1.4.4",
+    "fastmcp[tasks]>=3.1.1",
     "generate-changelog>=0.16.0",
     "gitpython>=3.1.45",
     "hatch-vcs>=0.5.0",
@@ -26,7 +27,6 @@ dev = [
     "hypothesis>=6.0.0",
     "matplotlib>=3.10.8",
     "mcp[cli]>=1.26.0",
-    "mypy>=1.19.1",
     "pandas>=3.0.0",
     "panel>=1.8.10",
     "pm4py>=2.7.0",
@@ -44,6 +44,7 @@ dev = [
     "python-dotenv>=1.1.1",
     "python-frontmatter>=1.1.0",
     "python-gitlab>=8.0.0",
+    "rich>=14.2.0",
     "ruamel.yaml>=0.18.0",
     "ruff>=0.15.4",
     "scikit-learn>=1.0",
@@ -51,7 +52,7 @@ dev = [
     "toml-sort>=0.24.3",
     "tomlkit>=0.13.0",
     "tornado>=6.5.5",
-    "ty>=0.0.17",
+    "ty>=0.0.25",
     "typer>=0.21.0",
     "uv-sort>=0.7.0",
     "vadersentiment>=3.3.2",
@@ -115,7 +116,7 @@ testpaths = [
     "plugins/development-harness/tests_sam",
     "plugins/frustration-analyzer/tests",
     "plugins/plugin-creator/tests",
-    "plugins/python3-development/skills/implementation-manager/tests",
+    "plugins/development-harness/skills/implementation-manager/tests",
     "plugins/summarizer/tests",
     "tests",
 ]
@@ -135,18 +136,23 @@ omit = ["tests/*", "*/tests/*", "**/test_*.py"]
 source = ["**/scripts"]
 
 [tool.ty.environment]
-# Order matters: real task_format.py (python3-development) must precede symlinked copy (development-harness)
 extra-paths = [
     "./plugins/development-harness",
     "./plugins/development-harness/skills/backlog",
     "./plugins/development-harness/skills/backlog/scripts",
+    "./plugins/development-harness/skills/kage-bunshin/scripts",
+    "./plugins/development-harness/tests",
     "./.claude/skills/create-merge-request-changelog/scripts",
     "./.claude/skills/gh/scripts",
     "./.claude/skills/research-curator/scripts",
     "./plugins/agentskill-kaizen/mcp",
+    "./plugins/agentskill-kaizen/tests",
+    "./plugins/frustration-analyzer/tests",
+    "./plugins/plugin-creator/tests",
     "./plugins/python3-development/scripts",
     "./plugins/development-harness/scripts",
     "./plugins/development-harness/skills/implementation-manager/scripts",
+    "./plugins/development-harness/skills/implementation-manager/tests/test_task_status_hook",
     "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
     "./plugins/gitlab-skill/skills/gitlab-skill/scripts",
     "./plugins/holistic-linting/skills/holistic-linting/scripts",
@@ -163,7 +169,8 @@ root = ["./"]
 include = ["plugins/agentskill-kaizen/**"]
 
 [tool.ty.overrides.rules]
-call-non-callable = "warn" # prefixspan has incomplete type stubs
+call-non-callable = "warn"    # prefixspan has incomplete type stubs
+unresolved-attribute = "warn" # lazy import pattern: `import mod; mod.Attr` — ty sees ModuleType, not resolved class
 
 [[tool.ty.overrides]]
 include = ["**/test_*.py", "**/conftest.py", "**/tests/**", "tests/**"]
@@ -174,7 +181,6 @@ invalid-argument-type = "warn"
 invalid-assignment = "warn"
 possibly-unresolved-reference = "warn"
 too-many-positional-arguments = "warn" # runtime-injected modules (e.g. backlog via sys.path in conftest)
-unresolved-import = "warn"             # test files may import from symlinked scripts excluded from ty analysis
 
 [[tool.ty.overrides]]
 # pytest.skip is decorated with @_with_exception which ty 0.0.17 miscounts as a bound
@@ -195,11 +201,11 @@ too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decor
 [tool.ty.src]
 # Exclude git symlinks (mode 120000) - on Windows without symlink support, these are
 # regular files whose content is the target path; linters parse that as Python and fail.
-# All 8 repo symlinks: 2 .py in implementation-manager, 5 .md (accessing_online_resources),
-# 1 dir (plugins/uv/skills/uv). Only the .py and dir need exclusion for Python linting.
+# All 6 repo symlinks: 5 .md (accessing_online_resources), 1 dir (plugins/uv/skills/uv).
+# Only the dir needs exclusion for Python linting.
 exclude = [
     "plugins/uv/skills/uv",
-    "plugins/development-harness/skills/implementation-manager",
+    ".tmp",
 ]
 include = ["**/*.py"]
 
@@ -208,7 +214,7 @@ include = ["**/*.py"]
 # See [tool.ty.src] exclude for full list. Add new symlinked .py paths here.
 extend-exclude = [
     "plugins/uv/skills/uv",
-    "plugins/development-harness/skills/implementation-manager",
+    ".tmp",
 ]
 fix = true
 line-length = 120

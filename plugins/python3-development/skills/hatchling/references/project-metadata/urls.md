@@ -118,5 +118,5 @@ Package indexes like PyPI display these URLs prominently on project pages, enabl
 
 ## Related Configuration
 
-- [Basic Metadata Fields](./basic-metadata.md)
-- [Project Ownership](./ownership.md)
+- `basic-metadata.md`
+- `ownership.md`

@@ -1,4 +1,7 @@
 raw/
+
+# Scratch space for agent output and temporary reports (not committed)
+.tmp/
 .cache*/
 .*_cache/
 .DS_Store
@@ -32,6 +35,9 @@ sessions/.archived/
 
 # GitLab skill sync lock files
 */.sync-gitlab-docs.lock
+
+# Claude Code scheduled tasks lock
+.claude/scheduled_tasks.lock
 
 # uv lock file (dependency management)
 uv.lock

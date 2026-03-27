@@ -34,7 +34,9 @@ flowchart TD
 
     CreateBranch["Step 3: Create Integration Branch<br>github_branches create<br>milestone/{N}-{slug} from main.<br>Switch to integration branch locally."]
 
-    CreateBranch --> WaveLoop["Step 4: Wave Dispatch Loop<br>Read next wave from dispatch plan"]
+    CreateBranch --> FetchItems["Step 3b: Fetch All Items Once<br>Call backlog_view once per issue in the dispatch plan.<br>Store results in context keyed by issue number.<br>DO NOT call backlog_view again for any issue<br>already fetched this session."]
+
+    FetchItems --> WaveLoop["Step 4: Wave Dispatch Loop<br>Read next wave from dispatch plan"]
 
     WaveLoop --> WaveItems{"Wave has items?"}
     WaveItems -->|"No waves remain"| Land
@@ -92,6 +94,14 @@ flowchart TD
 
     Complete --> Done(["Exit: milestone complete"])
 ```
+
+## Step 3b: Fetch All Items Once (Before Any Wave)
+
+Before entering the wave dispatch loop, call `backlog_view` **once per issue** listed across all waves in the dispatch plan. Store each result in context keyed by issue number.
+
+**Fetch-once rule**: Do NOT call `backlog_view` for the same issue more than once per session. Use the already-fetched data for all subsequent references — wave loop iterations, discovery relay construction, result reporting. If an item's state genuinely changes (e.g., after a `backlog_update` call), replace the cached value with a single new `backlog_view` call for that issue only.
+
+Pass the fetched data (title, AC, description) into spawned session prompts directly rather than having each spawned session re-fetch — see Step 5c prompt construction.
 
 ## Dispatch Step (Step 5 Detail)
 

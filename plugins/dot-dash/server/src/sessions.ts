@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { InjectQueueItem, Session } from './types.js';
 
 function findJsonlPath(cwd: string): string | null {
+  // Note: cwd encoding requires stripping the leading '/' before replacing separators.
   const encoded = cwd.replace(/^\//, '').replace(/\//g, '-');
   const projectDir = join(homedir(), '.claude', 'projects', encoded);
   if (!existsSync(projectDir)) return null;
@@ -12,14 +13,20 @@ function findJsonlPath(cwd: string): string | null {
   return join(projectDir, files[0]);
 }
 
+export interface SessionInfo extends Session {
+  transcriptPath?: string;
+}
+
 export class SessionManager {
-  private sessions = new Map<string, Session>();
+  private sessions = new Map<string, SessionInfo>();
   private injectQueues = new Map<string, InjectQueueItem[]>();
 
-  register(id: string, cwd: string, pid: number): Session {
+  register(id: string, cwd: string, pid: number, transcriptPath?: string): SessionInfo {
     const existing = this.sessions.get(id);
     if (existing && existing.status === 'active') return existing;
-    const session: Session = {
+    // Prefer the path provided by the hook; fall back to filesystem discovery.
+    const resolvedJsonlPath = transcriptPath || findJsonlPath(cwd);
+    const session: SessionInfo = {
       id,
       cwd,
       pid,
@@ -27,7 +34,8 @@ export class SessionManager {
       registeredAt: new Date().toISOString(),
       lastEventAt: null,
       projectName: cwd.split('/').filter(Boolean).pop() ?? cwd,
-      jsonlPath: findJsonlPath(cwd),
+      jsonlPath: resolvedJsonlPath,
+      transcriptPath: transcriptPath || undefined,
     };
     this.sessions.set(id, session);
     return session;
@@ -41,11 +49,11 @@ export class SessionManager {
     }
   }
 
-  getAll(): Session[] {
+  getAll(): SessionInfo[] {
     return Array.from(this.sessions.values());
   }
 
-  get(id: string): Session | undefined {
+  get(id: string): SessionInfo | undefined {
     return this.sessions.get(id);
   }
 

@@ -218,7 +218,7 @@ Key features:
 - Setuptools-scm compatibility
 - Custom tag pattern matching
 
-See [hatch-vcs Plugin](./hatch-vcs-plugin.md) for details.
+See `hatch-vcs-plugin.md` for details.
 
 ### hatch-nodejs-version
 
@@ -450,8 +450,8 @@ def get_version_data(self) -> dict:
 
 ## See Also
 
-- [Version Scheme Plugins](./version-scheme-plugins.md) - Validate and normalize versions
-- [hatch-vcs Plugin](./hatch-vcs-plugin.md) - VCS-based versioning
+- `version-scheme-plugins.md` - Validate and normalize versions
+- `hatch-vcs-plugin.md` - VCS-based versioning
 - [VersionSourceInterface Reference](https://hatch.pypa.io/latest/plugins/version-source/reference/)
 - [Hatchling Version Documentation](https://hatch.pypa.io/latest/plugins/version-source/)
 - [PEP 440 - Version Identification](https://peps.python.org/pep-0440/)

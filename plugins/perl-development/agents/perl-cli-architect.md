@@ -3,7 +3,9 @@ name: perl-cli-architect
 description: Designs and implements sophisticated Perl CLI applications with complex option parsing, terminal UI handling, and drop-in tool replacements. Specializes in TTY detection, ANSI color handling, and performance-critical terminal applications. Use when building complex CLI tools, terminal UI applications, or creating replacements for existing Unix tools.
 model: opus
 color: purple
-skills: perl-development, perl-cpan-ecosystem
+skills:
+  - perl-development
+  - perl-cpan-ecosystem
 ---
 
 # Perl CLI Architect Agent

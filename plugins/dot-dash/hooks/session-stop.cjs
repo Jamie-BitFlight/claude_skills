@@ -3,24 +3,44 @@
 // SessionEnd hook — deregister Claude Code session from dot-dash server
 // Uses only Node.js built-in modules. Never throws — server being down must not break the session.
 
-const { spawnSync } = require('node:child_process');
+const http = require('node:http');
 
 function main() {
   try {
-    const fd0 = require('node:fs').readFileSync('/dev/stdin');
-    const input = JSON.parse(fd0.toString('utf8') || '{}');
+    const raw = require('node:fs').readFileSync(0, 'utf8');
+    const input = JSON.parse(raw || '{}');
 
     const session_id = input.session_id || '';
 
     const port = process.env.DOT_DASH_PORT || '7765';
-    const url = `http://127.0.0.1:${port}/internal/session/deregister`;
     const body = JSON.stringify({ session_id });
 
-    spawnSync(
-      'curl',
-      ['-s', '-X', 'POST', '-H', 'Content-Type: application/json', '-d', body, url],
-      { timeout: 2000 },
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: '/internal/session/deregister',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: 2000,
+      },
+      (res) => {
+        res.resume(); // drain response
+      },
     );
+
+    req.on('error', () => {
+      // Silently ignore — never block Claude Code
+    });
+    req.on('timeout', () => {
+      req.destroy();
+    });
+
+    req.write(body);
+    req.end();
   } catch (_err) {
     // Silently ignore all errors — never block Claude Code
   }

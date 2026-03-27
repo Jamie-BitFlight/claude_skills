@@ -328,7 +328,7 @@ Common tags:
 
 ## Related Standards
 
-- [Core Metadata Specifications](./core-metadata.md)
-- [PEP 427 - Wheel Format](./pep-references.md#wheel-format-pep-427)
-- [PEP 625 - Source Distribution Filename](./pep-references.md#source-distribution-format-pep-625)
-- [PEP 643 - Metadata for Source Distributions](./pep-references.md#metadata-for-source-distributions-pep-643)
+- `core-metadata.md`
+- `pep-references.md#wheel-format-pep-427`
+- `pep-references.md#source-distribution-format-pep-625`
+- `pep-references.md#metadata-for-source-distributions-pep-643`

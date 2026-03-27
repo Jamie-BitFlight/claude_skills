@@ -2,8 +2,9 @@
 name: feature-researcher
 description: Researches feature requests and existing architecture documents to produce discovery context. Explores codebase patterns, identifies ambiguities, documents use scenarios, and surfaces questions for orchestrator resolution. Does NOT make technical implementation decisions.
 model: opus
-tools: Read, Grep, Glob, Write, Edit, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking
-skills: subagent-contract
+tools: Read, Grep, Glob, Write, Edit, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam__sam_create, mcp__plugin_dh_sam__sam_update
+skills:
+  - subagent-contract
 color: cyan
 ---
 
@@ -230,7 +231,19 @@ def generate_slug(input_text: str) -> str:
 
 ## Step 6: Write Output Document
 
-Write to: `dh_paths.plan_dir() / "feature-context-{slug}.md"` (resolves to `~/.dh/projects/{project-slug}/plan/feature-context-{slug}.md`)
+Create the document using the SAM MCP tool:
+
+```text
+mcp__plugin_dh_sam__sam_create(slug="{slug}", goal="Feature context for {feature name}", tasks_yaml="")
+```
+
+Then append the document content as a markdown section using:
+
+```text
+mcp__plugin_dh_sam__sam_update(plan_slug="{slug}", task_id=None, section="Feature Context", content="{document body}")
+```
+
+`sam_create` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path.
 
 Use the output format template below.
 

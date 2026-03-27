@@ -15,7 +15,7 @@ related_docs:
 
 Comprehensive guide for orchestrating Python development tasks using specialized agents and commands.
 
-**Quick Reference**: For a concise overview and quick-start examples, see [SKILL.md](../SKILL.md).
+**Quick Reference**: For a concise overview and quick-start examples, see `../SKILL.md`.
 
 ## Available Agents and Commands
 
@@ -252,7 +252,7 @@ flowchart TD
 
 **This skill is NOT simpler to use — it requires MORE work to build the same functionality. Choose it ONLY for portability, not for simplicity.**
 
-**Note**: Only activate this skill if deployment environment restrictions are confirmed. With PEP 723 + uv, python-cli-architect is preferred for better UX. ASK: "Will this run without internet access or where uv cannot be installed?" See [PEP 723 Reference](./PEP723.md) for details on when to use inline script metadata.
+**Note**: Only activate this skill if deployment environment restrictions are confirmed. With PEP 723 + uv, python-cli-architect is preferred for better UX. ASK: "Will this run without internet access or where uv cannot be installed?" See `PEP723.md` for details on when to use inline script metadata.
 
 **Example tasks**:
 

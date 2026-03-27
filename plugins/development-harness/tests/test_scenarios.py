@@ -101,7 +101,12 @@ class TestWorkBacklogItem:
     # Scenario 3: list sourced from GitHub (refresh_local_cache_from_github path)
     async def test_list_from_github(self, backlog_dir, mock_github):
         mock_repo = MagicMock()
+        mock_repo.full_name = "owner/repo"
         mock_repo.get_issues.return_value = []
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {"data": {"repository": {"issues": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}},
+        )
         mock_github["try_get_github"].return_value = mock_repo
 
         result = await _call("backlog_list", {"from_github": True})
@@ -126,7 +131,7 @@ class TestWorkBacklogItem:
         write_test_item("View Issue Test", issue="#42")
         mock_github["view_enrich_from_github"].return_value = False
 
-        result = await _call("backlog_view", {"selector": "#42"})
+        result = await _call("backlog_view", {"selector": "#42", "summary": False})
 
         assert result["title"] == "View Issue Test"
         assert isinstance(result["priority"], str)
@@ -140,7 +145,7 @@ class TestWorkBacklogItem:
     async def test_view_by_title_substring(self, backlog_dir, mock_github, write_test_item):
         write_test_item("My Unique Title Item")
 
-        result = await _call("backlog_view", {"selector": "Unique Title"})
+        result = await _call("backlog_view", {"selector": "Unique Title", "summary": False})
 
         assert result["title"] == "My Unique Title Item"
         assert isinstance(result["file_path"], str)
@@ -262,7 +267,30 @@ class TestGroomBacklogItem:
     async def test_groom_full_content(self, backlog_dir, mock_github, write_test_item):
         """Scenario 14: backlog_groom with section/content syncs to GitHub and updates the file."""
         filepath = write_test_item("Groom Full Test", issue="#80")
-        mock_github["try_get_github"].return_value = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.full_name = "owner/repo"
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "issue": {
+                            "id": "I_groom_test",
+                            "number": 80,
+                            "title": "Groom Full Test",
+                            "state": "OPEN",
+                            "body": "",
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-01T00:00:00Z",
+                            "labels": {"nodes": []},
+                            "milestone": None,
+                            "assignees": {"nodes": []},
+                        }
+                    }
+                }
+            },
+        )
+        mock_github["try_get_github"].return_value = mock_repo
         mock_github["sync_groomed_to_github_issue"].return_value = True
 
         result = await _call(
@@ -281,7 +309,30 @@ class TestGroomBacklogItem:
     async def test_groom_incremental_section(self, backlog_dir, mock_github, write_test_item):
         """Scenario 15: backlog_groom with section + content updates that section in the file."""
         filepath = write_test_item("Groom Section Test", issue="#81")
-        mock_github["try_get_github"].return_value = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.full_name = "owner/repo"
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "issue": {
+                            "id": "I_groom_section_test",
+                            "number": 81,
+                            "title": "Groom Section Test",
+                            "state": "OPEN",
+                            "body": "",
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-01T00:00:00Z",
+                            "labels": {"nodes": []},
+                            "milestone": None,
+                            "assignees": {"nodes": []},
+                        }
+                    }
+                }
+            },
+        )
+        mock_github["try_get_github"].return_value = mock_repo
 
         result = await _call(
             "backlog_groom",
@@ -319,7 +370,30 @@ class TestGroomBacklogItem:
     async def test_groom_via_update(self, backlog_dir, mock_github, write_test_item):
         """Scenario 17: backlog_update with section/content param sets groomed content."""
         write_test_item("Groom Via Update Test", issue="#82")
-        mock_github["try_get_github"].return_value = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.full_name = "owner/repo"
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "issue": {
+                            "id": "I_groom_via_update_test",
+                            "number": 82,
+                            "title": "Groom Via Update Test",
+                            "state": "OPEN",
+                            "body": "",
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-01T00:00:00Z",
+                            "labels": {"nodes": []},
+                            "milestone": None,
+                            "assignees": {"nodes": []},
+                        }
+                    }
+                }
+            },
+        )
+        mock_github["try_get_github"].return_value = mock_repo
 
         result = await _call(
             "backlog_update",
@@ -377,7 +451,7 @@ class TestBacklogItemGroomer:
 
         target = next(i for i in list_result["items"] if "Groomer View" in i["title"])
 
-        view_result = await _call("backlog_view", {"selector": target["title"]})
+        view_result = await _call("backlog_view", {"selector": target["title"], "summary": False})
 
         assert view_result["title"] == "Groomer View Target"
         assert "body" in view_result
@@ -530,7 +604,28 @@ class TestLifecycles:
         """
         # Step 1: Create item
         mock_repo = MagicMock()
-        mock_repo.full_name = "test-owner/test-repo"
+        mock_repo.full_name = "owner/repo"
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "issue": {
+                            "id": "I_lifecycle_close",
+                            "number": 70,
+                            "title": "Lifecycle Close Item",
+                            "state": "OPEN",
+                            "body": "",
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-01T00:00:00Z",
+                            "labels": {"nodes": []},
+                            "milestone": None,
+                            "assignees": {"nodes": []},
+                        }
+                    }
+                }
+            },
+        )
         mock_github["try_get_github"].return_value = mock_repo
         mock_github["create_issue_for_item"].return_value = 70
 
@@ -1045,7 +1140,9 @@ class TestCompactBacklogView:
         )
         mock_github["view_enrich_from_github"].return_value = False
 
-        result = await _call("backlog_view", {"selector": "Compact View Test Item", "include_content": False})
+        result = await _call(
+            "backlog_view", {"selector": "Compact View Test Item", "include_content": False, "summary": False}
+        )
 
         assert "error" not in result
         assert "sections_metadata" in result, "Compact mode must include sections_metadata"
@@ -1087,7 +1184,9 @@ class TestCompactBacklogView:
         write_test_item("Metadata Preserved Item", priority="P1", issue="#77")
         mock_github["view_enrich_from_github"].return_value = False
 
-        result = await _call("backlog_view", {"selector": "Metadata Preserved Item", "include_content": False})
+        result = await _call(
+            "backlog_view", {"selector": "Metadata Preserved Item", "include_content": False, "summary": False}
+        )
 
         assert "error" not in result
         assert result["title"] == "Metadata Preserved Item"
@@ -1121,7 +1220,14 @@ class TestCompactBacklogView:
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call(
-            "backlog_view", {"selector": "Pagination Compact Item", "include_content": False, "offset": 5, "limit": 3}
+            "backlog_view",
+            {
+                "selector": "Pagination Compact Item",
+                "include_content": False,
+                "summary": False,
+                "offset": 5,
+                "limit": 3,
+            },
         )
 
         assert "error" not in result
@@ -1141,7 +1247,7 @@ class TestCompactBacklogView:
         write_test_item("Default Full View Item")
         mock_github["view_enrich_from_github"].return_value = False
 
-        result = await _call("backlog_view", {"selector": "Default Full View Item"})
+        result = await _call("backlog_view", {"selector": "Default Full View Item", "summary": False})
 
         assert "error" not in result
         assert "body" in result, "Default mode must include 'body' key"
@@ -1202,7 +1308,7 @@ class TestResolveVerifiedGate:
         await _call("backlog_update", {"selector": "#200", "plan": "plan/test-plan.md"})
 
         # View item — should return labels (empty, no verified label)
-        view_result = await _call("backlog_view", {"selector": "#200"})
+        view_result = await _call("backlog_view", {"selector": "#200", "summary": False})
 
         assert view_result["title"] == "Verified Gate Test"
         assert isinstance(view_result["labels"], list)
@@ -1246,7 +1352,7 @@ class TestResolveVerifiedGate:
         mock_github["resolve_github_issue"].return_value = None
 
         # View confirms no plan
-        view_result = await _call("backlog_view", {"selector": "#202"})
+        view_result = await _call("backlog_view", {"selector": "#202", "summary": False})
         assert view_result.get("plan", "") == ""
 
         # Resolve succeeds without verified label — no plan means no gate
@@ -1329,25 +1435,43 @@ class TestResolveVerifiedGate:
         """
         write_test_item("Premature Close Test", issue="#206")
 
-        # Configure mock: no open issues, one closed issue #206
+        # Configure mock: GraphQL returns empty for OPEN, one closed issue for CLOSED.
+        # _fetch_issues_graphql passes variables["states"] = ["OPEN"] or ["CLOSED"] to
+        # graphql_query. The side_effect distinguishes open vs closed by inspecting variables.
         mock_repo = MagicMock()
-        mock_repo.full_name = "test-owner/test-repo"
+        mock_repo.full_name = "owner/repo"
         mock_repo.get_issues.return_value = []
+
+        closed_issue_node = {
+            "id": "I_206",
+            "number": 206,
+            "title": "Premature Close Test",
+            "state": "CLOSED",
+            "body": "",
+            "closedAt": "2026-01-01T00:00:00Z",
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "isPullRequest": False,
+            "labels": {"nodes": []},
+            "milestone": None,
+            "assignees": {"nodes": []},
+        }
+
+        def _graphql_side_effect(query: str, variables: dict) -> tuple[dict, dict]:
+            states = variables.get("states", [])
+            if "CLOSED" in states:
+                return (
+                    {},
+                    {
+                        "data": {
+                            "repository": {"issues": {"nodes": [closed_issue_node], "pageInfo": {"hasNextPage": False}}}
+                        }
+                    },
+                )
+            return ({}, {"data": {"repository": {"issues": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}})
+
+        mock_repo.requester.graphql_query.side_effect = _graphql_side_effect
         mock_github["try_get_github"].return_value = mock_repo
-
-        # The closed issue mock — issue #206 was closed externally
-        closed_issue = MagicMock()
-        closed_issue.number = 206
-        closed_issue.pull_request = None
-        closed_issue.title = "Premature Close Test"
-
-        # First call (state="open") returns empty, second call (state="closed") returns #206
-        def get_issues_side_effect(**kwargs):
-            if kwargs.get("state") == "closed":
-                return [closed_issue]
-            return []
-
-        mock_repo.get_issues.side_effect = get_issues_side_effect
 
         # Trigger reconciliation via from_github=True
         result = await _call("backlog_list", {"from_github": True})

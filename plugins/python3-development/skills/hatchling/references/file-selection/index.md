@@ -9,18 +9,18 @@ Reference documentation for Hatchling's file selection and pattern matching syst
 
 ## Contents
 
-- [Git-style Glob Patterns](./git-style-globs.md) - Pattern syntax and matching rules
-- [Include and Exclude Patterns](./include-exclude-patterns.md) - How to select and filter files
-- [Pattern Precedence](./pattern-precedence.md) - Order of operations and precedence rules
-- [Only-Include Option](./only-include-option.md) - Explicit path selection
-- [Packages Option](./packages-option.md) - Package directory configuration
-- [Sources Option](./sources-option.md) - Path mapping and rewriting
-- [Force-Include Option](./force-include-option.md) - Forced file inclusion from anywhere
-- [VCS Integration](./vcs-integration.md) - Git and Mercurial ignore file support
-- [Default Behavior](./default-behavior.md) - Default inclusion/exclusion rules
-- [Explicit Path Selection](./explicit-path-selection.md) - Direct file and directory selection
-- [Artifacts](./artifacts.md) - Including VCS-ignored files
-- [Advanced Patterns](./advanced-patterns.md) - Complex pattern examples
+- `git-style-globs.md` - Pattern syntax and matching rules
+- `include-exclude-patterns.md` - How to select and filter files
+- `pattern-precedence.md` - Order of operations and precedence rules
+- `only-include-option.md` - Explicit path selection
+- `packages-option.md` - Package directory configuration
+- `sources-option.md` - Path mapping and rewriting
+- `force-include-option.md` - Forced file inclusion from anywhere
+- `vcs-integration.md` - Git and Mercurial ignore file support
+- `default-behavior.md` - Default inclusion/exclusion rules
+- `explicit-path-selection.md` - Direct file and directory selection
+- `artifacts.md` - Including VCS-ignored files
+- `advanced-patterns.md` - Complex pattern examples
 
 ## Quick Reference
 
@@ -112,5 +112,5 @@ sources = ["src"]  # Strip 'src/' prefix
 ## See Also
 
 - [Hatch Build Configuration](https://hatch.pypa.io/latest/config/build/)
-- [Build Targets Documentation](../build-targets/)
-- [Build Hooks Reference](../build-hooks/)
+- `../build-targets/`
+- `../build-hooks/`

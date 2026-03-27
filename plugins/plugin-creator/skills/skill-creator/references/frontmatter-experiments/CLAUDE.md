@@ -90,7 +90,7 @@ Each file MUST contain these sections in order:
 
 1. Create the file following the naming convention and format above
 2. Update the Experiment Index below with a new entry
-3. Link to the file using relative path: `[E{N}: title](./E{N}-{date}-{slug}.md)`
+3. Link to the file using relative path: ``E{N}-{date}-{slug}.md``
 
 **After running an experiment (mandatory):**
 
@@ -249,4 +249,4 @@ Scenarios that need experiments but have not been tested yet. When creating an e
 
 | ID | Date | Field Tested | Status | Link |
 |----|------|-------------|--------|------|
-| E1 | 2026-02-14 | `allowed-tools` | Partial | [E1: allowed-tools Frontmatter Field Behavior](./E1-2026-02-14-allowed-tools-behavior.md) |
+| E1 | 2026-02-14 | `allowed-tools` | Partial | `E1-2026-02-14-allowed-tools-behavior.md` |

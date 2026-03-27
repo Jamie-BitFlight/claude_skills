@@ -1,4 +1,4 @@
-Features added in Python 3.13 (released October 7, 2024). Available when `requires-python >= '3.13'`. For 3.12 additions, see [python312-features.md](./python312-features.md).
+Features added in Python 3.13 (released October 7, 2024). Available when `requires-python >= '3.13'`. For 3.12 additions, see `python312-features.md`.
 
 ## Type System
 

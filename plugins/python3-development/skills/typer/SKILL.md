@@ -51,42 +51,42 @@ flowchart TD
 Core patterns for creating Typer apps, registering commands with `@app.command()`, configuring multi-command apps, and controlling command naming and help text.
 Load when creating a new app, adding commands, or configuring app-level behavior.
 
-[app-and-commands.md](./references/app-and-commands.md)
+`references/app-and-commands.md`
 
 ### Parameters
 
 Complete reference for CLI arguments and CLI options — `typer.Argument()`, `typer.Option()`, defaults, required vs optional, help text, prompts, password input, option names, environment variable bindings, multiple values, bool flags, and version options.
 Load when defining any CLI parameter or controlling how input is received.
 
-[parameters.md](./references/parameters.md)
+`references/parameters.md`
 
 ### Parameter Types
 
 Type annotations Typer understands — `str`, `int`, `float`, `bool`, `enum.Enum`, `Literal`, `pathlib.Path`, file objects, `datetime`, `UUID`, and custom Click `ParamType` subclasses.
 Load when restricting parameter values to a set, validating paths, parsing dates, or implementing custom types.
 
-[parameter-types.md](./references/parameter-types.md)
+`references/parameter-types.md`
 
 ### Subcommands
 
 Composing multiple `typer.Typer()` instances with `app.add_typer()` to create nested command hierarchies. Covers single-file and multi-file patterns, naming, help text, and callback overrides.
 Load when adding sub-apps, creating command groups, or building git-style multi-level command trees.
 
-[subcommands.md](./references/subcommands.md)
+`references/subcommands.md`
 
 ### Testing
 
 Testing Typer apps with pytest and `typer.testing.CliRunner`. Covers invoking the app in tests, checking exit codes and output, simulating prompt input, and testing bare functions.
 Load when writing tests for any Typer CLI.
 
-[testing.md](./references/testing.md)
+`references/testing.md`
 
 ### Advanced Patterns
 
 Context (`typer.Context`), eager callbacks, `typer.echo`/`typer.secho`/`typer.style`, progress bars, `typer.Exit`/`typer.Abort`, `typer.confirm`, autocompletion setup, packaging with `pyproject.toml`, and `typer.launch`.
 Load when implementing version flags, colored output, progress reporting, shell completion, or packaging a CLI as a distributable tool.
 
-[advanced-patterns.md](./references/advanced-patterns.md)
+`references/advanced-patterns.md`
 
 ## Quick Reference
 

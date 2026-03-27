@@ -321,6 +321,6 @@ unzip -l dist/*.whl     # For wheel
 
 ## See Also
 
-- [Include and Exclude Patterns](./include-exclude-patterns.md)
-- [Force-Include Option](./force-include-option.md)
-- [Artifacts](./artifacts.md)
+- `include-exclude-patterns.md`
+- `force-include-option.md`
+- `artifacts.md`

@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import difflib
 import io
+import logging
 import operator
 import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+log = logging.getLogger(__name__)
 
 import frontmatter
 from ruamel.yaml import YAML, YAMLError
@@ -280,7 +283,11 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
             item_text = filepath.read_text(encoding="utf-8")
         except OSError:
             continue
-        item = parse_item_file(item_text, filepath)
+        try:
+            item = parse_item_file(item_text, filepath)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Skipping corrupt backlog file %s: %s", filepath, exc)
+            continue
         # Filename-derived section; override with metadata if available
         meta_priority = item.priority
         if meta_priority and meta_priority.upper() in {"P0", "P1", "P2"}:

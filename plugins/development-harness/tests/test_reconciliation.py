@@ -18,14 +18,21 @@ NOTE: ReconcileResult, _reconcile_open_item, _has_active_work, _reconcile_item,
 
 from __future__ import annotations
 
+import importlib
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def _backlog_ops() -> Any:
+    """Return backlog_core.operations as Any so ty does not flag unimplemented symbols."""
+    return importlib.import_module("backlog_core.operations")
+
 
 # The reconciliation symbols (ReconcileResult, _reconcile_open_item, etc.) live
 # in backlog_core.operations once implemented. The old scripts/backlog.py path
@@ -44,7 +51,7 @@ class TestReconcileResultDataclass:
 
     def test_reconcile_result_has_all_fields(self) -> None:
         """ReconcileResult stores issue_number, action, old_status, new_status, and warning."""
-        from backlog import ReconcileResult
+        ReconcileResult = _backlog_ops().ReconcileResult
 
         result = ReconcileResult(
             issue_number=42, action="no_change", old_status="groomed", new_status="groomed", warning=""
@@ -57,7 +64,7 @@ class TestReconcileResultDataclass:
 
     def test_reconcile_result_with_warning(self) -> None:
         """ReconcileResult can hold a non-empty warning string."""
-        from backlog import ReconcileResult
+        ReconcileResult = _backlog_ops().ReconcileResult
 
         result = ReconcileResult(
             issue_number=10,
@@ -77,7 +84,7 @@ class TestHasActiveWork:
 
     def test_no_active_work_when_no_plan_files_exist(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns (False, '') when no plan files or context files exist for the item."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         # Create required directories but no plan files
@@ -93,7 +100,7 @@ class TestHasActiveWork:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Returns (True, reason) when a plan file has a task with legacy IN PROGRESS marker."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         plan_dir = tmp_path / "plan"
@@ -112,7 +119,7 @@ class TestHasActiveWork:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Returns (True, reason) when a plan file has a task with YAML status: in-progress."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         plan_dir = tmp_path / "plan"
@@ -131,7 +138,7 @@ class TestHasActiveWork:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Returns (False, '') when plan file exists but all tasks are COMPLETE."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         plan_dir = tmp_path / "plan"
@@ -148,7 +155,7 @@ class TestHasActiveWork:
 
     def test_active_work_detected_from_context_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns (True, reason) when an active-task context file references the item's issue."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -168,7 +175,7 @@ class TestHasActiveWork:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Returns (False, '') when context files exist but reference a different issue."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -185,7 +192,7 @@ class TestHasActiveWork:
 
     def test_handles_missing_topic_gracefully(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns (False, '') when item has no _topic field — skips plan file check."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -197,7 +204,7 @@ class TestHasActiveWork:
 
     def test_handles_non_numeric_issue_gracefully(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns (False, '') when item has a non-numeric _issue field."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -215,9 +222,9 @@ class TestReconcileOpenItem:
 
     def test_no_change_when_statuses_match(self) -> None:
         """Returns no_change when local and GitHub statuses are identical."""
-        from backlog import _reconcile_open_item
+        reconcile_open_item = _backlog_ops()._reconcile_open_item
 
-        result = _reconcile_open_item(issue_num=1, local_status="groomed", github_status="groomed", file_path_str=None)
+        result = reconcile_open_item(issue_num=1, local_status="groomed", github_status="groomed", file_path_str=None)
         assert result.action == "no_change"
         assert result.old_status == "groomed"
         assert result.new_status == "groomed"
@@ -225,9 +232,9 @@ class TestReconcileOpenItem:
 
     def test_flagged_divergence_when_github_has_no_status_label(self) -> None:
         """Returns flagged_divergence with stateless void warning when GitHub has no status label."""
-        from backlog import _reconcile_open_item
+        reconcile_open_item = _backlog_ops()._reconcile_open_item
 
-        result = _reconcile_open_item(issue_num=5, local_status="groomed", github_status="", file_path_str=None)
+        result = reconcile_open_item(issue_num=5, local_status="groomed", github_status="", file_path_str=None)
         assert result.action == "flagged_divergence"
         assert result.old_status == "groomed"
         assert result.new_status == "groomed"
@@ -235,7 +242,7 @@ class TestReconcileOpenItem:
 
     def test_auto_corrected_when_dag_valid_divergence(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns auto_corrected when divergence is DAG-valid (reachable via state transitions)."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         # find_valid_path returns a path for DAG-valid transitions
         monkeypatch.setattr(backlog_mod, "find_valid_path", lambda f, t: [f, t])
@@ -252,7 +259,7 @@ class TestReconcileOpenItem:
 
     def test_auto_corrected_persists_via_update_item_metadata(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When auto-correcting, _update_item_metadata is called to persist the change."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "find_valid_path", lambda f, t: [f, t])
         mock_update = MagicMock()
@@ -267,7 +274,7 @@ class TestReconcileOpenItem:
 
     def test_auto_corrected_skips_persistence_when_no_file_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When file_path_str is None, auto-correction returns result but does not persist."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "find_valid_path", lambda f, t: [f, t])
         mock_update = MagicMock()
@@ -281,7 +288,7 @@ class TestReconcileOpenItem:
 
     def test_flagged_divergence_when_dag_invalid(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns flagged_divergence when no valid DAG path exists between states."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "find_valid_path", lambda f, t: None)
 
@@ -301,7 +308,7 @@ class TestReconcileClosedItem:
 
     def test_wip_protected_when_active_work_exists(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns wip_protected when GitHub is closed but active local work exists."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         plan_dir = tmp_path / "plan"
@@ -322,7 +329,7 @@ class TestReconcileClosedItem:
 
     def test_closed_when_no_active_work(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns closed and updates to terminal status when no active work exists."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -342,7 +349,7 @@ class TestReconcileClosedItem:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """When GitHub has a terminal status label (e.g. 'done'), uses that instead of 'closed'."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -379,7 +386,7 @@ class TestReconcileItem:
 
     def test_returns_no_change_when_item_has_no_issue_ref(self) -> None:
         """Items without an _issue field return no_change with issue_number=0."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         item = {"_topic": "orphan"}
         result = backlog_mod._reconcile_item(item, {}, "repo")
@@ -388,7 +395,7 @@ class TestReconcileItem:
 
     def test_returns_no_change_when_issue_not_in_map(self) -> None:
         """Items whose issue number is not in the GitHub map return no_change with warning."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         item = {"_issue": "#999", "_topic": "missing"}
         result = backlog_mod._reconcile_item(item, {}, "repo")
@@ -398,7 +405,7 @@ class TestReconcileItem:
 
     def test_dispatches_to_open_handler_for_open_issues(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When GitHub issue is open, delegates to _reconcile_open_item."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         gh_issue = self._make_gh_issue(state="open", labels=["status:groomed"], number=10)
         item = {"_issue": "#10", "**Status**": "groomed", "_file_path": None}
@@ -410,7 +417,7 @@ class TestReconcileItem:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """When GitHub issue is closed, delegates to _reconcile_closed_item."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_REPO_ROOT", tmp_path)
         (tmp_path / "plan").mkdir(parents=True)
@@ -432,7 +439,7 @@ class TestReconcileBatch:
 
     def test_returns_warning_when_github_unavailable(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When _try_get_github returns None, returns items unchanged with warning."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         monkeypatch.setattr(backlog_mod, "_try_get_github", lambda _repo: None)
 
@@ -446,7 +453,7 @@ class TestReconcileBatch:
         """When GitHub API raises GithubException, returns items unchanged with warning."""
         from github import GithubException
 
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         mock_repo = MagicMock()
         mock_repo.get_issues.side_effect = GithubException(500, "Server Error", None)
@@ -460,7 +467,7 @@ class TestReconcileBatch:
 
     def test_auto_corrected_items_updated_in_memory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When an item is auto-corrected, its in-memory status is updated."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         # Create a mock repo that returns one open issue with status:groomed
         mock_issue = MagicMock()
@@ -485,7 +492,7 @@ class TestReconcileBatch:
 
     def test_divergence_warnings_collected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Divergence warnings from _reconcile_item are collected in the warnings list."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         # Open issue with no status label triggers flagged_divergence
         mock_issue = MagicMock()
@@ -505,7 +512,7 @@ class TestReconcileBatch:
 
     def test_filters_out_pull_requests(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Pull requests are excluded from the GitHub issue map."""
-        import backlog as backlog_mod
+        backlog_mod = _backlog_ops()
 
         # Create a PR (pull_request is not None) and a real issue
         mock_pr = MagicMock()
@@ -546,15 +553,15 @@ class TestFilterClosedItems:
 
     def test_returns_all_items_when_include_closed_true(self) -> None:
         """When include_closed=True, all items are returned unfiltered."""
-        from backlog import _filter_closed_items
+        filter_closed_items = _backlog_ops()._filter_closed_items
 
         items = [{"**Status**": "done"}, {"**Status**": "groomed"}, {"**Status**": "closed"}]
-        result = _filter_closed_items(items, include_closed=True)
+        result = filter_closed_items(items, include_closed=True)
         assert len(result) == 3
 
     def test_excludes_done_resolved_closed_by_default(self) -> None:
         """When include_closed=False, items with done/resolved/closed status are excluded."""
-        from backlog import _filter_closed_items
+        filter_closed_items = _backlog_ops()._filter_closed_items
 
         items = [
             {"**Status**": "done"},
@@ -563,7 +570,7 @@ class TestFilterClosedItems:
             {"**Status**": "groomed"},
             {"**Status**": "in-progress"},
         ]
-        result = _filter_closed_items(items, include_closed=False)
+        result = filter_closed_items(items, include_closed=False)
         assert len(result) == 2
         statuses = [it["**Status**"] for it in result]
         assert "groomed" in statuses
@@ -571,24 +578,24 @@ class TestFilterClosedItems:
 
     def test_handles_items_with_status_key_variant(self) -> None:
         """Items using _status key instead of **Status** are also filtered."""
-        from backlog import _filter_closed_items
+        filter_closed_items = _backlog_ops()._filter_closed_items
 
         items = [{"_status": "done"}, {"_status": "groomed"}]
-        result = _filter_closed_items(items, include_closed=False)
+        result = filter_closed_items(items, include_closed=False)
         assert len(result) == 1
         assert result[0]["_status"] == "groomed"
 
     def test_handles_empty_status(self) -> None:
         """Items with empty or missing status are not filtered out."""
-        from backlog import _filter_closed_items
+        filter_closed_items = _backlog_ops()._filter_closed_items
 
         items = [{"**Status**": ""}, {}]
-        result = _filter_closed_items(items, include_closed=False)
+        result = filter_closed_items(items, include_closed=False)
         assert len(result) == 2
 
     def test_empty_list_returns_empty(self) -> None:
         """Empty input list returns empty output."""
-        from backlog import _filter_closed_items
+        filter_closed_items = _backlog_ops()._filter_closed_items
 
-        result = _filter_closed_items([], include_closed=False)
+        result = filter_closed_items([], include_closed=False)
         assert result == []

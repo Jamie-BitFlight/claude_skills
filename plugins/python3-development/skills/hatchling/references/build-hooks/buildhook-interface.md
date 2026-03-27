@@ -376,6 +376,6 @@ class CustomBuildHook(BuildHookInterface):
 
 ## Related Topics
 
-- [Custom Build Hooks](./custom-build-hooks.md) - Writing custom hooks
-- [Build Data](./build-data.md) - Understanding and using build data
-- [Hook Dependencies](./hook-dependencies.md) - Declaring hook dependencies
+- `custom-build-hooks.md` - Writing custom hooks
+- `build-data.md` - Understanding and using build data
+- `hook-dependencies.md` - Declaring hook dependencies

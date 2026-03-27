@@ -484,7 +484,7 @@ print(f'{v1} < {v2}: {v1 < v2}')
 
 ## See Also
 
-- [Version Schemes](./version-schemes.md)
-- [Version CLI Commands](./version-cli.md)
+- `version-schemes.md`
+- `version-cli.md`
 - [PEP 440 Specification](https://peps.python.org/pep-0440/)
 - [Semantic Versioning](https://semver.org/)

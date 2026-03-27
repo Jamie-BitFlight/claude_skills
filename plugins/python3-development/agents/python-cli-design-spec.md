@@ -2,7 +2,8 @@
 name: python-cli-design-spec
 description: Use when designing a Python CLI tool's architecture before implementation — command interfaces, technology stack selection, data models, and contracts. Activates on architecture planning requests for new CLI tools or major feature additions. Produces WHAT to build (interfaces, schemas, contracts); python-cli-architect handles the HOW (implementation).
 tools: Read, Write, Edit, Glob, Grep, TodoWrite, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_python3-development_sequential_thinking__sequentialthinking
-skills: python3-development:python-cli-architect
+skills:
+  - python3-development:python-cli-architect
 ---
 
 # Python CLI Architecture Specialist
@@ -25,7 +26,21 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Write `plan/architect-{slug}.md` containing:
+Create the architecture spec using the SAM MCP tool:
+
+```text
+mcp__plugin_dh_sam__sam_create(slug="architect-{slug}", goal="Architecture spec for {feature}", tasks_yaml="")
+```
+
+Then append each section of the document using:
+
+```text
+mcp__plugin_dh_sam__sam_update(plan_slug="architect-{slug}", task_id=None, section="{Section Name}", content="{section body}")
+```
+
+`sam_create` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. Do not run `uv run python -c 'from dh_paths import plan_dir; print(plan_dir())'` to discover the path.
+
+The architecture spec document contains:
 
 1. **Executive Summary** — architectural approach in plain language
 2. **Architecture Overview** — C4 context + container Mermaid diagrams
@@ -53,10 +68,9 @@ Load these before writing the spec:
 
 Architecture specs routinely exceed 25K characters. Apply before writing:
 
-- **Strategy A** (preferred): split into `plan/architect-{slug}.md` + companion files
-  (`testing-architecture.md`, `integration-patterns.md`). Each file under 25K. Link companions from primary.
-- **Strategy B** (single file required): write skeleton with `<!-- PENDING: ... -->` stubs,
-  then Edit each stub. Each Write/Edit under 25K characters.
+- **Strategy A** (preferred): split into `architect-{slug}` plan + companion plans
+  (e.g., `testing-architecture-{slug}`, `integration-patterns-{slug}`), each created via `sam_create`. Each `sam_update` section call must stay under 25K. Link companions from the primary plan.
+- **Strategy B** (single plan required): call `sam_create` once, then use multiple `sam_update` calls to append each section. Each `sam_update` content must stay under 25K characters.
 
 ## Working Process
 
@@ -69,7 +83,7 @@ Architecture specs routinely exceed 25K characters. Apply before writing:
 
 ## Stopping Condition
 
-Stop when `plan/architect-{slug}.md` (and any companion files) exist and contain all 11 sections
-above. Report: `STATUS: DONE — architect-{slug}.md written at {path}`.
+Stop when the `architect-{slug}` plan (and any companion plans) exist and contain all 11 sections
+above. Report: `STATUS: DONE — architect-{slug} plan created via sam_create`.
 
 If requirements are ambiguous or contradictory, report: `STATUS: BLOCKED — {specific question}`.

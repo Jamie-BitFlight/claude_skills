@@ -4,7 +4,7 @@ This directory contains comprehensive documentation for special and advanced con
 
 ## Topics Covered
 
-### [PEP 561 Type Hinting Support](./pep-561-type-hinting.md)
+### `pep-561-type-hinting.md`
 
 Complete guide to distributing type information with your Python packages, including:
 
@@ -13,7 +13,7 @@ Complete guide to distributing type information with your Python packages, inclu
 - Type checker compatibility
 - Namespace packages with types
 
-### [SPDX License Metadata](./spdx-license-metadata.md)
+### `spdx-license-metadata.md`
 
 Comprehensive documentation for license configuration following modern standards:
 
@@ -22,7 +22,7 @@ Comprehensive documentation for license configuration following modern standards
 - License-File metadata and automatic discovery
 - Multi-licensing scenarios and migration guides
 
-### [Package Name Normalization](./package-name-normalization.md)
+### `package-name-normalization.md`
 
 Understanding how Hatchling handles package naming:
 
@@ -32,7 +32,7 @@ Understanding how Hatchling handles package naming:
 - Import names vs package names
 - Edge cases and Unicode handling
 
-### [Namespace Packages](./namespace-packages.md)
+### `namespace-packages.md`
 
 Complete guide to namespace package support:
 
@@ -42,7 +42,7 @@ Complete guide to namespace package support:
 - Configuration with only-include and sources
 - Enterprise/plugin system patterns
 
-### [Src-Layout Structure](./src-layout-structure.md)
+### `src-layout-structure.md`
 
 Best practices for src-layout project structure:
 
@@ -52,7 +52,7 @@ Best practices for src-layout project structure:
 - Testing with src-layout
 - Migration from flat layout
 
-### [Single Module Layout](./single-module-layout.md)
+### `single-module-layout.md`
 
 Auto-detection and configuration for single-file Python modules:
 
@@ -62,7 +62,7 @@ Auto-detection and configuration for single-file Python modules:
 - Testing single modules
 - Migration from package to single module
 
-### [Extension Module Loading](./extension-module-loading.md)
+### `extension-module-loading.md`
 
 Building and packaging compiled Python extensions:
 

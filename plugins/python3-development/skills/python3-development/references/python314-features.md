@@ -1,4 +1,4 @@
-Features added in Python 3.14 (released October 7, 2025). Available when `requires-python >= '3.14'`. For 3.13 additions, see [python313-features.md](./python313-features.md).
+Features added in Python 3.14 (released October 7, 2025). Available when `requires-python >= '3.14'`. For 3.13 additions, see `python313-features.md`.
 
 **Python 3.14 is the current stable release (released October 7, 2025). All features listed are final.**
 

@@ -299,7 +299,7 @@ include = [
 
 ## Related Topics
 
-- [Build Dependencies Management](./build-dependencies-management.md)
-- [UV vs Pip Installer](./uv-vs-pip-installer.md)
-- [Environment Variables](./environment-variables.md)
-- [Environment Isolation](./environment-isolation.md)
+- `build-dependencies-management.md`
+- `uv-vs-pip-installer.md`
+- `environment-variables.md`
+- `environment-isolation.md`

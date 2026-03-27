@@ -57,7 +57,7 @@ App class basics, run/exit/suspend, CSS loading, screen stack (push/pop/switch),
 
 Load when the user asks about App setup, screen navigation, modal dialogs, or multi-screen apps.
 
-[app-and-screens.md](./references/app-and-screens.md)
+`references/app-and-screens.md`
 
 ### Widgets
 
@@ -65,7 +65,7 @@ Custom widget creation, Static, Default CSS, focusability, bindings, Rich render
 
 Load when the user asks about creating widgets, choosing a builtin widget, or structuring compound UIs.
 
-[widgets.md](./references/widgets.md)
+`references/widgets.md`
 
 ### Layout and CSS
 
@@ -73,7 +73,7 @@ Layout types (vertical, horizontal, grid), utility containers, docking, layers, 
 
 Load when the user asks about arranging widgets, CSS syntax, selectors, or style properties.
 
-[layout-and-css.md](./references/layout-and-css.md)
+`references/layout-and-css.md`
 
 ### Events and Actions
 
@@ -81,7 +81,7 @@ Message queue, event handler naming convention, `@on` decorator, handler argumen
 
 Load when the user asks about handling user input, defining key bindings, creating custom events, or action strings.
 
-[events-and-actions.md](./references/events-and-actions.md)
+`references/events-and-actions.md`
 
 ### Reactivity
 
@@ -89,7 +89,7 @@ Reactive attributes, `var`, smart refresh, layout-triggering reactives, validati
 
 Load when the user asks about reactive state, auto-refresh, watchers, computed values, or binding parent state to child widgets.
 
-[reactivity.md](./references/reactivity.md)
+`references/reactivity.md`
 
 ### Testing and Workers
 
@@ -97,7 +97,7 @@ Load when the user asks about reactive state, auto-refresh, watchers, computed v
 
 Load when the user asks about writing tests, simulating input, snapshot comparisons, background HTTP requests, or preventing UI blocking.
 
-[testing-and-workers.md](./references/testing-and-workers.md)
+`references/testing-and-workers.md`
 
 ## Quick Reference
 

@@ -1,9 +1,10 @@
 ---
 name: tn-verification-gate
 description: Verification gate that runs after all implementation tasks complete. Re-runs acceptance-criteria-structured check commands, compares results against T0 baseline, computes CriterionStatus per criterion, and writes ~/.dh/projects/{slug}/plan/TN-verification-{slug}.yaml with a verdict of PASS or FAIL. FAIL blocks /complete-implementation if any criterion regressed.
-tools: Read, Bash, Write, Glob
+tools: Read, Bash, Write, Glob, mcp__plugin_dh_backlog__artifact_register
 model: haiku
-skills: subagent-contract
+skills:
+  - subagent-contract
 ---
 
 <role>
@@ -135,7 +136,23 @@ Use the Write tool to write this file. Resolve the path via `dh_paths.plan_dir()
 Write(file_path=str(dh_paths.plan_dir() / "TN-verification-{slug}.yaml"), content="...")
 ```
 
-## Step 5: Report Regressions (If verdict FAIL)
+## Step 5: Register Artifact
+
+After writing the file, register it in the backlog item's artifact manifest:
+
+```bash
+mcp__plugin_dh_backlog__artifact_register(
+    issue_number={issue_number},
+    type="TN-verification",
+    path=str(dh_paths.plan_dir() / "TN-verification-{slug}.yaml"),
+    status="complete",
+    agent="tn-verification-gate"
+)
+```
+
+The `issue_number` is provided in your task delegation prompt (the GitHub issue number for the feature). If not provided, omit the registration step and note it in the STATUS output.
+
+## Step 6: Report Regressions (If verdict FAIL)
 
 If `verdict: FAIL`, prepare a regression report for the orchestrator. For each regressed criterion, include:
 

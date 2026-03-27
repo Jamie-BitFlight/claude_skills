@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.
+description: Use when creating a new skill or updating an existing skill that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations. Activates on "create a new skill", "add a skill to plugin", or "update existing skill".
 user-invocable: true
 license: Complete terms in LICENSE.txt
 ---
@@ -136,7 +136,7 @@ description: 'This works when the value contains colons or other YAML-special ch
 
 The Claude Code skill indexer does not parse YAML multiline indicators correctly - the description appears as ">-" instead of actual content.
 
-**SOURCE:** [claude-skills-overview-2026](../claude-skills-overview-2026/SKILL.md) section on Skill Tokenomics.
+**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Skill Tokenomics.
 
 ### Set Appropriate Degrees of Freedom
 
@@ -254,7 +254,7 @@ agent: Explore  # or Plan, general-purpose, custom-agent-name
 - **Agent tool is NOT available** - cannot delegate to other subagents
 - For hierarchical delegation, parent must run in main context (no `context: fork`)
 
-**SOURCE:** [claude-skills-overview-2026](../claude-skills-overview-2026/SKILL.md) section on Context Fork Behavior.
+**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Context Fork Behavior.
 
 #### Invocation Control
 
@@ -271,7 +271,7 @@ flowchart TD
     Background --> Done
 ```
 
-**SOURCE:** [claude-skills-overview-2026](../claude-skills-overview-2026/SKILL.md) section on Invocation Control.
+**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Invocation Control.
 
 #### Hooks (Lifecycle Automation)
 
@@ -327,11 +327,11 @@ Skills use a three-level loading system to manage context efficiently:
 
 Keep SKILL.md lean. Run `uvx skilllint@latest check <skill-path>` to check token complexity. Keep only core workflow and selection guidance in SKILL.md; move variant-specific details into reference files. Reference them from SKILL.md with clear descriptions of when to read each file.
 
-Three patterns: (1) high-level guide with pointers to FORMS.md, REFERENCE.md, etc.; (2) domain-split references (finance.md, sales.md per domain); (3) conditional details (basic inline, advanced via link). See [references/workflows.md](./references/workflows.md) for full examples of all three patterns.
+Three patterns: (1) high-level guide with pointers to FORMS.md, REFERENCE.md, etc.; (2) domain-split references (finance.md, sales.md per domain); (3) conditional details (basic inline, advanced via link). See `references/workflows.md` for full examples of all three patterns.
 
-Rules: keep references one level deep from SKILL.md. NEVER add ToC, anchor links, or bold/italic for visual emphasis to reference files — see [references/ai-audience-writing-rules.md](./references/ai-audience-writing-rules.md).
+Rules: keep references one level deep from SKILL.md. NEVER add ToC, anchor links, or bold/italic for visual emphasis to reference files — see `references/ai-audience-writing-rules.md`.
 
-> **Editing an existing SKILL.md?** Before treating an unrecognized frontmatter key as an error, check `plugins/plugin-creator/scripts/ecosystem_registry.py`. If the key is returned by `get_ecosystem_owned_keys()` — such as `mcp:` (OpenCode) — preserve it and all its nested content verbatim. Do not strip, rewrite, or normalize it. For `mcp:` specifically, see the [agent-plugin-ecosystem](./references/agent-plugin-ecosystem.md) reference (OpenCode SKILL.md Extensions section) for the full schema.
+> **Editing an existing SKILL.md?** Before treating an unrecognized frontmatter key as an error, check `plugins/plugin-creator/scripts/ecosystem_registry.py`. If the key is returned by `get_ecosystem_owned_keys()` — such as `mcp:` (OpenCode) — preserve it and all its nested content verbatim. Do not strip, rewrite, or normalize it. For `mcp:` specifically, see the `references/agent-plugin-ecosystem.md` reference (OpenCode SKILL.md Extensions section) for the full schema.
 
 ## Skill Creation Process
 
@@ -416,7 +416,7 @@ flowchart TD
     Discovery --> Done(["Location decided — proceed to Step 4"])
 ```
 
-**SOURCE:** [claude-skills-overview-2026](../claude-skills-overview-2026/SKILL.md) section on Directory Structure and Location Priority.
+**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Directory Structure and Location Priority.
 
 ### Step 4: Initializing the Skill
 
@@ -478,11 +478,11 @@ When editing the (newly-generated or existing) skill, remember that the skill is
 Consult these helpful guides based on your skill's needs:
 
 - **Multi-step processes**: See references/workflows.md for sequential workflows and conditional logic
-- **Output formats, examples, anti-patterns, and quality standards**: See [agentskills best-practices](../agentskills/references/best-practices.md)
+- **Output formats, examples, anti-patterns, and quality standards**: See `../agentskills/references/best-practices.md`
 
 These files contain established best practices for effective skill design.
 
-- **Official specification**: See [claude-code-skills-official.md](./references/claude-code-skills-official.md) for the authoritative source on frontmatter fields, discovery rules, invocation control, and budget limits
+- **Official specification**: See `references/claude-code-skills-official.md` for the authoritative source on frontmatter fields, discovery rules, invocation control, and budget limits
 
 #### Start with Reusable Skill Contents
 
@@ -523,7 +523,7 @@ Write the YAML frontmatter. All fields are optional, but `description` is strong
 - `context`: Optional. Set to `fork` to run in a forked subagent context for isolation. See advanced patterns below.
 - `agent`: Optional. Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent name.
 - `user-invocable`: Optional. Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`.
-- `disable-model-invocation`: Optional. Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. **Note:** This field has no effect in `-p` (headless/Agent SDK CLI) mode — ALL skill invocations via `/skill-name` are unavailable in `-p` mode regardless of this setting. Skills used in automation must embed their full workflow in the prompt. See [Headless Mode and Agent SDK](../claude-skills-overview-2026/resources/headless-agent-sdk.md).
+- `disable-model-invocation`: Optional. Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. **Note:** This field has no effect in `-p` (headless/Agent SDK CLI) mode — ALL skill invocations via `/skill-name` are unavailable in `-p` mode regardless of this setting. Skills used in automation must embed their full workflow in the prompt. See `../claude-skills-overview-2026/resources/headless-agent-sdk.md`.
 - `hooks`: Optional. Hooks scoped to this skill's lifecycle. See hooks documentation for configuration format.
 
 **Multi-runtime scaffold** — when a skill targets multiple runtimes, combine portable fields with runtime-specific extensions. Fields not recognized by a runtime are silently ignored:
@@ -541,7 +541,7 @@ mcp:
 
 Here `mcp:` is an OpenCode-only extension — Claude Code ignores it. Use this pattern to ship a single SKILL.md that works on both runtimes without branching.
 
-**Complete field reference:** See [claude-skills-overview-2026 skill](../claude-skills-overview-2026/SKILL.md) for definitive schema documentation, or the [Claude Code Skills Official Reference](./references/claude-code-skills-official.md) for the authoritative source specification.
+**Complete field reference:** See `../claude-skills-overview-2026/SKILL.md` for definitive schema documentation, or the `references/claude-code-skills-official.md` for the authoritative source specification.
 
 ##### Body
 
@@ -592,7 +592,7 @@ Write instructions for using the skill and its bundled resources.
 
 3. **Extended Thinking Mode** - Include the word "ultrathink" anywhere in skill content to enable extended thinking mode for complex reasoning tasks.
 
-**SOURCE:** [claude-skills-overview-2026](../claude-skills-overview-2026/SKILL.md) sections on String Substitutions and Dynamic Context Injection.
+**SOURCE:** `../claude-skills-overview-2026/SKILL.md` sections on String Substitutions and Dynamic Context Injection.
 
 ### Step 6: Packaging a Skill (OPTIONAL — Plugin Distribution Only)
 
@@ -614,27 +614,27 @@ flowchart TD
     AgentReg --> Done
 ```
 
-See [claude-plugins-reference-2026](../claude-plugins-reference-2026/SKILL.md) for plugin creation documentation.
+See `../claude-plugins-reference-2026/SKILL.md` for plugin creation documentation.
 
 ### Steps 7-10: Evaluate, Improve, and Optimize
 
 After creating the skill, test it with real prompts, grade results with the A/B evaluation harness, iterate on failures, and optimize the description for triggering accuracy.
 
-**Read [references/evaluation-and-optimization.md](./references/evaluation-and-optimization.md)** for the complete workflow covering:
+**Read `references/evaluation-and-optimization.md`** for the complete workflow covering:
 
 - **Step 7** — Define test cases (`evals/evals.json`)
 - **Step 8** — Run A/B evaluation (parallel with-skill vs baseline runs, grading via `agents/grader.md`, viewer via `eval-viewer/generate_review.py`)
 - **Step 9** — Improve the skill (failure mode taxonomy, iteration loop, blind comparison via `agents/comparator.md` and `agents/analyzer.md`)
 - **Step 10** — Description optimization (automated trigger tuning via `scripts/run_loop.py` with train/test split)
 
-See [references/schemas.md](./references/schemas.md) for evals.json and grading.json formats.
+See `references/schemas.md` for evals.json and grading.json formats.
 
 ## Reference Files
 
 | Directory | Contents |
 |-----------|----------|
-| `agents/` | [grader.md](./agents/grader.md) (assertion grading), [comparator.md](./agents/comparator.md) (blind A/B), [analyzer.md](./agents/analyzer.md) (post-hoc analysis) |
-| `references/` | [schemas.md](./references/schemas.md) (JSON schemas), [evaluation-and-optimization.md](./references/evaluation-and-optimization.md) (Steps 7-10), [claude-code-skills-official.md](./references/claude-code-skills-official.md) (spec), [workflows.md](./references/workflows.md) (patterns) |
+| `agents/` | `agents/grader.md` (assertion grading), `agents/comparator.md` (blind A/B), `agents/analyzer.md` (post-hoc analysis) |
+| `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns) |
 | `eval-viewer/` | `viewer.html` (interactive eval viewer), `generate_review.py` (HTML generator) |
 | `assets/` | `eval_review.html` (trigger eval review template) |
 | `scripts/` | `init_skill.py`, `package_skill.py`, `quick_validate.py`, `run_eval.py`, `run_loop.py`, `improve_description.py`, `generate_report.py`, `aggregate_benchmark.py` |

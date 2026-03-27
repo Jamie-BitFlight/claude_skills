@@ -313,7 +313,7 @@ All sources must produce PEP 440 compliant versions.
 
 **Status**: Final (September 2015) **Authority**: BDFL-Delegate Donald Stufft **Repository**: [python/peps - PEP 508](https://github.com/python/peps/blob/main/peps/pep-0508.rst)
 
-See [Dependency Specification Formats](./dependency-formats.md) for detailed coverage.
+See `dependency-formats.md` for detailed coverage.
 
 ---
 
@@ -332,6 +332,6 @@ See [Dependency Specification Formats](./dependency-formats.md) for detailed cov
 
 ## Related Standards
 
-- [Core Metadata Specifications](./core-metadata.md) - Metadata format for wheels/sdists
-- [Package Distribution Formats](./distribution-formats.md) - Wheel and sdist structures
-- [Dependency Specification Formats](./dependency-formats.md) - PEP 508 detailed reference
+- `core-metadata.md` - Metadata format for wheels/sdists
+- `distribution-formats.md` - Wheel and sdist structures
+- `dependency-formats.md` - PEP 508 detailed reference

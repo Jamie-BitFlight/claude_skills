@@ -10,12 +10,12 @@ This directory contains comprehensive reference documentation about hatchling's 
 
 ## Contents
 
-- [Build Environment Configuration](./build-environment-configuration.md) - Core build environment setup and options
-- [Build Dependencies Management](./build-dependencies-management.md) - Managing build-time dependencies
-- [Environment Variables](./environment-variables.md) - Build environment variables and configuration
-- [UV vs Pip Installer](./uv-vs-pip-installer.md) - Comparison and configuration of package installers
-- [Cython and Build Tools](./cython-build-tools.md) - Integration with Cython and compiled extensions
-- [Environment Isolation](./environment-isolation.md) - Build isolation and reproducible builds
+- `build-environment-configuration.md` - Core build environment setup and options
+- `build-dependencies-management.md` - Managing build-time dependencies
+- `environment-variables.md` - Build environment variables and configuration
+- `uv-vs-pip-installer.md` - Comparison and configuration of package installers
+- `cython-build-tools.md` - Integration with Cython and compiled extensions
+- `environment-isolation.md` - Build isolation and reproducible builds
 
 ## Quick Reference for Users
 

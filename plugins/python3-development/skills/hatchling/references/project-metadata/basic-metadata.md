@@ -62,11 +62,11 @@ path = "src/my_package/__about__.py"
 
 ```
 
-**Version Format:** Must follow [PEP 440](./version-specifiers.md#pep-440-overview) version identification scheme:
+**Version Format:** Must follow `version-specifiers.md#pep-440-overview` version identification scheme:
 
 - Examples: `0.1.0`, `1.0.0a1`, `2.0.0rc1`, `3.1.0.post1`
 
-**Note:** See [Version Management](../version-management.md) for comprehensive versioning strategies.
+**Note:** See `../version-management.md` for comprehensive versioning strategies.
 
 ## Description
 
@@ -185,6 +185,6 @@ requires-python = ">=3.8,<4"
 
 ## Related Configuration
 
-- [Project Ownership](./ownership.md) - Authors and maintainers
-- [Keywords & Classifiers](./keywords-classifiers.md) - Discovery and categorization
-- [Dynamic Metadata](./dynamic-metadata.md) - Runtime metadata injection
+- `ownership.md` - Authors and maintainers
+- `keywords-classifiers.md` - Discovery and categorization
+- `dynamic-metadata.md` - Runtime metadata injection

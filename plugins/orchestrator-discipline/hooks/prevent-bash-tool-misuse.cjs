@@ -40,8 +40,10 @@ const VIOLATIONS = [
     example: 'Grep(pattern="...", path="...")',
   },
   {
-    // find with -name
-    pattern: /\bfind\b\s+\S+\s+-name\b/,
+    // find at command start (or after && / ;) searching by name or type — not mid-pipeline
+    // Matches: find . -name, find /path -name, find $VAR -name, find . -type f
+    // Does NOT match: ... | find "$TMP" -name (pipeline use in test scaffolds)
+    pattern: /(?:^|&&|;)\s*find\s+[.$/~"']?\S*\s+-(?:name|type)\b/,
     redirect: 'Glob',
     message:
       'Use the Glob tool instead of Bash find. Reason: built-in tools handle gitignore and permissions correctly.',
@@ -94,6 +96,7 @@ const VIOLATIONS = [
  * These are pipeline contexts where the bash command is necessary.
  */
 const LEGITIMATE_PATTERNS = [
+  /\|\s*find\b/, // find as a pipeline step — not standalone file discovery
   /git\s.*\|\s*grep/, // git log | grep, git diff | grep
   /\|\s*grep/, // any pipeline ... | grep
   /grep.*\|\s/, // grep as pipeline source with another step

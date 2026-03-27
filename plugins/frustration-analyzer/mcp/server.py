@@ -41,7 +41,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from xml.etree.ElementTree import Element as _Element  # noqa: S405
+    from xml.etree.ElementTree import Element as _Element
 
 import duckdb
 import tiktoken

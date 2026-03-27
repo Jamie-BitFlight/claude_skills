@@ -160,6 +160,6 @@ class DynamicIncludeHook(BuildHookInterface):
 
 ## See Also
 
-- [Path Rewriting with Sources](./path-rewriting.md) - Distribution path modification
-- [Build Data Passing](./build-data-passing.md) - Modifying build data in hooks
-- [Build Context](./build-context.md) - Accessing build environment information
+- `path-rewriting.md` - Distribution path modification
+- `build-data-passing.md` - Modifying build data in hooks
+- `build-context.md` - Accessing build environment information

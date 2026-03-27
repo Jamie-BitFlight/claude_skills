@@ -314,6 +314,6 @@ requests!=2.28.0        → 2.27.0, 2.28.1, 2.29.0, 3.0.0a1, 3.0.0
 
 ## Related Configuration
 
-- [Dependencies](./dependencies.md) - Dependency specification overview
-- [Direct References](./direct-references.md) - VCS and local references (alternative to version specifiers)
-- [Basic Metadata Fields](./basic-metadata.md#python-support-requires-python) - Python version requirements
+- `dependencies.md` - Dependency specification overview
+- `direct-references.md` - VCS and local references (alternative to version specifiers)
+- `basic-metadata.md#python-support-requires-python` - Python version requirements

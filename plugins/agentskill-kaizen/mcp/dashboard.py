@@ -516,6 +516,7 @@ class HealthHandler(tornado.web.RequestHandler):
     than stale copies captured at thread-start time.
     """
 
+    _body: bytes
     _get_port: Callable[[], int | None]
     _get_start_time: Callable[[], float | None]
     _get_csv_path: Callable[[], Path | None]

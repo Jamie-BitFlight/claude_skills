@@ -15,6 +15,7 @@
 - Subagent contract, delegation patterns
 - Evidence discipline (fact-check, find-cause, scientific-thinking)
 - Orchestrator discipline (anti-patterns)
+- Context-fit complexity model (decomposition, constraint economics, progressive disclosure)
 
 ---
 
@@ -38,3 +39,4 @@
 | [task-file-format.md](./task-file-format.md) | Link to TASK_FILE_FORMAT |
 | [evidence-discipline.md](./evidence-discipline.md) | fact-check, find-cause, scientific-thinking triggers |
 | [orchestrator-discipline.md](./orchestrator-discipline.md) | Delegation anti-patterns, read constraints |
+| [context-fit-complexity.md](./context-fit-complexity.md) | Task complexity as context sufficiency, decomposition principles |

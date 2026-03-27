@@ -34,6 +34,8 @@ TeamCreate(team_name="feature-slug-wave-1")
 
 Name the team after the work and wave number. One team per parallel wave.
 
+**Fetch-once rule**: Before spawning any workers, call `backlog_view` **once per issue** that will be worked in this session. Store each result in context keyed by issue number. Do NOT call `backlog_view` again for any issue already fetched — use the stored data for all wave iterations, prompt construction, and relay building. If a `backlog_update` changes an item's state mid-session, replace the cached value with a single new `backlog_view` call for that issue only.
+
 ### 2 — Spawn Workers
 
 Each worker gets exactly the context needed — no more.

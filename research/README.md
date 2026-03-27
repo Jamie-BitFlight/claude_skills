@@ -31,7 +31,8 @@ research/
 │   ├── picoclaw.md                    # Go AI assistant — <10MB RAM, 6 channels, runs on $10 RISC-V hardware, 18K stars
 │   ├── pinchtab.md                    # Browser control for AI agents — 12MB Go binary, HTTP API, a11y tree snapshots at 800 tokens/page (2.3K stars)
 │   ├── zeroclaw.md                    # Rust AI assistant infrastructure — sub-5MB RAM, 28+ providers, trait-driven (14.9K stars)
-│   └── zeroboot.md                    # Sub-millisecond VM fork sandbox (0.79ms p50) — Firecracker+KVM, ~265KB RSS, Python/Node SDKs, REST API (1.4K stars)
+│   ├── zeroboot.md                    # Sub-millisecond VM fork sandbox (0.79ms p50) — Firecracker+KVM, ~265KB RSS, Python/Node SDKs, REST API (1.4K stars)
+│   └── vibium.md                      # Browser automation for AI agents via WebDriver BiDi — CLI, MCP server, and client library modes
 ├── api-frameworks/                    # High-performance API frameworks for backend services
 │   ├── fastapi.md                     # Modern Python web framework with Pydantic (95K+ stars)
 │   ├── motia.md                       # Unified backend framework replacing APIs/queues/workflows/AI agents with one Step primitive (15K+ stars)
@@ -67,7 +68,8 @@ research/
 │   └── open-pencil.md                # OpenPencil v0.10.0 - Open-source Figma alt: native .fig I/O, 87+ AI tools, MCP server, P2P collab (2.8K stars)
 ├── ai-research-tools/                 # AI research tools and newsletters
 │   ├── merly-mentor.md               # Logic-based AI code quality tool: deterministic analysis of 1M LOC/min, 15 languages, REST API (Seed $6.8M)
-│   └── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
+│   ├── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
+│   └── samuraizer.md                 # Samuraizer - Full-stack AI knowledge base: semantic search, RAG chat, knowledge graph, Telegram bot (Flask+React+Gemini)
 ├── coding-agents/                     # Autonomous AI coding agent platforms
 │   ├── accomplish.md                  # Local-first AI desktop agent with MCP tools, 15 providers, permission-gated execution (9K+ stars)
 │   ├── cline.md                       # Open-source autonomous coding agent with human-in-the-loop approvals (Apache-2.0)
@@ -524,6 +526,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [happycapy.md](./agent-infrastructure/happycapy.md) | HappyCapy — browser-based agent-native computer (Claude Code → Clawdbot → GUI); isolated sandbox execution, 170K+ pre-built skills via SkillsMP, multi-agent teams (Max tier), 150+ AI models; Free/Pro $20/Max $200 per month (launched 2026-02-11) | 2026-03-13   |
 | [AutoResearchClaw.md](./agent-infrastructure/AutoResearchClaw.md) | AutoResearchClaw — 23-stage autonomous research pipeline with 4-layer citation verification, self-healing experiments (10 repair cycles), MetaClaw cross-run learning (+18.3% robustness), ACP support for Claude Code/OpenCode/Codex (6.2K stars) | 2026-03-19   |
 | [zeroboot.md](./agent-infrastructure/zeroboot.md) | Zeroboot — sub-millisecond Firecracker+KVM fork sandbox: 0.79ms p50, ~265KB RSS, 4-endpoint REST API, Python/Node SDKs, managed + self-hosted deployment (1,394 stars, v0.1.0) | 2026-03-21   |
+| [vibium.md](./agent-infrastructure/vibium.md) | Vibium — browser automation tool for AI agents via WebDriver BiDi; CLI, MCP server, and client library modes | 2026-03-24   |
 
 **Key Topics**:
 
@@ -636,6 +639,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [biome.md](./developer-tools/biome.md)                 | Biome - Rust-based web toolchain with formatter (97% Prettier compat, ~35× faster), linter (450+ rules), import organizer, and v2 type-aware linting without TypeScript compiler (23.8K stars) | 2026-02-23   |
 | [byobu.md](./developer-tools/byobu.md)                 | Byobu v6.14 — enhanced terminal multiplexer wrapper for tmux/screen with unified F-key layer, 40+ status bar plugins, XDG config layering, and backend switching (1.5K stars) | 2026-03-01   |
 | [animejs.md](./developer-tools/animejs.md)             | Lightweight JavaScript animation engine with declarative API, timelines, staggering, and 30+ easing functions                        | 2026-01-31   |
+| [anything_about_game_ai_resources.md](./developer-tools/anything_about_game_ai_resources.md) | Anything About Game — curated 878-line AI tools taxonomy for game dev: 27+ categories covering AIGC, MCP servers, agent frameworks, Unity integrations, 3D/audio generation (3.8K stars, Apache 2.0, active 2026-03-23) | 2026-03-24   |
 | [claude-conductor.md](./developer-tools/claude-conductor.md)       | Claude Conductor - Context-Driven Development plugin with 9 commands, skill ecosystem, pattern reference layer, and quality intelligence | 2026-02-17   |
 | [claude-openocd-spi-dump.md](./developer-tools/claude-openocd-spi-dump.md) | Claude Code plugin for SPI flash dumping via OpenOCD with RAM-resident code and MCU register maps for 6 chip families | 2026-02-20   |
 | [claude-pilot.md](./developer-tools/claude-pilot.md) | Claude Pilot — quality-enforcement layer for Claude Code CLI with 15 lifecycle hooks, TDD enforcement, /spec worktree workflow, and cross-session persistent memory (1,390 stars) | 2026-02-23   |
@@ -645,6 +649,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [github-cli.md](./developer-tools/github-cli.md)       | GitHub CLI (gh) - official CLI for PRs, issues, workflows, extensions with scriptable API access (37.8K stars)                        | 2026-02-20   |
 | [google-ai-studio.md](./developer-tools/google-ai-studio.md) | Google AI Studio — free browser-based IDE and playground for Gemini API with 1M-token context, OpenAI compatibility, and built-in Google Search grounding | 2026-02-23   |
 | [grepai.md](./developer-tools/grepai.md)               | Semantic code search and call graph analysis for AI agents with MCP server, 12-language trace, and embedding-based search (1.2K stars) | 2026-02-13   |
+| [gridland.md](./developer-tools/gridland.md)           | Gridland v0.2.53 — React-based TUI framework rendering identical component code to HTML5 Canvas (browser) and native terminal (OpenTUI); write-once deploy to both environments with Bun binary compilation | 2026-03-24   |
 | [jina-reader.md](./developer-tools/jina-reader.md)     | Jina Reader - Apache 2.0 URL-to-Markdown API (`r.jina.ai` prefix), full SPA/PDF support via Puppeteer, web search grounding via `s.jina.ai` (~9.8K stars) | 2026-02-23   |
 | [jirajs.md](./developer-tools/jirajs.md)               | jira.js - TypeScript Jira API client for Cloud, Server, and Data Center with full REST API coverage                                   | 2026-02-20   |
 | [jscpd.md](./developer-tools/jscpd.md)                 | Copy/paste detector for 150+ programming languages using Rabin-Karp algorithm with CI/CD integration                                 | 2026-01-31   |
@@ -686,6 +691,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [stoat.md](./developer-tools/stoat.md)                 | Stoat — Go-based TUI database browser for SQLite and PostgreSQL with vim keybindings, themes, and SQL syntax highlighting | 2026-03-18   |
 | [tori-cli.md](./developer-tools/tori-cli.md)           | Go-based SSH-tunneled Docker monitoring TUI with declarative alerts, multi-server dashboard, and zero network exposure | 2026-03-18   |
 | [emqutiti.md](./developer-tools/emqutiti.md)           | Go-based MQTT TUI client with multi-broker profiles, trace recording/replay, and OS keyring credential management | 2026-03-18   |
+| [claude-code-cli-power-patterns.md](./developer-tools/claude-code-cli-power-patterns.md) | 10 Claude Code CLI power patterns — session forking, PR-linked review, editor prompts, inline shell, effort levels, parallel worktrees, JSON output, context compaction, dynamic agents, CI/CD budget caps (Trigger.dev blog, March 2026) | 2026-03-24   |
 
 **Key Topics**:
 
@@ -1109,6 +1115,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | [merly-mentor.md](./ai-research-tools/merly-mentor.md) | Merly Mentor - Logic-based AI code quality tool: deterministic analysis of 1M LOC/min across 15 languages, REST API, Docker/K8s deployment (Seed $6.8M) | 2026-03-18   |
 | [codewiki-google.md](./ai-research-tools/codewiki-google.md) | CodeWiki (Google) - AI-powered documentation platform: auto-generates wikis, diagrams, and Gemini chat for code repos after every commit (public preview, Nov 2025) | 2026-03-18   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
+| [samuraizer.md](./ai-research-tools/samuraizer.md) | Samuraizer - Full-stack AI knowledge base for security research: URL/PDF analysis via Gemini 2.5 Flash, semantic search, RAG chat, knowledge graph (D3.js), Telegram bot (Flask+React+SQLite, MIT) | 2026-03-25   |
 
 **Key Topics**:
 

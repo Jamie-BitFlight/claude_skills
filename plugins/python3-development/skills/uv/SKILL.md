@@ -1,6 +1,6 @@
 ---
 name: uv
-description: Expert guidance for Astral's uv - an extremely fast Python package and project manager. Use when working with Python projects, managing dependencies, creating scripts with PEP 723 metadata, installing tools, managing Python versions, or configuring package indexes. Covers project initialization, dependency management, virtual environments, tool installation, workspace configuration, CI/CD integration, and migration from pip/poetry.
+description: Use when working with Astral's uv — managing Python project dependencies, creating PEP 723 scripts, installing tools, managing Python versions, configuring package indexes, or migrating from pip/poetry. Covers project initialization, virtual environments, workspace configuration, and CI/CD integration.
 ---
 
 # uv: Modern Python Package and Project Manager
@@ -50,7 +50,7 @@ If you're coming from another tool, here's the fast lookup:
 | virtualenv | `python -m venv .venv` | `uv venv` |
 | conda | `conda install X` | `uv add X` |
 
-For full step-by-step migration workflows, see [references/migration-guide.md](./references/migration-guide.md).
+For full step-by-step migration workflows, see `references/migration-guide.md`.
 
 ## Core Capabilities
 
@@ -710,7 +710,7 @@ uv add --dev -r requirements-dev.txt
 uv sync
 ```
 
-For full workflow including hybrid approach and common issues, see [references/migration-guide.md](./references/migration-guide.md).
+For full workflow including hybrid approach and common issues, see `references/migration-guide.md`.
 
 ### Migrating from Poetry
 
@@ -724,7 +724,7 @@ uvx migrate-to-uv --dry-run  # Preview first
 # uv init && uv add -r requirements.txt
 ```
 
-For command mapping table and pyproject.toml conversion, see [references/migration-guide.md](./references/migration-guide.md).
+For command mapping table and pyproject.toml conversion, see `references/migration-guide.md`.
 
 ### CI/CD Integration (GitHub Actions)
 

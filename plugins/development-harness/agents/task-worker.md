@@ -3,7 +3,8 @@ name: task-worker
 description: Universal SAM task executor — receives a task reference (P{N}/T{M}), loads the task via sam_read, loads skills from task metadata, claims the task, executes against acceptance criteria, and reports structured completion. Use when dispatching parallel work via TeamCreate, or when any agent needs to execute a SAM task. The task file contains the full work specification — this agent adapts to any domain by loading the skills the task requires.
 tools: Read, Write, Edit, Glob, Grep, Bash, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam__sam_claim, mcp__plugin_dh_sam__sam_state, mcp__plugin_dh_sam__sam_update, mcp__plugin_dh_backlog__backlog_get_ready_sam_tasks, mcp__plugin_dh_backlog__profile_load
 model: sonnet
-skills: dh:subagent-contract
+skills:
+  - dh:subagent-contract
 ---
 
 # Task Worker

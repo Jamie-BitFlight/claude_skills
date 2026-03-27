@@ -492,6 +492,6 @@ unzip -l dist/*.whl | grep -E "\.py$"
 
 ## Related Documentation
 
-- [Wheel File Selection](./wheel-file-selection.md)
-- [Path Validation](./path-validation.md)
-- [Build Validation](./build-validation.md)
+- `wheel-file-selection.md`
+- `path-validation.md`
+- `build-validation.md`

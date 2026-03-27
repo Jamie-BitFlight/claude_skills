@@ -147,6 +147,6 @@ dynamic = ["scripts"]
 
 ## Related Configuration
 
-- [Entry Points: GUI Scripts](./entry-points-gui.md)
-- [Plugin Namespaces](./entry-points-plugins.md)
-- [Dynamic Metadata Fields](./dynamic-metadata.md)
+- `entry-points-gui.md`
+- `entry-points-plugins.md`
+- `dynamic-metadata.md`

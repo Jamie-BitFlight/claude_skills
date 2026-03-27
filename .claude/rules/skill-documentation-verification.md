@@ -43,7 +43,6 @@ Before documenting behavior/capability/characteristic of commands (`~/.claude/co
 
 **Minimum Requirements:**
 
-- Cite minimum 3 independent authoritative sources for major claims
 - Include line numbers when referencing code files
 - Execute test if behavior observable directly
 - Note publication dates for documentation sources

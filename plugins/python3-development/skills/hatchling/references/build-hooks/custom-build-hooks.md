@@ -440,7 +440,7 @@ def initialize(self, version: str, build_data: dict) -> None:
 
 ## Related Topics
 
-- [BuildHookInterface Reference](./buildhook-interface.md) - Complete interface reference
-- [Build Data](./build-data.md) - Understanding build data
-- [Hook Execution Order](./execution-order.md) - How custom hooks execute
-- [Configuration Basics](./configuration.md) - Configuring custom hooks
+- `buildhook-interface.md` - Complete interface reference
+- `build-data.md` - Understanding build data
+- `execution-order.md` - How custom hooks execute
+- `configuration.md` - Configuring custom hooks

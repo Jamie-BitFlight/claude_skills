@@ -17,10 +17,9 @@ Use direct execution first. Scripts are self-contained executables, not library 
 
 **Why**: `uv run` resolves PEP 723 inline dependencies. Shebangs may specify `uv run --script` (handles venv and deps). Bare `python3` skips dependency resolution and may use wrong interpreter.
 
-**Prohibited patterns:**
+**Wrong — bypasses shebang and PEP 723 dependency resolution:**
 
 ```bash
-# Bypasses shebang, ignores PEP 723 dependency resolution
 python3 plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile
 node .claude/hooks/session-start-backlog.cjs
 ```

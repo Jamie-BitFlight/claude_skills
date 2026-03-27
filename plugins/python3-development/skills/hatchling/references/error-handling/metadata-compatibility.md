@@ -409,6 +409,6 @@ if __name__ == "__main__":
 
 ## Related Documentation
 
-- [SPDX License Validation](./spdx-validation.md)
-- [Version Validation](./version-validation.md)
-- [Build Validation](./build-validation.md)
+- `spdx-validation.md`
+- `version-validation.md`
+- `build-validation.md`

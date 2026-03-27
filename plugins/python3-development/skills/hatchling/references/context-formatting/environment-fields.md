@@ -311,7 +311,7 @@ This creates logs with both the environment name and matrix variable value.
 
 ## Related Topics
 
-- [Global Context Formatting Fields](./global-fields.md) — root, home, env fields available everywhere
-- [Optional Dependencies Formatting](./optional-dependencies.md) — Context formatting in optional dependency groups
-- [Dynamic Configuration](./dynamic-configuration.md) — Programmatic metadata and dynamic field resolution
-- [Configuration Interpolation](./configuration-interpolation.md) — Advanced field nesting and patterns
+- `global-fields.md` — root, home, env fields available everywhere
+- `optional-dependencies.md` — Context formatting in optional dependency groups
+- `dynamic-configuration.md` — Programmatic metadata and dynamic field resolution
+- `configuration-interpolation.md` — Advanced field nesting and patterns

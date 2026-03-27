@@ -389,6 +389,6 @@ license = "BSD-3-Clause"  # Specific
 
 ## Related Documentation
 
-- [Metadata Validation](./metadata-validation.md)
-- [Version Validation](./version-validation.md)
-- [Core Metadata Compatibility](./metadata-compatibility.md)
+- `metadata-validation.md`
+- `version-validation.md`
+- `metadata-compatibility.md`

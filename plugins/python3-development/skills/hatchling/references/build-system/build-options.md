@@ -349,6 +349,6 @@ unzip -l dist/*.whl | head -20
 
 ## Navigation
 
-- [Output Directory](./output-directory.md) - Detailed directory configuration
-- [Reproducible Builds](./reproducible-builds.md) - Deterministic builds
-- [VCS Integration](./vcs-integration.md) - Version control integration
+- `output-directory.md` - Detailed directory configuration
+- `reproducible-builds.md` - Deterministic builds
+- `vcs-integration.md` - Version control integration

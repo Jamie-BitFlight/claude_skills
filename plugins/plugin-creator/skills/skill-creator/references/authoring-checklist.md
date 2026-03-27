@@ -16,7 +16,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 - [ ] No time-sensitive information (specific version numbers, "as of [date]" statements) — or isolated in an explicit "Legacy / Old Patterns" section
 - [ ] Consistent terminology throughout — same term for the same concept, every time
 - [ ] Examples are concrete, not abstract
-- [ ] File references are one level deep — `[text](./references/file.md)` not `[text](./references/subdir/file.md)`
+- [ ] File references are one level deep — ``references/file.md`` not ``references/subdir/file.md``
 - [ ] Progressive disclosure used appropriately — overview in SKILL.md, detail in references
 - [ ] Workflows have clear, numbered steps
 
@@ -29,7 +29,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 - [ ] Frontmatter is valid YAML — no unquoted colons in description values
 - [ ] Reference files sit one level deep under `references/` — not in subdirectories
 - [ ] Long reference files (100+ lines) have a Table of Contents at the top
-- [ ] All file references use markdown link syntax with `./` prefix: `[text](./references/file.md)`
+- [ ] All file references use markdown link syntax with `./` prefix: ``references/file.md``
 - [ ] All code fences have a language specifier
 
 ---

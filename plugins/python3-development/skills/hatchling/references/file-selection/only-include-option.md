@@ -336,6 +336,6 @@ only-include = [
 
 ## See Also
 
-- [Include and Exclude Patterns](./include-exclude-patterns.md)
-- [Packages Option](./packages-option.md)
-- [Explicit Path Selection](./explicit-path-selection.md)
+- `include-exclude-patterns.md`
+- `packages-option.md`
+- `explicit-path-selection.md`

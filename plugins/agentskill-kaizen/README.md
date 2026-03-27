@@ -28,8 +28,6 @@ Invoke the commands with a task on the same line:
   gaps, and more
 - Generates actionable outputs: hook scripts, skill patches, CLAUDE.md updates, and automation
   proposals
-- Live sentiment dashboard with four visualization tabs — starts automatically with each session
-- Persistent analysis database at `~/.claude/kaizen/kaizen.duckdb`
 - All outputs are draft proposals by default — nothing is modified until you review and approve
 
 ## Installation
@@ -78,8 +76,6 @@ prefixspan, scikit-learn). Subsequent runs use the cached environment.
 | Skill | `transcript-analysis` | DuckDB query patterns, JSONL schema, PM4Py methodology |
 | Skill | `kaizen-improvement` | Templates for improvement output generation |
 | MCP Server | `kaizen-analysis` | FastMCP server: process mining, pattern detection, clustering |
-| MCP Server | `kaizen-duckdb` | Persistent DuckDB at `~/.claude/kaizen/kaizen.duckdb` |
-| Script | `scripts/sentiment-score.py` | Score sentiment of user messages; output to `~/.claude/kaizen/sentiment.csv` |
 | Dashboard | Panel/Bokeh dashboard | Live sentiment visualization served at OS-assigned port; access via `open_dashboard` MCP tool |
 
 ## Usage
@@ -118,43 +114,6 @@ Delegate to improvement-generator to produce hook configurations from the analys
 /agentskill-kaizen:transcript-analysis
 /agentskill-kaizen:kaizen-improvement
 ```
-
-## Sentiment Dashboard
-
-The dashboard starts automatically with each Claude Code session. It visualizes sentiment scores
-from your session transcripts in real time.
-
-**Discover the URL:**
-
-```bash
-# Open browser automatically
-# Call the open_dashboard MCP tool from within a session
-
-# Or check the health endpoint once the port is known
-curl http://localhost:PORT/health
-```
-
-The `/health` endpoint returns `{"status": "ok", "port": N, "csv_exists": true, "csv_rows": N}`.
-
-**Generate or refresh sentiment data:**
-
-```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/sentiment-score.py" \
-  --output ~/.claude/kaizen/sentiment.csv
-```
-
-**Dashboard tabs:**
-
-| Tab | What it shows |
-|-----|---------------|
-| Session Timeline | Scatter plot of sentiment over time, colored by session |
-| Session Heatmap | Per-session sentiment heatmap with RdYlGn colormap |
-| Distribution | Histogram with mean and median reference lines |
-| Hot Spots | Most-negative messages sorted by score (Tabulator widget) |
-
-The dashboard polls the sentiment CSV every 5 seconds. The port is OS-assigned — not fixed at
-5006. Each session gets its own dashboard instance. Use the `open_dashboard` MCP tool to
-discover the current port and open the browser automatically.
 
 ## What the Analysis Covers
 
@@ -239,8 +198,6 @@ plugins/agentskill-kaizen/
 ├── mcp/
 │   ├── dashboard.py          # Panel/Bokeh sentiment dashboard (daemon thread)
 │   └── server.py             # FastMCP server: process mining, clustering, DuckDB
-├── scripts/
-│   └── sentiment-score.py    # PEP 723 script; scores user messages → CSV
 ├── skills/
 │   ├── kaizen-improvement/
 │   │   └── SKILL.md

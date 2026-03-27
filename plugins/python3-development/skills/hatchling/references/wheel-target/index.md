@@ -28,26 +28,26 @@ The following files provide detailed information about wheel configuration aspec
 
 ### Core Configuration
 
-- [Wheel Target Configuration Overview](./wheel-configuration.md) - Basic wheel target setup, build system declaration, and key options
-- [Core Metadata Versions](./core-metadata-versions.md) - Understanding metadata version 2.4, 2.3, 2.2 options and compatibility
-- [Wheel Target Versioning](./wheel-versioning.md) - Multiple build versions and standard vs editable formats
+- `wheel-configuration.md` - Basic wheel target setup, build system declaration, and key options
+- `core-metadata-versions.md` - Understanding metadata version 2.4, 2.3, 2.2 options and compatibility
+- `wheel-versioning.md` - Multiple build versions and standard vs editable formats
 
 ### Package and File Management
 
-- [Package Discovery and Heuristics](./package-discovery.md) - Automatic package detection, layout patterns, and single-module projects
-- [File Selection and Patterns](./file-selection.md) - Include/exclude patterns, glob syntax, and file inclusion heuristics
-- [Force-Include Paths](./force-include.md) - Including files from anywhere on the filesystem with path mapping
-- [Sources Option](./sources-option.md) - Path rewriting for distribution artifacts
+- `package-discovery.md` - Automatic package detection, layout patterns, and single-module projects
+- `file-selection.md` - Include/exclude patterns, glob syntax, and file inclusion heuristics
+- `force-include.md` - Including files from anywhere on the filesystem with path mapping
+- `sources-option.md` - Path rewriting for distribution artifacts
 
 ### Distribution and Installation
 
-- [Shared Data Directory](./shared-data.md) - Configuring data files that install globally with the package
-- [Shared Scripts Directory](./shared-scripts.md) - Mapping executable scripts into Python environments
-- [Extra Metadata Directory](./extra-metadata.md) - Shipping additional metadata files in wheels
-- [Editable Wheel Mode](./editable-wheels.md) - Development installations with .pth files and import hooks
+- `shared-data.md` - Configuring data files that install globally with the package
+- `shared-scripts.md` - Mapping executable scripts into Python environments
+- `extra-metadata.md` - Shipping additional metadata files in wheels
+- `editable-wheels.md` - Development installations with .pth files and import hooks
 
 ### Naming and Platform Support
 
-- [Strict Naming Option](./strict-naming.md) - Controlling normalization of project names in wheel filenames
-- [macOS Compatibility Flag](./macos-compat.md) - Signaling broad platform support for macOS wheels
-- [Bypass Selection Option](./bypass-selection.md) - Creating empty metadata-only wheels when file selection fails
+- `strict-naming.md` - Controlling normalization of project names in wheel filenames
+- `macos-compat.md` - Signaling broad platform support for macOS wheels
+- `bypass-selection.md` - Creating empty metadata-only wheels when file selection fails

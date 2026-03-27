@@ -286,6 +286,6 @@ pip install dist/*.tar.gz
 
 ## See Also
 
-- [Building Wheels](./building-wheels.md)
-- [Build Output Customization](./output-customization.md)
+- `building-wheels.md`
+- `output-customization.md`
 - [Source Distribution Format](https://packaging.python.org/specifications/source-distribution-format/)

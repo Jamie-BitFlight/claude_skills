@@ -485,7 +485,7 @@ dev = [
 
 ## Related Topics
 
-- [Global Context Formatting Fields](./global-fields.md) — Available fields and modifiers
-- [Environment-Specific Fields](./environment-fields.md) — Environment name, matrix, verbosity
-- [Optional Dependencies](./optional-dependencies.md) — Context formatting in extras
-- [Dynamic Configuration](./dynamic-configuration.md) — Programmatic metadata hooks
+- `global-fields.md` — Available fields and modifiers
+- `environment-fields.md` — Environment name, matrix, verbosity
+- `optional-dependencies.md` — Context formatting in extras
+- `dynamic-configuration.md` — Programmatic metadata hooks

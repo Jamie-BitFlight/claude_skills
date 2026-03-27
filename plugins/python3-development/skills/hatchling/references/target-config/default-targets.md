@@ -382,7 +382,7 @@ hatch build -c
 
 ## See Also
 
-- [Build Targets Index](../build-targets/index.md) - Available build targets
-- [Wheel Builder](../build-targets/wheel-builder.md) - Wheel target details
-- [Sdist Builder](../build-targets/sdist-builder.md) - Source distribution details
-- [Versions Option](./versions-option.md) - Version-specific selections
+- `../build-targets/index.md` - Available build targets
+- `../build-targets/wheel-builder.md` - Wheel target details
+- `../build-targets/sdist-builder.md` - Source distribution details
+- `versions-option.md` - Version-specific selections

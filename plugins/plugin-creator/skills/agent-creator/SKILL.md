@@ -11,9 +11,9 @@ You are a Claude Code agent architect specializing in creating high-quality, foc
 
 ## Quick Reference
 
-- [Agent Schema Reference](./references/agent-schema.md) - Complete frontmatter specification
-- [Agent Templates](./references/agent-templates.md) - Role-based archetypes and guidance for finding patterns
-- [Agent Examples](./references/agent-examples.md) - Real-world agent implementations
+- `references/agent-schema.md` - Complete frontmatter specification
+- `references/agent-templates.md` - Role-based archetypes and guidance for finding patterns
+- `references/agent-examples.md` - Real-world agent implementations
 
 **Related Skills:**
 
@@ -32,7 +32,7 @@ BEFORE creating any agent, execute these steps:
 1. **Read existing agents** in `.claude/agents/` to understand project patterns
 2. **Identify similar agents** that could serve as templates
 3. **Note conventions** used across the project (naming, structure, tool access)
-4. **Review archetype templates** in [Agent Templates](./references/agent-templates.md)
+4. **Review archetype templates** in `references/agent-templates.md`
 
 ```bash
 # Find all project agents
@@ -82,7 +82,7 @@ Ask the user or infer from context:
 
 **Step 2: Find Matching Patterns**
 
-Consult [Agent Templates](./references/agent-templates.md) for guidance.
+Consult `references/agent-templates.md` for guidance.
 
 **For Standard (User-Facing) Agents:**
 
@@ -93,7 +93,7 @@ Look for similar agents in `.claude/agents/`:
 - Research agents → look for `permissionMode: plan` or `dontAsk`
 - Language/framework experts → look for agents loading specific skills
 
-If no similar agent exists, build from scratch using [Agent Schema Reference](./references/agent-schema.md).
+If no similar agent exists, build from scratch using `references/agent-schema.md`.
 
 **For Role-Based Contract Archetypes** (orchestrated, DONE/BLOCKED signaling):
 
@@ -113,7 +113,7 @@ If no similar agent exists, build from scratch using [Agent Schema Reference](./
 
 _Role-based agents include `skills: subagent-contract` for status signaling._
 
-**See also**: [Best Practices from Existing Agents](./references/agent-templates.md#best-practices-from-existing-agents) for patterns like embedded examples in descriptions, identity sections, and self-verification checklists.
+**See also**: `references/agent-templates.md#best-practices-from-existing-agents` for patterns like embedded examples in descriptions, identity sections, and self-verification checklists.
 
 **Step 3: Present Options via AskUserQuestion**
 
@@ -139,7 +139,7 @@ Which would you like to use as a foundation?
 
 When user selects a template:
 
-- If archetype: Read template from [Agent Templates](./references/agent-templates.md)
+- If archetype: Read template from `references/agent-templates.md`
 - If existing agent: Read agent from `.claude/agents/`
 - If from scratch: Use best practices structure
 
@@ -1024,7 +1024,7 @@ Test boundary conditions:
 WHEN user requests a new agent:
 
 1. READ all existing agents in `.claude/agents/`
-2. READ [Agent Templates](./references/agent-templates.md) for archetype options
+2. READ `references/agent-templates.md` for archetype options
 3. ANNOUNCE: "Found N existing agents. Let me also check available archetype templates..."
 4. GATHER requirements using AskUserQuestion (purpose, triggers, tools, model)
 5. PRESENT template options combining:

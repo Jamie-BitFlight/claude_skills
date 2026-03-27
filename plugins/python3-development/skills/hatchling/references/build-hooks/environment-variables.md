@@ -453,6 +453,6 @@ If a hook is running despite `enable-by-default = false`:
 
 ## Related Topics
 
-- [Conditional Execution](./conditional-execution.md) - Using `enable-by-default` option
-- [Hook Execution Order](./execution-order.md) - How hooks execute
-- [Configuration Basics](./configuration.md) - Hook configuration
+- `conditional-execution.md` - Using `enable-by-default` option
+- `execution-order.md` - How hooks execute
+- `configuration.md` - Hook configuration

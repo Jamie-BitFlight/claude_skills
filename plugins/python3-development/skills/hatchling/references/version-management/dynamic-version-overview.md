@@ -335,8 +335,8 @@ Found: 1.2.3
 
 ## See Also
 
-- [Code Version Source](./code-version-source.md)
-- [Regex Version Source](./regex-version-source.md)
-- [Environment Version Source](./env-version-source.md)
-- [Version Source Plugin Interface](./version-source-interface.md)
-- [Creating Custom Version Sources](./custom-version-sources.md)
+- `code-version-source.md`
+- `regex-version-source.md`
+- `env-version-source.md`
+- `version-source-interface.md`
+- `custom-version-sources.md`

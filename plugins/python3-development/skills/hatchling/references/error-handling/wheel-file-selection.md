@@ -431,6 +431,6 @@ Error: "At least one file selection option must be defined"
 
 ## Related Documentation
 
-- [Path Validation](./path-validation.md)
-- [Build Validation](./build-validation.md)
-- [Heuristic Failures](./heuristic-failures.md)
+- `path-validation.md`
+- `build-validation.md`
+- `heuristic-failures.md`

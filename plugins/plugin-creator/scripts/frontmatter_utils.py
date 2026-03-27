@@ -16,7 +16,7 @@ Public API:
 from __future__ import annotations
 
 from io import StringIO
-from typing import TYPE_CHECKING, TypeAlias, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import frontmatter
 from frontmatter.default_handlers import YAMLHandler
@@ -27,12 +27,6 @@ if TYPE_CHECKING:
 
 # Recursive type for YAML/JSON-serializable frontmatter values. More specific than Any.
 FrontmatterValue: TypeAlias = dict[str, "FrontmatterValue"] | list["FrontmatterValue"] | str | int | float | bool | None
-
-
-class _YAMLHandlerKwargs(TypedDict, total=False):
-    """Kwargs for YAMLHandler API compatibility. Base class may pass Loader; we ignore all."""
-
-    Loader: type
 
 
 class RuamelYAMLHandler(YAMLHandler):
@@ -59,19 +53,19 @@ class RuamelYAMLHandler(YAMLHandler):
         """Round-trip YAML instance for load/dump. Public for plugin_validator._dump_yaml."""
         return self._yaml
 
-    def load(self, fm: str, **kwargs: Unpack[_YAMLHandlerKwargs]) -> FrontmatterValue:
+    def load(self, fm: str, **kwargs: object) -> dict[str, Any]:
         """Parse YAML frontmatter string using ruamel.yaml round-trip loader.
 
         Args:
             fm: Raw YAML frontmatter string (without delimiters).
-            **kwargs: Ignored (present for API compatibility).
+            **kwargs: Ignored (present for API compatibility with YAMLHandler).
 
         Returns:
             Parsed YAML data as a CommentedMap or None for empty input.
         """
         return self._yaml.load(fm)
 
-    def export(self, metadata: dict[str, FrontmatterValue], **kwargs: Unpack[_YAMLHandlerKwargs]) -> str:
+    def export(self, metadata: dict[str, object], **kwargs: object) -> str:
         """Serialize metadata dict to YAML string using ruamel.yaml.
 
         Args:

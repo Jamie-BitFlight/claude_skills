@@ -167,6 +167,6 @@ The execution flow ensures metadata is consistently computed across all build sc
 
 ## Related Topics
 
-- [Custom Metadata Hooks Implementation](./custom-hooks.md) - Detailed implementation guide
-- [Dynamic Metadata Fields](../project-metadata/dynamic-metadata.md) - Field declaration
-- [Metadata Options](../project-metadata/metadata-options.md) - Hook configuration options
+- `custom-hooks.md` - Detailed implementation guide
+- `../project-metadata/dynamic-metadata.md` - Field declaration
+- `../project-metadata/metadata-options.md` - Hook configuration options

@@ -306,12 +306,12 @@ Check:
 
 When multiple hooks are conditionally enabled, ensure:
 
-1. They execute in the correct order (see [Execution Order](./execution-order.md))
+1. They execute in the correct order (see `execution-order.md`)
 2. They don't modify the same files/artifacts
 3. Dependencies between hooks are satisfied
 
 ## Related Topics
 
-- [Hook Execution Order](./execution-order.md) - How hooks execute when multiple are enabled
-- [Configuration Basics](./configuration.md) - How to configure hooks
-- [Environment Variables](./environment-variables.md) - All build-related environment variables
+- `execution-order.md` - How hooks execute when multiple are enabled
+- `configuration.md` - How to configure hooks
+- `environment-variables.md` - All build-related environment variables

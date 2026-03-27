@@ -79,8 +79,8 @@ When building wheels, both hooks will run (in the order they're defined).
 
 Each hook type has its own configuration options. Refer to the specific hook documentation:
 
-- **Custom hooks**: See [Custom Build Hooks](./custom-build-hooks.md)
-- **Version hooks**: See [Version Build Hook](./version-build-hook.md)
+- **Custom hooks**: See `custom-build-hooks.md`
+- **Version hooks**: See `version-build-hook.md`
 - **Third-party hooks**: Refer to the plugin's documentation
 
 ## Common Configuration Pattern
@@ -104,7 +104,7 @@ require-runtime-dependencies = false
 require-runtime-features = []
 ```
 
-See [Hook Dependencies](./hook-dependencies.md) for details on dependency configuration.
+See `hook-dependencies.md` for details on dependency configuration.
 
 ## Configuration Scope Precedence
 
@@ -187,4 +187,4 @@ If the same hook is configured both globally and target-specifically:
 - Target-specific configuration takes precedence
 - Both initialization and finalization will run (in execution order)
 
-See [Hook Execution Order](./execution-order.md) for details.
+See `execution-order.md` for details.

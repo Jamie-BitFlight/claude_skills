@@ -379,6 +379,6 @@ Hooks can modify build data, but can't override TOML settings.
 
 ## See Also
 
-- [Build Targets Index](../build-targets/index.md) - Target configuration details
-- [Build Hooks Configuration](../build-hooks/index.md) - Hook configuration and execution
-- [Target Dependencies](./target-dependencies.md) - Dependency configuration
+- `../build-targets/index.md` - Target configuration details
+- `../build-hooks/index.md` - Hook configuration and execution
+- `target-dependencies.md` - Dependency configuration

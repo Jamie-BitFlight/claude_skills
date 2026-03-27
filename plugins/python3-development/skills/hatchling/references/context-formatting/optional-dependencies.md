@@ -419,7 +419,7 @@ Benefits:
 
 ## Related Topics
 
-- [Global Context Formatting Fields](./global-fields.md) — Available context fields and modifiers
-- [Environment-Specific Context Fields](./environment-fields.md) — Fields for Hatch environments
-- [Dynamic Configuration](./dynamic-configuration.md) — Programmatic metadata setup
-- [Configuration Interpolation](./configuration-interpolation.md) — Advanced field nesting
+- `global-fields.md` — Available context fields and modifiers
+- `environment-fields.md` — Fields for Hatch environments
+- `dynamic-configuration.md` — Programmatic metadata setup
+- `configuration-interpolation.md` — Advanced field nesting

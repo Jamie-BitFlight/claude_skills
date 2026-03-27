@@ -380,7 +380,7 @@ hatch build -t wheel:optimized
 
 ## See Also
 
-- [Multi-Version Builds](../build-targets/multi-version-builds.md) - Building multiple targets with versions
-- [Wheel Builder](../build-targets/wheel-builder.md) - Wheel-specific version strategies
-- [Build Hooks](../build-hooks/index.md) - Hooks to customize version behavior
-- [Build Targets Index](../build-targets/index.md) - Available build targets
+- `../build-targets/multi-version-builds.md` - Building multiple targets with versions
+- `../build-targets/wheel-builder.md` - Wheel-specific version strategies
+- `../build-hooks/index.md` - Hooks to customize version behavior
+- `../build-targets/index.md` - Available build targets

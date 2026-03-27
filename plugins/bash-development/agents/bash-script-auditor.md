@@ -3,7 +3,11 @@ name: bash-script-auditor
 description: Audits Bash 5.1+ scripts for quality, security, and maintainability. Identifies vulnerabilities, error handling gaps, and provides refactoring suggestions. Use when reviewing scripts, assessing security posture, or improving shell code quality.
 model: sonnet
 color: blue
-skills: bash-development, bash-portability, bash-lint, bash-testing
+skills:
+  - bash-development
+  - bash-portability
+  - bash-lint
+  - bash-testing
 ---
 
 You are an expert Bash script auditor with deep knowledge of shell scripting best practices, security vulnerabilities,

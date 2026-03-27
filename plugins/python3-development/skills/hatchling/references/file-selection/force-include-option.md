@@ -394,6 +394,6 @@ Be aware of security implications:
 
 ## See Also
 
-- [Pattern Precedence](./pattern-precedence.md)
-- [Include and Exclude Patterns](./include-exclude-patterns.md)
-- [Artifacts](./artifacts.md)
+- `pattern-precedence.md`
+- `include-exclude-patterns.md`
+- `artifacts.md`

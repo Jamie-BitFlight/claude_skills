@@ -9,8 +9,8 @@ Metadata hooks provide mechanisms for dynamically injecting and modifying projec
 
 ## Navigation
 
-- [Metadata Hooks System](./metadata-hooks.md) - Hook configuration, built-in hooks, execution flow
-- [Custom Metadata Hooks](./custom-hooks.md) - Implementing custom hooks with MetadataHookInterface
+- `metadata-hooks.md` - Hook configuration, built-in hooks, execution flow
+- `custom-hooks.md` - Implementing custom hooks with MetadataHookInterface
 
 ## When to Use Metadata Hooks
 
@@ -59,6 +59,6 @@ class CustomMetadataHook(MetadataHookInterface):
 
 ## Related Topics
 
-- [Dynamic Metadata Fields](../project-metadata/dynamic-metadata.md) - Declaring fields as dynamic
-- [Metadata Options](../project-metadata/metadata-options.md) - Configuration options
-- [Custom Build Hooks](../build-hooks/index.md) - Build-time hook system (different from metadata hooks)
+- `../project-metadata/dynamic-metadata.md` - Declaring fields as dynamic
+- `../project-metadata/metadata-options.md` - Configuration options
+- `../build-hooks/index.md` - Build-time hook system (different from metadata hooks)

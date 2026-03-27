@@ -104,7 +104,7 @@ Django>=3.2,!=4.0,<5.0    # At least 3.2, not 4.0, before 5.0
 numpy~=1.20               # Compatible with 1.20
 </eg>
 
-**PEP 440 Version Specifiers**: See [core-metadata.md](./core-metadata.md) for detailed version scheme.
+**PEP 440 Version Specifiers**: See `core-metadata.md` for detailed version scheme.
 
 #### Environment Markers (Optional)
 
@@ -230,7 +230,7 @@ my-package @ https://github.com/user/project/archive/main.zip
 
 Version specifiers are defined in PEP 440 and control which package versions are acceptable.
 
-**Full Reference**: See [core-metadata.md](./core-metadata.md) for PEP 440 version scheme details.
+**Full Reference**: See `core-metadata.md` for PEP 440 version scheme details.
 
 ### Compatible Release Clause
 
@@ -402,6 +402,6 @@ Hatchling supports:
 ## Related Standards
 
 - [PEP 508 - Dependency Specification](https://peps.python.org/pep-0508/)
-- [PEP 440 - Version Identification](./core-metadata.md)
-- [PEP 621 - Project Metadata](./pep-references.md#project-metadata-specification-pep-621)
-- [Core Metadata Specifications](./core-metadata.md)
+- `core-metadata.md`
+- `pep-references.md#project-metadata-specification-pep-621`
+- `core-metadata.md`

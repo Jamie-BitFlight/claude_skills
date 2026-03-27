@@ -344,6 +344,6 @@ include = ["src/", "tests/", "setup.py"]
 
 ## See Also
 
-- [Artifact Directories](./artifact-directories.md) - Output directory configuration
-- [Force Include Permissions and Symlinks](./force-include.md) - Adding arbitrary files
-- [Path Rewriting with Sources](./path-rewriting.md) - Package path configuration
+- `artifact-directories.md` - Output directory configuration
+- `force-include.md` - Adding arbitrary files
+- `path-rewriting.md` - Package path configuration

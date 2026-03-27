@@ -1,6 +1,6 @@
 ---
 name: dot-dash
-description: Start or manage the dot-dash live session dashboard
+description: Use when starting, stopping, or checking the dot-dash live session dashboard — a real-time browser UI that monitors all active Claude Code sessions, streams transcripts, and supports prompt injection
 ---
 
 # dot-dash

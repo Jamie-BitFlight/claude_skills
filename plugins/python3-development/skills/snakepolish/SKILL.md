@@ -223,6 +223,6 @@ If an implementation is blocked:
 
 ## References
 
-- [stinkysnake skill](../stinkysnake/SKILL.md) - Parent workflow
-- [python-cli-architect agent](../../agents/python-cli-architect.md) - Implementation agent
-- [python3-development skill](../python3-development/SKILL.md) - Modern Python patterns
+- `../stinkysnake/SKILL.md` - Parent workflow
+- `../../agents/python-cli-architect.md` - Implementation agent
+- `../python3-development/SKILL.md` - Modern Python patterns

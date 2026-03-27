@@ -16,7 +16,7 @@ import time as _time
 from datetime import UTC, datetime as _datetime
 from io import StringIO as _StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -29,12 +29,19 @@ from . import models as _models, operations
 from .artifact_provider import GitHubArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
-from .github import IssueNode as _IssueNode, get_github as _get_github, sync_issues_graphql as _sync_issues_graphql
+from .github import (
+    IssueNode as _IssueNode,
+    get_github as _get_github,
+    probe_backend_status as _probe_backend_status,
+    sync_issues_graphql as _sync_issues_graphql,
+)
 from .models import (
     ArtifactContent,
     ArtifactEntry,
     ArtifactStatus,
     ArtifactType,
+    BackendAvailability as _BackendAvailability,
+    BackendStatus as _BackendStatus,
     BacklogError,
     DispatchItemRecord as _DispatchItemRecord,
     DispatchSpawnSummary as _DispatchSpawnSummary,
@@ -52,6 +59,99 @@ if TYPE_CHECKING:
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
 _enc: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
+
+# Fields searched by default when no field-specific prefix is given.
+_SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
+
+# Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
+_REGEX_SLASH_MIN_LEN = 2
+
+
+def _item_field_text(item: dict[str, str | bool], field: str) -> str:
+    """Return the casefolded text for a single field of an item dict."""
+    return str(item.get(field, "") or "").casefold()
+
+
+def _item_matches_term(item: dict[str, str | bool], term: str) -> bool:
+    """Return True if a single search term matches the item.
+
+    Supported term forms (evaluated in order):
+    - ``/pattern/`` or ``regex:pattern`` — compiled regex matched against all
+      default search fields joined with a space.
+    - ``field:value`` — substring match restricted to a named field
+      (``title``, ``section``, ``topic``, ``type``).  Unknown field names fall
+      back to full-text substring match.
+    - plain text — case-insensitive substring match across all default fields
+      (existing behaviour, fully preserved).
+    """
+    term = term.strip()
+    if not term:
+        return True
+
+    # Regex form: /pattern/ or regex:pattern
+    if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
+        pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
+        try:
+            pattern = _re.compile(pattern_str, _re.IGNORECASE)
+        except _re.error:
+            # Invalid regex — fall through to plain substring match on the raw term.
+            pass
+        else:
+            haystack = " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
+            return bool(pattern.search(haystack))
+
+    # Field-specific form: field:value
+    if ":" in term:
+        field, _, value = term.partition(":")
+        field = field.strip().lower()
+        value = value.strip().casefold()
+        if field in _SEARCH_FIELDS:
+            return value in _item_field_text(item, field)
+        # Unknown field prefix — treat as plain text (fall through).
+
+    # Plain text — existing case-insensitive substring match across all fields.
+    needle = term.casefold()
+    return needle in " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
+
+
+def _apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
+    """Filter items using the full-text search query syntax.
+
+    Query syntax (case-insensitive keywords):
+    - ``term1 OR term2``  — item matches if either term matches.
+    - ``term1 AND term2`` — item matches only if both terms match.
+    - Bare text without AND/OR — original substring behaviour (single term).
+
+    OR and AND keywords are whitespace-delimited and case-insensitive.  Mixed
+    AND/OR in a single query is not supported; AND takes precedence when both
+    appear.
+
+    Each individual term supports:
+    - ``/regex/`` or ``regex:pattern`` — regex match
+    - ``field:value`` — field-specific substring match
+    - plain text — substring match across all default fields
+
+    Returns:
+        Filtered list of items that match the search query.
+    """
+    search = search.strip()
+    if not search:
+        return items
+
+    # Tokenise on whitespace-delimited AND / OR operators (case-insensitive).
+    upper = search.upper()
+    if " AND " in upper:
+        # Split on first-level AND; each part is a term (may itself contain spaces
+        # for field:value terms like "title:auth deploy").
+        and_parts = _re.split(r"(?i)\s+AND\s+", search)
+        return [item for item in items if all(_item_matches_term(item, part) for part in and_parts)]
+
+    if " OR " in upper:
+        or_parts = _re.split(r"(?i)\s+OR\s+", search)
+        return [item for item in items if any(_item_matches_term(item, part) for part in or_parts)]
+
+    # No operator — treat entire query as a single term (existing behaviour).
+    return [item for item in items if _item_matches_term(item, search)]
 
 
 def _parse_args() -> argparse.Namespace:
@@ -129,6 +229,42 @@ async def backlog_add(
         return {"error": str(e), **out.to_dict()}
 
 
+def _format_backend_status_message(status: _BackendStatus) -> str:
+    """Format a single-line human-readable backend status string for the messages list.
+
+    When reachable, the format is:
+        ``Backend: GitHub, Backend availability: reachable, Backend items (N open / M total)``
+
+    When unavailable (any non-reachable state), the format is:
+        ``Backend: GitHub, Backend availability: <state>, Backend items (--- open / --- total)[cache: N open / M total]``
+
+    Args:
+        status: Populated BackendStatus from probe_backend_status().
+
+    Returns:
+        Formatted status string.
+    """
+    availability_label = (
+        status.availability.value if isinstance(status.availability, _BackendAvailability) else str(status.availability)
+    )
+    if (
+        status.availability == _BackendAvailability.REACHABLE
+        and status.open_count is not None
+        and status.total_count is not None
+    ):
+        return (
+            f"Backend: {status.name}, Backend availability: {availability_label}, "
+            f"Backend items ({status.open_count} open / {status.total_count} total)"
+        )
+    cache_open = status.cache_open_count
+    cache_total = status.cache_total_count
+    return (
+        f"Backend: {status.name}, Backend availability: {availability_label}, "
+        f"Backend items (--- open / --- total)"
+        f"[cache: {cache_open} open / {cache_total} total]"
+    )
+
+
 @mcp.tool
 async def backlog_list(
     from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
@@ -169,9 +305,14 @@ async def backlog_list(
         str | None,
         Field(
             description=(
-                "Case-insensitive substring search across title, section, topic, and type simultaneously. "
-                "Unlike title= which only matches the title field, search= matches any of these fields. "
-                "Combine with other filters to narrow results further."
+                "Full-text search across title, section, topic, and type simultaneously. "
+                "Supports OR/AND operators (e.g. 'auth OR deploy'), "
+                "regex patterns (/pattern/ or regex:pattern), "
+                "field-specific search (title:auth, type:bug, topic:devops, section:P1), "
+                "and plain case-insensitive substring matching (existing behaviour). "
+                "OR/AND are whitespace-delimited and case-insensitive. "
+                "Mixed AND/OR in a single query is not supported; AND takes precedence. "
+                "Combine with other filters (section=, type=, topic=) to narrow results further."
             )
         ),
     ] = None,
@@ -199,7 +340,9 @@ async def backlog_list(
     Use type_ to filter by metadata.type exact match (e.g. Bug, Feature).
     Use topic to filter by metadata.topic substring match.
     Use include_closed=true to include items with terminal status (done, resolved, closed).
-    Use search to search across title, section, topic, and type simultaneously.
+    Use search for full-text search across title, section, topic, and type.
+    Search supports OR/AND operators (e.g. 'auth OR deploy'), regex (/pattern/ or regex:pattern),
+    field-specific syntax (title:auth, type:bug, topic:devops), and plain substring matching.
     Use offset and limit to paginate results. When limit=0, auto-pagination keeps the
     response under 4400 tokens (cl100k_base encoding). When has_more=true, call again
     with the offset shown in next_call.
@@ -213,38 +356,43 @@ async def backlog_list(
     """
     out = Output()
     try:
-        result = await asyncio.to_thread(
-            operations.list_items,
-            from_github=from_github,
-            label=label,
-            section=section,
-            status=status,
-            title=title_filter,
-            type_=type_,
-            topic=topic,
-            include_closed=include_closed,
-            output=out,
+        result, backend_status = await asyncio.gather(
+            asyncio.to_thread(
+                operations.list_items,
+                from_github=from_github,
+                label=label,
+                section=section,
+                status=status,
+                title=title_filter,
+                type_=type_,
+                topic=topic,
+                include_closed=include_closed,
+                output=out,
+            ),
+            asyncio.to_thread(_probe_backend_status),
         )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        backend_status = await asyncio.to_thread(_probe_backend_status)
+        return {"error": str(e), "backend": backend_status.model_dump(), **out.to_dict()}
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
-    # cast narrows from the heterogeneous value union returned by dict.get().
-    all_items = cast("list[dict[str, str | bool]]", result.get("items", []))
+    # Filter to dict elements only to narrow the heterogeneous value union.
+    raw_items = result.get("items", [])
+    all_items: list[dict[str, str | bool]] = (
+        [x for x in raw_items if isinstance(x, dict)] if isinstance(raw_items, list) else []
+    )
 
     # Apply cross-field search filter when requested.
     if search is not None:
-        needle = search.casefold()
-        filtered: list[dict] = []
-        for item in all_items:
-            haystack = " ".join(
-                str(item.get(field, "") or "") for field in ("title", "section", "topic", "type")
-            ).casefold()
-            if needle in haystack:
-                filtered.append(item)
-        all_items = filtered
+        all_items = _apply_search_filter(all_items, search)
 
     total = len(all_items)
+
+    # ADR-5: cache_open_count reflects the same filter as the items list.
+    backend_status.cache_open_count = total
+
+    # Append the human-readable backend status line to the messages list.
+    out.info(_format_backend_status_message(backend_status))
 
     # Determine effective page limit.
     if limit > 0:
@@ -263,7 +411,6 @@ async def backlog_list(
 
     page_items = all_items[offset : offset + effective_limit]
     has_more = (offset + effective_limit) < total
-    next_offset = offset + effective_limit
 
     pagination: dict = {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more}
     response: dict = {
@@ -271,16 +418,23 @@ async def backlog_list(
         "items": page_items,
         "count": len(page_items),
         "pagination": pagination,
+        "backend": backend_status.model_dump(),
         **out.to_dict(),
     }
     if has_more:
-        response["next_call"] = f"backlog_list(offset={next_offset}, limit={effective_limit})"
+        response["next_call"] = f"backlog_list(offset={offset + effective_limit}, limit={effective_limit})"
     return response
 
 
 @mcp.tool
 async def backlog_view(
     selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
+    summary: Annotated[
+        bool,
+        Field(
+            description="When True (default), returns a compact 5-field routing manifest (issue_number, title, labels, status, plan_path) plus _full_chars and _hint. When False, returns the full response unchanged."
+        ),
+    ] = True,
     include_content: Annotated[
         bool,
         Field(
@@ -304,12 +458,15 @@ async def backlog_view(
     Use show and since to filter entry blocks within sections.
     Use include_content=False to get a compact response with section names and
     entry counts only, omitting the full body and entry content.
+    Use summary=False to receive the full response; summary=True (default) returns
+    a 5-field routing manifest with _full_chars so the caller knows what was skipped.
 
     Returns:
-        Dict with title, priority, issue, plan, file_path, body, sections
-        metadata, and output messages/warnings. On error, dict contains an
-        error key. When include_content=False, body and sections are omitted
-        and sections_metadata (list of section name/count dicts) is included.
+        When summary=True (default): compact dict with issue_number, title, labels,
+        status, plan_path, _summary, _full_chars, and _hint.
+        When summary=False: dict with title, priority, issue, plan, file_path, body,
+        sections metadata, and output messages/warnings.
+        On error, dict contains an error key.
     """
     out = Output()
     try:
@@ -330,7 +487,33 @@ async def backlog_view(
             since=since,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        full_response = {**result, **out.to_dict()}
+        if not summary:
+            return full_response
+        # Build compact routing manifest.
+        full_chars = len(_json.dumps(full_response))
+        body_text = str(result.get("body") or "")
+        plan_match = _re.search(r"^[Pp]lan:\s*(\S+)", body_text, _re.MULTILINE)
+        plan_path: str | None = plan_match.group(1) if plan_match else None
+        issue_field = str(result.get("issue") or "")
+        issue_number: int | None = None
+        num_match = _re.search(r"(\d+)", issue_field)
+        if num_match:
+            issue_number = int(num_match.group(1))
+        labels_raw = result.get("labels", [])
+        labels: list[str] = labels_raw if isinstance(labels_raw, list) else []
+        state = str(result.get("state") or "")
+        status: str = "closed" if state == "closed" else "open"
+        return {
+            "issue_number": issue_number,
+            "title": result.get("title", ""),
+            "labels": labels,
+            "status": status,
+            "plan_path": plan_path,
+            "_summary": True,
+            "_full_chars": full_chars,
+            "_hint": f"Call backlog_view(selector='{selector}', summary=False) for full body, comments, and timeline",
+        }
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
@@ -1257,6 +1440,56 @@ async def backlog_comment_issue(
 
 
 @mcp.tool
+async def backlog_list_comments(
+    issue_number: Annotated[int, Field(description="GitHub issue number (without #)")],
+    limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
+    offset: Annotated[int, Field(description="Number of comments to skip")] = 0,
+) -> dict:
+    """List comments on a GitHub issue.
+
+    Returns:
+        Dict with comments (list of {id, author, created_at, updated_at, preview}),
+        count, has_more, and output messages/warnings.
+        On error, dict contains an error key.
+    """
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.list_comments, issue_number=issue_number, limit=limit, offset=offset, output=out
+        )
+        return {**result, **out.to_dict()}
+    except BacklogError as e:
+        return {"error": str(e), **out.to_dict()}
+
+
+@mcp.tool
+async def backlog_read_comment(
+    issue_number: Annotated[int, Field(description="GitHub issue number (without #)")],
+    comment_id: Annotated[
+        int,
+        Field(
+            description="REST comment database ID (integer). Use the GitHub REST API or issue comment list to obtain this ID."
+        ),
+    ],
+) -> dict:
+    """Read the full body of a single comment on a GitHub issue.
+
+    Returns:
+        Dict with id (GraphQL node ID), author, created_at, updated_at,
+        body (full Markdown — no truncation), and output messages/warnings.
+        On error, dict contains an error key.
+    """
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.read_comment, issue_number=issue_number, comment_id=comment_id, output=out
+        )
+        return {**result, **out.to_dict()}
+    except BacklogError as e:
+        return {"error": str(e), **out.to_dict()}
+
+
+@mcp.tool
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
@@ -2134,7 +2367,8 @@ def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
         if isinstance(raw, list):
             backlog_items = raw
         elif isinstance(raw, dict):
-            backlog_items = cast("list[dict]", raw.get("items", []))
+            raw_backlog = raw.get("items", [])
+            backlog_items = [x for x in raw_backlog if isinstance(x, dict)] if isinstance(raw_backlog, list) else []
     except Exception:  # noqa: BLE001
         out.warn("Could not fetch backlog items for slug matching. Continuing without fallback.")
 

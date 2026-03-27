@@ -243,5 +243,5 @@ For force-include paths:
 ## See Also
 
 - [Wheel Specification (PEP 427)](https://www.python.org/dev/peps/pep-0427/)
-- [Building Source Distributions](./building-sdist.md)
-- [Build Output Customization](./output-customization.md)
+- `building-sdist.md`
+- `output-customization.md`

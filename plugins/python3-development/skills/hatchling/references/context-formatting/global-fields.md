@@ -337,7 +337,7 @@ dependencies = [
 
 When assisting users further, reference:
 
-- [Environment-Specific Context Fields](./environment-fields.md) — Fields specific to Hatch environments
-- [Optional Dependencies Formatting](./optional-dependencies.md) — Context formatting for optional dependency groups
-- [Dynamic Configuration](./dynamic-configuration.md) — Programmatic metadata and dynamic field resolution
-- [Configuration Interpolation](./configuration-interpolation.md) — Advanced field nesting and chaining
+- `environment-fields.md` — Fields specific to Hatch environments
+- `optional-dependencies.md` — Context formatting for optional dependency groups
+- `dynamic-configuration.md` — Programmatic metadata and dynamic field resolution
+- `configuration-interpolation.md` — Advanced field nesting and chaining

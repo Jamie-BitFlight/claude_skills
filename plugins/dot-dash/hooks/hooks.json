@@ -1,24 +1,37 @@
 {
+  "description": "dot-dash plugin hooks — live session monitoring and prompt injection",
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.cjs\"",
-        "description": "Register new Claude Code session with dot-dash server"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.cjs\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionEnd": [
       {
-        "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-stop.cjs\"",
-        "description": "Deregister session from dot-dash server"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-stop.cjs\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt-injector.cjs\"",
-        "description": "Check injection queue and prepend queued message to user prompt"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt-injector.cjs\"",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }

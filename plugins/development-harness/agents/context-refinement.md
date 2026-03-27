@@ -4,7 +4,8 @@ description: Updates task context manifest with discoveries from current work se
 tools: Read, Grep, Glob, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam__sam_update
 model: sonnet
 color: purple
-skills: subagent-contract
+skills:
+  - subagent-contract
 ---
 
 # Context Refinement Agent

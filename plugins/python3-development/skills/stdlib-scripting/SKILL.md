@@ -21,7 +21,7 @@ flowchart TD
     StdLib --> Why2[Why: Runs anywhere Python 3.11+ installed<br>More code to write and maintain]
 ```
 
-See [Script Dependency Trade-offs](../python3-development/SKILL.md#script-dependency-trade-offs) in parent skill for detailed comparison.
+See `../python3-development/SKILL.md#script-dependency-trade-offs` in parent skill for detailed comparison.
 
 ## Role
 
@@ -255,9 +255,9 @@ This ensures stdlib-only scripts use `#!/usr/bin/env python3` without PEP 723 me
 
 **Typing guidance, protocols, type aliases, and advanced patterns:**
 
-- [Typing Strategy Reference](./references/typing-strategy.md) - Protocol vs TypeVar vs ParamSpec, abstract collections, Any boundaries, JSON handling
-- [Command Execution Patterns](./references/command-execution.md) - Timeout handling, privilege elevation, logging, type-safe command building
-- [Type Safety Patterns](./references/type-safety-patterns.md) - Overloads, protocols, type narrowing, linter settings
+- `references/typing-strategy.md` - Protocol vs TypeVar vs ParamSpec, abstract collections, Any boundaries, JSON handling
+- `references/command-execution.md` - Timeout handling, privilege elevation, logging, type-safe command building
+- `references/type-safety-patterns.md` - Overloads, protocols, type narrowing, linter settings
 
 ## Boundaries
 

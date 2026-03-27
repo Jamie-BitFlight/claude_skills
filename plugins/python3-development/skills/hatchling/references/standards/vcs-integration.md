@@ -364,7 +364,7 @@ git log --oneline
 
 ## Related Standards
 
-- [PEP 427 - Wheel Format](./distribution-formats.md)
-- [PEP 440 - Version Identification](./core-metadata.md)
-- [PEP 517 - Build Backend Interface](./pep-references.md#build-system-interface-pep-517)
-- [PEP 625 - Source Distribution Filename](./pep-references.md#source-distribution-format-pep-625)
+- `distribution-formats.md`
+- `core-metadata.md`
+- `pep-references.md#build-system-interface-pep-517`
+- `pep-references.md#source-distribution-format-pep-625`

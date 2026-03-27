@@ -553,7 +553,7 @@ PIP_DISABLE_PIP_VERSION_CHECK = "1"
 
 ## Related Topics
 
-- [Build Environment Configuration](./build-environment-configuration.md)
-- [Build Dependencies Management](./build-dependencies-management.md)
-- [UV vs Pip Installer](./uv-vs-pip-installer.md)
-- [Environment Variables](./environment-variables.md)
+- `build-environment-configuration.md`
+- `build-dependencies-management.md`
+- `uv-vs-pip-installer.md`
+- `environment-variables.md`

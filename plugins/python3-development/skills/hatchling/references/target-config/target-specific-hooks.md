@@ -277,6 +277,6 @@ python -m pdb hatch_build.py
 
 ## See Also
 
-- [Build Hooks Index](../build-hooks/index.md) - Complete hook documentation
-- [Custom Build Hooks](../build-hooks/custom-build-hooks.md) - Writing custom hooks
-- [Build Data Passing](../build-hooks/build-data-passing.md) - Modifying build data
+- `../build-hooks/index.md` - Complete hook documentation
+- `../build-hooks/custom-build-hooks.md` - Writing custom hooks
+- `../build-hooks/build-data-passing.md` - Modifying build data

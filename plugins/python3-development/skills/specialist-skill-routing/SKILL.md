@@ -1,6 +1,6 @@
 ---
 name: specialist-skill-routing
-description: Context-aware skill router for Python development agents. Scan task description against trigger list and activate matching specialist skills before starting work. Covers Typer, Rich, Textual, FastMCP/MCP, ty type checker, uv, Hatchling, TOML editing, pre-commit/prek, async Python, PyPI packaging, complex linting, and technical debt modernization.
+description: Use as the routing layer for Python development tasks — matches task descriptions against trigger lists and activates specialist skills before starting work. Covers Typer, Rich, Textual, FastMCP/MCP, ty type checker, uv, Hatchling, TOML editing, pre-commit/prek, async Python, PyPI packaging, complex linting, and technical debt modernization.
 ---
 
 Scan your task description against the triggers below. For every match, call `Skill(skill="...")` **before** writing any architecture, plan, or code. Multiple matches → load all matching skills.

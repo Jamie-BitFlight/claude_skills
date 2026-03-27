@@ -25,6 +25,7 @@ from backlog_core.models import (
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
     from pytest_mock import MockerFixture
 
@@ -314,6 +315,29 @@ class TestDiscoverViaGit:
         result = _discover_via_git()
 
         assert result is None
+
+    def test_discover_via_git_uses_repo_root_not_process_cwd(
+        self, tmp_path: Path, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """git.Repo is opened at ``_REPO_ROOT`` so MCP cwd outside the project still works.
+
+        Tests: _discover_via_git passes resolved project root into GitPython
+        How: Point ``_REPO_ROOT`` at tmp_path; mock ``git.Repo``; assert call args.
+        Why: stdio MCP servers often have cwd in plugin cache or ``/``, not the repo.
+        """
+        import backlog_core.models as models
+
+        project_root = tmp_path / "my-app"
+        project_root.mkdir()
+        monkeypatch.setattr(models, "_REPO_ROOT", project_root)
+        mock_repo_ctor = mocker.patch(
+            "backlog_core.models.git.Repo", return_value=_make_mock_repo(mocker, "git@github.com:acme/widget.git")
+        )
+
+        result = _discover_via_git()
+
+        assert result == "acme/widget"
+        mock_repo_ctor.assert_called_once_with(str(project_root), search_parent_directories=True)
 
     @pytest.mark.parametrize(
         ("url", "expected_slug"),

@@ -345,7 +345,7 @@ Check for version conflicts between:
 
 ## See Also
 
-- [Target-Specific Dependencies](./target-dependencies.md) - Direct target dependencies
-- [Hook Dependencies](../build-hooks/hook-dependencies.md) - Dependencies for build hooks
-- [Build Dependencies Management](../build-environment/build-dependencies-management.md) - Global build configuration
-- [Build Targets Index](../build-targets/index.md) - Available build targets
+- `target-dependencies.md` - Direct target dependencies
+- `../build-hooks/hook-dependencies.md` - Dependencies for build hooks
+- `../build-environment/build-dependencies-management.md` - Global build configuration
+- `../build-targets/index.md` - Available build targets

@@ -324,6 +324,6 @@ Help users understand precedence:
 
 ## Navigation
 
-- [Build Options](./build-options.md) - General build configuration
-- [Environment Variables](./environment-variables.md) - All build-time variables
-- [Reproducible Builds](./reproducible-builds.md) - Consistent output
+- `build-options.md` - General build configuration
+- `environment-variables.md` - All build-time variables
+- `reproducible-builds.md` - Consistent output

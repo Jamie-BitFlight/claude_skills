@@ -16,7 +16,7 @@ flowchart TD
     Q -->|Companion script| PY["Python 3.11+ with PEP 723<br>Evidence: 27+ scripts in plugins/**/scripts/"]
     Q -->|Pre-commit hook| PY2["Python 3.11+<br>Evidence: auto_sync_manifests.py, validate_frontmatter.py"]
     Q -->|CI/CD wrapper| Bash["Bash acceptable<br>Simple wrappers only"]
-    Q -->|Anything else| Never["Never use bash for hooks or scripts"]
+    Q -->|Anything else| UsePY["Use Python 3.11+<br>Bash is for simple CI/CD wrappers only"]
 ```
 
 **Pattern Templates:**
@@ -38,8 +38,6 @@ Python script (PEP 723):
 # dependencies = ["typer>=0.21.0"]
 # ///
 ```
-
-Bash scripts prohibited for new hooks/companion scripts. Legacy bash scripts may remain but avoid creating new ones.
 
 ## Python File and Directory Naming
 

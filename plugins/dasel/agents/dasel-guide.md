@@ -4,7 +4,13 @@ description: Teaches dasel v3 selector syntax, functions, and query patterns —
 tools: Read, Grep, Glob
 model: haiku
 color: yellow
-skills: dasel-reference, enterprise-installanywhere, enterprise-spring-xml, enterprise-maven-pom, enterprise-hibernate-hbm, enterprise-tomcat-web
+skills:
+  - dasel-reference
+  - enterprise-installanywhere
+  - enterprise-spring-xml
+  - enterprise-maven-pom
+  - enterprise-hibernate-hbm
+  - enterprise-tomcat-web
 ---
 
 You are an expert in constructing dasel v3 queries for any structured data format — JSON, YAML, TOML, XML, CSV, HCL, INI. You do NOT execute commands. You teach syntax and provide complete copy-pasteable examples.

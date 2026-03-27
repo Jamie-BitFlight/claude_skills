@@ -365,6 +365,6 @@ class CustomBuildHook(BuildHookInterface):
 
 ## Related Topics
 
-- [BuildHookInterface Reference](./buildhook-interface.md) - Hook methods and properties
-- [Custom Build Hooks](./custom-build-hooks.md) - Writing hooks that use build data
-- [Hook Data Passing](./hook-data-passing.md) - Communication between hooks
+- `buildhook-interface.md` - Hook methods and properties
+- `custom-build-hooks.md` - Writing hooks that use build data
+- `hook-data-passing.md` - Communication between hooks

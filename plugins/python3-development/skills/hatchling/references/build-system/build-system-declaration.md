@@ -263,6 +263,6 @@ build-backend = "hatchling.build"
 
 ## Navigation
 
-- [PEP Standards](./pep-standards.md) - Detailed PEP 517/518 compliance
-- [Build Options](./build-options.md) - Configure build behavior
-- [Build Hooks](../build-hooks/index.md) - Extend build process
+- `pep-standards.md` - Detailed PEP 517/518 compliance
+- `build-options.md` - Configure build behavior
+- `../build-hooks/index.md` - Extend build process

@@ -11,40 +11,40 @@ This directory contains comprehensive documentation of Hatchling's plugin system
 
 ### By Plugin Type
 
-1. **[Builder Plugins](./builder-plugins.md)** - Create distributable packages
+1. **`builder-plugins.md`** - Create distributable packages
 
    - Wheel builder
    - Source distribution (sdist) builder
    - Custom/third-party builders
    - Interface: `BuilderInterface`
 
-2. **[Build Hook Plugins](./build-hook-plugins.md)** - Execute code during builds
+2. **`build-hook-plugins.md`** - Execute code during builds
 
    - Initialize phase (before build)
    - Finalize phase (after build)
    - Clean phase (with --clean flag)
    - Interface: `BuildHookInterface`
 
-3. **[Metadata Hook Plugins](./metadata-hook-plugins.md)** - Dynamically modify project metadata
+3. **`metadata-hook-plugins.md`** - Dynamically modify project metadata
 
    - Dynamic version, description, dependencies
    - Custom classifiers
    - Interface: `MetadataHookInterface`
 
-4. **[Version Source Plugins](./version-source-plugins.md)** - Determine project version
+4. **`version-source-plugins.md`** - Determine project version
 
    - VCS tags (via hatch-vcs)
    - Code extraction (regex/file parsing)
    - Environment variables
    - Interface: `VersionSourceInterface`
 
-5. **[Version Scheme Plugins](./version-scheme-plugins.md)** - Validate version bumping
+5. **`version-scheme-plugins.md`** - Validate version bumping
 
    - PEP 440 validation
    - Custom version formats
    - Interface: `VersionSchemeInterface`
 
-6. **[hatch-vcs Plugin](./hatch-vcs-plugin.md)** - VCS-based versioning (Git/Mercurial)
+6. **`hatch-vcs-plugin.md`** - VCS-based versioning (Git/Mercurial)
    - Complete guide to hatch-vcs
    - Configuration and usage patterns
    - Migration from setuptools
@@ -53,13 +53,13 @@ This directory contains comprehensive documentation of Hatchling's plugin system
 
 **I want to...**
 
-- **Customize the build process** → [Build Hook Plugins](./build-hook-plugins.md)
-- **Auto-generate version files** → [hatch-vcs Plugin](./hatch-vcs-plugin.md)
-- **Read version from VCS tags** → [Version Source Plugins](./version-source-plugins.md) + [hatch-vcs Plugin](./hatch-vcs-plugin.md)
-- **Create a custom package format** → [Builder Plugins](./builder-plugins.md)
-- **Generate metadata dynamically** → [Metadata Hook Plugins](./metadata-hook-plugins.md)
-- **Enforce versioning rules** → [Version Scheme Plugins](./version-scheme-plugins.md)
-- **Create a reusable plugin** → [Plugin System Overview](./index.md)
+- **Customize the build process** → `build-hook-plugins.md`
+- **Auto-generate version files** → `hatch-vcs-plugin.md`
+- **Read version from VCS tags** → `version-source-plugins.md` + `hatch-vcs-plugin.md`
+- **Create a custom package format** → `builder-plugins.md`
+- **Generate metadata dynamically** → `metadata-hook-plugins.md`
+- **Enforce versioning rules** → `version-scheme-plugins.md`
+- **Create a reusable plugin** → `index.md`
 
 ## Key Concepts
 
@@ -126,7 +126,7 @@ file = "description.txt"
 
 **Use**: Auto-generate version file from VCS tags
 
-**Solution**: [hatch-vcs Plugin](./hatch-vcs-plugin.md)
+**Solution**: `hatch-vcs-plugin.md`
 
 ```toml
 [tool.hatch.version]
@@ -140,7 +140,7 @@ version-file = "src/mypackage/_version.py"
 
 **Use**: Compile Cython files, generate code, build extensions
 
-**Solution**: [Build Hook Plugins](./build-hook-plugins.md)
+**Solution**: `build-hook-plugins.md`
 
 ```python
 class CythonBuildHook(BuildHookInterface):
@@ -159,7 +159,7 @@ class CythonBuildHook(BuildHookInterface):
 
 **Use**: Set dependencies from `requirements.txt`, description from README
 
-**Solution**: [Metadata Hook Plugins](./metadata-hook-plugins.md)
+**Solution**: `metadata-hook-plugins.md`
 
 ```python
 class RequirementsTxtHook(MetadataHookInterface):
@@ -174,7 +174,7 @@ class RequirementsTxtHook(MetadataHookInterface):
 
 **Use**: Calendar versioning (YYYY.MM.DD), custom schemes
 
-**Solution**: [Version Scheme Plugins](./version-scheme-plugins.md)
+**Solution**: `version-scheme-plugins.md`
 
 ```python
 class CalendarVersionScheme(VersionSchemeInterface):
@@ -356,7 +356,7 @@ version = "0.1.0"
 
 ## Reference Materials
 
-- [Hatchling Plugin System Overview](./index.md)
+- `index.md`
 - [Official Hatch Documentation](https://hatch.pypa.io/latest/plugins/)
 - [pluggy Documentation](https://pluggy.readthedocs.io/)
 - [PEP 517 - Build System Interface](https://peps.python.org/pep-0517/)

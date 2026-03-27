@@ -759,7 +759,7 @@ class TestSubprocessTimeoutContract:
         result = run_quality_gates(["cmd"], timeout=300.0)
 
         # Assert
-        assert "300.0s" in result.results[0].stderr
+        assert "300s" in result.results[0].stderr
 
     def test_timeout_result_has_passed_false(self, mocker: MockerFixture) -> None:
         """CommandResult.passed is False when TimeoutExpired is raised.

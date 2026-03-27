@@ -9,7 +9,7 @@ This directory provides comprehensive reference documentation for configuring Ha
 
 ## Files in This Reference
 
-### [index.md](./index.md) - Main Reference (642 lines)
+### `index.md` - Main Reference (642 lines)
 
 Complete guide to the sdist build target configuration:
 
@@ -22,7 +22,7 @@ Complete guide to the sdist build target configuration:
 
 **Start here** to understand sdist configuration fundamentals and common patterns.
 
-### [core-metadata-versions.md](./core-metadata-versions.md) - Metadata Versions (315 lines)
+### `core-metadata-versions.md` - Metadata Versions (315 lines)
 
 Detailed documentation on core metadata versions:
 
@@ -34,7 +34,7 @@ Detailed documentation on core metadata versions:
 
 **Read this** when working with license metadata or upgrading metadata versions.
 
-### [vcs-integration.md](./vcs-integration.md) - File Selection via VCS (482 lines)
+### `vcs-integration.md` - File Selection via VCS (482 lines)
 
 Comprehensive guide to Hatchling's version control system integration:
 
@@ -47,7 +47,7 @@ Comprehensive guide to Hatchling's version control system integration:
 
 **Consult this** when configuring which files to include/exclude.
 
-### [legacy-setup-py.md](./legacy-setup-py.md) - Legacy Support (327 lines)
+### `legacy-setup-py.md` - Legacy Support (327 lines)
 
 Complete reference for backward compatibility:
 
@@ -59,7 +59,7 @@ Complete reference for backward compatibility:
 
 **Review this** if supporting Python 2.7 or very old pip versions.
 
-### [unix-socket-handling.md](./unix-socket-handling.md) - Socket Files (362 lines)
+### `unix-socket-handling.md` - Socket Files (362 lines)
 
 Detailed handling of UNIX socket files:
 
@@ -71,7 +71,7 @@ Detailed handling of UNIX socket files:
 
 **Check this** if encountering socket files in your source tree.
 
-### [reproducible-builds.md](./reproducible-builds.md) - Reproducible Builds (443 lines)
+### `reproducible-builds.md` - Reproducible Builds (443 lines)
 
 Complete guide to creating byte-for-byte identical distributions:
 
@@ -89,23 +89,23 @@ Complete guide to creating byte-for-byte identical distributions:
 
 | When configuring...               | Consult...                                               |
 | --------------------------------- | -------------------------------------------------------- |
-| Basic sdist configuration         | [index.md](./index.md)                                   |
-| Core metadata version selection   | [core-metadata-versions.md](./core-metadata-versions.md) |
-| File inclusion/exclusion patterns | [vcs-integration.md](./vcs-integration.md)               |
-| Python 2.7 or legacy pip support  | [legacy-setup-py.md](./legacy-setup-py.md)               |
-| UNIX socket file handling         | [unix-socket-handling.md](./unix-socket-handling.md)     |
-| Reproducible build requirements   | [reproducible-builds.md](./reproducible-builds.md)       |
+| Basic sdist configuration         | `index.md`                                   |
+| Core metadata version selection   | `core-metadata-versions.md` |
+| File inclusion/exclusion patterns | `vcs-integration.md`               |
+| Python 2.7 or legacy pip support  | `legacy-setup-py.md`               |
+| UNIX socket file handling         | `unix-socket-handling.md`     |
+| Reproducible build requirements   | `reproducible-builds.md`       |
 
 ### By Topic
 
 | Topic                  | Primary                                                  | Related                                                  |
 | ---------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| Configuration Options  | [index.md](./index.md)                                   | [legacy-setup-py.md](./legacy-setup-py.md)               |
-| File Selection         | [vcs-integration.md](./vcs-integration.md)               | [index.md](./index.md)                                   |
-| Metadata               | [core-metadata-versions.md](./core-metadata-versions.md) | [index.md](./index.md)                                   |
-| Backward Compatibility | [legacy-setup-py.md](./legacy-setup-py.md)               | [core-metadata-versions.md](./core-metadata-versions.md) |
-| Special Files          | [unix-socket-handling.md](./unix-socket-handling.md)     | [vcs-integration.md](./vcs-integration.md)               |
-| Build Integrity        | [reproducible-builds.md](./reproducible-builds.md)       | [index.md](./index.md)                                   |
+| Configuration Options  | `index.md`                                   | `legacy-setup-py.md`               |
+| File Selection         | `vcs-integration.md`               | `index.md`                                   |
+| Metadata               | `core-metadata-versions.md` | `index.md`                                   |
+| Backward Compatibility | `legacy-setup-py.md`               | `core-metadata-versions.md` |
+| Special Files          | `unix-socket-handling.md`     | `vcs-integration.md`               |
+| Build Integrity        | `reproducible-builds.md`       | `index.md`                                   |
 
 ## Key Topics Covered
 
@@ -148,7 +148,7 @@ Complete guide to creating byte-for-byte identical distributions:
 
 ### Control file inclusion
 
-See [vcs-integration.md](./vcs-integration.md):
+See `vcs-integration.md`:
 
 ```toml
 [tool.hatch.build.targets.sdist]
@@ -158,7 +158,7 @@ exclude = ["*.pyc", "__pycache__"]
 
 ### Update core metadata version
 
-See [core-metadata-versions.md](./core-metadata-versions.md):
+See `core-metadata-versions.md`:
 
 ```toml
 [tool.hatch.build.targets.sdist]
@@ -167,7 +167,7 @@ core-metadata-version = "2.4"  # Latest with PEP 639
 
 ### Support legacy Python
 
-See [legacy-setup-py.md](./legacy-setup-py.md):
+See `legacy-setup-py.md`:
 
 ```toml
 [tool.hatch.build.targets.sdist]
@@ -176,7 +176,7 @@ support-legacy = true
 
 ### Create reproducible builds
 
-See [reproducible-builds.md](./reproducible-builds.md):
+See `reproducible-builds.md`:
 
 ```bash
 export SOURCE_DATE_EPOCH=$(date +%s)

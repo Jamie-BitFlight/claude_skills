@@ -342,6 +342,6 @@ When disabled:
 
 ## Navigation
 
-- [Build Options](./build-options.md) - General build configuration
-- [Environment Variables](./environment-variables.md) - Build environment setup
-- [Build Hooks](../build-hooks/index.md) - Custom build processing
+- `build-options.md` - General build configuration
+- `environment-variables.md` - Build environment setup
+- `../build-hooks/index.md` - Custom build processing

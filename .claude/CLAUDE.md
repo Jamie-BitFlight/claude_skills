@@ -47,7 +47,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
-| Starting complex task | `/plugin-creator:rt-ica` | High Quality Details |
+| Starting complex task | `/dh:rt-ica` | High Quality Details |
 | Delegating to sub-agent | `/delegate` | Enforces delegation framework |
 | Reviewing agent output | `/hallucination-detector:hallucination-audit` | Checks hallucinations, unverified causality |
 | Claiming task complete | `/verify` | Runs "Is It Done?" checklist |
@@ -111,8 +111,11 @@ When triggered: STOP. Write the file paths and observations gathered so far into
 flowchart TD
     T{Task type?}
     T -->|"Clear requirements, known output:<br>write file, fix known error, add test"| Exec[Execution — act immediately]
+    T -->|"Known bug, CI failure, broken behavior"| Fix[Fix — reproduction first]
     T -->|"Unknown cause, unclear path:<br>debug failure, diagnose perf, flaky test"| Inv[Investigation — hypothesis first]
     Exec --> V[Verify after completion]
+    Fix --> FD[".claude/rules/fix-delegation-discipline.md<br>Reproduce → Fix → Validate against reproduction"]
+    FD --> V
     Inv --> H[Load /scientific-method:scientific-thinking] --> V
 ```
 
@@ -207,6 +210,10 @@ flowchart TD
 SOURCE: Experimental validation (2026-02-02). Context-gathering: 4/4 correct. Explore: 2/4 correct.
 
 </sub_agent_selection>
+
+---
+
+- Scratch Directory Convention: `.claude/rules/scratch-directory.md`
 
 ---
 

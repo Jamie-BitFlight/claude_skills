@@ -21,6 +21,6 @@ stage_skills:
 quality_gates:
   format: "uv run ruff format {files}"
   lint: "uv run ruff check {files}"
-  typecheck: "uv run mypy {files}"
+  typecheck: "uv run ty check {files}"
   test: "uv run pytest tests/ --tb=short"
   standards: "/python3-development:modernpython"

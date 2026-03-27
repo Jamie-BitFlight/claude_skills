@@ -173,7 +173,7 @@ High-level API for executing shell commands remotely or locally. Built on top of
 - Building deployment scripts
 - Task automation across multiple hosts
 
-**See Also:** [Fabric Documentation](./modern-modules/fabric.md)
+**See Also:** `modern-modules/fabric.md`
 
 ---
 
@@ -271,7 +271,7 @@ Modern HTTP client library with both sync and async support. Designed as next-ge
 - Need both sync and async in one library
 - Testing ASGI/WSGI applications
 
-**See Also:** [httpx Deep Dive](./modern-modules/httpx.md)
+**See Also:** `modern-modules/httpx.md`
 
 ---
 
@@ -343,7 +343,7 @@ MQTT client library for IoT and message-based applications.
 - Integrating with MQTT brokers
 - Message-based system communication
 
-**See Also:** [paho-mqtt Documentation](./modern-modules/paho-mqtt.md)
+**See Also:** `modern-modules/paho-mqtt.md`
 
 ---
 
@@ -667,7 +667,7 @@ Drop-in replacement for asyncio event loop, written in Cython for performance.
 - Deploying async applications
 - Speeding up existing asyncio code
 
-**See Also:** [uvloop Documentation](./modern-modules/uvloop.md)
+**See Also:** `modern-modules/uvloop.md`
 
 ---
 
@@ -725,7 +725,7 @@ Class definition library with minimal boilerplate, validators, and converters.
 - Building domain models
 - Performance-critical class definitions
 
-**See Also:** [attrs Documentation](./modern-modules/attrs.md)
+**See Also:** `modern-modules/attrs.md`
 
 ---
 
@@ -798,7 +798,7 @@ Load environment variables from .env files.
 - Separating config from code
 - Local development workflows
 
-**See Also:** [python-dotenv Documentation](./modern-modules/python-dotenv.md)
+**See Also:** `modern-modules/python-dotenv.md`
 
 ---
 
@@ -1042,7 +1042,7 @@ Bidirectional dictionary supporting fast forward and reverse lookups.
 - Reverse lookups required
 - Enum-like behavior
 
-**See Also:** [bidict Documentation](./modern-modules/bidict.md)
+**See Also:** `modern-modules/bidict.md`
 
 ---
 
@@ -1067,7 +1067,7 @@ Set of utility functions for common programming tasks.
 - Extending standard library
 - Utility collections
 
-**See Also:** [boltons Documentation](./modern-modules/boltons.md)
+**See Also:** `modern-modules/boltons.md`
 
 ---
 
@@ -1092,7 +1092,7 @@ Persistent disk-based dictionary-like cache for large datasets.
 - Building caches that survive restarts
 - Replacing Redis for simple cases
 
-**See Also:** [python-diskcache Documentation](./modern-modules/python-diskcache.md)
+**See Also:** `modern-modules/python-diskcache.md`
 
 ---
 
@@ -1117,7 +1117,7 @@ Dictionary with attribute-style access (dot notation).
 - Nested data access
 - Configuration management
 
-**See Also:** [Box Documentation](./modern-modules/box.md)
+**See Also:** `modern-modules/box.md`
 
 ---
 
@@ -1142,7 +1142,7 @@ Signal (event) dispatching library for loose coupling.
 - Loose coupling between components
 - Application signaling
 
-**See Also:** [blinker Documentation](./modern-modules/blinker.md)
+**See Also:** `modern-modules/blinker.md`
 
 ---
 
@@ -1239,7 +1239,7 @@ Project templating and scaffolding tool.
 - Reproducible project structures
 - Creating new projects
 
-**See Also:** [Copier Documentation](./modern-modules/copier.md)
+**See Also:** `modern-modules/copier.md`
 
 ---
 
@@ -1289,7 +1289,7 @@ Python library for interacting with Git repositories.
 - Repository analysis
 - Deployment scripts
 
-**See Also:** [GitPython Documentation](./modern-modules/GitPython.md)
+**See Also:** `modern-modules/GitPython.md`
 
 ---
 
@@ -1322,7 +1322,7 @@ Workflow orchestration and task scheduling platform.
 - Task scheduling and execution
 - Production workflow management
 
-**See Also:** [Prefect Documentation](./modern-modules/prefect.md)
+**See Also:** `modern-modules/prefect.md`
 
 ---
 
@@ -1349,7 +1349,7 @@ Automation and testing framework with keyword-driven syntax.
 - Non-technical test authoring
 - End-to-end testing
 
-**See Also:** [Robot Framework Documentation](./modern-modules/robotframework.md)
+**See Also:** `modern-modules/robotframework.md`
 
 ---
 
@@ -1374,7 +1374,7 @@ Command line utility to create self-contained zip applications.
 - Shipping without pip
 - Simple application distribution
 
-**See Also:** [Shiv Documentation](./modern-modules/shiv.md)
+**See Also:** `modern-modules/shiv.md`
 
 ---
 
@@ -1399,7 +1399,7 @@ Friendlier datetime and timezone handling library.
 - Human-readable time formatting
 - Datetime parsing
 
-**See Also:** [Arrow Documentation](./modern-modules/arrow.md)
+**See Also:** `modern-modules/arrow.md`
 
 ---
 

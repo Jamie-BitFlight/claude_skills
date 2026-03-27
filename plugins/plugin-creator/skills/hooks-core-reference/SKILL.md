@@ -42,7 +42,7 @@ For working examples and patterns, activate `Skill(skill: "plugin-creator:hooks-
 
 > **Note:** The Agent tool was renamed from Task in Claude Code v2.1.63. Use `Agent` as the matcher name for tool-based hooks targeting subagent operations.
 
-For a visual overview of the full event sequence, see the [hooks lifecycle diagram](../hooks-guide/references/hooks-lifecycle.png).
+For a visual overview of the full event sequence, see the `../hooks-guide/references/hooks-lifecycle.png`.
 
 ---
 

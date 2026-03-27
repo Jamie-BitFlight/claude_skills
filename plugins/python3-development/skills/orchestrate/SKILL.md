@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: 'Orchestrate a Python development task using specialized agents. Invoke as /orchestrate <task description> or /orchestrate alone to use conversation context. Triggers on: build a Python CLI, add a feature, write tests, refactor Python code, debug Python, code review, any multi-agent Python workflow.'
+description: Use when orchestrating a Python development task via specialized agents. Activates on "build a Python CLI", "add a feature", "write tests", "refactor Python code", "debug Python", "code review", or any multi-agent Python workflow. Invoke as /orchestrate with a task description or alone to use conversation context.
 argument-hint: '[task description]'
 ---
 
@@ -12,7 +12,7 @@ If `orchestrate` is empty, derive the task from the conversation so far. If no t
 
 ## Step 1 — Read the orchestration guide (MANDATORY)
 
-Read [Python Development Orchestration Guide](../python3-development/references/python-development-orchestration.md).
+Read `../python3-development/references/python-development-orchestration.md`.
 
 Do not proceed to Step 2 until this file has been read. It contains agent selection criteria, workflow patterns, quality gates, and multi-agent chaining patterns you will need to fill in Step 2.
 
@@ -40,7 +40,7 @@ If you cannot fill in workflow pattern and agent chain from the guide read in St
 
 ```mermaid
 flowchart TD
-    P1["Phase 1 — Plan<br>Skill: /dh:add-new-feature<br>Args: task description<br>Produces: plan/tasks-{N}-{slug}.md"]
+    P1["Phase 1 — Plan<br>Skill: /dh:add-new-feature<br>Args: task description<br>Produces: ~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml"]
     P1 --> P1Q{"add-new-feature result?"}
     P1Q -->|"BLOCKED — plan-validator gate failed"| P1Blocked["Surface blocker to user<br>Await clarification<br>STOP"]
     P1Q -->|"PASS — task file produced"| P2

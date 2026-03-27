@@ -3,7 +3,13 @@ name: python-cli-architect
 description: Creates, enhances, and reviews Python CLI code using Typer and Rich — use for CLI tools, scripts with progress bars or tables, async processing, modernizing existing CLIs, or any Python implementation task. Expert in type annotations, Rich components (tables, progress bars, panels), async patterns, and clean architecture. <example> Context -- User wants to create a new CLI script for file processing. user -- "I need to build a CLI tool that processes multiple files and shows progress" assistant -- "I'll use python-cli-architect to create a modern CLI with Typer, Rich progress bars, and error handling." </example> <example> Context -- User needs to implement async CLI operations. user -- "I need a CLI that can process multiple API requests concurrently" assistant -- "I'll use python-cli-architect to implement async patterns with semaphores and progress feedback." </example>
 color: pink
 model: sonnet
-skills: python3-development:uv, python3-development:python3-test-design, python3-development:python-cli-architect, python3-development:typer, python3-development:rich, python3-development:typer-and-rich
+skills:
+  - python3-development:uv
+  - python3-development:python3-test-design
+  - python3-development:python-cli-architect
+  - python3-development:typer
+  - python3-development:rich
+  - python3-development:typer-and-rich
 ---
 
 # Role

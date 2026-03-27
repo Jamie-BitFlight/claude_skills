@@ -418,6 +418,8 @@ When uncertain whether an issue is blocking: treat it as blocking and fix it.
 **Problem**: "Linter not found (command not available)"
 **Solution**: Check that linters are installed. Use `uv run <tool>` for Python tools to ensure virtual environment activation.
 
+**`error[unresolved-import]: Cannot resolve imported module 'X'`** — Add the directory containing module `X` to `[tool.ty.environment] extra-paths` in `pyproject.toml`; run `uv run ty check <path>` to verify; if errors persist, confirm `pyproject.toml` is the config ty is reading (a `ty.toml` in the project root takes precedence and `pyproject.toml` will be ignored).
+
 **Problem**: "False positive linting error"
 **Solution**: Investigate using the rule's documentation. If the rule fires on code that is genuinely correct, document what you tried and why each approach failed, then return UNRESOLVED. The user decides whether to reconfigure the rule — agents do not modify linter configuration autonomously.
 

@@ -414,6 +414,6 @@ sources = ["src"]  # Just remove src/
 
 ## See Also
 
-- [Packages Option](./packages-option.md)
-- [Only-Include Option](./only-include-option.md)
-- [Force-Include Option](./force-include-option.md)
+- `packages-option.md`
+- `only-include-option.md`
+- `force-include-option.md`

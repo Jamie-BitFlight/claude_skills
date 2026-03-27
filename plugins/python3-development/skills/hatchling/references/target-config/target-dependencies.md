@@ -304,6 +304,6 @@ hatch -v build
 
 ## See Also
 
-- [Hook Dependencies](../build-hooks/hook-dependencies.md) - Dependencies for build hooks
-- [Target Configurations](./index.md) - Overview of all target configuration options
-- [Build Dependencies Management](../build-environment/build-dependencies-management.md) - Global build dependencies
+- `../build-hooks/hook-dependencies.md` - Dependencies for build hooks
+- `index.md` - Overview of all target configuration options
+- `../build-environment/build-dependencies-management.md` - Global build dependencies

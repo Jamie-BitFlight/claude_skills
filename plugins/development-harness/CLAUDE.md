@@ -16,6 +16,7 @@ Language-agnostic development process harness that orchestrates feature developm
 - Every stage produces a file-based artifact (stateless handoff)
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
 - Without a language manifest, the harness falls back to general-purpose agents
+- Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
 
 ---
 
@@ -92,6 +93,15 @@ All artifacts are written to the per-project state directory (`~/.dh/projects/{p
 The `.dh/` directory in the repository root (Tier 1) holds committed project configuration. State files live outside the repo at `~/.dh/`, preventing pollution of the working tree.
 
 Full conventions in [./skills/development-harness/references/artifact-conventions.md](./skills/development-harness/references/artifact-conventions.md).
+
+**Gotcha — `plan_dir` is NOT a repo-relative path:**
+
+The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related MCP tools defaults to `"plan"`. This does NOT mean `{repo_root}/plan/`. The SAM MCP server resolves it through `dh_paths.plan_dir()`, which produces `~/.dh/projects/{project-slug}/plan/`. The repo's `plan/` directory contains only stub placeholders; all real plan YAML files live in the DH state directory outside the repo.
+
+Two distinct types of plan data exist:
+
+- **SAM task plan YAML files** (`P{NNN}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.
+- **Plan artifact markdown files** (`plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`, etc.) — written to the repo root worktree's `plan/` directory. Not visible from isolated worktrees. Access via `artifact_read(issue_number, artifact_type)` — not filesystem path.
 
 ---
 

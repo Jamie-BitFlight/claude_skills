@@ -3,7 +3,12 @@ name: hook-creator
 description: Creates Claude Code hook scripts for plugins — generates Node.js .cjs files, wires hooks.json, selects correct event and scope. Use when creating hooks, wiring PostToolUse or PreToolUse logic, enforcing validation on tool calls, or building SessionStart context injection. Trigger phrases — create a hook, add a hook to my plugin, build a PostToolUse hook, I need a hook that. <example>User asks to block rm -rf with a PreToolUse hook — hook-creator generates the .cjs script and wires hooks.json.</example> <example>User asks to inject project context on SessionStart — hook-creator builds the context injection script.</example> <example>User asks to run prettier after every Write — hook-creator wires a PostToolUse formatter hook.</example>
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash
-skills: plugin-creator:hooks-guide, plugin-creator:hooks-core-reference, plugin-creator:hooks-io-api, plugin-creator:hooks-patterns, plugin-creator:hook-creator
+skills:
+  - plugin-creator:hooks-guide
+  - plugin-creator:hooks-core-reference
+  - plugin-creator:hooks-io-api
+  - plugin-creator:hooks-patterns
+  - plugin-creator:hook-creator
 color: blue
 ---
 

@@ -352,7 +352,7 @@ skip-gitignored = true
 
 ## See Also
 
-- [Building Wheels](./building-wheels.md)
-- [Building Source Distributions](./building-sdist.md)
-- [Build Output Customization](./output-customization.md)
-- [Python Build Tool](./python-build-tool.md)
+- `building-wheels.md`
+- `building-sdist.md`
+- `output-customization.md`
+- `python-build-tool.md`

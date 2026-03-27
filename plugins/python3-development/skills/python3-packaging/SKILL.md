@@ -21,7 +21,7 @@ Consult `../python3-development/references/python3-standards.md` when applying s
 
 1. **Analyze existing project** structure and configuration
 2. **Create or update** pyproject.toml with complete configuration
-3. **Configure tools** (ruff, mypy, pytest, hatch/setuptools)
+3. **Configure tools** (ruff, ty/mypy per `python3-standards.md`, pytest, hatch/setuptools)
 4. **Set up dependencies** with proper version constraints
 5. **Verify configuration** by running build
 
@@ -81,9 +81,11 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.12.0",
     "pytest-asyncio>=0.23.0",
-    "mypy>=1.8.0",
+    "ty>=0.0.0a1",
     "ruff>=0.9.0",
 ]
+# Type checker: ty is the default for new work. If the project uses mypy, replace ty with
+# mypy>=1.8.0 here. See python3-standards.md for type checker selection guidance.
 
 [project.scripts]
 my-cli = "my_package.cli:app"
@@ -304,7 +306,9 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "ruff>=0.9.0",
-    "mypy>=1.8.0",
+    "ty>=0.0.0a1",
+    # Type checker: ty is the default. Replace with mypy>=1.8.0 if the project uses mypy.
+    # See python3-standards.md for type checker selection guidance.
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -357,13 +361,18 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+  # Type checker hook: ty is the default for new work.
+  # If the project uses mypy, replace this block with:
+  #   - repo: https://github.com/pre-commit/mirrors-mypy
+  #     rev: v1.8.0
+  #     hooks:
+  #       - id: mypy
+  #         args: [--strict]
+  # See python3-standards.md for type checker selection guidance.
+  - repo: https://github.com/astral-sh/ty
+    rev: 0.0.0-alpha.11
     hooks:
-      - id: mypy
-        additional_dependencies:
-          - types-requests
-        args: [--strict]
+      - id: ty
 ```
 
 ---
@@ -379,7 +388,9 @@ uv pip install -e ".[dev]"
 # Run linters
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
-uv run mypy src/
+# Type check — ty is default; use uv run mypy src/ if project hooks/CI run mypy
+# Type checker selection: see python3-standards.md
+uv run ty check src/
 
 # Run tests
 uv run pytest tests/ -v --cov=src

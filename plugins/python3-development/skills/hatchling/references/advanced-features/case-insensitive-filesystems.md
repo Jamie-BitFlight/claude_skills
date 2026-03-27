@@ -398,6 +398,6 @@ src/
 
 ## See Also
 
-- [Path Rewriting with Sources](./path-rewriting.md) - Package path configuration
-- [Distributed Artifacts](./distributed-artifacts.md) - Understanding artifact naming
-- [Build Context](./build-context.md) - Platform detection in hooks
+- `path-rewriting.md` - Package path configuration
+- `distributed-artifacts.md` - Understanding artifact naming
+- `build-context.md` - Platform detection in hooks

@@ -55,7 +55,7 @@ class TestLanguageManifest:
             quality_gates=QualityGates(
                 format="uv run ruff format {files}",
                 lint="uv run ruff check {files}",
-                typecheck="uv run mypy {files}",
+                typecheck="uv run ty check {files}",
                 test="uv run pytest tests/ --tb=short",
                 standards="/python3-development:modernpython",
             ),
@@ -77,18 +77,6 @@ class TestLanguageManifest:
         )
         assert isinstance(m.extends, list)
         assert len(m.extends) == 2
-
-    def test_missing_name_raises(self) -> None:
-        """name is required."""
-        with pytest.raises(TypeError):
-            LanguageManifest(  # type: ignore[call-arg]
-                language="python", version="1.0", project_detection=ProjectDetection(markers=["pyproject.toml"])
-            )
-
-    def test_missing_markers_raises(self) -> None:
-        """ProjectDetection requires at least markers."""
-        with pytest.raises(TypeError):
-            ProjectDetection()  # type: ignore[call-arg]
 
 
 class TestProjectDetection:

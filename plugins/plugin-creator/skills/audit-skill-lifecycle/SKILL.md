@@ -44,7 +44,7 @@ Extract all `Skill(skill:)`, `Skill(skill=)`, `Agent(command:)`, and `@agent` re
 
 ### Step 2: Analysis — Run Audit Dimensions
 
-Execute 7 audit dimensions as defined in [Skill Lifecycle Audit Specifications](./references/skill-lifecycle-audit.md). Each dimension analyzes a different aspect of semantic coherence:
+Execute 7 audit dimensions as defined in `references/skill-lifecycle-audit.md`. Each dimension analyzes a different aspect of semantic coherence:
 
 | Dimension | Checks | Output Type |
 |-----------|--------|-------------|
@@ -245,7 +245,7 @@ Prioritized actionable fixes:
 
 ## Additional Resources
 
-- [Skill Lifecycle Audit Specifications](./references/skill-lifecycle-audit.md) — detailed audit dimension definitions, detection strategies, tier implementation guidance, and examples of each finding type
+- `references/skill-lifecycle-audit.md` — detailed audit dimension definitions, detection strategies, tier implementation guidance, and examples of each finding type
 
 ## What This Audit Does NOT Do
 

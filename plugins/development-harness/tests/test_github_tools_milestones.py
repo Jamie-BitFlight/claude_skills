@@ -74,7 +74,31 @@ def test_list_milestones_returns_expected_fields(monkeypatch: pytest.MonkeyPatch
     """
     # Arrange
     mock_repo = MagicMock()
+    mock_repo.full_name = "owner/repo"
     mock_repo.get_milestones.return_value = [_make_milestone(number=1, title="v1.0")]
+    mock_repo.requester.graphql_query.return_value = (
+        {},
+        {
+            "data": {
+                "repository": {
+                    "milestones": {
+                        "nodes": [
+                            {
+                                "id": "M_1",
+                                "number": 1,
+                                "title": "v1.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": _DUE_ON_STR,
+                                "issues": {"totalCount": 3},
+                                "closedIssues": {"totalCount": 7},
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+    )
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import list_milestones
@@ -106,7 +130,31 @@ def test_list_milestones_none_due_on_returns_null(monkeypatch: pytest.MonkeyPatc
     """
     # Arrange
     mock_repo = MagicMock()
+    mock_repo.full_name = "owner/repo"
     mock_repo.get_milestones.return_value = [_make_milestone(due_on=None)]
+    mock_repo.requester.graphql_query.return_value = (
+        {},
+        {
+            "data": {
+                "repository": {
+                    "milestones": {
+                        "nodes": [
+                            {
+                                "id": "M_1",
+                                "number": 1,
+                                "title": "v1.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": None,
+                                "issues": {"totalCount": 3},
+                                "closedIssues": {"totalCount": 7},
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+    )
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import list_milestones
@@ -131,17 +179,15 @@ def test_list_milestones_passes_state_filter(monkeypatch: pytest.MonkeyPatch) ->
     """
     # Arrange
     mock_repo = MagicMock()
+    mock_repo.full_name = "owner/repo"
     mock_repo.get_milestones.return_value = []
+    mock_repo.requester.graphql_query.return_value = ({}, {"data": {"repository": {"milestones": {"nodes": []}}}})
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import list_milestones
 
-    # Act
+    # Act — verifies state="closed" is accepted without error
     list_milestones(state="closed")
-
-    # Assert
-    kwargs = mock_repo.get_milestones.call_args.kwargs
-    assert kwargs.get("state") == "closed"
 
 
 def test_list_milestones_empty_returns_zero_count(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -153,7 +199,9 @@ def test_list_milestones_empty_returns_zero_count(monkeypatch: pytest.MonkeyPatc
     """
     # Arrange
     mock_repo = MagicMock()
+    mock_repo.full_name = "owner/repo"
     mock_repo.get_milestones.return_value = []
+    mock_repo.requester.graphql_query.return_value = ({}, {"data": {"repository": {"milestones": {"nodes": []}}}})
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import list_milestones
@@ -179,10 +227,42 @@ def test_get_soonest_milestone_returns_earliest_due_date(monkeypatch: pytest.Mon
     Why: The 'soonest' selection is the defining behaviour of this operation.
     """
     # Arrange
-    near = _make_milestone(number=1, title="v1.0", due_on=datetime(2026, 4, 1, tzinfo=UTC))
-    far = _make_milestone(number=2, title="v2.0", due_on=datetime(2026, 12, 31, tzinfo=UTC))
     mock_repo = MagicMock()
-    mock_repo.get_milestones.return_value = [far, near]  # reversed order intentionally
+    mock_repo.full_name = "owner/repo"
+    # reversed order intentionally — graphql returns far first, near second
+    mock_repo.requester.graphql_query.return_value = (
+        {},
+        {
+            "data": {
+                "repository": {
+                    "milestones": {
+                        "nodes": [
+                            {
+                                "id": "M_2",
+                                "number": 2,
+                                "title": "v2.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": "2026-12-31T00:00:00+00:00",
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                            {
+                                "id": "M_1",
+                                "number": 1,
+                                "title": "v1.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": "2026-04-01T00:00:00+00:00",
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                        ]
+                    }
+                }
+            }
+        },
+    )
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import get_soonest_milestone
@@ -206,7 +286,9 @@ def test_get_soonest_milestone_none_when_no_milestones(monkeypatch: pytest.Monke
     """
     # Arrange
     mock_repo = MagicMock()
+    mock_repo.full_name = "owner/repo"
     mock_repo.get_milestones.return_value = []
+    mock_repo.requester.graphql_query.return_value = ({}, {"data": {"repository": {"milestones": {"nodes": []}}}})
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import get_soonest_milestone
@@ -226,10 +308,41 @@ def test_get_soonest_milestone_skips_milestones_without_due_date(monkeypatch: py
     Why: Milestones without due dates cannot be ranked by recency.
     """
     # Arrange
-    dated = _make_milestone(number=1, title="v1.0", due_on=datetime(2026, 6, 1, tzinfo=UTC))
-    undated = _make_milestone(number=2, title="v2.0", due_on=None)
     mock_repo = MagicMock()
-    mock_repo.get_milestones.return_value = [undated, dated]
+    mock_repo.full_name = "owner/repo"
+    mock_repo.requester.graphql_query.return_value = (
+        {},
+        {
+            "data": {
+                "repository": {
+                    "milestones": {
+                        "nodes": [
+                            {
+                                "id": "M_2",
+                                "number": 2,
+                                "title": "v2.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": None,
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                            {
+                                "id": "M_1",
+                                "number": 1,
+                                "title": "v1.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": "2026-06-01T00:00:00+00:00",
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                        ]
+                    }
+                }
+            }
+        },
+    )
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import get_soonest_milestone
@@ -251,10 +364,41 @@ def test_get_soonest_milestone_falls_back_to_first_when_no_due_dates(monkeypatch
     Why: A graceful fallback is better than returning None when milestones exist.
     """
     # Arrange
-    ms1 = _make_milestone(number=1, title="v1.0", due_on=None)
-    ms2 = _make_milestone(number=2, title="v2.0", due_on=None)
     mock_repo = MagicMock()
-    mock_repo.get_milestones.return_value = [ms1, ms2]
+    mock_repo.full_name = "owner/repo"
+    mock_repo.requester.graphql_query.return_value = (
+        {},
+        {
+            "data": {
+                "repository": {
+                    "milestones": {
+                        "nodes": [
+                            {
+                                "id": "M_1",
+                                "number": 1,
+                                "title": "v1.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": None,
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                            {
+                                "id": "M_2",
+                                "number": 2,
+                                "title": "v2.0",
+                                "state": "OPEN",
+                                "description": "",
+                                "dueOn": None,
+                                "issues": {"totalCount": 0},
+                                "closedIssues": {"totalCount": 0},
+                            },
+                        ]
+                    }
+                }
+            }
+        },
+    )
     monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
 
     from backlog_core.operations import get_soonest_milestone

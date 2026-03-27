@@ -65,9 +65,11 @@ class TestGetEcosystemOwnedKeys:
         # Arrange
         owned = get_ecosystem_owned_skill_keys()
 
-        # Act / Assert
+        # Act / Assert — use getattr to invoke .add() dynamically, since
+        # frozenset has no .add attribute and ty correctly flags direct calls.
+        method_name = "add"
         with pytest.raises(AttributeError):
-            owned.add("test")
+            getattr(owned, method_name)("test")
 
     def test_description_not_in_owned_keys(self) -> None:
         """Claude Code's 'description' field is not in ecosystem-owned keys.

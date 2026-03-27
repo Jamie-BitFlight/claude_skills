@@ -30,10 +30,10 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Lint with Ruff
-        run: uv run prek run ruff --all-files
+        run: uv run -q prek run ruff --all-files
 
       - name: Check formatting with Ruff
-        run: uv run prek run ruff-format --all-files
+        run: uv run -q prek run ruff-format --all-files
 
   # =============================================================================
   # Python: Type checking with basedpyright
@@ -50,7 +50,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run basedpyright
-        run: uv run --with pep723-loader --with basedpyright pep723-loader basedpyright
+        run: uv run -q --with pep723-loader --with basedpyright pep723-loader basedpyright
 
   # =============================================================================
   # Python: Type checking with ty (Astral)
@@ -71,7 +71,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ty
-        run: uv run ty check .
+        run: uv run -q ty check .
 
   # =============================================================================
   # JavaScript/TypeScript/JSON: Biome linting and formatting (via prek)
@@ -88,7 +88,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run Biome
-        run: uv run prek run biome-check --all-files
+        run: uv run -q prek run biome-check --all-files
 
   # =============================================================================
   # Markdown: markdownlint (via prek)
@@ -105,7 +105,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run markdownlint-cli2
-        run: uv run prek run markdownlint-cli2 --all-files
+        run: uv run -q prek run markdownlint-cli2 --all-files
 
   # =============================================================================
   # Shell: shellcheck and shfmt (via prek)
@@ -122,10 +122,10 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run shellcheck
-        run: uv run prek run shellcheck --all-files
+        run: uv run -q prek run shellcheck --all-files
 
       - name: Run shfmt
-        run: uv run prek run shell-fmt-go --all-files
+        run: uv run -q prek run shell-fmt-go --all-files
 
   # =============================================================================
   # Local hooks: plugin validation (via prek)
@@ -161,7 +161,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Check manifest sync
-        run: uv run prek run auto-sync-manifests --all-files
+        run: uv run -q prek run auto-sync-manifests --all-files
 
   # =============================================================================
   # File hygiene: trailing whitespace, line endings, etc.
@@ -194,9 +194,9 @@ jobs:
           GH_EVENT: ${{ github.event_name }}
         run: |
           if [ "$GH_EVENT" = "pull_request" ]; then
-            uv run prek run --from-ref "$PR_BASE" --to-ref "$PR_HEAD"
+            uv run -q prek run --from-ref "$PR_BASE" --to-ref "$PR_HEAD"
           else
-            uv run prek run --all-files
+            uv run -q prek run --all-files
           fi
 
   # =============================================================================
@@ -217,7 +217,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run pytest
-        run: uv run pytest
+        run: uv run -q pytest
 
   # =============================================================================
   # JavaScript/TypeScript: test suite

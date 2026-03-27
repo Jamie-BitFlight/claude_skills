@@ -388,6 +388,6 @@ exclude = [
 
 ## Navigation
 
-- [Build Options](./build-options.md) - General build configuration
-- [File Selection](../core-concepts/file-selection.md) - Detailed file selection
-- [Artifacts](../core-concepts/artifacts.md) - Including VCS-ignored files
+- `build-options.md` - General build configuration
+- `../core-concepts/file-selection.md` - Detailed file selection
+- `../core-concepts/artifacts.md` - Including VCS-ignored files

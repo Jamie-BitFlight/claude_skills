@@ -252,6 +252,6 @@ sources = [
 
 ## See Also
 
-- [Force Include Permissions and Symlinks](./force-include.md) - File inclusion mechanism
-- [Artifact Directories](./artifact-directories.md) - Output directory configuration
-- [Build Data Passing](./build-data-passing.md) - Dynamic build data modification
+- `force-include.md` - File inclusion mechanism
+- `artifact-directories.md` - Output directory configuration
+- `build-data-passing.md` - Dynamic build data modification

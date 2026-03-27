@@ -57,45 +57,38 @@ class _StubRequestHandler:
         pass
 
 
-_tornado_web_mod.RequestHandler = _StubRequestHandler
-_tornado_mod.web = _tornado_web_mod
+vars(_tornado_web_mod).update({"RequestHandler": _StubRequestHandler})
+vars(_tornado_mod).update({"web": _tornado_web_mod})
 
 # --- holoviews stubs ---
 _hv_mod = types.ModuleType("holoviews")
-_hv_mod.extension = MagicMock()
-_hv_mod.HLine = MagicMock()
-_hv_mod.VLine = MagicMock()
-_hv_mod.Text = MagicMock()
+vars(_hv_mod).update({"extension": MagicMock(), "HLine": MagicMock(), "VLine": MagicMock(), "Text": MagicMock()})
 
 # --- hvplot stubs ---
 _hvplot_mod = types.ModuleType("hvplot")
 _hvplot_pandas_mod = types.ModuleType("hvplot.pandas")
-_hvplot_mod.pandas = _hvplot_pandas_mod
+vars(_hvplot_mod).update({"pandas": _hvplot_pandas_mod})
 
 # --- panel stubs ---
 _pn_mod = types.ModuleType("panel")
-_pn_mod.extension = MagicMock()
-_pn_mod.serve = MagicMock()
-_pn_mod.Tabs = MagicMock()
-_pn_mod.Column = MagicMock()
+vars(_pn_mod).update({"extension": MagicMock(), "serve": MagicMock(), "Tabs": MagicMock(), "Column": MagicMock()})
 
 _pn_pane = types.ModuleType("panel.pane")
-_pn_pane.Markdown = MagicMock()
-_pn_pane.HoloViews = MagicMock()
-_pn_mod.pane = _pn_pane
+vars(_pn_pane).update({"Markdown": MagicMock(), "HoloViews": MagicMock()})
+vars(_pn_mod).update({"pane": _pn_pane})
 
 _pn_widgets = types.ModuleType("panel.widgets")
-_pn_widgets.Tabulator = MagicMock()
-_pn_mod.widgets = _pn_widgets
+vars(_pn_widgets).update({"Tabulator": MagicMock()})
+vars(_pn_mod).update({"widgets": _pn_widgets})
 
 _pn_state = MagicMock()
 _pn_state.add_periodic_callback = MagicMock()
 _pn_state.onload = MagicMock()
-_pn_mod.state = _pn_state
+vars(_pn_mod).update({"state": _pn_state})
 
 _pn_template = types.ModuleType("panel.template")
-_pn_template.FastListTemplate = MagicMock()
-_pn_mod.template = _pn_template
+vars(_pn_template).update({"FastListTemplate": MagicMock()})
+vars(_pn_mod).update({"template": _pn_template})
 
 # Install stubs into sys.modules
 sys.modules["tornado"] = _tornado_mod

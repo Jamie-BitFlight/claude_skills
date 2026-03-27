@@ -429,5 +429,5 @@ pip install -e file:///path/to/package
 
 - [pip Documentation](https://pip.pypa.io/)
 - [Editable Installs (PEP 660)](https://www.python.org/dev/peps/pep-0660/)
-- [Building Wheels](./building-wheels.md)
+- `building-wheels.md`
 - [Development Mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)

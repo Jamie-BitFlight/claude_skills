@@ -171,16 +171,18 @@ def _discover_via_env() -> str | None:
 def _discover_via_git() -> str | None:
     """Parse the ``origin`` remote URL via GitPython to extract ``owner/repo``.
 
-    Uses :class:`git.Repo` with ``search_parent_directories=True`` to locate
-    the repository, then reads the ``origin`` remote URL and applies regex
-    patterns for SSH SCP, SSH protocol, and HTTPS URL formats.
+    Opens :class:`git.Repo` at :data:`_REPO_ROOT` (resolved project root from
+    :func:`dh_paths.infer_project_root`, ``DH_PROJECT_ROOT``, etc.), with
+    ``search_parent_directories=True`` so a subdirectory of a worktree still
+    resolves.  Does **not** use the process cwd — MCP stdio servers often
+    start with cwd outside the user's repository (plugin cache, ``/``, IDE).
 
     Returns:
         Validated ``owner/repo`` slug, or ``None`` when no git repository is
         found, there is no ``origin`` remote, or the URL cannot be parsed.
     """
     try:
-        repo = git.Repo(search_parent_directories=True)
+        repo = git.Repo(_REPO_ROOT, search_parent_directories=True)
         url = repo.remote().url
     except (git.InvalidGitRepositoryError, git.NoSuchPathError, ValueError):
         return None
@@ -651,6 +653,43 @@ class ArtifactStatus(StrEnum):
     CURRENT = "current"
     SUPERSEDED = "superseded"
     ARCHIVED = "archived"
+
+
+class BackendAvailability(StrEnum):
+    """Availability state of the GitHub backend.
+
+    Describes whether the GitHub API is reachable and authenticated, or why it
+    is not.  Used by :class:`BackendStatus` to summarise the probe result
+    returned on every ``backlog_list`` call.
+    """
+
+    REACHABLE = "reachable"
+    NOT_CHECKED = "not_checked"
+    NEEDS_AUTHENTICATION = "needs_authentication"
+    RATE_LIMITED = "rate_limited"
+    ERROR = "error"
+
+
+class BackendStatus(BaseModel):
+    """GitHub backend availability status included in every ``backlog_list`` response.
+
+    Populated by ``probe_backend_status()`` in ``backlog_core.github``.  Fields
+    default to their "unknown" states so the model is always safe to construct
+    without arguments.
+
+    Fields ``open_count`` and ``total_count`` are ``None`` when the backend was
+    not reachable.  ``cache_open_count`` and ``cache_total_count`` are derived
+    from the local list result in ``server.py``, not from the probe.
+    """
+
+    name: str = "GitHub"
+    availability: BackendAvailability = BackendAvailability.NOT_CHECKED
+    open_count: int | None = None
+    total_count: int | None = None
+    cache_open_count: int = 0
+    cache_total_count: int = 0
+    last_sync: str = ""
+    error: str = ""
 
 
 class ArtifactEntry(BaseModel):

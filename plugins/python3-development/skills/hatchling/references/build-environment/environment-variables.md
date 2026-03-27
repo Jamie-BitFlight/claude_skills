@@ -479,7 +479,7 @@ env-exclude = [
 
 ## Related Topics
 
-- [Build Environment Configuration](./build-environment-configuration.md)
-- [UV vs Pip Installer](./uv-vs-pip-installer.md)
-- [Build Dependencies Management](./build-dependencies-management.md)
-- [Environment Isolation](./environment-isolation.md)
+- `build-environment-configuration.md`
+- `uv-vs-pip-installer.md`
+- `build-dependencies-management.md`
+- `environment-isolation.md`

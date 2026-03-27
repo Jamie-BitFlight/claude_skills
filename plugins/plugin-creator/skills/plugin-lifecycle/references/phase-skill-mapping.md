@@ -9,7 +9,7 @@ Lookup reference: which skill or agent handles each phase, and the exact invocat
 | 1: Assess | `/plugin-creator:assessor` | `Skill(skill="plugin-creator:assessor")` |
 | 2: Research | `/plugin-creator:feature-discovery` | `Skill(skill="plugin-creator:feature-discovery")` |
 | 2: Research | 4-way parallel researchers | subagent_type="plugin-creator:plugin-assessor" x3 + "general-purpose" x1 |
-| 3: Design | `/plugin-creator:rt-ica` | `Skill(skill="plugin-creator:rt-ica")` |
+| 3: Design | `/dh:rt-ica` | `Skill(skill="dh:rt-ica")` |
 | 4: Create | `/plugin-creator:skill-creator` | `Skill(skill="plugin-creator:skill-creator")` |
 | 4: Create | `/plugin-creator:agent-creator` | `Skill(skill="plugin-creator:agent-creator")` |
 | 4: Create | `/plugin-creator:hook-creator` | `Skill(skill="plugin-creator:hook-creator")` |

@@ -59,7 +59,7 @@ Build dependency graph:
 
 ### Step 2: Analysis — Run Audit Dimensions
 
-Execute 8 semantic audits across 3 depth tiers. See [Agent Lifecycle Audit Specifications](./references/agent-lifecycle-audit.md) for detailed dimension definitions.
+Execute 8 semantic audits across 3 depth tiers. See `references/agent-lifecycle-audit.md` for detailed dimension definitions.
 
 | Dimension | Tier | Detection Strategy | Output |
 |-----------|------|-------------------|--------|
@@ -412,5 +412,5 @@ Agent `test-runner` has instruction "Run pytest tests" but tools field is `["Rea
 
 ## Additional Resources
 
-- [Agent Lifecycle Audit Specifications](./references/agent-lifecycle-audit.md) — detailed audit dimension definitions, detection strategies, and severity criteria
-- [Skill Lifecycle Audit](../audit-skill-lifecycle/SKILL.md) — complementary audit for workflow coherence
+- `references/agent-lifecycle-audit.md` — detailed audit dimension definitions, detection strategies, and severity criteria
+- `../audit-skill-lifecycle/SKILL.md` — complementary audit for workflow coherence

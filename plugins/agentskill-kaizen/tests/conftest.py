@@ -61,11 +61,10 @@ _real_fastmcp = sys.modules.get("fastmcp")
 _real_fastmcp_exc = sys.modules.get("fastmcp.exceptions")
 
 _stub_fastmcp = _types.ModuleType("fastmcp")
-_stub_fastmcp.FastMCP = _StubMCP
-_stub_fastmcp.Context = AsyncMock
+vars(_stub_fastmcp).update({"FastMCP": _StubMCP, "Context": AsyncMock})
 
 _stub_exceptions = _types.ModuleType("fastmcp.exceptions")
-_stub_exceptions.ToolError = _ToolError
+vars(_stub_exceptions).update({"ToolError": _ToolError})
 
 sys.modules["fastmcp"] = _stub_fastmcp
 sys.modules["fastmcp.exceptions"] = _stub_exceptions

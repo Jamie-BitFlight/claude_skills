@@ -204,8 +204,41 @@ mcp__plugin_dh_backlog__backlog_list(
     topic="matching",           # filter by metadata.topic — case-insensitive substring match
 )
 # Every response item always includes state (open/closed) and status (workflow status)
-# Returns: {items: [{title, priority, issue, plan, type, topic}], messages, warnings}
+# Returns: {items: [{title, priority, issue, plan, type, topic}], backend: {...}, messages, warnings}
 ```
+
+The `backend` dict is always present in the response, regardless of the `from_github` parameter.
+It reports the GitHub API availability status checked on every `backlog_list` call.
+
+```python
+# backend dict shape
+{
+    "name": "GitHub",
+    "availability": "reachable",   # see BackendAvailability values below
+    "open_count": 47,              # live open issue count (0 when not reachable)
+    "total_count": 123,            # live total issue count (0 when not reachable)
+    "cache_open_count": 45,        # open count from local cache (same filters as items)
+    "cache_total_count": 120,      # total count from local cache
+    "last_sync": "2026-03-23T10:30:00Z",  # ISO timestamp of most recent sync (empty string if never synced)
+    "error": "",                   # error message if availability is not "reachable"
+}
+```
+
+`cache_open_count` reflects the same label/section/status/title/type/topic filters used for the
+`items` result — it is derived from the same local list, not a separate count (ADR-5).
+
+#### BackendAvailability Values
+
+| Value | Meaning |
+|-------|---------|
+| `reachable` | GitHub API responded successfully |
+| `not_checked` | Probe has not run yet (default initial state) |
+| `needs_authentication` | `GITHUB_TOKEN` is not set |
+| `rate_limited` | Received 403 from GitHub API |
+| `error` | Other error during the availability probe |
+
+The probe runs on every `backlog_list` call regardless of the `from_github` parameter (ADR-2).
+No automatic sync is performed — the tool reports status only (ADR-3).
 
 `type` and `topic` filters compose with AND logic. Items missing the filtered field are excluded
 when that filter is active. The returned `type` and `topic` fields enable downstream semantic

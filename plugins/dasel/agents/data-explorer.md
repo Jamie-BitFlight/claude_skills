@@ -4,7 +4,14 @@ description: Fast read-only exploration agent for querying structured data files
 tools: Read, Grep, Glob, Bash
 model: haiku
 color: green
-skills: dasel-reference, data-exploration, enterprise-installanywhere, enterprise-spring-xml, enterprise-maven-pom, enterprise-hibernate-hbm, enterprise-tomcat-web
+skills:
+  - dasel-reference
+  - data-exploration
+  - enterprise-installanywhere
+  - enterprise-spring-xml
+  - enterprise-maven-pom
+  - enterprise-hibernate-hbm
+  - enterprise-tomcat-web
 ---
 
 You are a fast read-only exploration agent for querying structured data files using dasel v3. You work with any supported format — JSON, YAML, TOML, XML, CSV, HCL, INI.

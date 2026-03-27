@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 _SCRIPTS_DIR = (
     Path(__file__).resolve().parents[2]
     / "plugins"
-    / "python3-development"
+    / "development-harness"
     / "skills"
     / "implementation-manager"
     / "scripts"
@@ -45,31 +45,34 @@ from implementation_manager import Task, TaskPriority, TaskStatus, app
 
 
 def _make_task_file(tmp_path: Path, *, slug: str = "my-feature") -> Path:
-    """Create a minimal single-task YAML frontmatter file for local-path tests.
+    """Create a minimal single-task pure YAML file for local-path tests.
+
+    Uses the canonical SAM filename pattern ``P001-{slug}.yaml`` and the
+    ``tasks:`` list structure expected by ``_read_single_file`` / ``normalize_plan``.
+    Field names use kebab-case aliases matching the SAM YAML writer output.
 
     Args:
         tmp_path: pytest tmp_path fixture directory.
         slug: Feature slug embedded in the filename.
 
     Returns:
-        Path to the created ``.md`` task file.
+        Path to the created ``.yaml`` task file.
     """
     content = (
-        "---\n"
-        "task_id: T1\n"
-        "title: Implement something\n"
-        "status: not-started\n"
-        "agent: python3-development:python-cli-architect\n"
-        "priority: 2\n"
-        "complexity: Medium\n"
-        "skills: []\n"
-        "dependencies: []\n"
-        "---\n\n"
-        "## Context\n\nSome task body.\n"
+        f"feature: {slug}\n"
+        "tasks:\n"
+        "  - task-id: T1\n"
+        "    title: Implement something\n"
+        "    status: not-started\n"
+        "    agent: python3-development:python-cli-architect\n"
+        "    priority: 2\n"
+        "    complexity: Medium\n"
+        "    skills: []\n"
+        "    dependencies: []\n"
     )
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir(parents=True, exist_ok=True)
-    task_file = plan_dir / f"tasks-001-{slug}.md"
+    task_file = plan_dir / f"P001-{slug}.yaml"
     task_file.write_text(content, encoding="utf-8")
     return task_file
 

@@ -8,7 +8,7 @@ related: [dynamic-metadata, metadata-options]
 
 This page has been moved to provide better organization. For comprehensive metadata hooks documentation, refer to:
 
-- [Metadata Hooks System](../metadata-hooks/metadata-hooks.md) - Hook configuration, built-in hooks, execution flow
-- [Custom Metadata Hooks](../metadata-hooks/custom-hooks.md) - Implementing custom hooks with MetadataHookInterface
+- `../metadata-hooks/metadata-hooks.md` - Hook configuration, built-in hooks, execution flow
+- `../metadata-hooks/custom-hooks.md` - Implementing custom hooks with MetadataHookInterface
 
-See the [metadata-hooks directory](../metadata-hooks/index.md) for complete documentation.
+See the `../metadata-hooks/index.md` for complete documentation.

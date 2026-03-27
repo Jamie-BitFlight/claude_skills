@@ -12,48 +12,48 @@ This comprehensive reference documents command-line building workflows with Hatc
 
 ### Core Topics
 
-1. **[Overview](./overview.md)**
+1. **`overview.md`**
 
    - Quick start with basic build commands
    - Understanding build targets
    - Basic configuration in pyproject.toml
 
-2. **[Building Wheels](./building-wheels.md)**
+2. **`building-wheels.md`**
 
    - Building wheel distributions with `hatch build -t wheel`
    - Wheel configuration options
    - Platform-specific wheels
    - Editable wheels for development
 
-3. **[Building Source Distributions](./building-sdist.md)**
+3. **`building-sdist.md`**
 
    - Building sdist with `hatch build -t sdist`
    - File selection and exclusion
    - Archive structure and contents
    - Legacy compatibility options
 
-4. **[Building All Targets](./building-all-targets.md)**
+4. **`building-all-targets.md`**
 
    - Building both sdist and wheel with `hatch build`
    - Managing multiple build targets
    - Parallel building strategies
    - CI/CD integration
 
-5. **[Python's Build Tool](./python-build-tool.md)**
+5. **`python-build-tool.md`**
 
    - Using `python -m build` for building
    - Build isolation and dependencies
    - Configuration settings
    - Comparison with hatch build
 
-6. **[Installing from Local Path](./local-install.md)**
+6. **`local-install.md`**
 
    - Installing directly with `pip install .`
    - Editable/development installations
    - Working with optional dependencies
    - Virtual environment setup
 
-7. **[Build Output Customization](./output-customization.md)**
+7. **`output-customization.md`**
    - Customizing output directories
    - Per-target output locations
    - CI/CD output organization

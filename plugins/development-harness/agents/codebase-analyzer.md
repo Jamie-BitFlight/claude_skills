@@ -1,9 +1,10 @@
 ---
 name: codebase-analyzer
 description: Explores codebase patterns and writes structured analysis documents. Spawned before planning to understand existing conventions, architecture, and testing patterns. Writes documents directly to reduce orchestrator context load.
-tools: Read, Bash, Grep, Glob, Write, Edit, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
+tools: Read, Bash, Grep, Glob, Write, Edit, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam__sam_create, mcp__plugin_dh_sam__sam_update
 model: haiku
-skills: subagent-contract
+skills:
+  - subagent-contract
 color: cyan
 ---
 
@@ -568,9 +569,21 @@ For each finding, record:
 
 ## Step 3: Write Document
 
-Write document to `dh_paths.plan_dir() / "codebase/"` (resolves to `~/.dh/projects/{project-slug}/plan/codebase/`)
+Create the codebase analysis document using the SAM MCP tool. Use the focus-area name (e.g., `codebase-patterns`, `codebase-architecture`) as the slug:
 
-**Document naming:** UPPERCASE.md (e.g., PATTERNS.md)
+```text
+mcp__plugin_dh_sam__sam_create(slug="codebase-{focus}", goal="Codebase {focus} analysis", tasks_yaml="")
+```
+
+Then append the document content as a markdown section:
+
+```text
+mcp__plugin_dh_sam__sam_update(plan_slug="codebase-{focus}", task_id=None, section="{DOCUMENT}", content="{document body}")
+```
+
+`sam_create` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. The document is stored under `plan/codebase/` via the SAM plan directory conventions.
+
+**Document naming:** UPPERCASE focus area name (e.g., PATTERNS, ARCHITECTURE).
 
 **Template filling:**
 
@@ -650,7 +663,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 
 - [ ] Focus area identified from input
 - [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
-- [ ] Document created at `dh_paths.plan_dir() / "codebase/{DOCUMENT}.md"` (under `~/.dh/projects/{project-slug}/plan/codebase/`)
+- [ ] Document created via `mcp__plugin_dh_sam__sam_create` + `mcp__plugin_dh_sam__sam_update` (stored under `~/.dh/projects/{project-slug}/plan/codebase/`)
 
 **Level 2: Substantive**
 
@@ -664,7 +677,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 
 **Level 3: Wired**
 
-- [ ] Document path matches downstream consumer expectations (under `dh_paths.plan_dir() / "codebase/"`)
+- [ ] Document path matches downstream consumer expectations (under `dh_paths.plan_dir() / "codebase/"`, resolved internally by `sam_create`)
 - [ ] Document format compatible with agent consumption (python-cli-design-spec, python-cli-architect, python-pytest-architect)
 - [ ] Confirmation returned to orchestrator (not document contents)
 - [ ] OUTPUT_FILE path specified in DONE response

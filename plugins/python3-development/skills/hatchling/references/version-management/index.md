@@ -29,7 +29,7 @@ name = "my-package"
 version = "1.2.3"
 ```
 
-[Learn more about static versioning](./static-version.md)
+`static-version.md`
 
 ### Dynamic Versioning
 
@@ -45,7 +45,7 @@ source = "regex"  # or "code", "env", etc.
 path = "src/my_package/__about__.py"
 ```
 
-[Learn more about dynamic versioning](./dynamic-version-overview.md)
+`dynamic-version-overview.md`
 
 ## Version Source Plugins
 
@@ -61,7 +61,7 @@ source = "code"
 path = "src/my_package/__version__.py"
 ```
 
-[Code version source documentation](./code-version-source.md)
+`code-version-source.md`
 
 ### Regex Source
 
@@ -74,7 +74,7 @@ path = "src/my_package/__about__.py"
 pattern = "__version__ = ['\"](?P<version>[^'\"]+)['\"]"
 ```
 
-[Regex version source documentation](./regex-version-source.md)
+`regex-version-source.md`
 
 ### Environment Variable Source
 
@@ -86,7 +86,7 @@ source = "env"
 variable = "MY_PROJECT_VERSION"
 ```
 
-[Environment version source documentation](./env-version-source.md)
+`env-version-source.md`
 
 ## Version Schemes
 
@@ -104,7 +104,7 @@ scheme = "standard"
 validate-bump = true  # Ensure new versions are higher than current
 ```
 
-[Version schemes documentation](./version-schemes.md)
+`version-schemes.md`
 
 ## Version Build Hook
 
@@ -116,7 +116,7 @@ path = "src/my_package/_version.py"
 template = '__version__ = "{version}"'
 ```
 
-[Version build hook documentation](./version-build-hook.md)
+`version-build-hook.md`
 
 ## Command Line Usage
 
@@ -135,7 +135,7 @@ hatch version minor    # 1.2.3 -> 1.3.0
 hatch version major    # 1.2.3 -> 2.0.0
 ```
 
-[CLI usage documentation](./version-cli.md)
+`version-cli.md`
 
 ## Advanced Topics
 
@@ -148,7 +148,7 @@ Control version validation and bumping rules:
 validate-bump = false  # Allow any version change
 ```
 
-[Version validation documentation](./version-validation.md)
+`version-validation.md`
 
 ### Search Paths
 
@@ -160,7 +160,7 @@ source = "code"
 search-paths = ["src", "lib"]
 ```
 
-[Search paths documentation](./search-paths.md)
+`search-paths.md`
 
 ### Version Epochs
 
@@ -172,7 +172,7 @@ Handle version epochs and complex version formats:
 pattern = "(?P<epoch>\\d+!)?(?P<version>.*)"
 ```
 
-[Version epochs documentation](./version-epochs.md)
+`version-epochs.md`
 
 ### Version Template Configuration
 
@@ -186,15 +186,15 @@ __version_info__ = {version_tuple}
 """
 ```
 
-[Template configuration documentation](./version-templates.md)
+`version-templates.md`
 
 ## Migration Guide
 
 Migrating from other version management systems:
 
-- [From setuptools_scm](./migration-setuptools-scm.md)
-- [From versioneer](./migration-versioneer.md)
-- [From bump2version](./migration-bump2version.md)
+- `migration-setuptools-scm.md`
+- `migration-versioneer.md`
+- `migration-bump2version.md`
 
 ## Best Practices
 
@@ -215,7 +215,7 @@ Common issues and solutions:
 
 ## Reference
 
-- [Version Source Plugin Interface](./version-source-interface.md)
-- [Version Scheme Plugin Interface](./version-scheme-interface.md)
-- [Core Metadata Versions](./core-metadata-versions.md)
-- [Configuration Examples](./examples.md)
+- `version-source-interface.md`
+- `version-scheme-interface.md`
+- `core-metadata-versions.md`
+- `examples.md`

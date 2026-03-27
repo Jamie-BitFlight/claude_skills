@@ -68,10 +68,3 @@ Then re-run the original command with `uv run`.
    python scripts/some_script.py
    ```
 
-## Why uv
-
-- Reads `pyproject.toml` and `uv.lock` to pin exact dependency versions
-- Reuses a cached virtualenv — no install overhead on subsequent runs
-- Works without prior `pip install` or `venv activate`
-- PEP 723 inline metadata in standalone scripts is also supported (`uv run script.py` reads
-  `# dependencies` block automatically)

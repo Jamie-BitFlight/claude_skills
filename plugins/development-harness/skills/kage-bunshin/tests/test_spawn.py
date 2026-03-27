@@ -318,7 +318,7 @@ def test_build_parser_status_requires_name():
 
 
 def test_build_spawn_shell_cmd_returns_interactive_argv_without_p_flag():
-    argv = _spawn._build_spawn_shell_cmd("mysess", "sonnet", None)
+    argv = _spawn._build_spawn_shell_cmd("mysess", "sonnet", None, "sess-001", "tmux-mysess")
     assert argv[0] == "claude"
     assert "-p" not in argv
     assert "--output-format" not in argv
@@ -331,13 +331,13 @@ def test_build_spawn_shell_cmd_returns_interactive_argv_without_p_flag():
 
 
 def test_build_spawn_shell_cmd_includes_max_budget_when_set():
-    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", 5.0)
+    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", 5.0, "sess-002", "tmux-sess")
     assert "--max-budget-usd" in argv
     assert "5.0" in argv
 
 
 def test_build_spawn_shell_cmd_omits_max_budget_when_none():
-    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", None)
+    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", None, "sess-003", "tmux-sess")
     assert "--max-budget-usd" not in argv
 
 

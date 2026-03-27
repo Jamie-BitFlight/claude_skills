@@ -83,8 +83,8 @@ dist/
 
 ## See Also
 
-- [Building Wheels](./building-wheels.md)
-- [Building Source Distributions](./building-sdist.md)
-- [Build Output Customization](./output-customization.md)
-- [Using Python's Build Tool](./python-build-tool.md)
-- [Installing from Local Path](./local-install.md)
+- `building-wheels.md`
+- `building-sdist.md`
+- `output-customization.md`
+- `python-build-tool.md`
+- `local-install.md`

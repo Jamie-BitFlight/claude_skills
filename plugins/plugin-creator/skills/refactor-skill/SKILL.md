@@ -59,7 +59,7 @@ When the only issue is token count (SK006) and the skill covers a single user in
 
 1. Identify sections with detailed reference content — large tables, comprehensive examples, multi-step procedures that are consulted rather than executed sequentially.
 2. Move each such section to `./references/<topic>.md`.
-3. Replace the section in SKILL.md with a brief summary and a markdown link: `[Topic Details](./references/topic.md)`.
+3. Replace the section in SKILL.md with a brief summary and a markdown link: ``references/topic.md``.
 4. Re-run the validator to confirm token count is now below the warning threshold.
 5. Report the token reduction achieved and STOP — do not proceed to skill splitting.
 

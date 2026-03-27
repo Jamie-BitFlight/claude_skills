@@ -475,8 +475,8 @@ validate-bump = false  # Temporary, for special cases
 
 ## See Also
 
-- [Version CLI Commands](./version-cli.md) - Using version commands
-- [Version Validation](./version-validation.md) - Validation rules
-- [Version Source Interface](./version-source-interface.md) - Source plugin API
+- `version-cli.md` - Using version commands
+- `version-validation.md` - Validation rules
+- `version-source-interface.md` - Source plugin API
 - [PEP 440](https://peps.python.org/pep-0440/) - Python version spec
 - [Semantic Versioning](https://semver.org/) - SemVer specification

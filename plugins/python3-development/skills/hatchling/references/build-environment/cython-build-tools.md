@@ -656,7 +656,7 @@ SOURCE_DATE_EPOCH = "1580601600"
 
 ## Related Topics
 
-- [Build Environment Configuration](./build-environment-configuration.md)
-- [Build Dependencies Management](./build-dependencies-management.md)
-- [Environment Variables](./environment-variables.md)
-- [Environment Isolation](./environment-isolation.md)
+- `build-environment-configuration.md`
+- `build-dependencies-management.md`
+- `environment-variables.md`
+- `environment-isolation.md`

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from backlog_core.models import BacklogItem, ViewItemResult
@@ -21,6 +21,7 @@ from backlog_core.parsing import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -806,6 +807,12 @@ class TestBuildIssueBodyFromFileDict:
     the dict-based variant is implemented in backlog_core.
     """
 
+    @staticmethod
+    def _call_build(build_fn: object, item: dict[str, str]) -> str | None:
+        """Narrow *build_fn* for ty; body never runs while the class is skipped."""
+        fn = cast("Callable[[dict[str, str]], str | None]", build_fn)
+        return fn(item)
+
     @pytest.fixture
     def build_fn(self) -> object:
         """Skip — scripts/backlog.py was intentionally deleted; class is skipped.
@@ -830,10 +837,9 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _UNGROOMED_RAW_BODY, "_title": "Test"}
-        build = build_fn
 
         # Act
-        result = build(item)
+        result = self._call_build(build_fn, item)
 
         # Assert
         assert result is None
@@ -847,10 +853,9 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Test"}
-        build = build_fn
 
         # Act
-        result = build(item)
+        result = self._call_build(build_fn, item)
 
         # Assert
         assert result is not None
@@ -865,10 +870,9 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY}
-        build = build_fn
 
         # Act
-        result = build(item)
+        result = self._call_build(build_fn, item)
 
         # Assert
         assert result is not None
@@ -884,10 +888,9 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item: dict[str, str] = {"_title": "No body"}
-        build = build_fn
 
         # Act
-        result = build(item)
+        result = self._call_build(build_fn, item)
 
         # Assert
         assert result is None
@@ -901,10 +904,9 @@ class TestBuildIssueBodyFromFileDict:
         """
         # Arrange
         item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Detect Duplicates"}
-        build = build_fn
 
         # Act
-        result = build(item)
+        result = self._call_build(build_fn, item)
 
         # Assert
         assert result is not None
@@ -1397,3 +1399,106 @@ class TestBuildSamTaskIssueTitle:
         task = SamTask(task_id="T2", feature="my-feat", task_type="implementation")
         title = build_sam_task_issue_title(task, "Add the thing")
         assert title == "[my-feat/T2] implementation: Add the thing"
+
+
+# ---------------------------------------------------------------------------
+# parse_backlog_from_directory — corruption resilience
+# ---------------------------------------------------------------------------
+
+
+class TestParseBacklogFromDirectoryCorruptionResilience:
+    """parse_backlog_from_directory skips corrupt files and logs a warning.
+
+    The corrupt-YAML scenario: a file whose frontmatter block contains a bare
+    ``---`` delimiter (producing two YAML documents).  ruamel.yaml raises
+    ``YAMLError`` — not caught by _parse_frontmatter's except clause — causing
+    the entire parse run to abort.  The fix wraps parse_item_file per-file so
+    the corrupt file is skipped with a logged warning and remaining files are
+    returned normally.
+    """
+
+    # Content that causes ruamel.yaml to raise YAMLError: duplicate key 'name'
+    # with incompatible types (scalar then mapping).  This is a realistic
+    # corruption pattern — ruamel.yaml raises ``ComposerError: while constructing
+    # a mapping … found duplicate key`` with severity that cannot be caught by
+    # _parse_frontmatter's existing ``except (ValueError, KeyError, TypeError)``.
+    _CORRUPT_FRONTMATTER = """\
+---
+name: Corrupt Item
+name:
+  nested: bad
+metadata:
+  topic: corrupt-item
+  priority: P1
+  status: open
+---
+
+Body text.
+"""
+
+    _VALID_FRONTMATTER = """\
+---
+name: Valid Item
+description: clean frontmatter
+metadata:
+  topic: valid-item
+  source: test
+  added: '2026-01-01'
+  priority: P1
+  type: Feature
+  status: open
+---
+
+Body of valid item.
+"""
+
+    def test_parse_backlog_from_directory_skips_corrupt_file_returns_valid(self, backlog_dir) -> None:
+        """A corrupt file is skipped; the valid file in the same directory is returned."""
+        # Arrange
+        from backlog_core.parsing import parse_backlog_from_directory
+
+        corrupt_file = backlog_dir / "p1-corrupt-item.md"
+        valid_file = backlog_dir / "p1-valid-item.md"
+        corrupt_file.write_text(self._CORRUPT_FRONTMATTER, encoding="utf-8")
+        valid_file.write_text(self._VALID_FRONTMATTER, encoding="utf-8")
+
+        # Act
+        items = parse_backlog_from_directory()
+
+        # Assert
+        titles = [it.title for it in items]
+        assert "Valid Item" in titles
+        assert "Corrupt Item" not in titles
+
+    def test_parse_backlog_from_directory_logs_warning_for_corrupt_file(self, backlog_dir, caplog) -> None:
+        """A warning containing the corrupt file path is emitted to the log."""
+        import logging
+
+        from backlog_core.parsing import parse_backlog_from_directory
+
+        # Arrange
+        corrupt_file = backlog_dir / "p1-corrupt-item.md"
+        corrupt_file.write_text(self._CORRUPT_FRONTMATTER, encoding="utf-8")
+
+        # Act
+        with caplog.at_level(logging.WARNING, logger="backlog_core.parsing"):
+            parse_backlog_from_directory()
+
+        # Assert — at least one warning message names the corrupt file
+        assert any(
+            "corrupt" in record.message.lower() and "p1-corrupt-item.md" in record.message for record in caplog.records
+        )
+
+    def test_parse_backlog_from_directory_does_not_crash_on_all_corrupt_files(self, backlog_dir) -> None:
+        """When every file is corrupt, parse_backlog_from_directory returns an empty list."""
+        from backlog_core.parsing import parse_backlog_from_directory
+
+        # Arrange — write two different corrupt files
+        (backlog_dir / "p0-corrupt-a.md").write_text(self._CORRUPT_FRONTMATTER, encoding="utf-8")
+        (backlog_dir / "p1-corrupt-b.md").write_text(self._CORRUPT_FRONTMATTER, encoding="utf-8")
+
+        # Act
+        items = parse_backlog_from_directory()
+
+        # Assert — no crash, empty result
+        assert items == []

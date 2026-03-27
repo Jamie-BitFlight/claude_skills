@@ -273,6 +273,6 @@ dependencies = [
 
 ## Related Configuration
 
-- [Dependencies](./dependencies.md) - Dependency specification overview
-- [Version Specifiers](./version-specifiers.md) - Standard version constraints
-- [Metadata Options](./metadata-options.md) - Direct references configuration
+- `dependencies.md` - Dependency specification overview
+- `version-specifiers.md` - Standard version constraints
+- `metadata-options.md` - Direct references configuration

@@ -86,7 +86,6 @@ claude_skills/
 ├── research/                   # Research artifacts
 ├── sessions/                   # cc-sessions framework
 ├── docs/                       # Documentation (MCP docs, etc.)
-├── workshops/                  # Workshop materials
 ├── pyproject.toml              # Python config (linting, type checking, test config)
 ├── .pre-commit-config.yaml     # prek hook configuration
 ├── .mcp.json                   # MCP server definitions

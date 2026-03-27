@@ -1,6 +1,6 @@
 ---
 name: optimize
-description: Write great delegation instructions to subagents, also Audit optimize CLAUDE.md files, rules, skills, and agent definitions for content that Claude does not need — discoverable data, explained-away knowledge, invented constraints, duplicated content, and stale cached facts. Use when orchstrating or dispatching via Agent tool, writing new memory/rules/skills/agents, or when reviewing existing ones for bloat. Triggers include "write a rule for", "add to CLAUDE.md", "create an agent", "update memory", or any request to author AI-facing instruction content.
+description: Use when writing delegation instructions to subagents, authoring CLAUDE.md files, rules, skills, or agent definitions, or auditing existing AI-facing content for bloat. Activates on "write a rule for", "add to CLAUDE.md", "create an agent", "update memory", or any request to author AI-facing instruction content. Removes discoverable data, explained-away knowledge, invented constraints, and stale cached facts.
 user-invocable: true
 ---
 
@@ -43,9 +43,9 @@ For CLI tools, instruct the AI to discover arguments at runtime: "[ ] Run the co
 
 Read the reference for the content type you are writing or auditing:
 
-- Writing or reviewing **CLAUDE.md or `.claude/rules/`** → [references/memory-and-rules.md](./references/memory-and-rules.md)
-- Writing or reviewing **SKILL.md or references/** → [references/skills.md](./references/skills.md)
-- Writing or reviewing **agent definition files** → [references/agents.md](./references/agents.md)
+- Writing or reviewing **CLAUDE.md or `.claude/rules/`** → `references/memory-and-rules.md`
+- Writing or reviewing **SKILL.md or references/** → `references/skills.md`
+- Writing or reviewing **agent definition files** → `references/agents.md`
 
 ## Optimization Checklist
 

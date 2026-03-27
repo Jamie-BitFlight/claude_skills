@@ -12,7 +12,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ## Core Concept Documents
 
-### 1. [PEP 517/518 Backend](./pep-517-backend.md)
+### 1. `pep-517-backend.md`
 
 **Topics:** Standards compliance, build system abstraction, PEP specifications
 
@@ -29,7 +29,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 2. [Minimal Configuration Philosophy](./minimal-philosophy.md)
+### 2. `minimal-philosophy.md`
 
 **Topics:** Design philosophy, sensible defaults, progressive disclosure
 
@@ -46,7 +46,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 3. [VCS-Aware File Selection and Git-Style Glob Patterns](./vcs-file-selection.md)
+### 3. `vcs-file-selection.md`
 
 **Topics:** File selection, .gitignore respecting, glob patterns, reproducibility
 
@@ -63,7 +63,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 4. [Build Hook Patterns](./build-hooks.md)
+### 4. `build-hooks.md`
 
 **Topics:** Extensibility, custom build steps, hook interface, common patterns
 
@@ -81,7 +81,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 5. [Version Management Strategies](./version-management.md)
+### 5. `version-management.md`
 
 **Topics:** Single source of truth, version sources, PEP 440, semantic versioning
 
@@ -99,7 +99,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 6. [Wheel vs Source Distribution Trade-offs](./wheel-vs-sdist.md)
+### 6. `wheel-vs-sdist.md`
 
 **Topics:** Distribution formats, installation performance, packaging strategy
 
@@ -117,7 +117,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 7. [Reproducible Builds Configuration](./reproducible-builds.md)
+### 7. `reproducible-builds.md`
 
 **Topics:** Security, verification, integrity, deterministic builds
 
@@ -135,7 +135,7 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ---
 
-### 8. [Development vs Distribution Builds](./development-vs-distribution.md)
+### 8. `development-vs-distribution.md`
 
 **Topics:** Editable installs, PEP 660, workflows, build configurations
 
@@ -159,61 +159,61 @@ When helping users understand Hatchling's design principles and architecture, re
 
 **I'm starting a new project:**
 
-1. [Minimal Configuration Philosophy](./minimal-philosophy.md) - understand defaults
-2. [PEP 517/518 Backend](./pep-517-backend.md) - understand standards
-3. [Version Management Strategies](./version-management.md) - choose version strategy
+1. `minimal-philosophy.md` - understand defaults
+2. `pep-517-backend.md` - understand standards
+3. `version-management.md` - choose version strategy
 
 **I'm setting up development:**
 
-1. [Development vs Distribution Builds](./development-vs-distribution.md) - editable installs
-2. [Version Management Strategies](./version-management.md) - version in code
-3. [Build Hooks](./build-hooks.md) - if you need custom build steps
+1. `development-vs-distribution.md` - editable installs
+2. `version-management.md` - version in code
+3. `build-hooks.md` - if you need custom build steps
 
 **I'm preparing a release:**
 
-1. [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md) - what to build
-2. [Reproducible Builds Configuration](./reproducible-builds.md) - ensure reproducibility
-3. [Version Management Strategies](./version-management.md) - version strategy
+1. `wheel-vs-sdist.md` - what to build
+2. `reproducible-builds.md` - ensure reproducibility
+3. `version-management.md` - version strategy
 
 **I have a non-standard layout:**
 
-1. [Minimal Configuration Philosophy](./minimal-philosophy.md) - understand when config needed
-2. [VCS-Aware File Selection](./vcs-file-selection.md) - file patterns
-3. [Build Hooks](./build-hooks.md) - if hooks needed
+1. `minimal-philosophy.md` - understand when config needed
+2. `vcs-file-selection.md` - file patterns
+3. `build-hooks.md` - if hooks needed
 
 **I'm building C extensions:**
 
-1. [Build Hooks](./build-hooks.md) - understand hook patterns
-2. [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md) - platform-specific wheels
-3. [Reproducible Builds](./reproducible-builds.md) - reproducibility with compiled code
+1. `build-hooks.md` - understand hook patterns
+2. `wheel-vs-sdist.md` - platform-specific wheels
+3. `reproducible-builds.md` - reproducibility with compiled code
 
 ### By Concept
 
 **Standards and Compliance:**
 
-- [PEP 517/518 Backend](./pep-517-backend.md)
-- [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md)
-- [Reproducible Builds](./reproducible-builds.md)
+- `pep-517-backend.md`
+- `wheel-vs-sdist.md`
+- `reproducible-builds.md`
 
 **Configuration:**
 
-- [Minimal Configuration Philosophy](./minimal-philosophy.md)
-- [VCS-Aware File Selection](./vcs-file-selection.md)
-- [Build Hooks](./build-hooks.md)
+- `minimal-philosophy.md`
+- `vcs-file-selection.md`
+- `build-hooks.md`
 
 **Versioning:**
 
-- [Version Management Strategies](./version-management.md)
+- `version-management.md`
 
 **Installation and Distribution:**
 
-- [Development vs Distribution Builds](./development-vs-distribution.md)
-- [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md)
+- `development-vs-distribution.md`
+- `wheel-vs-sdist.md`
 
 **Quality and Reproducibility:**
 
-- [Reproducible Builds](./reproducible-builds.md)
-- [VCS-Aware File Selection](./vcs-file-selection.md)
+- `reproducible-builds.md`
+- `vcs-file-selection.md`
 
 ## Key Cross-References
 
@@ -250,34 +250,34 @@ When helping users understand Hatchling's design principles and architecture, re
 
 ### Beginner Path (Understanding Basics)
 
-1. [Minimal Configuration Philosophy](./minimal-philosophy.md) - why Hatchling is simple
-2. [PEP 517/518 Backend](./pep-517-backend.md) - standards compliance
-3. [Development vs Distribution Builds](./development-vs-distribution.md) - workflows
-4. [Version Management Strategies](./version-management.md) - version handling
+1. `minimal-philosophy.md` - why Hatchling is simple
+2. `pep-517-backend.md` - standards compliance
+3. `development-vs-distribution.md` - workflows
+4. `version-management.md` - version handling
 
 ### Intermediate Path (Working with Hatchling)
 
-1. [VCS-Aware File Selection](./vcs-file-selection.md) - configuring file inclusion
-2. [Build Hooks](./build-hooks.md) - customizing build process
-3. [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md) - distribution formats
-4. [Reproducible Builds](./reproducible-builds.md) - ensuring quality
+1. `vcs-file-selection.md` - configuring file inclusion
+2. `build-hooks.md` - customizing build process
+3. `wheel-vs-sdist.md` - distribution formats
+4. `reproducible-builds.md` - ensuring quality
 
 ### Advanced Path (Mastering Hatchling)
 
-1. [Build Hooks](./build-hooks.md) - advanced customization
-2. [Reproducible Builds](./reproducible-builds.md) - security and verification
-3. [Version Management Strategies](./version-management.md) - complex scenarios
-4. [PEP 517/518 Backend](./pep-517-backend.md) - standards deep-dive
+1. `build-hooks.md` - advanced customization
+2. `reproducible-builds.md` - security and verification
+3. `version-management.md` - complex scenarios
+4. `pep-517-backend.md` - standards deep-dive
 
 ### Problem-Solving Path (By Challenge)
 
-- "How do I include/exclude files?" → [VCS-Aware File Selection](./vcs-file-selection.md)
-- "How do I manage version?" → [Version Management Strategies](./version-management.md)
-- "How do I build C extensions?" → [Build Hooks](./build-hooks.md)
-- "What's the difference between .whl and .tar.gz?" → [Wheel vs Sdist Trade-offs](./wheel-vs-sdist.md)
-- "How do I ensure reproducible builds?" → [Reproducible Builds](./reproducible-builds.md)
-- "When should I configure Hatchling?" → [Minimal Configuration Philosophy](./minimal-philosophy.md)
-- "Why use `pip install -e .`?" → [Development vs Distribution Builds](./development-vs-distribution.md)
+- "How do I include/exclude files?" → `vcs-file-selection.md`
+- "How do I manage version?" → `version-management.md`
+- "How do I build C extensions?" → `build-hooks.md`
+- "What's the difference between .whl and .tar.gz?" → `wheel-vs-sdist.md`
+- "How do I ensure reproducible builds?" → `reproducible-builds.md`
+- "When should I configure Hatchling?" → `minimal-philosophy.md`
+- "Why use `pip install -e .`?" → `development-vs-distribution.md`
 
 ## Quick Reference
 
@@ -332,4 +332,4 @@ source = "vcs"
 
 - [Official Hatch Documentation](https://hatch.pypa.io/)
 - [Python Packaging Guide](https://packaging.python.org/)
-- [PEPs Referenced](./pep-517-backend.md#references)
+- `pep-517-backend.md#references`

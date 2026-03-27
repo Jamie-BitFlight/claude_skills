@@ -19,9 +19,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Add the plugin root to sys.path so sam_schema can be imported
-plugin_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(plugin_root))
+_scripts_dir = Path(__file__).resolve().parent
+_plugin_root = _scripts_dir.parent
+sys.path.insert(0, str(_plugin_root))
+sys.path.insert(0, str(_scripts_dir))
+
+from dh_mcp_preinit import apply_project_dir_from_argv
+
+apply_project_dir_from_argv()
 
 from sam_schema.server import run_server
 

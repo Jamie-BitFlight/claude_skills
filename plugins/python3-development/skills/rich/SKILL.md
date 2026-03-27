@@ -52,7 +52,7 @@ Console class instantiation and constructor parameters, `print()` / `log()` / `r
 
 Load when writing `console.print()`, applying colors/styles, using Rich markup tags, or configuring console behavior.
 
-[console-and-markup.md](./references/console-and-markup.md)
+`references/console-and-markup.md`
 
 ### Renderables
 
@@ -60,7 +60,7 @@ Panel, Table (add_column, add_row, constructor options, column options), Tree (a
 
 Load when building structured output with boxes, tables, tree views, or multi-column layouts.
 
-[renderables.md](./references/renderables.md)
+`references/renderables.md`
 
 ### Progress and Live
 
@@ -68,7 +68,7 @@ Load when building structured output with boxes, tables, tree views, or multi-co
 
 Load when adding progress tracking, spinners, or live-updating output to a CLI.
 
-[progress-and-live.md](./references/progress-and-live.md)
+`references/progress-and-live.md`
 
 ### Text and Syntax
 
@@ -76,7 +76,7 @@ Load when adding progress tracking, spinners, or live-updating output to a CLI.
 
 Load when highlighting code blocks, rendering markdown, pretty-printing data structures, or customizing object repr output.
 
-[text-and-syntax.md](./references/text-and-syntax.md)
+`references/text-and-syntax.md`
 
 ### Logging and Tracebacks
 
@@ -84,7 +84,7 @@ Load when highlighting code blocks, rendering markdown, pretty-printing data str
 
 Load when integrating Rich with Python's logging module, installing a global traceback handler, or improving exception display.
 
-[logging-and-tracebacks.md](./references/logging-and-tracebacks.md)
+`references/logging-and-tracebacks.md`
 
 ### Advanced Patterns
 
@@ -92,7 +92,7 @@ Load when integrating Rich with Python's logging module, installing a global tra
 
 Load when writing custom renderables, building multi-pane full-screen layouts, implementing custom syntax highlighting, or debugging Python objects.
 
-[advanced-patterns.md](./references/advanced-patterns.md)
+`references/advanced-patterns.md`
 
 ## Quick Reference
 

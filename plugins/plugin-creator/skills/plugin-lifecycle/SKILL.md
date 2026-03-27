@@ -28,7 +28,7 @@ Arguments: `<invocation_args/>`
 
 ## Domain Knowledge Prerequisites
 
-Load these skills at session start before executing any phase. Full skill descriptions and what each provides: [domain-knowledge-prerequisites.md](./references/domain-knowledge-prerequisites.md).
+Load these skills at session start before executing any phase. Full skill descriptions and what each provides: `references/domain-knowledge-prerequisites.md`.
 
 Required — load at session start:
 
@@ -38,6 +38,11 @@ Required — load at session start:
 Required for phases involving hooks (Phase 4: Create, Phase 5: Debug):
 
 3. `Skill(skill="plugin-creator:hooks-guide")` — 13 hook event types, exit codes, tool denial mechanisms, agent frontmatter fields
+
+Recommended for component selection and plugin configuration decisions:
+
+4. `Skill(skill="plugin-creator:component-patterns")` — component lifecycle, discovery and activation phases, decision framework for choosing commands vs skills vs agents vs hooks vs MCP servers
+5. `Skill(skill="plugin-creator:plugin-settings")` — .local.md per-project configuration pattern, YAML frontmatter parsing from hooks, configuration-driven behavior
 
 ## Workflow Overview
 
@@ -364,7 +369,7 @@ flowchart TD
 
 Entry condition: Research gate passed.
 
-1. Task is prerequisite check with Skill(skill="plugin-creator:rt-ica")
+1. Task is prerequisite check with Skill(skill="dh:rt-ica")
    Context to include in the prompt: research-FINDINGS.md, plugin concept, user requirements from discuss-CONTEXT.md
    Output: APPROVED or BLOCKED verdict — if BLOCKED, resolve blockers before proceeding
 
@@ -580,7 +585,7 @@ flowchart TD
 
 ## Phase-to-Skill Mapping
 
-Full lookup table with exact invocation syntax for all 18 phase-skill pairings: [phase-skill-mapping.md](./references/phase-skill-mapping.md).
+Full lookup table with exact invocation syntax for all 18 phase-skill pairings: `references/phase-skill-mapping.md`.
 
 Key invocations:
 - Phase 1: `Skill(skill="plugin-creator:assessor")`
@@ -593,7 +598,7 @@ Key invocations:
 
 ## Error Handling
 
-14 failure modes with recovery actions: [error-handling.md](./references/error-handling.md).
+14 failure modes with recovery actions: `references/error-handling.md`.
 
 Key rules:
 - SK007 (token limit exceeded) — run `/plugin-creator:refactor-skill`; editing alone is not sufficient
@@ -605,11 +610,11 @@ Key rules:
 
 ## Example Sessions
 
-Two complete walkthroughs (new plugin full lifecycle + existing plugin with validation errors): [example-sessions.md](./references/example-sessions.md).
+Two complete walkthroughs (new plugin full lifecycle + existing plugin with validation errors): `references/example-sessions.md`.
 
 ---
 
 ## Sources
 
-- Plugin-creator CLAUDE.md: [plugins/plugin-creator/CLAUDE.md](./../../CLAUDE.md)
+- Plugin-creator CLAUDE.md: `../../CLAUDE.md`
 - GitHub Issue: #427

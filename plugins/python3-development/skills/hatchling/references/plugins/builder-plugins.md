@@ -325,6 +325,6 @@ requires = ["hatchling", "hatch-custom-builder"]
 
 ## See Also
 
-- [Build Hook Plugins](./build-hook-plugins.md) - Customize build process
-- [Plugin System Overview](./index.md) - Core plugin architecture and concepts
-- [Metadata Hook Plugins](./metadata-hook-plugins.md) - Dynamic metadata generation
+- `build-hook-plugins.md` - Customize build process
+- `index.md` - Core plugin architecture and concepts
+- `metadata-hook-plugins.md` - Dynamic metadata generation

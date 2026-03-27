@@ -20,20 +20,20 @@ This reference helps Claude assist users with Hatchling's build system configura
 
 ### Essential Build Setup
 
-- [Build System Declaration](./build-system-declaration.md) - Configure `[build-system]` table correctly
-- [PEP Standards Compliance](./pep-standards.md) - Implement PEP 517/518 standards properly
-- [Build Options](./build-options.md) - Configure `[tool.hatch.build]` settings
+- `build-system-declaration.md` - Configure `[build-system]` table correctly
+- `pep-standards.md` - Implement PEP 517/518 standards properly
+- `build-options.md` - Configure `[tool.hatch.build]` settings
 
 ### Build Control Configuration
 
-- [Output Directory](./output-directory.md) - Set custom build output paths with `directory` option
-- [Reproducible Builds](./reproducible-builds.md) - Use SOURCE_DATE_EPOCH for deterministic builds
-- [VCS Integration](./vcs-integration.md) - Control `.gitignore` file handling with `ignore-vcs`
+- `output-directory.md` - Set custom build output paths with `directory` option
+- `reproducible-builds.md` - Use SOURCE_DATE_EPOCH for deterministic builds
+- `vcs-integration.md` - Control `.gitignore` file handling with `ignore-vcs`
 
 ### Environment Configuration
 
-- [Environment Variables](./environment-variables.md) - Use HATCH*BUILD*\* variables for dynamic configuration
-- [Dev Mode](./dev-mode.md) - Configure editable/development installations with `dev-mode-dirs`
+- `environment-variables.md` - Use HATCH*BUILD*\* variables for dynamic configuration
+- `dev-mode.md` - Configure editable/development installations with `dev-mode-dirs`
 
 ## Quick Configuration Templates for Claude
 
@@ -132,6 +132,6 @@ artifacts = ["*.so", "*.dll", "*.pyd"]
 
 ## Navigation
 
-- [Build Hooks](../build-hooks/index.md) - Customize build process
-- [Build Targets](../build-targets/index.md) - Configure wheel and sdist targets
-- [Build Environment](../build-environment/README.md) - Manage build environments
+- `../build-hooks/index.md` - Customize build process
+- `../build-targets/index.md` - Configure wheel and sdist targets
+- `../build-environment/README.md` - Manage build environments

@@ -583,6 +583,6 @@ jobs:
 ## See Also
 
 - [Build Configuration](https://hatch.pypa.io/latest/config/build/)
-- [Wheel Builder](./wheel-builder.md)
-- [Binary Builder](./binary-builder.md)
-- [Custom Builder](./custom-builder.md)
+- `wheel-builder.md`
+- `binary-builder.md`
+- `custom-builder.md`

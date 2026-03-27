@@ -11,19 +11,19 @@ This directory contains comprehensive documentation for all build target types a
 
 ### Core Build Targets
 
-- [Wheel Builder](./wheel-builder.md) - Binary distribution format for Python packages
-- [Source Distribution Builder](./sdist-builder.md) - Source archive format for Python packages
-- [Binary Builder](./binary-builder.md) - Standalone executable applications using PyApp
+- `wheel-builder.md` - Binary distribution format for Python packages
+- `sdist-builder.md` - Source archive format for Python packages
+- `binary-builder.md` - Standalone executable applications using PyApp
 
 ### Custom & Third-Party
 
-- [Custom Builder](./custom-builder.md) - Creating custom build targets for specialized needs
-- [Third-Party Builders](./third-party-builders.md) - Integration with external build systems
+- `custom-builder.md` - Creating custom build targets for specialized needs
+- `third-party-builders.md` - Integration with external build systems
 
 ### Advanced Features
 
-- [Multi-Version Build Support](./multi-version-builds.md) - Building multiple versions of targets
-- [Target-Specific Dependencies](./target-dependencies.md) - Managing dependencies per build target
+- `multi-version-builds.md` - Building multiple versions of targets
+- `target-dependencies.md` - Managing dependencies per build target
 
 ## Quick Reference
 

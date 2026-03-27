@@ -88,6 +88,8 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _SPAWN_WAIT_SECONDS = 30
 # Timeout waiting for a session to exit gracefully after Ctrl-C.
 _GRACEFUL_STOP_TIMEOUT = 30.0
+# RAM per kage-bunshin session: 2 GiB in bytes.
+_RAM_PER_SESSION_BYTES = 2_147_483_648
 
 
 # ---------------------------------------------------------------------------
@@ -359,11 +361,121 @@ def _slugify(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Session concurrency limit (RAM-based)
+# ---------------------------------------------------------------------------
+
+
+def _read_mem_available_bytes() -> int | None:
+    """Read MemAvailable from /proc/meminfo and return the value in bytes.
+
+    Returns:
+        Available RAM in bytes, or None if /proc/meminfo is unreadable or the
+        key is absent.
+    """
+    try:
+        text = Path("/proc/meminfo").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if line.startswith("MemAvailable:"):
+            parts = line.split()
+            # Format: "MemAvailable:   <N> kB"
+            if len(parts) >= 2:  # noqa: PLR2004
+                try:
+                    return int(parts[1]) * 1024
+                except ValueError:
+                    return None
+    return None
+
+
+def _count_active_sessions(state_dir: Path) -> int:
+    """Count live kage-bunshin sessions across all registry files in state_dir.
+
+    A session is live when its tmux session appears in ``tmux list-sessions``
+    output.  Registry entries whose tmux session is absent from the live tmux
+    session list are treated as dead and excluded from the count.
+
+    If tmux is not running the command fails non-zero, and the count is 0.
+
+    Args:
+        state_dir: kage-bunshin state directory containing registry files.
+
+    Returns:
+        Number of live sessions across all registries.
+    """
+    result = subprocess.run(
+        ["tmux", "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        # tmux is not running or no sessions exist.
+        return 0
+
+    live_sessions: set[str] = set(result.stdout.splitlines())
+
+    count = 0
+    for path in state_dir.glob("registry-*.json"):
+        try:
+            registry: dict[str, Any] = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        for entry in registry.values():
+            tmux_session = entry.get("tmux_session", "")
+            if tmux_session and tmux_session in live_sessions:
+                count += 1
+    return count
+
+
+def check_session_limit(session_id: str, state_dir: Path) -> tuple[bool, str]:
+    """Check whether a new kage-bunshin session may be spawned given available RAM.
+
+    The limit is floor(available_RAM_bytes / _RAM_PER_SESSION_BYTES) — one
+    session per 2 GiB of available RAM.  When /proc/meminfo is unreadable the
+    check is skipped and (True, "") is returned so spawning is not blocked on
+    unreadable hardware info.
+
+    Args:
+        session_id: Current orchestrator session ID (unused in computation,
+            present for testability and future scoping).
+        state_dir: kage-bunshin state directory; registry files are read from
+            here to count live sessions.
+
+    Returns:
+        Tuple ``(ok, message)`` where ``ok=True`` means the caller may proceed.
+        When ``ok=False``, ``message`` contains the formatted error text ready
+        to be printed to stderr.
+    """
+    mem_bytes = _read_mem_available_bytes()
+    if mem_bytes is None:
+        # Fail open: cannot read hardware info, do not block spawning.
+        return True, ""
+
+    mem_gib = mem_bytes / _RAM_PER_SESSION_BYTES
+    max_sessions = int(mem_bytes // _RAM_PER_SESSION_BYTES)
+    active = _count_active_sessions(state_dir)
+    room = max(0, max_sessions - active)
+
+    if active < max_sessions:
+        return True, ""
+
+    message = (
+        "Kage-bunshin session limit reached.\n"
+        f"  Max sessions:      {max_sessions}   (1 per 2 GiB available RAM)\n"
+        f"  Available RAM:     {mem_gib:.1f} GiB\n"
+        f"  Active sessions:   {active}\n"
+        f"  Room for more:     {room}\n"
+        "\nPlease wait for existing sessions to complete before starting new ones."
+    )
+    return False, message
+
+
+# ---------------------------------------------------------------------------
 # Subcommand: spawn
 # ---------------------------------------------------------------------------
 
 
-def _build_spawn_shell_cmd(name: str, model: str, max_budget: float | None) -> list[str]:
+def _build_spawn_shell_cmd(
+    name: str, model: str, max_budget: float | None, session_id: str, tmux_session_name: str
+) -> list[str]:
     """Build the command argv list for launching claude in interactive tmux mode.
 
     Launches claude as an interactive REPL via --worktree and --tmux flags.
@@ -374,11 +486,31 @@ def _build_spawn_shell_cmd(name: str, model: str, max_budget: float | None) -> l
         name: Session name (used as the --worktree value).
         model: Model identifier string.
         max_budget: Optional maximum USD spend, or None.
+        session_id: Orchestrator session ID — injected as KAGE_BUNSHIN_PARENT_SESSION_ID
+            so child hooks can write to the correct notifications file.
+        tmux_session_name: The tmux session name being created — injected as
+            KAGE_BUNSHIN_TMUX_SESSION so child hooks can identify themselves.
 
     Returns:
         Argv list suitable for passing directly to subprocess or tmux new-session.
     """
-    parts: list[str] = ["claude", "--dangerously-skip-permissions", "--worktree", name, "--tmux", "--model", model]
+    # Inject env vars so child hooks can:
+    #   KAGE_BUNSHIN_CHILD=1                  — skip sibling alerts, block recursive spawns
+    #   KAGE_BUNSHIN_PARENT_SESSION_ID=<id>   — write notifications to the correct file
+    #   KAGE_BUNSHIN_TMUX_SESSION=<name>      — identify this session in notifications
+    parts: list[str] = [
+        "env",
+        "KAGE_BUNSHIN_CHILD=1",
+        f"KAGE_BUNSHIN_PARENT_SESSION_ID={session_id}",
+        f"KAGE_BUNSHIN_TMUX_SESSION={tmux_session_name}",
+        "claude",
+        "--dangerously-skip-permissions",
+        "--worktree",
+        name,
+        "--tmux",
+        "--model",
+        model,
+    ]
     if max_budget is not None:
         parts += ["--max-budget-usd", str(max_budget)]
     return parts
@@ -399,14 +531,24 @@ def cmd_spawn(args: argparse.Namespace) -> None:
     Args:
         args: Parsed arguments containing name, prompt, model, max_budget fields.
     """
+    # Recursion prevention — block nested spawns from child sessions.
+    if os.environ.get("KAGE_BUNSHIN_CHILD") == "1":
+        print("kage-bunshin: recursive spawn blocked — this session is already a kage-bunshin child", file=sys.stderr)
+        sys.exit(1)
+
     if shutil.which("claude") is None:
         _die("claude binary not found in PATH")
     if shutil.which("tmux") is None:
         _die("tmux binary not found in PATH")
 
+    state_dir = _session_state_dir()
+    ok, limit_message = check_session_limit(args.session_id, state_dir)
+    if not ok:
+        print(limit_message, file=sys.stderr)
+        sys.exit(1)
+
     repo_root = _git_repo_root()
     repo_dir = _repo_dir_name(repo_root)
-    state_dir = _session_state_dir()
     registry = _load_registry(state_dir, args.session_id)
 
     name: str = args.name or _slugify(args.prompt[0])
@@ -424,7 +566,9 @@ def cmd_spawn(args: argparse.Namespace) -> None:
     # Build claude argv for interactive REPL mode (no -p, no --output-format).
     # --worktree creates an isolated git worktree for the session.
     # --tmux keeps claude alive in its own named tmux session.
-    claude_argv = _build_spawn_shell_cmd(name, args.model, args.max_budget)
+    claude_argv = _build_spawn_shell_cmd(
+        name, args.model, args.max_budget, session_id=args.session_id, tmux_session_name=claude_tmux_session
+    )
 
     # tmux new-session -d provides the TTY that --tmux requires.
     # Pass claude argv directly as the session command (no bash -c wrapper needed).

@@ -89,7 +89,7 @@ classDef neutral fill:#e0e0e0,stroke:#757575,stroke-width:1px,color:#424242
 | /sessions                              | Input          | Session management           |
 | /step-back                             | Planning       | Broader perspective          |
 | /how-confident                         | Verification   | Confidence self-assessment   |
-| /plugin-creator:rt-ica                 | Planning       | Requirements assessment      |
+| /dh:rt-ica                             | Planning       | Requirements assessment      |
 | /delegate                              | Planning       | Quick delegation template    |
 | /scientific-method:scientific-thinking | Planning       | Scientific method activation |
 

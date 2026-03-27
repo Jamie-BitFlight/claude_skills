@@ -173,6 +173,6 @@ dynamic = ["entry-points"]
 
 ## Related Configuration
 
-- [Entry Points: CLI Scripts](./entry-points-cli.md)
-- [Entry Points: GUI Scripts](./entry-points-gui.md)
-- [Dynamic Metadata Fields](./dynamic-metadata.md)
+- `entry-points-cli.md`
+- `entry-points-gui.md`
+- `dynamic-metadata.md`

@@ -224,6 +224,6 @@ dynamic = ["classifiers"]
 
 ## Related Configuration
 
-- [Basic Metadata Fields](./basic-metadata.md) - Name and description
-- [Project URLs](./urls.md) - Repository and documentation links
-- [Dynamic Metadata Fields](./dynamic-metadata.md) - Declaring dynamic fields
+- `basic-metadata.md` - Name and description
+- `urls.md` - Repository and documentation links
+- `dynamic-metadata.md` - Declaring dynamic fields
