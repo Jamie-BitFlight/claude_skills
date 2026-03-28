@@ -89,7 +89,8 @@ research/
 │   ├── cocoindex.md                   # Ultra-performant AI data transformation framework with Rust core, incremental processing, and dataflow model (Apache 2.0)
 │   ├── dolt.md                        # MySQL-compatible version-controlled SQL database — branch, merge, diff, clone via SQL (20.3K stars)
 │   ├── motherduck.md                  # Serverless cloud DuckDB warehouse with Dual Execution and native MCP integration (36K+ stars)
-│   └── tinybird.md                    # Managed ClickHouse platform with MCP and analytics agents
+│   ├── tinybird.md                    # Managed ClickHouse platform with MCP and analytics agents
+│   └── pocketbase.md                  # Open-source Go backend in 1 file: SQLite, realtime, auth, file storage, admin UI (57K+ stars)
 ├── documentation-tools/                # Architecture documentation and living docs
 │   └── living-architecture.md         # Operational flow architecture extraction with Rivière schema (79 stars)
 ├── embedded-ui-libraries/              # Embedded graphics libraries for microcontrollers and MCUs
@@ -470,6 +471,9 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [gstack.md](./agent-frameworks/gstack.md)                             | gstack — role-specific cognition switching for Claude Code with 8 specialized skills (CEO review, eng review, paranoid code review, shipping, browser QA), compiled Bun browser binary (~100-200ms commands), accessibility-based element selection (6K+ stars, MIT) | 2026-03-13   |
 | [AutoResearchClaw.md](./agent-frameworks/AutoResearchClaw.md)         | AutoResearchClaw — fully autonomous 23-stage research pipeline converting ideas into conference-ready papers; multi-agent orchestration, 4-layer citation verification, self-healing experiments, PIVOT/REFINE/PROCEED decision logic, MetaClaw cross-run learning (MIT) | 2026-03-19   |
 | [composure.md](./agent-frameworks/composure.md)                       | Composure — multi-language code quality plugin for Claude Code: 8 skills, 8 hooks, tree-sitter + SQLite MCP knowledge graph, severity-tracked task queue, 7-language anti-pattern blocking (PolyForm Noncommercial 1.0.0) | 2026-03-23   |
+| [agentscope.md](./agent-frameworks/agentscope.md)                     | AgentScope — Alibaba Tongyi Lab multi-agent framework with actor-model parallelism, fault-tolerant Rpc agent, built-in prompt tuning, and streaming/non-streaming support (21.2K stars, Apache-2.0) | 2026-03-28   |
+| [ruflo.md](./agent-frameworks/ruflo.md)                               | Ruflo (formerly Claude Flow) — production-ready multi-agent orchestration: 100+ specialized agents, 26 CLI commands, 215+ MCP tools, RuVector self-learning layer, fault-tolerant consensus (npm ruflo@3.5.0, MIT) | 2026-03-28   |
+| [solace-agent-mesh.md](./agent-frameworks/solace-agent-mesh.md)       | Solace Agent Mesh — event-driven multi-agent AI framework with Solace Platform messaging for agent delegation, artifact sharing, and scalable peer-to-peer agent collaboration (Apache-2.0) | 2026-03-28   |
 
 **Key Topics**:
 
@@ -527,6 +531,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [AutoResearchClaw.md](./agent-infrastructure/AutoResearchClaw.md) | AutoResearchClaw — 23-stage autonomous research pipeline with 4-layer citation verification, self-healing experiments (10 repair cycles), MetaClaw cross-run learning (+18.3% robustness), ACP support for Claude Code/OpenCode/Codex (6.2K stars) | 2026-03-19   |
 | [zeroboot.md](./agent-infrastructure/zeroboot.md) | Zeroboot — sub-millisecond Firecracker+KVM fork sandbox: 0.79ms p50, ~265KB RSS, 4-endpoint REST API, Python/Node SDKs, managed + self-hosted deployment (1,394 stars, v0.1.0) | 2026-03-21   |
 | [vibium.md](./agent-infrastructure/vibium.md) | Vibium — browser automation tool for AI agents via WebDriver BiDi; CLI, MCP server, and client library modes | 2026-03-24   |
+| [nemoclaw.md](./agent-infrastructure/nemoclaw.md) | NVIDIA NemoClaw — alpha reference stack for running OpenClaw agents in OpenShell sandboxes with 4-layer policy-enforced isolation (network, filesystem, process, inference), multi-provider inference routing, and supply-chain verification (17.3K stars) | 2026-03-28   |
 
 **Key Topics**:
 
@@ -888,6 +893,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [dolt.md](./data-infrastructure/dolt.md)                 | Dolt v1.83.0 — MySQL wire-protocol compatible version-controlled SQL database with Git semantics (branch, merge, diff, clone via SQL stored procedures), Prolly Tree O(d) diffs, and agentic memory via Beads (20.3K stars, Apache 2.0) | 2026-03-01   |
 | [motherduck.md](./data-infrastructure/motherduck.md)     | Serverless cloud DuckDB warehouse with Dual Execution engine and native MCP integration for AI agents        | 2026-02-23   |
 | [tinybird.md](./data-infrastructure/tinybird.md)         | Managed ClickHouse platform for real-time analytics APIs with native MCP server and analytics agents support | 2026-01-31   |
+| [pocketbase.md](./data-infrastructure/pocketbase.md)     | PocketBase — open-source Go backend in 1 file: embedded SQLite with realtime subscriptions, password/OTP/OAuth2/MFA auth, file storage, admin UI, simple REST API (57.2K stars, MIT) | 2026-03-28   |
 
 **Key Topics**:
 
