@@ -701,6 +701,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [tori-cli.md](./developer-tools/tori-cli.md)           | Go-based SSH-tunneled Docker monitoring TUI with declarative alerts, multi-server dashboard, and zero network exposure | 2026-03-18   |
 | [emqutiti.md](./developer-tools/emqutiti.md)           | Go-based MQTT TUI client with multi-broker profiles, trace recording/replay, and OS keyring credential management | 2026-03-18   |
 | [claude-code-cli-power-patterns.md](./developer-tools/claude-code-cli-power-patterns.md) | 10 Claude Code CLI power patterns — session forking, PR-linked review, editor prompts, inline shell, effort levels, parallel worktrees, JSON output, context compaction, dynamic agents, CI/CD budget caps (Trigger.dev blog, March 2026) | 2026-03-24   |
+| [worktrunk.md](./developer-tools/worktrunk.md) | Worktrunk v0.33.0 — CLI for git worktree management designed for parallel AI agent workflows; branch-name addressing instead of filesystem paths, simple create/switch/remove commands, MIT OR Apache-2.0 | 2026-03-28   |
 
 **Key Topics**:
 
