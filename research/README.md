@@ -362,6 +362,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [mcpskills-cli.md](./skill-generation-tools/mcpskills-cli.md)       | mcpskills-cli - MCP-to-skill converter generating SKILL.md and polyglot call scripts from Streamable HTTP servers | 2026-02-15   |
 | [skill-seekers.md](./skill-generation-tools/skill-seekers.md)       | Skill Seekers - converts docs, GitHub repos, and PDFs into Claude/Gemini/OpenAI skills                          | 2026-01-26   |
 | [skillkit.md](./skill-generation-tools/skillkit.md)                  | SkillKit - universal package manager for AI agent skills with 15K+ skills, 32 agent support, and cross-format translation | 2026-02-08   |
+| [claude-skills-library.md](./skill-generation-tools/claude-skills-library.md) | Claude Skills Library (alirezarezvani) — 205 production-ready skills across 9 domains, 268 stdlib-only Python tools, 9-phase SKILL_PIPELINE.md quality gates, converts to 11 AI coding tool formats via single script (7.5K stars, MIT) | 2026-03-28   |
 | [skillsmp.md](./skill-generation-tools/skillsmp.md)                   | SkillsMP - open marketplace for 66,500+ AI agent skills (Claude Code, Codex CLI, ChatGPT); REST API, MCP server, SKILL.md standard (MIT) | 2026-02-23   |
 | [skrills.md](./skill-generation-tools/skrills.md)                    | Skrills - Rust skills support engine validating and syncing skills across Claude Code, Codex CLI, and Copilot CLI with 40+ MCP tools (52 stars) | 2026-02-23   |
 | [softaworks-agent-toolkit.md](./skill-generation-tools/softaworks-agent-toolkit.md) | Softaworks Agent Toolkit - 43 skills, 6 agents, 7 slash commands for Claude Code with multi-platform support (621 stars) | 2026-02-20   |
@@ -433,6 +434,7 @@ Tools and frameworks for autonomous code security auditing and vulnerability det
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------ |
 | [hound.md](./code-auditing/hound.md) | Autonomous AI security auditor using knowledge graphs, belief systems, and hypothesis-driven analysis | 2026-01-26   |
 | [snyk-cli-cpp-scans.md](./code-auditing/snyk-cli-cpp-scans.md) | Snyk CLI hash-based open-source vulnerability scanning for C/C++ unmanaged dependencies via `--unmanaged` flag | 2026-02-23   |
+| [syft.md](./code-auditing/syft.md) | Syft v1.42.3 — Anchore SBOM generation tool: 3-stage pipeline (source resolution → cataloging → format output), 20+ ecosystem catalogers, CycloneDX/SPDX/Syft JSON output, signed attestations, Grype integration (8.6K stars, Apache-2.0) | 2026-03-28   |
 
 **Key Topics**:
 
@@ -532,6 +534,8 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [zeroboot.md](./agent-infrastructure/zeroboot.md) | Zeroboot — sub-millisecond Firecracker+KVM fork sandbox: 0.79ms p50, ~265KB RSS, 4-endpoint REST API, Python/Node SDKs, managed + self-hosted deployment (1,394 stars, v0.1.0) | 2026-03-21   |
 | [vibium.md](./agent-infrastructure/vibium.md) | Vibium — browser automation tool for AI agents via WebDriver BiDi; CLI, MCP server, and client library modes | 2026-03-24   |
 | [nemoclaw.md](./agent-infrastructure/nemoclaw.md) | NVIDIA NemoClaw — alpha reference stack for running OpenClaw agents in OpenShell sandboxes with 4-layer policy-enforced isolation (network, filesystem, process, inference), multi-provider inference routing, and supply-chain verification (17.3K stars) | 2026-03-28   |
+| [trustgraph.md](./agent-infrastructure/trustgraph.md) | TrustGraph AI — event-driven knowledge graph platform: RDF triple model, multi-model storage (Cassandra+Qdrant+Garage), three RAG modes (DocumentRAG/GraphRAG/OntoRAG), Context Cores versioned bundles, Apache Pulsar pub-sub, MCP server (1.7K stars, Apache-2.0) | 2026-03-28   |
+| [fleet.md](./agent-infrastructure/fleet.md) | Fleet — open-source device management for 400K+ hosts: Go backend with MySQL/Redis, 9 MDM subsystems (Apple/Windows/Android), osquery-based telemetry, Orbit agent, EnterpriseOverrides extensibility pattern, dual MIT/commercial license (6.2K stars) | 2026-03-28   |
 
 **Key Topics**:
 
@@ -1206,6 +1210,7 @@ Self-hosted LLM inference servers, multi-provider gateways, and LLMOps platforms
 | [localai.md](./llm-infrastructure/localai.md) | LocalAI - free open-source local AI inference server with OpenAI-compatible API, no GPU required, 40+ backends including llama.cpp, diffusers, whisper (43K+ stars) | 2026-02-22 |
 | [tensorzero.md](./llm-infrastructure/tensorzero.md) | TensorZero - industrial-grade LLM gateway written in Rust with <1ms p99 latency, 20+ providers, fine-tuning, A/B testing, and observability (10.9K stars) | 2026-01-31 |
 | [glm5-exacto.md](./llm-infrastructure/glm5-exacto.md) | GLM-5:exacto — Z.ai's 744B-parameter open-source model (40B active MoE) via OpenRouter Exacto routing for tool-calling accuracy, 77.8% SWE-bench Verified, MIT license | 2026-03-18 |
+| [openbao.md](./llm-infrastructure/openbao.md) | OpenBao v2.5.2 — MPL-2.0 fork of HashiCorp Vault: centralized identity-based secrets management, 9 auth methods (JWT/Kubernetes/LDAP/AppRole), 9 secret engines (KV/PKI/Database/Transit/SSH), sdk/v2 + api/v2 for plugins (Go 1.25.6) | 2026-03-28 |
 
 **Key Topics**:
 

@@ -272,3 +272,19 @@ From reviewed sources:
 - Primary code analysis: `/home/user/claude_skills/.worktrees/fleet/` shallow clone
 - Official documentation: <https://github.com/fleetdm/fleet/README.md>, CHANGELOG.md, orbit/README.md
 - GitHub API: Repository metadata (stars, forks, license, language, topics)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Fly.io](../fly-io.md) | agent-infrastructure | shared concern: infrastructure patterns for orchestrating scaled deployments across multiple regions and cloud environments |
+| [PocketBase](../api-frameworks/pocketbase.md) | api-frameworks | comparable modular backend design: service overrides via hooks and plugins; REST API with extensible architecture |
+| [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | shared pattern: version-controlled SQL database for audit trails and state management in distributed systems |
+| [Gas Town](../research-agent-patterns/gastown.md) | research-agent-patterns | applies fleet/agent management principles: distributed work state, health monitoring (Witness zombie detection), persistent context across agent lifecycle |
+| [PicoClaw](../picoclaw.md) | agent-infrastructure | lightweight edge deployment model: single-binary infrastructure deployable across heterogeneous hardware (RISC-V, ARM, x86) |
+| [OpenFang](../agent-frameworks/openfang.md) | agent-frameworks | modular service architecture with autonomous Hands and extensible channel adapters; comparable to Fleet's pluggable MDM service components |
+| [ZeroClaw](../zeroclaw.md) | agent-infrastructure | similar infrastructure constraint optimization: sub-5MB resource footprint for edge deployment scenarios |
+| [Kernel.sh](../kernel-sh.md) | agent-infrastructure | complementary execution environment isolation: VM-per-browser model parallels Fleet's device isolation and MDM agent sandboxing |
+| [Plano](../plano.md) | agent-infrastructure | multi-agent orchestration proxy with data plane abstraction; similar to Fleet's service router pattern for managing heterogeneous client types |

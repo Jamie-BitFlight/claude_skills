@@ -431,6 +431,21 @@ The conversion system (one skill format → 11 tool-native formats via `scripts/
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Everything Claude Code](./everything-claude-code.md) | skill-generation-tools | Parallel harness system: 65+ skills, 16 agents, production quality gates and marketplace distribution approach |
+| [SkillKit](./skillkit.md) | skill-generation-tools | Cross-platform skill translator: handles 32-agent format conversion like this library's script/convert.sh approach |
+| [Anthropic Agent Skills](./anthropics-skills.md) | skill-generation-tools | Official SKILL.md specification reference and 17-skill collection matching this library's format and quality standards |
+| [ClawHub](./clawhub.md) | skill-generation-tools | Public marketplace registry solving the skill discovery and versioning problem this library addresses |
+| [Claude Code Templates](./claude-code-templates.md) | skill-generation-tools | 100+ ready-to-use components distribution model shares marketplace and CLI install pattern |
+| [Skill Seekers](./skill-seekers.md) | skill-generation-tools | Documentation-to-skill automation complementing this library's manual authoring approach |
+| [mcpskills-cli](./mcpskills-cli.md) | skill-generation-tools | MCP-to-skill conversion pattern extending this library's Python tool generation methodology to protocol tools |
+| [HumanCompiler](./human-compiler.md) | skill-generation-tools | Interview-driven plugin generation from behavioral profiles parallels skill authoring as knowledge codification |
+
+---
+
 ## Freshness Tracking
 
 **Content Last Verified:** March 28, 2026
