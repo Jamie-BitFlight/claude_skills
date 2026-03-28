@@ -282,3 +282,18 @@ N/A — initial entry created 2026-03-28
 
 - <https://pocketbase.io/docs> — Official documentation site not directly read (linked from README; would provide extended API reference and guides)
 - Full historical contributor statistics — shallow clone limits contributor history visibility
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Dolt](./dolt.md) | data-infrastructure | Git-like version control for SQL data with branch/merge semantics, complementary for schema-versioned multi-environment testing |
+| [Motherduck](./motherduck.md) | data-infrastructure | Serverless cloud analytics layer; PocketBase records → DuckDB for OLAP queries and embedded analytics |
+| [Tinybird](./tinybird.md) | data-infrastructure | Real-time analytics API builder; routes PocketBase event streams to SQL-queryable analytics endpoints |
+| [FastAPI](../api-frameworks/fastapi.md) | api-frameworks | Alternative Python backend framework; FastAPI's Pydantic validation patterns complement PocketBase's declarative collection schema system |
+| [Motia](../api-frameworks/motia.md) | api-frameworks | Unified backend abstraction using Step primitives; similar problem domain (consolidating APIs, queues, and workflows into single runtime) |
+| [Modelence](../api-frameworks/modelence.md) | api-frameworks | AI-native TypeScript backend with MongoDB; MongoDB alternative to PocketBase for schema-less data, contrasts embedded SQLite with cloud database models |
+| [Tornado](../api-frameworks/tornado.md) | api-frameworks | WebSocket and long-polling support; shares async networking approach for realtime subscriptions beyond SSE |
+| [Local Memory](../context-management/local-memory.md) | context-management | Persistent agent memory infrastructure; uses SQLite + Qdrant similar to PocketBase's embedded-database-first philosophy for stateful agents |

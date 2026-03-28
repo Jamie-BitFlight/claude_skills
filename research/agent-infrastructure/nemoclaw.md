@@ -228,6 +228,18 @@ Network egress approvals for unknown hosts require operator interaction via Open
 - [Community Discord](https://discord.gg/XFpfPv9Uvx) — support and discussion channel
 - [Release Notes](https://github.com/NVIDIA/NemoClaw/blob/main/docs/about/release-notes.md) — alpha status and changelog
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ZeroClaw](./zeroclaw.md) | agent-infrastructure | Parallel lightweight agent runtime; both enable policy-enforced execution with trait-driven architecture |
+| [Zeroboot](./zeroboot.md) | agent-infrastructure | Complementary sandbox technology; Zeroboot provides sub-millisecond VM fork isolation while NemoClaw provides policy layers on top |
+| [Fly.io](./fly-io.md) | agent-infrastructure | Alternative infrastructure platform for agent deployment; Sprites provide persistent VM sandboxes similar to NemoClaw's sandboxed OpenClaw model |
+| [Plano](./plano.md) | agent-infrastructure | Overlapping orchestration concern; Plano handles LLM inference routing via proxy pattern while NemoClaw routes inference within sandbox boundary |
+| [PicoClaw](./picoclaw.md) | agent-infrastructure | Sibling project in the Claw ecosystem; ultra-lightweight agent design vs NemoClaw's reference stack approach |
+| [AutoResearchClaw](./AutoResearchClaw.md) | agent-infrastructure | Advanced Claw variant; extends autonomous agent patterns with multi-stage pipeline and self-healing capabilities |
+| [OpenAI Codex CLI](../coding-agents/openai-codex-cli.md) | coding-agents | Shared security design pattern; both implement OS sandbox isolation plus policy-enforced approval model for untrusted code execution |
+
 ## Freshness Tracking
 
 **Last Reviewed**: 2026-03-28

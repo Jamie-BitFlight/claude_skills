@@ -246,6 +246,19 @@ The project provides hands-on tutorials for:
 - **Source Code**: GitHub repository shallow clone to /tmp/.worktrees/solace-agent-mesh (accessed 2026-03-28)
 - **License**: Apache 2.0 (<https://github.com/SolaceLabs/solace-agent-mesh/blob/main/LICENSE>, accessed 2026-03-28)
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Google Agent Development Kit (ADK)](./google-adk.md) | agent-frameworks | Core runtime dependency (google-adk==1.18.0 specified in pyproject.toml); ADK LlmAgent processes tasks with permission scope filtering |
+| [AgentScope](./agentscope.md) | agent-frameworks | Peer multi-agent framework with A2A (Agent-to-Agent) protocol support; both enable decoupled inter-agent communication |
+| [Ruflo](./ruflo.md) | agent-frameworks | Enterprise multi-agent orchestration with 215+ MCP tools; shares MCP ecosystem integration and swarm coordination patterns |
+| [Micro-Agent](./micro-agent.md) | agent-frameworks | Lightweight Python agent framework with MCP multi-server support; same async streaming interface and ReAct agent pattern |
+| [OpenFang](./openfang.md) | agent-frameworks | Rust-based Agent OS with 40 channel adapters and autonomous scheduling; parallels SAM's gateway-based architecture for external system integration |
+| [LiteAgents](./liteagents.md) | agent-frameworks | Multi-agent toolkit with 11 specialized agents and orchestrator agent; shares task delegation and agent-to-agent workflow patterns |
+| [CopilotKit](./copilotkit.md) | agent-frameworks | React frontend framework with AG-UI protocol for bi-directional agent-UI state sync; complements SAM's Gateway architecture for user interaction |
+| [Plano](../agent-infrastructure/plano.md) | agent-infrastructure | AI-native proxy with unified agent orchestration and model routing; addresses similar infrastructure concerns for multi-agent coordination |
+
 ## Freshness Tracking
 
 **Last Researched**: 2026-03-28
