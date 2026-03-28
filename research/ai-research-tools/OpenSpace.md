@@ -280,6 +280,19 @@ OpenSpace is directly compatible with Claude Code and other agent platforms that
   - WorldMonitor: <https://github.com/koala73/worldmonitor>
 - **Web Portal**: <https://open-space.cloud> (accessed 2026-03-28)
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [clawhub.md](../skill-generation-tools/clawhub.md) | skill-generation-tools | Public skill registry with vector search and versioning — complementary skill discovery mechanism to OpenSpace's cloud community |
+| [skillsmp.md](../skill-generation-tools/skillsmp.md) | skill-generation-tools | 66,500+ skill marketplace with MCP server — overlapping use case for skill ecosystem and multi-agent reuse at scale |
+| [everything-claude-code.md](../skill-generation-tools/everything-claude-code.md) | skill-generation-tools | 65+ skills + 16 agents with hook-based automation — shares skill optimization and reuse methodology with OpenSpace |
+| [claude-skills-library.md](../skill-generation-tools/claude-skills-library.md) | skill-generation-tools | 205 production-ready skills with 9-phase quality gates — alternative approach to skill lifecycle management and quality tracking |
+| [mcpskills-cli.md](../mcp-ecosystem/mcpskills-cli.md) | mcp-ecosystem | MCP-to-skill converter for polyglot output — feeds OpenSpace's skill discovery pipeline via standardized tool definitions |
+| [ruflo.md](../agent-frameworks/ruflo.md) | agent-frameworks | 100+ specialized agents with RuVector self-learning layer — shares self-evolving agent design and skill reuse model |
+| [oh-my-opencode.md](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | 37.5K-star production Claude Code orchestration with model routing — adjacent workflow: skill evolution improves agent coordination |
+| [gastown.md](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager with Dolt SQL ledger — potential integration point for OpenSpace skill versioning via SQL record store |
+
 ## Freshness Tracking
 
 **Created**: 2026-03-28
