@@ -257,3 +257,15 @@ OpenBao is relevant to Claude Code development in these scenarios:
 - Installation & Usage: Verified against README and website documentation with working code examples.
 - Limitations: Extracted from official CHANGELOG bug fix descriptions. Some limitations noted in code (deadlock in JobManager, mount deletion timeouts) are documented in official release notes.
 - Relevance: Reasoned from architecture and capabilities; not extracted from a primary source. Medium confidence appropriate for inferred relevance.
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Bifrost](../llm-infrastructure/bifrost.md) | llm-infrastructure | integrates with HashiCorp Vault for governance and access control |
+| [TensorZero](../llm-infrastructure/tensorzero.md) | llm-infrastructure | multi-provider LLM gateway with auth component architecture |
+| [LocalAI](../llm-infrastructure/localai.md) | llm-infrastructure | self-hosted inference requiring credential management for API providers |
+| [NemoClaw](../agent-infrastructure/nemoclaw.md) | agent-infrastructure | isolates provider credentials from agents via routed inference management |
+| [Stakpak-Agent](../coding-agents/stakpak-agent.md) | coding-agents | includes secret substitution and mTLS credential handling for DevOps workflows |
+| [Dify](../agent-frameworks/dify.md) | agent-frameworks | provides per-workspace access control and tool permission management |
+| [Fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | device management platform requiring authentication and authorization mechanisms |
