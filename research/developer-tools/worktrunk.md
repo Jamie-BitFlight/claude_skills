@@ -230,7 +230,19 @@ model = "claude-3-5-sonnet"
 
 ## Cross-References
 
-None currently documented. Cross-references to be populated by research-cross-referencer after entry creation.
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Agent Deck](../agent-deck.md) | developer-tools | terminal session manager for AI agents with native git worktree isolation and unified TUI |
+| [Superset](../superset-sh.md) | developer-tools | runs 10+ parallel AI agents via git worktrees on macOS with branch-isolated execution |
+| [Sidecar](../sidecar.md) | developer-tools | terminal UI companion for AI agents with tmux workspace management and git status tracking |
+| [tmuxp](../tmuxp.md) | developer-tools | Python tmux session manager with YAML workspace configs—complementary to worktree orchestration |
+| [Byobu](../byobu.md) | developer-tools | enhanced terminal multiplexer for tmux/screen—shares session management abstraction layer |
+| [Using tmux with Claude Code](../using-tmux-with-claude-code.md) | developer-tools | practical guide for multi-pane agent orchestration; overlaps with Worktrunk's multi-agent coordination use case |
+| [Everything Claude Code](../everything-claude-code.md) | developer-tools | 13 agents and 48+ skills—complements Worktrunk's agent isolation and parallel execution patterns |
+| [Claude Code CLI Power Patterns](../claude-code-cli-power-patterns.md) | developer-tools | includes parallel worktrees pattern as core Claude Code deployment technique |
+| [1Code](../1code.md) | coding-agents | Electron app wrapping Claude Code CLI with git worktree isolation for conflict-free parallel work |
+| [Gastown](../gastown.md) | research-agent-patterns | multi-agent workspace manager coordinating 20-50+ Claude Code sessions—addresses same parallelism problem |
+| [Vibe Kanban](../vibe-kanban.md) | task-management | Kanban UI for parallel AI agent orchestration with git worktree isolation |
 
 ---
 
