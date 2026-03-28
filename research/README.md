@@ -44,6 +44,7 @@ research/
 │   └── trio.md                        # Structured concurrency async library for Python (7K+ stars)
 ├── llm-infrastructure/                # LLM inference and serving infrastructure
 │   ├── localai.md                     # Free open-source local AI inference server, OpenAI-compatible API, no GPU required (43K+ stars)
+│   ├── openbao.md                     # OpenBao v2.5.2 — MPL-2.0 HashiCorp Vault fork: 9 auth methods, 9 secret engines, identity-based secrets for AI agents (Go 1.25.6)
 │   └── tensorzero.md                  # Industrial-grade LLM gateway with <1ms latency, fine-tuning, and A/B testing (Rust)
 ├── ml-infrastructure/                 # ML compute engines and model serving platforms
 │   ├── microgpt-playground.md         # Browser-native GPT training and inference, zero-dependency JS port of Karpathy's microgpt.py (65 stars)
@@ -58,7 +59,8 @@ research/
 │   └── logfire.md                     # Pydantic Logfire - full-stack AI observability with MCP (4K+ stars)
 ├── code-auditing/                     # Code security and quality auditing tools
 │   ├── hound.md                       # Autonomous AI security auditor with knowledge graphs
-│   └── snyk-cli-cpp-scans.md          # Snyk CLI hash-based open-source vulnerability scanning for C/C++ unmanaged dependencies
+│   ├── snyk-cli-cpp-scans.md          # Snyk CLI hash-based open-source vulnerability scanning for C/C++ unmanaged dependencies
+│   └── syft.md                        # Syft v1.42.3 — Anchore SBOM generation: 20+ ecosystem catalogers, CycloneDX/SPDX output, signed attestations, Grype integration (8.6K stars)
 ├── ai-design-tools/                   # AI-powered visual creation and design platforms
 │   ├── hedra.md                       # AI video/image/audio creation platform
 │   ├── jimeng.md                      # ByteDance SeedDance 2.0 AI video/image generation with cinematic camera control
@@ -88,6 +90,7 @@ research/
 ├── data-infrastructure/               # Real-time data platforms for analytics
 │   ├── cocoindex.md                   # Ultra-performant AI data transformation framework with Rust core, incremental processing, and dataflow model (Apache 2.0)
 │   ├── dolt.md                        # MySQL-compatible version-controlled SQL database — branch, merge, diff, clone via SQL (20.3K stars)
+│   ├── chroma.md                      # Chroma v1.5.5 — open-source vector database: 4-function API, HNSW/Spann indices, hybrid search, Rust+Python (26.9K stars)
 │   ├── motherduck.md                  # Serverless cloud DuckDB warehouse with Dual Execution and native MCP integration (36K+ stars)
 │   ├── tinybird.md                    # Managed ClickHouse platform with MCP and analytics agents
 │   └── pocketbase.md                  # Open-source Go backend in 1 file: SQLite, realtime, auth, file storage, admin UI (57K+ stars)
@@ -130,6 +133,7 @@ research/
 │   ├── tmuxp.md                      # Python tmux session manager — YAML/JSON workspace configs, plugin system, freeze/replay (4.4K stars)
 │   ├── using-tmux-with-claude-code.md # tmux + Claude Code workflow guide: copy-mode, capture, multi-pane orchestration
 │   ├── vert.md                        # WebAssembly-based file converter (13K+ stars)
+│   ├── worktrunk.md                   # Worktrunk v0.33.0 — Rust CLI for git worktree management with parallel AI agent workflows, branch-name addressing, lifecycle hooks (14.8K stars)
 │   └── yume.md                        # Native desktop GUI for Claude Code CLI (Tauri + Rust)
 ├── evaluation-testing/                # Agent evaluation, testing, and harness engineering
 │   ├── harness-engineering-martin-fowler.md  # Harness engineering discipline for AI coding agents (Martin Fowler / Böckeler)
@@ -149,6 +153,8 @@ research/
 │   ├── spec-workflow-mcp.md           # Spec-driven development workflow with approval gates and real-time dashboard (3.9K stars)
 │   ├── cocoindex-code.md             # Embedded MCP server for semantic code search via AST analysis and embeddings (Apache-2.0)
 │   └── mcpskills-cli.md              # CLI that converts MCP server tools into static AI agent skills to reduce token consumption
+├── agent-orchestration/               # Multi-agent orchestration systems and frameworks
+│   └── oh-my-claudecode.md            # oh-my-claudecode — 32-agent TypeScript orchestration with smart model routing, skill system, Haiku/Sonnet/Opus tiers (13.9K stars)
 ├── research-agent-patterns/           # Multi-agent architectures and orchestration
 │   ├── claw-loop.md                   # Autonomous development orchestration via tmux + cron
 │   ├── compound-engineering-plugin.md # Every Inc's Plan/Work/Review/Compound workflow plugin
@@ -159,6 +165,7 @@ research/
 │   ├── tinyclaw.md                    # Multi-agent multi-channel 24/7 AI assistant with peer-to-peer handoffs
 │   ├── ollama-subagents-web-search-claude-code.md  # Ollama native subagents and web search for Claude Code (163K+ stars)
 │   ├── oh-my-opencode.md              # code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months)
+│   ├── takt.md                        # TAKT — YAML-defined multi-agent workflows with state machine transitions, faceted prompting, 3 runner types, AI judge routing (866 stars)
 │   └── the-delegation.md             # Embodied 3D multi-agent orchestration: spatial office, NavMesh pathfinding, PM orchestrator, WebGPU (v0.1.0)
 ├── skill-generation-tools/            # Tools that create AI skills/prompts
 │   ├── claude-code-skills-alirezarezvani.md # 170 modular skill packages for Claude Code, Codex, Gemini CLI across 9 domains (2.5K+ stars)
@@ -229,6 +236,7 @@ Research on multi-agent architectures, orchestration patterns, and research work
 | [ai-data-science-team.md](./research-agent-patterns/ai-data-science-team.md) | AI Data Science Team — LangGraph supervisor + 9 specialist agents (wrangling, cleaning, visualization, SQL, H2O ML, MLflow, EDA, feature engineering, loader) with sandboxed code execution and AI Pipeline Studio Streamlit app (5K+ stars, MIT) | 2026-03-04   |
 | [oh-my-opencode.md](./research-agent-patterns/oh-my-opencode.md) | code-yeongyu/oh-my-opencode — Production-scale Claude Code orchestration: Sisyphus/Atlas/Prometheus multi-agent architecture, category-based model routing, hash-anchored editing, demand-scoped MCP (37.5K stars in 4 months) | 2026-03-06   |
 | [the-delegation.md](./research-agent-patterns/the-delegation.md) | The Delegation — Embodied 3D multi-agent orchestration: spatial office simulation with NavMesh pathfinding, PM orchestrator, LLM function calling, client approval workflow, WebGPU rendering (v0.1.0) | 2026-03-18   |
+| [takt.md](./research-agent-patterns/takt.md) | TAKT v0.33.2 — YAML-defined multi-agent workflow engine: state machine transitions, faceted prompting (persona/policy/knowledge/instruction), AI judge routing, 3 runner types (Chord parallel, Arpeggio batch, Team Leader decomposition), audit pieces for security/architecture/e2e (866 stars) | 2026-03-28   |
 
 **Key Topics**:
 
