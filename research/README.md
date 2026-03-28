@@ -583,7 +583,25 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 
 ---
 
-### 7. API Frameworks
+### 7. Agent Orchestration
+
+**Location**: [./agent-orchestration/](./agent-orchestration/)
+
+Plugins and systems for coordinating multiple Claude Code agents with automatic routing, parallelism management, and task completion guarantees.
+
+| Document | Description | Last Updated |
+| -------- | ----------- | ------------ |
+| [oh-my-claudecode.md](./agent-orchestration/oh-my-claudecode.md) | oh-my-claudecode (OMC) — zero-config multi-agent orchestration for Claude Code: 32 specialized agents across cognitive domains, natural language task routing, automatic parallelism, Sisyphus persistent execution mode (TypeScript, MIT) | 2026-03-28 |
+
+**Key Topics**:
+
+- Natural language task routing to specialized agents
+- Automatic parallelism and completion guarantees
+- Sisyphus persistent execution for complex tasks
+
+---
+
+### 8. API Frameworks
 
 **Location**: [./api-frameworks/](./api-frameworks/)
 
@@ -637,7 +655,7 @@ High-performance API frameworks for building backend services, tool endpoints, a
 
 ---
 
-### 8. Developer Tools
+### 9. Developer Tools
 
 **Location**: [./developer-tools/](./developer-tools/)
 
@@ -817,7 +835,7 @@ Developer productivity tools and workflow automation for software engineering wi
 
 ---
 
-### 9. Documentation Tools
+### 10. Documentation Tools
 
 **Location**: [./documentation-tools/](./documentation-tools/)
 
@@ -839,7 +857,7 @@ Architecture documentation, living documentation, and code-to-architecture extra
 
 ---
 
-### 10. Coding Agents
+### 11. Coding Agents
 
 **Location**: [./coding-agents/](./coding-agents/)
 
@@ -887,7 +905,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 
 ---
 
-### 11. Data Infrastructure
+### 12. Data Infrastructure
 
 **Location**: [./data-infrastructure/](./data-infrastructure/)
 
@@ -916,7 +934,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 
 ---
 
-### 12. Task Management
+### 13. Task Management
 
 **Location**: [./task-management/](./task-management/)
 
@@ -941,7 +959,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 
 ---
 
-### 13. Context Management
+### 14. Context Management
 
 **Location**: [./context-management/](./context-management/)
 
@@ -980,7 +998,7 @@ Memory systems, context window optimization tools, and RAG solutions for maintai
 
 ---
 
-### 14. Async Libraries
+### 15. Async Libraries
 
 **Location**: [./async-libraries/](./async-libraries/)
 
@@ -1011,7 +1029,7 @@ Python async I/O libraries and concurrency frameworks for building concurrent ap
 
 ---
 
-### 15. ML Infrastructure
+### 16. ML Infrastructure
 
 **Location**: [./ml-infrastructure/](./ml-infrastructure/)
 
@@ -1041,7 +1059,7 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 
 ---
 
-### 16. Python Runtimes
+### 17. Python Runtimes
 
 **Location**: [./python-runtimes/](./python-runtimes/)
 
@@ -1066,7 +1084,7 @@ Alternative Python interpreters and runtime implementations for specialized use 
 
 ---
 
-### 17. AI Observability
+### 18. AI Observability
 
 **Location**: [./ai-observability/](./ai-observability/)
 
@@ -1091,7 +1109,7 @@ AI-native observability platforms for monitoring, debugging, and optimizing LLM 
 
 ---
 
-### 18. Rust-Python Bindings
+### 19. Rust-Python Bindings
 
 **Location**: [./rust-python-bindings/](./rust-python-bindings/)
 
@@ -1116,7 +1134,7 @@ Rust-Python interoperability libraries for building high-performance Python exte
 
 ---
 
-### 19. AI Research Tools
+### 20. AI Research Tools
 
 **Location**: [./ai-research-tools/](./ai-research-tools/)
 
@@ -1141,7 +1159,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 
 ---
 
-### 20. AI Design Tools
+### 21. AI Design Tools
 
 **Location**: [./ai-design-tools/](./ai-design-tools/)
 
@@ -1169,7 +1187,7 @@ AI-powered visual creation platforms and design intelligence tools for video, im
 
 ---
 
-### 21. Evaluation & Testing
+### 22. Evaluation & Testing
 
 **Location**: [./evaluation-testing/](./evaluation-testing/)
 
@@ -1201,7 +1219,7 @@ Harness engineering, evaluation infrastructure, and testing methodologies for AI
 
 ---
 
-### 22. LLM Infrastructure
+### 23. LLM Infrastructure
 
 **Location**: [./llm-infrastructure/](./llm-infrastructure/)
 
@@ -1230,7 +1248,7 @@ Self-hosted LLM inference servers, multi-provider gateways, and LLMOps platforms
 
 ---
 
-### 23. Prompt Engineering
+### 24. Prompt Engineering
 
 **Location**: [./prompt-engineering/](./prompt-engineering/)
 
@@ -1274,7 +1292,7 @@ Interactive prompt development platforms and tools for iterating on LLM prompts,
 
 ---
 
-### 24. AI Writing Tools
+### 25. AI Writing Tools
 
 **Location**: [./ai-writing-tools/](./ai-writing-tools/)
 
@@ -1293,7 +1311,7 @@ Automated content generation tools that produce changelogs, release notes, blog 
 
 ---
 
-### 25. Low-Code Platforms
+### 26. Low-Code Platforms
 
 **Location**: [./low-code-platforms/](./low-code-platforms/)
 
@@ -1312,7 +1330,7 @@ No-code and low-code AI workflow builders for creating AI-powered applications a
 
 ---
 
-### 26. Claude Code Plugins
+### 27. Claude Code Plugins
 
 **Location**: [./claude-code-plugins/](./claude-code-plugins/)
 
@@ -1329,7 +1347,7 @@ Curated Claude Code plugin ecosystems, configuration repositories, and multi-plu
 - Multi-LLM backend routing (Z.ai, Kimi K2, ccproxy, OpenRouter)
 - Battle-tested plugin selection and curated skill sets
 
-### 27. Serialization Libraries
+### 28. Serialization Libraries
 
 **Location**: [./serialization-libraries/](./serialization-libraries/)
 

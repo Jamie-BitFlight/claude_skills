@@ -535,6 +535,19 @@ The ARCHITECTURE.md file covers overview and skill composition but does not deta
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [oh-my-opencode.md](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | Production-scale Claude Code orchestration with category-based model routing and Sisyphus/Atlas/Prometheus multi-agent architecture; OMC shares identical goal and model switching strategy |
+| [compound-engineering-plugin.md](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | Claude Code plugin with 27 agents and Plan/Work/Review/Compound workflow; parallel pattern to OMC's team mode pipeline |
+| [gastown.md](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager for coordinating 20-50+ Claude Code sessions; overlapping execution model with OMC's team and CLI worker modes |
+| [everything-claude-code.md](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Comprehensive 16-agent harness with 65+ skills and hook-based automation; shares OMC's skill layering and execution parallelism patterns |
+| [claw-loop.md](../research-agent-patterns/claw-loop.md) | research-agent-patterns | Autonomous orchestration via tmux + cron with supervisor-worker pattern; foundational pattern for OMC's Ralph mode and persistent execution loops |
+| [ollama-subagents-web-search-claude-code.md](../research-agent-patterns/ollama-subagents-web-search-claude-code.md) | research-agent-patterns | Ollama native subagents for Claude Code with parallel task isolation; shares OMC's model-agnostic agent spawning and context isolation approach |
+
+---
+
 ## Freshness Tracking
 
 **Last Researched**: 2026-03-28
