@@ -392,6 +392,27 @@ All factual claims in this entry are traceable to extracted passages from the of
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AgentScope](./agentscope.md) | agent-frameworks | Multi-agent framework with actor-model parallelism and fault-tolerant consensus; comparable production-readiness and semantic routing via learning layer |
+| [Superpowers](./superpowers.md) | agent-frameworks | Structured orchestration with specialized agent roles and two-stage verification; shares TDD enforcement and agent pool architecture patterns |
+| [OpenFang](./openfang.md) | agent-frameworks | Agent OS with 40 channel adapters and 16-layer security; shares autonomous scheduling, multi-provider routing, and WASM sandbox execution model |
+| [Everything Claude Code](./everything-claude-code.md) | agent-frameworks | 16 specialized agents with hook-based automation and token optimization; overlaps in agent pool design and skill-based orchestration |
+| [gstack](./gstack.md) | agent-frameworks | Role-specific cognition switching with 8 specialized skills; comparable approach to task-specific agent routing and plugin architecture |
+| [pi-mono](./pi-mono.md) | agent-frameworks | TypeScript monorepo with unified LLM API and agent runtime; shares provider-agnostic model support and MCP extensibility patterns |
+| [Copilotkit](./copilotkit.md) | agent-frameworks | React-first agentic framework with bi-directional state sync and generative UI; provides UI orchestration complement to Ruflo's backend architecture |
+| [Dify](./dify.md) | agent-frameworks | Open-source LLM platform with 100+ model providers, RAG pipelines, and visual workflow builder; shares multi-provider routing and HITL patterns |
+| [Browsermcp](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | Chrome automation via MCP extension bridge; provides specialized tool capability for Ruflo's 215+ MCP tool ecosystem |
+| [Perplexity MCP Server](../mcp-ecosystem/perplexity-mcp-server.md) | mcp-ecosystem | Real-time web search via 4 Sonar tools; exemplifies domain-specific MCP tool integration matching Ruflo's provider-agnostic approach |
+| [Ultra MCP](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | Multi-model routing MCP with cost tracking and vector search; directly applicable to Ruflo's token optimization and semantic routing |
+| [Gitnexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | Graph-based code intelligence MCP with 13-language support; provides semantic code analysis layer compatible with Ruflo's knowledge graph integration |
+| [Motherduck](../data-infrastructure/motherduck.md) | data-infrastructure | Serverless DuckDB with native MCP integration and Dual Execution engine; provides memory backend alternative to AgentDB for pattern storage |
+| [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | Version-controlled SQL database with Git semantics and Beads agentic memory; provides persistent memory layer for Ruflo's ReasoningBank pattern storage |
+
+---
+
 ## Keywords
 
 agent-orchestration, multi-agent-systems, ai-agents, swarm-intelligence, model-context-protocol, mcp, llm-routing, self-learning-agents, byzantine-consensus, vector-memory, hnsw, agent-booster, wasm, token-optimization, claude-code-integration, enterprise-ai, fault-tolerance, plugin-system, ipfs-marketplace, security-hardening

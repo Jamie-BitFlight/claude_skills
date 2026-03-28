@@ -496,6 +496,23 @@ AgentScope is async-first. Blocking I/O in tools or agent code will block the en
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [micro-agent.md](../agent-frameworks/micro-agent.md) | agent-frameworks | shares lightweight Python ReAct pattern with MCP multi-server support |
+| [pi-mono.md](../agent-frameworks/pi-mono.md) | agent-frameworks | comparable unified LLM API and agent runtime architecture across multiple platforms |
+| [everything-claude-code.md](../agent-frameworks/everything-claude-code.md) | agent-frameworks | parallel multi-agent orchestration system with 16 specialized agents and skill binding |
+| [composure.md](../agent-frameworks/composure.md) | agent-frameworks | multi-language agentic system with hook-based automation similar to AgentScope's middleware patterns |
+| [ruflo.md](../agent-frameworks/ruflo.md) | agent-frameworks | 100+ specialized agents with fault-tolerant consensus and 215+ MCP tools |
+| [superpowers.md](../agent-frameworks/superpowers.md) | agent-frameworks | agentic skills framework with subagent-driven development model |
+| [dify.md](../agent-frameworks/dify.md) | agent-frameworks | production LLM application platform with visual workflows and 100+ model providers |
+| [mcpjam.md](../mcp-ecosystem/mcpjam.md) | mcp-ecosystem | local MCP server inspector with LLM playground for debugging tool integration |
+| [ultra-mcp.md](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | unified MCP routing interface with 25 tools as prompts and cost tracking |
+| [cocoindex-code.md](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | embedded MCP server for semantic code search via AST analysis |
+
+---
+
 ## Notes for Future Updates
 
 - Monitor AgentScope-Runtime releases for K8s and serverless deployment patterns
