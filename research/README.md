@@ -899,6 +899,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [motherduck.md](./data-infrastructure/motherduck.md)     | Serverless cloud DuckDB warehouse with Dual Execution engine and native MCP integration for AI agents        | 2026-02-23   |
 | [tinybird.md](./data-infrastructure/tinybird.md)         | Managed ClickHouse platform for real-time analytics APIs with native MCP server and analytics agents support | 2026-01-31   |
 | [pocketbase.md](./data-infrastructure/pocketbase.md)     | PocketBase — open-source Go backend in 1 file: embedded SQLite with realtime subscriptions, password/OTP/OAuth2/MFA auth, file storage, admin UI, simple REST API (57.2K stars, MIT) | 2026-03-28   |
+| [chroma.md](./data-infrastructure/chroma.md)             | Chroma — open-source vector database for AI applications: Python/JavaScript/Rust clients, in-memory and persistent storage, multi-modal embeddings, metadata filtering, distance functions (17K+ stars, Apache-2.0) | 2026-03-28   |
 
 **Key Topics**:
 
