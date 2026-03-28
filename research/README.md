@@ -188,7 +188,8 @@ research/
 │   ├── prompt-engine.md               # SaaS prompt generator converting plain-language to professional-grade prompts in <15s ($19/month)
 │   └── system-prompts-ai-tools.md     # Leaked system prompts and model configs for 30+ AI tools including Claude Code, Cursor, Windsurf, Devin AI (117.9K stars)
 ├── task-management/                   # AI-powered task management for development
-│   └── claude-task-master.md          # Task management system for AI-driven development (25K+ stars)
+│   ├── claude-task-master.md          # Task management system for AI-driven development (25K+ stars)
+│   └── beads.md                       # Dolt-powered version-controlled issue tracker for distributed AI workflows — hash-based IDs, dependency DAG, semantic compaction (19.7K stars)
 └── serialization-libraries/           # High-performance serialization and validation libraries
     └── msgspec.md                     # Zero-overhead JSON/MessagePack/YAML/TOML validation in C; 6-12x faster than Pydantic, 0.46 MiB (3.6K stars)
 ```
@@ -954,6 +955,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 | [vibe-kanban.md](./task-management/vibe-kanban.md)               | Vibe Kanban - Kanban-style orchestration UI for parallel AI coding agent sessions with git worktree isolation | 2026-03-03   |
 | [artifact-manifest-backend-providers.md](./task-management/artifact-manifest-backend-providers.md) | Cross-platform comparison of structured metadata capabilities (GitHub, Linear, GitLab, Supabase) for ArtifactBackend provider implementations | 2026-03-22   |
 | [xyops.md](./task-management/xyops.md)                                                             | xyOps - distributed job orchestration and fleet management platform with visual workflow editor, real-time monitoring, alerting, and remote satellite agent system | 2026-03-26   |
+| [beads.md](./task-management/beads.md) | Beads (bd) — Dolt-powered version-controlled issue tracker for distributed AI workflows: hash-based collision-free IDs, dependency DAG with 4 relationship types, semantic compaction for context window recovery, offline-first with S3/GCS/DoltHub sync (19,673 stars, v0.62.0) | 2026-03-25   |
 
 **Key Topics**:
 
