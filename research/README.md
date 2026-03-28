@@ -1156,6 +1156,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | [codewiki-google.md](./ai-research-tools/codewiki-google.md) | CodeWiki (Google) - AI-powered documentation platform: auto-generates wikis, diagrams, and Gemini chat for code repos after every commit (public preview, Nov 2025) | 2026-03-18   |
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
 | [samuraizer.md](./ai-research-tools/samuraizer.md) | Samuraizer - Full-stack AI knowledge base for security research: URL/PDF analysis via Gemini 2.5 Flash, semantic search, RAG chat, knowledge graph (D3.js), Telegram bot (Flask+React+SQLite, MIT) | 2026-03-25   |
+| [OpenSpace.md](./ai-research-tools/OpenSpace.md) | OpenSpace — self-evolving skills engine for AI agents: autonomous skill development, 46% token reduction via reuse, collective skill sharing across agent networks (1.7K stars, MIT, v0.1.0) | 2026-03-28   |
 
 **Key Topics**:
 
