@@ -545,6 +545,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [trustgraph.md](./agent-infrastructure/trustgraph.md) | TrustGraph AI — event-driven knowledge graph platform: RDF triple model, multi-model storage (Cassandra+Qdrant+Garage), three RAG modes (DocumentRAG/GraphRAG/OntoRAG), Context Cores versioned bundles, Apache Pulsar pub-sub, MCP server (1.7K stars, Apache-2.0) | 2026-03-28   |
 | [fleet.md](./agent-infrastructure/fleet.md) | Fleet — open-source device management for 400K+ hosts: Go backend with MySQL/Redis, 9 MDM subsystems (Apple/Windows/Android), osquery-based telemetry, Orbit agent, EnterpriseOverrides extensibility pattern, dual MIT/commercial license (6.2K stars) | 2026-03-28   |
 | [holyclaude.md](./agent-infrastructure/holyclaude.md) | HolyClaude — containerized AI development workstation: Claude Code + web UI + 7 AI CLIs + headless browser + 50+ dev tools in one `docker compose up` (1.1K stars, MIT, v1.1.4) | 2026-03-28   |
+| [cmux.md](./agent-infrastructure/cmux.md) | cmux — Ghostty-based macOS terminal for AI coding agents: sidebar vertical tabs, visual notification rings, in-app browser with scriptable API, CLI socket for pane automation (11.1K stars, AGPL-3.0, v0.63.0) | 2026-03-28   |
 
 **Key Topics**:
 
