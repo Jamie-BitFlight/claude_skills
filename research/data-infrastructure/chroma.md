@@ -334,3 +334,18 @@ Unit tests via `pytest` (configured in `pyproject.toml` with `asyncio_mode = "au
 **Next Review Date**: 2026-06-28 (3 months)
 
 **Notes**: Chroma is actively maintained with weekly releases. Kubernetes and distributed features are production-ready. The project has clear API stability (core 4-function API unchanged). Documentation is comprehensive but spread across repository README, docs site, and code. Cloud offering is separate managed service with distinct feature parity from OSS.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude-Mem - Persistent Memory Compression for Claude Code](../context-management/claude-mem.md) | context-management | Uses Chroma as embedded vector database for hybrid semantic search in AI agent memory |
+| [CocoIndex](./cocoindex.md) | data-infrastructure | Complementary AI data transformation framework with native Chroma target for vector index building |
+| [SimpleMem-Cross: Persistent Cross-Conversation Memory for LLM Agents](../context-management/simplemem-cross.md) | context-management | Shares use case for persistent agent memory with token-budgeted vector search and semantic retrieval |
+| [Jina AI](../context-management/jina-ai.md) | context-management | Provides embedding models and APIs that feed into Chroma for RAG knowledge bases |
+| [Zvec — Alibaba's Embedded Vector Database](./zvec.md) | data-infrastructure | Alternative embedded vector database with similar deployment model and dense/sparse vector support |
+| [Local Memory - Persistent Memory Infrastructure for AI Agents](../context-management/local-memory.md) | context-management | Uses Qdrant for vector search in agent memory; shared pattern for persistent semantic retrieval across sessions |
+| [MotherDuck](./motherduck.md) | data-infrastructure | Serverless analytics warehouse with Dual Execution model; complements Chroma for querying structured metadata alongside vectors |
+| [Dolt](./dolt.md) | data-infrastructure | Version-controlled SQL database enabling reproducible training data snapshots; pairs with Chroma for versioned knowledge bases |
