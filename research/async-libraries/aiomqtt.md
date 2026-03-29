@@ -306,10 +306,10 @@ The library is relevant for:
 
 ## References
 
-- Repository: https://github.com/sbtinstruments/asyncio-mqtt (accessed 2026-03-29)
-- Documentation: https://aiomqtt.bo3hm.com (accessed 2026-03-29)
-- PyPI package: https://pypi.org/project/aiomqtt/ (accessed 2026-03-29)
-- paho-mqtt dependency: https://github.com/eclipse/paho.mqtt.python (accessed 2026-03-29)
+- Repository: <https://github.com/sbtinstruments/asyncio-mqtt> (accessed 2026-03-29)
+- Documentation: <https://aiomqtt.bo3hm.com> (accessed 2026-03-29)
+- PyPI package: <https://pypi.org/project/aiomqtt/> (accessed 2026-03-29)
+- paho-mqtt dependency: <https://github.com/eclipse/paho.mqtt.python> (accessed 2026-03-29)
 
 ## Freshness Tracking
 

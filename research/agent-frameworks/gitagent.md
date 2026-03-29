@@ -14,9 +14,9 @@ GitAgent is an open-source framework and specification for defining AI agents as
 
 GitAgent is maintained by the open-gitagent organization and published as the npm package `@shreyaskapale/gitagent`. Current version: **v0.1.7** (as of 2026-03-29). Specification version: v0.1.0 (aligned with Spec section in repository).
 
-**Repository**: https://github.com/open-gitagent/gitagent
+**Repository**: <https://github.com/open-gitagent/gitagent>
 **npm package**: @shreyaskapale/gitagent
-**Homepage**: https://gitagent.sh
+**Homepage**: <https://gitagent.sh>
 **License**: MIT
 
 ## Problem Addressed
@@ -42,7 +42,7 @@ Key use cases:
 - **Created**: 2026-02-24
 - **Last updated**: 2026-03-29
 - **Node version requirement**: >= 18
-- **npm downloads**: Available at https://www.npmjs.com/package/@shreyaskapale/gitagent
+- **npm downloads**: Available at <https://www.npmjs.com/package/@shreyaskapale/gitagent>
 
 ## Key Features
 
@@ -500,14 +500,14 @@ GitAgent is directly relevant to Claude Code development in several ways:
 
 ## References
 
-- **Main Repository**: https://github.com/open-gitagent/gitagent
-- **Homepage**: https://gitagent.sh
-- **npm Package**: https://www.npmjs.com/package/@shreyaskapale/gitagent
-- **Specification**: https://github.com/open-gitagent/gitagent/blob/main/spec/SPECIFICATION.md (accessed 2026-03-29)
-- **Documentation**: https://github.com/open-gitagent/gitagent/blob/main/docs.md (accessed 2026-03-29)
-- **Example Agents**: https://github.com/open-gitagent/gitagent/tree/main/examples (accessed 2026-03-29)
-- **NVIDIA AIQ Deep Researcher Port**: https://github.com/open-gitagent/gitagent/tree/main/examples/nvidia-deep-researcher (accessed 2026-03-29)
-- **Source Code**: https://github.com/open-gitagent/gitagent/tree/main/src (accessed 2026-03-29)
+- **Main Repository**: <https://github.com/open-gitagent/gitagent>
+- **Homepage**: <https://gitagent.sh>
+- **npm Package**: <https://www.npmjs.com/package/@shreyaskapale/gitagent>
+- **Specification**: <https://github.com/open-gitagent/gitagent/blob/main/spec/SPECIFICATION.md> (accessed 2026-03-29)
+- **Documentation**: <https://github.com/open-gitagent/gitagent/blob/main/docs.md> (accessed 2026-03-29)
+- **Example Agents**: <https://github.com/open-gitagent/gitagent/tree/main/examples> (accessed 2026-03-29)
+- **NVIDIA AIQ Deep Researcher Port**: <https://github.com/open-gitagent/gitagent/tree/main/examples/nvidia-deep-researcher> (accessed 2026-03-29)
+- **Source Code**: <https://github.com/open-gitagent/gitagent/tree/main/src> (accessed 2026-03-29)
 - **Compliance Reference**: FINRA Rules 3110, 4511, 2210; Federal Reserve SR 11-7, SR 23-4; SEC Regulation S-P, 17a-4; CFPB Circular 2022-03; EU AI Act; UK FCA guidance; MAS Singapore standards
 - **Related Projects**: Salient AI (purpose-built agent architecture), FINOS AI Governance Framework
 

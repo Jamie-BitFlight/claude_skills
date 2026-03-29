@@ -20,7 +20,7 @@ published_date: "2026-03-23"
 
 HyperAgents is a research framework from Meta (formerly Facebook) that implements self-referential self-improving agents capable of optimizing for any computable task. The system uses two primary agent types: a Meta Agent that iteratively improves the codebase, and Task Agents that solve domain-specific problems. The framework supports multiple evaluation domains including code synthesis, reinforcement learning, mathematical proof generation, and text-to-image generation, with experimental results tracked via Docker containerization and artifact storage.
 
-SOURCE: GitHub README (https://github.com/facebookresearch/HyperAgents, accessed 2026-03-29)
+SOURCE: GitHub README (<https://github.com/facebookresearch/HyperAgents>, accessed 2026-03-29)
 arXiv paper metadata (Zhang et al., eprint:2603.19461, year 2026)
 
 ## Problem Addressed
@@ -253,10 +253,10 @@ Source code review did not explicitly document:
 
 ## References
 
-- **arXiv**: Zhang, J., Zhao, B., Yang, W., Foerster, J., Clune, J., Jiang, M., Devlin, S., Shavrina, T. "HyperAgents." arXiv:2603.19461 (2026). https://arxiv.org/abs/2603.19461
-- **Blog post**: https://ai.meta.com/research/publications/hyperagents/
-- **GitHub repository**: https://github.com/facebookresearch/HyperAgents (CC BY-NC-SA 4.0 license)
-- **X (Twitter) announcement**: https://x.com/jennyzhangzt/status/2036099935083618487
+- **arXiv**: Zhang, J., Zhao, B., Yang, W., Foerster, J., Clune, J., Jiang, M., Devlin, S., Shavrina, T. "HyperAgents." arXiv:2603.19461 (2026). <https://arxiv.org/abs/2603.19461>
+- **Blog post**: <https://ai.meta.com/research/publications/hyperagents/>
+- **GitHub repository**: <https://github.com/facebookresearch/HyperAgents> (CC BY-NC-SA 4.0 license)
+- **X (Twitter) announcement**: <https://x.com/jennyzhangzt/status/2036099935083618487>
 
 ## Cross-References
 
