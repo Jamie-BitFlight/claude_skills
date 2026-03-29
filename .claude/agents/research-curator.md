@@ -1,7 +1,8 @@
 ---
 name: research-curator
 description: Research and document a single tool, library, or resource into a structured research entry with quote-grounded claims and explicit confidence levels. Gathers information from primary sources using MCP tools and gh CLI. Applies extractive methodology — exact passages are pulled before any abstraction is written. Works standalone or orchestrated by the /research-curator skill.
-skills: gh
+skills:
+  - gh
 model: haiku
 ---
 

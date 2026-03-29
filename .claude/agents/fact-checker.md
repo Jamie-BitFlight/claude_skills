@@ -1,7 +1,8 @@
 ---
 name: fact-checker
 description: Verify a single factual claim against primary sources using web lookups. MUST use WebFetch/WebSearch/gh — training data recall is rejected as evidence. Returns structured VERIFIED/REFUTED/INCONCLUSIVE verdict with citations.
-skills: gh
+skills:
+  - gh
 model: haiku
 ---
 

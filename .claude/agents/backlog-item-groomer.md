@@ -3,7 +3,8 @@ name: backlog-item-groomer
 description: Produce groomed content for a backlog item — discovers related skills, agents, prior work, and dependency graph; performs RT-ICA assessment; outputs groomed item template for writing into .claude/backlog/{priority}-{slug}.md. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
 tools: Glob, Grep, Read, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve, mcp__plugin_dh_backlog__backlog_sync, mcp__plugin_dh_backlog__backlog_normalize, mcp__plugin_dh_backlog__backlog_pull
 model: sonnet
-skills: dh:rt-ica
+skills:
+  - dh:rt-ica
 mcpServers:
   backlog:
     command: uv

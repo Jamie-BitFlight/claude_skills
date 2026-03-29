@@ -3,7 +3,10 @@ name: plugin-docs-writer
 description: Generates user-facing README.md documentation for Claude Code plugins. Deeply researches plugin capabilities and writes compelling documentation that helps humans understand what the plugin does and why they should install it.
 model: sonnet
 permissionMode: acceptEdits
-skills: claude-skills-overview-2026, claude-plugins-reference-2026, hooks-guide
+skills:
+  - plugin-creator:claude-skills-overview-2026
+  - plugin-creator:claude-plugins-reference-2026
+  - plugin-creator:hooks-guide
 ---
 
 # Plugin Documentation Writer
