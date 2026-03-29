@@ -38,6 +38,8 @@ flowchart TD
         M2["backlog_list"]
         M3["backlog_view"]
         M4["backlog_update(selector, plan)"]
+        M6["backlog_groom"]
+        M7["backlog_sync"]
         C1["sam create"]
         S1 --> A1
         S1 --> A2
@@ -49,6 +51,8 @@ flowchart TD
         A4 -->|"§2.1 sam create"| C1
         M1 -->|"§2.5 BacklogItem"| M4
         M2 --> M3
+        M4 --> M6
+        M6 -->|"sync to GitHub"| M7
     end
 
     subgraph Execution [Phase 2 — Execution]
@@ -61,6 +65,7 @@ flowchart TD
         C3["sam status"]
         C4["sam claim"]
         C5["sam read"]
+        C6["sam update"]
         H1["task_status_hook.py SubagentStop"]
         H2["task_status_hook.py PostToolUse"]
         S2 -->|"§2.1"| M5
@@ -74,6 +79,7 @@ flowchart TD
         A7 -->|"§2.3"| A8
         H1 -->|"status: complete"| C4
         H2 -->|"last-activity"| C4
+        S3 -->|"§2.2 update fields"| C6
     end
 
     subgraph QualityGates [Phase 3 — Quality Gates]
@@ -257,6 +263,8 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 
 | Artifact | Publisher | Consumer(s) |
 |----------|-----------|-------------|
+| `.claude/backlog/{priority}-{slug}.md` | `backlog_add`, `backlog_update`, `backlog_sync` (local cache write) | `backlog_view`, `backlog_list`, `/dh:work-backlog-item` orchestrator |
+| `~/.dh/projects/{slug}/backlog/{priority}-{slug}.md` | `backlog_add`, `backlog_sync`, `backlog_normalize` (DH state cache) | `backlog_view`, `backlog_list`, `backlog_groom` |
 | `~/.dh/projects/{slug}/plan/feature-context-{slug}.md` | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/codebase/{FOCUS}.md` | `codebase-analyzer` | `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/architect-{slug}.md` | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
