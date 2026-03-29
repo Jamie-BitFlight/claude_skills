@@ -18,6 +18,7 @@
       "mcp__plugin_context-mode_context-mode__*",
       "Bash(bc:*)",
       "Bash(diffstat:*)",
+      "Bash(npm:*)",
       "Bash(bd:*)"
     ],
     "deny": []
