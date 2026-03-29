@@ -256,6 +256,75 @@ Also re-exports `loads_frontmatter` and `dump_frontmatter` from `frontmatter_uti
 
 ---
 
+## Lifespan Bootstrap
+
+At server startup, `server.py` auto-bootstraps the [beads](https://github.com/beads-dev/beads) toolchain so every user gets the `bd` binary, `.beads/` project database, and Claude PreCompact/SessionStart hooks without manual setup.
+
+### How It Wires In
+
+The FastMCP constructor receives a `lifespan=_beads_lifespan` parameter (see `server.py`, `FastMCP(...)` call). FastMCP invokes this hook once per server startup (or once per `Client(mcp)` context manager entry in tests). The hook runs `_bootstrap_beads()` in a thread executor before yielding to accept tool calls:
+
+```text
+FastMCP startup → _beads_lifespan → asyncio.run_in_executor(_bootstrap_beads) → yield → tools available
+```
+
+The `@lifespan` decorator is imported from `fastmcp.server.lifespan`.
+
+### Sentinel Pattern
+
+A module-level `_beads_bootstrapped: bool = False` sentinel prevents repeated execution. The sentinel is checked at the top of `_bootstrap_beads()` and set to `True` on every exit path (including degradation paths). This matters because tests open multiple `Client(mcp)` connections — without the sentinel, bootstrap would run on every connection.
+
+Tests reset the sentinel via `monkeypatch.setattr("backlog_core.server._beads_bootstrapped", False)`.
+
+### Bootstrap Decision Tree
+
+```mermaid
+flowchart TD
+    Start([_bootstrap_beads called]) --> S{_beads_bootstrapped?}
+    S -->|True| Skip([return immediately])
+    S -->|False| BD{shutil.which bd?}
+    BD -->|found| HasBeads{.beads/ exists?}
+    HasBeads -->|No| InitHappy[bd init --stealth --quiet]
+    HasBeads -->|Yes| Setup
+    InitHappy --> Setup[bd setup claude --project --stealth]
+    Setup --> SetTrue1([_beads_bootstrapped = True])
+    BD -->|not found| NPM{shutil.which npm?}
+    NPM -->|not found| WarnNPM[log warning: npm not available]
+    WarnNPM --> SetTrue2([_beads_bootstrapped = True])
+    NPM -->|found| Install[npm install -g @beads/bd]
+    Install --> BDAgain{shutil.which bd?}
+    BDAgain -->|not found| WarnFail[log warning: npm install failed silently]
+    WarnFail --> SetTrue3([_beads_bootstrapped = True])
+    BDAgain -->|found| InitInstall[bd init --stealth --quiet]
+    InitInstall --> SetupInstall[bd setup claude --project --stealth]
+    SetupInstall --> SetTrue4([_beads_bootstrapped = True])
+```
+
+### Execution Paths
+
+| Path | Condition | Actions |
+|------|-----------|---------|
+| Happy (bd present, `.beads/` exists) | `bd` on PATH, `.beads/` directory exists | `bd setup claude --project --stealth` |
+| Happy (bd present, no `.beads/`) | `bd` on PATH, `.beads/` missing | `bd init --stealth --quiet`, then `bd setup claude --project --stealth` |
+| Install | `bd` absent, `npm` present | `npm install -g @beads/bd`, `bd init`, `bd setup` |
+| Degraded — npm absent | `bd` absent, `npm` absent | Warning logged, returns |
+| Degraded — install failed | `bd` absent, `npm` present but install silent-failed | Warning logged, returns |
+
+### Subprocess Call Contracts
+
+All subprocess calls in `_bootstrap_beads()` follow these rules:
+
+- `check=False` — non-zero exits do not raise exceptions; the next `shutil.which()` check determines outcome
+- `capture_output=True` — suppresses stdout/stderr from subprocess; prevents MCP transport pollution
+- `cwd=project_dir` — set on all `bd` commands; absent on `npm install` (npm installs globally)
+- Command as list (never `shell=True`) — prevents shell injection
+
+### Project Directory Source
+
+Bootstrap receives the project root from `models.get_repo_root()`, which returns the path set during `_init_models()` at module import time. The sequence is: `sys.argv` → `_parse_args()` → `_init_models(project_dir)` → `models._REPO_ROOT` → `models.get_repo_root()` → `_bootstrap_beads(project_dir)`.
+
+---
+
 ## CLI wrapper: backlog.py (rewritten)
 
 **Responsibility**: Thin Typer CLI that imports from `operations` module.
