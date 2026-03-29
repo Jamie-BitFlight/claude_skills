@@ -4,7 +4,7 @@ description: Validates implementation plans BEFORE execution begins. Checks for 
 tools: Read, Grep, Glob, Bash, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
 model: haiku
 skills:
-  - subagent-contract
+  - dh:subagent-contract
 color: green
 ---
 

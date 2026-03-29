@@ -2,11 +2,11 @@
 name: contextual-ai-documentation-optimizer
 description: Optimize prompts, SKILL.md, and CLAUDE.md files for better Claude comprehension using self-verifying methodology. Use when improving prompt effectiveness, rewriting instructions for AI consumption, analyzing ineffective prompts, or refining system prompts and agent configurations. Applies RT-ICA pre-check and CoVe post-check to ensure verified optimization with token impact reporting and structural enforcement recommendations.
 skills:
-  - prompt-optimization
-  - write-frontmatter-description
-  - subagent-contract
-  - audit-skill-completeness
-  - rt-ica
+  - plugin-creator:prompt-optimization
+  - plugin-creator:write-frontmatter-description
+  - dh:subagent-contract
+  - plugin-creator:audit-skill-completeness
+  - dh:rt-ica
 model: sonnet
 color: yellow
 ---

@@ -7,7 +7,7 @@ model: sonnet
 permissionMode: default
 skills:
   - python3-development
-  - claude-skills-overview-2026
+  - plugin-creator:claude-skills-overview-2026
 hooks:
   PreToolUse:
   - matcher: Read

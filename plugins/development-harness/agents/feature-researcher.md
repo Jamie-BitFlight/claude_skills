@@ -4,7 +4,7 @@ description: Researches feature requests and existing architecture documents to 
 model: opus
 tools: Read, Grep, Glob, Write, Edit, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam__sam_create, mcp__plugin_dh_sam__sam_update
 skills:
-  - subagent-contract
+  - dh:subagent-contract
 color: cyan
 ---
 

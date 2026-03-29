@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam__sam_u
 model: sonnet
 color: purple
 skills:
-  - subagent-contract
+  - dh:subagent-contract
 ---
 
 # Context Refinement Agent

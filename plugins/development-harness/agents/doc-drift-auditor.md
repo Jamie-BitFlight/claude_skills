@@ -4,7 +4,7 @@ description: Audits documentation accuracy against actual implementation. Analyz
 model: haiku
 color: orange
 skills:
-  - subagent-contract
+  - dh:subagent-contract
 ---
 
 # Documentation Drift Auditor
