@@ -7,6 +7,7 @@ skills:
   - fact-check
   - find-cause
   - research-curator
+  - gh
 ---
 
 # Topic Specialist Agent
