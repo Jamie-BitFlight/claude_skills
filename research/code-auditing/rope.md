@@ -319,3 +319,14 @@ Not mentioned in reviewed sources: compatibility with Python 3.14 beta features,
 **Next Review**: 2026-06-29 (3 months from now)
 
 **Reviewer Notes**: Rope is a mature, well-maintained Python refactoring library with active development. The 1.14.0 release (January 2026) added Python 3.13 and 3.14 compatibility and preferred_import_style configuration. For Claude Code use cases, this library is well-suited for building refactoring-based code analysis tools but should not replace dedicated type checkers. The pure-Python implementation and minimal dependencies make it an ideal library candidate for embedded tooling in Claude Code agents.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [copier-astral](../developer-tools/copier-astral.md) | developer-tools | Python project template integrating rope-compatible toolchain (ruff, ty) for refactoring-aware development |
+| [grepai](../developer-tools/grepai.md) | developer-tools | Complements rope's transformation capabilities with semantic code search and call graph analysis |
+| [kythe](../developer-tools/kythe.md) | developer-tools | Language-agnostic code intelligence platform; rope provides Python-specific refactoring alternative to Kythe's multi-language semantic analysis |
+| [cocoindex-code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | AST-based semantic code search via MCP; pairs with rope for find-and-refactor workflows |
