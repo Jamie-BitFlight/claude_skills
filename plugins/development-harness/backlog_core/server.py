@@ -144,7 +144,7 @@ async def _beads_lifespan(server: FastMCP) -> AsyncIterator[None]:
     Yields:
         None after bootstrap completes.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, _bootstrap_beads, _models.get_repo_root())
     yield
 
