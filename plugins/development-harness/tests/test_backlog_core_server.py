@@ -15,12 +15,18 @@ All imports are at module level.
 from __future__ import annotations
 
 import json
+import logging
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
+import backlog_core.server as _server_mod
 import pytest
 from backlog_core.models import BackendAvailability, BackendStatus, BacklogError, Output
-from backlog_core.server import mcp
+from backlog_core.server import _beads_lifespan, mcp
 from fastmcp.client import Client
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1998,3 +2004,225 @@ async def test_backlog_sync_ctx_uses_info_level_for_start_and_completion():
     info_messages = _extract_log_messages(mock_log, level="info")
     assert "Starting backlog sync" in info_messages
     assert "Sync complete: 0 issue(s) created, 0 item(s) pushed" in info_messages
+
+
+# ---------------------------------------------------------------------------
+# _bootstrap_beads: all 4 execution paths + sentinel + lifespan integration
+# ---------------------------------------------------------------------------
+
+
+def test_bootstrap_beads_happy_path_beads_exists_calls_setup_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """_bootstrap_beads calls only bd setup when bd is on PATH and .beads/ exists.
+
+    Tests: _bootstrap_beads happy path execution path.
+    How:
+        1. Reset sentinel to False via monkeypatch.
+        2. Create a .beads/ directory inside tmp_path so existence check returns True.
+        3. Patch shutil.which to return a full path for "bd".
+        4. Patch subprocess.run to capture all calls.
+        5. Call _bootstrap_beads directly with tmp_path as project_dir.
+    Why: Verifies that when bd is installed and the database is already initialised,
+    the function skips bd init and only runs bd setup, avoiding repeated init
+    in already-configured projects.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", False)
+    beads_dir = tmp_path / ".beads"
+    beads_dir.mkdir()
+
+    with (
+        patch("backlog_core.server.shutil.which", return_value="/usr/bin/bd") as mock_which,
+        patch("backlog_core.server.subprocess.run") as mock_run,
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    mock_which.assert_called_with("bd")
+    assert mock_run.call_count == 1
+    called_cmd = mock_run.call_args_list[0][0][0]
+    assert called_cmd[1:] == ["setup", "claude", "--project", "--stealth"]
+    assert _server_mod._beads_bootstrapped is True
+
+
+def test_bootstrap_beads_happy_path_beads_absent_calls_init_and_setup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """_bootstrap_beads calls bd init then bd setup when bd is on PATH but .beads/ is absent.
+
+    Tests: _bootstrap_beads happy path with uninitialised project.
+    How:
+        1. Reset sentinel to False via monkeypatch.
+        2. Do NOT create .beads/ directory — existence check returns False.
+        3. Patch shutil.which to return a full path for "bd".
+        4. Patch subprocess.run to capture calls.
+        5. Call _bootstrap_beads directly.
+    Why: Verifies that when bd is installed but the database is not yet initialised,
+    the function runs bd init followed by bd setup to fully configure the project.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", False)
+    # No .beads/ directory created — tmp_path exists but .beads/ is absent.
+
+    with (
+        patch("backlog_core.server.shutil.which", return_value="/usr/bin/bd"),
+        patch("backlog_core.server.subprocess.run") as mock_run,
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    assert mock_run.call_count == 2
+    init_cmd = mock_run.call_args_list[0][0][0]
+    setup_cmd = mock_run.call_args_list[1][0][0]
+    assert init_cmd[1:] == ["init", "--stealth", "--quiet"]
+    assert setup_cmd[1:] == ["setup", "claude", "--project", "--stealth"]
+    # Both bd commands use cwd=project_dir.
+    assert mock_run.call_args_list[0].kwargs.get("cwd") == tmp_path
+    assert mock_run.call_args_list[1].kwargs.get("cwd") == tmp_path
+    assert _server_mod._beads_bootstrapped is True
+
+
+def test_bootstrap_beads_install_path_bd_absent_npm_present(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """_bootstrap_beads runs npm install then bd init and bd setup when bd is absent but npm is present.
+
+    Tests: _bootstrap_beads install execution path (bd absent, npm present, install succeeds).
+    How:
+        1. Reset sentinel to False via monkeypatch.
+        2. Patch shutil.which with side_effect: first call ("bd") returns None,
+           second call ("npm") returns "/usr/bin/npm", third call ("bd") post-install
+           returns "/usr/local/bin/bd".
+        3. Patch subprocess.run to capture 3 expected calls.
+        4. Call _bootstrap_beads directly.
+    Why: Verifies the install path runs npm install, then re-checks for bd, then
+    runs bd init and bd setup to complete setup in a fresh environment.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", False)
+
+    which_side_effects = [None, "/usr/bin/npm", "/usr/local/bin/bd"]
+
+    with (
+        patch("backlog_core.server.shutil.which", side_effect=which_side_effects),
+        patch("backlog_core.server.subprocess.run") as mock_run,
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    assert mock_run.call_count == 3
+    npm_cmd = mock_run.call_args_list[0][0][0]
+    init_cmd = mock_run.call_args_list[1][0][0]
+    setup_cmd = mock_run.call_args_list[2][0][0]
+    assert npm_cmd == ["/usr/bin/npm", "install", "-g", "@beads/bd"]
+    assert init_cmd[1:] == ["init", "--stealth", "--quiet"]
+    assert setup_cmd[1:] == ["setup", "claude", "--project", "--stealth"]
+    # npm install must NOT pass cwd (global install).
+    assert mock_run.call_args_list[0].kwargs.get("cwd") is None
+    assert _server_mod._beads_bootstrapped is True
+
+
+def test_bootstrap_beads_graceful_degradation_npm_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """_bootstrap_beads logs a warning and skips all subprocess calls when npm is not found.
+
+    Tests: _bootstrap_beads graceful degradation path A (npm absent).
+    How:
+        1. Reset sentinel to False via monkeypatch.
+        2. Patch shutil.which to always return None (both bd and npm absent).
+        3. Capture log output via caplog fixture.
+        4. Call _bootstrap_beads directly.
+        5. Assert no subprocess.run was called and warning was logged.
+    Why: Verifies that the function degrades gracefully without npm rather than
+    raising an exception, so the MCP server starts successfully even without the
+    beads toolchain available.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", False)
+
+    with (
+        patch("backlog_core.server.shutil.which", return_value=None),
+        patch("backlog_core.server.subprocess.run") as mock_run,
+        caplog.at_level(logging.WARNING, logger="backlog_core.server"),
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    assert mock_run.call_count == 0
+    assert any("npm not available" in record.message for record in caplog.records)
+    assert _server_mod._beads_bootstrapped is True
+
+
+def test_bootstrap_beads_graceful_degradation_npm_install_fails_silently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """_bootstrap_beads logs a warning when npm install runs but bd is still not found afterward.
+
+    Tests: _bootstrap_beads graceful degradation path B (npm install fails silently).
+    How:
+        1. Reset sentinel to False via monkeypatch.
+        2. Patch shutil.which with side_effect: first call ("bd") returns None,
+           second call ("npm") returns "/usr/bin/npm", third call ("bd") post-install
+           still returns None (npm install did not actually install bd).
+        3. Patch subprocess.run to intercept the npm call.
+        4. Assert only 1 subprocess call (npm install) and warning was logged.
+    Why: Verifies the install path fails gracefully when npm is present but the
+    install silently fails (e.g., network error), preventing a crash in the server.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", False)
+
+    # First "bd" call → None, "npm" call → found, second "bd" call → still None.
+    which_side_effects = [None, "/usr/bin/npm", None]
+
+    with (
+        patch("backlog_core.server.shutil.which", side_effect=which_side_effects),
+        patch("backlog_core.server.subprocess.run") as mock_run,
+        caplog.at_level(logging.WARNING, logger="backlog_core.server"),
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    assert mock_run.call_count == 1
+    npm_cmd = mock_run.call_args_list[0][0][0]
+    assert "install" in npm_cmd
+    assert any("npm install failed silently" in record.message for record in caplog.records)
+    assert _server_mod._beads_bootstrapped is True
+
+
+def test_bootstrap_beads_sentinel_prevents_re_execution(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """_bootstrap_beads returns immediately without any work when sentinel is True.
+
+    Tests: _bootstrap_beads sentinel guard logic.
+    How:
+        1. Set _beads_bootstrapped = True via monkeypatch (simulates already-ran state).
+        2. Patch shutil.which and subprocess.run to detect any calls.
+        3. Call _bootstrap_beads directly.
+        4. Assert neither shutil.which nor subprocess.run were called at all.
+    Why: Verifies the module-level sentinel prevents repeated bootstrap executions
+    across multiple Client(mcp) connections in test suites, ensuring test isolation
+    and preventing unwanted subprocess side effects.
+    """
+    monkeypatch.setattr(_server_mod, "_beads_bootstrapped", True)
+
+    with (
+        patch("backlog_core.server.shutil.which") as mock_which,
+        patch("backlog_core.server.subprocess.run") as mock_run,
+    ):
+        _server_mod._bootstrap_beads(tmp_path)
+
+    mock_which.assert_not_called()
+    mock_run.assert_not_called()
+
+
+def test_bootstrap_beads_lifespan_is_registered_in_fastmcp_constructor() -> None:
+    """_beads_lifespan is wired into the FastMCP constructor via lifespan= parameter.
+
+    Tests: Lifespan integration wiring between FastMCP constructor and _beads_lifespan.
+    How:
+        1. Import the mcp singleton and _beads_lifespan from backlog_core.server.
+        2. Inspect the mcp object's _lifespan attribute (set by the lifespan= parameter).
+        3. Assert the lifespan attribute references _beads_lifespan (not None, not a
+           different lifespan object).
+    Why: Verifies the lifespan=_beads_lifespan parameter was passed to the FastMCP
+    constructor, ensuring the bootstrap hook will be invoked at server startup.
+    Uses static attribute inspection rather than triggering the lifespan to execute,
+    which avoids event loop isolation issues in pytest-asyncio multi-loop scenarios
+    caused by the asyncio.get_event_loop() call inside run_in_executor.
+    """
+    # FastMCP stores the lifespan on the server instance via the lifespan= constructor param.
+    server_lifespan = mcp._lifespan
+    assert server_lifespan is not None, "lifespan= was not passed to the FastMCP constructor"
+    assert server_lifespan is _beads_lifespan, (
+        f"mcp._lifespan is {server_lifespan!r}, expected _beads_lifespan {_beads_lifespan!r}"
+    )
