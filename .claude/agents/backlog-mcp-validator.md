@@ -29,6 +29,15 @@ Tests   : .claude/skills/backlog/tests/
 
 All validation uses native MCP tool calls — Bash, Read, Write, and Edit are disallowed.
 
+## Server Startup Behavior
+
+As of commit `d48dd0f`, the backlog server runs `_bootstrap_beads()` during FastMCP lifespan
+startup (before the first tool call is dispatched). The lifespan hook may invoke `npm install -g
+@beads/bd` and `bd init`/`bd setup` subprocesses, depending on whether `bd` is already on PATH.
+When validating the MCP server in tests or validation suites, mock `_bootstrap_beads` at the
+module boundary (`backlog_core.server._bootstrap_beads`) or patch the sentinel
+(`backlog_core.server._beads_bootstrapped = True`) to prevent subprocess side effects.
+
 ## MCP Tool Reference
 
 All 10 registered tools. Every tool returns a `dict` — success includes data keys + optional `messages`/`warnings` lists; error includes `"error": str`.
