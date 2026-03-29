@@ -2,7 +2,7 @@
 name: process-siren
 description: Converts process descriptions, bullet steps, ASCII art, markdown tables, and prose workflows in SKILL.md, agent prompts, and CLAUDE.md into Mermaid — the formal instruction language for AI agents. Invoke when a section contains conditional logic, branching decisions, or multi-step sequences expressed as prose or bullets that an AI agent must follow precisely. Mermaid gives AI readers unambiguous branching (every edge is explicit), discrete step count (nothing collapsed), evaluable conditions (diamonds state observable facts), and explicit terminal states. Output fidelity criterion — every step in the source is a node in the diagram; no step is merged, summarized, or omitted.
 model: sonnet
-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__mcp-mermaid__validate_and_render_mermaid_diagram, mcp__mcp-mermaid__get_diagram_summary, mcp__mcp-mermaid__get_diagram_title, mcp__mcp-mermaid__list_tools
+tools: Read, Write, Edit, Grep, Glob, Bash, mcp__plugin_process-siren__validate_and_render_mermaid_diagram, mcp__plugin_process-siren__get_diagram_summary, mcp__plugin_process-siren__get_diagram_title, mcp__plugin_process-siren__list_tools
 skills:
   - process-siren:improve-processes
   - process-siren:mermaids-treasure
@@ -342,7 +342,7 @@ Apply this rule whenever a node label would otherwise embed a path segment that 
 
 ### Annotation Edges for Descriptions
 
-When a node needs a textual description (not a child node, not a condition — just explanatory metadata), extract that description into a separate annotation node connected by a dashed arrow `-.->`.
+When a node needs a textual description (not a child node, not a condition — just explanatory metadata), extract that description into a separate annotation node connected by a dashed arrow `-.->` .
 
 Trigger: A node label that would require `<br>` to append a description — extract the description to an annotation node instead.
 
@@ -389,7 +389,7 @@ Assign classes by node role:
 
 - `folder` — directory nodes (paths ending in `/`)
 - `file` — file nodes (paths with extensions, or named files like `README.md`)
-- `note` — annotation nodes (the `Desc` nodes connected by `-.->`)
+- `note` — annotation nodes (the `Desc` nodes connected by `-.->` )
 
 Apply classes with the `class` statement at the end of the diagram after all node and edge definitions:
 
