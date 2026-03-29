@@ -105,18 +105,20 @@ def _make_two_task_file(tmp_path: Path) -> Path:
     return task_file
 
 
-def _make_mock_issue(number: int) -> MagicMock:
-    """Create a mock PyGithub Issue with the given number.
+def _make_mock_issue(number: int) -> dict[str, object]:
+    """Create a minimal IssueNode dict with the given issue number.
+
+    The production code accesses the return value of create_task_issue via
+    subscript (issue["number"]), matching the IssueNode TypedDict interface.
+    Returning a plain dict ensures JSON serialisation in _write_cache succeeds.
 
     Args:
         number: Issue number to assign.
 
     Returns:
-        MagicMock that mimics a PyGithub Issue object.
+        Dict with "number" key matching the IssueNode TypedDict interface.
     """
-    issue = MagicMock()
-    issue.number = number
-    return issue
+    return {"number": number, "title": "", "state": "OPEN", "body": "", "id": "", "createdAt": ""}
 
 
 # ---------------------------------------------------------------------------
