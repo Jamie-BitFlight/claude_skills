@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob, mcp__plugin_dh_sequential_thinking__
 model: opus
 skills:
   - dh:subagent-contract
-  - dh
+  - dh:final-verification
   - dh:validation-protocol
 color: green
 ---
