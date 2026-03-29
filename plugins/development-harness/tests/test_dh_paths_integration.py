@@ -40,6 +40,8 @@ from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus,
 from dh_paths import backlog_dir, compute_slug, context_dir, ensure_dirs, plan_dir, reports_dir, state_root
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_mock import MockerFixture
 
 
@@ -137,7 +139,9 @@ class TestBacklogWriteReadCycle:
         """Verify models.BACKLOG_DIR resolves under DH_STATE_HOME, not .claude/.
 
         Tests: models.init() updates BACKLOG_DIR via dh_paths
-        How: Call models.init(project_dir=...); check BACKLOG_DIR path
+        How: Call models.init(project_dir=..., repo=...) with a stub repo slug to
+             bypass discover_repo() which requires a real GitHub remote.
+             Check BACKLOG_DIR path.
         Why: models.BACKLOG_DIR is the runtime constant used by operations.py
         """
         project_root, _state_home = isolated_project
@@ -155,7 +159,8 @@ class TestBacklogWriteReadCycle:
         """Verify models.BACKLOG_DIR path embeds the project slug.
 
         Tests: models.BACKLOG_DIR path includes project-specific slug
-        How: Init with project_root; check slug appears in BACKLOG_DIR string
+        How: Init with project_root and stub repo slug to bypass discover_repo()
+             which requires a real GitHub remote. Check slug in BACKLOG_DIR.
         Why: Multiple projects must have distinct backlog directories
         """
         project_root, _state_home = isolated_project
@@ -1165,7 +1170,7 @@ class TestFullThreeTierDirectoryLayout:
         [(backlog_dir, "backlog"), (plan_dir, "plan"), (context_dir, "context"), (reports_dir, "reports")],
     )
     def test_all_state_dirs_are_named_correctly(
-        self, dir_fn: object, expected_name: str, isolated_project: tuple[Path, Path]
+        self, dir_fn: Callable[[Path], Path], expected_name: str, isolated_project: tuple[Path, Path]
     ) -> None:
         """Verify each state directory function returns the correctly named path.
 

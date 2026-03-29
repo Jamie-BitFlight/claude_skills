@@ -334,7 +334,7 @@ def _extract_body_task_blocks(body: str) -> dict[str, dict]:
     segments = _split_body_outside_fences(body)
 
     # Parse each segment: classify as task YAML block, other YAML, or prose
-    parsed: list[tuple[bool, object]] = []
+    parsed: list[tuple[bool, dict | str]] = []
     for raw_segment in segments:
         segment = raw_segment.strip()
         if not segment:
@@ -352,8 +352,10 @@ def _extract_body_task_blocks(body: str) -> dict[str, dict]:
     for idx, (is_task, payload) in enumerate(parsed):
         if not is_task:
             continue
+        if not isinstance(payload, dict):
+            continue
 
-        block = dict(payload)  # type: ignore[arg-type]
+        block = dict(payload.items())
         task_id = str(block.get("task") or block.get("task_id") or "")
         if not task_id:
             continue
@@ -445,7 +447,7 @@ def _strip_bold_fields_from_prose(prose: str) -> str:
 
 
 def _build_task_dict(  # noqa: C901, PLR0912
-    entry: dict, prose_by_task: dict[str, str], body_task_blocks: dict[str, dict] | None = None
+    entry: dict | str | int, prose_by_task: dict[str, str], body_task_blocks: dict[str, dict] | None = None
 ) -> dict | None:
     """Build a raw task dict from a manifest ``tasks:`` entry.
 

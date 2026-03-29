@@ -324,7 +324,7 @@ class TestPullRequestRef:
 
     def test_pull_request_ref_requires_number(self) -> None:
         with pytest.raises(PydanticValidationError, match="number"):
-            PullRequestRef(title="No number", url="https://example.com")  # type: ignore[call-arg]
+            PullRequestRef.model_validate({"title": "No number", "url": "https://example.com"})
 
 
 # ---------------------------------------------------------------------------

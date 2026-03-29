@@ -342,7 +342,7 @@ def discover_candidates(backlog_items: list[dict]) -> list[Candidate]:
 
 
 def register_one(
-    provider: GitHubArtifactProvider, registry: ArtifactRegistry, candidate: Candidate, dry_run: bool
+    provider: GitHubArtifactProvider | None, registry: ArtifactRegistry, candidate: Candidate, dry_run: bool
 ) -> str:
     """Register a single artifact.
 
@@ -374,6 +374,7 @@ def register_one(
         return f"DRY-RUN: would register {candidate.artifact_type} -> issue #{candidate.issue}{content_note}"
 
     # Get current manifest, upsert entry, persist
+    assert provider is not None  # noqa: S101 — guarded by dry_run early return above
     manifest = provider.get_manifest(candidate.issue)
     updated = registry.register(manifest, entry)
     provider.set_manifest(candidate.issue, updated)

@@ -683,7 +683,7 @@ def update(
     task_id = f"T{task_ref}" if task_ref is not None and task_ref.isdigit() else task_ref
 
     # Parse --set field=value pairs
-    parsed_fields: dict[str, str] = {}
+    parsed_fields: dict[str, str | int | list[str]] = {}
     for pair in set_field:
         if "=" not in pair:
             _err(f"--set value must be in 'field=value' format, got: {pair!r}")

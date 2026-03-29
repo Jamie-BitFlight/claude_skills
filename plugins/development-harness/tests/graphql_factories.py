@@ -22,7 +22,10 @@ Reused by: T02 (github.py tests), T04 (operations.py tests),
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from backlog_core.github import IssueNode
 
 # ---------------------------------------------------------------------------
 # Node factories
@@ -100,7 +103,7 @@ def make_issue_node(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def make_parsed_issue_node(**overrides: Any) -> dict[str, Any]:
+def make_parsed_issue_node(**overrides: Any) -> IssueNode:
     """Return an already-parsed IssueNode-shaped dict with flat label/assignee lists.
 
     Use this factory when calling functions that operate on a parsed
@@ -130,7 +133,7 @@ def make_parsed_issue_node(**overrides: Any) -> dict[str, Any]:
         "assignees": [],
     }
     base.update(overrides)
-    return base
+    return cast("IssueNode", base)
 
 
 def make_milestone_full_node(**overrides: Any) -> dict[str, Any]:

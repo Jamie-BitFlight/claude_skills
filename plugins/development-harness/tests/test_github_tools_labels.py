@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_label(name: str, color: str = "aabbcc", description: str = "") -> MagicMock:
+def _make_label(name: str, color: str = "aabbcc", description: str | None = "") -> MagicMock:
     """Build a MagicMock mimicking a PyGithub Label object."""
     label = MagicMock()
     label.name = name

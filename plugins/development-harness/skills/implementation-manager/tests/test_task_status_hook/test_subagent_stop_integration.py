@@ -190,9 +190,13 @@ class TestSubagentStopFullPathWithGithubSync:
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
+            mp.setattr(hook, "_resolve_context_file_from_transcript", lambda _: context_file)
 
             # Act
-            hook.handle_subagent_stop(hook_input)
+            result = hook.handle_subagent_stop(hook_input)
+
+        # Assert: function returned None without raising
+        assert result is None
 
         # Assert: local YAML is marked complete
         updated_content = task_file.read_text(encoding="utf-8")
@@ -245,9 +249,13 @@ class TestSubagentStopFullPathWithGithubSync:
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
+            mp.setattr(hook, "_resolve_context_file_from_transcript", lambda _: context_file)
 
-            # Act — must not raise
+            # Act — must return without raising despite GitHub failure
             result = hook.handle_subagent_stop(hook_input)
+
+        # Assert: function returned None without raising
+        assert result is None
 
         # Assert: local YAML still shows complete
         updated_content = task_file.read_text(encoding="utf-8")
@@ -255,9 +263,6 @@ class TestSubagentStopFullPathWithGithubSync:
 
         # Assert: GitHub update was attempted
         mock_update.assert_called_once()
-
-        # Assert: function returned None (did not raise)
-        assert result is None
 
         # Assert: warning was written to stderr
         stderr = capsys.readouterr().err

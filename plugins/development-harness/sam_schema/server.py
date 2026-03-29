@@ -532,7 +532,7 @@ def sam_update(
 
         plan_path = resolve_plan_address(plan_part, _resolve_plan_dir(plan_dir))
 
-        set_fields: dict[str, str] | None = None
+        set_fields: dict[str, str | int | list[str]] | None = None
         if set_fields_json is not None:
             raw_fields: Any = json.loads(set_fields_json)
             if not isinstance(raw_fields, dict):

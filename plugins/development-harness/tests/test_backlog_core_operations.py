@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import backlog_core.operations as ops
 import pytest
@@ -25,6 +25,8 @@ from backlog_core.models import (
 from backlog_core.operations import add_item, close_item, list_items, resolve_item, view_item
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_mock import MockerFixture
 
 
@@ -700,7 +702,7 @@ class TestResolveItem:
     ],
 )
 def test_github_only_falls_back_to_pull(
-    op: object,
+    op: Callable[..., Any],
     op_kwargs: dict,
     gh_mock: str,
     result_key: str,
@@ -741,7 +743,7 @@ def test_github_only_falls_back_to_pull(
         (resolve_item, {"selector": "#999", "summary": "Should not succeed"}),
     ],
 )
-def test_github_only_raises_when_issue_absent(op: object, kwargs: dict, mocker: MockerFixture) -> None:
+def test_github_only_raises_when_issue_absent(op: Callable[..., Any], kwargs: dict, mocker: MockerFixture) -> None:
     """Verify close_item and resolve_item raise ItemNotFoundError when issue is absent from both local cache and GitHub.
 
     Tests: Double-not-found path after _pull_if_issue_selector fallback yields nothing.

@@ -170,7 +170,7 @@ def update_plan_fields(
     plan_path: Path,
     task_id: str | None = None,
     *,
-    set_fields: dict[str, str] | None = None,
+    set_fields: dict[str, str | int | list[str]] | None = None,
     context: str | None = None,
     append_section_name: str | None = None,
     section_content: str | None = None,

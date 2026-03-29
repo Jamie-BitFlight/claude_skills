@@ -285,7 +285,7 @@ class TestTaskRequiredFields:
     def test_missing_status_raises_validation_error(self) -> None:
         """Verify missing 'status' raises ValidationError."""
         with pytest.raises(ValidationError):
-            Task(id="T1", title="No status")  # type: ignore[call-arg]
+            Task.model_validate({"id": "T1", "title": "No status"})
 
     def test_empty_title_raises_validation_error(self) -> None:
         """Verify empty string title fails min_length=1 validation."""
@@ -385,7 +385,7 @@ class TestTaskEnumCoercion:
 
     def test_status_string_coerced_to_enum_value(self) -> None:
         """Verify 'not-started' string is accepted as TaskStatus."""
-        task = Task(id="T1", title="T", status="not-started")  # type: ignore[arg-type]
+        task = Task.model_validate({"id": "T1", "title": "T", "status": "not-started"})
         assert task.status == TaskStatus.NOT_STARTED
 
     def test_priority_int_coerced_to_enum_value(self) -> None:
@@ -395,7 +395,7 @@ class TestTaskEnumCoercion:
 
     def test_complexity_string_coerced_to_enum_value(self) -> None:
         """Verify 'high' string is accepted as Complexity."""
-        task = Task(id="T1", title="T", status=TaskStatus.NOT_STARTED, complexity="high")  # type: ignore[arg-type]
+        task = Task.model_validate({"id": "T1", "title": "T", "status": TaskStatus.NOT_STARTED, "complexity": "high"})
         assert task.complexity == Complexity.HIGH
 
 
@@ -1185,7 +1185,13 @@ class TestTaskBookendFields:
              BookendValidator (neither T0 nor TN).
         """
         with pytest.raises(ValidationError):
-            Task(id="T0", title="Bad bookend", status=TaskStatus.NOT_STARTED, is_bookend=True, bookend_type="foo")  # type: ignore[invalid-argument-type]  # intentional invalid value to test Pydantic rejection
+            Task.model_validate({
+                "id": "T0",
+                "title": "Bad bookend",
+                "status": TaskStatus.NOT_STARTED,
+                "is_bookend": True,
+                "bookend_type": "foo",
+            })  # intentional invalid value to test Pydantic rejection
 
     def test_bookend_type_enum_member_t0_accepted(self) -> None:
         """Verify BookendType.T0_BASELINE is accepted for bookend_type.

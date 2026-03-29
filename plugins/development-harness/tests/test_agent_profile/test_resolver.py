@@ -463,10 +463,10 @@ class TestResolverEdgeCases:
         # Monkeypatch Path.resolve to raise OSError for our specific skill dir
         original_resolve = Path.resolve
 
-        def patched_resolve(self: Path, **kwargs: object) -> Path:
+        def patched_resolve(self: Path, strict: bool = False) -> Path:
             if self == plugins_root / "plugin-a" / "skills" / "oserror-skill":
                 raise OSError("Simulated OS error during resolve")
-            return original_resolve(self, **kwargs)
+            return original_resolve(self, strict=strict)
 
         monkeypatch.setattr(Path, "resolve", patched_resolve)
 

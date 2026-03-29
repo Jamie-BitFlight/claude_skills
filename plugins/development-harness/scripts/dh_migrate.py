@@ -36,7 +36,10 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, cast
+
+if TYPE_CHECKING:
+    from backlog_core.artifact_provider import GitHubArtifactProvider
 
 # ---------------------------------------------------------------------------
 # Bootstrap: make the development-harness package importable from within the
@@ -901,7 +904,7 @@ def _print_rows_table(title: str, rows: list[tuple[str, str, int | None, str]]) 
     console.print(table)
 
 
-def _register_one(provider: object, rel: str, artifact_type: str, issue_number: int) -> str:
+def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str, issue_number: int) -> str:
     """Register a single artifact and return the outcome status string.
 
     Imports model types lazily — only called after GitHub connectivity is confirmed.
