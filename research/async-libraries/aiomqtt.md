@@ -326,6 +326,18 @@ The library is relevant for:
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AnyIO](./anyio.md) | async-libraries | Backend-agnostic async/await foundation; aiomqtt uses asyncio, AnyIO provides unified API across asyncio and Trio |
+| [Trio](./trio.md) | async-libraries | Alternative structured concurrency model; aiomqtt event loop patterns share Trio's nursery-like cancellation semantics |
+| [AsyncSSH](./asyncssh.md) | async-libraries | Complementary async transport layer; both provide async context manager patterns for persistent connections |
+| [FastAPI](../api-frameworks/fastapi.md) | api-frameworks | Integration pattern: FastAPI lifespan context manager handles MQTT client lifecycle alongside HTTP requests |
+| [Tornado](../api-frameworks/tornado.md) | api-frameworks | Comparable async architecture: both manage long-lived persistent connections via non-blocking event loops |
+
+---
+
 **Entry metadata**:
 
 - **Created**: 2026-03-29
