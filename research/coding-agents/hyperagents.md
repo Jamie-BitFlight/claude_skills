@@ -262,14 +262,14 @@ Source code review did not explicitly document:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [OpenHands - Open Platform for Cloud Coding Agents](../openhands.md) | coding-agents | Autonomous coding agent platform with multi-domain task execution and evaluation benchmarking (SWE-bench) |
+| [OpenHands - Open Platform for Cloud Coding Agents](./openhands.md) | coding-agents | Autonomous coding agent platform with multi-domain task execution and evaluation benchmarking (SWE-bench) |
 | [OpenAI Codex CLI - OpenAI's Terminal Coding Agent](./openai-codex-cli.md) | coding-agents | Agent execution with tool use protocol, sandbox isolation, and iterative code generation model |
 | [Cline - Open-Source Autonomous Coding Agent](./cline.md) | coding-agents | Multi-step autonomous coding with tool integration and MCP extensibility for agent-driven improvements |
 | [OpenAI Symphony](./openai-symphony.md) | coding-agents | Continuous agent automation loop: issue-driven dispatch, workspace isolation, and autonomous iteration |
 | [Agno](../agent-frameworks/agno.md) | agent-frameworks | Learning agents with persistent memory, knowledge transfer across users, and multi-agent orchestration |
 | [AgentScope - Alibaba's Multi-Agent Framework](../agent-frameworks/agentscope.md) | agent-frameworks | Actor-model multi-agent architecture with built-in agent introspection and prompt tuning |
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Agent optimization system: 16 specialized subagents, 65+ skills, learning-based improvements from session patterns |
-| [TrainLoop - Managed RL Fine-Tuning Platform](../../ml-infrastructure/trainloop.md) | ml-infrastructure | Reinforcement learning for domain-specific agent improvement with reward model training and deployment |
+| [TrainLoop - Managed RL Fine-Tuning Platform](../ml-infrastructure/trainloop.md) | ml-infrastructure | Reinforcement learning for domain-specific agent improvement with reward model training and deployment |
 
 ---
 
