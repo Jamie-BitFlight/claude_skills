@@ -143,7 +143,7 @@ class TestBacklogWriteReadCycle:
         project_root, _state_home = isolated_project
 
         # Arrange / Act
-        models.init(project_dir=str(project_root))
+        models.init(project_dir=str(project_root), repo="test-owner/test-repo")
 
         # Assert
         assert ".claude" not in str(models.BACKLOG_DIR)
@@ -161,7 +161,7 @@ class TestBacklogWriteReadCycle:
         project_root, _state_home = isolated_project
 
         # Arrange / Act
-        models.init(project_dir=str(project_root))
+        models.init(project_dir=str(project_root), repo="test-owner/test-repo")
         slug = compute_slug(project_root)
 
         # Assert

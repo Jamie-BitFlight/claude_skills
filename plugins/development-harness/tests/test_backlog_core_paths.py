@@ -166,14 +166,14 @@ class TestModelsBACKLOGDIR:
         """BACKLOG_DIR must not point inside .claude/ after init()."""
         from backlog_core import models
 
-        models.init(project_dir=str(fake_project_root))
+        models.init(project_dir=str(fake_project_root), repo="test-owner/test-repo")
         assert ".claude" not in str(models.BACKLOG_DIR), f"BACKLOG_DIR still contains .claude: {models.BACKLOG_DIR}"
 
     def test_backlog_dir_resolves_to_state_root_backlog(self, isolated_state: Path, fake_project_root: Path) -> None:
         import dh_paths
         from backlog_core import models
 
-        models.init(project_dir=str(fake_project_root))
+        models.init(project_dir=str(fake_project_root), repo="test-owner/test-repo")
         expected = dh_paths.backlog_dir(fake_project_root)
         assert expected == models.BACKLOG_DIR
 
@@ -188,10 +188,10 @@ class TestModelsBACKLOGDIR:
         project_a.mkdir()
         project_b.mkdir()
 
-        models.init(project_dir=str(project_a))
+        models.init(project_dir=str(project_a), repo="test-owner/test-repo")
         dir_a = models.BACKLOG_DIR
 
-        models.init(project_dir=str(project_b))
+        models.init(project_dir=str(project_b), repo="test-owner/test-repo")
         dir_b = models.BACKLOG_DIR
 
         assert dir_a != dir_b

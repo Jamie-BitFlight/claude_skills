@@ -28,7 +28,7 @@ import json
 import sys
 import types
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -183,7 +183,10 @@ class TestSubagentStopFullPathWithGithubSync:
 
         mock_hook_path = MagicMock()
         mock_hook_path.exists.return_value = True
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            pytest.MonkeyPatch.context() as mp,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file),
+        ):
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
@@ -226,7 +229,7 @@ class TestSubagentStopFullPathWithGithubSync:
 
         session_id = "integration-failure-session"
         task_file = _write_task_file(tmp_path)
-        _write_context_file(tmp_path, session_id, task_file)
+        context_file = _write_context_file(tmp_path, session_id, task_file)
         hook_input = _build_hook_input(tmp_path, session_id, task_file)
 
         mock_repo = MagicMock()
@@ -235,7 +238,10 @@ class TestSubagentStopFullPathWithGithubSync:
 
         mock_hook_path = MagicMock()
         mock_hook_path.exists.return_value = True
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            pytest.MonkeyPatch.context() as mp,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file),
+        ):
             mp.setitem(sys.modules, "backlog_core", mock_bc)
             mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)

@@ -401,7 +401,11 @@ class TestHandleSubagentStopCallsSync:
             "prompt": f"/start-task {task_file} --task T1",
         }
 
-        with patch.object(hook, "sync_completion_to_github") as mock_sync:
+        context_file_path = tmp_path / ".claude" / "context" / f"active-task-{session_id}.json"
+        with (
+            patch.object(hook, "sync_completion_to_github") as mock_sync,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file_path),
+        ):
             # Act
             hook.handle_subagent_stop(hook_input)
 
@@ -452,7 +456,11 @@ class TestActivityUpdateNoGithubCall:
             "cwd": str(tmp_path),
         }
 
-        with patch.object(hook, "sync_completion_to_github") as mock_sync:
+        context_dir_path = tmp_path / ".claude" / "context"
+        with (
+            patch.object(hook, "sync_completion_to_github") as mock_sync,
+            patch.object(hook._dh_paths, "context_dir", return_value=context_dir_path),
+        ):
             # Act
             hook.handle_activity_update(hook_input)
 
