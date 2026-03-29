@@ -337,7 +337,7 @@ class TestDiscoverViaGit:
         result = _discover_via_git()
 
         assert result == "acme/widget"
-        mock_repo_ctor.assert_called_once_with(str(project_root), search_parent_directories=True)
+        mock_repo_ctor.assert_called_once_with(project_root, search_parent_directories=True)
 
     @pytest.mark.parametrize(
         ("url", "expected_slug"),
