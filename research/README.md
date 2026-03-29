@@ -1027,7 +1027,7 @@ Python async I/O libraries and concurrency frameworks for building concurrent ap
 | [anyio.md](./async-libraries/anyio.md)     | AnyIO - backend-agnostic async concurrency library providing unified API across asyncio and Trio (426M downloads/month)  | 2026-02-04   |
 | [asyncssh.md](./async-libraries/asyncssh.md) | asyncssh v2.22.0 — asyncio-native SSH client/server with reverse tunnels (`forward_remote_port`, `connect_reverse`), SFTP, jump-host chaining, and pure-Python key management (1.7K stars, EPL-2.0/GPL-2.0) | 2026-03-01   |
 | [trio.md](./async-libraries/trio.md)       | Trio - structured concurrency async library for Python with nurseries, cancel scopes (7K+ stars, 218M downloads/month)   | 2026-02-04   |
-| [aiomqtt.md](./async-libraries/aiomqtt.md) | aiomqtt v2.4.0 — asyncio-native MQTT client wrapping paho-mqtt; structured async context managers, async for message iteration, TLS/WebSocket support, topic wildcard filtering, anyio compatibility (MIT) | 2026-03-29   |
+| [aiomqtt.md](./async-libraries/aiomqtt.md) | aiomqtt v2.5.1 — asyncio-native MQTT client wrapping paho-mqtt; async context manager + async for message iteration, MQTT 5.0/3.1.1/3.1 support, TLS/WebSocket, custom queue types, FastAPI lifespan integration, Python 3.8-3.13 (MIT) | 2026-03-29   |
 
 **Key Topics**:
 
