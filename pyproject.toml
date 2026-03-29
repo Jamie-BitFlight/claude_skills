@@ -310,6 +310,8 @@ max-complexity = 12
 "**/assets/nested-typer-exceptions/*.py" = ["ANN", "DOC"]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
 "**/assets/version.py" = ["PLC0415"]
+# FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
+"**/backlog_core/server.py" = ["RUF029"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["S607"]
 "**/kage-bunshin/scripts/spawn.py" = ["S607"]

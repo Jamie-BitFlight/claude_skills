@@ -10,7 +10,9 @@ import json as _json
 import logging as _logging
 import os as _os
 import re as _re
+import shutil
 import sqlite3
+import subprocess
 import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
@@ -22,6 +24,7 @@ import dh_paths as _dh_paths
 import dispatch_schema as _ds
 import tiktoken
 from fastmcp import Context, FastMCP
+from fastmcp.server.lifespan import lifespan
 from pydantic import Field, ValidationError as _ValidationError
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
@@ -54,6 +57,8 @@ from .models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
@@ -65,6 +70,83 @@ _SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
 
 # Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
 _REGEX_SLASH_MIN_LEN = 2
+
+# Sentinel: prevents _bootstrap_beads from running more than once per process.
+# Tests reset via monkeypatch.setattr("backlog_core.server._beads_bootstrapped", False).
+_beads_bootstrapped: bool = False
+
+
+def _bootstrap_beads(project_dir: Path) -> None:
+    """Auto-bootstrap beads toolchain (bd binary, .beads/ database, Claude hooks).
+
+    Runs at server startup via the FastMCP lifespan hook. Blocked by module-level
+    sentinel so it executes at most once per process, even when multiple
+    ``Client(mcp)`` connections are opened in tests.
+
+    All subprocess calls use ``check=False`` and ``capture_output=True`` to avoid
+    raising exceptions or polluting the MCP transport with subprocess output.
+    Full binary paths (from ``shutil.which``) are used in subprocess calls to
+    satisfy S607 (no partial executable paths).
+
+    Args:
+        project_dir: Resolved project root path (from ``models.get_repo_root()``).
+    """
+    global _beads_bootstrapped  # noqa: PLW0603
+    if _beads_bootstrapped:
+        return
+
+    log = _logging.getLogger(__name__)
+
+    bd_path = shutil.which("bd")
+    if bd_path:
+        # Happy path: bd is already on PATH.
+        if not (project_dir / ".beads").exists():
+            subprocess.run([bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True)
+        subprocess.run(
+            [bd_path, "setup", "claude", "--project", "--stealth"], cwd=project_dir, check=False, capture_output=True
+        )
+        _beads_bootstrapped = True
+        return
+
+    # bd not on PATH — try installing via npm.
+    npm_path = shutil.which("npm")
+    if not npm_path:
+        log.warning("beads bootstrap skipped: npm not available")
+        _beads_bootstrapped = True
+        return
+
+    subprocess.run([npm_path, "install", "-g", "@beads/bd"], check=False, capture_output=True)
+
+    bd_path = shutil.which("bd")
+    if not bd_path:
+        log.warning("beads bootstrap skipped: npm install failed silently")
+        _beads_bootstrapped = True
+        return
+
+    # Install succeeded; initialise and set up.
+    subprocess.run([bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True)
+    subprocess.run(
+        [bd_path, "setup", "claude", "--project", "--stealth"], cwd=project_dir, check=False, capture_output=True
+    )
+    _beads_bootstrapped = True
+
+
+@lifespan
+async def _beads_lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """FastMCP lifespan hook: bootstrap beads before server accepts tool calls.
+
+    Runs ``_bootstrap_beads`` in a thread executor to avoid blocking the event
+    loop during startup (subprocess calls may take several seconds).
+
+    Args:
+        server: FastMCP server instance (provided by FastMCP at startup).
+
+    Yields:
+        None after bootstrap completes.
+    """
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _bootstrap_beads, _models.get_repo_root())
+    yield
 
 
 def _item_field_text(item: dict[str, str | bool], field: str) -> str:
@@ -187,6 +269,7 @@ mcp = FastMCP(
         "backlog items including add, list, view, update, groom, close, resolve, and sync."
     ),
     version="0.1.0",
+    lifespan=_beads_lifespan,
 )
 
 
