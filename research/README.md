@@ -1184,6 +1184,7 @@ AI-powered visual creation platforms and design intelligence tools for video, im
 | [google-stitch.md](./ai-design-tools/google-stitch.md) | Google Stitch - AI-powered UI design tool generating app frontends (HTML/CSS, React) from text prompts or images using Gemini 2.5 models; launched Google I/O 2025 (proprietary) | 2026-03-04   |
 | [diode.md](./ai-design-tools/diode.md) | Diode - Browser-based 3D hardware simulator for building, programming, and simulating circuits with Arduino support; shut down 2022, site still operational | 2026-03-12   |
 | [open-pencil.md](./ai-design-tools/open-pencil.md) | OpenPencil v0.10.0 - Open-source Figma alternative: native .fig read/write, 87+ AI design tools, MCP server (stdio+HTTP), P2P collaboration via WebRTC+Yjs, CanvasKit WASM renderer (2.8K stars) | 2026-03-19   |
+| [omma-build.md](./ai-design-tools/omma-build.md) | Omma - Spline's AI creative studio generating interactive websites, 3D scenes, and web apps from natural language; parallel multi-agent architecture (code + 3D + media + data agents); $29/mo (launched 2026-03-24) | 2026-03-29   |
 
 **Key Topics**:
 
