@@ -41,8 +41,6 @@ from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus,
 from dh_paths import backlog_dir, compute_slug, context_dir, ensure_dirs, plan_dir, reports_dir, state_root
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from pytest_mock import MockerFixture
 
 
