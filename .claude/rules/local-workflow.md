@@ -9,6 +9,10 @@ The SAM (Structured Agent-Managed) workflow converts a feature idea into executa
    (planning)            (execution loop)         (quality gates)
 ```
 
+> For data structure shapes at each pipeline edge, publisher-consumer relationships,
+> hook trigger conditions, and the SAM task state lifecycle, see the
+> [Workflow Architecture Diagram](./../docs/workflow-architecture-diagram.md).
+
 ## Skills (User-Invocable)
 
 | Skill | Source File | Purpose |
