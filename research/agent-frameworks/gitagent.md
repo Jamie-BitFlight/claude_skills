@@ -524,3 +524,17 @@ GitAgent is directly relevant to Claude Code development in several ways:
 | **Compliance Features** | high | 2026-03-29 | Full compliance configuration documented from SPECIFICATION.md with exact YAML schema structure |
 
 **Next review recommended**: 2026-06-29 (3 months). Recheck for v1.0 release, adapter maturity changes, registry implementation, and new frameworks added.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Agno](./agno.md) | agent-frameworks | Multi-agent framework with persistent state and knowledge transfer; gitagent can export agent definitions to Agno format |
+| [OpenFang](./openfang.md) | agent-frameworks | Rust Agent OS with native SKILL.md support; shares structured agent definition and autonomous hands pattern with gitagent skills system |
+| [Micro-Agent](./micro-agent.md) | agent-frameworks | Python ReAct agent framework with MCP multi-server support; both support framework-agnostic tool integration via protocol abstraction |
+| [Everything Claude Code](./everything-claude-code.md) | agent-frameworks | Claude Code skills and agents system; gitagent export adapter for claude-code generates CLAUDE.md compatible with this framework |
+| [AI Agents Frameworks](./ai-agents-frameworks.md) | agent-frameworks | Comparative benchmarks of 10+ agent frameworks; gitagent enables unified definition and export across these evaluated frameworks |
+| [Ruflo](./ruflo.md) | agent-frameworks | Multi-agent orchestration with 100+ agents and 215+ MCP tools; gitagent format enables portable agent definitions for Ruflo's swarm coordination |
+| [Pi Monorepo](./pi-mono.md) | agent-frameworks | TypeScript agent framework with unified LLM API and modular architecture; shares agent composition and skill reuse philosophy with gitagent |

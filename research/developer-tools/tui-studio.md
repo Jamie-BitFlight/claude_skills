@@ -232,6 +232,20 @@ No limitations are explicitly documented in official sources. However, given the
 
 ---
 
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Gridland](./gridland.md) | developer-tools | Shares React-based TUI framework approach with write-once, deploy-anywhere multi-environment rendering |
+| [Sidecar](./sidecar.md) | developer-tools | Bubbletea TUI framework for real-time terminal interfaces; similar component-driven UI architecture for agent workflows |
+| [Agent Deck](./agent-deck.md) | developer-tools | Terminal session manager with unified TUI design for AI coding agents; overlapping use case for terminal UI composition |
+| [Lopaka](./lopaka.md) | developer-tools | Visual-to-code editor for embedded displays; shares design-then-export pattern and multi-framework code generation strategy |
+| [Pixel Agents](./pixel-agents.md) | developer-tools | Visual rendering of terminal interfaces via React and Canvas; complements TUI Studio's visual design approach for agent development |
+
+---
+
 ## Freshness Tracking
 
 **Last reviewed**: 2026-03-29
