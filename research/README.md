@@ -445,6 +445,7 @@ Tools and frameworks for autonomous code security auditing and vulnerability det
 | [hound.md](./code-auditing/hound.md) | Autonomous AI security auditor using knowledge graphs, belief systems, and hypothesis-driven analysis | 2026-01-26   |
 | [snyk-cli-cpp-scans.md](./code-auditing/snyk-cli-cpp-scans.md) | Snyk CLI hash-based open-source vulnerability scanning for C/C++ unmanaged dependencies via `--unmanaged` flag | 2026-02-23   |
 | [syft.md](./code-auditing/syft.md) | Syft v1.42.3 — Anchore SBOM generation tool: 3-stage pipeline (source resolution → cataloging → format output), 20+ ecosystem catalogers, CycloneDX/SPDX/Syft JSON output, signed attestations, Grype integration (8.6K stars, Apache-2.0) | 2026-03-28   |
+| [rope.md](./code-auditing/rope.md) | Rope v1.14.0 — pure Python AST-based refactoring library; 11 operations (rename, move, extract, inline, change signature, etc.); scope-aware symbol resolution, minimal deps (pytoolconfig only), Python 3.8-3.14 support, designed for IDE embedding (2.2K stars, LGPL-3.0) | 2026-03-29   |
 
 **Key Topics**:
 
@@ -1026,6 +1027,7 @@ Python async I/O libraries and concurrency frameworks for building concurrent ap
 | [anyio.md](./async-libraries/anyio.md)     | AnyIO - backend-agnostic async concurrency library providing unified API across asyncio and Trio (426M downloads/month)  | 2026-02-04   |
 | [asyncssh.md](./async-libraries/asyncssh.md) | asyncssh v2.22.0 — asyncio-native SSH client/server with reverse tunnels (`forward_remote_port`, `connect_reverse`), SFTP, jump-host chaining, and pure-Python key management (1.7K stars, EPL-2.0/GPL-2.0) | 2026-03-01   |
 | [trio.md](./async-libraries/trio.md)       | Trio - structured concurrency async library for Python with nurseries, cancel scopes (7K+ stars, 218M downloads/month)   | 2026-02-04   |
+| [aiomqtt.md](./async-libraries/aiomqtt.md) | aiomqtt v2.4.0 — asyncio-native MQTT client wrapping paho-mqtt; structured async context managers, async for message iteration, TLS/WebSocket support, topic wildcard filtering, anyio compatibility (MIT) | 2026-03-29   |
 
 **Key Topics**:
 
