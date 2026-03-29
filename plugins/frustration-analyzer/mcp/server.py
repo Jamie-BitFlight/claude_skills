@@ -38,7 +38,7 @@ import pathlib
 import re
 import xml.etree.ElementTree as ET  # noqa: S405
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element as _Element
@@ -515,7 +515,7 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
     """
     own_conn = conn is None
     try:
-        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else conn  # type: ignore[assignment]
+        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else cast("duckdb.DuckDBPyConnection", conn)
         rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
         if own_conn:
             db.close()

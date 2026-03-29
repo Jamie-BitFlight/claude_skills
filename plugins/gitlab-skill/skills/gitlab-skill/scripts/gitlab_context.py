@@ -39,7 +39,7 @@ _CI_FILE_PREVIEW_LINES = 50
 
 
 @lru_cache(maxsize=1)
-def _get_repo() -> object:
+def _get_repo() -> git.Repo:
     """Get the git repository for the current directory.
 
     Returns:
@@ -58,7 +58,7 @@ def _parse_git_origin() -> tuple[str, str]:
     Raises:
         ValueError: If the origin URL cannot be parsed.
     """
-    repo: git.Repo = _get_repo()  # type: ignore[assignment]
+    repo = _get_repo()
     url: str = repo.remotes.origin.url
     if match := re.search(r"(?:@|://(?:[^@]+@)?)([^:/]+)[:/](.+?)(?:\.git)?$", url):
         return match.group(1), match.group(2)
@@ -90,7 +90,7 @@ def _get_current_branch() -> str:
     Returns:
         Current branch name.
     """
-    repo: git.Repo = _get_repo()  # type: ignore[assignment]
+    repo = _get_repo()
     return repo.active_branch.name
 
 
