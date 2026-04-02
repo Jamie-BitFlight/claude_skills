@@ -616,5 +616,7 @@ Two complete walkthroughs (new plugin full lifecycle + existing plugin with vali
 
 ## Sources
 
+- Architecture spec: `./references/architect-plugin-lifecycle.md`
+- Feature context: `./references/feature-context-plugin-lifecycle.md`
 - Plugin-creator CLAUDE.md: `../../CLAUDE.md`
 - GitHub Issue: #427
