@@ -278,6 +278,52 @@ jobs:
         run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v
 
   # =============================================================================
+  # Python: End-to-end live validation tests
+  # Runs only on main push and manual dispatch — not on PRs.
+  # Creates real GitHub issues in a test sandbox repo and cleans up after.
+  # Advisory: NOT wired into quality-gate until stable run history established.
+  # =============================================================================
+  test-e2e:
+    name: Python / E2E live tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run e2e tests
+        run: uv run -q pytest -m e2e -v --timeout=120 plugins/development-harness/tests/test_live_validation.py
+
+      - name: Emergency cleanup (always runs)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Close any orphaned [MCP-TEST-*] issues left by failed teardown
+          gh issue list -R ${{ github.repository }} --state open \
+            --search "[MCP-TEST-" --limit 200 --json number,title \
+            | python3 -c "
+          import json, subprocess, sys
+          issues = [i for i in json.load(sys.stdin) if '[MCP-TEST-' in i['title']]
+          for i in issues:
+              subprocess.run(['gh', 'issue', 'close', str(i['number']),
+                  '-R', '${{ github.repository }}',
+                  '--comment', 'Closed by CI emergency sweep: orphaned e2e test issue'],
+                  check=False)
+          print(f'Swept {len(issues)} orphaned test issues')
+          "
+
+  # =============================================================================
   # Summary job that requires all checks to pass
   # =============================================================================
   quality-gate:
