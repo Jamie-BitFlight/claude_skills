@@ -1,8 +1,8 @@
 <p align="center">
   <a href="#available-plugins"><img src="https://img.shields.io/badge/Claude_Code-Plugin_Marketplace-6B4FBB?style=for-the-badge&logo=anthropic&logoColor=white" alt="Claude Code Plugin Marketplace"></a>
-  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Plugins-27-blue?style=for-the-badge" alt="27 Plugins"></a>
-  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Agents-56-orange?style=for-the-badge" alt="56 Agents"></a>
-  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Skills-119-green?style=for-the-badge" alt="119 Skills"></a>
+  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Plugins-29-blue?style=for-the-badge" alt="29 Plugins"></a>
+  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Agents-61-orange?style=for-the-badge" alt="61 Agents"></a>
+  <a href="#full-featured-development-systems"><img src="https://img.shields.io/badge/Skills-190-green?style=for-the-badge" alt="190 Skills"></a>
 </p>
 
 <p align="center">
@@ -60,11 +60,12 @@ Comprehensive frameworks with multiple skills, commands, and specialized agents.
 
 | Plugin | What It Does |
 | --- | --- |
-| [development-harness](./plugins/development-harness) | Language-agnostic SAM 7-stage pipeline (Discovery → Planning → Context → Decomposition → Execution → Review → Verification) with backlog management, milestone dispatch, and kage-bunshin parallel sessions. 31 skills, 15 agents, MCP backlog server. |
-| [python3-development](./plugins/python3-development) | Python 3.11+ specialist with 35 skills, 5 agents, and TDD workflows. Covers Typer/Rich CLI development, pytest test suites, code review, type checking, and PEP 723 inline script metadata. MCP semantic code search included. |
+| [development-harness](./plugins/development-harness) | Language-agnostic SAM 7-stage pipeline (Discovery → Planning → Context → Decomposition → Execution → Review → Verification) with backlog management, milestone dispatch, and kage-bunshin parallel sessions. 33 skills, 18 agents, MCP backlog server. |
+| [python3-development](./plugins/python3-development) | Python 3.11+ specialist with 34 skills, 5 agents, and TDD workflows. Covers Typer/Rich CLI development, pytest test suites, code review, type checking, and PEP 723 inline script metadata. MCP semantic code search included. |
 | [bash-development](./plugins/bash-development) | Write robust Bash 5.1+ scripts with modern patterns, error handling, POSIX portability, and specialized agents for development and auditing |
 | [perl-development](./plugins/perl-development) | Build production-quality Perl 5.30+ scripts with modern practices, CPAN ecosystem integration, comprehensive testing, and CLI architecture |
-| [plugin-creator](./plugins/plugin-creator) | Complete toolkit for creating, refactoring, and validating Claude Code plugins with 36 skills, 8 specialized agents, automated version bumping, and `skilllint` integration |
+| [python-engineering](./plugins/python-engineering) | Opinionated Python 3.11+ engineering system with 19 skills and 5 agents. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI (Typer/Rich), web, data/science, and constrained environments. |
+| [plugin-creator](./plugins/plugin-creator) | Complete toolkit for creating, refactoring, and validating Claude Code plugins with 40 skills, 8 specialized agents, automated version bumping, and `skilllint` integration |
 | [uv](./plugins/uv) | Expert guidance for Astral's uv — the fast Python package manager that replaces pip, poetry, pyenv, and virtualenv with modern lockfiles |
 | [clang-format](./plugins/clang-format) | Configure clang-format to match your existing C/C++ code style by analyzing patterns and showing impact before changes (install name: `clang-format-configuration`) |
 | [holistic-linting](./plugins/holistic-linting) | Automatic code quality enforcement — Claude won't say "done" until code passes all configured linters with root-cause fixing. Covers ruff, mypy, and bandit. |
@@ -105,6 +106,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 | [hallucination-detector](https://github.com/bitflight-devops/hallucination-detector) | Blocks task completion when Claude speculates or makes ungrounded claims, forcing evidence-first rewrites |
 | [scientific-method](./plugins/scientific-method) | Structures hypothesis-driven debugging and investigation with experiment protocols and evidence-first methodology |
 | [brainstorming-skill](./plugins/brainstorming-skill) | Significantly improves brainstorming with 30+ research-validated prompt patterns across 14 categories |
+| [frustration-analyzer](./plugins/frustration-analyzer) | Finds the strongest user reaction to an AI instruction-following failure in a session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG rage receipt. 3 agents, MCP server. |
 | [orchestrator-discipline](./plugins/orchestrator-discipline) | Enforces context window discipline via PreToolUse hooks — blocks source-file reads without edits and blocks diagnostic commands that should be delegated to agents |
 
 #### Architecture
@@ -121,9 +123,9 @@ The SAM (Stateless Agent Methodology) pipeline in a single plugin. Every feature
 
 Language plugins (like `python3-development`) compose with the harness by providing a manifest that maps abstract roles to concrete agents. Without a language plugin, the harness falls back to general-purpose agents.
 
-**Skills include:** `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:groom-milestone`, `/dh:work-milestone`, `/dh:dispatch`, `/dh:backlog`, and 24 more.
+**Skills include:** `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:groom-milestone`, `/dh:work-milestone`, `/dh:dispatch`, `/dh:backlog`, and 26 more.
 
-**Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and 10 more.
+**Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and 13 more.
 
 **MCP servers:** Backlog server (GitHub Issues sync, artifact management, dispatch orchestration), sequential-thinking server.
 
@@ -141,6 +143,19 @@ Python specialist that composes with `development-harness`. Install both for the
 - `@python3-development:semantic-code-search` — semantic search over Python codebases
 
 **MCP servers:** cocoindex-code semantic code search, sequential-thinking server.
+
+### python-engineering
+
+Opinionated Python 3.11+ engineering system that establishes strong defaults and routes to specialist skills. Composes with `development-harness` for the full pipeline, or works standalone.
+
+**Skills include:** One automatic router (`python3-core`) plus specialist skills for CLI (`python3-cli`), testing (`python3-testing`, `python3-tdd`), typing (`python3-typing`), web (`python3-web`), data (`python3-data`), tooling (`python3-tools`), and constrained environments (`python3-stdlib-only`). Manual entrypoints: `/python-engineering:orchestrate`, `/python-engineering:review`, `/python-engineering:lint`, `/python-engineering:cleanup`, `/python-engineering:debug`.
+
+**Agents include:**
+- `@python-engineering:python-cli-architect` — implements Python CLI features end-to-end
+- `@python-engineering:python-cli-design-spec` — produces architecture specs for CLIs
+- `@python-engineering:python-pytest-architect` — writes pytest test suites
+- `@python-engineering:code-reviewer` — code review with Python idiom awareness
+- `@python-engineering:semantic-code-search` — semantic search over Python codebases
 
 ### plugin-creator
 
