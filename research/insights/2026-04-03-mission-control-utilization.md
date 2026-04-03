@@ -44,7 +44,7 @@ async def spawn_convoy_with_cost_tracking(team_config, agents_to_spawn, mission_
         },
         headers={"Authorization": f"Bearer {MC_API_TOKEN}"}
     )
-    
+
     # 2. Spawn agents locally, tagging them with task_id
     for agent in agents_to_spawn:
         Agent(
@@ -54,7 +54,7 @@ async def spawn_convoy_with_cost_tracking(team_config, agents_to_spawn, mission_
             prompt=agent["prompt"],
             env={"MC_TASK_ID": task_id, "MC_URL": mission_control_url}
         )
-    
+
     # 3. Periodically check cost cap
     async def poll_cost():
         while team_active:
@@ -69,7 +69,7 @@ async def spawn_convoy_with_cost_tracking(team_config, agents_to_spawn, mission_
             await sleep(30)
 ```
 
-The research entry documents the exact API contract (lines 263-276) needed to implement this: task registration via `POST /api/tasks/{TASK_ID}`, cost retrieval via endpoints, and health metrics via `GET /api/health/metrics`. 
+The research entry documents the exact API contract (lines 263-276) needed to implement this: task registration via `POST /api/tasks/{TASK_ID}`, cost retrieval via endpoints, and health metrics via `GET /api/health/metrics`.
 
 **Integration blockers**: Mission Control requires OpenClaw Gateway for agent dispatch (line 429), which Claude Code does not use. The cost tracking API itself is decoupled from agent runtime and can be called independently, but operators would need to host Mission Control separately to use the cost API.
 
