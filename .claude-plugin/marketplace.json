@@ -42,6 +42,10 @@
       "source": "./plugins/fastmcp-creator"
     },
     {
+      "name": "frustration-analyzer",
+      "source": "./plugins/frustration-analyzer"
+    },
+    {
       "name": "gitlab-skill",
       "source": "./plugins/gitlab-skill"
     },
