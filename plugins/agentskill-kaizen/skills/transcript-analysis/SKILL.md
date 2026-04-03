@@ -1,6 +1,6 @@
 ---
 name: transcript-analysis
-description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, detecting user frustration signals, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema with field paths, DuckDB SQL query patterns, 10 analysis dimensions, and PM4Py process mining methodology.
+description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, detecting user frustration signals, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, 10 analysis dimensions, and PM4Py process mining methodology.
 ---
 
 # Transcript Analysis
@@ -10,6 +10,8 @@ Analyze Claude Code JSONL session transcripts to detect anti-patterns, inefficie
 ## Data Location
 
 Find transcripts under `~/.claude/projects/` in project-specific directories named after the project path (with hyphens replacing slashes).
+
+**DuckDB’s role:** Load the full field/path reference from `kaizen-analysis` via **`get_transcript_jsonl_schema`** or MCP **`resources/read`** `kaizen://session-log/schema`, then use `kaizen-duckdb` **`execute_query`** to run **any** DuckDB SQL over those files (see [DuckDB Query Patterns](./references/duckdb-queries.md) for examples and the arbitrary-query workflow). Session history stays in JSONL on disk. [Path rules for the DuckDB MCP](../../docs/cross-platform-notes.md) (absolute paths, no `~` in SQL).
 
 ```text
 ~/.claude/projects/{project-key}/
@@ -101,9 +103,9 @@ Identify manual corrections that recur across sessions. When the same correction
 
 ### 10. DuckDB SQL Querying
 
-Use the MotherDuck MCP server (`execute_query` tool) for direct SQL access to JSONL files. DuckDB natively reads JSONL via `read_ndjson_auto()`.
+Use `kaizen-analysis` **`get_transcript_jsonl_schema`** or resource **`kaizen://session-log/schema`** for the full path reference, then `kaizen-duckdb` **`execute_query`** for **any** SQL over JSONL (`read_ndjson_auto` with **absolute** paths). You are not limited to the cookbook queries.
 
-For SQL query patterns and examples, see [DuckDB Query Patterns](./references/duckdb-queries.md).
+For the arbitrary-query workflow and examples, see [DuckDB Query Patterns](./references/duckdb-queries.md).
 
 ## Process Mining Methodology
 

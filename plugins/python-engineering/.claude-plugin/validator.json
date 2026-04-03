@@ -1,0 +1,12 @@
+{
+  "ignore": {
+    "references": ["SK006"],
+    "scripts": ["SK006"],
+    "assets": ["SK006"],
+    "skills/orchestrate": ["SK006"],
+    "skills/review": ["SK006"],
+    "skills/lint": ["SK006"],
+    "skills/cleanup": ["SK006"],
+    "skills/debug": ["SK006"]
+  }
+}

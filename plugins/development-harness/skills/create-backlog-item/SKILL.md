@@ -1,8 +1,9 @@
 ---
 name: create-backlog-item
-description: Use when capturing a new backlog item — creates a per-item file in ~/.dh/projects/{slug}/backlog/. Three modes — guided intake (no args), quick entry (quick {title}), or fully autonomous (--auto {title}). Validates required fields, detects duplicates, and offers GitHub Issue creation for P0/P1 items.
+description: Use when capturing a new backlog item via the backlog MCP server. Three modes — guided intake (no args), quick entry (quick {title}), or fully autonomous (--auto {title}). Validates required fields, detects duplicates, and offers GitHub Issue creation for P0/P1 items.
 argument-hint: '[quick {title} | --auto {title} | <empty for guided intake>]'
 user-invocable: true
+context: fork
 ---
 
 <mode>$0</mode>
@@ -10,7 +11,8 @@ user-invocable: true
 
 # Create Backlog Item
 
-Capture a new backlog item and create a per-item file in `~/.dh/projects/{slug}/backlog/`.
+Capture a new backlog item via `mcp__plugin_dh_backlog__backlog_add`. The MCP server handles persistence and GitHub Issue creation.
+See [backlog lifecycle overview](../../docs/backlog-lifecycle.md) for the end-to-end flow.
 
 ## PROHIBITED: Backlog Items Describe Problems, Not Solutions
 
@@ -57,10 +59,12 @@ Solutions come from investigation during grooming and planning — not at creati
 Title = `<item_title/>` onward (all remaining words joined). Do not call `AskUserQuestion`. Instead:
 
 1. Search `research/` recursively for any file whose name or content matches the title (case-insensitive). Read the best match.
-2. Search `~/.dh/projects/{slug}/backlog/` per-item files for related items to understand existing priority patterns.
+2. Call `mcp__plugin_dh_backlog__backlog_list()` to search existing items for related titles and understand priority patterns.
 3. Derive all fields from the research file, task description, and available context:
    - **Title**: from `<item_title/>` onward
-   - **Priority**: infer from description urgency keywords (`critical`, `required`, `must` → P1; `nice to have`, `optional` → P2; default P1)
+   - **Priority**: infer from description urgency keywords (`critical`, `required`, `must` → P1; `nice to have`, `optional` → P2; default P2)
+     P1 requires either a matched urgency keyword or explicit --priority=P1 flag.
+     P0 is never assigned by auto-mode — P0 must be set manually.
    - **Description**: summarize problem space and desired outcome from research file — do NOT include implementation steps, architecture ideas, proposed solutions, required changes, or file-level prescriptions. If the research file contains fix instructions, strip them. Keep only: what is broken, where it was observed, what the impact is.
    - **Verbatim user report**: the `<item_title/>` argument string, reproduced exactly — character for character, no trimming, no reformatting.
    - **Source**: `"Agent task — auto-derived from research/{filename}"`
@@ -70,13 +74,13 @@ Title = `<item_title/>` onward (all remaining words joined). Do not call `AskUse
 
 ```text
 [AUTO] Title: {title} — from <item_title/> onward
-[AUTO] Priority: P1 — inferred from description (no urgency keywords found, defaulting P1)
+[AUTO] Priority: P2 — inferred from description (no urgency keywords found, defaulting P2)
 [AUTO] Description: derived from research/skill-generation-tools/vercel-labs-skills.md
 [AUTO] Source: Agent task — auto-derived from research/skill-generation-tools/vercel-labs-skills.md
 [AUTO] Type: Feature — inferred from "integrate" keyword
 ```
 
-Proceed to Step 2 (validate). Skip Step 7 (GitHub issue) — auto mode does not create GitHub issues unless `--create-issue` is also passed.
+Proceed to Step 2 (validate).
 
 **If `<mode/>` is empty (guided intake):**
 
@@ -161,9 +165,25 @@ Required fields: `title`, `priority`, `description`.
 
 ### Step 3: Duplicate Detection
 
-Scan `~/.dh/projects/{slug}/backlog/` per-item files. Search item titles for case-insensitive overlap with `title`.
+**Search syntax note**: `backlog_list(search=...)` is a multi-keyword boolean substring search — NOT semantic and NOT fuzzy. Exact title strings miss semantically related items with different wording. Always search with OR-joined key concepts extracted from the title, not the full title string.
 
-If a match is found within edit distance ≤ 2 tokens (same first 3 words), report:
+Extract 2–4 key concept words from the title and join with ` OR `:
+
+```text
+# Title: "Formalise IssueBackend Protocol and audit BacklogItem field portability"
+# Key concepts: IssueBackend, backend protocol, backend abstraction, field portability
+search = "IssueBackend OR backend protocol OR backend abstraction"
+```
+
+Call:
+
+```text
+mcp__plugin_dh_backlog__backlog_list(search="{concept1} OR {concept2} OR {concept3}")
+```
+
+Also supports `field:value` syntax (`title:auth`, `type:bug`) and regex (`/pattern/`) for narrower checks.
+
+If a match is found with overlapping concepts, report:
 
 ```text
 Possible duplicate: "{existing title}" already exists in {section}.
@@ -216,6 +236,7 @@ Call the `mcp__plugin_dh_backlog__backlog_add` tool:
 
 | Parameter | Value |
 |-----------|-------|
+| `gate_token` | `"problems-not-solutions"` |
 | `title` | `"{title}"` |
 | `priority` | `"{priority}"` |
 | `description` | `"{description}"` |
@@ -223,18 +244,10 @@ Call the `mcp__plugin_dh_backlog__backlog_add` tool:
 | `type` | `"{type}"` |
 | `how_to_reproduce` | `"{reproduction steps}"` if provided; omit parameter entirely if not |
 | `verbatim_user_report` | `"{exact user words}"` — always provide; never omit |
-| `create_issue` | `true` if P0/P1 and user confirmed; `false` if P2/Ideas or user declined |
 
 Check the returned dict for `error` key.
 
 **Note on `research_first`:** The `--research-first` CLI flag has no MCP equivalent. The `research_first` parameter does not exist on `backlog_add`. Embed research questions directly in the `description` parameter instead.
-
-**`create_issue` logic:**
-
-- P0 or P1 + (guided/quick mode with user said Yes, or `--auto` with `--create-issue` passed): `create_issue=true`
-- P2 or Idea: `create_issue=false`
-- P0 or P1 + user said No (skip): `create_issue=false`
-- `--auto` mode without `--create-issue` flag: `create_issue=false`
 
 ### Step 6: Confirm Write
 
@@ -258,11 +271,16 @@ Next steps:
 - Missing required field: report field name, stop.
 - Duplicate detected and user says No: stop without writing.
 - backlog script fails: report error, stop.
-- GITHUB_TOKEN not set (for P0/P1 issue creation): script reports; per-item file still written to `~/.dh/projects/{slug}/backlog/`.
+- GITHUB_TOKEN not set (for P0/P1 issue creation): MCP tool reports warning; item still created in local cache.
 
 ## Completion Criteria
 
-- backlog add invoked successfully
-- Per-item file created in `~/.dh/projects/{slug}/backlog/` (script handles)
-- GitHub Issue created and `issue` field set in per-item frontmatter (P0/P1 only, if --create-issue; script handles)
+- `backlog_add` MCP tool invoked successfully (no `error` key in response)
+- GitHub Issue created and linked (MCP tool handles)
 - Next-step commands shown to user
+
+## Handoff
+
+```text
+NEXT: skill="groom-backlog-item" args="{item title}" condition="item created successfully AND metadata.status=needs-grooming"
+```

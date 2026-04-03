@@ -9,7 +9,7 @@ Covers:
 - artifact_read MCP tool: GitHub-first, filesystem fallback, neither available
 
 All GitHub API calls are mocked at the ``_graphql_request`` boundary
-(``backlog_core.github._graphql_request``) using fixture factories from
+(``backlog_core.gh_client._graphql_request``) using fixture factories from
 ``tests.graphql_factories``.  No PyGithub REST mocks remain in this file.
 """
 
@@ -273,7 +273,7 @@ def test_store_artifact_content_creates_new_comment_when_none_exists(tmp_path: P
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=mock_repo),
-        patch("backlog_core.github._graphql_request", side_effect=responses) as mock_gql,
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses) as mock_gql,
     ):
         # Act
         provider.store_artifact_content(42, "research", "plan/foo.md", "# Content")
@@ -309,7 +309,7 @@ def test_store_artifact_content_updates_existing_comment_in_place(tmp_path: Path
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=_make_mock_repo()),
-        patch("backlog_core.github._graphql_request", side_effect=responses) as mock_gql,
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses) as mock_gql,
     ):
         # Act
         provider.store_artifact_content(42, "research", "plan/foo.md", "new content")
@@ -345,7 +345,7 @@ def test_store_artifact_content_does_not_update_comment_with_different_path(tmp_
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=_make_mock_repo()),
-        patch("backlog_core.github._graphql_request", side_effect=responses) as mock_gql,
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses) as mock_gql,
     ):
         # Act
         provider.store_artifact_content(42, "research", "plan/foo.md", "new content")
@@ -381,7 +381,7 @@ def test_read_artifact_content_from_github_returns_content_when_found(tmp_path: 
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=_make_mock_repo()),
-        patch("backlog_core.github._graphql_request", side_effect=responses),
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses),
     ):
         # Act
         result = provider.read_artifact_content_from_github(42, "research", "plan/foo.md")
@@ -407,7 +407,7 @@ def test_read_artifact_content_from_github_returns_none_when_not_found(tmp_path:
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=_make_mock_repo()),
-        patch("backlog_core.github._graphql_request", side_effect=responses),
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses),
     ):
         # Act
         result = provider.read_artifact_content_from_github(42, "research", "plan/foo.md")
@@ -433,7 +433,7 @@ def test_read_artifact_content_from_github_ignores_wrong_type(tmp_path: Path) ->
 
     with (
         patch("backlog_core.artifact_provider.get_github", return_value=_make_mock_repo()),
-        patch("backlog_core.github._graphql_request", side_effect=responses),
+        patch("backlog_core.gh_client._graphql_request", side_effect=responses),
     ):
         # Act
         result = provider.read_artifact_content_from_github(42, "research", "plan/foo.md")

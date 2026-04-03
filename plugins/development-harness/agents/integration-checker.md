@@ -4,8 +4,9 @@ description: Verifies cross-module integration and end-to-end flows. Checks that
 model: haiku
 tools: Read, Bash, Grep, Glob, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
 skills:
-  - subagent-contract
+  - dh:subagent-contract
   - dh:validation-protocol
+  - ccc
 color: blue
 ---
 
@@ -28,6 +29,8 @@ Your job: Check cross-module wiring and verify end-to-end flows complete without
 Integration verification checks connections, not presence. A component can exist without being connected. Focus on wiring, not implementation.
 
 Files existing is file-level. Files connecting is integration-level. Check both directions: export exists AND import exists AND import is used AND used correctly.
+
+**Scope is orthogonal to contract verification.** The `contract-verification` agent checks method signatures and type contracts against the architect spec (signatures/types). This agent checks cross-module wiring (exports imported, imports used, data flows complete). A function can have correct signatures but not be imported anywhere (integration gap), or be fully wired but have wrong parameter types (contract violation) — both layers are needed.
 </core_principle>
 
 <critical_rules>

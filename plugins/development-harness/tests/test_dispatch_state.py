@@ -8,6 +8,7 @@ mutable state. os.kill is patched via pytest-mock for PID-liveness tests.
 
 from __future__ import annotations
 
+import errno
 import sqlite3
 from typing import TYPE_CHECKING
 
@@ -742,3 +743,43 @@ class TestCheckStalePids:
         mgr.close()
         assert alive is not None
         assert alive.status == "in-progress"
+
+    def test_check_stale_pids_plain_oserror_marks_item_failed(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """check_stale_pids marks items failed when os.kill raises a plain OSError.
+
+        Tests: DispatchStateManager.check_stale_pids — bare OSError path
+        How: Create an in-progress item with pid=99999. Patch os.kill to raise
+             OSError(errno.EPERM, "Operation not permitted") — a plain OSError
+             that is NOT a PermissionError subclass, as raised by some container
+             runtimes. Call check_stale_pids and verify the item is failed.
+        Why: Container runtimes may raise OSError subclasses other than
+             ProcessLookupError or PermissionError. The old code only caught
+             those two specific types; a bare OSError would propagate and crash
+             the stale-check loop.
+        """
+        # Arrange
+        mgr = DispatchStateManager(tmp_path / "test.db")
+        mgr.create_wave(milestone=5, wave_num=1, items=_make_items(5, 1, count=1))
+        mgr.set_item_in_progress(milestone=5, wave_num=1, issue=100, pid=99999)
+
+        # Use errno.ENODEV ("No such device") — it is never auto-mapped to a
+        # named OSError subclass, so the instance stays a plain OSError.
+        plain_oserror = OSError(errno.ENODEV, "No such device")
+        assert not isinstance(plain_oserror, PermissionError), (
+            "Test precondition: OSError(errno.ENODEV) must not be a PermissionError instance"
+        )
+        mocker.patch("backlog_core.dispatch_state.os.kill", side_effect=plain_oserror)
+
+        # Act
+        stale = mgr.check_stale_pids()
+
+        # Assert
+        assert len(stale) == 1
+        assert stale[0].issue == 100
+        assert stale[0].status == "failed"
+        assert "99999" in stale[0].error
+
+        record = mgr.get_item(milestone=5, wave_num=1, issue=100)
+        mgr.close()
+        assert record is not None
+        assert record.status == "failed"

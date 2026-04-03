@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Single interface for backlog items and GitHub Issues. GitHub Issues are the source of truth; ~/.dh/projects/{slug}/backlog/ per-item files are the local cache. All backlog CRUD goes through MCP tools (mcp__plugin_dh_backlog__*) in orchestrator sessions — no direct file edits. Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items and GitHub issues.
+description: Single interface for backlog items and GitHub Issues. GitHub Issues are the source of truth. All backlog CRUD goes through MCP tools (mcp__plugin_dh_backlog__*) — no direct file edits. Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items and GitHub issues.
 ---
 
 # Backlog
@@ -19,7 +19,7 @@ The MCP tool name prefix is `mcp__plugin_dh_backlog__` followed by the tool name
 
 ### `backlog_add`
 
-Create a new backlog item and optionally a GitHub issue.
+Create a new backlog item and a GitHub issue.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -28,7 +28,6 @@ Create a new backlog item and optionally a GitHub issue.
 | `description` | `str` | required | Item description |
 | `source` | `str` | `"Not specified"` | Where this item came from |
 | `type` | `str` | `"Feature"` | `Feature`, `Bug`, `Refactor`, `Docs`, or `Chore` |
-| `create_issue` | `bool` | `True` | Create a GitHub issue for this item |
 | `force` | `bool` | `False` | Skip fuzzy duplicate check |
 
 Returns `{filepath, filename, title, priority, issue_num?, messages, warnings}`.
@@ -152,7 +151,6 @@ for incremental section update.
 | `selector` | `str` | required | Title substring, `#N`, bare number, or GitHub issue URL |
 | `plan` | `str \| None` | `None` | Path to a plan file to attach |
 | `status` | `str \| None` | `None` | Set item status (e.g. `"in-progress"`) |
-| `create_issue` | `bool` | `False` | Create a GitHub issue if the item lacks one (P0/P1 only) |
 | `groomed_content` | `str \| None` | `None` | Full groomed content (replaces entire groomed section) |
 | `section` | `str \| None` | `None` | Section name for incremental update (use with `content`) |
 | `content` | `str \| None` | `None` | Content for the named section (use with `section`) |

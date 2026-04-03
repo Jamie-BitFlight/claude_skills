@@ -4,7 +4,7 @@ description: Captures baseline state of structured acceptance criteria before im
 tools: Read, Bash, Write, Glob, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
-  - subagent-contract
+  - dh:subagent-contract
 ---
 
 <role>

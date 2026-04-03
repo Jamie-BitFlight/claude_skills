@@ -1,0 +1,147 @@
+# prek - Pre-commit Re-engineered in Rust
+# install via: `uv tool install prek`
+# prek is a Rust-based drop-in replacement for pre-commit created by https://github.com/j178/prek
+# Sources:
+# - https://github.com/j178/prek
+# - https://prek.j178.dev/
+# - https://pypi.org/project/prek/
+# - https://hugovk.dev/blog/2025/ready-prek-go/
+# - https://pydevtools.com/blog/prek-pre-commit-but-fast/
+
+default_stages:
+  - commit-msg
+  - pre-commit
+
+repos:
+  - repo: https://github.com/mxr/sync-pre-commit-deps
+    rev: v0.0.3
+    hooks:
+      - id: sync-pre-commit-deps
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.3.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Validate Conventional Commits format
+        stages: [commit-msg]
+        args:
+          - --strict
+          - --force-scope
+          - feat
+          - fix
+          - chore
+          - docs
+          - test
+          - refactor
+          - perf
+          - ci
+          - style
+          - build
+
+  # Standard pre-commit hooks for general file maintenance
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.lock$
+      - id: end-of-file-fixer
+        exclude: \.lock$
+      - id: check-yaml
+        args: [--unsafe] # Allow Python tags in mkdocs.yml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=10000"] # 10MB limit
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Python formatting and linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.4
+    hooks:
+      - id: ruff
+        name: Lint Python with ruff
+        args: [--fix]
+      - id: ruff-format
+        name: Format Python with ruff
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.19.1
+    hooks:
+      - id: markdownlint-cli2
+
+  # YAML/JSON formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        name: Format YAML, JSON, and Markdown files
+        types_or: [yaml, json, markdown]
+        exclude: (\.lock$|mkdocs\.yml|docs/generated/)
+
+  - repo: https://github.com/DetachHead/basedpyright-prek-mirror
+    rev: 1.34.0
+    hooks:
+      - id: basedpyright
+
+  # Shell formatting
+  - repo: https://github.com/pecigonzalo/pre-commit-shfmt
+    rev: v2.2.0
+    hooks:
+      - id: shell-fmt-go
+        args:
+          - "--apply-ignore"
+          - -w
+          - -i
+          - "4"
+          - -ci
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Local hooks for type checking
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run -q --no-sync pep723-loader mypy
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: robotidy
+        name: Format Robot Framework files
+        entry: uv run -q --no-sync --with robotframework-tidy robotidy --check --diff robotTests/
+        language: system
+        files: \.robot$
+        pass_filenames: false
+
+      - id: robocop
+        name: Lint Robot Framework files
+        entry: uv run -q --no-sync --with robotframework-robocop robocop robotTests/
+        language: system
+        files: \.robot$
+        pass_filenames: false
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3
+
+# Exclude patterns
+exclude: |
+  (?x)^(
+    \.git/|
+    \.venv/|
+    __pycache__/|
+    \.mypy_cache/|
+    \.cache/|
+    \.pytest_cache/|
+    \.lock$|
+    typings/
+  )

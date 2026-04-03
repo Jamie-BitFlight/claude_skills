@@ -126,7 +126,7 @@ flowchart TD
     P1_CONFIRM -->|"Yes — proceed anyway"| P1_COMPOSE
 
     P1_COMPOSE["Step 4: Compose item block<br>Fields: Title, Source, Added (date),<br>Priority, Type, Description,<br>Verbatim user report (REQUIRED),<br>How to reproduce (if provided)"]
-    P1_COMPOSE --> P1_ADD["Step 5: backlog_add MCP tool<br>Creates per-item file at<br>~/.dh/projects/{slug}/backlog/"]
+    P1_COMPOSE --> P1_ADD["Step 5: backlog_add MCP tool<br>Registers backlog item via MCP<br>(stored in project state directory)"]
 
     P1_ADD --> P1_ISSUE{"GitHub Issue?"}
     P1_ISSUE -->|"P0/P1 + user confirmed<br>or --auto + --create-issue"| P1_GH_CREATE["GitHub Issue created<br>issue field set in frontmatter"]
@@ -151,7 +151,7 @@ flowchart TD
 | P1_STOP_DUP | orchestrator | duplicate detection result | error report (no file written) | terminal |
 | P1_STOP_DECLINE | orchestrator | user decline | error report | terminal |
 | P1_COMPOSE | orchestrator | validated fields | item block (title, source, added, priority, type, description, verbatim_user_report, how_to_reproduce) | always → P1_ADD |
-| P1_ADD | `backlog_add` MCP | item block | per-item file at `~/.dh/projects/{slug}/backlog/`, `issue` field if created | always → P1_ISSUE |
+| P1_ADD | `backlog_add` MCP | item block | registered backlog item (project state managed by MCP server), `issue` field if created | always → P1_ISSUE |
 | P1_ISSUE | orchestrator | priority, user preference, `--create-issue` flag | issue creation decision | P0/P1 + confirmed → P1_GH_CREATE, otherwise → P1_NO_GH |
 | P1_GH_CREATE | `backlog_add` MCP | item fields | GitHub Issue number, `issue` frontmatter field | always → P1_DONE |
 | P1_NO_GH | orchestrator | — | no issue created | always → P1_DONE |
@@ -259,17 +259,29 @@ flowchart TD
 
 **RT-ICA runs twice**: Step 3.5 (initial snapshot, item-level info only) and Step 8.5 (final pass, full swarm output). The Step 8.5 result replaces the Step 3.5 snapshot in the item file (same `section="RT-ICA"` call overwrites). **Why:** The initial snapshot calibrates swarm intensity — scope sizing (Step 3.6) uses the AVAILABLE/DERIVABLE/MISSING distribution to choose swarm intensity. The final pass incorporates swarm discoveries (fact-check results convert DERIVABLE to AVAILABLE, refuted claims convert AVAILABLE to MISSING).
 
-**Metadata written**: `groomed` frontmatter field set to `YYYY-MM-DD` (not nested under `metadata.`). No explicit GitHub label transition is documented in the skill source — the only documented state change is the `groomed` frontmatter field.
+**Metadata written**: `groomed` frontmatter field set to `YYYY-MM-DD` (not nested under `metadata.`). This field records when grooming occurred and is distinct from the item's status field.
+
+**Status advancement via `mark_groomed`**: Passing `mark_groomed=True` to the `backlog_groom` MCP tool triggers a status transition after all content writes complete:
+
+1. The item's `metadata.status` field is set to `groomed` in the local per-item file.
+2. The `status:needs-grooming` GitHub label is removed from the issue (no-op if already absent — it is removed as a side effect of each content sync, so it may already be gone).
+3. The `status:groomed` GitHub label is added to the issue. If the label does not exist on the repository, it is created automatically.
+
+The flag works with both single-section writes and the batch `sections` parameter. When `sections` is used with `mark_groomed=True`, all sections are written first; the status transition fires exactly once after the batch completes.
+
+**Idempotent**: Calling `backlog_groom` with `mark_groomed=True` multiple times is safe. If `status:groomed` is already present on the issue, the GitHub label update is skipped entirely. If `status:needs-grooming` was already removed, the removal is a no-op.
+
+**Error handling**: If the GitHub label transition fails, the local frontmatter update still applies and a warning is recorded in the result. Content writes are not affected.
+
+**When to use**: Pass `mark_groomed=True` on the final `backlog_groom` call when all required sections have been written and the item is approved for planning. Using the `sections` parameter to write all sections in a single call combined with `mark_groomed=True` is the recommended pattern — it writes all content and advances the status atomically.
 
 **Failure paths**:
 
 - Validity check fails (C1-C4) — item skipped with report.
 - RT-ICA BLOCKED — STOP, present MISSING conditions to user, wait for answers.
-- No validation step exists between groomer output and Step 9 write (audit Finding 6 — groomer output written directly, no quality gate on groomer sections).
+- Advisory AC overlap check: `_check_ac_overlap()` in `operations.py` issues a non-blocking warning when the Acceptance Criteria section is written and the description already contains checkbox items or acceptance headers (`## Acceptance`, `### Acceptance Criteria`). This fires for both single-section and batch `sections` writes.
 
 **Transition to next phase**: No explicit invocation of the next skill. The groomed item is available for `/dh:work-backlog-item` to pick up. Transition from grooming to milestone grouping is not mentioned (audit Finding 9 Gap B).
-
-**Missing reference files**: The SKILL.md references `./references/issue-classification.md` and `./references/groomer-agent.md` — neither file exists on disk.
 
 **Recommended completeness check before Phase 3**: The RT-ICA presence check in `work-backlog-item` Step 4 does not verify full grooming completeness. The recommended approach before entering Phase 3 is to verify presence of the RT-ICA section AND the Acceptance Criteria section AND the Description section. An item missing acceptance criteria would enter planning with incomplete information, producing a plan that cannot be validated against its own acceptance criteria.
 
@@ -338,7 +350,7 @@ flowchart TD
 
 **Storage**: Feature context and architecture specs are registered as Documents via the artifact manifest system. See [Backend Providers — SAM Storage Model](./backend-providers.md#sam-storage-model) for the document lifecycle.
 
-**All paths are state-relative**: Resolved via `dh_paths.plan_dir()` → `~/.dh/projects/{project-slug}/plan/`. NOT repo-relative.
+**Artifact access is MCP-first**: Consumers retrieve artifacts via `artifact_read(issue_number, artifact_type)` and register them via `artifact_register(issue_number, artifact_type, path, agent, content)`. Task plans are accessed via `sam_read(plan, task)`. The MCP servers resolve storage internally — consumers never construct filesystem paths.
 
 **No feasibility gate exists** between RT-ICA APPROVED and SAM planning invocation. The transition from "do we have enough information?" to "start planning" is direct — no assessment of technical feasibility, effort/value, risk, or alternative approaches (audit Finding 1).
 
@@ -559,7 +571,11 @@ flowchart TD
     P6_DETECT -->|"No follow-up files"| P6_APPLY_VERIFIED
     P6_DETECT -->|"Follow-up files exist"| P6_ROUTE["For each follow-up:<br>1. Derive search slug from filename<br>2. Search backlog via backlog_list<br>3. If match: backlog_update with plan<br>4. If no match: create-backlog-item --auto"]
 
-    P6_ROUTE --> P6_RECURSE{"Recursion gate:<br>BOTH conditions required<br>1. follow-up slug matches parent (ADR-3)<br>2. follow-up priority = High (ADR-2)"}
+    P6_ROUTE --> P6_DEPTH_GUARD{depth >= 5?}
+    P6_DEPTH_GUARD -->|"Yes — limit reached"| P6_DEPTH_STOP["RECURSION DEPTH LIMIT REACHED<br>Route remaining to backlog"]
+    P6_DEPTH_GUARD -->|"No — continue"| P6_RTCA_GUARD{BLOCKED-FOR-PLANNING?}
+    P6_RTCA_GUARD -->|"Yes — blocked"| P6_RTCA_STOP["RECURSION STOPPED — RT-ICA BLOCKED<br>Resume: /dh:work-backlog-item"]
+    P6_RTCA_GUARD -->|"No — proceed"| P6_RECURSE{"Recursion gate:<br>BOTH conditions required<br>1. follow-up slug matches parent (ADR-3)<br>2. follow-up priority = High (ADR-2)"}
     P6_RECURSE -->|"Both conditions met"| P6_RECURSE_IMMEDIATE["Recurse immediately:<br>Skill('implement-feature', followup)<br>Then re-run complete-implementation"]
     P6_RECURSE -->|"Either condition not met"| P6_DEFER(["Defer follow-up<br>Output: 'to resume:<br>/dh:work-backlog-item &lt;title&gt;'"])
 
@@ -597,6 +613,10 @@ flowchart TD
 | P6_FOLLOWUP | orchestrator | QG plan state | follow-up routing decision | always → P6_DETECT |
 | P6_DETECT | orchestrator | T1 ARTIFACTS output, glob `P*-{slug}-followup-*.yaml` | follow-up file list | always → P6_ROUTE |
 | P6_ROUTE | orchestrator + `backlog_list` + `backlog_update` or `create-backlog-item` MCP | follow-up files, backlog state | follow-ups linked or created | always → P6_RECURSE |
+| P6_DEPTH_GUARD | orchestrator | `{recursion_depth}`, `DH_RECURSIVE_REVIEW_TASK_DEPTH` (=5) | depth comparison result | depth >= 5 → P6_DEPTH_STOP; depth < 5 → P6_RTCA_GUARD |
+| P6_DEPTH_STOP | orchestrator | in-scope follow-up titles, parent issue number, depth count | systemic design issue warning; `backlog_add` per remaining in-scope finding | terminal for recursion path |
+| P6_RTCA_GUARD | orchestrator | plan artifact (BLOCKED-FOR-PLANNING signal) | RT-ICA status determination | BLOCKED → P6_RTCA_STOP; not BLOCKED → P6_RECURSE |
+| P6_RTCA_STOP | orchestrator | blocking gaps from planner-rt-ica artifact, followup backlog item title | RT-ICA BLOCKED message with gap list and resume instruction | terminal for this follow-up; continues to next follow-up if any |
 | P6_RECURSE | orchestrator | follow-up slug, follow-up priority, parent slug | recursion gate evaluation | slug matches parent AND priority=High → P6_RECURSE_IMMEDIATE, either not met → P6_DEFER |
 | P6_RECURSE_IMMEDIATE | orchestrator | follow-up plan path | `Skill('implement-feature', followup)` then re-run `complete-implementation` | always → P6_APPLY_VERIFIED |
 | P6_DEFER | orchestrator | follow-up title | deferred follow-up message | always → P6_APPLY_VERIFIED |
@@ -616,6 +636,12 @@ flowchart TD
 **T5 skip condition**: After T4 completes, orchestrator inspects T4 output for `## Findings` section. If "No documentation drift detected" or empty findings → skip T5 via `sam_state(status='skipped')`. Otherwise T5 proceeds. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
 
 **Recursive follow-up routing** requires BOTH conditions: (1) the follow-up slug matches the parent feature slug (ADR-3), and (2) the follow-up priority is High (ADR-2). **Why:** Slug matching prevents unrelated bugs found during review from hijacking the current feature's quality gates. Priority gating prevents low-priority same-feature follow-ups from delaying completion.
+
+**Depth guard**: The recursion counter `{recursion_depth}` is initialized to 0 at skill invocation and increments by 1 before each call to `implement-feature`. When `{recursion_depth}` reaches `DH_RECURSIVE_REVIEW_TASK_DEPTH = 5`, Guard 1 fires: all remaining in-scope follow-ups are routed to the backlog with a systemic design issue warning and recursion stops. The counter resets between separate `/complete-implementation` invocations — it is not persisted.
+
+**RT-ICA BLOCKED stop**: Guard 2 checks whether the follow-up's linked planner-rt-ica artifact contains `BLOCKED-FOR-PLANNING`. If so, the follow-up is not recursed and the user receives the blocking conditions with a resume instruction: `/dh:work-backlog-item {title}`. Remaining follow-ups continue processing.
+
+**Out-of-scope routing**: A follow-up task file with `## Scope: out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never reaches the recursion gate. This prevents out-of-scope findings from blocking the current implementation cycle.
 
 **complete-implementation does NOT invoke work-backlog-item close/resolve**. After quality gates pass, it: (1) applies `status:verified` label, (2) commits and pushes, (3) outputs a handoff message telling the user to run `/dh:work-backlog-item <next-item>`. The explicit instruction to resolve the current item is absent from the output (audit Finding 9 Gap D — partially resolved).
 
@@ -747,7 +773,13 @@ Each grooming section requires a separate `backlog_groom` call with `section` an
 
 ### Gap 2: Description / Groomed Section Overlap (Session observation)
 
-The item's initial `## Description` body and the groomed `### Output / Evidence` / `### Decision` subsections frequently contain overlapping content. No deduplication or handoff mechanism exists.
+The item's initial `## Description` body and groomed subsections (especially `### Acceptance Criteria`) frequently contain overlapping content.
+
+**Convention enforced as of #1077:**
+- `backlog_groom` emits an advisory warning in `output.warnings` when writing an "Acceptance Criteria" section and the item's description contains checkboxes (`- [ ]`) or an `## Acceptance` / `### Acceptance Criteria` header.
+- The groomer agent prompt (`references/groomer-agent.md`) includes an explicit DESCRIPTION / AC SEPARATION instruction to prevent restatement.
+
+The warning is advisory — the write still proceeds. No suppression mechanism exists; the warning fires on every qualifying `backlog_groom` call.
 
 ### Gap 3: No Auto-Advance After Grooming (Session observation)
 
@@ -755,7 +787,7 @@ After `backlog_groom` writes all sections and sets the `groomed` frontmatter fie
 
 ### Gap 4: No Machine-Readable Parent/Child Links (Session observation)
 
-The GraphQL `addSubIssue` mutation is implemented in `backlog_core/github.py` and used for SAM task sub-issues. However, no general `backlog_link_parent` MCP tool exists for arbitrary backlog-to-backlog item linking. Inter-item dependencies in groomed items are prose-only (the `### Dependencies` section lists titles or issue numbers as text).
+The GraphQL `addSubIssue` mutation is implemented in `backlog_core/gh_client.py` and used for SAM task sub-issues. However, no general `backlog_link_parent` MCP tool exists for arbitrary backlog-to-backlog item linking. Inter-item dependencies in groomed items are prose-only (the `### Dependencies` section lists titles or issue numbers as text).
 
 ### Gap 5: Compaction Recovery (Tracked: #1069)
 
@@ -827,6 +859,10 @@ Neither `implement-feature` nor `start-task` documents an explicit procedure for
 - [Backlog Item Lifecycle (Draft — superseded by this document)](./backlog-lifecycle.draft.md)
 - [Workflow Architecture Diagram (SAM pipeline detail)](./workflow-architecture-diagram.md)
 - [Plan Artifact Lifecycle Policy](./plan-artifact-lifecycle.md)
+- [Default Development Flow (S1-S7 pipeline)](../skills/development-harness/references/default-development-flow.md)
+- [Artifact Conventions (naming, file layout)](../skills/development-harness/references/artifact-conventions.md)
+- [Task File Format (task field reference, sam CLI)](./TASK_FILE_FORMAT.md)
+- [Domain model source (authoritative field definitions)](../sam_schema/core/models.py)
 - [Backend Providers](./backend-providers.md)
 - [ADR-9: Close/Resolve Semantics](./adr-9-close-resolve-semantics.md)
 - [Process Audit (2026-03-02)](./process-audit-backlog-lifecycle-2026-03-02.md)

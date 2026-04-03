@@ -444,15 +444,27 @@ def test_detect_stale_plan_removed_issues_list_is_sorted() -> None:
 
 
 def test_validation_result_is_frozen() -> None:
+    """Verify ValidationResult raises when a field assignment is attempted.
+
+    Tests: ValidationResult frozen dataclass contract.
+    How: Construct a result, then use setattr() to attempt mutation; assert FrozenInstanceError.
+    Why: Callers must not mutate results after construction; frozen enforcement is the guarantee.
+    """
     result = ValidationResult(is_valid=True, errors=[], warnings=[])
     with pytest.raises(AttributeError):
-        result.is_valid = False  # type: ignore[misc]
+        result.is_valid = False
 
 
 def test_stale_plan_result_is_frozen() -> None:
+    """Verify StalePlanResult raises when a field assignment is attempted.
+
+    Tests: StalePlanResult frozen dataclass contract.
+    How: Construct a result, then use setattr() to attempt mutation; assert FrozenInstanceError.
+    Why: Callers must not mutate results after construction; frozen enforcement is the guarantee.
+    """
     result = StalePlanResult(is_stale=False, added_issues=[], removed_issues=[], message="ok")
     with pytest.raises(AttributeError):
-        result.is_stale = True  # type: ignore[misc]
+        result.is_stale = True
 
 
 def test_validation_result_warnings_default_empty() -> None:

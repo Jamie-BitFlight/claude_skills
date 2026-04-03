@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .github_branches import (
+from ._branch_delegates import (
     create_integration_branch,
     delete_integration_branch,
     get_integration_branch_status,

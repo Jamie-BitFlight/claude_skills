@@ -6,10 +6,11 @@
 #   "gitpython>=3.1.0",
 #   "pygithub>=2.8.1",
 #   "pydantic>=2.12.3",
-#   "python-frontmatter>=1.1.0",
+#   "marko>=2.0.0",
 #   "ruamel.yaml>=0.18.0",
 #   "tiktoken>=0.12.0",
 #   "typer>=0.21.2",
+#   "python-dotenv>=1.0.0",
 # ]
 # ///
 """PEP 723 wrapper for the backlog MCP server."""
@@ -24,6 +25,10 @@ _plugin_root = _scripts_dir.parent
 # Scripts first for dh_mcp_preinit; plugin root second for backlog_core.
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from dh_mcp_preinit import apply_project_dir_from_argv
 

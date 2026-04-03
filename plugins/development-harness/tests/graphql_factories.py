@@ -1,7 +1,7 @@
 """GraphQL response fixture factories for backlog_core tests.
 
 These factories produce dict shapes that match the TypedDict response models
-defined in backlog_core/github.py (IssueNode, MilestoneFullNode, etc.).
+defined in backlog_core/gh_client.py (IssueNode, MilestoneFullNode, etc.).
 
 All factories accept **overrides so individual tests can customise specific
 fields without spelling out the full structure every time.
@@ -16,13 +16,16 @@ Usage in tests::
 All factories return plain dicts — no TypedDict annotation at runtime so tests
 can import them without triggering circular imports.
 
-Reused by: T02 (github.py tests), T04 (operations.py tests),
+Reused by: T02 (gh_client.py tests), T04 (operations.py tests),
            T07 (server.py tests), T08 (artifact_provider.py tests).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from backlog_core.gh_client import IssueNode
 
 # ---------------------------------------------------------------------------
 # Node factories
@@ -42,18 +45,22 @@ def make_label_node(name: str = "status:open", node_id: str = "LBL_abc123") -> d
     return {"name": name, "id": node_id}
 
 
-def make_milestone_node(node_id: str = "MS_001", number: int = 1, title: str = "v1.0") -> dict[str, Any]:
+def make_milestone_node(
+    node_id: str = "MS_001", number: int = 1, title: str = "v1.0", due_on: str | None = None, state: str = "OPEN"
+) -> dict[str, Any]:
     """Return a MilestoneNode-shaped dict (minimal reference embedded in issues).
 
     Args:
         node_id: GraphQL node ID.
         number: Milestone number.
         title: Milestone title.
+        due_on: ISO 8601 due date string, or None if not set.
+        state: Milestone state, ``"OPEN"`` or ``"CLOSED"``.
 
     Returns:
         Dict matching MilestoneNode TypedDict shape.
     """
-    return {"id": node_id, "number": number, "title": title}
+    return {"id": node_id, "number": number, "title": title, "dueOn": due_on, "state": state}
 
 
 def make_issue_node(**overrides: Any) -> dict[str, Any]:
@@ -100,7 +107,7 @@ def make_issue_node(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def make_parsed_issue_node(**overrides: Any) -> dict[str, Any]:
+def make_parsed_issue_node(**overrides: Any) -> IssueNode:
     """Return an already-parsed IssueNode-shaped dict with flat label/assignee lists.
 
     Use this factory when calling functions that operate on a parsed
@@ -130,7 +137,7 @@ def make_parsed_issue_node(**overrides: Any) -> dict[str, Any]:
         "assignees": [],
     }
     base.update(overrides)
-    return base
+    return cast("IssueNode", base)
 
 
 def make_milestone_full_node(**overrides: Any) -> dict[str, Any]:

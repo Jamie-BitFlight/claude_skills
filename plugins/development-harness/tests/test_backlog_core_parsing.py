@@ -7,13 +7,19 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from backlog_core.models import BacklogItem, ViewItemResult
 from backlog_core.parsing import (
+    _MdPost,
     _parse_frontmatter,
-    append_or_replace_section,
-    build_backlog_frontmatter,
+    _validate_metadata,
+    build_body_extra_only,
     build_issue_body,
     build_issue_body_from_file,
+    dump_frontmatter,
+    extract_description_from_issue_body,
     find_fuzzy_duplicates,
     find_item,
+    infer_type,
+    loads_frontmatter,
+    merge_sections,
     normalize_issue_title,
     parse_item_file,
     title_to_slug,
@@ -109,10 +115,15 @@ class TestParseItemFile:
 
         assert item.description == "A test description"
 
-    def test_parse_item_file_nested_meta_body_captured_as_raw_body(self, tmp_path: Path) -> None:
+    def test_parse_item_file_nested_meta_body_not_on_item(self, tmp_path: Path) -> None:
+        """Body content below frontmatter is no longer stored on the item.
+
+        LEGACY: raw_body has been removed; body is only accessible from the file on disk.
+        """
         item = parse_item_file(_NESTED_META_FRONTMATTER, tmp_path / "item.md")
 
-        assert "Body content here." in item.raw_body
+        # Body content is not carried on the item — only metadata fields are stored
+        assert not hasattr(item, "raw_body") or not item.raw_body  # type: ignore[attr-defined]
 
     def test_parse_item_file_flat_priority_accessible(self, tmp_path: Path) -> None:
         # When priority is a top-level flat key it is accessible
@@ -150,10 +161,15 @@ class TestParseItemFile:
 
         assert item.skip is False
 
-    def test_parse_item_file_no_frontmatter_returns_body_in_raw_body(self, tmp_path: Path) -> None:
+    def test_parse_item_file_no_frontmatter_returns_empty_item(self, tmp_path: Path) -> None:
+        """When no frontmatter is found, an empty BacklogItem is returned.
+
+        LEGACY: raw_body has been removed; no-frontmatter items produce an empty item.
+        """
         item = parse_item_file(_NO_FRONTMATTER, tmp_path / "item.md")
 
-        assert item.raw_body == _NO_FRONTMATTER
+        # Item has no title or metadata — body is not stored on the item
+        assert item.title == ""
 
     def test_parse_item_file_no_frontmatter_title_is_empty(self, tmp_path: Path) -> None:
         item = parse_item_file(_NO_FRONTMATTER, tmp_path / "item.md")
@@ -633,22 +649,30 @@ Not yet groomed.
 """
 
 
+def _write_md_item(tmp_path: Path, title: str, body: str) -> BacklogItem:
+    """Write a minimal .md item file to tmp_path and return a BacklogItem with file_path set."""
+    content = f"---\nname: {title}\n---\n\n{body}\n"
+    path = tmp_path / f"{title.lower().replace(' ', '-')}.md"
+    path.write_text(content, encoding="utf-8")
+    return BacklogItem(title=title, file_path=str(path))
+
+
 class TestBuildIssueBodyFromFile:
     """Tests for build_issue_body_from_file(item: BacklogItem) -> str | None.
 
-    Verifies the passthrough behavior: raw_body is returned directly when
+    Verifies the passthrough behavior: body is read from item.file_path when
     it contains a '## Groomed' section, and None is returned otherwise.
     """
 
-    def test_returns_none_when_raw_body_has_no_groomed_section(self) -> None:
+    def test_returns_none_when_body_has_no_groomed_section(self, tmp_path: Path) -> None:
         """Ungroomed items return None — they should not be synced to GitHub.
 
         Tests: Gate logic for sync eligibility
-        How: Create BacklogItem with body lacking '## Groomed', call function
+        How: Create .md item with body lacking '## Groomed', call function
         Why: Ungroomed items must not push incomplete bodies to GitHub issues
         """
         # Arrange
-        item = BacklogItem(title="Ungroomed Item", description="desc", raw_body=_UNGROOMED_RAW_BODY)
+        item = _write_md_item(tmp_path, "Ungroomed Item", _UNGROOMED_RAW_BODY)
 
         # Act
         result = build_issue_body_from_file(item)
@@ -656,15 +680,15 @@ class TestBuildIssueBodyFromFile:
         # Assert
         assert result is None
 
-    def test_returns_stripped_body_plus_newline_when_groomed_present(self) -> None:
-        """Groomed items return raw_body.strip() + newline.
+    def test_returns_stripped_body_plus_newline_when_groomed_present(self, tmp_path: Path) -> None:
+        """Groomed items return file body.strip() + newline.
 
         Tests: Passthrough behavior for groomed content
-        How: Create BacklogItem with groomed body, verify output matches input
+        How: Create .md item with groomed body, verify output matches input
         Why: Body must be emitted verbatim without synthetic generation
         """
         # Arrange
-        item = BacklogItem(title="Groomed Item", description="desc", raw_body=_GROOMED_RAW_BODY)
+        item = _write_md_item(tmp_path, "Groomed Item", _GROOMED_RAW_BODY)
 
         # Act
         result = build_issue_body_from_file(item)
@@ -673,15 +697,15 @@ class TestBuildIssueBodyFromFile:
         assert result is not None
         assert result == _GROOMED_RAW_BODY.strip() + "\n"
 
-    def test_preserves_all_sections_without_duplication(self) -> None:
-        """All sections from raw_body appear exactly once in output.
+    def test_preserves_all_sections_without_duplication(self, tmp_path: Path) -> None:
+        """All sections from file body appear exactly once in output.
 
         Tests: Content integrity — no duplication or loss
         How: Count occurrences of each section header in the result
         Why: Previous bug duplicated Story headers; this is a regression guard
         """
         # Arrange
-        item = BacklogItem(title="Full Item", description="desc", raw_body=_GROOMED_RAW_BODY)
+        item = _write_md_item(tmp_path, "Full Item", _GROOMED_RAW_BODY)
 
         # Act
         result = build_issue_body_from_file(item)
@@ -693,18 +717,16 @@ class TestBuildIssueBodyFromFile:
         assert result.count("## Groomed") == 1
         assert result.count("## Fact-Check") == 1
 
-    def test_does_not_generate_synthetic_story_text(self) -> None:
+    def test_does_not_generate_synthetic_story_text(self, tmp_path: Path) -> None:
         """Output must NOT contain synthetic 'As a developer, I want to' text.
 
         Tests: Regression guard for old synthetic header bug
         How: Verify output does not contain the old template pattern
-        Why: The refactored function passes through raw_body; it must never
-             generate synthetic content like build_issue_body() does
+        Why: The function passes through file body; it must never generate
+             synthetic content like build_issue_body() does
         """
         # Arrange
-        item = BacklogItem(
-            title="Detect Duplicates", description="Implement duplicate detection", raw_body=_GROOMED_RAW_BODY
-        )
+        item = _write_md_item(tmp_path, "Detect Duplicates", _GROOMED_RAW_BODY)
 
         # Act
         result = build_issue_body_from_file(item)
@@ -715,15 +737,15 @@ class TestBuildIssueBodyFromFile:
         # The new behavior passes through whatever Story text the file already has
         assert "I want to **detect duplicates" not in result.lower()
 
-    def test_does_not_truncate_content(self) -> None:
-        """Full raw_body content is preserved — no truncation.
+    def test_does_not_truncate_content(self, tmp_path: Path) -> None:
+        """Full file body content is preserved — no truncation.
 
         Tests: No Invented Limits compliance
-        How: Verify all content from raw_body appears in result
+        How: Verify all content from file body appears in result
         Why: Truncation violates the repo's 'No Invented Limits' policy
         """
         # Arrange
-        item = BacklogItem(title="Full Content", description="desc", raw_body=_GROOMED_RAW_BODY)
+        item = _write_md_item(tmp_path, "Full Content", _GROOMED_RAW_BODY)
 
         # Act
         result = build_issue_body_from_file(item)
@@ -734,15 +756,15 @@ class TestBuildIssueBodyFromFile:
         assert "Confirmed P1" in result
         assert "Full description of the feature" in result
 
-    def test_returns_none_for_empty_raw_body(self) -> None:
-        """Empty raw_body returns None.
+    def test_returns_none_when_no_file_path(self) -> None:
+        """Item without file_path returns None.
 
-        Tests: Edge case — empty body
-        How: Create BacklogItem with empty raw_body
-        Why: Empty body has no groomed section, must return None
+        Tests: Edge case — item not backed by a file
+        How: Create BacklogItem without file_path
+        Why: No file means no body to read; must return None cleanly
         """
         # Arrange
-        item = BacklogItem(title="Empty", raw_body="")
+        item = BacklogItem(title="No File")
 
         # Act
         result = build_issue_body_from_file(item)
@@ -750,7 +772,7 @@ class TestBuildIssueBodyFromFile:
         # Assert
         assert result is None
 
-    def test_output_ends_with_single_newline(self) -> None:
+    def test_output_ends_with_single_newline(self, tmp_path: Path) -> None:
         """Output ends with exactly one trailing newline.
 
         Tests: Consistent formatting
@@ -758,7 +780,7 @@ class TestBuildIssueBodyFromFile:
         Why: GitHub markdown rendering expects clean trailing newline
         """
         # Arrange
-        item = BacklogItem(title="Trailing", raw_body="Some content\n\n## Groomed (2026-01-01)\n\nDone.\n\n\n")
+        item = _write_md_item(tmp_path, "Trailing", "Some content\n\n## Groomed (2026-01-01)\n\nDone.\n\n\n")
 
         # Act
         result = build_issue_body_from_file(item)
@@ -768,7 +790,7 @@ class TestBuildIssueBodyFromFile:
         assert result.endswith("\n")
         assert not result.endswith("\n\n")
 
-    def test_groomed_keyword_in_non_heading_position_does_not_match(self) -> None:
+    def test_groomed_keyword_in_non_heading_position_does_not_match(self, tmp_path: Path) -> None:
         """The word 'Groomed' in body text (not as ## heading) returns None.
 
         Tests: Heading-level matching specificity
@@ -776,7 +798,7 @@ class TestBuildIssueBodyFromFile:
         Why: Only the section heading indicates actual grooming status
         """
         # Arrange
-        item = BacklogItem(title="False Positive", raw_body="This item has not been Groomed yet.\n\nStill needs work.")
+        item = _write_md_item(tmp_path, "False Positive", "This item has not been Groomed yet.\n\nStill needs work.")
 
         # Act
         result = build_issue_body_from_file(item)
@@ -911,79 +933,6 @@ class TestBuildIssueBodyFromFileDict:
         # Assert
         assert result is not None
         assert "I want to **detect duplicates" not in result.lower()
-
-
-# ---------------------------------------------------------------------------
-# build_backlog_frontmatter
-# ---------------------------------------------------------------------------
-
-
-class TestBuildBacklogFrontmatter:
-    """Tests for build_backlog_frontmatter(...) -> str."""
-
-    def _build(self, **kwargs: str) -> str:
-        defaults = {
-            "name": "Test Feature",
-            "description": "A new feature",
-            "source": "user",
-            "added": "2026-01-01",
-            "priority": "P1",
-            "type_val": "Feature",
-            "status": "open",
-        }
-        defaults.update(kwargs)
-        return build_backlog_frontmatter(**defaults)
-
-    def test_build_backlog_frontmatter_starts_with_dashes(self) -> None:
-        result = self._build()
-
-        assert result.startswith("---")
-
-    def test_build_backlog_frontmatter_contains_name(self) -> None:
-        result = self._build(name="My Feature")
-
-        assert "My Feature" in result
-
-    def test_build_backlog_frontmatter_contains_priority(self) -> None:
-        result = self._build(priority="P0")
-
-        assert "P0" in result
-
-    def test_build_backlog_frontmatter_contains_status(self) -> None:
-        result = self._build(status="open")
-
-        assert "open" in result
-
-    def test_build_backlog_frontmatter_contains_source(self) -> None:
-        result = self._build(source="automated")
-
-        assert "automated" in result
-
-    def test_build_backlog_frontmatter_issue_included_when_provided(self) -> None:
-        result = self._build(issue="#42")
-
-        assert "#42" in result
-
-    def test_build_backlog_frontmatter_issue_omitted_when_empty(self) -> None:
-        result = self._build()
-
-        assert "issue" not in result
-
-    def test_build_backlog_frontmatter_plan_included_when_provided(self) -> None:
-        result = self._build(plan="plan/tasks-1-test.md")
-
-        assert "plan/tasks-1-test.md" in result
-
-    def test_build_backlog_frontmatter_groomed_included_when_provided(self) -> None:
-        result = self._build(groomed="true")
-
-        assert "groomed" in result
-
-    def test_build_backlog_frontmatter_contains_topic_slug(self) -> None:
-        result = self._build(name="My New Feature")
-
-        # topic is a slug derived from the name
-        assert "my-new-feature" in result
 
 
 # ---------------------------------------------------------------------------
@@ -1204,19 +1153,19 @@ class TestViewResultFromLocalItem:
 
         assert result.file_path == "/tmp/p1-my-item.md"
 
-    def test_view_result_from_local_item_groomed_true_when_set(self) -> None:
-        item = BacklogItem(title="My Item", groomed="true", section="P1")
+    def test_view_result_from_local_item_groomed_date_when_set(self) -> None:
+        item = BacklogItem(title="My Item", groomed="2026-03-15", section="P1")
 
         result = view_result_from_local_item(item)
 
-        assert result.groomed is True
+        assert result.groomed == "2026-03-15"
 
-    def test_view_result_from_local_item_groomed_false_when_empty(self) -> None:
+    def test_view_result_from_local_item_groomed_empty_when_not_set(self) -> None:
         item = BacklogItem(title="My Item", groomed="", section="P1")
 
         result = view_result_from_local_item(item)
 
-        assert result.groomed is False
+        assert result.groomed == ""
 
     def test_view_result_from_local_item_returns_view_item_result_type(self) -> None:
         item = BacklogItem(title="My Item", section="P1")
@@ -1300,31 +1249,6 @@ class TestViewResultFromLocalItem:
 
         # Assert
         assert result.status == "open"
-
-
-# ---------------------------------------------------------------------------
-# append_or_replace_section — regex crash guard
-# ---------------------------------------------------------------------------
-
-
-class TestAppendOrReplaceSectionBackslash:
-    """Content containing regex backreference syntax must not crash re.sub."""
-
-    def test_append_or_replace_section_with_backslash_in_content(self) -> None:
-        body = "## Fact-Check\n\nOld content\n"
-        content_with_backslash = r"Score: \1 — verified"
-
-        result = append_or_replace_section(body, "Fact-Check", content_with_backslash)
-
-        assert r"\1" in result
-
-    def test_append_or_replace_section_subsection_with_backslash(self) -> None:
-        body = "## Groomed (2026-01-01)\n\n### Priority\n\nOld\n"
-        content = r"High \g<name> priority"
-
-        result = append_or_replace_section(body, "Priority", content)
-
-        assert r"\g<name>" in result
 
 
 # ---------------------------------------------------------------------------
@@ -1502,3 +1426,537 @@ Body of valid item.
 
         # Assert — no crash, empty result
         assert items == []
+
+
+# ---------------------------------------------------------------------------
+# infer_type
+# ---------------------------------------------------------------------------
+
+
+class TestInferType:
+    """Tests for infer_type(description, title) -> str.
+
+    Verifies the keyword heuristic that assigns an issue type label.
+    """
+
+    def test_infer_type_bug_keyword_in_title(self) -> None:
+        assert infer_type("", "fix the broken parser") == "type:bug"
+
+    def test_infer_type_bug_keyword_in_description(self) -> None:
+        assert infer_type("vulnerability in auth module", "") == "type:bug"
+
+    def test_infer_type_feature_keyword_add(self) -> None:
+        assert infer_type("", "add new command") == "type:feature"
+
+    def test_infer_type_feature_keyword_implement(self) -> None:
+        assert infer_type("implement the new pipeline", "") == "type:feature"
+
+    def test_infer_type_refactor_keyword(self) -> None:
+        assert infer_type("refactor the models layer", "") == "type:refactor"
+
+    def test_infer_type_refactor_keyword_consolidate(self) -> None:
+        assert infer_type("consolidate parsing utilities", "") == "type:refactor"
+
+    def test_infer_type_docs_keyword(self) -> None:
+        assert infer_type("update readme with new examples", "") == "type:docs"
+
+    def test_infer_type_docs_keyword_docs(self) -> None:
+        assert infer_type("", "docs: clarify architecture") == "type:docs"
+
+    def test_infer_type_default_returns_feature(self) -> None:
+        # No matching keyword — falls back to "type:feature"
+        assert infer_type("some unrelated task", "unrelated work") == "type:feature"
+
+
+# ---------------------------------------------------------------------------
+# build_body_extra_only
+# ---------------------------------------------------------------------------
+
+
+class TestBuildBodyExtraOnly:
+    """Tests for build_body_extra_only(...) -> str.
+
+    Verifies conditional inclusion of extra body fields.
+    """
+
+    def test_build_body_extra_only_includes_suggested_when_provided(self) -> None:
+        result = build_body_extra_only("src/utils.py", "", "", "", "", "")
+
+        assert "**Suggested location**: src/utils.py" in result
+
+    def test_build_body_extra_only_includes_research_when_provided(self) -> None:
+        result = build_body_extra_only("", "Is this safe?", "", "", "", "")
+
+        assert "**Research first**: Is this safe?" in result
+
+    def test_build_body_extra_only_includes_decision_when_provided(self) -> None:
+        result = build_body_extra_only("", "", "Yes or no?", "", "", "")
+
+        assert "**Decision needed**: Yes or no?" in result
+
+    def test_build_body_extra_only_includes_files_when_provided(self) -> None:
+        result = build_body_extra_only("", "", "", "main.py", "", "")
+
+        assert "**Files**: main.py" in result
+
+    def test_build_body_extra_only_includes_required_work_when_provided(self) -> None:
+        result = build_body_extra_only("", "", "", "", "refactor parsing", "")
+
+        assert "**Required work**" in result
+        assert "refactor parsing" in result
+
+    def test_build_body_extra_only_includes_groomed_section_when_provided(self) -> None:
+        result = build_body_extra_only("", "", "", "", "", "## Groomed (2026-01-01)\n\nContent")
+
+        assert "## Groomed" in result
+
+    def test_build_body_extra_only_all_empty_returns_empty_string(self) -> None:
+        result = build_body_extra_only("", "", "", "", "", "")
+
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# extract_description_from_issue_body
+# ---------------------------------------------------------------------------
+
+
+class TestExtractDescriptionFromIssueBody:
+    """Tests for extract_description_from_issue_body(body) -> str."""
+
+    def test_extract_description_from_section_heading(self) -> None:
+        body = "## Description\n\nThis is the description text."
+
+        result = extract_description_from_issue_body(body)
+
+        assert result == "This is the description text."
+
+    def test_extract_description_fallback_to_first_paragraph(self) -> None:
+        # No ## Description heading — should fall back to first non-empty, non-heading, non-list line
+        body = "Some opening paragraph.\n\n## Other Section\n\ncontent"
+
+        result = extract_description_from_issue_body(body)
+
+        assert result == "Some opening paragraph."
+
+    def test_extract_description_skips_headings_in_fallback(self) -> None:
+        body = "## Heading\n\nFirst paragraph below heading."
+
+        result = extract_description_from_issue_body(body)
+
+        assert result == "First paragraph below heading."
+
+    def test_extract_description_skips_list_items_in_fallback(self) -> None:
+        body = "- list item\n\nActual paragraph."
+
+        result = extract_description_from_issue_body(body)
+
+        assert result == "Actual paragraph."
+
+    def test_extract_description_returns_stripped_body_when_all_headings(self) -> None:
+        body = "## Only headings here"
+
+        result = extract_description_from_issue_body(body)
+
+        # Falls through to body.strip() at line 740
+        assert result == body.strip()
+
+
+# ---------------------------------------------------------------------------
+# merge_sections / reconstruct_body_from_sections
+# ---------------------------------------------------------------------------
+
+
+class TestMergeSections:
+    """Tests for merge_sections(local_body, github_body) -> tuple[str, bool]."""
+
+    def test_merge_sections_returns_local_unmodified_when_github_empty(self) -> None:
+        local = "## Story\n\nAs a user..."
+
+        result, modified = merge_sections(local, "")
+
+        assert result == local
+        assert modified is False
+
+    def test_merge_sections_appends_github_only_sections(self) -> None:
+        local = "## Story\n\nAs a user..."
+        github = "## New Section\n\nGitHub-only content."
+
+        result, modified = merge_sections(local, github)
+
+        assert modified is True
+        assert "## New Section" in result
+        assert "GitHub-only content." in result
+
+    def test_merge_sections_keeps_longer_version_of_existing_section(self) -> None:
+        local = "## Description\n\nShort."
+        github = "## Description\n\nMuch longer description from GitHub issue body."
+
+        result, modified = merge_sections(local, github)
+
+        assert modified is True
+        assert "Much longer description from GitHub issue body." in result
+
+    def test_merge_sections_keeps_local_when_local_is_longer(self) -> None:
+        local = "## Description\n\nA very long local description that should be preserved."
+        github = "## Description\n\nShort."
+
+        result, modified = merge_sections(local, github)
+
+        assert modified is False
+        assert result == local
+
+    def test_merge_sections_no_modification_when_content_identical(self) -> None:
+        body = "## Description\n\nIdentical content."
+
+        result, modified = merge_sections(body, body)
+
+        assert modified is False
+        assert result == body
+
+
+# ---------------------------------------------------------------------------
+# find_fuzzy_duplicates edge cases (empty title guard)
+# ---------------------------------------------------------------------------
+
+
+class TestFindFuzzyDuplicatesEdgeCases:
+    """Tests for edge-case branches in find_fuzzy_duplicates."""
+
+    def test_find_fuzzy_duplicates_skips_items_with_empty_title(self) -> None:
+        # Items with no title should be silently skipped (line 400 coverage)
+        items = [BacklogItem(title="", file_path="/tmp/no-title.md"), BacklogItem(title="SAM", file_path="/tmp/b.md")]
+
+        matches = find_fuzzy_duplicates("SAM", items)
+
+        # Only the titled item can match
+        assert all(t != "" for t, _, _ in matches)
+
+
+# ---------------------------------------------------------------------------
+# Round-trip tests for loads_frontmatter / dump_frontmatter
+# ---------------------------------------------------------------------------
+
+
+class TestFrontmatterRoundTrip:
+    """Round-trip tests: loads_frontmatter → dump_frontmatter preserves all content."""
+
+    _SIMPLE = """\
+---
+name: My Item
+description: A simple description
+priority: P1
+status: open
+---
+
+Body content here.
+"""
+
+    _NESTED_METADATA = """\
+---
+name: Nested Item
+description: Has nested metadata
+metadata:
+  source: test-source
+  added: '2026-01-01'
+  priority: P2
+  type: Feature
+  status: open
+---
+
+Body with nested frontmatter.
+"""
+
+    _MULTILINE_BODY = """\
+---
+name: Multi
+description: Multiple body paragraphs
+---
+
+First paragraph.
+
+Second paragraph with **bold**.
+
+- list item one
+- list item two
+"""
+
+    def test_round_trip_simple_document_preserves_fields(self) -> None:
+        """Round-tripping a simple document keeps all frontmatter fields intact.
+
+        Tests: loads_frontmatter → dump_frontmatter field preservation
+        How: Parse known document, dump, re-parse, compare metadata dicts
+        Why: Single implementation ensures no data loss across the round-trip
+        """
+        # Arrange / Act
+        post = loads_frontmatter(self._SIMPLE)
+        serialised = dump_frontmatter(post)
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert — all fields survive the round-trip
+        assert reparsed.metadata["name"] == "My Item"
+        assert reparsed.metadata["description"] == "A simple description"
+        assert reparsed.metadata["priority"] == "P1"
+        assert reparsed.metadata["status"] == "open"
+
+    def test_round_trip_simple_document_preserves_body(self) -> None:
+        """Round-tripping a simple document keeps the body unchanged.
+
+        Tests: body content preservation through loads_frontmatter → dump_frontmatter
+        How: Parse and dump, verify content field of re-parsed post
+        Why: Body must not be altered or truncated by serialisation
+        """
+        # Arrange / Act
+        post = loads_frontmatter(self._SIMPLE)
+        serialised = dump_frontmatter(post)
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert
+        assert reparsed.content == "Body content here."
+
+    def test_round_trip_nested_metadata_preserves_nested_dict(self) -> None:
+        """Round-tripping nested metadata preserves the nested dict structure.
+
+        Tests: nested YAML map survival through loads_frontmatter → dump_frontmatter
+        How: Parse document with metadata sub-dict, dump, re-parse, assert sub-dict intact
+        Why: operations.py mutates the metadata sub-dict; it must survive serialisation
+        """
+        # Arrange / Act
+        post = loads_frontmatter(self._NESTED_METADATA)
+        serialised = dump_frontmatter(post)
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert
+        assert reparsed.metadata["name"] == "Nested Item"
+        nested = reparsed.metadata.get("metadata")
+        assert isinstance(nested, dict)
+        assert nested["source"] == "test-source"
+        assert nested["added"] == "2026-01-01"
+        assert nested["priority"] == "P2"
+        assert nested["type"] == "Feature"
+        assert nested["status"] == "open"
+
+    def test_round_trip_multiline_body_preserves_all_lines(self) -> None:
+        """Round-tripping a multiline body preserves every line without truncation.
+
+        Tests: multiline body content preservation
+        How: Parse document with multiple paragraphs, dump, re-parse, check content
+        Why: Confirms no silent truncation during serialisation
+        """
+        # Arrange / Act
+        post = loads_frontmatter(self._MULTILINE_BODY)
+        serialised = dump_frontmatter(post)
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert
+        assert "First paragraph." in reparsed.content
+        assert "Second paragraph with **bold**." in reparsed.content
+        assert "- list item one" in reparsed.content
+        assert "- list item two" in reparsed.content
+
+    def test_round_trip_no_frontmatter_returns_empty_metadata(self) -> None:
+        """Input without frontmatter delimiter returns empty metadata and full text as content.
+
+        Tests: absent-frontmatter branch of loads_frontmatter
+        How: Parse plain text, verify metadata is {} and content is the input text
+        Why: No frontmatter must not crash or return garbage metadata
+        """
+        # Arrange
+        plain = "No frontmatter here.\n\nJust text."
+
+        # Act
+        post = loads_frontmatter(plain)
+
+        # Assert
+        assert post.metadata == {}
+        assert "No frontmatter here." in post.content
+
+    def test_round_trip_metadata_field_order_preserved(self) -> None:
+        """Field order in frontmatter is preserved through the round-trip (rt YAML).
+
+        Tests: round-trip YAML typ="rt" preserves insertion order
+        How: Parse document, dump, check serialised string for field ordering
+        Why: typ="rt" is chosen specifically to preserve order; this verifies it
+        """
+        # Arrange / Act
+        post = loads_frontmatter(self._SIMPLE)
+        serialised = dump_frontmatter(post)
+
+        # Assert — fields appear in original order in the serialised YAML block
+        name_pos = serialised.index("name:")
+        desc_pos = serialised.index("description:")
+        priority_pos = serialised.index("priority:")
+        assert name_pos < desc_pos < priority_pos
+
+    def test_round_trip_modified_metadata_survives_dump(self) -> None:
+        """Mutating metadata before dump produces the updated value in the output.
+
+        Tests: _MdPost mutation + dump_frontmatter workflow (as used in operations.py)
+        How: Parse, mutate metadata, dump via _MdPost, re-parse, verify updated value
+        Why: operations.py mutates post.metadata directly before calling dump_frontmatter
+        """
+        # Arrange
+        post = loads_frontmatter(self._SIMPLE)
+
+        # Act — mutate as operations.py does
+        post.metadata["status"] = "closed"
+        serialised = dump_frontmatter(post)
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert
+        assert reparsed.metadata["status"] == "closed"
+        # Other fields unchanged
+        assert reparsed.metadata["name"] == "My Item"
+
+    def test_round_trip_mdpost_constructor_with_new_body(self) -> None:
+        """_MdPost constructed with new body produces updated body in dump output.
+
+        Tests: _MdPost(metadata, new_body) + dump_frontmatter (as used in _pull_md_force)
+        How: Parse, extract metadata, construct _MdPost with new body, dump, re-parse
+        Why: _pull_md_force preserves frontmatter while replacing body — must work correctly
+        """
+        # Arrange
+        post = loads_frontmatter(self._SIMPLE)
+        new_body = "Replaced body content."
+
+        # Act — as done in _pull_md_force
+        serialised = dump_frontmatter(_MdPost(post.metadata, new_body))
+        reparsed = loads_frontmatter(serialised)
+
+        # Assert
+        assert reparsed.content == new_body
+        assert reparsed.metadata["name"] == "My Item"
+
+
+# ---------------------------------------------------------------------------
+# TestValidateMetadata
+# ---------------------------------------------------------------------------
+
+
+class TestValidateMetadata:
+    """Tests for _validate_metadata — the YAML metadata boundary coercion function."""
+
+    def test_integer_value_coerced_to_string(self) -> None:
+        """Integer values must be coerced to strings at the YAML boundary.
+
+        Tests: _validate_metadata scalar coercion
+        How: Pass raw dict with int value, assert result value is str
+        Why: YAML parses unquoted numbers as int; downstream consumers expect str
+        """
+        result = _validate_metadata({"priority": 1})
+
+        assert result["priority"] == "1"
+        assert isinstance(result["priority"], str)
+
+    def test_none_value_coerced_to_empty_string(self) -> None:
+        """None values (YAML null) must be coerced to empty string.
+
+        Tests: _validate_metadata None handling
+        How: Pass raw dict with None value, assert result value is ''
+        Why: YAML null appears as None in Python; `str(None)` would give 'None',
+             which is misleading in a metadata context — empty string is correct.
+        """
+        result = _validate_metadata({"status": None})
+
+        assert result["status"] == ""
+
+    def test_list_value_coerced_to_string(self) -> None:
+        """List values must be coerced to their string representation.
+
+        Tests: _validate_metadata list coercion
+        How: Pass raw dict with list value, assert result value is str
+        Why: YAML sequences are valid YAML but invalid as BacklogItem field values;
+             coercing to str preserves the data and prevents silent AttributeError.
+        """
+        result = _validate_metadata({"tags": ["a", "b"]})
+
+        assert isinstance(result["tags"], str)
+
+    def test_bool_value_coerced_to_string(self) -> None:
+        """Boolean values must be coerced to strings.
+
+        Tests: _validate_metadata bool coercion
+        How: Pass raw dict with bool value, assert result value is 'True' or 'False'
+        Why: YAML parses 'true'/'false' as Python bool; field consumers expect str.
+        """
+        result = _validate_metadata({"groomed": True})
+
+        assert result["groomed"] == "True"
+        assert isinstance(result["groomed"], str)
+
+    def test_nested_dict_values_coerced_to_str(self) -> None:
+        """Values inside a nested mapping must be coerced to strings.
+
+        Tests: _validate_metadata nested dict coercion
+        How: Pass raw dict with nested dict whose values include int and None,
+             assert inner values are all str
+        Why: The metadata sub-dict in YAML items may contain non-string values
+             (e.g. priority: 2); _parse_frontmatter reads them as dict[str, str].
+        """
+        result = _validate_metadata({"metadata": {"priority": 2, "added": None}})
+
+        inner = result["metadata"]
+        assert isinstance(inner, dict)
+        assert inner["priority"] == "2"
+        assert inner["added"] == "None"  # dict values use str(), not the None-to-empty rule
+
+    def test_string_values_pass_through_unchanged(self) -> None:
+        """String values must not be modified.
+
+        Tests: _validate_metadata no-op for already-valid input
+        How: Pass raw dict with string values, assert result matches input exactly
+        Why: Normal frontmatter is all strings; this must be a no-op for valid input.
+        """
+        result = _validate_metadata({"name": "My Item", "status": "open"})
+
+        assert result["name"] == "My Item"
+        assert result["status"] == "open"
+
+    def test_loads_frontmatter_coerces_non_string_yaml_values(self) -> None:
+        """Non-string YAML values are coerced to strings by loads_frontmatter.
+
+        Tests: integration of _validate_metadata inside loads_frontmatter
+        How: Parse YAML with integer priority, boolean groomed, and null issue;
+             assert metadata values are all strings after parsing.
+        Why: _validate_metadata is the boundary guard — this test verifies it
+             is wired in at the correct point (loads_frontmatter, not later).
+        """
+        text = """\
+---
+name: Boundary Test
+priority: 2
+groomed: true
+issue: null
+---
+Body.
+"""
+        post = loads_frontmatter(text)
+
+        assert post.metadata["name"] == "Boundary Test"
+        assert post.metadata["priority"] == "2"
+        assert post.metadata["groomed"] == "True"
+        assert post.metadata["issue"] == ""
+
+    def test_parse_item_file_with_non_string_frontmatter_values(self, tmp_path: Path) -> None:
+        """parse_item_file tolerates non-string YAML values via _validate_metadata coercion.
+
+        Tests: end-to-end non-string value handling through parse_item_file
+        How: Build a YAML frontmatter string with integer priority and boolean groomed,
+             parse it, assert the resulting BacklogItem has string fields.
+        Why: The full parse pipeline must be robust to YAML producing non-str values;
+             this is the consumer-level regression test for the boundary guard.
+        """
+        text = """\
+---
+name: Full Pipeline Test
+description: testing non-string coercion
+priority: 1
+groomed: false
+status: open
+---
+"""
+        item = parse_item_file(text, tmp_path / "item.md")
+
+        assert item.title == "Full Pipeline Test"
+        assert item.priority == "1"
+        assert isinstance(item.priority, str)

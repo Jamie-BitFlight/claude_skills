@@ -14,35 +14,6 @@ Kaizen uses DuckDB in **two distinct modes**:
 
 1. **Direct SQL on JSONL files (no database required)** — via the MotherDuck MCP server's `execute_query` tool. DuckDB reads JSONL natively through `read_ndjson_auto()`. No ETL step, no schema definition, no persistent storage needed for querying. The agent writes SQL that reads raw JSONL files directly from disk.
 
-2. **Persistent DuckDB file for scored data** — the `sentiment-score.py` CLI script writes VADER sentiment scores into a persistent DuckDB file at `~/.claude/kaizen/kaizen.duckdb`. This uses the Python `duckdb` library directly (not MCP), with `CREATE TABLE IF NOT EXISTS` and upsert (`INSERT ... ON CONFLICT DO UPDATE`) semantics.
-
-### MCP Server Configuration (MotherDuck)
-
-The plugin registers a MotherDuck MCP server in two places with different configurations:
-
-**In `plugin.json` (installed plugin context):**
-
-```json
-"kaizen-duckdb": {
-  "command": "uvx",
-  "args": ["mcp-server-motherduck", "--db-path", "${CLAUDE_PLUGIN_ROOT}/data/kaizen.duckdb", "--read-only"],
-  "env": { "HOME": "$USERPROFILE" }
-}
-```
-
-- Points to a persistent `.duckdb` file inside the plugin's data directory
-- Read-only mode — the MCP server cannot modify the database
-- Uses `${CLAUDE_PLUGIN_ROOT}` for portable path resolution
-
-**In `.mcp.json` (development/local context):**
-
-```json
-"kaizen-duckdb": {
-  "command": "uvx",
-  "args": ["mcp-server-motherduck", "--db-path", ":memory:", "--read-write"]
-}
-```
-
 - In-memory database — no persistent storage
 - Read-write mode — allows creating temporary tables during analysis
 

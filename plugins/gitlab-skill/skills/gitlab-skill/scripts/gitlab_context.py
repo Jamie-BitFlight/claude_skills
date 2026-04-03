@@ -39,7 +39,7 @@ _CI_FILE_PREVIEW_LINES = 50
 
 
 @lru_cache(maxsize=1)
-def _get_repo() -> object:
+def _get_repo() -> git.Repo:
     """Get the git repository for the current directory.
 
     Returns:
@@ -58,7 +58,7 @@ def _parse_git_origin() -> tuple[str, str]:
     Raises:
         ValueError: If the origin URL cannot be parsed.
     """
-    repo: git.Repo = _get_repo()  # type: ignore[assignment]
+    repo = _get_repo()
     url: str = repo.remotes.origin.url
     if match := re.search(r"(?:@|://(?:[^@]+@)?)([^:/]+)[:/](.+?)(?:\.git)?$", url):
         return match.group(1), match.group(2)
@@ -90,7 +90,7 @@ def _get_current_branch() -> str:
     Returns:
         Current branch name.
     """
-    repo: git.Repo = _get_repo()  # type: ignore[assignment]
+    repo = _get_repo()
     return repo.active_branch.name
 
 
@@ -220,7 +220,7 @@ def _gather_ci_validation(project: Project) -> str:
     content = ci_file.read_text(encoding="utf-8")
     try:
         result = project.ci_lint.create({"content": content})
-    except Exception as exc:  # noqa: BLE001
+    except gitlab_module.GitlabError as exc:
         return f"Could not validate CI config: {exc}"
     else:
         if result.valid:
@@ -251,14 +251,14 @@ def main() -> None:
     try:
         gl = get_gitlab_client()
         project = _get_project(gl)
-    except Exception as exc:  # noqa: BLE001
+    except (RuntimeError, gitlab_module.GitlabError) as exc:
         print(f"**Pipeline status:** {exc}")
         return
 
     # 1. Pipeline status
     try:
         pipeline_status = _gather_pipeline_status(project)
-    except Exception as exc:  # noqa: BLE001
+    except gitlab_module.GitlabError as exc:
         pipeline_status = f"Error retrieving pipeline status: {exc}"
     print(f"**Pipeline status:** {pipeline_status}")
     print()
@@ -266,7 +266,7 @@ def main() -> None:
     # 2. Recent pipelines
     try:
         recent = _gather_recent_pipelines(project)
-    except Exception as exc:  # noqa: BLE001
+    except gitlab_module.GitlabError as exc:
         recent = f"Error retrieving recent pipelines: {exc}"
     print(f"**Recent pipeline runs:**\n{recent}")
     print()
@@ -274,7 +274,7 @@ def main() -> None:
     # 3. CI lint validation
     try:
         validation = _gather_ci_validation(project)
-    except Exception as exc:  # noqa: BLE001
+    except (gitlab_module.GitlabError, OSError) as exc:
         validation = f"Error validating CI config: {exc}"
     print(f"**CI configuration:** {validation}")
     print()
@@ -291,6 +291,6 @@ if __name__ == "__main__":
         pass
     except KeyboardInterrupt:
         sys.exit(0)
-    except Exception as exc:  # noqa: BLE001
+    except (RuntimeError, gitlab_module.GitlabError, OSError) as exc:
         print(f"**Pipeline status:** {exc}")
         sys.exit(0)

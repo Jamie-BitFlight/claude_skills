@@ -410,3 +410,16 @@ Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered
 ### QG Plan File Location
 
 The QG plan file is written by `sam_create` to `plan/QG{NNN}-qg-{slug}.yaml` (in the project plan directory). The `QG{N}` address is used in all subsequent `sam_ready`, `sam_claim`, `sam_state`, and `sam_status` calls for this quality gate run. The `QG{NNN}` number is auto-assigned by SAM (sequential, separate from implementation plan numbering `P{NNN}`).
+
+---
+
+## Related Documents
+
+Read these together to get the full system picture:
+
+- [Default Development Flow](../skills/development-harness/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
+- [Artifact Conventions](../skills/development-harness/references/artifact-conventions.md) — naming, file layout, cross-referencing
+- [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
+- [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Task File Format](./TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
+- [Domain model source](../sam_schema/core/models.py) — authoritative field definitions (`Task` class)

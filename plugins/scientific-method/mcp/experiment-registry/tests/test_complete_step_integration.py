@@ -14,11 +14,10 @@ AC6: Completed experiments reject further steps (TERMINAL_STATE).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from models import ArtefactIntegrity, ExperimentState, StepDefinition, ValidationRule
 from state_manager import StateManager
-
 from validators import (
     EMPTY_ARTEFACT,
     FROZEN_ARTEFACT_MODIFIED,
@@ -44,14 +43,11 @@ def _error_codes(result: dict[str, object]) -> set[str]:
     Returns:
         Set of error code strings from the validation_errors list.
     """
-    errors = result["validation_errors"]
-    assert isinstance(errors, list)
+    errors_raw = result["validation_errors"]
+    assert isinstance(errors_raw, list)
+    errors = cast("list[dict[str, str]]", errors_raw)
     codes: set[str] = set()
-    for e in errors:
-        assert isinstance(e, dict)
-        code = e["code"]  # type: ignore[index]
-        assert isinstance(code, str)
-        codes.add(code)
+    codes.update(e["code"] for e in errors)
     return codes
 
 

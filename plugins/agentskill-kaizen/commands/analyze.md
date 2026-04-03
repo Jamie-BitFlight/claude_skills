@@ -8,26 +8,27 @@ allowed-tools: Read,Write,Glob,Grep,Bash,Task
 Run the autonomous transcript analysis pipeline. Spawn the @transcript-analyst agent to query JSONL session data, detect anti-patterns, and write structured findings.
 
 ## Arguments
+<user_arguments>$ARGUMENTS</user_arguments>
 
-- `--project <name>` — Scope analysis to a specific project. The project key is the path with hyphens replacing slashes. Default: current project (derived from cwd).
-- `--dimensions <list>` — Comma-separated list of dimensions to analyze. Options: tool-misuse, errors, frustration, tooling-gaps, delegation, shortest-path, red-herrings, interruptions, missing-hooks, all. Default: all.
+- `--project {project}` — Scope analysis to a specific project. The project key is the path with hyphens replacing slashes. Default: current project (derived from cwd).
+- `--dimensions {dimensions}` — Comma-separated list of dimensions to analyze. Options: tool-misuse, errors, frustration, tooling-gaps, delegation, shortest-path, red-herrings, interruptions, missing-hooks, all. Default: all.
 
 ## Execution Steps
 
 1. **Resolve transcript path.** Determine the project transcript directory:
 
    ```text
-   ~/.claude/projects/{project-key}/
+   ~/.claude/projects/{project}/
    ```
 
    If `--project` is provided, use it as the project key. Otherwise, derive from the current working directory by replacing `/` with `-` and prepending `-`.
 
 2. **Create output directory.** Ensure `.planning/kaizen/` exists in the current project root.
 
-3. **Spawn @transcript-analyst agent.** Delegate the analysis via Agent tool:
+3. Delegate the analysis via Agent tool:
 
    ```text
-   subagent_type: transcript-analyst
+   subagent_type: agentskill-kaizen:transcript-analyst
    prompt: "Analyze transcripts at {path}. Dimensions: {dimensions}. Write findings to .planning/kaizen/analysis-{date}.md"
    ```
 

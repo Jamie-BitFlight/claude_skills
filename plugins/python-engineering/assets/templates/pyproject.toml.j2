@@ -1,0 +1,76 @@
+# pyproject.toml template
+# Copy and customize for your project
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "{{project_name}}"
+version = "0.1.0"
+description = "{{description}}"
+readme = "README.md"
+license = "{{license}}"
+requires-python = ">=3.11"
+authors = [
+    { name = "{{author_name}}", email = "{{author_email}}" }
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.0",
+    "ty>=0.0.26",
+    "ruff>=0.15.0",
+]
+
+[project.scripts]
+{{cli_name}} = "{{package_name}}.cli:app"
+
+[project.urls]
+Documentation = "{{docs_url}}"
+Issues = "{{issues_url}}"
+Source = "{{source_url}}"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{package_name}}"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM", "TCH", "PTH", "ERA", "PL", "RUF", "ANN", "D", "S", "T20"]
+
+ignore = ["D100", "D104", "D107", "ANN101", "ANN102"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D", "ANN", "PLR2004"]
+"scripts/**" = ["T201", "S"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = ["--strict-markers", "--strict-config", "-ra", "-v"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+fail_under = 80

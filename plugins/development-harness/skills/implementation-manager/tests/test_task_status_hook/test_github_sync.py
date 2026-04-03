@@ -7,7 +7,7 @@ call any GitHub code.
 Scope: Unit tests — all GitHub I/O is mocked via sys.modules injection.
 
 Strategy:
-- Inject mock ``backlog_core.github`` into ``sys.modules`` before each test
+- Inject mock ``backlog_core.gh_client`` into ``sys.modules`` before each test
   that exercises the GitHub path. The conditional import in
   ``sync_completion_to_github`` reads from ``sys.modules`` at call-time.
 - Use ``tmp_path`` for all temporary files.
@@ -142,10 +142,13 @@ class TestGetParentIssueNumber:
         """Returns the integer issue number when parent_issue_number is in context file.
 
         Tests: get_parent_issue_number with a context file containing parent_issue_number.
-        How: Create a context file with parent_issue_number=480. Build hook_input
-             pointing to tmp_path as cwd. Call get_parent_issue_number. Assert 480.
+        How: Create a context file with parent_issue_number=480. Mock _dh_paths.context_dir
+             to return the tmp_path-based context directory. Build hook_input pointing to
+             tmp_path as cwd. Call get_parent_issue_number. Assert 480.
         Why: This is the primary success path — the orchestrator writes the parent
              issue number so the hook can sync completion to the right GitHub issue.
+             The mock is required because get_context_file_path resolves via
+             _dh_paths.context_dir() (which points to ~/.dh/...), not via cwd.
         """
         # Arrange
         import task_status_hook as hook
@@ -219,7 +222,7 @@ class TestSyncCompletionToGithub:
     Scope: Syncs task completion to a GitHub sub-issue. Wraps all GitHub I/O
     in try/except — must never raise regardless of failure mode.
 
-    Strategy: Inject mock ``backlog_core`` and ``backlog_core.github`` modules
+    Strategy: Inject mock ``backlog_core`` and ``backlog_core.gh_client`` modules
     into sys.modules so the conditional import in sync_completion_to_github
     resolves the mock instead of the real module.
 
@@ -244,11 +247,11 @@ class TestSyncCompletionToGithub:
         task_file.write_text(_TASK_YAML_WITHOUT_GITHUB_ISSUE, encoding="utf-8")
 
         mock_bc = cast("Any", types.ModuleType("backlog_core"))
-        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.gh_client"))
         mock_update = MagicMock(return_value=True)
         vars(mock_bc_github).update({"update_task_status": mock_update, "get_github": MagicMock()})
 
-        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
+        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.gh_client": mock_bc_github}):
             # Act
             result = hook.sync_completion_to_github(task_file, "T1", 480)
 
@@ -276,7 +279,7 @@ class TestSyncCompletionToGithub:
 
         mock_repo = MagicMock()
         mock_bc = cast("Any", types.ModuleType("backlog_core"))
-        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.gh_client"))
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(return_value=True)
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
@@ -284,7 +287,7 @@ class TestSyncCompletionToGithub:
         mock_hook_path = MagicMock()
         mock_hook_path.exists.return_value = True
         with (
-            patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}),
+            patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.gh_client": mock_bc_github}),
             patch.object(hook, "_BACKLOG_CORE_HOOK", mock_hook_path),
         ):
             # Act
@@ -312,12 +315,12 @@ class TestSyncCompletionToGithub:
 
         mock_repo = MagicMock()
         mock_bc = cast("Any", types.ModuleType("backlog_core"))
-        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.gh_client"))
         mock_get_github = MagicMock(return_value=mock_repo)
         mock_update = MagicMock(side_effect=RuntimeError("GitHub API error"))
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
 
-        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
+        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.gh_client": mock_bc_github}):
             # Act
             result = hook.sync_completion_to_github(task_file, "T1", 480)
 
@@ -342,12 +345,12 @@ class TestSyncCompletionToGithub:
         task_file.write_text(_TASK_YAML_WITH_GITHUB_ISSUE, encoding="utf-8")
 
         mock_bc = cast("Any", types.ModuleType("backlog_core"))
-        mock_bc_github = cast("Any", types.ModuleType("backlog_core.github"))
+        mock_bc_github = cast("Any", types.ModuleType("backlog_core.gh_client"))
         mock_get_github = MagicMock(side_effect=RuntimeError("No token"))
         mock_update = MagicMock()
         vars(mock_bc_github).update({"get_github": mock_get_github, "update_task_status": mock_update})
 
-        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.github": mock_bc_github}):
+        with patch.dict(sys.modules, {"backlog_core": mock_bc, "backlog_core.gh_client": mock_bc_github}):
             # Act
             result = hook.sync_completion_to_github(task_file, "T1", 480)
 
@@ -399,7 +402,11 @@ class TestHandleSubagentStopCallsSync:
             "prompt": f"/start-task {task_file} --task T1",
         }
 
-        with patch.object(hook, "sync_completion_to_github") as mock_sync:
+        context_file_path = tmp_path / ".claude" / "context" / f"active-task-{session_id}.json"
+        with (
+            patch.object(hook, "sync_completion_to_github") as mock_sync,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file_path),
+        ):
             # Act
             hook.handle_subagent_stop(hook_input)
 
@@ -450,7 +457,11 @@ class TestActivityUpdateNoGithubCall:
             "cwd": str(tmp_path),
         }
 
-        with patch.object(hook, "sync_completion_to_github") as mock_sync:
+        context_dir_path = tmp_path / ".claude" / "context"
+        with (
+            patch.object(hook, "sync_completion_to_github") as mock_sync,
+            patch.object(hook._dh_paths, "context_dir", return_value=context_dir_path),
+        ):
             # Act
             hook.handle_activity_update(hook_input)
 

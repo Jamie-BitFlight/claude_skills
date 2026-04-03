@@ -44,9 +44,9 @@ flowchart TD
 
 ### Step 1 — Read Task File
 
-Read the task file from `.planning/harness/tasks/TASK-{NNN}.md`. The YAML
-frontmatter contains metadata (role, dependencies, priority, accuracy-risk).
-The body contains the complete CLEAR-structured prompt.
+Read the task via `sam_read(plan="{plan_address}", task="T{NNN}")`. The returned
+`TaskAssignment` dict contains both plan-level context (`plan_goal`, `plan_context`,
+`plan_acceptance_criteria`) and the task body with YAML frontmatter.
 
 ### Step 2 — Resolve Role to Agent
 
@@ -100,11 +100,21 @@ collecting results.
 
 ## Input
 
-- Single `ARTIFACT:TASK` file from `.planning/harness/tasks/TASK-{NNN}.md`
+- Single `ARTIFACT:TASK` via `sam_read(plan="{plan_address}", task="T{NNN}")`
 
 ## Output
 
-File at `.planning/harness/executions/EXECUTION-{NNN}.md`:
+Execution results stored via SAM:
+
+```text
+sam_update(
+    address="{plan_address}/T{NNN}",
+    append_section="Execution Results",
+    section_content="{execution markdown below}"
+)
+```
+
+The execution results follow this template:
 
 ```markdown
 # ARTIFACT:EXECUTION — TASK-{NNN}

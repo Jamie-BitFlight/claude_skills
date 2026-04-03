@@ -36,9 +36,18 @@ import json
 import logging
 import pathlib
 import re
+import sys
 import xml.etree.ElementTree as ET  # noqa: S405
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from io import TextIOWrapper
+from typing import TYPE_CHECKING, Any, cast
+
+# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
+# reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if isinstance(sys.stderr, TextIOWrapper):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element as _Element
@@ -515,7 +524,7 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
     """
     own_conn = conn is None
     try:
-        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else conn  # type: ignore[assignment]
+        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else cast("duckdb.DuckDBPyConnection", conn)
         rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
         if own_conn:
             db.close()
@@ -525,7 +534,7 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
             text = _extract_user_text_from_value(message)
             if text and _is_human_plaintext(text):
                 return text[:80].replace("\n", " ").strip()
-    except Exception as exc:  # noqa: BLE001
+    except (duckdb.Error, ValueError, KeyError, TypeError) as exc:
         logger.debug("Could not derive session title from %s: %s", file_path, exc)
     return pathlib.Path(file_path).stem
 

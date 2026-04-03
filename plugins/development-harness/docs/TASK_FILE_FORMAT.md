@@ -1,7 +1,9 @@
 # SAM Task File Format
 
-**Status**: Current specification (updated 2026-03-21)
-**Purpose**: Canonical reference for SAM task file structure and the SAM MCP server as the primary interface
+**Status**: Snapshot (last synced 2026-03-31)
+**Purpose**: Reference for SAM task file structure and the SAM MCP server as the primary interface
+
+> **Drift warning**: This document drifts from the implementation between updates. The authoritative source for field definitions is `plugins/development-harness/sam_schema/core/models.py` (the `Task` Pydantic model). For planning or implementation work, verify field names, types, and defaults against `models.py` and the generated schema (`uv run sam schema --model Task`). For conceptual discussion, this document is sufficient as a point-in-time snapshot.
 
 All task file I/O routes through the SAM MCP server (`mcp__plugin_dh_sam__*`) or the `uv run sam` CLI fallback. No component reads or writes task files directly via Read/Edit/Write tools.
 
@@ -99,7 +101,7 @@ feature: "My Feature Name"
 status: in-progress           # not-started | in-progress | complete
 created: "2026-03-15T00:00:00Z"
 tasks:
-  - task: T01
+  - id: T01
     title: "First task"
     status: not-started
     ...
@@ -113,37 +115,85 @@ For the complete field specification:
 
 ## Task Schema
 
-Task-level fields are defined in the `Task` Pydantic model.
+Task-level fields are defined in the `Task` Pydantic model (`plugins/development-harness/sam_schema/core/models.py`, lines 107–242).
+
+### Task ID Pattern
+
+`id` must match the pattern `^[A-Za-z]?\d+(\.\d+)?$`.
+
+Examples of valid IDs: `T01`, `T1`, `T2.3`, `1`, `10`.
 
 ### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `task` | `str` | Task ID — `T01`, `T02`, etc. (local to plan) |
-| `title` | `str` | Human-readable task title |
+| `id` | `str` | Task ID — must match `^[A-Za-z]?\d+(\.\d+)?$` (e.g., `T01`, `T2.3`) |
+| `title` | `str` | Human-readable task title (1–200 characters) |
 | `status` | `str` | See [Status Values](#status-values) |
-| `agent` | `str` | Agent name for execution |
-| `dependencies` | `list[str]` | Task IDs this task depends on |
-| `priority` | `int` | 1-5 (1=critical) |
-| `complexity` | `str` | `low`, `medium`, `high` |
 
-### Optional Fields
+### Optional Fields — Structural
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `skills` | `list[str]` | Skills the executing sub-agent loads |
-| `accuracy-risk` | `str` | `low`, `medium`, `high` |
-| `started` | `str` | ISO 8601 timestamp — set by `sam claim` |
-| `completed` | `str` | ISO 8601 timestamp — set by SubagentStop hook |
-| `last-activity` | `str` | ISO 8601 timestamp — set by PostToolUse hook |
-| `github_issue` | `int` | Linked GitHub sub-issue number |
-| `issue-classification` | `str` | `procedural`, `defect`, `recurring-pattern`, `missing-guardrail`, `unbounded-design` |
-| `scenario-target` | `str` | `"{scenario} -> {improvement}"` |
-| `analysis-method` | `str` | `none`, `5-whys`, `6-sigma`, `design-framing` |
-| `divergence-notes` | `int` | Count of `## Divergence Notes` sections in body |
-| `is-bookend` | `bool` | `true` for T0 baseline or TN verification tasks |
-| `bookend-type` | `str` | `t0-baseline` or `tn-verification` |
-| `body` | `str` | Markdown body: Objective, Requirements, Acceptance Criteria, Verification Steps |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `agent` | `str` | `null` | Agent name for execution |
+| `dependencies` | `list[str]` | `[]` | Task IDs this task depends on |
+| `priority` | `int` | `3` (medium) | See [Priority Values](#priority-values) |
+| `complexity` | `str` | `medium` | `low`, `medium`, or `high` |
+| `skills` | `list[str]` | `[]` | Skills the executing sub-agent loads |
+| `blocked-by` | `list[str]` | `[]` | Task IDs that block this task (distinct from `dependencies`) |
+| `parallelize-with` | `list[str]` | `[]` | Task IDs that can run concurrently with this task |
+
+### Optional Fields — Timestamps
+
+All timestamps are ISO 8601 strings (e.g., `2026-03-15T13:00:00Z`).
+
+| Field | Default | Written By |
+|-------|---------|------------|
+| `created` | `null` | `swarm-task-planner` at plan creation |
+| `started` | `null` | `sam claim` via `start-task` skill |
+| `completed` | `null` | `task_status_hook.py` SubagentStop handler |
+| `last-activity` | `null` | `task_status_hook.py` PostToolUse handler |
+
+### Optional Fields — Analytical Metadata
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `issue-classification` | `str` | `null` | See [Issue Classification Values](#issue-classification-values) |
+| `scenario-target` | `str` | `null` | `"{scenario} -> {improvement}"` |
+| `analysis-method` | `str` | `none` | See [Analysis Method Values](#analysis-method-values) |
+| `divergence-notes` | `int` | `0` | Count of `## Divergence Notes` sections in body |
+| `accuracy-risk` | `str` | `low` | Risk level for Chain of Verification — `low`, `medium`, or `high`. CoVe checks are included when `medium` or `high`. |
+| `reason` | `str` | `""` | Rationale for task decisions — parallelization safety, dependency choices, or design tradeoffs. |
+
+### Optional Fields — Markdown Content
+
+All content fields are stored as YAML multiline scalars. Default is an empty string.
+
+| Field | Description |
+|-------|-------------|
+| `body` | Full markdown body for the task |
+| `description` | Short description of the task |
+| `objective` | Goal and scope of the task |
+| `requirements` | Implementation requirements |
+| `constraints` | Constraints and boundaries |
+| `expected-outputs` | Artifacts or outputs the task must produce |
+| `acceptance-criteria` | Criteria that must be satisfied for the task to be complete |
+| `verification-steps` | Steps to verify acceptance criteria are met |
+| `context-notes` | Additional context shared with the executing agent |
+| `handoff` | Notes for the next task or agent |
+
+### Optional Fields — Bookend Metadata
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `is-bookend` | `bool` | `false` | `true` for T0 baseline or TN verification tasks |
+| `bookend-type` | `str` | `null` | `t0-baseline` or `tn-verification` (required when `is-bookend` is `true`) |
+
+### Optional Fields — GitHub Integration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `github-issue` | `int` | `null` | Linked GitHub sub-issue number |
 
 ### Status Values
 
@@ -155,6 +205,86 @@ Task-level fields are defined in the `Task` Pydantic model.
 | `blocked` | Cannot proceed — external dependency | Agent via `sam state` |
 | `deferred` | Postponed to a later session | Orchestrator |
 | `skipped` | Intentionally not executed | Orchestrator |
+
+### Priority Values
+
+| Value | Name | Meaning |
+|-------|------|---------|
+| `1` | critical | Highest priority |
+| `2` | high | |
+| `3` | medium | Default |
+| `4` | low | |
+| `5` | lowest | Lowest priority |
+
+### Issue Classification Values
+
+| Value | Description |
+|-------|-------------|
+| `procedural` | Process or workflow failure |
+| `defect` | Code defect |
+| `recurring-pattern` | Same class of issue seen repeatedly |
+| `missing-guardrail` | No check or validation exists to prevent this |
+| `unbounded-design` | Design without clear scope or exit criteria |
+
+### Analysis Method Values
+
+| Value | Description |
+|-------|-------------|
+| `none` | No structured analysis applied (default) |
+| `5-whys` | Five Whys root cause analysis |
+| `6-sigma` | Six Sigma methodology |
+| `design-framing` | Design framing analysis |
+
+### Complete YAML Example
+
+```yaml
+id: T01
+title: "Implement auth token refresh"
+status: not-started
+agent: python-cli-architect
+dependencies: []
+priority: 2
+complexity: medium
+skills:
+  - python3-development
+blocked-by: []
+parallelize-with:
+  - T02
+created: "2026-03-15T00:00:00Z"
+started: null
+completed: null
+last-activity: null
+issue-classification: defect
+scenario-target: "token expires silently -> token refreshed with user notification"
+analysis-method: 5-whys
+divergence-notes: 0
+accuracy-risk: medium
+reason: "Token refresh is isolated from request handling — safe to parallelize with T02"
+objective: |
+  Implement automatic refresh of expired auth tokens without user interruption.
+requirements: |
+  - Detect 401 responses and attempt token refresh before retrying
+  - Refresh endpoint: POST /auth/refresh
+acceptance-criteria: |
+  - Expired token triggers refresh and retry on 401
+  - Refresh failure returns clear error to caller
+verification-steps: |
+  - Run pytest tests/auth/test_token_refresh.py
+expected-outputs: |
+  - auth/token_refresh.py module
+  - pytest suite with >80% coverage
+constraints: |
+  - Do not store refresh token in memory longer than one request cycle
+context-notes: |
+  Token TTL is 15 minutes. Refresh token TTL is 7 days.
+handoff: |
+  T02 depends on the refresh module being importable from auth.token_refresh.
+body: ""
+description: "Add automatic token refresh on 401 responses"
+is-bookend: false
+bookend-type: null
+github-issue: 842
+```
 
 For the complete field specification:
 
@@ -187,7 +317,7 @@ Task metadata fields are owned by specific components. The SAM MCP server and `s
 
 4. `divergence-notes` count and `## Divergence Notes` body content are written by the executing agent via `sam update --append-section`.
 
-5. All other fields (`task`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`, and analytical metadata) are written once at plan creation by `swarm-task-planner`. No component modifies them after creation.
+5. All other fields (`id`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`, and analytical metadata) are written once at plan creation by `swarm-task-planner`. No component modifies them after creation.
 
 ---
 
@@ -223,7 +353,7 @@ Stdin YAML structure:
 
 ```yaml
 tasks:
-  - task: T01
+  - id: T01
     title: "First task"
     status: not-started
     agent: python-cli-architect
@@ -259,7 +389,7 @@ TaskAssignment response shape (see [TaskAssignment Schema](./assignment-schema.j
   "plan_context": "Background context shared across all tasks",
   "plan_acceptance_criteria": ["AC1: criterion one"],
   "task": {
-    "task": "T04",
+    "id": "T04",
     "title": "TASK_FILE_FORMAT.md rewrite",
     "status": "in-progress",
     "agent": "contextual-ai-documentation-optimizer",
@@ -448,3 +578,16 @@ Manual registration is required when:
 
 - The plan is created without an `issue` field and the issue is linked later
 - Non-plan artifacts (feature-context, architect-spec) are produced by planning agents
+
+---
+
+## Related Documents
+
+Read these together to get the full system picture:
+
+- [Default Development Flow](../skills/development-harness/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
+- [Artifact Conventions](../skills/development-harness/references/artifact-conventions.md) — naming, file layout, cross-referencing
+- [Workflow Architecture Diagram](./workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
+- [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
+- [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Domain model source](../sam_schema/core/models.py) — authoritative field definitions (`Task` class)

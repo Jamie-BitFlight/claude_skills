@@ -2,7 +2,7 @@
 
 > **Repository**: OWNER/REPO is discovered via `discover_repo()` from `backlog_core.models`. Use MCP tools for all GitHub operations — no `gh` CLI required.
 
-## Step 2.5: GitHub Issue Sync
+## Step 2.2: GitHub Issue Sync
 
 <github_sync>
 
@@ -23,20 +23,20 @@ After extracting item fields (Step 2), check for an existing linked issue:
    This P1 item has no linked GitHub issue. Create one? (yes/no)
    ```
 
-   If yes, proceed to 2.5a.
+   If yes, proceed to 2.3.
    If no, skip GitHub sync; the per-item file remains the only local record.
 
 4. If not found AND priority is P2 or Ideas: do not prompt; skip GitHub sync silently.
 
 </github_sync>
 
-## Step 2.5a: Create GitHub Issue
+## Step 2.3: Create GitHub Issue
 
-Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"` and `create_issue=true`.
+Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"`.
 
-The tool creates the issue and writes `issue: '#N'` back to the per-item file frontmatter. Check the returned dict for an `error` key.
+The tool creates the issue automatically when the item lacks one and writes `issue: '#N'` back to the per-item file frontmatter. Check the returned dict for an `error` key.
 
-## Step 2.7: Set In-Progress Label
+## Step 2.4: Set In-Progress Label
 
 Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"` and `status="in-progress"`. Check the returned dict for an `error` key.
 
@@ -199,4 +199,4 @@ GitHub setup complete.
   metadata.status   →  Issue closed
 ```
 
-The issue body template is built into the `backlog_update(create_issue=true)` MCP tool — it generates the story format automatically from the per-item file fields.
+The issue body template is built into the `backlog_update` MCP tool — it generates the story format automatically from the per-item file fields.

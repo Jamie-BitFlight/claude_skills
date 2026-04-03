@@ -15,7 +15,7 @@ A data extraction skill for pulling specific facts from files. Delegates to an E
 1. **Extract exactly what is requested.** Return the data points asked for, nothing else.
 2. **Do NOT analyze, interpret, or recommend.** Return raw facts only.
 3. **Do NOT summarize or editorialize.** No "this suggests..." or "this indicates..." — return numbers, strings, and lists.
-4. **Use the kaizen-duckdb MCP for JSONL queries.** DuckDB can read JSONL files directly with `read_ndjson_auto()`. Use SQL for counting, aggregation, and filtering. Use Grep only for markdown reports.
+4. **Use the kaizen-duckdb MCP for JSONL queries.** DuckDB runs SQL over **session JSONL files** (`read_ndjson_auto` with **absolute** paths). Use SQL for counting, aggregation, and filtering. Use Grep only for markdown reports.
 5. **Return structured output.** Use the format below.
 
 ## Output Format

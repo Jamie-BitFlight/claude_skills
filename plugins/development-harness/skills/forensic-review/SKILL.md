@@ -42,11 +42,10 @@ flowchart TD
 
 ### Step 1 — Read Execution Results
 
-Read the execution artifact and the original plan:
+Read the execution results, task content, and plan via MCP:
 
-- `.planning/harness/executions/EXECUTION-{NNN}.md`
-- `.planning/harness/PLAN.md` (for acceptance criteria and design intent)
-- `.planning/harness/tasks/TASK-{NNN}.md` (for original requirements)
+- Execution results and task content: `sam_read(plan="{plan_id}", task="{task_id}")` — returns the `TaskAssignment` with execution sections appended by Stage 5 and original task requirements
+- Plan (acceptance criteria and design intent): `artifact_read(issue_number={issue}, artifact_type="architect")` — returns the architect artifact content
 
 ### Step 2 — Validate Against Acceptance Criteria
 
@@ -84,14 +83,15 @@ Quality issues are findings, not automatic NEEDS_WORK verdicts. Categorize each:
 
 ## Input
 
-- `ARTIFACT:EXECUTION` at `.planning/harness/executions/EXECUTION-{NNN}.md`
-- `ARTIFACT:PLAN` at `.planning/harness/PLAN.md`
-- `ARTIFACT:TASK` at `.planning/harness/tasks/TASK-{NNN}.md`
+- `ARTIFACT:EXECUTION` + `ARTIFACT:TASK` via `sam_read(plan="{plan_id}", task="{task_id}")` — execution results are appended sections in the task body; task requirements are in the task fields
+- `ARTIFACT:PLAN` via `artifact_read(issue_number={issue}, artifact_type="architect")` — plan content with acceptance criteria and design intent
 - Read access to the codebase
 
 ## Output
 
-File at `.planning/harness/reviews/REVIEW-{NNN}.md`:
+Append review results to the task via `sam_update(address="{plan_id}/{task_id}", append_section="Review Results", section_content="{review_markdown}")`.
+
+Review content follows this template:
 
 ```markdown
 # ARTIFACT:REVIEW — TASK-{NNN}
@@ -180,6 +180,7 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 - Distinguish blocking findings from advisory findings
 - Do not add new requirements — review against the ORIGINAL acceptance criteria
 - Report findings with file:line evidence, not vague observations
+- **Verification Gap findings are always BLOCKING.** Any finding that describes a check which cannot detect the class of failure it is supposed to detect must be classified as BLOCKING, not advisory or minor. Examples that must be BLOCKING: "Round-trip check does not validate section content"; "Fidelity check only verifies structural validity"; "Tests use synthetic fixtures; no real data tested"; "Acceptance criteria verify that output is valid, not that output is complete". Classification rule: if a finding can be described as "the safety net cannot catch what it was designed to catch," that finding is BLOCKING regardless of other severity heuristics. Consequence: if the reviewer identifies a verification gap, the verdict is NEEDS_WORK and the finding must be addressed in a remediation cycle — not moved to a follow-on backlog item.
 
 ## Success Criteria
 

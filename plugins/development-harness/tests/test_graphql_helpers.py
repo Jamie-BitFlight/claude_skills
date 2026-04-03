@@ -1,4 +1,4 @@
-"""Tests for _resolve_labels_graphql() in backlog_core/github.py.
+"""Tests for _resolve_labels_graphql() in backlog_core/gh_client.py.
 
 Covers: all-found, partial-found, all-missing, empty-input, exception propagation,
 deduplication, and invalid label name rejection.
@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.github import _resolve_labels_graphql
+from backlog_core.gh_client import _resolve_labels_graphql
 from github import GithubException
 
 if TYPE_CHECKING:

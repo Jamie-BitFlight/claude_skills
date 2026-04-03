@@ -6,17 +6,18 @@ All models use Pydantic BaseModel for natural integration with FastMCP 3.x.
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import os
 import re
 import sys
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Literal
 
 import git
-from pydantic import AliasChoices, BaseModel, Field
-from typing_extensions import TypedDict as ExtTypedDict
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
+from typing_extensions import TypedDict, TypedDict as ExtTypedDict
 
 # ---------------------------------------------------------------------------
 # Path constants — via dh_paths
@@ -47,28 +48,79 @@ def _resolve_repo_root(project_dir: str | None = None) -> Path:
     return _dh_paths.git_project_root()
 
 
-_REPO_ROOT = _resolve_repo_root()
-BACKLOG_DIR: Path = _dh_paths.backlog_dir(_REPO_ROOT)
+@dataclasses.dataclass
+class BacklogConfig:
+    """Immutable configuration bundle set once at server startup.
+
+    Attributes:
+        repo_root: Absolute path to the repository root.
+        backlog_dir: Absolute path to the backlog directory
+            (``~/.dh/projects/{slug}/backlog/``).
+        default_repo: ``owner/repo`` slug for GitHub API calls.
+    """
+
+    repo_root: Path
+    backlog_dir: Path
+    default_repo: str
+
+
+# Single mutable config cell — replaces the three bare module globals.
+_config: BacklogConfig | None = None
+
+
+def get_config() -> BacklogConfig:
+    """Return the active :class:`BacklogConfig`.
+
+    Returns:
+        The :class:`BacklogConfig` set by the last call to :func:`init_paths`.
+
+    Raises:
+        RuntimeError: When :func:`init_paths` has not been called yet.
+    """
+    if _config is None:
+        raise RuntimeError("BacklogConfig is not initialised — call init_paths() before accessing config.")
+    return _config
 
 
 def get_repo_root() -> Path:
     """Return the current project (git) root.
 
     Returns:
-        Absolute path to the repository root.  Updated when :func:`init` is
-        called with a ``project_dir`` argument.
+        Absolute path to the repository root.  Updated when :func:`init_paths`
+        is called.
     """
-    return _REPO_ROOT
+    return get_config().repo_root
 
 
-def init(project_dir: str | None = None, repo: str | None = None) -> None:
-    """Re-initialise module-level path and repository constants.
+def get_backlog_dir() -> Path:
+    """Return the backlog directory path.
+
+    Returns:
+        Absolute path to the backlog directory
+        (``~/.dh/projects/{slug}/backlog/``).  Updated when :func:`init_paths`
+        is called.
+    """
+    return get_config().backlog_dir
+
+
+def get_default_repo() -> str:
+    """Return the default repository slug.
+
+    Returns:
+        ``owner/repo`` slug set by the last call to :func:`init_paths`, or an
+        empty string when slug discovery found nothing.
+    """
+    return get_config().default_repo
+
+
+def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
+    """Initialise (or re-initialise) the module config from startup arguments.
 
     Call this once at server startup (before any tool runs) when the server is
-    launched with ``--project-dir`` or a known ``repo`` slug.  Mutates module
-    globals ``_REPO_ROOT``, ``BACKLOG_DIR``, and ``DEFAULT_REPO`` in-place.
+    launched with ``--project-dir`` or a known ``repo`` slug.  Replaces the
+    module-level :data:`_config` instance with a new :class:`BacklogConfig`.
 
-    Path resolution now delegates to :mod:`dh_paths` so that ``BACKLOG_DIR``
+    Path resolution delegates to :mod:`dh_paths` so that ``backlog_dir``
     points to ``~/.dh/projects/{slug}/backlog/``.
 
     Args:
@@ -77,14 +129,57 @@ def init(project_dir: str | None = None, repo: str | None = None) -> None:
         repo: Explicit ``owner/repo`` slug override.  When ``None``, calls
             :func:`discover_repo` to resolve the slug dynamically.
     """
-    global _REPO_ROOT, BACKLOG_DIR, DEFAULT_REPO  # noqa: PLW0603
-    _REPO_ROOT = _resolve_repo_root(project_dir)
-    BACKLOG_DIR = _dh_paths.backlog_dir(_REPO_ROOT)
+    global _config  # noqa: PLW0603
+    repo_root = _resolve_repo_root(project_dir)
+    backlog_dir = _dh_paths.backlog_dir(repo_root)
     if repo is not None:
-        DEFAULT_REPO = _validate_repo_slug(repo)
+        default_repo = _validate_repo_slug(repo)
     else:
         discover_repo.cache_clear()
-        DEFAULT_REPO = discover_repo()
+        default_repo = discover_repo()
+    _config = BacklogConfig(repo_root=repo_root, backlog_dir=backlog_dir, default_repo=default_repo)
+
+
+#: Backward-compat alias — server.py imports ``init as _init_models``.
+init = init_paths
+
+
+# Module-level type declarations for attributes resolved via __getattr__.
+# These bare annotations do not create bindings — __getattr__ still executes
+# at runtime — but they let type checkers see the correct types.
+BACKLOG_DIR: Path
+DEFAULT_REPO: str
+_REPO_ROOT: Path
+
+
+def __getattr__(name: str) -> Path | str:
+    """Module-level ``__getattr__`` for backward-compat attribute access.
+
+    Intercepts ``_REPO_ROOT``, ``BACKLOG_DIR``, and ``DEFAULT_REPO`` so that
+    code using ``_models.BACKLOG_DIR`` continues to work without importing a
+    stale snapshot.  All three delegate to :func:`get_config`.
+
+    Returns:
+        The current value for the requested compat attribute.
+
+    Raises:
+        AttributeError: For any name not handled here.
+    """
+    if name == "BACKLOG_DIR":
+        return get_config().backlog_dir
+    if name == "DEFAULT_REPO":
+        return get_config().default_repo
+    if name == "_REPO_ROOT":
+        return get_config().repo_root
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Initialise at import time so existing code that reads module attrs before
+# calling init_paths() still works (matches pre-refactor behaviour).
+_initial_repo_root = _resolve_repo_root()
+_config = BacklogConfig(
+    repo_root=_initial_repo_root, backlog_dir=_dh_paths.backlog_dir(_initial_repo_root), default_repo=""
+)
 
 
 # ---------------------------------------------------------------------------
@@ -171,8 +266,8 @@ def _discover_via_env() -> str | None:
 def _discover_via_git() -> str | None:
     """Parse the ``origin`` remote URL via GitPython to extract ``owner/repo``.
 
-    Opens :class:`git.Repo` at :data:`_REPO_ROOT` (resolved project root from
-    :func:`dh_paths.infer_project_root`, ``DH_PROJECT_ROOT``, etc.), with
+    Opens :class:`git.Repo` at :func:`get_repo_root` (resolved project root
+    from :func:`dh_paths.infer_project_root`, ``DH_PROJECT_ROOT``, etc.), with
     ``search_parent_directories=True`` so a subdirectory of a worktree still
     resolves.  Does **not** use the process cwd — MCP stdio servers often
     start with cwd outside the user's repository (plugin cache, ``/``, IDE).
@@ -182,7 +277,7 @@ def _discover_via_git() -> str | None:
         found, there is no ``origin`` remote, or the URL cannot be parsed.
     """
     try:
-        repo = git.Repo(_REPO_ROOT, search_parent_directories=True)
+        repo = git.Repo(get_repo_root(), search_parent_directories=True)
         url = repo.remote().url
     except (git.InvalidGitRepositoryError, git.NoSuchPathError, ValueError):
         return None
@@ -237,19 +332,29 @@ def discover_repo() -> str:
     raise RepoDiscoveryError(methods_tried=methods_tried, details=details)
 
 
-#: Populated at server startup by :func:`init`. Not set at import time to avoid
-#: triggering git I/O during module import. Call :func:`discover_repo` directly
-#: when a default is needed before ``init()`` has run.
-DEFAULT_REPO: str = ""
+def resolve_repo(repo: str) -> str:
+    """Resolve a repo slug, falling back to the configured default.
+
+    Args:
+        repo: Caller-supplied ``owner/repo`` slug, or empty string to use the
+            default from :func:`get_default_repo`.
+
+    Returns:
+        ``repo`` when non-empty; otherwise the value of
+        :func:`get_default_repo`.
+    """
+    return repo or get_default_repo()
+
 
 # ---------------------------------------------------------------------------
 # Regex patterns
 # ---------------------------------------------------------------------------
 
+
 SECTION_RE = re.compile(r"^##\s+(P0|P1|P2|Ideas)")
 GITHUB_ISSUE_URL_RE = re.compile(r"https?://github\.com/([^/]+/[^/]+)/issues/(\d+)")
 COMMIT_PREFIX_RE = re.compile(r"^(feat|fix|refactor|docs|chore|perf|test|ci):\s*", re.IGNORECASE)
-_COMMIT_PREFIX_RE = COMMIT_PREFIX_RE  # backwards-compat alias; import COMMIT_PREFIX_RE in new code
+
 
 # ---------------------------------------------------------------------------
 # Scalar constants
@@ -306,6 +411,42 @@ PRIORITY_SECTIONS: dict[str, str] = {
     "Idea": "## Ideas",
     "Ideas": "## Ideas",
 }
+
+# Heading alias normalization: lowercased heading text (with hyphens, as produced by
+# legacy .md parser) -> canonical underscore section key (as used in BacklogItem.sections).
+# Consumed by parsing.py (section key normalization) and the GitHub sync adapter
+# (reverse-lookup table for known headings).
+SECTION_HEADING_ALIAS: dict[str, str] = {
+    "fact-check": "fact_check",
+    "rt-ica": "rt_ica",
+    "issue-classification": "issue_classification",
+}
+
+# ---------------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------------
+
+
+def parse_issue_number(ref: str | None) -> int | None:
+    """Parse an issue reference string to a positive integer.
+
+    Accepts ``"#123"``, ``"123"``, ``"  #123  "`` and similar forms.
+
+    Args:
+        ref: Issue reference string, e.g. ``"#42"`` or ``"42"``.
+
+    Returns:
+        Positive integer issue number, or ``None`` when *ref* is empty,
+        ``None``, or not a valid positive integer.
+    """
+    if not ref:
+        return None
+    stripped = ref.lstrip("#").strip()
+    if stripped.isdigit():
+        num = int(stripped)
+        return num if num > 0 else None
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Exception classes
@@ -415,7 +556,215 @@ class Entry(BaseModel):
     struck: bool = False
     struck_reason: str = ""
     struck_at: str = ""
-    raw: str = ""
+
+    @model_validator(mode="after")
+    def _validate_struck_requires_struck_at(self) -> Entry:
+        """Require struck_at to be non-empty when struck is True.
+
+        Returns:
+            The validated Entry instance.
+
+        Raises:
+            ValueError: When struck is True but struck_at is empty.
+        """
+        if self.struck and not self.struck_at:
+            raise ValueError("struck_at must be non-empty when struck is True")
+        return self
+
+
+class GroomedData(BaseModel):
+    """Structured grooming data for a backlog item.
+
+    Holds the grooming date and named subsections produced during grooming.
+    """
+
+    date: str = ""
+    subsections: dict[str, str] = Field(default_factory=dict)
+
+
+class Section(BaseModel):
+    """A named section within a backlog item containing an ordered list of entries."""
+
+    entries: list[Entry] = Field(default_factory=list)
+
+
+_VALID_PRIORITIES = {"P0", "P1", "P2", "Ideas", "completed"}
+_VALID_TYPES = {"Feature", "Bug", "Refactor", "Docs", "Chore"}
+_VALID_STATUSES = {"open", "done", "in-progress", "needs-grooming", "closed"}
+
+# Alias maps for legacy / variant spellings found in production files.
+_PRIORITY_ALIASES: dict[str, str] = {}  # populated below via case-insensitive idea* rule
+_TYPE_ALIASES: dict[str, str] = {"documentation": "Docs"}
+_ADDED_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class MilestoneInfo(BaseModel):
+    """Structured milestone reference embedded in backlog metadata.
+
+    Consolidates the three flat milestone fields (``milestone_number``,
+    ``milestone_due_on``, ``milestone_state``) that previously appeared
+    separately on :class:`BacklogItemMetadata` and :class:`IssueLocalFields`.
+
+    ``state`` is constrained to the two values GitHub's GraphQL API returns.
+    """
+
+    title: str = ""
+    number: int | None = None
+    due_on: str = ""
+    state: Literal["OPEN", "CLOSED"] = "OPEN"
+
+
+class BacklogItemMetadata(BaseModel):
+    """Typed metadata fields for a backlog item, persisted to YAML frontmatter.
+
+    All fields default to empty strings.  Field-level validators reject
+    non-empty values that fall outside the allowed set, so empty strings
+    always pass (items can be partially initialised during parsing).
+    """
+
+    source: str = "Not specified"
+    added: str = ""
+    priority: str = ""
+    item_type: str = Field(default="Feature", alias="type", serialization_alias="type")
+    status: str = ""
+    issue: str = ""
+    last_synced: str = ""
+    updated_at: str = ""
+    groomed: str = ""
+    plan: str = ""
+    topic: str = ""
+    research_first: str = ""
+    files: str = ""
+    suggested_location: str = ""
+    close_reason: str = ""
+    assignees: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
+    milestone: str = ""
+    milestone_info: MilestoneInfo = Field(default_factory=MilestoneInfo)
+    layer: str = ""  # SDLC Layer 0 (framework), 1 (language), 2 (stack)
+    language: str = ""  # Language plugin identifier (e.g., "python", "typescript")
+    stack: str = ""  # Stack profile identifier (e.g., "fastapi", "nextjs")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_flat_milestone_fields(cls, data: dict[str, object]) -> dict[str, object]:
+        """Populate ``milestone_info`` from legacy flat milestone fields on load.
+
+        Existing YAML frontmatter files may contain ``milestone_number``,
+        ``milestone_due_on``, and ``milestone_state`` as top-level keys.
+        This validator reads those keys and merges them into ``milestone_info``
+        so that old files load correctly without data loss.
+
+        The flat keys are consumed here and not forwarded; ``extra="ignore"``
+        on the model config ensures any remaining unknown keys are dropped.
+
+        Args:
+            data: Raw dict of field values before Pydantic model construction.
+
+        Returns:
+            Updated dict with ``milestone_info`` populated from flat keys when
+            present and ``milestone_info`` is not already supplied.
+        """
+        if not isinstance(data, dict):
+            return data
+        if "milestone_info" in data:
+            return data
+        flat_number = data.pop("milestone_number", None)
+        flat_due_on = data.pop("milestone_due_on", None)
+        flat_state = data.pop("milestone_state", None)
+        if flat_number is not None or flat_due_on is not None or flat_state is not None:
+            ms_number: int | None = int(flat_number) if isinstance(flat_number, int) else None
+            ms_due_on: str = str(flat_due_on) if isinstance(flat_due_on, str) and flat_due_on else ""
+            ms_state: Literal["OPEN", "CLOSED"] = (
+                "CLOSED" if isinstance(flat_state, str) and flat_state == "CLOSED" else "OPEN"
+            )
+            data["milestone_info"] = MilestoneInfo(number=ms_number, due_on=ms_due_on, state=ms_state)
+        return data
+
+    @field_validator("priority")
+    @classmethod
+    def _validate_priority(cls, v: str) -> str:
+        """Normalise and accept priority values, preserving unknown strings verbatim.
+
+        Canonical set: P0, P1, P2, Ideas, completed.  P3 and any other strings
+        are preserved as-is.  Case-insensitive ``idea*`` prefix is normalised
+        to ``Ideas`` (covers legacy ``IDEA``, ``Idea`` values in production files).
+
+        Args:
+            v: Raw priority value from input.
+
+        Returns:
+            Normalised or verbatim priority string.
+        """
+        if not v:
+            return v
+        if v in _VALID_PRIORITIES:
+            return v
+        if v.lower().startswith("idea"):
+            return "Ideas"
+        # Unknown value — preserve verbatim rather than rejecting.
+        return v
+
+    @field_validator("item_type", mode="before")
+    @classmethod
+    def _validate_item_type(cls, v: str) -> str:
+        """Normalise and accept item_type values, preserving unknown strings verbatim.
+
+        Canonical set: Feature, Bug, Refactor, Docs, Chore.
+        Known aliases: Documentation → Docs.
+        Unknown values (Enhancement, Tech Debt, etc.) are preserved as-is.
+
+        Args:
+            v: Raw item type value from input.
+
+        Returns:
+            Normalised or verbatim item type string.
+        """
+        if not v:
+            return v
+        if v in _VALID_TYPES:
+            return v
+        canonical = _TYPE_ALIASES.get(v.lower())
+        if canonical is not None:
+            return canonical
+        # Unknown value — preserve verbatim rather than rejecting.
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: str) -> str:
+        """Accept any non-empty status string, preserving unknown values verbatim.
+
+        Canonical set: open, done, in-progress, needs-grooming, closed.
+        Legacy values (resolved, groomed, etc.) are preserved as-is.
+
+        Args:
+            v: Raw status value from input.
+
+        Returns:
+            Status string unchanged.
+        """
+        return v
+
+    @field_validator("added")
+    @classmethod
+    def _validate_added(cls, v: str) -> str:
+        """Allow empty or a YYYY-MM-DD date string.
+
+        Args:
+            v: Raw added date value from input.
+
+        Returns:
+            Validated added date string.
+
+        Raises:
+            ValueError: When v is non-empty and does not match YYYY-MM-DD.
+        """
+        if v and not _ADDED_DATE_RE.match(v):
+            raise ValueError(f"added must be YYYY-MM-DD or empty, got {v!r}")
+        return v
 
 
 class BacklogItem(BaseModel):
@@ -424,30 +773,145 @@ class BacklogItem(BaseModel):
     Replaces the untyped ``dict`` that was previously passed between functions.
     All fields default to empty/falsy values so items can be constructed
     incrementally during parsing.
+
+    The ``metadata`` sub-model holds all YAML-persisted metadata fields.
+    Backward-compatible flat fields (``priority``, ``issue``, etc.) are
+    declared as ``exclude=True`` so they remain valid constructor parameters
+    and are kept in sync with ``metadata`` via the ``_sync_metadata``
+    model validator, but are omitted from ``model_dump()`` serialisation.
+
+    ``file_path`` and ``skip`` are runtime-only fields also excluded from
+    YAML serialisation.
+
+    Invariant: after construction, every flat accessor field has the same
+    value as its counterpart in ``metadata``.  Use either access form;
+    they are always equivalent (``item.priority == item.metadata.priority``).
     """
 
     title: str = ""
     description: str = ""
-    source: str = "Not specified"
-    added: str = ""
-    priority: str = ""
-    item_type: str = "Feature"
-    issue: str = ""
-    plan: str = ""
-    research_first: str = ""
-    files: str = ""
-    suggested_location: str = ""
+    type_: str = Field(default="", exclude=True)
+    section: str = Field(default="", exclude=True)
+    file_path: str = Field(default="", exclude=True)
+    skip: bool = Field(default=False, exclude=True)
+    metadata: BacklogItemMetadata = Field(default_factory=BacklogItemMetadata)
+    sections: dict[str, Section | GroomedData] = Field(default_factory=dict)
 
-    type_: str = ""
-    topic: str = ""
+    # ------------------------------------------------------------------
+    # Backward-compatible flat accessor fields (excluded from serialisation)
+    # These accept the values that callers previously passed directly to
+    # BacklogItem(...) before the metadata sub-model was introduced.
+    # After the _sync_metadata validator runs they mirror metadata.
+    # ------------------------------------------------------------------
 
-    section: str = ""
-    file_path: str = ""
-    skip: bool = False
-    status: str = ""
-    groomed: str = ""
-    last_synced: str = ""
-    raw_body: str = ""
+    priority: str = Field(default="", exclude=True)
+    issue: str = Field(default="", exclude=True)
+    source: str = Field(default="", exclude=True)
+    added: str = Field(default="", exclude=True)
+    status: str = Field(default="", exclude=True)
+    plan: str = Field(default="", exclude=True)
+    item_type: str = Field(default="", exclude=True)
+    groomed: str = Field(default="", exclude=True)
+    last_synced: str = Field(default="", exclude=True)
+    research_first: str = Field(default="", exclude=True)
+    files: str = Field(default="", exclude=True)
+    suggested_location: str = Field(default="", exclude=True)
+    topic: str = Field(default="", exclude=True)
+
+    @model_validator(mode="after")
+    def _sync_metadata(self) -> BacklogItem:
+        """Synchronise flat accessor fields and the metadata sub-model.
+
+        Priority chain (first non-empty value wins per field):
+        1. Flat field value supplied at construction time
+        2. Value already present in ``metadata``
+        3. Default (empty string / "Not specified" for source)
+
+        After this validator runs the flat fields are updated to reflect
+        ``metadata`` so that both access forms are equivalent.
+
+        ``section`` is also used to seed ``metadata.priority`` when
+        ``priority`` is not supplied directly.
+
+        Returns:
+            The validated BacklogItem instance with flat fields and metadata
+            in sync.
+        """
+        meta = self.metadata
+
+        # Helper: apply a flat-field value to metadata when it is non-empty
+        # and the metadata field is still at its default (empty/unset).
+        def _apply(flat_val: str, meta_attr: str, default: str = "") -> str:
+            """Return the resolved value and update metadata in place.
+
+            Args:
+                flat_val: Value supplied via the flat field.
+                meta_attr: Attribute name on BacklogItemMetadata to update.
+                default: Sentinel value that counts as "not set" on metadata.
+
+            Returns:
+                The resolved value after merging flat field and metadata.
+            """
+            meta_val: str = getattr(meta, meta_attr)
+            if flat_val and (not meta_val or meta_val == default):
+                setattr(meta, meta_attr, flat_val)
+                return flat_val
+            return meta_val
+
+        # section seeds metadata.priority when neither flat priority nor
+        # metadata.priority are set.
+        if self.section and not self.priority and not meta.priority:
+            meta.priority = self.section
+
+        _apply(self.priority, "priority")
+        _apply(self.issue, "issue")
+        _apply(self.source, "source", default="Not specified")
+        _apply(self.added, "added")
+        _apply(self.status, "status")
+        _apply(self.plan, "plan")
+        _apply(self.item_type, "item_type", default="Feature")
+        _apply(self.groomed, "groomed")
+        _apply(self.last_synced, "last_synced")
+        _apply(self.research_first, "research_first")
+        _apply(self.files, "files")
+        _apply(self.suggested_location, "suggested_location")
+        _apply(self.topic, "topic")
+
+        # type_ is an alias for metadata.item_type — treat as an override.
+        if self.type_:
+            meta.item_type = self.type_
+
+        # Re-validate metadata through BacklogItemMetadata field validators.
+        # _apply() and the direct attribute assignments above use setattr(), which
+        # bypasses Pydantic validators.  For example, priority='IDEA' stored via
+        # setattr is not normalised to 'Ideas' until the model is reconstructed.
+        # model_validate() re-runs all @field_validator methods so the stored values
+        # match what a freshly loaded YAML round-trip would produce.
+        self.metadata = BacklogItemMetadata.model_validate(meta.model_dump())
+
+        # Reflect the validated values back to the flat fields so both access
+        # forms are always equivalent.  Use self.metadata (post-validation) as
+        # the source of truth to keep flat fields in sync.
+        self.priority = self.metadata.priority
+        self.issue = self.metadata.issue
+        self.source = self.metadata.source or "Not specified"
+        self.added = self.metadata.added
+        self.status = self.metadata.status
+        self.plan = self.metadata.plan
+        self.item_type = self.metadata.item_type
+        # type_ is the BacklogItem-level alias for metadata.item_type — keep in sync
+        # so YAML-loaded items (which have type_='' on disk but metadata.item_type set)
+        # expose the correct value via item.type_.  Invariant: after construction,
+        # item.type_ == item.item_type == item.metadata.item_type.
+        self.type_ = self.metadata.item_type
+        self.groomed = self.metadata.groomed
+        self.last_synced = self.metadata.last_synced
+        self.research_first = self.metadata.research_first
+        self.files = self.metadata.files
+        self.suggested_location = self.metadata.suggested_location
+        self.topic = self.metadata.topic
+
+        return self
 
 
 class Output(BaseModel):
@@ -505,6 +969,65 @@ class PullRequestRef(BaseModel):
     url: str
 
 
+class SectionEntryDict(TypedDict):
+    """A single entry row within a :class:`SectionEntryMetadata` entries list.
+
+    Produced by :func:`operations._build_sections_from_yaml_item` from an
+    :class:`Entry` model.  Fields map directly to :attr:`Entry.id`,
+    :attr:`Entry.struck`, and :attr:`Entry.content`.
+    """
+
+    id: str
+    """Unique identifier for this entry block, derived from its timestamp."""
+
+    struck: bool
+    """``True`` when the entry has been struck (retracted); ``False`` while active."""
+
+    content: str
+    """Full text content of the entry."""
+
+
+class SectionEntryMetadata(TypedDict):
+    """Per-section entry counts and row metadata for regular (entry-block) sections.
+
+    Returned as values in :attr:`ViewItemResult.sections` when the section contains
+    timestamped entry blocks (``<div><sub>…</sub>…</div>``).  Use the ``"entries"``
+    key to iterate individual entry dicts; each entry dict follows the
+    :class:`SectionEntryDict` shape.
+
+    Discriminated from :class:`GroomedSectionMetadata` by the absence of a ``"type"``
+    key (or by checking ``isinstance(value, dict) and "entries" in value``).
+    """
+
+    num_entries: int
+    """Count of active (non-struck) entries in this section."""
+
+    num_struck: int
+    """Count of struck (completed/removed) entries in this section."""
+
+    entries: list[SectionEntryDict]
+    """List of entry dicts following :class:`SectionEntryDict` shape."""
+
+
+class GroomedSectionMetadata(TypedDict):
+    """Per-section metadata for groomed sections in :attr:`ViewItemResult.sections`.
+
+    Returned as values in :attr:`ViewItemResult.sections` when the section was
+    produced by a grooming pass (i.e. backed by a :class:`GroomedData` model).
+    Discriminated from :class:`SectionEntryMetadata` by the presence of
+    ``"type": "groomed"``.
+    """
+
+    type: str
+    """Discriminator — always ``"groomed"`` for this shape."""
+
+    date: str
+    """ISO date string of when the item was groomed."""
+
+    subsections: dict[str, str]
+    """Named subsections produced during grooming."""
+
+
 class ViewItemResult(BaseModel):
     """Result of viewing a single backlog item, optionally enriched with GitHub data."""
 
@@ -516,14 +1039,24 @@ class ViewItemResult(BaseModel):
     plan: str = ""
     issue: str = ""
     file_path: str = ""
-    groomed: bool = False
+    groomed: str = ""
     status: str = ""
     number: int | None = None
     state: str = ""
     body: str = ""
     labels: list[str] = Field(default_factory=list)
     milestone: str = ""
-    sections: dict[str, dict[str, object]] = Field(default_factory=dict)
+    sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = Field(default_factory=dict)
+    sections_metadata: list[SectionMeta] = Field(default_factory=list)
+    sections_index: str = ""
+    body_truncated: bool = False
+    body_remaining_entries: int | None = None
+    body_total_entries: int | None = None
+    body_remaining_lines: int | None = None
+    body_total_lines: int | None = None
+    messages: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
 
 
 class SectionMeta(ExtTypedDict):
@@ -559,7 +1092,7 @@ class ViewItemResultCompact(BaseModel):
     plan: str = ""
     issue: str = ""
     file_path: str = ""
-    groomed: bool = False
+    groomed: str = ""
     status: str = ""
     number: int | None = None
     state: str = ""
@@ -583,6 +1116,9 @@ class IssueLocalFields(BaseModel):
     status: str = "open"
     updated_at: str = ""
     milestone: str = ""
+    milestone_info: MilestoneInfo = Field(default_factory=MilestoneInfo)
+    assignees: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
 
 
 class SamTask(BaseModel):
@@ -673,7 +1209,7 @@ class BackendAvailability(StrEnum):
 class BackendStatus(BaseModel):
     """GitHub backend availability status included in every ``backlog_list`` response.
 
-    Populated by ``probe_backend_status()`` in ``backlog_core.github``.  Fields
+    Populated by ``probe_backend_status()`` in ``backlog_core.gh_client``.  Fields
     default to their "unknown" states so the model is always safe to construct
     without arguments.
 

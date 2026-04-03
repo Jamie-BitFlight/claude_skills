@@ -77,6 +77,10 @@ repos:
     hooks:
       - id: pypfmt
         name: Sort and format pyproject.toml with pypfmt
+        language: system
+        # PYTHONUTF8=1 required: pypfmt calls taplo via subprocess.run(text=True)
+        # which defaults to cp1252 on Windows, causing taplo to fail silently.
+        entry: env PYTHONUTF8=1 uv run -q --with pypfmt pypfmt
         files: ^pyproject\.toml$
 
   # Python formatting and linting
@@ -128,19 +132,19 @@ repos:
         pass_filenames: false
         files: ^plugins/
 
-      # - id: skilllint
-      #   name: Validate and fix plugins, skills, agents, commands
-      #   entry: uvx skilllint@latest check --fix
-      #   language: system
-      #   stages: [pre-commit]
-      #   pass_filenames: true
-      #   # TODO: re-add hooks\.json after skilllint publishes TaskCompleted event support
-      #   files: ^(plugins|\.claude)/.*(SKILL\.md|CLAUDE\.md|agents/.*\.md|commands/.*\.md|plugin\.json)$
+      - id: skilllint
+        name: Validate and fix plugins, skills, agents, commands
+        entry: uvx skilllint@latest check --fix
+        language: system
+        stages: [pre-commit]
+        pass_filenames: true
+        # TODO: re-add hooks\.json after skilllint publishes TaskCompleted event support
+        files: ^(plugins|\.claude)/.*(SKILL\.md|CLAUDE\.md|agents/.*\.md|commands/.*\.md|plugin\.json)$
 
       - id: check-compat-annotations
         name: Check COMPAT annotation completeness
-        entry: scripts/check_compat_annotations.py
-        language: python
+        entry: uv run -q scripts/check_compat_annotations.py
+        language: system
         types: [python]
 
       - id: ty

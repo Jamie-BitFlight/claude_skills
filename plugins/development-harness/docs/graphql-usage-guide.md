@@ -4,7 +4,7 @@ Reference for implementers and agent authors working with GitHub issue fetching 
 
 ## Entry Point: `sync_issues_graphql`
 
-`sync_issues_graphql` in `backlog_core/github.py` is the **only function to call for bulk issue fetching**. It handles cursor pagination, callback dispatch, and optional timestamp tracking internally.
+`sync_issues_graphql` in `backlog_core/gh_client.py` is the **only function to call for bulk issue fetching**. It handles cursor pagination, callback dispatch, and optional timestamp tracking internally.
 
 Do not call `_fetch_issues_graphql` directly — it is an internal primitive called by `sync_issues_graphql`. Calling it directly bypasses pagination, callback dispatch, and timestamp tracking.
 
@@ -94,7 +94,7 @@ SOURCE: Observed during GraphQL migration (issues #916, #1018, #1020), 2026-03-2
 
 ## References
 
-- `backlog_core/github.py` — `sync_issues_graphql` and `_fetch_issues_graphql` implementation
+- `backlog_core/gh_client.py` — `sync_issues_graphql` and `_fetch_issues_graphql` implementation
 - `backlog_core/operations.py` — callers of `sync_issues_graphql`
 - `backlog_core/server.py` — MCP tool wrappers
 - [backend-providers.md](./backend-providers.md) — GitHub backend architecture and ADR-004 reference

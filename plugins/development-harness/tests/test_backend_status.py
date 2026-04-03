@@ -17,9 +17,10 @@ import json
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import backlog_core.models as _bc_models
 import pytest
-from backlog_core.github import probe_backend_status
-from backlog_core.models import BackendAvailability, BackendStatus
+from backlog_core.gh_client import probe_backend_status
+from backlog_core.models import BackendAvailability, BackendStatus, BacklogConfig
 from backlog_core.server import mcp
 from fastmcp.client import Client
 from github import GithubException
@@ -315,13 +316,24 @@ def probe_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir()
 
-    # Redirect BACKLOG_DIR used by probe_backend_status via _models.BACKLOG_DIR
-    monkeypatch.setattr("backlog_core.models.BACKLOG_DIR", backlog_dir)
+    # Redirect BACKLOG_DIR used by probe_backend_status via _config.backlog_dir.
+    # monkeypatch.setattr on BACKLOG_DIR no longer works after the BacklogConfig
+    # refactor — get_backlog_dir() reads from _config, not a module-level var.
+    existing = _bc_models._config
+    monkeypatch.setattr(
+        _bc_models,
+        "_config",
+        BacklogConfig(
+            repo_root=tmp_path,
+            backlog_dir=backlog_dir,
+            default_repo=existing.default_repo if existing is not None else "",
+        ),
+    )
 
     # Redirect dh_paths.state_root() so .last_sync resolves under tmp_path
     state_root = tmp_path / "state"
     state_root.mkdir()
-    monkeypatch.setattr("backlog_core.github._dh_paths", _make_dh_paths_mock(state_root))
+    monkeypatch.setattr("backlog_core.gh_client._dh_paths", _make_dh_paths_mock(state_root))
 
     return backlog_dir
 
@@ -408,7 +420,7 @@ class TestProbeBackendStatusReachable:
         mock_issues.totalCount = 20
         mock_repo.get_issues.return_value = mock_issues
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.availability == BackendAvailability.REACHABLE
@@ -428,7 +440,7 @@ class TestProbeBackendStatusReachable:
         mock_issues.totalCount = 20
         mock_repo.get_issues.return_value = mock_issues
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.open_count == 5
@@ -448,7 +460,7 @@ class TestProbeBackendStatusReachable:
         mock_issues.totalCount = 20
         mock_repo.get_issues.return_value = mock_issues
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.total_count == 20
@@ -476,7 +488,7 @@ class TestProbeBackendStatusGitHubUnreachable:
         """
         monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
 
-        with patch("backlog_core.github.try_get_github", return_value=None):
+        with patch("backlog_core.gh_client.try_get_github", return_value=None):
             result = probe_backend_status()
 
         assert result.availability == BackendAvailability.ERROR
@@ -490,7 +502,7 @@ class TestProbeBackendStatusGitHubUnreachable:
         """
         monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_token")
 
-        with patch("backlog_core.github.try_get_github", return_value=None):
+        with patch("backlog_core.gh_client.try_get_github", return_value=None):
             result = probe_backend_status()
 
         assert result.error != ""
@@ -523,7 +535,7 @@ class TestProbeBackendStatusRateLimited:
         exc = GithubException(status=403, data={"message": "rate limited"}, headers={})
         type(mock_repo).open_issues_count = property(lambda self: (_ for _ in ()).throw(exc))
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.availability == BackendAvailability.RATE_LIMITED
@@ -556,7 +568,7 @@ class TestProbeBackendStatusCountFetchFailure:
         exc = GithubException(status=500, data={"message": "server error"}, headers={})
         type(mock_repo).open_issues_count = property(lambda self: (_ for _ in ()).throw(exc))
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.availability == BackendAvailability.REACHABLE
@@ -574,7 +586,7 @@ class TestProbeBackendStatusCountFetchFailure:
         exc = GithubException(status=500, data={"message": "server error"}, headers={})
         type(mock_repo).open_issues_count = property(lambda self: (_ for _ in ()).throw(exc))
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.open_count is None
@@ -592,7 +604,7 @@ class TestProbeBackendStatusCountFetchFailure:
         exc = GithubException(status=500, data={"message": "server error"}, headers={})
         type(mock_repo).open_issues_count = property(lambda self: (_ for _ in ()).throw(exc))
 
-        with patch("backlog_core.github.try_get_github", return_value=mock_repo):
+        with patch("backlog_core.gh_client.try_get_github", return_value=mock_repo):
             result = probe_backend_status()
 
         assert result.error != ""
@@ -688,7 +700,7 @@ class TestProbeBackendStatusLastSync:
         timestamp = "2026-03-23T10:30:00Z"
 
         # Get the state_root path that the probe will read from
-        import backlog_core.github as _gh_module
+        import backlog_core.gh_client as _gh_module
 
         state_root = _gh_module._dh_paths.state_root()
         (state_root / ".last_sync").write_text(timestamp, encoding="utf-8")
@@ -706,7 +718,7 @@ class TestProbeBackendStatusLastSync:
         """
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
 
-        import backlog_core.github as _gh_module
+        import backlog_core.gh_client as _gh_module
 
         state_root = _gh_module._dh_paths.state_root()
         last_sync_path = state_root / ".last_sync"

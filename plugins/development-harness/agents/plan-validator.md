@@ -1,10 +1,11 @@
 ---
 name: plan-validator
 description: Validates implementation plans BEFORE execution begins. Checks for completeness, contradictions, missing dependencies, and executability. Returns READY or BLOCKED with specific gaps. Prevents wasted effort from flawed plans.
-tools: Read, Grep, Glob, Bash, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
+tools: Read, Grep, Glob, Bash, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam__sam_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_list
 model: haiku
 skills:
-  - subagent-contract
+  - dh:subagent-contract
+  - ccc
 color: green
 ---
 
@@ -364,13 +365,29 @@ issue:
 
 ## Step 1: Read Plan Files
 
-```bash
-# Read task file
-Read(path="[task_file_path]")
+Plans live in the DH state directory outside the repo. Access them via SAM MCP — never via filesystem path.
 
-# Read architecture spec
-Read(path="[architect_file_path]")
+```text
+# Read plan and all its tasks
+sam_read(plan="{plan_id}")          # plan_id: P123 or slug
+
+# Read a specific task
+sam_read(plan="{plan_id}", task="T1")
+
+# List plans to find the right one
+sam_list(search="{feature_slug}")
 ```
+
+When delegated with a plan path like `plan/P1129-some-slug.yaml`, extract the plan ID (`P1129`) and use `sam_read(plan="P1129")`. Do NOT attempt to read the file at the literal path — it is not repo-relative.
+
+Read the architect spec and feature context via artifact MCP tools:
+
+```text
+artifact_read(issue_number={N}, artifact_type="architect")
+artifact_read(issue_number={N}, artifact_type="feature-context")
+```
+
+If no issue number is available, read them via `artifact_list(issue_number={N})` first to discover paths, then `artifact_read`.
 
 ## Step 2: Extract Feature Goals
 

@@ -13,30 +13,34 @@ All logic originates from: `.claude/skills/backlog/scripts/backlog.py`
 
 Each agent MUST read the full source file and extract ONLY the functions assigned to their module.
 
-## Dependency: frontmatter_utils
+## I/O Modules (post-YAML migration)
 
-`backlog.py` imports `frontmatter_utils` from `plugins/plugin-creator/scripts/`.
-This import path must be set up in `parsing.py` (the only module that uses it directly).
+Local file I/O is handled by two dedicated modules:
 
-```python
-import sys
-from pathlib import Path
+- `yaml_io.py` — pure-YAML read/write for backlog items (`.yaml` format). Primary path for all
+  new items. Uses `ruamel.yaml` directly; no `python-frontmatter` dependency.
+- `github_sync.py` — bidirectional GitHub issue body conversion. `render_issue_body` serialises a
+  `BacklogItem` to GitHub markdown; `parse_issue_body` reconstructs a `BacklogItem` from issue
+  body text; `merge_item` merges local and remote items with conflict resolution rules. Uses
+  `entry_blocks.py` for timestamped div block handling.
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
-sys.path.insert(0, str(_REPO_ROOT / "plugins" / "plugin-creator" / "scripts"))
-from frontmatter_utils import dump_frontmatter, loads_frontmatter
-```
+**Bulk migration**: `scripts/migrate_backlog_to_yaml.py` converts an existing backlog directory
+from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_item` and
+`yaml_io.save_item` and deletes the source `.md` file after a successful write.
 
 ## Module Dependency Graph
 
 ```text
-models.py          ← standalone, no imports from other mcp modules
-parsing.py         ← imports from models
-github.py          ← imports from models, parsing
-operations.py      ← imports from models, parsing, github
-dispatch_state.py  ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
-server.py          ← imports from models, operations, dispatch_state
-backlog.py         ← imports from operations (thin CLI wrapper)
+models.py             ← standalone, no imports from other mcp modules
+parsing.py            ← imports from models; provides loads_frontmatter/dump_frontmatter (ruamel.yaml-based)
+entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
+yaml_io.py            ← pure-YAML read/write for .yaml backlog items; imports from models, parsing
+github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
+gh_client.py             ← imports from models, parsing
+operations.py         ← imports from models, parsing, github, yaml_io
+dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
+server.py             ← imports from models, operations, dispatch_state
+backlog.py            ← imports from operations (thin CLI wrapper)
 ```
 
 ## Output Pattern
@@ -47,6 +51,23 @@ Functions that previously used `typer.echo()` for status/progress messages must 
 # In models.py — ALL models use Pydantic BaseModel
 from pydantic import BaseModel, Field
 
+class Entry(BaseModel):
+    """Timestamped addressable content entry within a section."""
+    id: str                        # ISO timestamp used as primary key
+    content: str
+    struck: bool = False
+    struck_at: str = ""
+    struck_reason: str = ""
+
+class Section(BaseModel):
+    """A section containing a list of timestamped entries."""
+    entries: list[Entry] = Field(default_factory=list)
+
+class GroomedData(BaseModel):
+    """Structured groomed section with a date and named subsections."""
+    date: str = ""
+    subsections: dict[str, str] = Field(default_factory=dict)
+
 class BacklogItem(BaseModel):
     """Parsed backlog item — replaces untyped dict."""
     title: str = ""
@@ -54,18 +75,20 @@ class BacklogItem(BaseModel):
     source: str = "Not specified"
     added: str = ""
     priority: str = ""
+    status: str = ""
     item_type: str = "Feature"
     issue: str = ""
     plan: str = ""
-    research_first: str = ""
-    files: str = ""
-    suggested_location: str = ""
     section: str = ""
     file_path: str = ""
     skip: bool = False
-    groomed: str = ""
     last_synced: str = ""
-    raw_body: str = ""
+    sections: dict[str, Section | GroomedData] = Field(default_factory=dict)
+
+# Notes:
+# - `file_path` and `skip` are excluded from YAML serialisation (yaml_io.save_item).
+# - `sections` holds Entry-bearing sections ("fact_check", "rt_ica", "issue_classification")
+#   plus a "groomed" key (GroomedData). Populated by github_sync.parse_issue_body.
 
 class Output(BaseModel):
     messages: list[str] = Field(default_factory=list)
@@ -109,7 +132,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - Constants: `BACKLOG_DIR`, `DEFAULT_REPO`, `SECTION_RE`, `SKIP_STATUS`, `GITHUB_ISSUE_URL_RE`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `MIN_FRONTMATTER_PARTS`, `TYPE_TO_LABEL`, `ROLE_MAP`, `BENEFIT_MAP`, `FUZZY_DUPLICATE_THRESHOLD`, `_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`
 - Add new: `PRIORITY_SECTIONS` dict mapping priority strings to section headings (from the `add` command)
 - Exception classes: `BacklogError`, `ItemNotFoundError`, `DuplicateItemError`, `GitHubUnavailableError`, `ValidationError`
-- Pydantic models: `BacklogItem`, `Output`, `IssueStatus`, `PullRequestRef`, `ViewItemResult`, `IssueLocalFields`
+- Pydantic models: `Entry`, `Section`, `GroomedData`, `BacklogItem`, `Output`, `IssueStatus`, `PullRequestRef`, `ViewItemResult`, `IssueLocalFields`
 
 **Exports** (public API):
 All constants, all exception classes, all Pydantic models.
@@ -120,30 +143,101 @@ All constants, all exception classes, all Pydantic models.
 
 ## Module: parsing.py
 
-**Responsibility**: File parsing, item search, slug generation, frontmatter building, body section utilities, view helpers, normalize helpers.
+**Responsibility**: File parsing, item search, slug generation, body section utilities, view helpers, normalize helpers.
 
-**Functions extracted from backlog.py**:
+**Current active functions** (post-YAML migration):
 
-- Date helpers: `_today()` → `today()`, `_now_iso()` → `now_iso()`
-- Slug/title: `_title_to_slug()` → `title_to_slug()`, `_normalize_issue_title()` → `normalize_issue_title()`, `_infer_type()` → `infer_type()`
-- Selector: `_parse_issue_selector()` → `parse_issue_selector()`
-- Item parsing: `_parse_item_file()` → `parse_item_file()`, `_parse_backlog_from_directory()` → `parse_backlog_from_directory()`, `parse_backlog()`
-- Item search: `find_item()`, `_find_fuzzy_duplicates()` → `find_fuzzy_duplicates()`
+- Date helpers: `today()`, `now_iso()`
+- Slug/title: `title_to_slug()`, `normalize_issue_title()`, `infer_type()`
+- Selector: `parse_issue_selector()`
+- Item parsing: `parse_item_file()` (legacy `.md` path — deprecated, kept for migration tooling),
+  `parse_backlog_from_directory()`, `parse_backlog()`
+- Item search: `find_item()`, `find_fuzzy_duplicates()`
 - Item filtering: `items_needing_issues()`, `items_with_issues()`
-- Frontmatter: `_build_backlog_frontmatter()` → `build_backlog_frontmatter()`, `build_issue_body()`, `_build_issue_body_from_file()` → `build_issue_body_from_file()`
-- Body utilities: `_extract_body_field_pairs()`, `_apply_field_to_result()`, `_merge_field_into_result()`, `_parse_body_extra_fields()`, `_extract_groomed_section()`, `_build_body_extra_only()`, `_append_or_replace_section()`
-- Section merging: `_extract_description_from_issue_body()`, `_extract_sections()`, `_reconstruct_body_from_sections()`, `_merge_sections()`
-- View helper: `_view_result_from_local_item()` → `view_result_from_local_item()`
-- Normalize helper: `_extract_normalize_metadata()` → `extract_normalize_metadata()`
+- Issue body: `build_issue_body()`, `build_issue_body_from_file()`
+- Body utilities: `extract_groomed_section()`, `build_body_extra_only()`, `merge_sections()`
+- Section extraction (used by `github_sync.py`): `extract_sections()`, `extract_groomed_section()`
+- View helper: `view_result_from_local_item()`
+- Normalize helper: `extract_normalize_metadata()`
 
-**Exports**: All functions listed above (without leading underscores).
-Also re-exports `loads_frontmatter` and `dump_frontmatter` from `frontmatter_utils` for use by other modules.
+**Exports**: All functions above (without leading underscores).
 
-**Imports from other modules**: `from .models import ...` (constants only).
+**Imports from other modules**: `from .models import ...`, `from ruamel.yaml import YAML, YAMLError`.
 
 ---
 
-## Module: github.py
+## Module: entry_blocks.py
+
+**Responsibility**: Parse, render, rewrite, and diff timestamped HTML div entry blocks embedded in
+GitHub issue section bodies. Each entry is identified by an ISO timestamp used as a primary key.
+
+**Public functions**:
+
+- Wrap: `wrap_entry(content)` — wraps content in a new timestamped `<div><sub>…</sub></div>` block
+- Wrap with specific timestamp: `wrap_entry_with_timestamp(content, timestamp)` — for legacy migration and overwrites
+- Parse: `parse_entries(section_body, show, since, added_date)` — parses all entry blocks from a section body string; `show` accepts `"all"`, `"last"`, `"first"`, `"struck"`, positive/negative int
+- Strike: `strike_entry(entry_raw, reason)` — wraps entry content in a `<details>` struck block
+- Rewrite: `rewrite_section(existing_body, new_content, entry_id, replace, reason, added_date)` — orchestrates append, targeted-entry replace, or full-replace-and-strike operations
+- Diff: `generate_diff(local, remote)` — git-diff-style comparison of entry blocks between two section bodies
+
+**Imports from other modules**: `from .models import Entry`, `from .parsing import now_iso`
+
+---
+
+## Module: yaml_io.py
+
+**Responsibility**: Pure-YAML read/write for `.yaml` backlog item files. Primary I/O path for all
+new items. Provides a format-detecting reader that falls back to the legacy `.md` parser during
+transition.
+
+**Public API** (`__all__`): `detect_format`, `load_item`, `load_item_text`, `save_item`
+
+- `detect_format(path)` — returns `"yaml"` or `"legacy_md"` based on file suffix; raises `ValueError` for unsupported extensions
+- `load_item(path)` — reads `BacklogItem` from `.yaml` or `.md` file; `.md` emits `DeprecationWarning`
+- `load_item_text(text, path)` — parses `BacklogItem` from in-memory string; format determined by `path` suffix; file need not exist on disk
+- `save_item(item, path)` — serialises `BacklogItem` to YAML; excludes `file_path` and `skip`; line-wrapping disabled
+
+**Key behaviours**:
+- Uses `ruamel.yaml` (typ="safe" for reads, typ="rt" for writes); no `python-frontmatter` dependency
+- `.md` load path delegates to `parsing.parse_item_file()` and emits `DeprecationWarning`
+
+**Imports from other modules**: `from .models import BacklogItem`, `from .parsing import parse_item_file`
+
+---
+
+## Module: github_sync.py
+
+**Responsibility**: Bidirectional conversion between `BacklogItem` and GitHub issue body markdown.
+Operations layer never writes raw markdown body strings directly — they go through this adapter.
+
+**Public API** (`__all__`): `render_issue_body`, `parse_issue_body`, `merge_item`
+
+- `render_issue_body(item)` — serialises `BacklogItem` to GitHub markdown; embeds metadata in an
+  invisible `<!-- backlog-metadata: -->` HTML comment; renders description, entry-bearing sections,
+  and groomed section in canonical order
+- `parse_issue_body(body, existing)` — reconstructs `BacklogItem` from issue body text; extracts
+  metadata comment for priority/type/status/added; maps `## Section` headings to typed section
+  models; non-body fields are carried over from `existing` when provided
+- `merge_item(local, remote)` — merges remote into local; local metadata is authoritative; sections
+  are merged per-entry (struck state wins over active; longer content wins on tie; unique entries
+  from either side are preserved)
+
+**Known section keys** (BacklogItem.sections):
+- `"fact_check"` → `## Fact-Check`
+- `"rt_ica"` → `## RT-ICA`
+- `"issue_classification"` → `## Issue Classification`
+- `"groomed"` → `## Groomed (date)` (GroomedData type, not Section)
+
+**Dependency direction**: `models ← parsing ← entry_blocks ← github_sync` (must remain acyclic;
+do not import from `gh_client.py`, `operations.py`, or `server.py`)
+
+**Imports from other modules**: `from .entry_blocks import parse_entries`,
+`from .models import BacklogItem, Entry, GroomedData, Section`,
+`from .parsing import extract_sections`
+
+---
+
+## Module: gh_client.py
 
 **Responsibility**: GitHub API connection, issue CRUD, status/label management, view enrichment.
 
@@ -190,7 +284,8 @@ Also re-exports `loads_frontmatter` and `dump_frontmatter` from `frontmatter_uti
 **Imports from other modules**:
 - `from .models import ...`
 - `from .parsing import ...`
-- `from .github import ...`
+- `from .gh_client import ...`
+- `from .yaml_io import ...`
 
 ---
 
@@ -253,6 +348,75 @@ Also re-exports `loads_frontmatter` and `dump_frontmatter` from `frontmatter_uti
 **Storage**: SQLite at `~/.dh/projects/{project-slug}/dispatch-state.db`. `server.py` initialises the path; `dispatch_state.py` does not resolve it.
 
 **Imports from other modules**: `from .models import DispatchItemRecord, DispatchWaveRecord`
+
+---
+
+## Lifespan Bootstrap
+
+At server startup, `server.py` auto-bootstraps the [beads](https://github.com/beads-dev/beads) toolchain so every user gets the `bd` binary, `.beads/` project database, and Claude PreCompact/SessionStart hooks without manual setup.
+
+### How It Wires In
+
+The FastMCP constructor receives a `lifespan=_beads_lifespan` parameter (see `server.py`, `FastMCP(...)` call). FastMCP invokes this hook once per server startup (or once per `Client(mcp)` context manager entry in tests). The hook runs `_bootstrap_beads()` in a thread executor before yielding to accept tool calls:
+
+```text
+FastMCP startup → _beads_lifespan → asyncio.run_in_executor(_bootstrap_beads) → yield → tools available
+```
+
+The `@lifespan` decorator is imported from `fastmcp.server.lifespan`.
+
+### Sentinel Pattern
+
+A module-level `_beads_bootstrapped: bool = False` sentinel prevents repeated execution. The sentinel is checked at the top of `_bootstrap_beads()` and set to `True` on every exit path (including degradation paths). This matters because tests open multiple `Client(mcp)` connections — without the sentinel, bootstrap would run on every connection.
+
+Tests reset the sentinel via `monkeypatch.setattr("backlog_core.server._beads_bootstrapped", False)`.
+
+### Bootstrap Decision Tree
+
+```mermaid
+flowchart TD
+    Start([_bootstrap_beads called]) --> S{_beads_bootstrapped?}
+    S -->|True| Skip([return immediately])
+    S -->|False| BD{shutil.which bd?}
+    BD -->|found| HasBeads{.beads/ exists?}
+    HasBeads -->|No| InitHappy[bd init --stealth --quiet]
+    HasBeads -->|Yes| Setup
+    InitHappy --> Setup[bd setup claude --project --stealth]
+    Setup --> SetTrue1([_beads_bootstrapped = True])
+    BD -->|not found| NPM{shutil.which npm?}
+    NPM -->|not found| WarnNPM[log warning: npm not available]
+    WarnNPM --> SetTrue2([_beads_bootstrapped = True])
+    NPM -->|found| Install[npm install -g @beads/bd]
+    Install --> BDAgain{shutil.which bd?}
+    BDAgain -->|not found| WarnFail[log warning: npm install failed silently]
+    WarnFail --> SetTrue3([_beads_bootstrapped = True])
+    BDAgain -->|found| InitInstall[bd init --stealth --quiet]
+    InitInstall --> SetupInstall[bd setup claude --project --stealth]
+    SetupInstall --> SetTrue4([_beads_bootstrapped = True])
+```
+
+### Execution Paths
+
+| Path | Condition | Actions |
+|------|-----------|---------|
+| Happy (bd present, `.beads/` exists) | `bd` on PATH, `.beads/` directory exists | `bd setup claude --project --stealth` |
+| Happy (bd present, no `.beads/`) | `bd` on PATH, `.beads/` missing | `bd init --stealth --quiet`, then `bd setup claude --project --stealth` |
+| Install | `bd` absent, `npm` present | `npm install -g @beads/bd`, `bd init`, `bd setup` |
+| Degraded — npm absent | `bd` absent, `npm` absent | Warning logged, returns |
+| Degraded — install failed | `bd` absent, `npm` present but install silent-failed | Warning logged, returns |
+
+### Subprocess Call Contracts
+
+All subprocess calls in `_bootstrap_beads()` follow these rules:
+
+- `check=False` — non-zero exits do not raise exceptions; the next `shutil.which()` check determines outcome
+- `capture_output=True` — suppresses stdout/stderr from subprocess; prevents MCP transport pollution
+- `cwd=project_dir` — set on all `bd` commands; absent on `npm install` (npm installs globally)
+- Command as list (never `shell=True`) — prevents shell injection
+
+### Project Directory Source
+
+Bootstrap receives the project root from `models.get_repo_root()`, which returns the path set during `_init_models()` at module import time. The sequence is: `sys.argv` → `_parse_args()` → `_init_models(project_dir)` → `models._REPO_ROOT` → `models.get_repo_root()` → `_bootstrap_beads(project_dir)`.
 
 ---
 

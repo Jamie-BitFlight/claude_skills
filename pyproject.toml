@@ -1,13 +1,14 @@
 [project]
 name = "claude_skills"
-version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "backlog-core",
     "fastmcp[tasks]>=3.0.2",
+    "marko>=2.2.2",
     "pygithub>=2.8.1",
     "skill-seekers>=3.0.0",
 ]
+version = "0.1.0"
 
 [dependency-groups]
 dev = [
@@ -56,84 +57,8 @@ dev = [
     "typer>=0.21.0",
     "uv-sort>=0.7.0",
     "vadersentiment>=3.3.2",
-    "zvec>=0.2.0",
+    "zvec>=0.2.0; sys_platform != 'win32'",
 ]
-
-[tool.uv.sources]
-backlog-core = { workspace = true }
-
-[tool.uv.workspace]
-members = ["plugins/development-harness"]
-
-[tool.pytest.ini_options]
-addopts = [
-    "--cov=scripts",
-    "--cov=plugins",
-    "--strict-config",
-    "--strict-markers",
-    "--tb=short",
-    "--import-mode=importlib",
-    "-n",
-    "auto",
-    "--dist",
-    "loadgroup",
-]
-asyncio_mode = "auto"
-markers = [
-    "demos: marks tests as demonstration tests",
-    "e2e: marks tests as end-to-end tests",
-    "integration: marks tests as integration tests",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "unit: marks tests as unit tests",
-]
-pythonpath = [
-    ".",
-    "./.claude/skills/create-merge-request-changelog/scripts",
-    "./.claude/skills/gh/scripts",
-    "./.claude/skills/research-curator/scripts",
-    "./plugins/development-harness/scripts",
-    "./plugins/development-harness/skills/implementation-manager/scripts",
-    "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
-    "./plugins/gitlab-skill/skills/gitlab-skill/scripts",
-    "./plugins/holistic-linting/skills/holistic-linting/scripts",
-    "./plugins/plugin-creator/scripts",
-    "./plugins/plugin-creator/skills/skill-creator/scripts",
-    "./plugins/python3-development/scripts",
-    "./plugins/python3-development/skills/mkdocs/scripts",
-    "./plugins/python3-development/skills/uv/scripts",
-    "./plugins/summarizer/scripts",
-    "./plugins/frustration-analyzer/tests",
-]
-testpaths = [
-    # Explicit list excludes plugins/scientific-method/mcp/experiment-registry/tests,
-    # which is a standalone sub-project with its own pyproject.toml and pytest config.
-    # That sub-project must be tested independently: cd into its directory and run pytest.
-    # Including it here causes a conftest module name collision because uv adds the
-    # experiment-registry package root to sys.path, making tests/conftest.py resolve
-    # as "tests.conftest" — the same name as plugins/development-harness/tests/conftest.py.
-    "plugins/agentskill-kaizen/tests",
-    "plugins/development-harness/tests",
-    "plugins/development-harness/tests_sam",
-    "plugins/frustration-analyzer/tests",
-    "plugins/plugin-creator/tests",
-    "plugins/development-harness/skills/implementation-manager/tests",
-    "plugins/summarizer/tests",
-    "tests",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if __name__ == .__main__.:",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
-]
-
-[tool.coverage.run]
-omit = ["tests/*", "*/tests/*", "**/test_*.py"]
-source = ["**/scripts"]
 
 [tool.ty.environment]
 extra-paths = [
@@ -203,19 +128,19 @@ too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decor
 # regular files whose content is the target path; linters parse that as Python and fail.
 # All 6 repo symlinks: 5 .md (accessing_online_resources), 1 dir (plugins/uv/skills/uv).
 # Only the dir needs exclusion for Python linting.
-exclude = [
-    "plugins/uv/skills/uv",
-    ".tmp",
-]
+exclude = ["plugins/uv/skills/uv", ".tmp"]
 include = ["**/*.py"]
+
+[tool.uv.sources]
+backlog-core = { workspace = true }
+
+[tool.uv.workspace]
+members = ["plugins/development-harness"]
 
 [tool.ruff]
 # Exclude git symlinks - Windows reads target path as file content; linters fail.
 # See [tool.ty.src] exclude for full list. Add new symlinked .py paths here.
-extend-exclude = [
-    "plugins/uv/skills/uv",
-    ".tmp",
-]
+extend-exclude = ["plugins/uv/skills/uv", ".tmp"]
 fix = true
 line-length = 120
 src = ["**/scripts", ".github", ".gitlab", "plugins", "tests", "typings"]
@@ -292,24 +217,28 @@ ignore = [
 preview = true
 unfixable = ["F401"]
 
-[tool.ruff.lint.flake8-quotes]
-docstring-quotes = "double"
-
-[tool.ruff.lint.isort]
-combine-as-imports = true
-force-single-line = false
-force-wrap-aliases = false
-required-imports = ["from __future__ import annotations"]
-split-on-trailing-comma = false
-
-[tool.ruff.lint.mccabe]
-max-complexity = 12
-
 [tool.ruff.lint.per-file-ignores]
 # Anti-pattern examples: intentionally incorrect code demonstrating what NOT to do
 "**/assets/nested-typer-exceptions/*.py" = ["ANN", "DOC"]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
 "**/assets/version.py" = ["PLC0415"]
+# BacklogBackend Protocol must expose all 41 operations from gh_client/github_sync/github_branches
+# PLR0904 limit (20) is not applicable to Protocol classes that define a full backend surface
+"**/backlog_core/backend_protocol.py" = ["PLR0904"]
+# GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
+# SLF001 — protocol surface includes _-prefixed methods that delegate to _-prefixed gh_client functions by design
+"**/backlog_core/backends/github_backend.py" = ["PLR0904", "SLF001"]
+# InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
+# DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
+"**/backlog_core/backends/memory_backend.py" = ["DOC201", "PLR0904"]
+# SQLiteBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
+# SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
+"**/backlog_core/backends/sqlite_backend.py" = ["PLR0904", "SLF001"]
+# operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
+# SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
+"**/backlog_core/operations.py" = ["SLF001"]
+# FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
+"**/backlog_core/server.py" = ["RUF029"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["S607"]
 "**/kage-bunshin/scripts/spawn.py" = ["S607"]
@@ -365,6 +294,8 @@ max-complexity = 12
 ]
 # Lazy import for optional duckdb dependency in _write_duckdb
 "plugins/agentskill-kaizen/scripts/sentiment-score.py" = ["PLC0415"]
+# Executable bit is set at runtime via uv run (PEP 723 shebang)
+"plugins/development-harness/scripts/verify_migration_fidelity.py" = ["EXE001"]
 # Hyphenated package directory name is required by MCP convention
 "plugins/scientific-method/mcp/experiment-registry/__init__.py" = ["N999"]
 # ruamel.yaml returns dynamically typed values; Any is the correct annotation here
@@ -377,8 +308,21 @@ max-line-length = 120
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "requests".msg = "Use httpx instead. httpx has built-in type annotations and is the project standard."
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+force-wrap-aliases = false
+required-imports = ["from __future__ import annotations"]
+split-on-trailing-comma = false
 
 [tool.mypy]
 # Project uses ty (basedpyright) for type checking. Exclude all to avoid mypy extension errors.
@@ -387,3 +331,73 @@ exclude = [".*"]
 [tool.basedpyright]
 # Disabled: project uses ty for type checking. Config kept so IDE uses project settings, not defaults.
 typeCheckingMode = "off"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=scripts",
+    "--cov=plugins",
+    "--strict-config",
+    "--strict-markers",
+    "--tb=short",
+    "--import-mode=importlib",
+    "-n",
+    "auto",
+    "--dist",
+    "loadgroup",
+]
+asyncio_mode = "auto"
+markers = [
+    "demos: marks tests as demonstration tests",
+    "e2e: marks tests as end-to-end tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+]
+pythonpath = [
+    ".",
+    "./.claude/skills/create-merge-request-changelog/scripts",
+    "./.claude/skills/gh/scripts",
+    "./.claude/skills/research-curator/scripts",
+    "./plugins/development-harness/scripts",
+    "./plugins/development-harness/skills/implementation-manager/scripts",
+    "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
+    "./plugins/gitlab-skill/skills/gitlab-skill/scripts",
+    "./plugins/holistic-linting/skills/holistic-linting/scripts",
+    "./plugins/plugin-creator/scripts",
+    "./plugins/plugin-creator/skills/skill-creator/scripts",
+    "./plugins/python3-development/scripts",
+    "./plugins/python3-development/skills/mkdocs/scripts",
+    "./plugins/python3-development/skills/uv/scripts",
+    "./plugins/summarizer/scripts",
+    "./plugins/frustration-analyzer/tests",
+]
+testpaths = [
+    # Explicit list excludes plugins/scientific-method/mcp/experiment-registry/tests,
+    # which is a standalone sub-project with its own pyproject.toml and pytest config.
+    # That sub-project must be tested independently: cd into its directory and run pytest.
+    # Including it here causes a conftest module name collision because uv adds the
+    # experiment-registry package root to sys.path, making tests/conftest.py resolve
+    # as "tests.conftest" — the same name as plugins/development-harness/tests/conftest.py.
+    "plugins/agentskill-kaizen/tests",
+    "plugins/development-harness/tests",
+    "plugins/development-harness/tests_sam",
+    "plugins/frustration-analyzer/tests",
+    "plugins/plugin-creator/tests",
+    "plugins/development-harness/skills/implementation-manager/tests",
+    "plugins/summarizer/tests",
+    "tests",
+]
+
+[tool.coverage.run]
+omit = ["tests/*", "*/tests/*", "**/test_*.py"]
+source = ["**/scripts"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

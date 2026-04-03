@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
-from .github import (
+from .gh_client import (
     _add_comment_graphql,
     _fetch_issue_comments_graphql,
     _fetch_issue_graphql,
@@ -289,7 +289,7 @@ class GitHubArtifactProvider:
     """GitHub-backed implementation of :class:`ArtifactBackend`.
 
     Reads and writes the artifact manifest section inside GitHub Issue bodies
-    using the existing PyGithub + GraphQL helpers from ``backlog_core.github``.
+    using the existing PyGithub + GraphQL helpers from ``backlog_core.gh_client``.
     No new credentials are required — the same ``GITHUB_TOKEN`` used by other
     backlog operations is reused.
 

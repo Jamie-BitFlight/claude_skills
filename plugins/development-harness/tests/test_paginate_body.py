@@ -1,4 +1,4 @@
-"""Tests for entry-block-aware pagination in _paginate_body.
+"""Tests for entry-block-aware pagination in _paginate_body_result.
 
 Covers:
 - offset/limit operates on entry blocks, never splitting mid-block
@@ -8,6 +8,7 @@ Covers:
 from __future__ import annotations
 
 import backlog_core.operations as ops
+from backlog_core.models import ViewItemResult
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +33,11 @@ def _make_body(count: int) -> str:
     return "\n\n".join(_make_entry(_TS[i], f"Content {i + 1}") for i in range(count))
 
 
+def _result_with_body(body: str) -> ViewItemResult:
+    """Return a ViewItemResult pre-populated with the given body."""
+    return ViewItemResult(body=body)
+
+
 # ---------------------------------------------------------------------------
 # Entry-block pagination
 # ---------------------------------------------------------------------------
@@ -41,13 +47,13 @@ def test_paginate_body_offset2_limit2_returns_blocks_3_and_4_intact():
     """offset=2, limit=2 on a 5-block body returns blocks 3 and 4 without splitting them."""
     # Arrange
     body = _make_body(5)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=2, limit=2)
+    ops._paginate_body_result(result, body, offset=2, limit=2)
 
     # Assert — two blocks returned
-    result_body = data["body"]
+    result_body = result.body
     # Each block must appear intact (not cut mid-tag)
     block3 = _make_entry(_TS[2], "Content 3")
     block4 = _make_entry(_TS[3], "Content 4")
@@ -64,15 +70,15 @@ def test_paginate_body_offset2_limit2_sets_truncation_metadata():
     """Truncation metadata reflects remaining blocks after the page."""
     # Arrange
     body = _make_body(5)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=2, limit=2)
+    ops._paginate_body_result(result, body, offset=2, limit=2)
 
     # Assert
-    assert data.get("body_truncated") is True
-    assert data["body_remaining_entries"] == 1  # block 5 is beyond the page
-    assert data["body_total_entries"] == 5
+    assert result.body_truncated is True
+    assert result.body_remaining_entries == 1  # block 5 is beyond the page
+    assert result.body_total_entries == 5
 
 
 def test_paginate_body_entry_block_boundary_never_broken():
@@ -82,15 +88,15 @@ def test_paginate_body_entry_block_boundary_never_broken():
         _make_entry(_TS[i], f"Line A of block {i + 1}\n\nLine B of block {i + 1}\n\nLine C of block {i + 1}")
         for i in range(4)
     )
-    data: dict = {}
+    result = _result_with_body(multi_line_entries)
 
     # Act
-    ops._paginate_body(data, multi_line_entries, offset=1, limit=2)
+    ops._paginate_body_result(result, multi_line_entries, offset=1, limit=2)
 
     # Assert — every <div> is matched by a corresponding </div>
-    result = data["body"]
-    open_tags = result.count("<div>")
-    close_tags = result.count("</div>")
+    body_text = result.body
+    open_tags = body_text.count("<div>")
+    close_tags = body_text.count("</div>")
     assert open_tags == close_tags, "Unbalanced div tags — block was split mid-block"
     assert open_tags == 2, "Expected exactly 2 complete blocks"
 
@@ -99,29 +105,29 @@ def test_paginate_body_offset_zero_limit_zero_returns_all_blocks():
     """offset=0, limit=0 (unlimited) returns all entry blocks unchanged."""
     # Arrange
     body = _make_body(3)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=0, limit=0)
+    ops._paginate_body_result(result, body, offset=0, limit=0)
 
     # Assert — all three timestamps present, no truncation flag
     for ts in _TS[:3]:
-        assert ts in data["body"]
-    assert "body_truncated" not in data
+        assert ts in result.body
+    assert result.body_truncated is False
 
 
 def test_paginate_body_offset_exceeds_block_count_returns_empty():
     """offset larger than block count yields an empty body with no truncation flag."""
     # Arrange
     body = _make_body(3)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=10, limit=5)
+    ops._paginate_body_result(result, body, offset=10, limit=5)
 
     # Assert
-    assert data["body"] == ""
-    assert "body_truncated" not in data
+    assert result.body == ""
+    assert result.body_truncated is False
 
 
 # ---------------------------------------------------------------------------
@@ -134,13 +140,13 @@ def test_paginate_body_no_entry_blocks_falls_back_to_line_based():
     # Arrange — 5 plain text lines, no div wrappers
     lines = ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5"]
     body = "\n".join(lines)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=1, limit=2)
+    ops._paginate_body_result(result, body, offset=1, limit=2)
 
     # Assert — lines 2 and 3 returned
-    result_lines = data["body"].splitlines()
+    result_lines = result.body.splitlines()
     assert result_lines == ["Line 2", "Line 3"]
 
 
@@ -149,27 +155,27 @@ def test_paginate_body_no_entry_blocks_truncation_metadata_uses_lines():
     # Arrange
     lines = ["A", "B", "C", "D", "E"]
     body = "\n".join(lines)
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=1, limit=2)
+    ops._paginate_body_result(result, body, offset=1, limit=2)
 
     # Assert
-    assert data.get("body_truncated") is True
-    assert "body_remaining_lines" in data
-    assert "body_remaining_entries" not in data
-    assert data["body_remaining_lines"] == 2  # lines D and E remain
+    assert result.body_truncated is True
+    assert result.body_remaining_lines is not None
+    assert result.body_remaining_entries is None
+    assert result.body_remaining_lines == 2  # lines D and E remain
 
 
 def test_paginate_body_no_entry_blocks_no_truncation_when_within_limit():
     """Line-based fallback sets no truncation flag when all lines fit in limit."""
     # Arrange
     body = "Only line"
-    data: dict = {}
+    result = _result_with_body(body)
 
     # Act
-    ops._paginate_body(data, body, offset=0, limit=5)
+    ops._paginate_body_result(result, body, offset=0, limit=5)
 
     # Assert
-    assert "body_truncated" not in data
-    assert data["body"] == "Only line"
+    assert result.body_truncated is False
+    assert result.body == "Only line"

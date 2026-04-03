@@ -1,16 +1,19 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv --quiet run --active --script
 # /// script
 # requires-python = ">=3.11"
 # ///
 """Kage-bunshin session monitor — detects interactive states in child Claude Code sessions.
 
-Polls tmux sessions registered for the current orchestrator session and exits as soon as
-it detects a state requiring intervention, or when all sessions are complete/idle.
+Subcommands:
+  poll   Poll tmux sessions registered for the current orchestrator session and exit as soon as
+         a state requiring intervention is detected, or when all sessions complete/idle.
+  health Show last JSONL actions + tmux pane content for each teammate in a team.
 
 Usage:
-    uv run monitor.py --session-id <id> [--state-dir <path>] [--interval <seconds>] [--timeout <seconds>]
+    uv run monitor.py poll --session-id <id> [--state-dir <path>] [--interval <s>] [--timeout <s>]
+    uv run monitor.py health [team-name] [--jsonl-dir <path>]
 
-Exit codes:
+Exit codes (poll subcommand):
     0: Success (all_complete, intervention_needed, or timeout — check JSON status field).
     1: Fatal error (registry missing, unexpected failure).
 """
@@ -27,6 +30,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, cast
+
+from health import run_health
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -186,13 +191,11 @@ def _live_tmux_sessions() -> set[str]:
     """
     tmux = shutil.which("tmux")
     if tmux is None:
-        # tmux not installed — no sessions possible
         return set()
     result = subprocess.run(
         [tmux, "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True, check=False
     )
     if result.returncode != 0:
-        # tmux not running, no server, or no sessions — all mean no live sessions
         return set()
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
@@ -236,36 +239,28 @@ def _detect_interactive_state(lines: list[str]) -> str | None:
     Returns:
         Interaction type string if detected, or None if no intervention needed.
     """
-    # Check last N lines for yes/no prompt
     tail5 = lines[-_YES_NO_TAIL_LINES:] if len(lines) >= _YES_NO_TAIL_LINES else lines
     for line in tail5:
         if _PATTERN_YES_NO.search(line):
             return "yes_no_prompt"
 
     for line in lines:
-        # Permission approval: Allow/Deny as selectable options
         if _PATTERN_PERMISSION.match(line.strip()):
             return "permission_approval"
-
-        # AskUserQuestion marker anywhere
         if _PATTERN_ASK_USER.search(line):
             return "question"
-
-        # Question phrases
         if _PATTERN_QUESTION_PHRASE.search(line):
             return "question"
 
-    # Lines ending with '?' after Claude output (not shell prompts)
-    # Look for lines that end with '?' and are not blank, and are not shell prompts
     for line in reversed(lines):
         stripped = line.rstrip()
         if not stripped:
             continue
         if _PATTERN_IDLE.match(stripped):
-            break  # hit an idle prompt — Claude output block ended
+            break
         if stripped.endswith("?"):
             return "question"
-        break  # Only check the most recent non-blank Claude output line
+        break
 
     return None
 
@@ -313,7 +308,6 @@ def _load_registry(registry_path: Path) -> list[dict[str, Any]] | None:
     except json.JSONDecodeError:
         return None
 
-    # Registry can be a dict (name → entry) or a list of entries
     if isinstance(data, dict):
         return cast("list[dict[str, Any]]", list(data.values()))
     if isinstance(data, list):
@@ -322,7 +316,7 @@ def _load_registry(registry_path: Path) -> list[dict[str, Any]] | None:
 
 
 # ---------------------------------------------------------------------------
-# Main poll loop
+# Poll subcommand — main loop
 # ---------------------------------------------------------------------------
 
 
@@ -367,7 +361,6 @@ def _run_monitor(session_id: str, state_dir: Path, interval: float, timeout: flo
         for session_name in sorted(active_sessions):
             lines = _capture_pane(session_name)
             if lines is None:
-                # Capture failed — skip this session this tick
                 continue
 
             interaction_type = _detect_interactive_state(lines)
@@ -382,7 +375,6 @@ def _run_monitor(session_id: str, state_dir: Path, interval: float, timeout: flo
                 })
                 return
 
-        # All live sessions idle or working — check timeout
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             _emit({"status": "timeout", "active_sessions": sorted(active_sessions)})
@@ -397,50 +389,83 @@ def _run_monitor(session_id: str, state_dir: Path, interval: float, timeout: flo
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser for the monitor CLI.
+    """Build the argument parser with poll and health subcommands.
 
     Returns:
         Configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
-        description="Monitor kage-bunshin tmux sessions for interactive states requiring orchestrator attention.",
+        description="Kage-bunshin monitor: poll sessions for interactive states or inspect team health.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+    sub = parser.add_subparsers(dest="subcommand")
+
+    # --- poll subcommand ---
+    poll = sub.add_parser(
+        "poll",
+        help="Poll tmux sessions for interactive states requiring orchestrator attention.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    poll.add_argument(
         "--session-id", required=True, metavar="ID", help="Claude orchestrator session ID — resolves registry-<ID>.json"
     )
-    parser.add_argument(
+    poll.add_argument(
         "--state-dir", default=None, metavar="PATH", help="Base state directory (default: ~/.dh/projects/<git-slug>/)"
     )
-    parser.add_argument(
+    poll.add_argument(
         "--interval", type=float, default=5.0, metavar="SECONDS", help="Seconds between polls (default: 5)"
     )
-    parser.add_argument(
+    poll.add_argument(
         "--timeout",
         type=float,
         default=300.0,
         metavar="SECONDS",
         help="Maximum seconds to run before emitting timeout status (default: 300)",
     )
+
+    # --- health subcommand ---
+    health = sub.add_parser(
+        "health",
+        help="Show last JSONL actions and tmux pane content per team member.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    health.add_argument(
+        "team_name", nargs="?", default=None, metavar="TEAM", help="Team name (default: most recently modified team)"
+    )
+    health.add_argument(
+        "--jsonl-dir",
+        default=None,
+        metavar="PATH",
+        help="Directory containing .jsonl session files (default: derived from git repo slug)",
+    )
+
     return parser
 
 
 def main() -> None:
-    """Parse arguments and run the monitor loop."""
+    """Parse arguments and dispatch to the appropriate subcommand."""
     parser = _build_parser()
     args = parser.parse_args()
 
-    try:
-        state_dir = _resolve_state_dir(args.state_dir)
-    except Exception as exc:  # noqa: BLE001
-        _emit_error(f"failed to resolve state directory: {exc}")
-        sys.exit(1)
+    if args.subcommand == "poll":
+        try:
+            state_dir = _resolve_state_dir(args.state_dir)
+        except OSError as exc:
+            _emit_error(f"failed to resolve state directory: {exc}")
+            sys.exit(1)
+        try:
+            _run_monitor(session_id=args.session_id, state_dir=state_dir, interval=args.interval, timeout=args.timeout)
+        except (OSError, subprocess.CalledProcessError, KeyError, ValueError) as exc:
+            _emit_error(f"unexpected error: {exc}")
+            sys.exit(1)
 
-    try:
-        _run_monitor(session_id=args.session_id, state_dir=state_dir, interval=args.interval, timeout=args.timeout)
-    except Exception as exc:  # noqa: BLE001
-        _emit_error(f"unexpected error: {exc}")
-        sys.exit(1)
+    elif args.subcommand == "health":
+        jsonl_dir = Path(args.jsonl_dir).expanduser() if args.jsonl_dir else None
+        run_health(team_name=args.team_name, jsonl_dir=jsonl_dir)
+
+    else:
+        parser.print_help()
+        sys.exit(0)
 
 
 if __name__ == "__main__":

@@ -210,18 +210,23 @@ def _read_process_output(process: subprocess.Popen[bytes], timeout: int, clean_n
     accumulated_json = ""
     start_time = time.time()
 
+    if process.stdout is None:
+        return False
+
     while time.time() - start_time < timeout:
         if process.poll() is not None:
-            remaining = process.stdout.read()  # type: ignore[union-attr]
-            if remaining:
-                buffer += remaining.decode("utf-8", errors="replace")
+            if process.stdout is not None:
+                remaining = process.stdout.read()
+                if remaining:
+                    buffer += remaining.decode("utf-8", errors="replace")
             break
 
         ready, _, _ = select.select([process.stdout], [], [], 1.0)
         if not ready:
             continue
 
-        chunk = os.read(process.stdout.fileno(), _CHUNK_SIZE)  # type: ignore[union-attr]
+        assert process.stdout is not None
+        chunk = os.read(process.stdout.fileno(), _CHUNK_SIZE)
         if not chunk:
             break
         buffer += chunk.decode("utf-8", errors="replace")

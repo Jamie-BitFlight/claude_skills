@@ -50,7 +50,7 @@ class RuamelYAMLHandler(YAMLHandler):
 
     @property
     def yaml(self) -> YAML:
-        """Round-trip YAML instance for load/dump. Public for plugin_validator._dump_yaml."""
+        """Round-trip YAML instance for load/dump."""
         return self._yaml
 
     def load(self, fm: str, **kwargs: object) -> dict[str, Any]:

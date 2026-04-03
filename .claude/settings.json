@@ -15,10 +15,13 @@
       "mcp__context7__*",
       "mcp__sequential-thinking__*",
       "mcp__plugin_dh_backlog__*",
+      "mcp__plugin_dh_sam__*",
       "mcp__plugin_context-mode_context-mode__*",
       "Bash(bc:*)",
       "Bash(diffstat:*)",
-      "Bash(bd:*)"
+      "Bash(npm:*)",
+      "Bash(bd:*)",
+      "Bash(uv run fastmcp :*)"
     ],
     "deny": []
   },

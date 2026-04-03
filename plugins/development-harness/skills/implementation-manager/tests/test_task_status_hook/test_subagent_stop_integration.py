@@ -13,7 +13,7 @@ Two variants:
 Scope: Integration tests — real task_status_hook functions are called end-to-end.
        Only GitHub I/O is mocked (sys.modules injection).
 
-Strategy: Use tmp_path for all temporary files. Inject mock backlog_core.github
+Strategy: Use tmp_path for all temporary files. Inject mock backlog_core.gh_client
           via sys.modules so the conditional import resolves the mock. Assert
           YAML file content after handle_subagent_stop returns.
 
@@ -28,7 +28,7 @@ import json
 import sys
 import types
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -116,17 +116,17 @@ def _build_hook_input(tmp_path: Path, session_id: str, task_file: Path) -> dict[
 def _make_mock_backlog_core_github(
     mock_repo: MagicMock, update_task_status_mock: MagicMock
 ) -> tuple[types.ModuleType, types.ModuleType]:
-    """Build fake backlog_core and backlog_core.github modules.
+    """Build fake backlog_core and backlog_core.gh_client modules.
 
     Args:
         mock_repo: Mock repository object returned by get_github.
         update_task_status_mock: Mock for the update_task_status function.
 
     Returns:
-        Tuple of (backlog_core module, backlog_core.github module).
+        Tuple of (backlog_core module, backlog_core.gh_client module).
     """
     mock_bc = types.ModuleType("backlog_core")
-    mock_bc_github = types.ModuleType("backlog_core.github")
+    mock_bc_github = types.ModuleType("backlog_core.gh_client")
     vars(mock_bc_github).update({
         "get_github": MagicMock(return_value=mock_repo),
         "update_task_status": update_task_status_mock,
@@ -183,13 +183,20 @@ class TestSubagentStopFullPathWithGithubSync:
 
         mock_hook_path = MagicMock()
         mock_hook_path.exists.return_value = True
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            pytest.MonkeyPatch.context() as mp,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file),
+        ):
             mp.setitem(sys.modules, "backlog_core", mock_bc)
-            mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
+            mp.setitem(sys.modules, "backlog_core.gh_client", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
+            mp.setattr(hook, "_resolve_context_file_from_transcript", lambda _: context_file)
 
             # Act
-            hook.handle_subagent_stop(hook_input)
+            result = hook.handle_subagent_stop(hook_input)
+
+        # Assert: function returned None without raising
+        assert result is None
 
         # Assert: local YAML is marked complete
         updated_content = task_file.read_text(encoding="utf-8")
@@ -226,7 +233,7 @@ class TestSubagentStopFullPathWithGithubSync:
 
         session_id = "integration-failure-session"
         task_file = _write_task_file(tmp_path)
-        _write_context_file(tmp_path, session_id, task_file)
+        context_file = _write_context_file(tmp_path, session_id, task_file)
         hook_input = _build_hook_input(tmp_path, session_id, task_file)
 
         mock_repo = MagicMock()
@@ -235,13 +242,20 @@ class TestSubagentStopFullPathWithGithubSync:
 
         mock_hook_path = MagicMock()
         mock_hook_path.exists.return_value = True
-        with pytest.MonkeyPatch.context() as mp:
+        with (
+            pytest.MonkeyPatch.context() as mp,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file),
+        ):
             mp.setitem(sys.modules, "backlog_core", mock_bc)
-            mp.setitem(sys.modules, "backlog_core.github", mock_bc_github)
+            mp.setitem(sys.modules, "backlog_core.gh_client", mock_bc_github)
             mp.setattr(hook, "_BACKLOG_CORE_HOOK", mock_hook_path)
+            mp.setattr(hook, "_resolve_context_file_from_transcript", lambda _: context_file)
 
-            # Act — must not raise
+            # Act — must return without raising despite GitHub failure
             result = hook.handle_subagent_stop(hook_input)
+
+        # Assert: function returned None without raising
+        assert result is None
 
         # Assert: local YAML still shows complete
         updated_content = task_file.read_text(encoding="utf-8")
@@ -249,9 +263,6 @@ class TestSubagentStopFullPathWithGithubSync:
 
         # Assert: GitHub update was attempted
         mock_update.assert_called_once()
-
-        # Assert: function returned None (did not raise)
-        assert result is None
 
         # Assert: warning was written to stderr
         stderr = capsys.readouterr().err

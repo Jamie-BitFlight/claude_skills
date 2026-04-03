@@ -5,84 +5,26 @@ Provides reusable test fixtures for:
 - Pre-extracted tool sequence dicts
 - Frustration-signal test data
 - FastMCP Context mock factory
+
+``mcp/`` is prepended to ``sys.path`` so ``import server`` resolves to
+``plugins/agentskill-kaizen/mcp/server.py``. MCP protocol tests use
+``Client(mcp)`` in ``test_server_mcp.py`` (FastMCP v3 in-memory transport).
 """
 
 from __future__ import annotations
 
 import json
 import sys
-import types as _types
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from fastmcp.exceptions import ToolError as _ToolError
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-# ---------------------------------------------------------------------------
-# Module import -- server.py uses ``from __future__ import annotations``
-# which defers annotation evaluation.  FastMCP 3.x's ``@mcp.tool``
-# decorator triggers Pydantic TypeAdapter resolution at decoration time,
-# which fails on Python 3.11 because ``typing._eval_type`` cannot
-# resolve the deferred ``Annotated[...]`` hints.
-#
-# Workaround: Replace FastMCP with a stub that makes ``@mcp.tool`` a
-# transparent passthrough, then import the module.  The actual async tool
-# functions are plain coroutines -- the decorator only adds MCP metadata.
-# ---------------------------------------------------------------------------
-
-
-class _StubMCP:
-    """Minimal FastMCP stand-in that makes @mcp.tool a no-op decorator."""
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        pass
-
-    def tool(self, *args: object, **kwargs: object) -> Callable[..., object]:
-        """Return a no-op decorator (or decorate the function directly)."""
-
-        def decorator(fn: object) -> object:
-            return fn
-
-        if args and callable(args[0]):
-            return args[0]
-        return decorator
-
-    def run(self) -> None:
-        """No-op run for stub."""
-
-
-# Temporarily replace the fastmcp module so server.py's
-# ``from fastmcp import Context, FastMCP`` finds our stub.
-_real_fastmcp = sys.modules.get("fastmcp")
-_real_fastmcp_exc = sys.modules.get("fastmcp.exceptions")
-
-_stub_fastmcp = _types.ModuleType("fastmcp")
-vars(_stub_fastmcp).update({"FastMCP": _StubMCP, "Context": AsyncMock})
-
-_stub_exceptions = _types.ModuleType("fastmcp.exceptions")
-vars(_stub_exceptions).update({"ToolError": _ToolError})
-
-sys.modules["fastmcp"] = _stub_fastmcp
-sys.modules["fastmcp.exceptions"] = _stub_exceptions
-
+# Ensure `import server` resolves to plugins/agentskill-kaizen/mcp/server.py
 _MCP_DIR = str(Path(__file__).resolve().parent.parent / "mcp")
 if _MCP_DIR not in sys.path:
     sys.path.insert(0, _MCP_DIR)
-
-import server as kaizen_server
-
-__all__ = ["kaizen_server"]
-
-# Restore real fastmcp so other test infrastructure works
-if _real_fastmcp is not None:
-    sys.modules["fastmcp"] = _real_fastmcp
-if _real_fastmcp_exc is not None:
-    sys.modules["fastmcp.exceptions"] = _real_fastmcp_exc
-
 
 # ---------------------------------------------------------------------------
 # JSONL transcript record builders

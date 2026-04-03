@@ -129,6 +129,9 @@ The default pipeline has two pre-scheduled touchpoint gates:
 
 **Gate 1 — After S1 Discovery, before S2 Planning:**
 
+- Triggered when: unbound constraints in requirements, domain knowledge gaps
+- Skipped when: all constraints bound, sufficient context
+
 ```mermaid
 flowchart TD
     S1Done([S1 Discovery Complete]) --> Eval1[Evaluate discovery findings]
@@ -144,6 +147,9 @@ flowchart TD
 ```
 
 **Gate 2 — After S4 Task Decomposition, before S5 Execution:**
+
+- Triggered when: high complexity, novel architecture
+- Skipped when: routine patterns, existing codebase precedent
 
 ```mermaid
 flowchart TD

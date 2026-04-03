@@ -8,12 +8,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import backlog_core.models as _bc_models
 import pytest
 from backlog_core.models import (
-    _COMMIT_PREFIX_RE,
     BACKLOG_DIR,
+    COMMIT_PREFIX_RE,
     DEFAULT_REPO,
     TYPE_TO_LABEL,
+    BacklogConfig,
     BacklogError,
     BacklogItem,
     DuplicateItemError,
@@ -25,6 +27,7 @@ from backlog_core.models import (
     PullRequestRef,
     ValidationError,
     ViewItemResult,
+    resolve_repo,
 )
 from pydantic import ValidationError as PydanticValidationError
 
@@ -137,31 +140,42 @@ class TestBacklogItemModelDump:
     def test_model_dump_contains_all_expected_keys(self) -> None:
         item = BacklogItem()
         result = item.model_dump()
-        expected_keys = {
-            "title",
-            "description",
-            "source",
-            "added",
-            "priority",
-            "item_type",
-            "issue",
-            "plan",
-            "research_first",
-            "files",
-            "suggested_location",
-            "section",
-            "file_path",
-            "skip",
-            "groomed",
-            "last_synced",
-            "raw_body",
-        }
+        expected_keys = {"title", "description", "metadata", "sections"}
         assert expected_keys.issubset(result.keys())
 
-    def test_model_dump_skip_default_is_false(self) -> None:
+    def test_model_dump_excludes_type_(self) -> None:
+        item = BacklogItem(type_="bug")
+        result = item.model_dump()
+        assert "type_" not in result
+
+    def test_model_dump_excludes_section(self) -> None:
+        item = BacklogItem(section="P1")
+        result = item.model_dump()
+        assert "section" not in result
+
+    def test_model_dump_excludes_file_path(self) -> None:
+        item = BacklogItem(file_path="/some/path.md")
+        result = item.model_dump()
+        assert "file_path" not in result
+
+    def test_model_dump_excludes_skip(self) -> None:
+        item = BacklogItem(skip=True)
+        result = item.model_dump()
+        assert "skip" not in result
+
+    def test_model_dump_excludes_raw_body(self) -> None:
+        """raw_body is an excluded runtime field and must not appear in model_dump output.
+
+        ``raw_body`` is declared with ``exclude=True`` so that legacy ``.md`` parsing
+        results are not serialised to YAML.  This test guards that the exclusion holds.
+        """
         item = BacklogItem()
         result = item.model_dump()
-        assert result["skip"] is False
+        assert "raw_body" not in result
+
+    def test_model_dump_skip_accessible_directly(self) -> None:
+        item = BacklogItem()
+        assert item.skip is False
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +338,7 @@ class TestPullRequestRef:
 
     def test_pull_request_ref_requires_number(self) -> None:
         with pytest.raises(PydanticValidationError, match="number"):
-            PullRequestRef(title="No number", url="https://example.com")  # type: ignore[call-arg]
+            PullRequestRef.model_validate({"title": "No number", "url": "https://example.com"})
 
 
 # ---------------------------------------------------------------------------
@@ -339,9 +353,9 @@ class TestViewItemResult:
         result = ViewItemResult()
         assert result.title == ""
 
-    def test_view_item_result_default_groomed_false(self) -> None:
+    def test_view_item_result_default_groomed_empty(self) -> None:
         result = ViewItemResult()
-        assert result.groomed is False
+        assert result.groomed == ""
 
     def test_view_item_result_default_number_none(self) -> None:
         result = ViewItemResult()
@@ -363,9 +377,9 @@ class TestViewItemResult:
         result = ViewItemResult(labels=["type:feature", "status:open"])
         assert result.labels == ["type:feature", "status:open"]
 
-    def test_view_item_result_stores_groomed_true(self) -> None:
-        result = ViewItemResult(groomed=True)
-        assert result.groomed is True
+    def test_view_item_result_stores_groomed_date(self) -> None:
+        result = ViewItemResult(groomed="2026-03-15")
+        assert result.groomed == "2026-03-15"
 
 
 # ---------------------------------------------------------------------------
@@ -574,31 +588,72 @@ class TestConstants:
 
 
 class TestCommitPrefixRegex:
-    """_COMMIT_PREFIX_RE strips conventional-commit prefixes."""
+    """COMMIT_PREFIX_RE strips conventional-commit prefixes."""
 
     @pytest.mark.parametrize("prefix", ["feat", "fix", "refactor", "docs", "chore", "perf", "test", "ci"])
     def test_commit_prefix_re_matches_known_prefix(self, prefix: str) -> None:
         text = f"{prefix}: My Title"
-        assert _COMMIT_PREFIX_RE.match(text) is not None
+        assert COMMIT_PREFIX_RE.match(text) is not None
 
     @pytest.mark.parametrize("prefix", ["feat", "fix", "refactor", "docs", "chore", "perf", "test", "ci"])
     def test_commit_prefix_re_strips_prefix_leaving_title(self, prefix: str) -> None:
         text = f"{prefix}: My Title"
-        result = _COMMIT_PREFIX_RE.sub("", text)
+        result = COMMIT_PREFIX_RE.sub("", text)
         assert result == "My Title"
 
     def test_commit_prefix_re_case_insensitive_upper(self) -> None:
-        assert _COMMIT_PREFIX_RE.match("FEAT: Something") is not None
+        assert COMMIT_PREFIX_RE.match("FEAT: Something") is not None
 
     def test_commit_prefix_re_case_insensitive_mixed(self) -> None:
-        assert _COMMIT_PREFIX_RE.match("Fix: Something") is not None
+        assert COMMIT_PREFIX_RE.match("Fix: Something") is not None
 
     def test_commit_prefix_re_no_match_on_plain_title(self) -> None:
-        assert _COMMIT_PREFIX_RE.match("My plain title") is None
+        assert COMMIT_PREFIX_RE.match("My plain title") is None
 
     def test_commit_prefix_re_no_match_on_unknown_prefix(self) -> None:
-        assert _COMMIT_PREFIX_RE.match("wip: My Title") is None
+        assert COMMIT_PREFIX_RE.match("wip: My Title") is None
 
     def test_commit_prefix_re_strips_trailing_space(self) -> None:
-        result = _COMMIT_PREFIX_RE.sub("", "feat: Title With Spaces")
+        result = COMMIT_PREFIX_RE.sub("", "feat: Title With Spaces")
         assert result == "Title With Spaces"
+
+
+# ---------------------------------------------------------------------------
+# resolve_repo
+# ---------------------------------------------------------------------------
+
+
+class TestResolveRepo:
+    """Behavioural tests for :func:`~backlog_core.models.resolve_repo`."""
+
+    def test_resolve_repo_returns_default_when_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Empty string falls back to the configured default_repo."""
+        existing = _bc_models._config
+        monkeypatch.setattr(
+            _bc_models,
+            "_config",
+            BacklogConfig(
+                repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
+                backlog_dir=existing.backlog_dir
+                if existing is not None
+                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                default_repo="owner/default",
+            ),
+        )
+        assert resolve_repo("") == "owner/default"
+
+    def test_resolve_repo_returns_input_when_non_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Non-empty slug is returned unchanged regardless of DEFAULT_REPO."""
+        existing = _bc_models._config
+        monkeypatch.setattr(
+            _bc_models,
+            "_config",
+            BacklogConfig(
+                repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
+                backlog_dir=existing.backlog_dir
+                if existing is not None
+                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                default_repo="owner/default",
+            ),
+        )
+        assert resolve_repo("owner/custom") == "owner/custom"

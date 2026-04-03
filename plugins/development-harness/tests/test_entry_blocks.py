@@ -327,6 +327,61 @@ def test_diff_content_differs():
 
 
 # ---------------------------------------------------------------------------
+# Task 7: _render_entry_raw() — unified entry renderer
+# ---------------------------------------------------------------------------
+from backlog_core.entry_blocks import _render_entry_raw
+
+
+def test_render_entry_raw_active_format():
+    """Active entry uses double newline between id and content."""
+    e = Entry(id="2026-03-10T22:18:04Z", content="Active content.")
+    result = _render_entry_raw(e)
+    assert result == "<div><sub>2026-03-10T22:18:04Z</sub>\n\nActive content.\n</div>"
+
+
+def test_render_entry_raw_struck_uses_double_newline():
+    """Struck entry wraps content in details block with double newline before inner block.
+
+    Regression: github_sync._render_entry used a single newline (\\n{inner}\\n),
+    which caused merge operations to see false differences. The unified function
+    must use double newline (\\n\\n{inner}\\n) consistent with active entry format.
+    """
+    e = Entry(
+        id="2026-03-10T22:18:04Z",
+        content="Old content.",
+        struck=True,
+        struck_reason="outdated",
+        struck_at="2026-03-11T09:00:00Z",
+    )
+    result = _render_entry_raw(e)
+    expected_inner = "<details><summary>struck: 2026-03-11T09:00:00Z — outdated</summary>\n\nOld content.\n</details>"
+    expected = f"<div><sub>2026-03-10T22:18:04Z</sub>\n\n{expected_inner}\n</div>"
+    assert result == expected
+    # Explicitly verify the double-newline before the inner block is present
+    assert "<sub>2026-03-10T22:18:04Z</sub>\n\n<details>" in result
+    # Verify the old single-newline variant is NOT present
+    assert "<sub>2026-03-10T22:18:04Z</sub>\n<details>" not in result
+
+
+def test_render_entry_raw_struck_roundtrips_through_parser():
+    """Rendered struck entry must parse back to the same Entry."""
+    e = Entry(
+        id="2026-03-10T22:18:04Z",
+        content="Some content.",
+        struck=True,
+        struck_reason="wrong info",
+        struck_at="2026-03-11T09:00:00Z",
+    )
+    rendered = _render_entry_raw(e)
+    entries = parse_entries(rendered, show="all")
+    assert len(entries) == 1
+    assert entries[0].struck is True
+    assert entries[0].struck_reason == "wrong info"
+    assert entries[0].struck_at == "2026-03-11T09:00:00Z"
+    assert "Some content." in entries[0].content
+
+
+# ---------------------------------------------------------------------------
 # Edge-case tests
 # ---------------------------------------------------------------------------
 
@@ -389,3 +444,98 @@ from backlog_core.entry_blocks import wrap_entry_with_timestamp
 def test_wrap_entry_with_timestamp():
     result = wrap_entry_with_timestamp("Some content.", "2026-01-15T00:00:00Z")
     assert result == "<div><sub>2026-01-15T00:00:00Z</sub>\n\nSome content.\n</div>"
+
+
+# ---------------------------------------------------------------------------
+# _resolve_duplicate_ids() and _deduplicate_timestamps() — shared dedup logic
+# ---------------------------------------------------------------------------
+from backlog_core.entry_blocks import _deduplicate_timestamps, _resolve_duplicate_ids
+
+
+def test_resolve_duplicate_ids_suffixes_duplicates():
+    """Duplicate IDs must be suffixed with -0, -1, etc."""
+    entries = [
+        Entry(id="2026-03-10T08:00:00Z", content="First."),
+        Entry(id="2026-03-10T08:00:00Z", content="Second."),
+        Entry(id="2026-03-10T08:00:00Z", content="Third."),
+    ]
+    _resolve_duplicate_ids(entries)
+    assert entries[0].id == "2026-03-10T08:00:00Z-0"
+    assert entries[1].id == "2026-03-10T08:00:00Z-1"
+    assert entries[2].id == "2026-03-10T08:00:00Z-2"
+
+
+def test_resolve_duplicate_ids_returns_modified_count():
+    """Return value must equal the number of entries whose id was changed."""
+    entries = [
+        Entry(id="2026-03-10T08:00:00Z", content="First."),
+        Entry(id="2026-03-10T08:00:00Z", content="Second."),
+        Entry(id="2026-03-10T09:00:00Z", content="Unique."),
+    ]
+    count = _resolve_duplicate_ids(entries)
+    assert count == 2
+
+
+def test_resolve_duplicate_ids_no_duplicates_returns_zero():
+    """When all IDs are unique, return 0 and leave entries unchanged."""
+    entries = [Entry(id="2026-03-10T08:00:00Z", content="A."), Entry(id="2026-03-10T09:00:00Z", content="B.")]
+    count = _resolve_duplicate_ids(entries)
+    assert count == 0
+    assert entries[0].id == "2026-03-10T08:00:00Z"
+    assert entries[1].id == "2026-03-10T09:00:00Z"
+
+
+def test_deduplicate_timestamps_returns_modified_count():
+    """_deduplicate_timestamps must return count of modified IDs (not None)."""
+    entries = [Entry(id="2026-03-10T08:00:00Z", content="First."), Entry(id="2026-03-10T08:00:00Z", content="Second.")]
+    result = _deduplicate_timestamps(entries)
+    assert result == 2
+    assert entries[0].id == "2026-03-10T08:00:00Z-0"
+    assert entries[1].id == "2026-03-10T08:00:00Z-1"
+
+
+def test_deduplicate_timestamps_delegates_to_resolve_duplicate_ids():
+    """_deduplicate_timestamps and _resolve_duplicate_ids must produce identical results."""
+    entries_a = [
+        Entry(id="2026-03-10T08:00:00Z", content="First."),
+        Entry(id="2026-03-10T08:00:00Z", content="Second."),
+        Entry(id="2026-03-10T09:00:00Z", content="Unique."),
+    ]
+    entries_b = [
+        Entry(id="2026-03-10T08:00:00Z", content="First."),
+        Entry(id="2026-03-10T08:00:00Z", content="Second."),
+        Entry(id="2026-03-10T09:00:00Z", content="Unique."),
+    ]
+    count_a = _resolve_duplicate_ids(entries_a)
+    count_b = _deduplicate_timestamps(entries_b)
+    assert count_a == count_b
+    assert [e.id for e in entries_a] == [e.id for e in entries_b]
+
+
+def test_rewrite_by_entry_id_uses_same_dedup_logic_as_parse():
+    """rewrite_section(entry_id=...) with duplicate timestamps must resolve
+    IDs the same way parse_entries() does, so a suffixed ID from parse
+    round-trips correctly through rewrite."""
+    existing = (
+        "<div><sub>2026-03-10T08:00:00Z</sub>\n\nFirst.\n</div>\n\n"
+        "<div><sub>2026-03-10T08:00:00Z</sub>\n\nSecond.\n</div>\n\n"
+        "<div><sub>2026-03-10T09:00:00Z</sub>\n\nThird.\n</div>"
+    )
+    # parse_entries assigns: -0, -1 to the two duplicates; third stays as-is
+    parsed = parse_entries(existing)
+    assert parsed[0].id == "2026-03-10T08:00:00Z-0"
+    assert parsed[1].id == "2026-03-10T08:00:00Z-1"
+    assert parsed[2].id == "2026-03-10T09:00:00Z"
+
+    # rewrite targeting the second duplicate must use the same suffixed ID
+    result = rewrite_section(
+        existing_body=existing,
+        new_content="Replaced second.",
+        entry_id="2026-03-10T08:00:00Z-1",
+        added_date="2026-01-01",
+    )
+    entries = parse_entries(result)
+    assert len(entries) == 3
+    assert entries[0].content == "First."
+    assert entries[1].content == "Replaced second."
+    assert entries[2].content == "Third."

@@ -16,7 +16,7 @@ Design constraints (SOLID, DRY):
     callers that receive `type[BaseModel]` from get_frontmatter_model() can call
     .model_validate() and .model_dump() uniformly.
   - Interface Segregation: lean exports — models, helpers, constants only.
-  - Dependency Inversion: both validate_frontmatter.py and plugin_validator.py depend on
+  - Dependency Inversion: both validate_frontmatter.py and skilllint validators depend on
     this module, not on each other.
 
 Public API:

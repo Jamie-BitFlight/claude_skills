@@ -1,4 +1,4 @@
-"""Tests for sync_issues_graphql() in backlog_core/github.py.
+"""Tests for sync_issues_graphql() in backlog_core/gh_client.py.
 
 Covers: pagination delegation, since-filter passthrough, callback invocation,
 timestamp read/write, and error propagation.
@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.github import sync_issues_graphql
+from backlog_core.gh_client import sync_issues_graphql
 from backlog_core.models import BacklogError
 
 if TYPE_CHECKING:
@@ -82,7 +82,7 @@ class TestSyncIssuesGraphqlPaginationFetchesAllPages:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 7)]
-        mock_fetch = mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
 
         # Act
         result = sync_issues_graphql(repo, "test-owner", "test-repo")
@@ -109,7 +109,7 @@ class TestSyncIssuesGraphqlSinceFilterPassthrough:
         # Arrange
         repo = _make_mock_repo(mocker)
         since_dt = datetime(2024, 1, 1, tzinfo=UTC)
-        mock_fetch = mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=[])
+        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=[])
 
         # Act
         sync_issues_graphql(repo, "test-owner", "test-repo", since=since_dt)
@@ -135,7 +135,7 @@ class TestSyncIssuesGraphqlCallbackCalledPerIssue:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 4)]
-        mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
         received: list[Any] = []
 
         # Act
@@ -165,8 +165,8 @@ class TestSyncIssuesGraphqlTrackTimestampReadsLastSync:
         last_sync_file = tmp_path / ".last_sync"
         last_sync_file.write_text(stored_ts, encoding="utf-8")
 
-        mocker.patch("backlog_core.github._dh_paths.state_root", return_value=tmp_path)
-        mock_fetch = mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=[])
+        mocker.patch("backlog_core.gh_client._dh_paths.state_root", return_value=tmp_path)
+        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=[])
 
         # Act
         sync_issues_graphql(repo, "test-owner", "test-repo", track_timestamp=True)
@@ -193,8 +193,8 @@ class TestSyncIssuesGraphqlTrackTimestampWritesAfterFetch:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._dh_paths.state_root", return_value=tmp_path)
-        mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=[])
+        mocker.patch("backlog_core.gh_client._dh_paths.state_root", return_value=tmp_path)
+        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=[])
 
         # Act
         sync_issues_graphql(repo, "test-owner", "test-repo", track_timestamp=True)
@@ -224,7 +224,7 @@ class TestSyncIssuesGraphqlErrorPropagates:
         # Arrange
         repo = _make_mock_repo(mocker)
         mocker.patch(
-            "backlog_core.github._fetch_issues_graphql", side_effect=BacklogError("GraphQL rate limit exceeded")
+            "backlog_core.gh_client._fetch_issues_graphql", side_effect=BacklogError("GraphQL rate limit exceeded")
         )
 
         # Act / Assert
@@ -262,7 +262,7 @@ class TestSyncIssuesGraphqlIntegration:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 11)]
-        mock_fetch = mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
         received: list[Any] = []
         since_dt = datetime(2024, 3, 1, tzinfo=UTC)
 
@@ -303,7 +303,7 @@ class TestSyncIssuesGraphqlNoNPlusOne:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 51)]
-        mock_fetch = mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
 
         # Act
         result = sync_issues_graphql(repo, "test-owner", "test-repo")
@@ -345,7 +345,7 @@ class TestSyncIssuesGraphqlIncrementalPerformance:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 21)]
-        mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
         since_dt = datetime(2024, 1, 1, tzinfo=UTC)
 
         # Act
@@ -386,7 +386,7 @@ class TestSyncIssuesGraphqlFullSyncPerformance:
         # Arrange
         repo = _make_mock_repo(mocker)
         issues = [_make_issue_node(i) for i in range(1, 101)]
-        mocker.patch("backlog_core.github._fetch_issues_graphql", return_value=issues)
+        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
 
         # Act
         start = time.perf_counter()

@@ -6,7 +6,7 @@ resolves correctly regardless of pytest invocation directory.
 Shared fixtures for scenario integration tests:
 - ``backlog_dir``: Redirects backlog state to tmp_path via DH_STATE_HOME for
   test isolation (uses dh_paths.backlog_dir() path conventions)
-- ``mock_github``: Patches all github.py functions at operations.py boundary
+- ``mock_github``: Patches all gh_client.py functions at operations.py boundary
 - ``write_test_item``: Factory for creating per-item files with valid frontmatter
 """
 
@@ -14,9 +14,14 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
+import backlog_core.models as _bc_models
 import pytest
+
+if TYPE_CHECKING:
+    from backlog_core.models import GroomedData, Section
 
 # Ensure backlog_core package is importable when running tests from repo root.
 # The package lives at plugins/development-harness/ (not installed as editable
@@ -60,16 +65,25 @@ def backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     bd = dh_paths.backlog_dir(project_root=fake_project_root)
     bd.mkdir(parents=True, exist_ok=True)
 
-    # Only models.py exports BACKLOG_DIR at module level. parsing.py and
-    # operations.py access it via `_models.BACKLOG_DIR`, so patching models
-    # is sufficient to redirect all consumers.
-    monkeypatch.setattr("backlog_core.models.BACKLOG_DIR", bd)
+    # Redirect backlog_dir via _config so get_backlog_dir() returns the temp path.
+    # parsing.py and operations.py call _models.get_backlog_dir(); patching _config
+    # is the correct interception point after the BacklogConfig refactor.
+    existing = _bc_models._config
+    monkeypatch.setattr(
+        _bc_models,
+        "_config",
+        _bc_models.BacklogConfig(
+            repo_root=existing.repo_root if existing is not None else fake_project_root,
+            backlog_dir=bd,
+            default_repo=existing.default_repo if existing is not None else "",
+        ),
+    )
     return bd
 
 
 @pytest.fixture
 def mock_github(monkeypatch):
-    """Patch all github.py functions imported by operations.py.
+    """Patch all gh_client.py functions imported by operations.py.
 
     Returns dict of ``{function_name: MagicMock}`` for per-test configuration.
     Override return values in individual tests like::
@@ -105,14 +119,17 @@ def mock_github(monkeypatch):
 
 
 @pytest.fixture
-def write_test_item(backlog_dir):
-    """Factory: create per-item file with valid frontmatter in test backlog_dir.
+def write_test_item(backlog_dir: Path) -> object:
+    """Factory: create per-item ``.yaml`` file loadable by yaml_io in test backlog_dir.
+
+    Creates pure-YAML backlog item files via ``yaml_io.save_item()``, replacing the
+    legacy ``build_backlog_frontmatter`` + ``.md`` approach.
 
     Usage::
 
         filepath = write_test_item("My Title", priority="P0", issue="#42")
 
-    Returns the Path to the created file.
+    Returns the Path to the created ``.yaml`` file.
     """
 
     def _write(
@@ -122,15 +139,29 @@ def write_test_item(backlog_dir):
         description: str = "Test item",
         status: str = "open",
         type_val: str = "Feature",
+        sections: dict[str, Section | GroomedData] | None = None,
     ) -> Path:
-        from backlog_core.parsing import build_backlog_frontmatter, title_to_slug
+        from backlog_core.models import BacklogItem, BacklogItemMetadata
+        from backlog_core.parsing import title_to_slug
+        from backlog_core.yaml_io import save_item
 
         slug = title_to_slug(title)
-        filepath = backlog_dir / f"{priority.lower()}-{slug}.md"
-        fm = build_backlog_frontmatter(
-            title, description, "test", "2026-01-01", priority, type_val, status, issue, "", ""
+        filepath = backlog_dir / f"{priority.lower()}-{slug}.yaml"
+        item = BacklogItem(
+            title=title,
+            description=description,
+            metadata=BacklogItemMetadata(
+                source="test",
+                added="2026-01-01",
+                priority=priority,
+                item_type=type_val,
+                status=status,
+                issue=issue,
+                topic=slug,
+            ),
+            sections=sections or {},
         )
-        filepath.write_text(fm, encoding="utf-8")
+        save_item(item, filepath)
         return filepath
 
     return _write

@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 try:
-    from ruamel.yaml import YAML
+    from ruamel.yaml import YAML, YAMLError
 except ImportError:
     print("ERROR: ruamel.yaml not available. Run: uv add ruamel.yaml", file=sys.stderr)
     sys.exit(1)
@@ -170,14 +170,14 @@ def _extract_issue_from_file(file_path: Path) -> int | None:
     if file_path.suffix in {".yaml", ".yml"}:
         try:
             raw_data = _yaml.load(text)
-        except Exception:  # noqa: BLE001
+        except YAMLError:
             return None
     else:
         fm_match = re.match(r"^---\r?\n(.*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)", text, re.DOTALL)
         if fm_match:
             try:
                 raw_data = _yaml.load(fm_match.group(1))
-            except Exception:  # noqa: BLE001
+            except YAMLError:
                 return None
 
     if isinstance(raw_data, dict):
@@ -342,7 +342,7 @@ def discover_candidates(backlog_items: list[dict]) -> list[Candidate]:
 
 
 def register_one(
-    provider: GitHubArtifactProvider, registry: ArtifactRegistry, candidate: Candidate, dry_run: bool
+    provider: GitHubArtifactProvider | None, registry: ArtifactRegistry, candidate: Candidate, dry_run: bool
 ) -> str:
     """Register a single artifact.
 
@@ -373,7 +373,12 @@ def register_one(
     if dry_run:
         return f"DRY-RUN: would register {candidate.artifact_type} -> issue #{candidate.issue}{content_note}"
 
+    if provider is None:
+        msg = "provider is required when dry_run is False"
+        raise ValueError(msg)
+
     # Get current manifest, upsert entry, persist
+    assert provider is not None  # noqa: S101 — guarded by dry_run early return above
     manifest = provider.get_manifest(candidate.issue)
     updated = registry.register(manifest, entry)
     provider.set_manifest(candidate.issue, updated)
@@ -414,7 +419,7 @@ def _load_backlog_items() -> list[dict]:
                 data = fm_yaml.load(fm_match.group(1))
                 if isinstance(data, dict):
                     items.append(data)
-        except Exception:  # noqa: BLE001, S110
+        except (OSError, YAMLError):
             pass
     return items
 
@@ -454,13 +459,13 @@ def _run_registrations(
         assert c.issue is not None  # ensured by caller filter  # noqa: S101
         try:
             if dry_run:
-                outcome = register_one(None, registry, c, dry_run=True)  # type: ignore[arg-type]
+                outcome = register_one(None, registry, c, dry_run=True)
             else:
                 assert provider is not None  # noqa: S101
                 outcome = register_one(provider, registry, c, dry_run=False)
             log(f"  {c.rel_path}: {outcome}")
             registered += 1
-        except Exception as exc:  # noqa: BLE001
+        except (_models.BacklogError, ValueError, OSError) as exc:
             log(f"  FAILED: {c.rel_path}: {exc}")
             failed += 1
     return registered, failed

@@ -1,36 +1,7 @@
-# Task File Format
+# Task File Format — Layer 0 Design Reference
 
-YAML frontmatter-based task file format for SAM workflows.
-
----
-
-## Specification
-
-Full specification: [TASK_FILE_FORMAT.md](../../TASK_FILE_FORMAT.md)
-
----
-
-## Key Fields
-
-| Field | Type | Required |
-|-------|------|----------|
-| task | string | Yes |
-| title | string | Yes |
-| status | enum | Yes |
-| agent | string | No |
-| dependencies | array | No |
-| priority | integer | No |
-| complexity | enum | No |
-
----
-
-## File Organization
-
-- **Single file**: Multi-task with `---` delimiters
-- **Directory**: One task per file, `{task-id}-{slug}.md`
-
----
-
-## Sections
-
-Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, Handoff.
+> **Canonical location**: [TASK_FILE_FORMAT.md](../../TASK_FILE_FORMAT.md)
+>
+> This document was merged into the canonical specification on 2026-03-31 to eliminate drift between the design and operational specifications. All content from this file has been preserved in the canonical location.
+>
+> **Drift warning**: The canonical document is a snapshot. For implementation work, verify field definitions against `models.py` (`plugins/development-harness/sam_schema/core/models.py`).

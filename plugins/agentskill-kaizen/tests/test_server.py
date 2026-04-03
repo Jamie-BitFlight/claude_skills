@@ -1,12 +1,17 @@
-"""Comprehensive test suite for the kaizen-analysis MCP server.
+"""Unit and direct-call tests for the kaizen-analysis MCP server module.
+
+Covers helpers and tools invoked on the imported module. MCP protocol coverage
+(list_tools, call_tool, read_resource) lives in ``test_server_mcp.py`` using
+``Client(mcp)`` in-memory transport.
 
 Tests cover:
 - Helper functions: _read_jsonl, _extract_tools_from_records, _resolve_glob,
   _build_event_log, _extract_user_text, _extract_tool_sequences_impl,
   _resolve_sequences
-- Async MCP tools: extract_tool_sequences, discover_process_model,
-  check_conformance, find_frequent_patterns, detect_frustration_signals,
-  cluster_sessions
+- Session log schema helpers and resource function
+- Async MCP tools (direct call): get_transcript_jsonl_schema, extract_tool_sequences,
+  discover_process_model, check_conformance, find_frequent_patterns,
+  detect_frustration_signals, cluster_sessions
 - Edge cases: empty globs, malformed JSONL, zero tool calls,
   n_clusters > sessions, empty sequences
 """
@@ -19,7 +24,7 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 import pytest
-import server as kaizen_server  # conftest.py stubs fastmcp before this runs
+import server as kaizen_server
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -418,6 +423,37 @@ class TestResolveSequences:
 
         with pytest.raises(ToolError, match="No reference sequences found"):
             kaizen_server._resolve_sequences("", {}, target_name="reference")
+
+
+# ===================================================================
+# MCP Tool: get_transcript_jsonl_schema
+# ===================================================================
+
+
+class TestGetTranscriptJsonlSchema:
+    """Tests for get_transcript_jsonl_schema async MCP tool."""
+
+    def test_schema_path_is_readable_file(self) -> None:
+        """Bundled schema path resolves to an existing markdown file."""
+        path = kaizen_server._session_log_schema_path()
+        assert path.name == "session-log-schema.md"
+        assert path.is_file()
+
+    @pytest.mark.asyncio
+    async def test_returns_full_schema_markdown(self) -> None:
+        """Tool returns canonical session log schema markdown."""
+        result = await kaizen_server.get_transcript_jsonl_schema()
+
+        assert "Claude Code Session Log Schema Reference" in result
+        assert '## `type: "assistant"` Records' in result
+        assert len(result) > 2000
+
+    def test_resource_returns_same_schema_body(self) -> None:
+        """Resource handler returns the same markdown as the sync reader."""
+        body = kaizen_server._read_session_log_schema_text()
+        resource_body = kaizen_server.session_log_schema_resource()
+        assert resource_body == body
+        assert not resource_body.startswith("# Session log schema unavailable")
 
 
 # ===================================================================

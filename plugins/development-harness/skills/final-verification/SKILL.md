@@ -28,7 +28,7 @@ anchoring bias from the implementation details.
 
 ```mermaid
 flowchart TD
-    Start([All ARTIFACT:REVIEW COMPLETE + DISCOVERY + PLAN]) --> G1[1. Extract original goals]
+    Start([All reviews COMPLETE + feature-context + architect artifacts]) --> G1[1. Extract original goals]
     G1 --> G2[2. For each goal — identify required truths]
     G2 --> G3[3. For each truth — verify in codebase]
     G3 --> G4[4. Check acceptance criteria from PLAN]
@@ -44,7 +44,7 @@ flowchart TD
 
 ### Step 1 — Extract Original Goals
 
-Read `.planning/harness/DISCOVERY.md` and extract:
+Read the feature-context artifact via `artifact_read(issue_number={issue}, artifact_type="feature-context")` and extract:
 
 - All goals from the Goals section
 - All anti-goals from the Anti-Goals section
@@ -81,7 +81,7 @@ Document evidence for each truth — file paths, test output, observed behavior.
 
 ### Step 4 — Check Acceptance Tests
 
-Read the acceptance tests from `.planning/harness/PLAN.md` (Given/When/Then).
+Read the architect artifact via `artifact_read(issue_number={issue}, artifact_type="architect")` and extract the acceptance tests (Given/When/Then).
 For each acceptance test:
 
 - Verify the precondition (Given) can be established
@@ -102,14 +102,14 @@ For the quality gate protocol, reference `/dh:validation-protocol`.
 
 ## Input
 
-- All `ARTIFACT:REVIEW` files at `.planning/harness/reviews/REVIEW-{NNN}.md`
-- `ARTIFACT:DISCOVERY` at `.planning/harness/DISCOVERY.md`
-- `ARTIFACT:PLAN` at `.planning/harness/PLAN.md`
+- All review results via `sam_read(plan="{plan_id}", task="{task_id}")` per task — review content is stored in task body sections
+- Feature-context artifact via `artifact_read(issue_number={issue}, artifact_type="feature-context")`
+- Architect artifact via `artifact_read(issue_number={issue}, artifact_type="architect")`
 - Read access to the codebase
 
 ## Output
 
-File at `.planning/harness/VERIFICATION.md`:
+Append to the plan via `sam_update(address="{plan_id}/{task_id}", append_section="Final Verification", section_content="{verification_markdown}")` where `{verification_markdown}` follows this template:
 
 ```markdown
 # ARTIFACT:VERIFICATION

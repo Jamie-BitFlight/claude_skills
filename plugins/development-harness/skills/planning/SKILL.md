@@ -79,11 +79,23 @@ For each identified risk:
 
 ## Input
 
-- `ARTIFACT:DISCOVERY` at `.planning/harness/DISCOVERY.md`
+- `ARTIFACT:DISCOVERY` via `artifact_read(issue_number={issue}, artifact_type="feature-context")`
 
 ## Output
 
-File at `.planning/harness/PLAN.md` using this template:
+Artifact registered via MCP:
+
+```text
+artifact_register(
+    issue_number={issue},
+    artifact_type="architect",
+    path="plan/architect-{slug}.md",
+    agent="planning",
+    content="{full PLAN markdown below}"
+)
+```
+
+The content parameter contains the full plan document using this template:
 
 ```markdown
 # ARTIFACT:PLAN

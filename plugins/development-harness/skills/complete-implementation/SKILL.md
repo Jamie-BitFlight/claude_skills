@@ -257,13 +257,13 @@ Before invoking Phase 1, check for a TN verification report produced by `tn-veri
 
 Extract `{slug}` from the task file path (`plan/P{NNN}-{slug}.yaml` — strip the `P{NNN}-` prefix and `.yaml` suffix).
 
-Read `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"` (resolves to `~/.dh/projects/{project-slug}/plan/TN-verification-{slug}.yaml`).
+Read the TN-verification artifact via `artifact_read(issue_number={N}, artifact_type="TN-verification")`. Fallback: if no artifact is registered, read `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"`.
 
 The file contains a list of per-criterion `BookendVerification` records — one per `acceptance-criteria-structured` entry. There is no top-level `verdict` field. Aggregate the verdict by scanning all records: the overall result is FAIL if any record has `status: regressed`; otherwise PASS.
 
 ```mermaid
 flowchart TD
-    Read["Read dh_paths.plan_dir() / TN-verification-{slug}.yaml"] --> Exists{File exists?}
+    Read["artifact_read(issue_number, 'TN-verification')<br>Fallback: dh_paths.plan_dir() / TN-verification-{slug}.yaml"] --> Exists{Artifact exists?}
     Exists -->|No| Proceed["No structured criteria — proceed to Phase 1"]
     Exists -->|Yes| Scan["Scan all per-criterion records<br>for status: regressed"]
     Scan --> AnyRegressed{Any criterion<br>has status: regressed?}
@@ -290,6 +290,53 @@ Fix the regressions, then re-run /complete-implementation.
 ```
 
 3. Stop. Do not proceed to Phase 1.
+
+---
+
+## Pre-Phase 1a: Migration Fidelity Sign-Off
+
+Before proceeding to Artifact Discovery, check for migration signals.
+
+**Detection: scan for migration signals**
+
+Check:
+1. Issue title — contains: "migrat", "convert format", "replace .md", "format conversion", "move from", "transition from"
+2. Issue body / description section — same keywords
+3. P{NNN}.yaml tasks — read each task's `acceptance_criteria` field for: "delete", "remove source", "after migration complete", "drop the source"
+
+Note: `acceptance_criteria` is a dedicated `str` field on the Task model (`sam_schema/core/models.py`) — it can be read directly, not parsed out of a body blob.
+
+If no signal found → skip this gate and proceed to Artifact Discovery.
+
+If any signal found → gate activates.
+
+**Gate logic (when activated)**
+
+Before proceeding, confirm ALL four items. Read the plan artifacts and execution history to find evidence for each.
+
+- [ ] **Fidelity check on real data**: evidence exists (file path or commit SHA) showing a content completeness assertion was run against real production records — not only synthetic fixtures — and passed with zero data loss
+- [ ] **Content completeness verified**: the check verified field-by-field completeness, not only that output is structurally valid (loads without error)
+- [ ] **Constrained field values enumerated**: all distinct values of constrained fields were enumerated from real data before migration and are all handled in the target model
+- [ ] **Deletion deferred or confirmed**: if source files were deleted, deletion occurred after zero-data-loss confirmation
+
+If any item is unconfirmed, emit:
+
+```text
+COMPLETION BLOCKED — Migration Fidelity Gate
+
+Unconfirmed items:
+- [list each unchecked item]
+
+To unblock: run `uv run plugins/development-harness/scripts/verify_migration_fidelity.py`
+against real production data and provide the path to the generated report in
+`.tmp/scratch/reports/`. A passing report (zero data loss, all sections preserved) confirms
+items 1 and 2. Alternatively, a commit SHA showing the completeness assertion was run on
+real files is accepted.
+```
+
+Do NOT build the QG plan, dispatch T1, or apply any SAM state until all four items are confirmed.
+
+If all confirmed → proceed to Artifact Discovery.
 
 ---
 
@@ -404,6 +451,15 @@ The 6 quality gate phases are enforced via a SAM task loop. Each phase is a task
 | T5 | Documentation Update | service-docs-maintainer |
 | T6 | Context Refinement | context-refinement |
 
+### Team Setup
+
+Check for an existing implementation team before dispatching QG agents:
+
+- `team_name = "impl-{slug}"` (same team created by `implement-feature`)
+- If the team exists (config at `~/.claude/teams/impl-{slug}/config.json`), reuse it for QG agent dispatch
+- If no team exists, create one: `TeamCreate(team_name="impl-{slug}")`
+- Store `team_name` for use in agent dispatch and the Team Shutdown step below
+
 ### Dispatch Loop
 
 Repeat until `sam_ready` returns an empty list:
@@ -429,6 +485,8 @@ If `"claimed": false`, stop — another agent is running this phase. Do not re-d
 ```text
 Skill(skill="start-task", args="plan/{QG}-qg-{slug}.yaml --task {task_id}")
 ```
+
+Pass `team_name="{team_name}"` when spawning QG agents so they join the existing implementation team.
 
 The SubagentStop hook marks the task COMPLETE after the sub-agent finishes.
 
@@ -521,19 +579,32 @@ If absent, no additional output is needed — the feature proceeds normally.
 
 ## Recursive Follow-up Handling
 
+## Constants
+
+`DH_RECURSIVE_REVIEW_TASK_DEPTH = 5`
+
+Maximum number of recursive review-implement-verify cycles permitted within a single
+top-level `/complete-implementation` invocation. When `{recursion_depth}` reaches this
+value, Guard 1 fires: all remaining in-scope follow-ups are routed to the backlog and
+recursion stops.
+
+Initialization: `{recursion_depth}` is set to `0` at skill invocation. It increments by 1
+before each call to `Skill(skill="implement-feature")` in the recursion path. A re-run
+of `/complete-implementation` on the same task file starts `{recursion_depth}` at `0`.
+
 After all six phases complete, route any follow-up task files created by Phase 1 (code-reviewer) to the backlog before deciding on recursion. This ensures no follow-up file is orphaned when the orchestrator skips recursion.
 
 ### Step 1: Detect Follow-up Files
 
 Extract file paths from the `Task files:` list in the code-reviewer's ARTIFACTS output (the `STATUS: DONE` block from Phase 1).
 
-If the `Task files:` list is empty or absent, run a confirmatory glob:
+If the `Task files:` list is empty or absent, search for follow-up plans via the SAM MCP:
 
-```bash
-~/.dh/projects/{project-slug}/plan/P*-{slug}-followup-*.yaml
+```text
+mcp__plugin_dh_sam__sam_list(search="{slug}-followup")
 ```
 
-Where `{project-slug}` is computed by `dh_paths.compute_slug()` and `{slug}` is extracted from the parent task file path (`plan/P{NNN}-{slug}.yaml` -- strip `P{NNN}-` prefix and `.yaml` suffix).
+Where `{slug}` is extracted from the parent task file path (`plan/P{NNN}-{slug}.yaml` — strip `P{NNN}-` prefix and `.yaml` suffix).
 
 If both ARTIFACTS and glob return empty: skip the entire routing section (no follow-ups to route).
 
@@ -566,10 +637,10 @@ flowchart TD
     R1 -->|Zero results| S2["Strategy 2 — filter-first<br>backlog_list(topic='{slug}')"]
     S2 --> R2{Results?}
     R2 -->|One or more matches| UseS2["Use Strategy 2 result"]
-    R2 -->|Zero results| NoMatch["No match found<br>→ proceed to Step 3 (create new item)"]
-    UseS1 --> Step3["Step 3: Link or Create"]
-    UseS2 --> Step3
-    NoMatch --> Step3
+    R2 -->|Zero results| NoMatch["No match found<br>→ proceed to Step 4 (create new item)"]
+    UseS1 --> Step4["Step 4: Link or Create"]
+    UseS2 --> Step4
+    NoMatch --> Step4
 ```
 
 **Strategy 1 — substring via `title=`**
@@ -596,15 +667,44 @@ this an effective second-pass filter when title substring fails.
 
 If Strategy 2 returns one or more items, use the first match.
 
-If both strategies return zero results, treat as "no match found" and proceed to Step 3.
+If both strategies return zero results, treat as "no match found" and proceed to Step 4.
 
 **Error handling**: If either `mcp__plugin_dh_backlog__backlog_list` call fails, log the error, skip
-that strategy, and continue to the next strategy (or to Step 3 as "no match found" if all
+that strategy, and continue to the next strategy (or to Step 4 as "no match found" if all
 strategies fail). If the follow-up filename does not match the expected
 `P{NNN}-{slug}-followup-{k}.yaml` pattern, log a warning and use the full filename (without
 directory prefix and `.yaml` extension) as the derived slug.
 
-### Step 3: Link or Create Backlog Item
+### Step 3: Classify Follow-up Findings
+
+For each follow-up file, read its `## Scope` field:
+
+- If `## Scope` is absent: default to **in-scope** and emit:
+  `WARNING: No ## Scope section in {followup_path}. Defaulting to in-scope.`
+- If `## Scope: out-of-scope`: route immediately to backlog via `backlog_add` and
+  continue to the next follow-up. Do NOT proceed to Step 4 for this follow-up.
+
+```mermaid
+flowchart TD
+    Q{"Does the finding touch<br>the same design goals/intent/outcomes<br>as the current task?"}
+    Q -->|"Yes — linting, tests, docs,<br>same design outcomes"| InScope["IN-SCOPE<br>Proceed to Step 4"]
+    Q -->|"No — separate system/domain<br>OR perceived impact warrants<br>own grooming and research"| OutScope["OUT-OF-SCOPE<br>Route to backlog via backlog_add<br>Continue to next follow-up"]
+```
+
+Out-of-scope backlog_add call pattern:
+
+```text
+backlog_add(
+    title="{derived_title}",
+    body="Quality gate follow-up from #{issue_number}",
+    labels=["type:task"],
+    source="Quality gate follow-up from #{issue_number} — out-of-scope: {followup_path}"
+)
+```
+
+Output: `Out-of-scope finding routed to backlog: {title}`
+
+### Step 4: Link or Create Backlog Item
 
 Based on Step 2 result, for each follow-up file:
 
@@ -631,7 +731,65 @@ mcp__plugin_dh_backlog__backlog_update(selector="{derived_title}", plan="{follow
 - If `mcp__plugin_dh_backlog__backlog_update` fails after creation (title mismatch between what `dh:create-backlog-item` produced and what `update` searched for): re-invoke `mcp__plugin_dh_backlog__backlog_list()`, find the most recently added item, and retry `mcp__plugin_dh_backlog__backlog_update` with its exact title. If the retry also fails, log the error and continue to the next follow-up file.
 - If `dh:create-backlog-item --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `mcp__plugin_dh_backlog__backlog_update` on the duplicate's title to attach the plan.
 
-### Step 4: Recursion Gate
+### Step 5: Recursion Gate
+
+### Guard 1: Depth check
+
+Before evaluating conditions, check the recursion counter:
+
+```text
+If {recursion_depth} >= DH_RECURSIVE_REVIEW_TASK_DEPTH (5):
+
+  Output:
+  RECURSION DEPTH LIMIT REACHED — Systemic Design Issue Detected
+  Follow-up task: {followup_task_file_path}
+  Depth: {recursion_depth} (limit: {DH_RECURSIVE_REVIEW_TASK_DEPTH})
+
+  For all remaining in-scope follow-ups (including this one):
+    backlog_add(
+        title="{derived_title}",
+        body="Depth limit exceeded — review cycle stopped at depth {recursion_depth}",
+        labels=["type:task"],
+        source="Depth limit exceeded on #{issue_number} at depth {recursion_depth}"
+    )
+
+  Stop recursion. Proceed to the Apply status:verified Label step.
+```
+
+If `{recursion_depth}` < 5: continue to Guard 2.
+
+### Guard 2: RT-ICA BLOCKED check
+
+Check whether the follow-up's underlying planner-rt-ica output contains the BLOCKED signal.
+The signal is the string `BLOCKED-FOR-PLANNING` in the planner-rt-ica output artifact
+(NOT in implement-feature's direct output — implement-feature emits no BLOCKED signal).
+
+To check: read the plan artifact linked to the follow-up's backlog item and search for
+`BLOCKED-FOR-PLANNING`.
+
+```text
+If the planner-rt-ica artifact for this follow-up contains BLOCKED-FOR-PLANNING:
+
+  Output:
+  RECURSION STOPPED — RT-ICA BLOCKED
+  Follow-up task: {followup_task_file_path}
+  Depth: {recursion_depth}
+  Blocking conditions: {blocking_conditions_from_artifact}
+  Resume: /dh:work-backlog-item {followup_backlog_item_title}
+
+  Stop for this follow-up. Continue to next follow-up if any remain.
+  Do not apply status:verified label for the blocked follow-up.
+```
+
+If no BLOCKED-FOR-PLANNING signal: continue to Condition 1 (ADR-3).
+
+**Evaluation order for each in-scope follow-up:**
+1. Guard 1: depth check (`{recursion_depth} >= 5` → stop all)
+2. Guard 2: RT-ICA BLOCKED check (`BLOCKED-FOR-PLANNING` in plan artifact → stop this follow-up)
+3. Condition 1 (ADR-3): slug match
+4. Condition 2 (ADR-2): High priority
+5. Both Conditions 1 and 2 met → increment depth, recurse
+6. Either not met → defer to backlog
 
 For each follow-up file, evaluate two conditions. BOTH must be true for recursion.
 
@@ -640,6 +798,8 @@ For each follow-up file, evaluate two conditions. BOTH must be true for recursio
 **Condition 2 -- High priority (ADR-2)**: Read the follow-up file content and extract the `## Priority` section. Only `High` qualifies for immediate recursion.
 
 **If BOTH conditions are met** -- recurse immediately:
+
+Increment {recursion_depth} by 1 before invoking implement-feature.
 
 ```text
 Skill(skill="implement-feature", args="{followup_task_file_path}")
@@ -730,24 +890,39 @@ Push after committing. If the working tree is clean, skip this step.
 
 ---
 
+## Team Shutdown
+
+After commit+push, shut down all teammates in the implementation team:
+
+1. Read `~/.claude/teams/{team_name}/config.json` to get the members list.
+2. For each member name in the `members` array, send:
+
+```text
+SendMessage(to="{name}", message={"type": "shutdown_request"})
+```
+
+3. Note: broadcast to `"*"` does not support structured shutdown messages — send individually
+   to each named member.
+
+---
+
 ## Final Handoff Output
 
 After the commit+push step, output this block to the user:
 
-```text
-Clear context and run:
-  /dh:work-backlog-item <next-backlog-item-title>
-```
-
-Where `<next-backlog-item-title>` is determined by:
+Call `mcp__plugin_dh_backlog__backlog_list()` and find the highest-priority open item whose
+title contains the current feature slug. Check the `plan` field on that item.
 
 ```text
-mcp__plugin_dh_backlog__backlog_list()
-```
+If item found AND item.plan is set (non-empty):
+  Clear context and run:
+    /dh:implement-feature {item.plan}
 
-Find the highest-priority open item whose title contains the current feature slug. If one exists, use its exact title. If none exists, output:
+If item found AND item.plan is NOT set:
+  Clear context and run:
+    /dh:work-backlog-item {item.title}
 
-```text
-Clear context and run:
-  /dh:work-backlog-item — nothing queued —
+If no item found:
+  Clear context and run:
+    /dh:work-backlog-item — nothing queued —
 ```

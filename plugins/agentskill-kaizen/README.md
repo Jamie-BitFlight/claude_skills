@@ -15,7 +15,7 @@ mistakes, then generate fixes automatically.
 Invoke the commands with a task on the same line:
 
 ```
-/agentskill-kaizen:analyze find tool misuse patterns in the last 30 sessions
+/agentskill-kaizen:analyze find tool misuse patterns
 /agentskill-kaizen:explore show me where I keep repeating the same mistakes
 /agentskill-kaizen:report summarize findings from the most recent analysis
 /agentskill-kaizen:generate-hooks create hooks for the top three anti-patterns
@@ -75,7 +75,7 @@ prefixspan, scikit-learn). Subsequent runs use the cached environment.
 | Agent | `improvement-generator` | Generates hooks, skill patches, CLAUDE.md updates |
 | Skill | `transcript-analysis` | DuckDB query patterns, JSONL schema, PM4Py methodology |
 | Skill | `kaizen-improvement` | Templates for improvement output generation |
-| MCP Server | `kaizen-analysis` | FastMCP server: process mining, pattern detection, clustering |
+| MCP Server | `kaizen-analysis` | FastMCP server: `get_transcript_jsonl_schema`, resource `kaizen://session-log/schema`, process mining, pattern detection, clustering |
 | Dashboard | Panel/Bokeh dashboard | Live sentiment visualization served at OS-assigned port; access via `open_dashboard` MCP tool |
 
 ## Usage

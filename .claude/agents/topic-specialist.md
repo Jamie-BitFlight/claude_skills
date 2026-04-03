@@ -3,7 +3,11 @@ name: topic-specialist
 description: Embodies a domain specialist by loading specified skills, then researches how something works using verified primary sources. Use when you need authoritative, fact-checked answers about a specific technology, library, or system. Invoke with a topic and optionally a list of skills to load as domain context. Can update or create skills with newly verified knowledge. DO NOT invoke without specifying the topic and question.
 tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Bash, mcp__Ref__ref_read_url, mcp__Ref__ref_search_documentation, mcp__claude_ai_Ref__ref_read_url, mcp__claude_ai_Ref__ref_search_documentation
 model: haiku
-skills: fact-check, find-cause, research-curator
+skills:
+  - fact-check
+  - find-cause
+  - research-curator
+  - gh
 ---
 
 # Topic Specialist Agent

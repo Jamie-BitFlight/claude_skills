@@ -168,6 +168,13 @@ class Task(BaseModel):
         validation_alias=AliasChoices("divergence-notes", "divergence_notes"),
         serialization_alias="divergence-notes",
     )
+    accuracy_risk: str = Field(
+        default="low",
+        pattern=r"^(low|medium|high)$",
+        validation_alias=AliasChoices("accuracy-risk", "accuracy_risk"),
+        serialization_alias="accuracy-risk",
+    )
+    reason: str = ""
 
     # Markdown content fields (stored as YAML multiline scalars in canonical format)
     body: str = ""

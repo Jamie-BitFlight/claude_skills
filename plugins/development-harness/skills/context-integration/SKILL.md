@@ -70,17 +70,29 @@ Map each plan component to the concrete resources it will use.
 
 ### Step 4 — Plan Update
 
-Update `.planning/harness/PLAN.md` with contextualization data. Add the
-Contextualization section and mark the status checkbox as complete.
+Re-register the updated plan via MCP:
+
+```text
+artifact_register(
+  issue_number={issue},
+  artifact_type="architect",
+  path="plan/architect-{slug}.md",
+  agent="context-integration",
+  content="{full_updated_plan_markdown}"
+)
+```
+
+This overwrites the previous `"architect"` artifact with the contextualized version.
+Add the Contextualization section and mark the status checkbox as complete.
 
 ## Input
 
-- `ARTIFACT:PLAN` at `.planning/harness/PLAN.md`
+- `ARTIFACT:PLAN` via `artifact_read(issue_number={issue}, artifact_type="architect")`
 - Read access to the codebase
 
 ## Output
 
-Updated `.planning/harness/PLAN.md` with the following section appended:
+Updated `ARTIFACT:PLAN` re-registered via `artifact_register(issue_number={issue}, artifact_type="architect", path="plan/architect-{slug}.md", agent="context-integration", content="{full_updated_plan_markdown}")` with the following section appended:
 
 ```markdown
 ## Contextualization

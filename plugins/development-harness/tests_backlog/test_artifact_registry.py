@@ -227,7 +227,7 @@ class TestArtifactManifestModelValidation:
 
         # Arrange / Act / Assert
         with pytest.raises(pydantic.ValidationError):
-            ArtifactManifest.model_validate({})  # type: ignore[arg-type]
+            ArtifactManifest.model_validate({})
 
     def test_artifacts_defaults_to_empty_list(self) -> None:
         """ArtifactManifest.artifacts defaults to an empty list.

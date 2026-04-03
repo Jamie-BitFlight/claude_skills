@@ -34,6 +34,8 @@ Agent(
 
 SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementation steps, architecture decisions, code design, or proposed solutions. Those belong in the SAM planning phase (add-new-feature / architect spec), which runs AFTER grooming. Groomed output describes: (1) what the problem is and where it lives, (2) what success looks like, (3) how the specialist will know they have reached it. Acceptance criteria must be observable checks — not implementation steps.
 
+DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
+
 Item title: {item title}
 Item description: {item description}
 Item source: {item source}
@@ -73,6 +75,8 @@ Agent(
 
 SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementation steps, architecture decisions, code design, or proposed solutions. Those belong in the SAM planning phase (add-new-feature / architect spec), which runs AFTER grooming. Groomed output describes: (1) what the problem is and where it lives, (2) what success looks like, (3) how the specialist will know they have reached it. Acceptance criteria must be observable checks — not implementation steps.
 
+DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
+
 Item title: {item title}
 Item description: {item description}
 Item file path: {item file path}
@@ -96,3 +100,83 @@ Impact Radius:
 ```
 
 The `backlog-item-groomer` agent discovers related skills, agents, prior work, and dependency graphs. Pass file paths (not file contents) so it can verify independently.
+
+---
+
+## Impact Radius Output Format
+
+The impact-analyst teammate writes the Impact Radius section in this format:
+
+```markdown
+## Impact Radius
+
+### Code — Producers (write the changed interface)
+- `{path}::{function_name}` — {what it produces, what change is needed}
+
+### Code — Consumers (read the changed interface)
+- `{path}::{function_name}` — {what it consumes, what migration is needed}
+
+### Code — Other References
+- `{path}` — {import/constant/type reference, what change is needed}
+
+### Documentation (will become stale)
+- `{path}` — {what section becomes inaccurate}
+
+### Configuration / CI
+- `{path}` — {what change is needed}
+
+### Agent Instructions (instruct AI to use current interface)
+- `{path}` — {what instruction needs updating}
+
+### Systems Inventory
+{full list of TodoItems with roles and connections, for planner completeness verification}
+
+### Ecosystem Completeness Checklist
+- [ ] Every code producer updated or verified compatible
+- [ ] Every code consumer migrated to new interface
+- [ ] Every stale document updated
+- [ ] Every agent instruction updated
+- [ ] Old interface deprecated or removed (if replacing)
+- [ ] CI/config files updated and validated
+```
+
+If a category has no affected files, write `None identified.` — do not omit the category.
+
+---
+
+## RT-ICA BLOCKED Batch Format
+
+When MISSING conditions remain after the self-resolution pass in Step 8.5, present them as:
+
+```text
+RT-ICA: BLOCKED
+
+The following inputs could not be resolved autonomously.
+
+[Category]:
+- Question: {what is unknown}
+  Tried: {tools used, what they returned}
+  Options found: {a) option with trade-off | b) option with trade-off | c) open-ended}
+
+Answer what you can — skip what you don't know.
+Grooming will not proceed to Step 9 with unresolved gaps.
+```
+
+---
+
+## Fact-Checker Output Contract
+
+Each claim in fact-checker output must contain these required fields:
+
+```text
+verdict: VERIFIED | REFUTED | INCONCLUSIVE
+claim: {exact claim from item}
+evidence: {tool result citation — WebFetch, WebSearch, Bash, or Read output}
+source: {URL or file path with line numbers}
+```
+
+Validation rules applied by the orchestrator before writing to `section="Fact-Check"`:
+
+- If `verdict` field absent: reject the claim, log "fact-checker output missing verdict field", do not write
+- If `evidence` field absent: mark claim INCONCLUSIVE, write with note "evidence field missing"
+- Verdict to RT-ICA mapping: REFUTED maps to MISSING condition, INCONCLUSIVE maps to DERIVABLE

@@ -1,4 +1,4 @@
-"""Tests for backlog_core/github.py — GraphQL migration (T02).
+"""Tests for backlog_core/gh_client.py — GraphQL migration (T02).
 
 All tests mock at the ``_graphql_request`` boundary, not at
 ``repo.requester.graphql_query``. This validates the helper's error handling
@@ -22,13 +22,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.github import (
+from backlog_core.gh_client import (
     _get_repo_node_id,
     _is_not_found_error,
     _parse_issue_node,
     _parse_milestone_node,
     _parse_search_pr_node,
     _resolve_label_ids_graphql,
+    apply_status_groomed,
     apply_status_in_progress,
     batch_fetch_statuses,
     check_open_prs_for_issue,
@@ -488,7 +489,7 @@ class TestGetRepoNodeId:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        repo.node_id = 12345  # type: ignore[assignment]
+        object.__setattr__(repo, "node_id", 12345)
 
         # Act
         result = _get_repo_node_id(repo)
@@ -658,7 +659,7 @@ class TestCreateIssueForItem:
             },
         )
         mocker.patch(
-            "backlog_core.github._graphql_request",
+            "backlog_core.gh_client._graphql_request",
             return_value=make_create_issue_response(make_created_issue_node(number=42)),
         )
         item = BacklogItem(title="Add dark mode", item_type="feature", priority="P1")
@@ -678,7 +679,7 @@ class TestCreateIssueForItem:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mock_gql = mocker.patch("backlog_core.github._graphql_request")
+        mock_gql = mocker.patch("backlog_core.gh_client._graphql_request")
         item = BacklogItem(title="", item_type="feature", priority="P1")
 
         # Act
@@ -697,7 +698,7 @@ class TestCreateIssueForItem:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mock_gql = mocker.patch("backlog_core.github._graphql_request")
+        mock_gql = mocker.patch("backlog_core.gh_client._graphql_request")
         out = Output()
         item = BacklogItem(title="Dry run item", item_type="feature", priority="P1")
 
@@ -724,7 +725,7 @@ class TestCreateIssueForItem:
             {"data": {"repository": {"label0": None, "label1": None, "label2": None}}},
         )
         mocker.patch(
-            "backlog_core.github._graphql_request",
+            "backlog_core.gh_client._graphql_request",
             return_value=make_create_issue_response(make_created_issue_node(number=5)),
         )
         out = Output()
@@ -754,7 +755,7 @@ class TestCreateIssueForItem:
                 captured_vars.append(variables)
             return make_create_issue_response(make_created_issue_node(number=7))
 
-        mocker.patch("backlog_core.github._graphql_request", side_effect=capture_graphql)
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=capture_graphql)
         item = BacklogItem(title="Fix null crash", item_type="bug", priority="P0")
 
         # Act
@@ -791,8 +792,8 @@ class TestBatchFetchStatuses:
             labels=[make_label_node("status:in-progress", "LBL_ip"), make_label_node("priority:p1", "LBL_p1")],
             milestone=make_milestone_node(title="v1.0"),
         )
-        mocker.patch("backlog_core.github.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issues_list_response([issue_node]))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issues_list_response([issue_node]))
         items = [BacklogItem(title="Feature A", issue="#10", priority="P1")]
 
         # Act
@@ -811,8 +812,8 @@ class TestBatchFetchStatuses:
         Why: Local-only items have no issue number to look up.
         """
         # Arrange
-        mocker.patch("backlog_core.github.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issues_list_response([]))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issues_list_response([]))
         items = [BacklogItem(title="No issue item", issue="", priority="P1")]
 
         # Act
@@ -829,7 +830,7 @@ class TestBatchFetchStatuses:
         Why: Agents must work offline — empty status is acceptable, crash is not.
         """
         # Arrange
-        mocker.patch("backlog_core.github.try_get_github", return_value=None)
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=None)
         items = [BacklogItem(title="Item", issue="#5", priority="P1")]
 
         # Act
@@ -847,8 +848,8 @@ class TestBatchFetchStatuses:
         """
         # Arrange
         issue_node = make_issue_node(number=30, milestone=None)
-        mocker.patch("backlog_core.github.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issues_list_response([issue_node]))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issues_list_response([issue_node]))
         items = [BacklogItem(title="No milestone", issue="#30", priority="P1")]
 
         # Act
@@ -866,8 +867,8 @@ class TestBatchFetchStatuses:
         """
         # Arrange
         issue_node = make_issue_node(number=10)
-        mocker.patch("backlog_core.github.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issues_list_response([issue_node]))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issues_list_response([issue_node]))
         items = [BacklogItem(title="Missing issue", issue="#99", priority="P1")]
 
         # Act
@@ -899,8 +900,8 @@ class TestCheckOpenPrsForIssue:
         """
         # Arrange
         pr_node = make_search_pr_node(number=55, title="fix: implement feature")
-        mocker.patch("backlog_core.github.get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_search_prs_response([pr_node]))
+        mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_search_prs_response([pr_node]))
 
         # Act
         result = check_open_prs_for_issue(10, "test-owner/test-repo")
@@ -918,8 +919,8 @@ class TestCheckOpenPrsForIssue:
         Why: Empty list is the expected signal that close/resolve is safe.
         """
         # Arrange
-        mocker.patch("backlog_core.github.get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_search_prs_response([]))
+        mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_search_prs_response([]))
 
         # Act
         result = check_open_prs_for_issue(42, "test-owner/test-repo")
@@ -935,8 +936,8 @@ class TestCheckOpenPrsForIssue:
         Why: PR-check errors must not block the close/resolve flow.
         """
         # Arrange
-        mocker.patch("backlog_core.github.get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
+        mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
 
         # Act
         result = check_open_prs_for_issue(10, "test-owner/test-repo")
@@ -954,9 +955,9 @@ class TestCheckOpenPrsForIssue:
         # Arrange
         pr_node = make_search_pr_node(number=55)
         non_pr_node: dict[str, Any] = {}  # non-PR union member returns empty dict
-        mocker.patch("backlog_core.github.get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
         mocker.patch(
-            "backlog_core.github._graphql_request", return_value=make_search_prs_response([pr_node, non_pr_node])
+            "backlog_core.gh_client._graphql_request", return_value=make_search_prs_response([pr_node, non_pr_node])
         )
 
         # Act
@@ -993,7 +994,7 @@ class TestIssueToLocalFields:
         )
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.priority == "P0"
@@ -1009,7 +1010,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(title="Bug fix", labels=[make_label_node("type:bug", "LBL_bug")], state="OPEN")
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.item_type == "Bug"
@@ -1025,7 +1026,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(state="CLOSED", labels=[])
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.status == "done"
@@ -1041,7 +1042,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(state="OPEN", labels=[make_label_node("status:in-progress", "LBL_ip")])
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.status == "in-progress"
@@ -1057,7 +1058,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(milestone=make_milestone_node(title="v2.0"))
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.milestone == "v2.0"
@@ -1073,7 +1074,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(milestone=None)
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.milestone == ""
@@ -1089,7 +1090,7 @@ class TestIssueToLocalFields:
         issue = make_parsed_issue_node(labels=[])
 
         # Act
-        result = issue_to_local_fields(issue)  # type: ignore[arg-type]
+        result = issue_to_local_fields(issue)
 
         # Assert
         assert result.priority == "P1"
@@ -1124,8 +1125,8 @@ class TestViewEnrichFromGithub:
             milestone=make_milestone_node(title="v1.0"),
         )
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issue_by_number_response(issue_node))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node))
         result = ViewItemResult()
 
         # Act
@@ -1148,7 +1149,7 @@ class TestViewEnrichFromGithub:
         Why: No token / offline must degrade gracefully, not crash.
         """
         # Arrange
-        mocker.patch("backlog_core.github.try_get_github", return_value=None)
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=None)
         result = ViewItemResult()
 
         # Act
@@ -1165,8 +1166,8 @@ class TestViewEnrichFromGithub:
         Why: Errors must not crash the view command; False is the correct signal.
         """
         # Arrange
-        mocker.patch("backlog_core.github.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.github._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
         result = ViewItemResult()
 
         # Act
@@ -1215,7 +1216,7 @@ class TestTryGetGithub:
         from github import GithubException
 
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.github.Github").return_value.get_repo.side_effect = GithubException(
+        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = GithubException(
             status=401, data="Bad credentials", headers={}
         )
 
@@ -1254,7 +1255,7 @@ class TestApplyStatusInProgress:
             labels=[make_label_node("status:needs-grooming", "LBL_ng"), make_label_node("priority:p1", "LBL_p1")],
         )
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github.get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
         # _resolve_label_ids_graphql uses repo.requester.graphql_query directly
         mock_repo.requester.graphql_query.return_value = (
             {},
@@ -1279,7 +1280,7 @@ class TestApplyStatusInProgress:
             # Second call: _update_issue_graphql
             return make_update_issue_response()
 
-        mocker.patch("backlog_core.github._graphql_request", side_effect=side_effect)
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
         item = BacklogItem(title="Task", issue="#5", priority="P1")
 
         # Act — should not raise
@@ -1300,9 +1301,9 @@ class TestApplyStatusInProgress:
             id="MDU6SXNzdWUx", number=5, labels=[make_label_node("status:in-progress", "LBL_ip")]
         )
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github.get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
         mock_gql = mocker.patch(
-            "backlog_core.github._graphql_request", return_value=make_issue_by_number_response(issue_node)
+            "backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node)
         )
         item = BacklogItem(title="Task", issue="#5", priority="P1")
         out = Output()
@@ -1337,7 +1338,7 @@ class TestFetchGithubIssueBody:
         # Arrange
         issue_node = make_issue_node(body="This is the issue body")
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issue_by_number_response(issue_node))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node))
 
         # Act
         result = fetch_github_issue_body(mock_repo, 42)
@@ -1354,7 +1355,7 @@ class TestFetchGithubIssueBody:
         """
         # Arrange
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
         out = Output()
 
         # Act
@@ -1397,7 +1398,7 @@ class TestSyncGroomedToGithubIssue:
                 return make_issue_by_number_response(issue_node)
             return make_update_issue_response()
 
-        mocker.patch("backlog_core.github._graphql_request", side_effect=side_effect)
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
 
         # Act
         result = sync_groomed_to_github_issue(mock_repo, 1, "New groomed content")
@@ -1416,7 +1417,7 @@ class TestSyncGroomedToGithubIssue:
         # Arrange
         issue_node = make_issue_node(body="Original body")
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issue_by_number_response(issue_node))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node))
 
         # Act
         result = sync_groomed_to_github_issue(mock_repo, 1, "")
@@ -1433,7 +1434,7 @@ class TestSyncGroomedToGithubIssue:
         """
         # Arrange
         mock_repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
         out = Output()
 
         # Act
@@ -1442,3 +1443,200 @@ class TestSyncGroomedToGithubIssue:
         # Assert
         assert result is False
         assert any("WARNING" in w for w in out.warnings)
+
+
+# ---------------------------------------------------------------------------
+# apply_status_groomed — ADR-003 fetch-then-update label pattern
+# ---------------------------------------------------------------------------
+
+
+class TestApplyStatusGroomed:
+    """apply_status_groomed uses fetch-then-update GraphQL label pattern (ADR-003).
+
+    Tests: apply_status_groomed fetches issue labels, computes desired set
+           (add status:groomed, remove status:needs-grooming), and calls
+           _update_issue_graphql with the full label ID list.
+    Why: ADR-003 requires full label ID replacement (not additive); tests verify
+         the fetch-then-compute-then-update flow, idempotency, label creation, and
+         no-issue early exit.
+    """
+
+    def test_apply_status_groomed_adds_label_removes_needs_grooming(self, mocker: MockerFixture) -> None:
+        """apply_status_groomed adds status:groomed and removes status:needs-grooming.
+
+        Tests: apply_status_groomed happy path label set computation
+        How: Issue has status:needs-grooming + priority:p1. Assert update call
+             receives status:groomed ID (LBL_g) but not needs-grooming ID (LBL_ng).
+        Why: Core behavior — groomed replaces needs-grooming in the label set.
+        """
+        # Arrange
+        issue_node = make_issue_node(
+            id="MDU6SXNzdWUx",
+            number=5,
+            labels=[make_label_node("status:needs-grooming", "LBL_ng"), make_label_node("priority:p1", "LBL_p1")],
+        )
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
+                        "label1": {"id": "LBL_g", "name": "status:groomed"},
+                    }
+                }
+            },
+        )
+
+        call_count = 0
+
+        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_issue_by_number_response(issue_node)
+            return make_update_issue_response()
+
+        mock_gql = mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
+        item = BacklogItem(title="Task", issue="#5", priority="P1")
+
+        # Act
+        apply_status_groomed(item)
+
+        # Assert — fetch + update both ran
+        assert call_count == 2
+        # Update call must carry groomed ID but not needs-grooming ID
+        update_call = mock_gql.call_args_list[1]
+        variables = update_call.kwargs.get("variables") or (update_call.args[2] if len(update_call.args) > 2 else None)
+        assert variables is not None
+        label_ids = variables.get("labelIds", [])
+        assert "LBL_g" in label_ids
+        assert "LBL_ng" not in label_ids
+
+    def test_apply_status_groomed_idempotent_when_already_groomed(self, mocker: MockerFixture) -> None:
+        """apply_status_groomed is a no-op when issue already has status:groomed.
+
+        Tests: apply_status_groomed idempotent — already-groomed early return
+        How: Issue already has status:groomed label; verify _update_issue_graphql
+             is NOT called (only the fetch call is made).
+        Why: Calling apply_status_groomed twice must not re-apply labels.
+        """
+        # Arrange
+        issue_node = make_issue_node(id="MDU6SXNzdWUx", number=5, labels=[make_label_node("status:groomed", "LBL_g")])
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
+        mock_gql = mocker.patch(
+            "backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node)
+        )
+        item = BacklogItem(title="Task", issue="#5", priority="P1")
+        out = Output()
+
+        # Act
+        apply_status_groomed(item, output=out)
+
+        # Assert — only fetch call; no update call issued
+        assert mock_gql.call_count == 1
+        assert any("already" in m.lower() for m in out.messages)
+
+    def test_apply_status_groomed_idempotent_when_needs_grooming_already_removed(self, mocker: MockerFixture) -> None:
+        """apply_status_groomed still adds status:groomed when needs-grooming is absent.
+
+        Tests: apply_status_groomed with no needs-grooming label to remove
+        How: Issue has only priority:p1 (no needs-grooming); verify update is
+             still called and status:groomed is applied.
+        Why: Absence of needs-grooming must not prevent the groomed label being added.
+        """
+        # Arrange
+        issue_node = make_issue_node(id="MDU6SXNzdWUx", number=5, labels=[make_label_node("priority:p1", "LBL_p1")])
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
+                        "label1": {"id": "LBL_g", "name": "status:groomed"},
+                    }
+                }
+            },
+        )
+
+        call_count = 0
+
+        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_issue_by_number_response(issue_node)
+            return make_update_issue_response()
+
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
+        item = BacklogItem(title="Task", issue="#5", priority="P1")
+
+        # Act
+        apply_status_groomed(item)
+
+        # Assert — update still ran even without needs-grooming present to remove
+        assert call_count == 2
+
+    def test_apply_status_groomed_creates_label_if_absent(self, mocker: MockerFixture) -> None:
+        """apply_status_groomed creates status:groomed label when it does not exist.
+
+        Tests: apply_status_groomed label auto-creation (ADR-004 REST exception)
+        How: get_label raises GithubException(status=404); verify create_label is
+             called with name='status:groomed' and color='0075ca'.
+        Why: ADR-004 — label creation stays REST; new repos need the label created
+             on first use.
+        """
+        from github import GithubException
+
+        # Arrange
+        issue_node = make_issue_node(
+            id="MDU6SXNzdWUx", number=5, labels=[make_label_node("status:needs-grooming", "LBL_ng")]
+        )
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
+        mock_repo.get_label.side_effect = GithubException(404, "not found")
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {"data": {"repository": {"label0": {"id": "LBL_g", "name": "status:groomed"}}}},
+        )
+
+        call_count = 0
+
+        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_issue_by_number_response(issue_node)
+            return make_update_issue_response()
+
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
+        item = BacklogItem(title="Task", issue="#5", priority="P1")
+
+        # Act
+        apply_status_groomed(item)
+
+        # Assert — label was created with the correct name and color
+        mock_repo.create_label.assert_called_once_with(
+            name="status:groomed", color="0075ca", description="Grooming complete — all sections written and approved"
+        )
+
+    def test_apply_status_groomed_noop_without_issue(self, mocker: MockerFixture) -> None:
+        """apply_status_groomed is a no-op when BacklogItem has no issue number.
+
+        Tests: apply_status_groomed early-exit guard for empty issue field
+        How: Item has issue=""; verify get_github is never called.
+        Why: Items without GitHub issues cannot have labels updated — must not raise.
+        """
+        # Arrange
+        mock_get_github = mocker.patch("backlog_core.gh_client.get_github")
+        item = BacklogItem(title="Task", issue="", priority="P1")
+
+        # Act — should not raise
+        apply_status_groomed(item)
+
+        # Assert — no GitHub API calls made
+        mock_get_github.assert_not_called()

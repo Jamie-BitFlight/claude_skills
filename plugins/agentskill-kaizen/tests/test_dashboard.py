@@ -711,14 +711,14 @@ class TestStateLock:
             for _ in range(50):
                 try:
                     dashboard._reset_dashboard_state()
-                except Exception as exc:  # noqa: BLE001
+                except RuntimeError as exc:
                     errors.append(exc)
 
         def url_loop() -> None:
             for _ in range(50):
                 try:
                     dashboard.get_dashboard_url()
-                except Exception as exc:  # noqa: BLE001
+                except RuntimeError as exc:
                     errors.append(exc)
 
         t1 = stdlib_threading.Thread(target=reset_loop)

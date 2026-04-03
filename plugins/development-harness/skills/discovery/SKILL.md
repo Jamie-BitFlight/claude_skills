@@ -34,8 +34,10 @@ flowchart TD
     P4 --> P5[4. Document NFRs]
     P5 --> P6[5. Capture goals and anti-goals]
     P6 --> P7[6. Draft ARTIFACT:DISCOVERY]
-    P7 --> Gate{User confirms discovery captures intent?}
-    Gate -->|Yes| Done([ARTIFACT:DISCOVERY complete])
+    P7 --> AutoMode{AUTO_MODE<br>active?}
+    AutoMode -->|Yes — treat as confirmed| Done([ARTIFACT:DISCOVERY complete])
+    AutoMode -->|No — interactive| Gate{User confirms discovery captures intent?}
+    Gate -->|Yes| Done
     Gate -->|No| P2
     Gate -->|Escalation needed| Escalate([Human touchpoint — unbound constraints or domain knowledge gap])
 ```
@@ -81,7 +83,19 @@ User request, problem statement, or feature description in any format.
 
 ## Output
 
-File at `.planning/harness/DISCOVERY.md` using this template:
+Artifact registered via MCP:
+
+```text
+artifact_register(
+    issue_number={issue},
+    artifact_type="feature-context",
+    path="plan/feature-context-{slug}.md",
+    agent="discovery",
+    content="{full DISCOVERY markdown below}"
+)
+```
+
+The content parameter contains the full discovery document using this template:
 
 ```markdown
 # ARTIFACT:DISCOVERY
@@ -147,10 +161,12 @@ flowchart TD
     Q2 -->|Yes| Escalate
     Q2 -->|No| Q3{Contradictory requirements?}
     Q3 -->|Yes| Escalate
-    Q3 -->|No| Confirm[Request user confirmation]
-    Confirm --> Done([Proceed to Stage 2])
+    Q3 -->|No| AutoCheck{AUTO_MODE<br>active?}
+    AutoCheck -->|Yes — treat as confirmed| Done([Proceed to Stage 2])
+    AutoCheck -->|No| Confirm[Request user confirmation]
+    Confirm --> Done
     Escalate --> Resolve[User resolves — update DISCOVERY]
-    Resolve --> Confirm
+    Resolve --> Q1
 ```
 
 Escalation triggers:

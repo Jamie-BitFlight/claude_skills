@@ -1,0 +1,19 @@
+title: Add YAML-based backlog item storage
+description: Implement pure-YAML file I/O for backlog items to replace legacy markdown format.
+type_: ''
+section: ''
+metadata:
+  source: engineering-team
+  added: '2026-01-15'
+  priority: P1
+  item_type: Feature
+  status: open
+  issue: ''
+  last_synced: ''
+  groomed: ''
+  plan: ''
+  topic: ''
+  research_first: ''
+  files: ''
+  suggested_location: ''
+sections: {}

@@ -1,4 +1,4 @@
-"""Backlog parsing, item search, slug generation, frontmatter building, body section utilities.
+"""Backlog parsing, item search, slug generation, body section utilities.
 
 Extracted from ``backlog.py`` — pure functions with no GitHub or typer dependencies.
 """
@@ -10,50 +10,47 @@ import io
 import logging
 import operator
 import re
+import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
-import frontmatter
 from ruamel.yaml import YAML, YAMLError
 
 # ---------------------------------------------------------------------------
 # Imports from sibling models module
 # ---------------------------------------------------------------------------
 from . import models as _models
-from .frontmatter_utils import dump_frontmatter, loads_frontmatter
 from .models import (
     BENEFIT_MAP,
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
-    FIELD_TO_INDEX as _FIELD_TO_INDEX,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
     ROLE_MAP,
+    SECTION_HEADING_ALIAS,
     SKIP_STATUS,
     BacklogItem,
+    Entry,
+    GroomedData,
     SamTask,
+    Section,
     ViewItemResult,
+    parse_issue_number,
 )
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 # ---------------------------------------------------------------------------
-# Re-exports so other modules can ``from .parsing import loads_frontmatter``
+# Public API
 # ---------------------------------------------------------------------------
 __all__ = [
-    "append_or_replace_section",
-    "apply_field_to_result",
-    "build_backlog_frontmatter",
     "build_body_extra_only",
     "build_issue_body",
     "build_issue_body_from_file",
     "build_sam_task_body",
     "build_sam_task_issue_title",
     "dump_frontmatter",
-    "extract_body_field_pairs",
     "extract_description_from_issue_body",
     "extract_groomed_section",
     "extract_normalize_metadata",
@@ -64,21 +61,115 @@ __all__ = [
     "items_needing_issues",
     "items_with_issues",
     "loads_frontmatter",
-    "merge_field_into_result",
     "merge_sections",
     "normalize_issue_title",
     "now_iso",
     "parse_backlog",
     "parse_backlog_from_directory",
-    "parse_body_extra_fields",
     "parse_issue_selector",
     "parse_item_file",
+    "parse_md_body_sections",
     "parse_sam_task_metadata",
-    "reconstruct_body_from_sections",
     "title_to_slug",
     "today",
     "view_result_from_local_item",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Ruamel-based frontmatter helpers (replaces python-frontmatter dependency)
+# ---------------------------------------------------------------------------
+
+
+class _MdPost:
+    """Lightweight container for legacy .md frontmatter + body.
+
+    Replaces ``frontmatter.Post`` for the legacy .md code paths.
+    Both attributes are mutable so callers can patch them before serialising.
+    """
+
+    def __init__(self, metadata: dict[str, str | dict[str, str]], content: str) -> None:
+        """Initialize post with parsed metadata dict and body content."""
+        self.metadata: dict[str, str | dict[str, str]] = metadata
+        self.content: str = content
+
+
+def _make_yaml() -> YAML:
+    """Return a configured ruamel.yaml round-trip instance.
+
+    Returns:
+        YAML instance with wide width to prevent unwanted line-wrapping.
+    """
+    y = YAML(typ="rt")
+    y.width = sys.maxsize
+    y.preserve_quotes = False
+    return y
+
+
+def _validate_metadata(raw: dict[str, Any]) -> dict[str, str | dict[str, str]]:
+    """Coerce raw YAML metadata values to ``str`` or ``dict[str, str]`` at the parse boundary.
+
+    YAML can produce integers, booleans, lists, or ``None`` for any scalar field.
+    This function ensures every value is either a plain string or a shallow mapping
+    of strings to strings before the metadata dict reaches any consumer.
+
+    - Scalar values (int, float, bool, None, list, …) are coerced to ``str``.
+    - Mapping values have their own values coerced to ``str`` (one level deep).
+
+    Args:
+        raw: The raw metadata dict produced by the YAML parser.
+
+    Returns:
+        A new dict with all values typed as ``str | dict[str, str]``.
+    """
+    result: dict[str, str | dict[str, str]] = {}
+    for k, v in raw.items():
+        if isinstance(v, dict):
+            result[str(k)] = {str(dk): str(dv) for dk, dv in v.items()}
+        else:
+            result[str(k)] = str(v) if v is not None else ""
+    return result
+
+
+def loads_frontmatter(text: str) -> _MdPost:
+    """Parse frontmatter + body from a markdown string using ruamel.yaml.
+
+    Raises ``YAMLError`` when the frontmatter block contains invalid YAML so
+    callers can distinguish corrupt input from absent frontmatter.
+
+    Args:
+        text: Markdown string with optional ``---``-delimited YAML frontmatter.
+
+    Returns:
+        ``_MdPost`` with *metadata* dict and *content* body string.
+
+    Raises:
+        YAMLError: When the frontmatter block is present but contains invalid YAML.
+    """
+    parts = text.split("---", 2)
+    if len(parts) < MIN_FRONTMATTER_PARTS:
+        return _MdPost({}, text)
+    y = _make_yaml()
+    raw = y.load(parts[1]) or {}
+    metadata = _validate_metadata(dict(raw) if raw else {})
+    return _MdPost(metadata, parts[2].strip())
+
+
+def dump_frontmatter(post: _MdPost) -> str:
+    """Serialise a ``_MdPost`` back to a markdown string with ``---`` delimiters.
+
+    Args:
+        post: Post object with *metadata* dict and *content* body string.
+
+    Returns:
+        Markdown string with YAML frontmatter block followed by the body.
+    """
+    y = _make_yaml()
+    buf = io.StringIO()
+    y.dump(dict(post.metadata), buf)
+    fm_text = buf.getvalue()
+    body = post.content.strip()
+    return f"---\n{fm_text}---\n\n{body}\n"
 
 
 # ---------------------------------------------------------------------------
@@ -173,9 +264,9 @@ def parse_issue_selector(selector: str) -> str | None:
         return url_match.group(2)
     # #N form
     if selector.startswith("#"):
-        num = selector.lstrip("#").strip()
-        if num.isdigit():
-            return num
+        n = parse_issue_number(selector)
+        if n is not None:
+            return str(n)
     # Bare number form
     if selector.isdigit():
         return selector
@@ -187,7 +278,7 @@ def parse_issue_selector(selector: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _fm_str(fm: dict[str, object], meta: dict[str, str], key: str, fm_key: str = "") -> str:
+def _fm_str(fm: dict[str, str | dict[str, str]], meta: dict[str, str], key: str, fm_key: str = "") -> str:
     """Resolve a string field from metadata dict with frontmatter fallback.
 
     Returns:
@@ -196,18 +287,24 @@ def _fm_str(fm: dict[str, object], meta: dict[str, str], key: str, fm_key: str =
     return str(meta.get(key) or fm.get(fm_key or key) or "")
 
 
-def _parse_frontmatter(text: str) -> tuple[dict[str, object], dict[str, str], str]:
+def _parse_frontmatter(text: str) -> tuple[dict[str, str | dict[str, str]], dict[str, str], str]:
     """Parse frontmatter and metadata from item text.
+
+    ``loads_frontmatter`` guarantees all metadata values are ``str`` or
+    ``dict[str, str]`` via ``_validate_metadata``, so no further coercion is
+    needed here.
 
     Returns:
         Tuple of (frontmatter_dict, metadata_dict, body_text).
     """
     try:
         post = loads_frontmatter(text)
-        fm: dict[str, object] = (
-            {k: (v if isinstance(v, dict) else str(v)) for k, v in post.metadata.items()} if post.metadata else {}
-        )
+        fm: dict[str, str | dict[str, str]] = post.metadata or {}
         body: str = post.content or ""
+    except YAMLError:
+        # Structural YAML corruption (e.g. duplicate keys, bad anchors) cannot be
+        # recovered via text-split; propagate so callers can log and skip the file.
+        raise
     except (ValueError, KeyError, TypeError):
         parts = text.split("---", 2)
         fm, body = {}, parts[2].strip() if len(parts) >= MIN_FRONTMATTER_PARTS else text
@@ -223,7 +320,7 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
         BacklogItem with parsed fields from frontmatter and body.
     """
     if not text.startswith("---"):
-        return BacklogItem(raw_body=text)
+        return BacklogItem()
     fm, meta, body = _parse_frontmatter(text)
     # Research-style: name, description, metadata.*
     # Flat (legacy): title, source, added, ...
@@ -232,7 +329,8 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
     groomed = _fm_str(fm, meta, "groomed")
     if not groomed and "## Groomed" in body:
         groomed = "true"
-    return BacklogItem(
+    added_date = _fm_str(fm, meta, "added") or "0000-00-00"
+    item = BacklogItem(
         title=str(fm.get("name") or fm.get("title") or ""),
         description=str(fm.get("description") or ""),
         source=_fm_str(fm, meta, "source"),
@@ -246,8 +344,34 @@ def parse_item_file(text: str, path: Path) -> BacklogItem:
         status=status_raw,
         groomed=groomed,
         last_synced=_fm_str(fm, meta, "last_synced"),
-        raw_body=body,
     )
+    if body:
+        item.sections.update(parse_md_body_sections(body, added_date=added_date))
+    return item
+
+
+def _parse_yaml_item_file(path: Path) -> BacklogItem:
+    """Load a per-item ``.yaml`` file into a BacklogItem using ruamel.yaml.
+
+    Intentionally does not import from ``yaml_io`` to avoid the circular
+    dependency ``yaml_io → parsing → yaml_io``.  The implementation mirrors
+    the read path in :func:`yaml_io.load_item`.
+
+    Args:
+        path: Path to a ``.yaml`` backlog item file.
+
+    Returns:
+        Parsed ``BacklogItem`` with ``file_path`` set.
+
+    Raises:
+        YAMLError: On malformed YAML content.
+    """
+    yaml = YAML(typ="safe")
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.load(fh)
+    item = _models.BacklogItem.model_validate(data)
+    item.file_path = str(path.resolve())
+    return item
 
 
 def parse_backlog_from_directory() -> list[BacklogItem]:
@@ -260,7 +384,7 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
     Returns:
         List of BacklogItem instances with section, title, and parsed fields.
     """
-    if not _models.BACKLOG_DIR.exists():
+    if not _models.get_backlog_dir().exists():
         return []
     prefix_to_section = {
         "p0-": "P0",
@@ -271,8 +395,15 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
         "completed-": "Completed",
         "medium-": "P1",
     }
+    # Collect .yaml files first (new format), then .md files (legacy).
+    # When a stem has both .yaml and .md, .yaml takes precedence.
+    yaml_files = list(_models.get_backlog_dir().glob("*.yaml"))
+    md_files = list(_models.get_backlog_dir().glob("*.md"))
+    yaml_stems = {f.stem for f in yaml_files}
+    all_files = sorted(yaml_files + [f for f in md_files if f.stem not in yaml_stems])
+
     items: list[BacklogItem] = []
-    for filepath in sorted(_models.BACKLOG_DIR.glob("*.md")):
+    for filepath in all_files:
         name = filepath.stem
         section = ""
         for prefix, sec in prefix_to_section.items():
@@ -280,12 +411,12 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
                 section = sec
                 break
         try:
-            item_text = filepath.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        try:
-            item = parse_item_file(item_text, filepath)
-        except Exception as exc:  # noqa: BLE001
+            if filepath.suffix == ".yaml":
+                item = _parse_yaml_item_file(filepath)
+            else:
+                item_text = filepath.read_text(encoding="utf-8")
+                item = parse_item_file(item_text, filepath)
+        except (YAMLError, OSError, ValueError, KeyError) as exc:
             log.warning("Skipping corrupt backlog file %s: %s", filepath, exc)
             continue
         # Filename-derived section; override with metadata if available
@@ -333,7 +464,7 @@ def find_item(items: list[BacklogItem], selector: str) -> BacklogItem | None:
     if issue_num is not None:
         for it in items:
             issue_ref = it.issue or ""
-            if issue_ref.lstrip("#") == issue_num:
+            if str(parse_issue_number(issue_ref)) == issue_num:
                 return it
         return None
     # Title substring match (case-insensitive)
@@ -400,48 +531,6 @@ def items_with_issues(items: list[BacklogItem]) -> list[BacklogItem]:
 
 
 # ---------------------------------------------------------------------------
-# Frontmatter building
-# ---------------------------------------------------------------------------
-
-
-def build_backlog_frontmatter(
-    name: str,
-    description: str,
-    source: str,
-    added: str,
-    priority: str,
-    type_val: str,
-    status: str,
-    issue: str = "",
-    plan: str = "",
-    groomed: str = "",
-) -> str:
-    """Build research-style frontmatter with metadata block.
-
-    Returns:
-        YAML frontmatter string.
-    """
-    meta: dict[str, str] = {
-        "topic": title_to_slug(name),
-        "source": source or "Not specified",
-        "added": added or today(),
-        "priority": priority,
-        "type": type_val,
-        "status": status,
-    }
-    if issue:
-        meta["issue"] = issue
-    if plan:
-        meta["plan"] = plan
-    if groomed:
-        meta["groomed"] = groomed
-    post = frontmatter.Post(
-        "", name=name.replace('"', "'"), description=(description or "").replace('"', "'"), metadata=meta
-    )
-    return dump_frontmatter(post)
-
-
-# ---------------------------------------------------------------------------
 # Issue body building
 # ---------------------------------------------------------------------------
 
@@ -449,23 +538,37 @@ def build_backlog_frontmatter(
 def build_issue_body_from_file(item: BacklogItem) -> str | None:
     """Build GitHub issue body from local per-item file content.
 
-    Emits the file's raw body directly — all sections (Story, Description,
-    Groomed, Fact-Check, etc.) are authored in the local file and passed
-    through without synthetic header generation.
+    For ``.yaml`` items, returns None when no groomed section exists in
+    ``item.sections``.  For legacy ``.md`` items, reads the body from the
+    file referenced by ``item.file_path``.
 
-    Returns None if the body has no groomed content (i.e. no '## Groomed'
+    Returns None if the body has no groomed content (i.e. no ``## Groomed``
     section), since ungroomed items don't need their body synced to GitHub.
 
     Args:
-        item: Parsed BacklogItem with raw_body and frontmatter fields.
+        item: Parsed BacklogItem with file_path and sections populated.
 
     Returns:
         Issue body markdown string, or None if no groomed section present.
     """
-    raw_body = item.raw_body
-    if "## Groomed" not in raw_body:
+    file_path_str = item.file_path
+    has_groomed_section = "groomed" in item.sections
+
+    # For non-YAML items, require a .md file path
+    if not has_groomed_section and (not file_path_str or Path(file_path_str).suffix != ".md"):
         return None
-    return raw_body.strip() + "\n"
+    if not file_path_str:
+        return None
+
+    path = Path(file_path_str)
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("---", 2)
+    body = parts[2].strip() if len(parts) >= MIN_FRONTMATTER_PARTS else text
+    if "## Groomed" not in body:
+        return None
+    return body.strip() + "\n"
 
 
 def build_issue_body(item: BacklogItem) -> str:
@@ -510,77 +613,6 @@ def build_issue_body(item: BacklogItem) -> str:
     return "\n\n".join(sections) + "\n"
 
 
-# ---------------------------------------------------------------------------
-# Body field extraction / merging
-# ---------------------------------------------------------------------------
-
-
-def extract_body_field_pairs(body: str) -> list[tuple[str, str]]:
-    """Extract (key, value) pairs from body until first ## heading. Stops at ## Groomed or ## .
-
-    Returns:
-        List of (key, value) tuples.
-    """
-    field_re = re.compile(r"^\*\*([^*]+)\*\*:\s*(.*)$", re.DOTALL)
-    pairs: list[tuple[str, str]] = []
-    current_key = ""
-    current_val: list[str] = []
-    for line in body.splitlines():
-        if line.startswith("## "):
-            if current_key:
-                pairs.append((current_key, "\n".join(current_val).strip()))
-            return pairs
-        m = field_re.match(line)
-        if m:
-            if current_key:
-                pairs.append((current_key, "\n".join(current_val).strip()))
-            current_key = m.group(1).strip()
-            current_val = [m.group(2).strip()] if m.group(2).strip() else []
-        elif current_key:
-            current_val.append(line)
-    if current_key:
-        pairs.append((current_key, "\n".join(current_val).strip()))
-    return pairs
-
-
-def apply_field_to_result(key_lower: str, val: str) -> tuple[str, str, str, str, str, str]:
-    """Return (desc, suggested, research, decision, files_val, required_work) with val applied to the matching key.
-
-    Returns:
-        Tuple of (desc, suggested, research, decision, files_val, required_work).
-    """
-    result: list[str] = ["", "", "", "", "", ""]
-    if key_lower in _FIELD_TO_INDEX:
-        result[_FIELD_TO_INDEX[key_lower]] = val
-    return (result[0], result[1], result[2], result[3], result[4], result[5])
-
-
-def merge_field_into_result(
-    key: str, val: str, desc: str, suggested: str, research: str, decision: str, files_val: str, required_work: str
-) -> tuple[str, str, str, str, str, str]:
-    """Merge one field (key, val) into result tuple.
-
-    Returns:
-        Updated (desc, suggested, research, decision, files_val, required_work).
-    """
-    d, s, r, dec, f, req = apply_field_to_result(key.lower(), val)
-    return (d or desc, s or suggested, r or research, dec or decision, f or files_val, req or required_work)
-
-
-def parse_body_extra_fields(body: str) -> tuple[str, str, str, str, str, str]:
-    """Extract Description, Suggested location, Research first, Decision needed, Files, Required work from body.
-
-    Returns:
-        Tuple of (desc, suggested, research, decision, files_val, required_work).
-    """
-    desc, suggested, research, decision, files_val, required_work = "", "", "", "", "", ""
-    for key, val in extract_body_field_pairs(body):
-        desc, suggested, research, decision, files_val, required_work = merge_field_into_result(
-            key, val, desc, suggested, research, decision, files_val, required_work
-        )
-    return desc, suggested, research, decision, files_val, required_work
-
-
 def extract_groomed_section(body: str) -> str:
     """Extract full ## Groomed (date) ... section from body.
 
@@ -613,76 +645,6 @@ def build_body_extra_only(
     if groomed_section:
         parts.append(groomed_section)
     return "\n\n".join(parts) + "\n" if parts else ""
-
-
-def _build_section_block(header: str, existing_body: str, new_content: str, *, append: bool) -> str:
-    """Build section block content, optionally appending to existing body.
-
-    Returns:
-        Complete section block string (header + body + trailing newline).
-    """
-    body_text = existing_body.rstrip() + "\n" + new_content if append and existing_body else new_content
-    return header + body_text + "\n"
-
-
-def _replace_groomed_subsection(body: str, section_name: str, content: str, *, append: bool) -> str:
-    """Replace or append a ### subsection under ## Groomed.
-
-    Returns:
-        Updated body string.
-    """
-    sub_header = f"### {section_name.strip()}\n\n"
-    # [^\n]* absorbs trailing text like ": BLOCKED" on the heading line.
-    sub_re = re.compile(
-        rf"\n?### {re.escape(section_name.strip())}[^\n]*\n([\s\S]*?)(?=\n### |\n## |\Z)", re.IGNORECASE | re.MULTILINE
-    )
-    groomed_re = re.compile(r"(## Groomed\s*\([^)]*\)\s*\n)([\s\S]*?)(?=\n## |\Z)", re.MULTILINE)
-    match = groomed_re.search(body)
-    if match:
-        groomed_body = match.group(2)
-        sub_match = sub_re.search(groomed_body)
-        if sub_match:
-            new_block = _build_section_block(sub_header, sub_match.group(1), content, append=append)
-            new_groomed_body = sub_re.sub(lambda _: f"\n{new_block}", groomed_body)
-        else:
-            new_groomed_body = groomed_body.rstrip() + "\n\n" + sub_header + content + "\n"
-        captured = match.group(1) + new_groomed_body + "\n"
-        return groomed_re.sub(lambda _: captured, body, count=1)
-    groomed_header = f"## Groomed ({today()})"
-    return body.rstrip() + "\n\n" + groomed_header + "\n\n" + sub_header + content + "\n"
-
-
-def append_or_replace_section(body: str, section_name: str, content: str, *, append: bool = False) -> str:
-    """Append or replace a section in body. section_name: Fact-Check, RT-ICA, or groomed subsection (Reproducibility, Priority, etc.).
-
-    When ``append=True`` and the section already exists, the new content is
-    appended after the existing section content (separated by a newline) instead
-    of replacing it.  When the section does not yet exist the behaviour is
-    identical regardless of ``append``.
-
-    Returns:
-        Updated body string.
-    """
-    content = content.strip()
-    if not content:
-        return body
-    section_lower = section_name.strip().lower()
-    if section_lower in {"fact-check", "rt-ica"}:
-        header = f"## {section_name.strip()}\n\n"
-        # [^\n]* absorbs trailing text like ": BLOCKED" on the heading line.
-        # Using \s* instead would silently fail on headings with suffixes.
-        section_re = re.compile(
-            rf"\n## {re.escape(section_name.strip())}[^\n]*\n([\s\S]*?)(?=\n## |\Z)", re.IGNORECASE | re.MULTILINE
-        )
-        existing_match = section_re.search(body)
-        if existing_match:
-            new_block = _build_section_block(header, existing_match.group(1), content, append=append)
-            return section_re.sub(lambda _: f"\n{new_block}", body)
-        return body.rstrip() + "\n\n" + header + content + "\n"
-    # Treat known groomed subsections AND any unrecognized section name as a
-    # ### subsection under ## Groomed.  Previous code silently dropped unknown
-    # section names (returned body unchanged), violating "no silent data loss".
-    return _replace_groomed_subsection(body, section_name, content, append=append)
 
 
 # ---------------------------------------------------------------------------
@@ -742,32 +704,6 @@ def extract_sections(text: str) -> dict[str, str]:
     return sections
 
 
-def reconstruct_body_from_sections(
-    local_sections: dict[str, str], github_sections: dict[str, str], result_sections: dict[str, str]
-) -> str:
-    """Reconstruct body from merged sections, preserving local order then appending GitHub-only sections.
-
-    Args:
-        local_sections: Original local section map (preserves order).
-        github_sections: GitHub section map (source of new sections).
-        result_sections: Merged result to render from.
-
-    Returns:
-        Reconstructed body string ending with newline.
-    """
-    seen: set[str] = set()
-    parts: list[str] = []
-    for heading in local_sections:
-        content = result_sections[heading]
-        parts.append(f"{heading}\n\n{content}" if content else heading)
-        seen.add(heading)
-    for heading in github_sections:
-        if heading not in seen:
-            content = result_sections[heading]
-            parts.append(f"{heading}\n\n{content}" if content else heading)
-    return "\n\n".join(parts) + "\n"
-
-
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
     """Merge GitHub issue body into local body by section.
 
@@ -803,7 +739,341 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
     if not modified:
         return local_body, False
 
-    return reconstruct_body_from_sections(local_sections, github_sections, result_sections), True
+    seen: set[str] = set()
+    parts: list[str] = []
+    for heading in local_sections:
+        content = result_sections[heading]
+        parts.append(f"{heading}\n\n{content}" if content else heading)
+        seen.add(heading)
+    for heading in github_sections:
+        if heading not in seen:
+            content = result_sections[heading]
+            parts.append(f"{heading}\n\n{content}" if content else heading)
+    return "\n\n".join(parts) + "\n", True
+
+
+# ---------------------------------------------------------------------------
+# Legacy .md body section parsing — converts markdown body into typed sections
+# ---------------------------------------------------------------------------
+
+import marko
+from marko.block import Heading as _MarkoHeading
+
+# Heading levels used for body section splitting.
+_H2_LEVEL = 2
+_H3_LEVEL = 3
+
+# Groomed heading: "## Groomed" with optional " (YYYY-MM-DD)" suffix.
+_GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IGNORECASE)
+
+# ATX heading detector used when mapping AST positions back to source lines.
+_ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
+
+
+def _extract_heading_text(node: _MarkoHeading) -> str:
+    """Reconstruct heading text from all inline children of a marko Heading node.
+
+    Args:
+        node: Parsed marko Heading node.
+
+    Returns:
+        Heading text as a plain string with inline formatting stripped.
+    """
+    parts: list[str] = []
+    for inline in node.children:
+        raw = getattr(inline, "children", "")
+        parts.append(raw if isinstance(raw, str) else str(raw))
+    return "".join(parts).strip()
+
+
+def _ast_h2_headings(text: str) -> list[str]:
+    """Return level-2 heading texts from the marko AST in document order.
+
+    marko correctly ignores ``##`` lines inside fenced code blocks.
+
+    Args:
+        text: Raw markdown body text.
+
+    Returns:
+        Ordered list of heading text strings (after ``## ``).
+    """
+    doc = marko.parse(text)
+    return [
+        _extract_heading_text(child)
+        for child in doc.children
+        if isinstance(child, _MarkoHeading) and child.level == _H2_LEVEL
+    ]
+
+
+def _ast_h3_headings(text: str) -> list[str]:
+    """Return level-3 heading texts from the marko AST in document order.
+
+    Args:
+        text: Raw markdown text for a single section body.
+
+    Returns:
+        Ordered list of heading text strings (after ``### ``).
+    """
+    doc = marko.parse(text)
+    return [
+        _extract_heading_text(child)
+        for child in doc.children
+        if isinstance(child, _MarkoHeading) and child.level == _H3_LEVEL
+    ]
+
+
+def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target_level: int) -> list[tuple[int, str]]:
+    """Map AST heading texts to their 0-indexed source line numbers.
+
+    Uses a code-fence state tracker to skip ``#`` lines inside fenced code
+    blocks, then matches AST heading entries in document order by level.  Line
+    numbers are 0-indexed (offsets into ``raw_lines``).
+
+    Args:
+        ast_headings: Heading texts extracted from the marko AST, in order.
+        raw_lines: Source lines of the text (``text.splitlines()``).
+        target_level: Heading depth to match (2 for ``##``, 3 for ``###``).
+
+    Returns:
+        List of ``(line_index, heading_text_from_source)`` tuples.
+    """
+    "#" * target_level + " "
+    result: list[tuple[int, str]] = []
+    ast_idx = 0
+    in_fence = False
+
+    for idx, line in enumerate(raw_lines):
+        if ast_idx >= len(ast_headings):
+            break
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _ATX_HEADING_RE.match(line)
+        if m and len(m.group(1)) == target_level:
+            result.append((idx, m.group(2).strip()))
+            ast_idx += 1
+
+    return result
+
+
+def _split_body_h2(body: str) -> list[tuple[str, str]]:
+    """Split markdown body on ``## `` headings using the marko AST.
+
+    marko correctly identifies ATX headings while ignoring ``##`` lines inside
+    fenced code blocks.  Heading positions are then mapped back to source lines
+    so that raw content (including HTML entry blocks) is extracted verbatim.
+
+    Args:
+        body: Raw markdown body text (everything after frontmatter).
+
+    Returns:
+        List of ``(heading_name, content)`` tuples in document order.
+        The heading_name is the text after ``## `` with whitespace stripped.
+        Content does not include the heading line itself.
+    """
+    ast_headings = _ast_h2_headings(body)
+    if not ast_headings:
+        return []
+
+    raw_lines = body.splitlines()
+    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
+
+    segments: list[tuple[str, str]] = []
+    for i, (line_idx, heading_name) in enumerate(positioned):
+        content_start = line_idx + 1
+        content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
+        content = "\n".join(raw_lines[content_start:content_end]).strip()
+        segments.append((heading_name, content))
+
+    return segments
+
+
+def _split_h3_subsections(content: str) -> dict[str, str]:
+    """Split a block of text on ``### `` headings using the marko AST.
+
+    Subsection content is extracted from the raw source lines so that entry
+    block HTML is stored verbatim.
+
+    Args:
+        content: Block of text under a ``## `` section.
+
+    Returns:
+        Dict mapping subsection name to raw content (verbatim).
+        Keys are the heading text after ``### ``, whitespace stripped.
+    """
+    ast_headings = _ast_h3_headings(content)
+    if not ast_headings:
+        return {}
+
+    raw_lines = content.splitlines()
+    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=3)
+
+    subsections: dict[str, str] = {}
+    for i, (line_idx, sub_name) in enumerate(positioned):
+        content_start = line_idx + 1
+        content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
+        sub_content = "\n".join(raw_lines[content_start:content_end]).strip()
+        subsections[sub_name] = sub_content
+
+    return subsections
+
+
+def _parse_section_entries(content: str, added_date: str) -> Section:
+    """Parse content into a Section, handling both entry-block and plain text.
+
+    If ``<div><sub>`` entry blocks are present the content is parsed into
+    ``Entry`` objects via the entry_blocks module.  Plain text (no entry
+    blocks) is wrapped in a single synthetic ``Entry`` so the data model
+    stays uniform.
+
+    Edge case: text appearing after the last ``</div>`` closing tag is captured
+    as an additional synthetic ``Entry`` so no content is dropped.
+
+    Args:
+        content: Raw text content of a section body.
+        added_date: YYYY-MM-DD date used to construct a synthetic entry id
+            when the content has no entry block wrappers.
+
+    Returns:
+        ``Section`` with one or more ``Entry`` objects.
+    """
+    # Import here to avoid circular dependency: entry_blocks → parsing (now_iso).
+    from .entry_blocks import ENTRY_RE  # noqa: PLC0415
+
+    if not content:
+        return Section(entries=[])
+
+    matches = list(ENTRY_RE.finditer(content))
+    if matches:
+        from .entry_blocks import _deduplicate_timestamps, _parse_match_to_entry  # noqa: PLC0415
+
+        entries = [_parse_match_to_entry(m) for m in matches]
+        _deduplicate_timestamps(entries)
+
+        # Edge case 3: capture any text that appears after the last </div>.
+        last_match_end = matches[-1].end()
+        trailing = content[last_match_end:].strip()
+        if trailing:
+            entries.append(Entry(id="", content=trailing))
+
+        return Section(entries=entries)
+
+    # No entry blocks — wrap raw content in a synthetic entry.
+    synthetic_id = f"{added_date}T00:00:00Z"
+    return Section(entries=[Entry(id=synthetic_id, content=content)])
+
+
+def _parse_groomed_section(heading_name: str, content: str, added_date: str) -> GroomedData:
+    """Parse a ``## Groomed`` section into a ``GroomedData`` object.
+
+    The date is extracted from the heading suffix ``(YYYY-MM-DD)``.
+    ``### `` subsections become keys in ``GroomedData.subsections``; their
+    values are stored verbatim so existing ``entry_blocks`` operations work
+    without re-parsing.
+
+    Edge case 2: when a ``## Groomed`` section has body content but no
+    ``### `` subsections, the entire body is stored under the key
+    ``"Content"`` so no text is silently dropped.
+
+    Args:
+        heading_name: Full heading text after ``## ``, e.g. ``"Groomed (2026-02-28)"``.
+        content: Raw text content under the heading (after the heading line).
+        added_date: Fallback date when no date is in the heading.
+
+    Returns:
+        ``GroomedData`` with ``date`` and ``subsections`` populated.
+    """
+    date_match = re.search(r"\((\d{4}-\d{2}-\d{2})\)", heading_name)
+    date = date_match.group(1) if date_match else added_date
+    subsections = _split_h3_subsections(content)
+    # Edge case 2: body present but no ### subsection markers — preserve body verbatim.
+    if not subsections and content.strip():
+        subsections = {"Content": content.strip()}
+    return GroomedData(date=date, subsections=subsections)
+
+
+def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> dict[str, Section | GroomedData]:
+    """Parse markdown body sections from a legacy ``.md`` backlog file body.
+
+    Splits the body on ``## `` top-level headings (respecting fenced code
+    blocks), then converts each section to a typed model:
+
+    - ``## Groomed`` (with optional date suffix) → ``GroomedData``
+      ``### `` subsections become ``GroomedData.subsections`` keys; values
+      are stored verbatim so ``entry_blocks`` operations work unchanged.
+    - All other sections → ``Section`` with a list of ``Entry`` objects.
+      Sections with ``<div><sub>`` entry blocks are parsed into individual
+      ``Entry`` instances.  Sections with plain text get a single synthetic
+      ``Entry`` (id = ``{added_date}T00:00:00Z``).
+
+    Duplicate ``## `` headings are merged: entries from the second (and any
+    subsequent) occurrence are appended to the first, preserving all content.
+    ``GroomedData`` from duplicate ``## Groomed`` headings are merged by
+    updating ``subsections`` (later keys overwrite earlier ones with the same
+    name).
+
+    Args:
+        body_text: Raw markdown body string — everything after the ``---``
+            frontmatter delimiter block.
+        added_date: YYYY-MM-DD date used as the synthetic entry id timestamp
+            for plain-text sections that have no ``<div><sub>`` wrappers.
+            Defaults to ``"0000-00-00"``.
+
+    Returns:
+        Dict mapping section name (as it appears in the heading after ``## ``,
+        with any date suffix stripped for ``Groomed``) to a ``Section`` or
+        ``GroomedData`` instance.  The key for ``## Groomed (2026-02-28)``
+        is ``"groomed"``; all other section names are lowercased.
+    """
+    segments = _split_body_h2(body_text)
+    result: dict[str, Section | GroomedData] = {}
+
+    # Edge case 1: capture body text that precedes the first ## heading as "preamble".
+    if segments:
+        raw_lines = body_text.splitlines()
+        ast_headings = _ast_h2_headings(body_text)
+        positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
+        if positioned:
+            first_heading_line = positioned[0][0]
+            pre_heading_text = "\n".join(raw_lines[:first_heading_line]).strip()
+            if pre_heading_text:
+                synthetic_id = f"{added_date}T00:00:00Z"
+                result["preamble"] = Section(entries=[Entry(id=synthetic_id, content=pre_heading_text)])
+    elif body_text.strip():
+        # No ## headings at all — entire body is preamble.
+        synthetic_id = f"{added_date}T00:00:00Z"
+        result["preamble"] = Section(entries=[Entry(id=synthetic_id, content=body_text.strip())])
+
+    for heading_name, content in segments:
+        groomed_match = _GROOMED_DATE_RE.match(heading_name.strip())
+        if groomed_match:
+            key = "groomed"
+            parsed: Section | GroomedData = _parse_groomed_section(heading_name, content, added_date)
+            existing_groomed = result.get(key)
+            if isinstance(existing_groomed, GroomedData) and isinstance(parsed, GroomedData):
+                # Merge duplicate ## Groomed sections: later subsections overwrite.
+                existing_groomed.subsections.update(parsed.subsections)
+                if parsed.date and not existing_groomed.date:
+                    existing_groomed.date = parsed.date
+            else:
+                result[key] = parsed
+        else:
+            raw_key = heading_name.lower()
+            # Normalize legacy hyphenated keys (e.g. "fact-check") to canonical
+            # underscore form (e.g. "fact_check") so they are visible to render_issue_body.
+            key = SECTION_HEADING_ALIAS.get(raw_key, raw_key)
+            parsed_section = _parse_section_entries(content, added_date)
+            existing_section = result.get(key)
+            if isinstance(existing_section, Section):
+                # Merge duplicate headings: append entries from subsequent occurrences.
+                existing_section.entries.extend(parsed_section.entries)
+            else:
+                result[key] = parsed_section
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -824,14 +1094,18 @@ def view_result_from_local_item(item: BacklogItem) -> ViewItemResult:
         issue=item.issue,
         plan=item.plan,
         file_path=item.file_path,
-        groomed=bool(item.groomed),
+        groomed=item.metadata.groomed,
     )
     # Use fields already parsed on BacklogItem instead of re-reading the file
     result.description = item.description or ""
     result.source = item.source or ""
     result.added = item.added or ""
-    if item.raw_body:
-        result.body = item.raw_body
+    if item.file_path:
+        fp = Path(item.file_path)
+        if fp.suffix == ".md" and fp.exists():
+            text = fp.read_text(encoding="utf-8")
+            parts = text.split("---", 2)
+            result.body = parts[2].strip() if len(parts) >= MIN_FRONTMATTER_PARTS else text
     result.status = item.status
     return result
 
@@ -841,7 +1115,7 @@ def view_result_from_local_item(item: BacklogItem) -> ViewItemResult:
 # ---------------------------------------------------------------------------
 
 
-def extract_normalize_metadata(fm: dict[str, object], meta: dict[str, str]) -> dict[str, str]:
+def extract_normalize_metadata(fm: dict[str, str | dict[str, str]], meta: dict[str, str]) -> dict[str, str]:
     """Extract normalized metadata from frontmatter and metadata dicts.
 
     Returns:

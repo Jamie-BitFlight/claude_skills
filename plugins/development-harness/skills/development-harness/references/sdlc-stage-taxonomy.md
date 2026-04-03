@@ -29,7 +29,7 @@ skill_activation: /dh:discovery
 purpose: Understand the feature request, identify constraints, and survey the codebase state before any planning occurs.
 inputs: Feature description, codebase root path, any prior context files
 outputs: DISCOVERY artifact containing problem framing, constraint inventory, affected surfaces, and open questions
-artifact_path: .planning/harness/DISCOVERY.md
+artifact_access: artifact_register(issue_number, "feature-context", path, agent, content=...) / artifact_read(issue_number, "feature-context")
 ```
 
 #### S2 — `planning`
@@ -41,7 +41,7 @@ skill_activation: /dh:planning
 purpose: Produce a structured plan covering solution architecture, acceptance tests, risk assessment, and RT-ICA completeness gate.
 inputs: DISCOVERY artifact, codebase context
 outputs: PLAN artifact with architecture, acceptance tests in Given/When/Then format, risk assessment, task skeletons, and RT-ICA gate result
-artifact_path: .planning/harness/PLAN.md
+artifact_access: artifact_register(issue_number, "architect", path, agent, content=...) / artifact_read(issue_number, "architect")
 ```
 
 #### S3 — `context-integration`
@@ -53,7 +53,7 @@ skill_activation: /dh:context-integration
 purpose: Validate the S2 plan against actual codebase state, resolving gaps and updating the plan artifact before task decomposition.
 inputs: PLAN artifact, live codebase read access
 outputs: Amended PLAN artifact with resolved gaps, confirmed assumptions, and updated constraints
-artifact_path: .planning/harness/PLAN.md
+artifact_access: artifact_read(issue_number, "architect") / artifact_register(issue_number, "architect", path, agent, content=...)
 ```
 
 #### S4 — `task-decomposition`
@@ -65,7 +65,7 @@ skill_activation: /dh:task-decomposition
 purpose: Break the validated plan into executable, independently-delegatable task files with acceptance criteria and dependency ordering.
 inputs: Amended PLAN artifact
 outputs: One TASK file per work unit, with acceptance criteria, agent routing, and dependency graph
-artifact_path: .planning/harness/tasks/TASK-{NNN}.md
+artifact_access: sam_create(slug, goal, tasks_yaml, issue=issue_number) / sam_read(plan, task)
 ```
 
 #### S5 — `execution`
@@ -77,7 +77,7 @@ skill_activation: /dh:execution
 purpose: Implement each task using language-appropriate specialist agents; produce execution artifacts per task.
 inputs: TASK file, quality gate commands from language manifest
 outputs: EXECUTION artifact per task containing implementation evidence and quality gate results
-artifact_path: .planning/harness/executions/EXECUTION-{NNN}.md
+artifact_access: sam_read(plan, task) / sam_update(address, append_section="Execution Results", section_content=...)
 ```
 
 #### S6 — `forensic-review`
@@ -89,7 +89,7 @@ skill_activation: /dh:forensic-review
 purpose: Verify each executed task against its acceptance criteria; identify regressions, gaps, and quality violations.
 inputs: TASK file, EXECUTION artifact, codebase diff
 outputs: REVIEW artifact per task with pass/fail per acceptance criterion and remediation instructions
-artifact_path: .planning/harness/reviews/REVIEW-{NNN}.md
+artifact_access: sam_read(plan, task) / sam_update(address, append_section="Review Results", section_content=...)
 ```
 
 #### S7 — `final-verification`
@@ -101,7 +101,7 @@ skill_activation: /dh:final-verification
 purpose: Certify the complete feature against the original discovery and acceptance criteria; produce a CERTIFIED or NOT_CERTIFIED verdict.
 inputs: DISCOVERY artifact, all REVIEW artifacts, codebase state
 outputs: VERIFICATION artifact with per-criterion verdict and overall CERTIFIED or NOT_CERTIFIED determination
-artifact_path: .planning/harness/VERIFICATION.md
+artifact_access: sam_read(plan, task) / sam_update(address, append_section="Final Verification", section_content=...)
 ```
 
 ---

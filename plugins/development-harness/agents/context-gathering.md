@@ -5,7 +5,8 @@ tools: Read, Grep, Glob, Bash, mcp__plugin_dh_sam__sam_read, mcp__plugin_dh_sam_
 model: haiku
 color: cyan
 skills:
-  - subagent-contract
+  - dh:subagent-contract
+  - ccc
 ---
 
 # Context-Gathering Agent

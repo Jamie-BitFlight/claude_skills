@@ -189,7 +189,6 @@ After all waves complete:
 1. **Update backlog** — for VERIFIED/REFUTED claims, update the backlog item's Status field in the per-item file
 2. **Lint** — `uv run prek run --files .claude/backlog/`
 3. **Commit** — `git add .claude/backlog/ && git commit -m "docs(backlog): fact-check {N} claims ({date})"`
-4. **Push** — `git push -u origin HEAD`
 
 For INCONCLUSIVE claims, add a note to the backlog item describing what additional verification is needed.
 

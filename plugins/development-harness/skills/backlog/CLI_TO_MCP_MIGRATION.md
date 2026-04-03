@@ -16,7 +16,7 @@ Generated: 2026-03-01
 
 | CLI Subcommand | MCP Tool | operations.py Function | Notes |
 |---|---|---|---|
-| `backlog add` | `backlog_add` | `add_item()` | `--create-issue` → `create_issue: bool` |
+| `backlog add` | `backlog_add` | `add_item()` | always creates a GitHub issue |
 | `backlog list` | `backlog_list` | `list_items()` | `--format json` implicit (MCP returns dicts); status fields always included in every response |
 | `backlog view` | `backlog_view` | `view_item()` | `--format json` implicit (MCP returns dicts) |
 | `backlog sync` | `backlog_sync` | `sync_items()` | `--dry-run` → `dry_run: true` |
@@ -143,7 +143,7 @@ These contain the actual `uv run backlog.py` commands that agents execute.
 | 584 | `backlog.py close "{title}" --plan "..." --checklist-pass` | `backlog_close(selector="{title}", plan="...", checklist_pass=true)` |
 | 590 | `backlog.py close "#{N}" --plan "..." --checklist-pass` | `backlog_close(selector="#{N}", plan="...", checklist_pass=true)` |
 | 641 | `backlog.py view "#{issue_number}" --format json` | `backlog_view(selector="#{N}")` |
-| 650 | `backlog.py update "{title}" --create-issue` | `backlog_update(selector="{title}", create_issue=true)` |
+| 650 | `backlog.py update "{title}" --create-issue` | `backlog_update(selector="{title}")` (issue created automatically when missing) |
 | 660 | `backlog.py update "{title}" --status in-progress` | `backlog_update(selector="{title}", status="in-progress")` |
 | 685 | `backlog.py list` | `backlog_list()` |
 
@@ -164,7 +164,7 @@ These contain the actual `uv run backlog.py` commands that agents execute.
 
 | Line | CLI Command | MCP Replacement |
 |---|---|---|
-| 36 | `backlog.py update "{title}" --create-issue` | `backlog_update(selector="{title}", create_issue=true)` |
+| 36 | `backlog.py update "{title}" --create-issue` | `backlog_update(selector="{title}")` (issue created automatically when missing) |
 | 46 | `backlog.py update "{title}" --status in-progress` | `backlog_update(selector="{title}", status="in-progress")` |
 | 61 | `backlog.py close "{title}" --plan "..." --checklist-pass` | `backlog_close(selector="{title}", plan="...", checklist_pass=true)` |
 

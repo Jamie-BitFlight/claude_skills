@@ -110,25 +110,25 @@ class TestBug2StringFormatTaskEntriesDropped:
 
     def test_build_task_dict_string_entry_returns_task_dict(self) -> None:
         """String entry '1.1: Update some-file.md — note' is parsed correctly."""
-        result = _build_task_dict("1.1: Update some-file.md — note", {})  # type: ignore[arg-type]
+        result = _build_task_dict("1.1: Update some-file.md — note", {})
         assert result is not None
         assert result["task"] == "1.1"
         assert result["title"] == "Update some-file.md — note"
 
     def test_build_task_dict_string_entry_without_colon_returns_none(self) -> None:
         """String entry with no colon cannot be parsed and returns None."""
-        result = _build_task_dict("no colon here at all", {})  # type: ignore[arg-type]
+        result = _build_task_dict("no colon here at all", {})
         assert result is None
 
     def test_build_task_dict_string_entry_defaults_status_to_not_started(self) -> None:
         """String entry without prose gets default status not-started."""
-        result = _build_task_dict("T1: Some title", {})  # type: ignore[arg-type]
+        result = _build_task_dict("T1: Some title", {})
         assert result is not None
         assert result["status"] == "not-started"
 
     def test_build_task_dict_non_string_non_dict_returns_none(self) -> None:
         """Non-string non-dict entry (e.g. integer) is still rejected."""
-        result = _build_task_dict(42, {})  # type: ignore[arg-type]
+        result = _build_task_dict(42, {})
         assert result is None
 
     def test_string_format_tasks_survive_full_pipeline(self, tmp_path: Path) -> None:

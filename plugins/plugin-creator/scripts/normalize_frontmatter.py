@@ -32,9 +32,18 @@ from __future__ import annotations
 
 import difflib
 import sys
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Annotated
 
+# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
+# reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if isinstance(sys.stderr, TextIOWrapper):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+import ruamel.yaml
 import typer
 from rich import box
 from rich.console import Console
@@ -137,7 +146,7 @@ def normalize_file(path: Path) -> str | None:
     try:
         post = load_frontmatter(path)
         normalized = dump_frontmatter(post)
-    except Exception as exc:  # noqa: BLE001
+    except (ruamel.yaml.YAMLError, ValueError, UnicodeDecodeError) as exc:
         console.print(f"  :warning:  [yellow]Skipping[/yellow] {path}: {exc}")
         return None
 

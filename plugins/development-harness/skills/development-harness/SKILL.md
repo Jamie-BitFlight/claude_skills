@@ -1,193 +1,94 @@
 ---
 name: development-harness
-description: Language-agnostic development process orchestrator implementing SAM 7-stage pipeline with Voltron composition. Detects project language, resolves specialist roles from language plugin manifests, and orchestrates discovery through verification. Use when starting feature development, planning implementations, or running the full development workflow.
+description: Development Harness plugin overview and skill router — use when unsure which dh skill to invoke. Routes by intent — capture, groom, plan, execute, single task, quality gates, or milestone. Activates on 'which skill', 'where do I start', 'development workflow', or direct /dh invocation.
 model: opus
 context: fork
 user-invocable: true
 ---
 
-# Development Harness Orchestrator
+# Development Harness — Plugin Overview and Skill Router
 
-You are the development harness orchestrator. Your role is to guide feature development through the SAM 7-stage pipeline, resolving language-specific specialists from plugin manifests and managing state as file-based artifacts.
+This skill routes to the correct entry point for the development lifecycle. Read it to decide which skill to invoke — not to execute work.
 
-## Activation Triggers
+## SAM Workflow Pipeline
 
-- User requests feature development ("implement X", "add Y", "build Z")
-- User asks to plan an implementation
-- User invokes `/development-harness` directly
-- User wants to run the full development workflow
+```text
+/dh:add-new-feature  ──>  /dh:implement-feature  ──>  /dh:complete-implementation
+   (planning)            (execution loop)         (quality gates)
+```
 
-## Role Resolution Protocol
+---
 
-Before starting the pipeline, detect the project language and resolve specialist roles.
+## What This Plugin Provides
+
+The development-harness plugin implements the structured development lifecycle for tracked backlog items. It spans capture through verified closure using a chain of skills backed by GitHub Issues as the source of truth and `~/.dh/projects/{slug}/` as the local state directory.
+
+**Skills available:** `/dh:create-backlog-item`, `/dh:groom-backlog-item`, `/dh:work-backlog-item`, `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:work-milestone`
+
+Plugin-level source copies exist at `plugins/development-harness/skills/` for each skill.
+
+---
+
+## Skill Router — "I want to do X"
 
 ```mermaid
 flowchart TD
-    Start([Invocation]) --> Scan[Scan project root for language markers]
-    Scan --> Found{Language marker found?}
-    Found -->|pyproject.toml| SearchPy[Search for Python language manifest]
-    Found -->|package.json| SearchTS[Search for TypeScript language manifest]
-    Found -->|Cargo.toml| SearchRust[Search for Rust language manifest]
-    Found -->|Multiple| Multi[Detect primary from source file count]
-    Found -->|None| FB[Use fallback — general-purpose for all roles]
-    Multi --> SearchPrimary[Search for primary language manifest]
-    SearchPy --> ManifestFound{Manifest exists?}
-    SearchTS --> ManifestFound
-    SearchRust --> ManifestFound
-    SearchPrimary --> ManifestFound
-    ManifestFound -->|Yes| LoadManifest[Load manifest and resolve roles]
-    ManifestFound -->|No| FB
-    LoadManifest --> CheckOverride{Flow override declared?}
-    CheckOverride -->|Yes| UseCustomFlow[Load custom flow from manifest]
-    CheckOverride -->|No| UseDefault[Load default SAM pipeline]
-    FB --> UseDefault
-    UseCustomFlow --> Begin([Begin Pipeline])
-    UseDefault --> Begin
+    Start([What do you want to do?]) --> Q1{Intent?}
+
+    Q1 -->|Capture new work —<br>bug, feature idea, observation| Create["/dh:create-backlog-item<br>Modes: guided intake, quick title, --auto title<br>Writes to ~/.dh/projects/{slug}/backlog/"]
+
+    Q1 -->|Prepare an item for planning —<br>verify claims, map impact, estimate effort| Groom["/dh:groom-backlog-item {title|section|all}<br>RT-ICA + parallel swarm: fact-checker,<br>impact-analyst, rtica-assessor, classifier, groomer<br>Requires: item exists in backlog"]
+
+    Q1 -->|Plan AND execute a backlog item<br>end-to-end through closure| Work["/dh:work-backlog-item {title|#N|--auto}<br>Handles: auto-groom, RT-ICA gate, SAM planning,<br>GitHub sync, close, resolve<br>STOPS if item already has a Plan field"]
+
+    Q1 -->|Plan a feature — produce SAM artifacts<br>without executing| Plan["/dh:add-new-feature {feature description}<br>Phases: discovery → codebase analysis →<br>architecture spec → task decomposition →<br>validation → context manifest<br>Output: feature slug + P{NNN} task plan"]
+
+    Q1 -->|Execute an existing plan —<br>task plan already produced| Execute["/dh:implement-feature {plan path or slug}<br>Loops ready tasks, dispatches agents,<br>calls complete-implementation when all tasks COMPLETE"]
+
+    Q1 -->|Work a single specific task<br>inside an existing plan| Single["/dh:start-task {plan path} --task {task-id}<br>Used by implement-feature per-task dispatch —<br>invoke directly to target one task"]
+
+    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>6-phase SAM path (with plan) or<br>3-phase proportional path (issue only):<br>code review → verification → integration →<br>doc drift → doc update → context refinement"]
+
+    Q1 -->|Work a full milestone<br>in parallel isolated worktrees| Milestone["/dh:work-milestone<br>Wave-based parallel execution — each item<br>gets its own worktree. Use /dh:groom-milestone first."]
 ```
 
-**Detection markers:**
-
-- Python — `pyproject.toml`, `setup.py`, `setup.cfg`
-- TypeScript/JavaScript — `package.json`, `tsconfig.json`
-- Rust — `Cargo.toml`
-- Go — `go.mod`
-
-**Manifest location:** Search installed language plugins for `references/language-manifest.md`. The manifest declares which agents fulfill each role and what quality gate commands to run.
-
-**Role mapping:** The harness uses these abstract roles that manifests resolve to concrete agents:
-
-- **architect** — Design decisions, interface definitions, module structure
-- **test-designer** — Test strategy, test generation, coverage analysis
-- **code-reviewer** — Code quality, pattern compliance, review
-- **design-spec** — Design specification generation and validation
-- **linting** — Code formatting and linting orchestration
-
-**Fallback:** When no language manifest is found, use the general-purpose agent for all roles. Quality gates fall back to file-type detection (run `ruff` if Python files detected, `eslint` if JS/TS files detected, etc.).
-
-Full protocol in [./references/role-resolution-protocol.md](./references/role-resolution-protocol.md).
-
 ---
 
-## Default Development Flow
-
-Load the default pipeline from [./references/default-development-flow.md](./references/default-development-flow.md).
-
-The pipeline has 7 stages with ARL touchpoint gates between S1-S2 and S4-S5.
-
----
-
-## Stage Orchestration
-
-### Walking the Pipeline
-
-For each stage S1 through S7:
-
-1. **Load stage skill** — Activate the corresponding workflow skill (e.g., `/dh:discovery` for S1)
-2. **Resolve agents** — Use the language manifest to determine which agent handles this stage's work
-3. **Execute** — Delegate to the resolved agent with the previous stage's artifact as input
-4. **Write artifact** — Store the stage output in `.planning/harness/` with SAM naming
-5. **Evaluate gate** — Check if ARL touchpoint analysis requires human escalation before proceeding
-
-### ARL Touchpoint Evaluation
-
-At each gate, evaluate whether to escalate or proceed:
+## Lifecycle — Creation to Verified Closure
 
 ```mermaid
 flowchart TD
-    Gate([Stage Complete]) --> Analyze[Analyze constraint state]
-    Analyze --> Bound{All constraints bound?}
-    Bound -->|Yes| Risk{Risk level?}
-    Bound -->|No — unbound constraints| Escalate[Escalate to human]
-    Risk -->|Low — reversible, local scope| Proceed[Proceed to next stage]
-    Risk -->|High — irreversible, broad scope| Escalate
-    Proceed --> Next([Next Stage])
-    Escalate --> HumanDecision[Human reviews and decides]
-    HumanDecision --> Next
+    Capture["/dh:create-backlog-item<br>Per-item file in ~/.dh/.../backlog/"] --> Groom
+    Groom["/dh:groom-backlog-item<br>RT-ICA + impact radius + fact-check<br>Item status: needs-grooming → groomed"] --> Work
+    Work["/dh:work-backlog-item<br>Auto-groom gate → RT-ICA gate →<br>SAM planning via /add-new-feature<br>Attaches plan to backlog item"] --> Execute
+    Execute["/dh:implement-feature<br>SAM dispatch loop — ready tasks →<br>agents → hooks update task status"] --> QG
+    QG["/dh:complete-implementation<br>6 quality gate phases → status:verified label<br>Fixes #N commit — issue closure"] --> Done(["Item resolved"])
+
+    Work -.->|item already has Plan field| Execute
+    Work -.->|close or resolve mode| Done
 ```
 
-Details in [./references/human-touchpoint-model.md](./references/human-touchpoint-model.md).
+**Key invariants derived from the skill sources:**
 
-### Handling NEEDS_WORK Loops
-
-When S6 (Forensic Review) returns NEEDS_WORK for a task:
-
-1. Identify which acceptance criteria failed
-2. Route the task back to S5 (Execution) with the failure report attached
-3. Re-execute only the failed task, not the entire plan
-4. Re-run S6 on the corrected task
-5. After 3 NEEDS_WORK loops on the same task, escalate to human
-
-When S7 (Final Verification) returns NOT_CERTIFIED:
-
-1. Identify which original requirements are not met
-2. Route back to S4 (Task Decomposition) to generate corrective tasks
-3. Execute corrective tasks through S5-S6-S7
-4. After 2 NOT_CERTIFIED loops, escalate to human
+- `/dh:work-backlog-item` stops immediately when the item already has a `Plan` field — use `/dh:implement-feature` instead
+- `/dh:work-backlog-item` stops at the RT-ICA gate when MISSING conditions remain unresolved
+- Task-level commits produced during `/dh:implement-feature` must NOT include `Fixes #N` — that trailer is reserved for the final commit in `/dh:complete-implementation`
+- The `status:verified` label applied by `/dh:complete-implementation` is a prerequisite for `/dh:work-backlog-item resolve`
 
 ---
 
-## State Management
+## Quick Decision Reference
 
-Create the `.planning/harness/` directory at pipeline start if it does not exist.
-
-**Artifact naming:** `{stage-prefix}-{feature-slug}.md` for stage artifacts, `{stage-prefix}-{task-id}-{task-slug}.md` for task-level artifacts.
-
-**Stage prefixes:**
-
-- S1 — `discovery`
-- S2 — `plan`
-- S3 — `context`
-- S4 — `task`
-- S5 — `execution`
-- S6 — `review`
-- S7 — `verification`
-
-**Example for feature "add-jwt-auth":**
-
-- `.planning/harness/discovery-add-jwt-auth.md`
-- `.planning/harness/plan-add-jwt-auth.md`
-- `.planning/harness/context-add-jwt-auth.md`
-- `.planning/harness/task-001-add-jwt-middleware.md`
-- `.planning/harness/task-002-add-token-validation.md`
-- `.planning/harness/execution-001-add-jwt-middleware.md`
-- `.planning/harness/review-add-jwt-auth.md`
-- `.planning/harness/verification-add-jwt-auth.md`
-
-Each artifact cross-references its predecessor and successor using `ARTIFACT:{TYPE}({ID})` tokens.
-
-Full conventions in [./references/artifact-conventions.md](./references/artifact-conventions.md).
-
----
-
-## Composition with Language Plugins
-
-Language plugins compose with the harness by providing a manifest file. The harness reads the manifest to:
-
-1. **Resolve roles** — Map abstract roles (architect, test-designer) to plugin-provided agents
-2. **Configure gates** — Use plugin-declared commands for format, lint, typecheck, test
-3. **Detect projects** — Use plugin-declared markers and patterns for language detection
-4. **Override flow** — Optionally replace the default pipeline with a plugin-specific flow
-
-**Without a manifest:** The harness operates with general-purpose agents and file-type-based quality gates. This provides a usable but less specialized workflow.
-
-**With a manifest:** The harness delegates to language-specific specialists who understand idioms, toolchains, and best practices for that language.
-
-Manifest schema in [./references/language-manifest-schema.md](./references/language-manifest-schema.md).
-
-Template for language plugin authors at [../../templates/language-manifest-template.md](../../templates/language-manifest-template.md).
-
----
-
-## References
-
-- [Default Development Flow](./references/default-development-flow.md) - SAM pipeline with ARL gates
-- [Role Resolution Protocol](./references/role-resolution-protocol.md) - Language detection and role mapping
-- [Language Manifest Schema](./references/language-manifest-schema.md) - Schema for language plugin manifests
-- [Human Touchpoint Model](./references/human-touchpoint-model.md) - ARL-derived escalation decisions
-- [Artifact Conventions](./references/artifact-conventions.md) - SAM artifact naming and file layout
-
-## Sources
-
-- SAM methodology: <https://github.com/bitflight-devops/stateless-agent-methodology>
-- ARL skill: `plugins/plugin-creator/skills/arl/`
-- RT-ICA skill: `plugins/python3-development/skills/planner-rt-ica/`
+| Situation | Skill |
+|---|---|
+| Item does not exist yet | `/dh:create-backlog-item` |
+| Item exists, not yet groomed | `/dh:groom-backlog-item {title}` |
+| Item is groomed, no plan yet | `/dh:work-backlog-item {title}` |
+| Item has a Plan field | `/dh:implement-feature {plan path or slug}` |
+| Plan is executing, one task needs focus | `/dh:start-task {plan} --task {id}` |
+| All tasks complete, run quality gates | `/dh:complete-implementation {plan path}` |
+| Issue number, no plan | `/dh:complete-implementation #{N}` (proportional gates) |
+| Groomed item, skip to planning directly | `/dh:add-new-feature {description}` then `/dh:implement-feature` |
+| Full milestone in parallel worktrees | `/dh:groom-milestone` then `/dh:work-milestone` |
+| Dismiss without completing | `/dh:work-backlog-item close {title}` |
+| Mark completed with evidence | `/dh:work-backlog-item resolve {title}` |

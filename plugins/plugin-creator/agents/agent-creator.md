@@ -4,10 +4,10 @@ description: Creates Claude Code agent files from requirements — handles disco
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash
 skills:
-  - claude-plugins-reference-2026
-  - hooks-guide
-  - claude-skills-overview-2026
-  - agent-creator
+  - plugin-creator:claude-plugins-reference-2026
+  - plugin-creator:hooks-guide
+  - plugin-creator:claude-skills-overview-2026
+  - plugin-creator:agent-creator
 color: green
 ---
 

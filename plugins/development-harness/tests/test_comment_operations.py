@@ -4,9 +4,9 @@ All tests mock at the ``_graphql_request`` boundary or at the PyGithub REST
 boundary, keeping tests independent of live API calls.
 
 Functions under test:
-  - backlog_core.github._parse_comment_node
-  - backlog_core.github._fetch_issue_comments_graphql
-  - backlog_core.github._fetch_comment_by_id_graphql
+  - backlog_core.gh_client._parse_comment_node
+  - backlog_core.gh_client._fetch_issue_comments_graphql
+  - backlog_core.gh_client._fetch_comment_by_id_graphql
   - backlog_core.operations.list_comments
   - backlog_core.operations.read_comment
 """
@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.github import _fetch_comment_by_id_graphql, _fetch_issue_comments_graphql, _parse_comment_node
+from backlog_core.gh_client import _fetch_comment_by_id_graphql, _fetch_issue_comments_graphql, _parse_comment_node
 from backlog_core.models import BacklogError, ValidationError
 from backlog_core.operations import list_comments, read_comment
 
@@ -147,7 +147,7 @@ class TestFetchIssueCommentsGraphql:
         comment_a = make_issue_comment_node(comment_id="IC_001", body="first comment", author="alice")
         comment_b = make_issue_comment_node(comment_id="IC_002", body="second comment", author="bob")
         mocker.patch(
-            "backlog_core.github._graphql_request", return_value=make_issue_comments_response([comment_a, comment_b])
+            "backlog_core.gh_client._graphql_request", return_value=make_issue_comments_response([comment_a, comment_b])
         )
 
         # Act
@@ -169,7 +169,7 @@ class TestFetchIssueCommentsGraphql:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", return_value=make_issue_comments_response([]))
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_comments_response([]))
 
         # Act
         result = _fetch_issue_comments_graphql(repo, "owner", "repo", 1)
@@ -190,7 +190,7 @@ class TestFetchIssueCommentsGraphql:
             [make_issue_comment_node(comment_id="IC_001")], has_next=True, end_cursor="cursor_abc"
         )
         page2 = make_issue_comments_response([make_issue_comment_node(comment_id="IC_002")], has_next=False)
-        mocker.patch("backlog_core.github._graphql_request", side_effect=[page1, page2])
+        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=[page1, page2])
 
         # Act
         result = _fetch_issue_comments_graphql(repo, "owner", "repo", 5)
@@ -219,7 +219,7 @@ class TestFetchCommentByIdGraphql:
         # Arrange
         repo = _make_mock_repo(mocker)
         mocker.patch(
-            "backlog_core.github._graphql_request",
+            "backlog_core.gh_client._graphql_request",
             return_value=make_comment_by_id_response(comment_id="IC_abc", body="Full comment body", author="carol"),
         )
 
@@ -240,7 +240,7 @@ class TestFetchCommentByIdGraphql:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", return_value={"node": None})
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value={"node": None})
 
         # Act + Assert
         with pytest.raises(BacklogError, match="Could not resolve comment node"):
@@ -256,7 +256,7 @@ class TestFetchCommentByIdGraphql:
         """
         # Arrange
         repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.github._graphql_request", return_value={"node": {}})
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value={"node": {}})
 
         # Act + Assert
         with pytest.raises(BacklogError, match="is not an IssueComment"):

@@ -15,48 +15,149 @@ import ast
 import importlib.metadata
 import json
 import re
+import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 
 # ---------------------------------------------------------------------------
-# Feature registry constants
+# Feature registry — table-driven scaffold generation
 # ---------------------------------------------------------------------------
 
-KNOWN_FEATURES: frozenset[str] = frozenset(
-    {
-        "auth",
-        "filesystem-provider",
-        "tasks",
-        "elicitation",
-        "transforms",
-        "tool-search",
-        "code-mode",
-        "multi-auth",
-        "prefab-apps",
-        "client",
-        "middleware",
-        "dependency-injection",
-    }
-)
 
-# Features that map to server-level transforms (Fix 1)
-TRANSFORM_FEATURES: dict[str, str] = {
-    "tool-search": "BM25SearchTransform()",
-    "code-mode": "CodeMode()",
-}
+@dataclass(frozen=True)
+class FeatureSpec:
+    """Declarative specification for a scaffold-able feature."""
 
-# Features requiring fastmcp>=3.1 (Fix 3)
-V31_FEATURES: frozenset[str] = frozenset(
-    {
-        "tool-search",
-        "code-mode",
-        "multi-auth",
-        "prefab-apps",
+    imports: tuple[str, ...] = ()
+    extras: tuple[str, ...] = ()
+    code_block: tuple[str, ...] = ()
+    transform_expr: str = ""
+    requires_v31: bool = False
+
+
+def _build_feature_registry() -> dict[str, FeatureSpec]:
+    """Build the canonical feature registry.
+
+    Extracted to a factory so the module-level constant is a plain dict
+    (not a complex expression), keeping the module top-level readable.
+
+    Returns:
+        Mapping of feature name to its ``FeatureSpec``.
+    """
+    return {
+        "auth": FeatureSpec(
+            imports=("from fastmcp.server.auth import require_scopes  # v3 auth",),
+            code_block=(
+                "@mcp.tool(auth=require_scopes('read'))  # auth= kwarg, NOT stacked decorator",
+                "async def protected_tool(ctx: Context) -> str:",
+                '    """Tool requiring read scope — v3 auth pattern."""',
+                "    return 'Authenticated!'",
+                "",
+            ),
+        ),
+        "multi-auth": FeatureSpec(
+            requires_v31=True,
+            code_block=(
+                "# --- MultiAuth configuration (v3.1) ---",
+                "# Uncomment the imports and config below to enable multi-auth:",
+                "# from fastmcp.server.auth import MultiAuth, OAuthProxy",
+                "# from fastmcp.server.auth.providers.jwt import JWTVerifier",
+                "#",
+                "# auth = MultiAuth(",
+                "#     server=OAuthProxy(",
+                '#         issuer_url="https://your-idp.example.com",',
+                '#         client_id="...",',
+                '#         client_secret="...",',
+                '#         base_url="http://localhost:8000",',
+                "#     ),",
+                "#     verifiers=[",
+                '#         JWTVerifier(jwks_uri="https://your-idp.example.com/.well-known/jwks.json"),',
+                "#     ],",
+                "# )",
+                "# mcp = FastMCP('server', auth=auth)  # pass auth= to constructor",
+                "",
+            ),
+        ),
+        "filesystem-provider": FeatureSpec(
+            imports=("from fastmcp.server.providers import FileSystemProvider",),
+            code_block=(
+                "# Mount FileSystemProvider for reference docs (reload=True for dev)",
+                'mcp.add_provider(FileSystemProvider("./references", reload=True))',
+                "",
+            ),
+        ),
+        "tasks": FeatureSpec(
+            extras=("tasks",),
+            code_block=(
+                "@mcp.tool(task=True)  # task=True, NOT task=TaskConfig()",
+                "async def long_running_task(payload: str, ctx: Context) -> str:",
+                '    """Long-running task executed via Docket (requires fastmcp[tasks])."""',
+                "    await ctx.report_progress(50, 100)",
+                "    return f'Done: {payload}'",
+                "",
+            ),
+        ),
+        "elicitation": FeatureSpec(
+            imports=("from dataclasses import dataclass",),
+            code_block=(
+                "@dataclass",
+                "class UserInfo:",
+                '    """Schema for elicitation response."""',
+                "    name: str",
+                "",
+                "@mcp.tool",
+                "async def elicit_example(ctx: Context) -> str:",
+                '    """Demonstrate multi-turn elicitation."""',
+                "    result = await ctx.elicit(",
+                "        message='What is your name?',",
+                "        response_type=UserInfo,  # v3: response_type, NOT schema=",
+                "    )",
+                "    if hasattr(result, 'data') and result.data:",
+                "        return f'Hello, {result.data.name}!'",
+                "    return 'Elicitation was declined or cancelled.'",
+                "",
+            ),
+        ),
+        "transforms": FeatureSpec(),
+        "tool-search": FeatureSpec(
+            imports=("from fastmcp.server.transforms.search import BM25SearchTransform  # v3.1",),
+            extras=("search",),
+            transform_expr="BM25SearchTransform()",
+            requires_v31=True,
+        ),
+        "code-mode": FeatureSpec(
+            imports=("from fastmcp.experimental.transforms.code_mode import CodeMode  # v3.1 experimental",),
+            extras=("code-mode",),
+            transform_expr="CodeMode()",
+            requires_v31=True,
+        ),
+        "prefab-apps": FeatureSpec(
+            imports=("from prefab_ui.components import Column, Heading", "from prefab_ui.app import PrefabApp"),
+            extras=("apps",),
+            requires_v31=True,
+            code_block=(
+                "@mcp.tool(app=True)",
+                "def dashboard() -> PrefabApp:",
+                '    """Return an interactive UI dashboard — requires fastmcp[apps]."""',
+                "    with Column(gap=4) as view:",
+                '        Heading("{safe_name} Dashboard")',
+                "    return PrefabApp(view=view)",
+                "",
+            ),
+        ),
+        "client": FeatureSpec(),
+        "middleware": FeatureSpec(imports=("from fastmcp.server.middleware import Middleware",)),
+        "dependency-injection": FeatureSpec(imports=("from fastmcp.server.dependencies import Depends",)),
     }
-)
+
+
+FEATURE_REGISTRY: dict[str, FeatureSpec] = _build_feature_registry()
+KNOWN_FEATURES: frozenset[str] = frozenset(FEATURE_REGISTRY)
+V31_FEATURES: frozenset[str] = frozenset(name for name, spec in FEATURE_REGISTRY.items() if spec.requires_v31)
 
 # ---------------------------------------------------------------------------
 # Pre-compiled regex patterns for validate_server (Fix 4)
@@ -72,9 +173,7 @@ _RE_CONTRIB = re.compile(r"from\s+fastmcp\.contrib\b")
 # ---------------------------------------------------------------------------
 _REFERENCES_DIR: Path = Path(__file__).parent.parent / "skills" / "fastmcp-creator" / "references"
 
-_DOCS_WORKTREE: Path = (
-    Path(__file__).parent.parent.parent.parent / ".claude" / "worktrees" / "fastmcp" / "docs"
-)
+_DOCS_WORKTREE: Path = Path(__file__).parent.parent.parent.parent / ".claude" / "worktrees" / "fastmcp" / "docs"
 
 # ---------------------------------------------------------------------------
 # Server instantiation
@@ -119,25 +218,33 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
 
     feature_set = {f.lower() for f in features}
     unknown = feature_set - KNOWN_FEATURES
-
     safe_name = re.sub(r"[^a-z0-9_]", "_", server_name.lower())
+
+    lines = _build_pep723_header(feature_set, safe_name)
+    lines.extend(_build_imports(feature_set))
+    lines.extend(_build_constructor(feature_set, safe_name))
+    lines.extend(_build_code_blocks(feature_set, safe_name))
+    lines.extend(_build_footer(feature_set, unknown))
+
+    return "\n".join(lines)
+
+
+def _build_pep723_header(feature_set: set[str], safe_name: str) -> list[str]:
+    """Generate the PEP 723 inline metadata header.
+
+    Returns:
+        Lines for the shebang, PEP 723 script block, and base imports.
+    """
     min_version = "3.1" if feature_set & V31_FEATURES else "3.0"
-
-    # Build pip extras based on selected features (Fix 6)
     extras: list[str] = []
-    if "tool-search" in feature_set:
-        extras.append("search")
-    if "code-mode" in feature_set:
-        extras.append("code-mode")
-    if "prefab-apps" in feature_set:
-        extras.append("apps")
-    if "tasks" in feature_set:
-        extras.append("tasks")
-
-    extras_suffix = "[" + ",".join(extras) + "]" if extras else ""
+    for name in feature_set:
+        spec = FEATURE_REGISTRY.get(name)
+        if spec:
+            extras.extend(spec.extras)
+    extras_suffix = "[" + ",".join(sorted(extras)) + "]" if extras else ""
     fastmcp_dep = f"fastmcp{extras_suffix}>={min_version}"
 
-    lines: list[str] = [
+    return [
         "#!/usr/bin/env -S uv --quiet run --active --script",
         "# /// script",
         '# requires-python = ">=3.11"',
@@ -150,53 +257,49 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
         "",
     ]
 
-    if "auth" in feature_set:
-        lines.append("from fastmcp.server.auth import require_scopes  # v3 auth")
-    # multi-auth imports are emitted inside the commented config block (see below)
-    if "filesystem-provider" in feature_set:
-        lines.append("from fastmcp.server.providers import FileSystemProvider")
-    if "tasks" in feature_set:
-        pass  # tasks extra handled in PEP 723 dependencies
-    if "tool-search" in feature_set:
-        lines.append("from fastmcp.server.transforms.search import BM25SearchTransform  # v3.1")
-    if "code-mode" in feature_set:
-        lines.append(
-            "from fastmcp.experimental.transforms.code_mode import CodeMode  # v3.1 experimental"
-        )
-    if "middleware" in feature_set:
-        lines.append("from fastmcp.server.middleware import Middleware")
-    if "dependency-injection" in feature_set:
-        lines.append("from fastmcp.server.dependencies import Depends")
-    if "elicitation" in feature_set:
-        lines.append("from dataclasses import dataclass")
-    if "prefab-apps" in feature_set:
-        lines.append("from prefab_ui.components import Column, Heading")
-        lines.append("from prefab_ui.app import PrefabApp")
 
-    # Build transforms list for constructor (Fix 1: table-driven loop)
+def _build_imports(feature_set: set[str]) -> list[str]:
+    """Collect import lines from the feature registry.
+
+    Returns:
+        Import statements for all requested features, sorted by feature name.
+    """
+    lines: list[str] = []
+    for name in sorted(feature_set):
+        spec = FEATURE_REGISTRY.get(name)
+        if spec:
+            lines.extend(spec.imports)
+    return lines
+
+
+def _build_constructor(feature_set: set[str], safe_name: str) -> list[str]:
+    """Generate the FastMCP constructor with optional transforms.
+
+    Returns:
+        Lines containing the ``mcp = FastMCP(...)`` instantiation.
+    """
     transforms_args: list[str] = [
-        TRANSFORM_FEATURES[f] for f in TRANSFORM_FEATURES if f in feature_set
+        spec.transform_expr for name in feature_set if (spec := FEATURE_REGISTRY.get(name)) and spec.transform_expr
     ]
 
     if transforms_args:
         transforms_str = ", ".join(transforms_args)
-        lines += ["", f'mcp = FastMCP("{safe_name}", transforms=[{transforms_str}])', ""]
-    else:
-        lines += ["", f'mcp = FastMCP("{safe_name}")', ""]
+        return ["", f'mcp = FastMCP("{safe_name}", transforms=[{transforms_str}])', ""]
+    return ["", f'mcp = FastMCP("{safe_name}")', ""]
 
-    if "filesystem-provider" in feature_set:
-        lines += [
-            "# Mount FileSystemProvider for reference docs (reload=True for dev)",
-            'mcp.add_provider(FileSystemProvider("./references", reload=True))',
-            "",
-        ]
 
-    lines += [
+def _build_code_blocks(feature_set: set[str], safe_name: str) -> list[str]:
+    """Emit the hello tool, resource, and feature-specific code blocks.
+
+    Returns:
+        Lines for the default hello tool, info resource, and per-feature code.
+    """
+    lines: list[str] = [
         "@mcp.tool",
         "async def hello(message: str, ctx: Context) -> str:",
         '    """Echo a message back — replace with your tool implementation."""',
         "    await ctx.info(f'Processing: {message}')",
-        "    return f'Hello from {safe_name}: {message}'",
+        f"    return f'Hello from {safe_name}: {{message}}'",
         "",
         "@mcp.resource('resource://info')",
         "def server_info() -> str:",
@@ -205,79 +308,24 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
         "",
     ]
 
-    if "auth" in feature_set:
-        lines += [
-            "@mcp.tool(auth=require_scopes('read'))  # auth= kwarg, NOT stacked decorator",
-            "async def protected_tool(ctx: Context) -> str:",
-            '    """Tool requiring read scope — v3 auth pattern."""',
-            "    return 'Authenticated!'",
-            "",
-        ]
+    for name in sorted(feature_set):
+        spec = FEATURE_REGISTRY.get(name)
+        if spec and spec.code_block:
+            block = [line.replace("{safe_name}", safe_name) for line in spec.code_block]
+            lines.extend(block)
 
-    if "multi-auth" in feature_set:
-        lines += [
-            "# --- MultiAuth configuration (v3.1) ---",
-            "# Uncomment the imports and config below to enable multi-auth:",
-            "# from fastmcp.server.auth import MultiAuth, OAuthProxy",
-            "# from fastmcp.server.auth.providers.jwt import JWTVerifier",
-            "#",
-            "# auth = MultiAuth(",
-            "#     server=OAuthProxy(",
-            '#         issuer_url="https://your-idp.example.com",',
-            '#         client_id="...",',
-            '#         client_secret="...",',
-            '#         base_url="http://localhost:8000",',
-            "#     ),",
-            "#     verifiers=[",
-            '#         JWTVerifier(jwks_uri="https://your-idp.example.com/.well-known/jwks.json"),',
-            "#     ],",
-            "# )",
-            "# mcp = FastMCP('server', auth=auth)  # pass auth= to constructor",
-            "",
-        ]
+    return lines
 
-    if "tasks" in feature_set:
-        lines += [
-            "@mcp.tool(task=True)  # task=True, NOT task=TaskConfig()",
-            "async def long_running_task(payload: str, ctx: Context) -> str:",
-            '    """Long-running task executed via Docket (requires fastmcp[tasks])."""',
-            "    await ctx.report_progress(50, 100)",
-            "    return f'Done: {payload}'",
-            "",
-        ]
 
-    if "elicitation" in feature_set:
-        lines += [
-            "@dataclass",
-            "class UserInfo:",
-            '    """Schema for elicitation response."""',
-            "    name: str",
-            "",
-            "@mcp.tool",
-            "async def elicit_example(ctx: Context) -> str:",
-            '    """Demonstrate multi-turn elicitation."""',
-            "    result = await ctx.elicit(",
-            "        message='What is your name?',",
-            "        response_type=UserInfo,  # v3: response_type, NOT schema=",
-            "    )",
-            "    if hasattr(result, 'data') and result.data:",
-            "        return f'Hello, {result.data.name}!'",
-            "    return 'Elicitation was declined or cancelled.'",
-            "",
-        ]
+def _build_footer(feature_set: set[str], unknown: set[str]) -> list[str]:
+    """Emit transforms hint (if bare 'transforms' selected) and unknown-feature note.
 
-    if "prefab-apps" in feature_set:
-        lines += [
-            "@mcp.tool(app=True)",
-            "def dashboard() -> PrefabApp:",
-            '    """Return an interactive UI dashboard — requires fastmcp[apps]."""',
-            "    with Column(gap=4) as view:",
-            f'        Heading("{safe_name} Dashboard")',
-            "    return PrefabApp(view=view)",
-            "",
-        ]
-
-    if "transforms" in feature_set and not transforms_args:
+    Returns:
+        Lines for the transforms comment, unknown-feature note, and ``__main__`` guard.
+    """
+    lines: list[str] = []
+    has_transform_exprs = any(spec.transform_expr for name in feature_set if (spec := FEATURE_REGISTRY.get(name)))
+    if "transforms" in feature_set and not has_transform_exprs:
         lines += [
             "# transforms: use mcp.mount(sub_server, namespace='ns') for server composition",
             "# or mcp.add_transform(YourTransform()) for custom transforms",
@@ -285,14 +333,10 @@ def scaffold_server(language: str, features: list[str], server_name: str) -> str
         ]
 
     if unknown:
-        lines += [
-            f"# NOTE: Unrecognised features (not scaffolded): {', '.join(sorted(unknown))}",
-            "",
-        ]
+        lines += [f"# NOTE: Unrecognised features (not scaffolded): {', '.join(sorted(unknown))}", ""]
 
     lines += ['if __name__ == "__main__":', "    mcp.run()"]
-
-    return "\n".join(lines)
+    return lines
 
 
 @mcp.tool
@@ -348,9 +392,7 @@ def validate_server(path: str) -> dict[str, list[str]]:
 
         # task=TaskConfig(...) — v3 uses task=True
         if _RE_TASK_CONFIG.search(stripped):
-            errors.append(
-                f"Line {lineno}: `task=TaskConfig(...)` is invalid in v3 — use `task=True` instead"
-            )
+            errors.append(f"Line {lineno}: `task=TaskConfig(...)` is invalid in v3 — use `task=True` instead")
 
         # require_auth — removed in v3
         if _RE_REQUIRE_AUTH.search(stripped):
@@ -398,7 +440,7 @@ def version_check() -> dict[str, str]:
         with urllib.request.urlopen("https://pypi.org/pypi/fastmcp/json", timeout=5) as resp:
             data = json.loads(resp.read())
         latest = data["info"]["version"]
-    except Exception as exc:  # noqa: BLE001
+    except (urllib.error.URLError, json.JSONDecodeError, KeyError, TypeError) as exc:
         latest = f"pypi-error: {exc}"
 
     up_to_date = "true" if installed == latest else "false"
@@ -446,13 +488,11 @@ def search_docs(query: str, max_results: int = 5) -> list[dict[str, str]]:
                 current_heading = heading_match.group(1)
             lower_line = line.lower()
             if all(t in lower_line for t in terms):
-                results.append(
-                    {
-                        "file": str(mdx_file.relative_to(_DOCS_WORKTREE)),
-                        "section": current_heading,
-                        "snippet": line.strip(),
-                    }
-                )
+                results.append({
+                    "file": str(mdx_file.relative_to(_DOCS_WORKTREE)),
+                    "section": current_heading,
+                    "snippet": line.strip(),
+                })
                 if len(results) >= max_results:
                     break
 

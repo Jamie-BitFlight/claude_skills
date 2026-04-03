@@ -39,9 +39,6 @@ sessions/.archived/
 # Claude Code scheduled tasks lock
 .claude/scheduled_tasks.lock
 
-# uv lock file (dependency management)
-uv.lock
-
 # Local settings with machine-specific paths
 .claude/settings.local.json
 

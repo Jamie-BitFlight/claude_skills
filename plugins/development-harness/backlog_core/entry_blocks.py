@@ -45,13 +45,16 @@ def _parse_match_to_entry(m: re.Match[str]) -> Entry:
             struck=True,
             struck_at=struck_match.group(1),
             struck_reason=struck_match.group(2).strip(),
-            raw=m.group(0),
         )
-    return Entry(id=ts, content=inner, raw=m.group(0))
+    return Entry(id=ts, content=inner)
 
 
-def _deduplicate_timestamps(entries: list[Entry]) -> None:
-    """Suffix duplicate timestamp IDs in-place with ``-0``, ``-1``, etc."""
+def _resolve_duplicate_ids(entries: list[Entry]) -> int:
+    """Suffix duplicate IDs in-place with ``-0``, ``-1``, etc.
+
+    Returns:
+        Count of Entry objects whose ``id`` was modified.
+    """
     seen: dict[str, int] = {}
     has_dupes: set[str] = set()
     for e in entries:
@@ -59,6 +62,7 @@ def _deduplicate_timestamps(entries: list[Entry]) -> None:
         if seen[e.id] > 1:
             has_dupes.add(e.id)
 
+    modified = 0
     if has_dupes:
         counters: dict[str, int] = {}
         for e in entries:
@@ -66,6 +70,17 @@ def _deduplicate_timestamps(entries: list[Entry]) -> None:
                 idx = counters.get(e.id, 0)
                 counters[e.id] = idx + 1
                 e.id = f"{e.id}-{idx}"
+                modified += 1
+    return modified
+
+
+def _deduplicate_timestamps(entries: list[Entry]) -> int:
+    """Suffix duplicate timestamp IDs in-place with ``-0``, ``-1``, etc.
+
+    Returns:
+        Count of Entry objects whose ``id`` was modified.
+    """
+    return _resolve_duplicate_ids(entries)
 
 
 def _apply_show_filter(raw_entries: list[Entry], show: str | int | None) -> list[Entry]:
@@ -111,7 +126,7 @@ def parse_entries(
         content = section_body.strip()
         if not content:
             return []
-        raw_entries = [Entry(id=f"{added_date}T00:00:00Z", content=content, raw=section_body)]
+        raw_entries = [Entry(id=f"{added_date}T00:00:00Z", content=content)]
     else:
         raw_entries = [_parse_match_to_entry(m) for m in matches]
         _deduplicate_timestamps(raw_entries)
@@ -196,26 +211,13 @@ def _rewrite_by_entry_id(
             if new_content:
                 result_parts.append(wrap_entry(new_content))
     else:
-        seen_counts: dict[str, int] = {}
-        for m in entries_raw:
-            raw_ts = m.group(1)
-            seen_counts[raw_ts] = seen_counts.get(raw_ts, 0) + 1
+        id_entries = [Entry(id=m.group(1), content="") for m in entries_raw]
+        _resolve_duplicate_ids(id_entries)
 
-        has_dupes = {k for k, v in seen_counts.items() if v > 1}
-        counters: dict[str, int] = {}
-
-        for m in entries_raw:
-            raw_ts = m.group(1)
-            if raw_ts in has_dupes:
-                idx = counters.get(raw_ts, 0)
-                counters[raw_ts] = idx + 1
-                effective_id = f"{raw_ts}-{idx}"
-            else:
-                effective_id = raw_ts
-
-            if effective_id == entry_id:
+        for m, id_entry in zip(entries_raw, id_entries, strict=False):
+            if id_entry.id == entry_id:
                 if new_content:
-                    result_parts.append(wrap_entry_with_timestamp(new_content, raw_ts))
+                    result_parts.append(wrap_entry_with_timestamp(new_content, m.group(1)))
             else:
                 result_parts.append(m.group(0))
     return "\n\n".join(p for p in result_parts if p)
@@ -262,6 +264,25 @@ def rewrite_section(
     return "\n\n".join(parts)
 
 
+def _render_entry_raw(entry: Entry) -> str:
+    """Reconstruct the raw HTML entry block from a parsed Entry.
+
+    Used when the original ``raw`` text is not available (e.g. entries parsed
+    from YAML structured data or after round-tripping through the model).
+
+    Returns:
+        HTML div block string equivalent to the original source text.
+    """
+    if entry.struck:
+        inner = (
+            f"<details><summary>struck: {entry.struck_at} — {entry.struck_reason}</summary>"
+            f"\n\n{entry.content}\n</details>"
+        )
+    else:
+        inner = entry.content
+    return f"<div><sub>{entry.id}</sub>\n\n{inner}\n</div>"
+
+
 def generate_diff(local: str, remote: str) -> str:
     """Generate a git-diff style comparison of entry blocks between local and remote.
 
@@ -279,14 +300,16 @@ def generate_diff(local: str, remote: str) -> str:
         remote_e = remote_entries.get(eid)
 
         if local_e and remote_e:
-            if local_e.raw == remote_e.raw:
-                lines.extend(f"  {line}" for line in local_e.raw.splitlines())
+            local_raw = _render_entry_raw(local_e)
+            remote_raw = _render_entry_raw(remote_e)
+            if local_raw == remote_raw:
+                lines.extend(f"  {line}" for line in local_raw.splitlines())
             else:
-                lines.extend(f"- {line}" for line in local_e.raw.splitlines())
-                lines.extend(f"+ {line}" for line in remote_e.raw.splitlines())
+                lines.extend(f"- {line}" for line in local_raw.splitlines())
+                lines.extend(f"+ {line}" for line in remote_raw.splitlines())
         elif local_e:
-            lines.extend(f"- {line}" for line in local_e.raw.splitlines())
+            lines.extend(f"- {line}" for line in _render_entry_raw(local_e).splitlines())
         elif remote_e:
-            lines.extend(f"+ {line}" for line in remote_e.raw.splitlines())
+            lines.extend(f"+ {line}" for line in _render_entry_raw(remote_e).splitlines())
 
     return "\n".join(lines)

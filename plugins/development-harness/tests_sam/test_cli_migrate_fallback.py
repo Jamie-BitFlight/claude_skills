@@ -36,7 +36,9 @@ def _load_yaml(path: Path) -> dict:
         Parsed YAML content as a dict.
     """
     y = YAML()
-    return y.load(path.read_text(encoding="utf-8"))  # type: ignore[return-value]
+    result = y.load(path.read_text(encoding="utf-8"))
+    assert isinstance(result, dict)
+    return result
 
 
 def _make_nonstandard_plan_dir(tmp_path: Path) -> Path:

@@ -486,7 +486,15 @@ uv run prek run --files <file>
 
 ---
 
+- Markdown AST Parsing: Use `marko` for any task that requires parsing markdown structure (headers, list items, inline code, bold, tables, section extraction). Do NOT write regex parsers for markdown. Reference usage and processing patterns in `../agentskills-linter` (`/home/ubuntulinuxqa2/repos/agentskills-linter`) — `marko` is already a dependency there with established patterns for walking the AST. Add `marko` as a dependency via `uv add marko` if not already present in the target project.
+
+---
+
 - Silent Failure Prevention: `.claude/rules/silent-failure-prevention.md`
+
+---
+
+- Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): `.claude/rules/exception-handling.md`
 
 ---
 

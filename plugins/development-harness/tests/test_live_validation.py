@@ -152,7 +152,7 @@ class TestLiveLifecycle:
     async def test_l3_view_by_issue_number(self, live_items):
         """L3: backlog_view by issue number returns full item data."""
         issue_num = live_items["item_issue_num"]
-        result = await _call("backlog_view", {"selector": f"#{issue_num}"})
+        result = await _call("backlog_view", {"selector": f"#{issue_num}", "summary": False})
 
         # backlog_view may return a GitHub-normalised title (e.g. "feat: ..." prefix)
         # so verify the original title text is present in the returned title.

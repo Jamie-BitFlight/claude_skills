@@ -4,6 +4,14 @@ The SAM 7-stage pipeline with ARL touchpoint gates. This is the default flow use
 
 ---
 
+## Design Principles
+
+- Each stage produces a file-based artifact — no stage relies on conversation memory.
+- Human escalation follows ARL constraint analysis, not arbitrary checkpoints.
+- Artifact handoffs are stateless: any stage can be re-entered from its input artifact without replaying prior stages.
+
+---
+
 ## Pipeline Overview
 
 ```mermaid
@@ -25,6 +33,16 @@ flowchart TD
     S7 -->|NOT_CERTIFIED| S4
     S7 -->|CERTIFIED| Done([Feature Complete])
 ```
+
+---
+
+## Artifact Flow (Linear)
+
+```text
+User Request → DISCOVERY → PLAN → PLAN (contextualized) → TASK(s) → EXECUTION(s) → REVIEW(s) → VERIFICATION
+```
+
+Each arrow represents a file-based artifact handoff. No stage reads from conversation state.
 
 ---
 
@@ -114,7 +132,7 @@ flowchart TD
 - Map task dependencies and identify parallelization opportunities
 - Assign each task to the appropriate specialist agent (from manifest or fallback)
 
-**Output:** `ARTIFACT:TASK({task-id})` per task — Individual task files stored in `.planning/harness/`.
+**Output:** `ARTIFACT:TASK({task-id})` per task — Task plan registered via `sam_create`; access via `sam_read` / `sam_list`.
 
 **Skill:** `/dh:task-decomposition`
 
@@ -158,6 +176,8 @@ flowchart TD
 - Check for regressions in existing functionality
 - Verify cross-task dependencies are satisfied
 
+**Output:** `ARTIFACT:REVIEW({task-id})` — verdict document per task.
+
 **Output verdicts:**
 
 - `COMPLETE` — All acceptance criteria met, quality gates passed
@@ -186,6 +206,8 @@ flowchart TD
 - Verify no regressions in existing functionality
 - Generate certification report
 
+**Output:** `ARTIFACT:VERIFICATION({feature-slug})` — certification report for the feature.
+
 **Output verdicts:**
 
 - `CERTIFIED` — Feature complete, all requirements met
@@ -212,6 +234,33 @@ Two explicit human touchpoint gates exist in the default flow:
 - Skipped when tasks follow routine patterns with existing codebase precedent
 
 Additional escalation points exist within stages (e.g., NEEDS_WORK loop limits, NOT_CERTIFIED loop limits) but these are not pre-scheduled gates — they trigger on failure conditions.
+
+---
+
+## Complete-Implementation Pre-Phase Gates
+
+The `/dh:complete-implementation` skill runs quality gates after all S5 execution tasks reach COMPLETE status. Before building the QG plan, it runs a sequence of pre-phase checks. As of commit f230ae0d, the sequence is:
+
+**Pre-Phase 1: TN Verification Check** — checks for a TN verification report from `tn-verification-gate`. If regressed criteria are found, emits `COMPLETION BLOCKED — TN Verification Failed` and stops.
+
+**Pre-Phase 1a: Migration Fidelity Sign-Off** — activates when migration signals are detected in the issue title, body, or task `acceptance_criteria` fields (keywords: "migrat", "convert format", "replace .md", "format conversion", "move from", "transition from", or deletion-related acceptance criteria). When activated, confirms four items before allowing QG plan creation to proceed:
+
+1. Fidelity check on real data — evidence exists showing content completeness was asserted against real production records, not only synthetic fixtures
+2. Content completeness verified — field-by-field completeness confirmed, not only structural validity
+3. Constrained field values enumerated — all distinct values of constrained fields were enumerated from real data and are handled in the target model
+4. Deletion deferred or confirmed — if source files were deleted, deletion occurred after zero-data-loss confirmation
+
+If any item is unconfirmed, emits `COMPLETION BLOCKED — Migration Fidelity Gate` and stops. QG plan creation, T1 dispatch, and SAM state updates are all deferred until the gate clears.
+
+If no migration signals are detected, the gate is skipped entirely.
+
+**Pre-Phase: Artifact Discovery** — queries the artifact manifest for all plan artifacts linked to the issue, enabling worktree-isolated agents to access plan files via `artifact_read` instead of filesystem paths.
+
+**Pre-Phase 1b: Process Accumulated Concerns** — checks the backlog item for a `## Concerns` section accumulated during `/implement-feature` and routes unresolved concerns to the QG plan.
+
+After all pre-phases complete, the skill builds the SAM-enforced QG plan (6 phases).
+
+For the full pre-phase logic, see the `complete-implementation` skill: `/dh:complete-implementation`.
 
 ---
 
@@ -248,7 +297,19 @@ When a flow override is present, the harness loads the custom flow instead of th
 
 ---
 
+## Related Documents
+
+Read these together to get the full system picture:
+
+- [Artifact Conventions](./artifact-conventions.md) — naming, file layout, cross-referencing
+- [Workflow Architecture Diagram](../../../docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
+- [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
+- [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Task File Format](../../../docs/TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
+- [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
+
 ## Sources
 
 - SAM methodology: <https://github.com/bitflight-devops/stateless-agent-methodology>
 - ARL human touchpoint model: [./human-touchpoint-model.md](./human-touchpoint-model.md)
+- SAM definition (work-backlog-item skill): [../../../skills/work-backlog-item/references/sam-definition.md](../../../skills/work-backlog-item/references/sam-definition.md)

@@ -313,7 +313,7 @@ def _dh_user_root() -> Path:
     """
     env_override = os.environ.get("DH_STATE_HOME", "")
     if env_override:
-        return Path(env_override)
+        return Path(env_override).expanduser()
     return Path.home() / ".dh"
 
 

@@ -206,6 +206,54 @@ Before finalizing a task prompt, check:
 
 If any item fails, revise the task prompt.
 
+## Migration and Data Conversion Tasks
+
+When the draft task describes any of: data migration, format conversion, source file deletion, replacing one storage format with another — four additional `[E]` (Explicit) criteria are **mandatory** in acceptance criteria before the task scores as CLEAR-compliant.
+
+### Required `[E]` criteria for migration tasks
+
+**1. Content completeness assertion**
+
+An explicit check that every field/section in the source record appears in the destination. Structural validity (does it load?) is not sufficient.
+
+Example: `assert set(source_sections) == set(output_item.sections.keys())`
+
+`[E]: MISSING — migration task must include a content completeness assertion (structural validity is not sufficient)`
+
+**2. Real data sample test**
+
+The acceptance criteria must include a step run against ≥10 real production records chosen to include complex/edge-case files. Synthetic fixtures alone do not satisfy this criterion.
+
+Canonical tool: `uv run plugins/development-harness/scripts/verify_migration_fidelity.py`
+
+Example criterion: "Run `verify_migration_fidelity.py` against ≥10 real files. Report must show zero data loss."
+
+`[E]: MISSING — migration task must test against ≥10 real production records (synthetic fixtures do not satisfy this criterion)`
+
+**3. Edge case enumeration**
+
+Before writing the migration, enumerate all distinct values of constrained fields from real data.
+
+Example: `grep -h "^status:" real_data/*.md | sort -u`
+
+Any value not handled by the target model is a bug to fix before migration, not after.
+
+`[E]: MISSING — migration task must enumerate all distinct constrained field values from real data before implementation`
+
+**4. Deletion gate**
+
+Any task that deletes source files must have deletion as a **separate explicit criterion** with stated condition: "Zero data loss confirmed on real data sample before deletion is permitted." Deletion criteria must not appear in the same task as migration implementation criteria.
+
+`[E]: MISSING — deletion gate required: source file deletion must be a separate criterion conditioned on zero-data-loss confirmation`
+
+### Scorer behavior
+
+If any of these four criteria are absent when the draft describes migration, the scorer returns:
+
+```text
+[E]: MISSING — migration task requires: content completeness check / real data sample test / edge case enumeration / deletion gate (see Migration and Data Conversion Tasks section)
+```
+
 ## Special Guidance for Swarm Planning Agents
 
 When writing a plan that contains multiple worker tasks:

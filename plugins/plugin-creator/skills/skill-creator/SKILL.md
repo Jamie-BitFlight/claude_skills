@@ -327,9 +327,9 @@ Skills use a three-level loading system to manage context efficiently:
 
 Keep SKILL.md lean. Run `uvx skilllint@latest check <skill-path>` to check token complexity. Keep only core workflow and selection guidance in SKILL.md; move variant-specific details into reference files. Reference them from SKILL.md with clear descriptions of when to read each file.
 
-Three patterns: (1) high-level guide with pointers to FORMS.md, REFERENCE.md, etc.; (2) domain-split references (finance.md, sales.md per domain); (3) conditional details (basic inline, advanced via link). See `references/workflows.md` for full examples of all three patterns.
+Three patterns: (1) high-level guide with pointers to FORMS.md, REFERENCE.md, etc.; (2) domain-split references (finance.md, sales.md per domain); (3) conditional details (basic inline, advanced via link). Load [workflows.md](./references/workflows.md) for full examples of all three patterns.
 
-Rules: keep references one level deep from SKILL.md. NEVER add ToC, anchor links, or bold/italic for visual emphasis to reference files — see `references/ai-audience-writing-rules.md`.
+Rules: keep references one level deep from SKILL.md. NEVER add ToC, anchor links, or bold/italic for visual emphasis to reference files — Load [ai-audience-writing-rules.md](./references/ai-audience-writing-rules.md).
 
 > **Editing an existing SKILL.md?** Before treating an unrecognized frontmatter key as an error, check `plugins/plugin-creator/scripts/ecosystem_registry.py`. If the key is returned by `get_ecosystem_owned_keys()` — such as `mcp:` (OpenCode) — preserve it and all its nested content verbatim. Do not strip, rewrite, or normalize it. For `mcp:` specifically, see the `references/agent-plugin-ecosystem.md` reference (OpenCode SKILL.md Extensions section) for the full schema.
 
@@ -477,12 +477,12 @@ When editing the (newly-generated or existing) skill, remember that the skill is
 
 Consult these helpful guides based on your skill's needs:
 
-- **Multi-step processes**: See references/workflows.md for sequential workflows and conditional logic
-- **Output formats, examples, anti-patterns, and quality standards**: See `../agentskills/references/best-practices.md`
+- **Multi-step processes**: Load [workflows.md](./references/workflows.md) for sequential workflows and conditional logic
+- **Output formats, examples, anti-patterns, and quality standards**: Load [best-practices.md](../agentskills/references/best-practices.md)
 
 These files contain established best practices for effective skill design.
 
-- **Official specification**: See `references/claude-code-skills-official.md` for the authoritative source on frontmatter fields, discovery rules, invocation control, and budget limits
+- **Official specification**: Load [claude-code-skills-official.md](./references/claude-code-skills-official.md) for the authoritative source on frontmatter fields, discovery rules, invocation control, and budget limits
 
 #### Start with Reusable Skill Contents
 
@@ -505,6 +505,21 @@ Any example files and directories not needed for the skill should be deleted. Th
 Orchestrator role in Step 5: write YAML frontmatter only, pass file paths to the sub-agent, verify output after completion.
 
 **Writing Guidelines:** Always use imperative/infinitive form.
+
+##### The only audience is an AI agent — scan for human-facing drift before finishing
+
+Every sentence in a skill body must be either a command the agent executes or knowledge the agent recalls. Before marking a skill done, scan for these anti-patterns and fix each one:
+
+| Anti-pattern trigger | What it signals | Fix |
+|---|---|---|
+| "Open a new terminal" / "Click X" / "Navigate to Y" | Action only a human can take | Replace with the equivalent agent action: `export PATH=...`, `source ~/.bashrc`. If no direct equivalent is known, research how to achieve the same outcome programmatically — use a subagent if available, otherwise research and test directly. Do not document the human step as a dead end |
+| Troubleshooting table with causes and fixes | Unverified guesses presented as facts | Remove entirely unless each row was derived from an actual observed failure — state the observed evidence, not a theory |
+| "You should..." / "Consider..." / "It is recommended..." | Passive advice to a human reader | Rewrite as an imperative command or delete |
+| Platform-specific steps with no prior environment check | Assumes an environment that may differ | Precede with a detection command (`echo $MSYSTEM`, `uname`, etc.) and branch on its output |
+| Subprocess check that inherits the parent process's PATH | False positive — finds a tool via parent env, not the target shell's env | Use an environment-isolated check (e.g., `[Environment]::GetEnvironmentVariable('PATH','User')` reads the Windows registry directly) |
+| "Install X, then verify" with no observed output shown | Gives steps without confirming they work | Run the steps, capture the actual output, include that output as the expected result |
+
+These patterns appear when skill content is drafted from training data or general knowledge rather than from executing the steps in the actual environment. The fix in every case is the same: run the command, observe the output, write what you observed.
 
 ##### Frontmatter
 
@@ -614,7 +629,7 @@ flowchart TD
     AgentReg --> Done
 ```
 
-See `../claude-plugins-reference-2026/SKILL.md` for plugin creation documentation.
+See [claude-plugins-reference-2026](../claude-plugins-reference-2026/SKILL.md) for plugin creation documentation.
 
 ### Steps 7-10: Evaluate, Improve, and Optimize
 
@@ -627,7 +642,7 @@ After creating the skill, test it with real prompts, grade results with the A/B 
 - **Step 9** — Improve the skill (failure mode taxonomy, iteration loop, blind comparison via `agents/comparator.md` and `agents/analyzer.md`)
 - **Step 10** — Description optimization (automated trigger tuning via `scripts/run_loop.py` with train/test split)
 
-See `references/schemas.md` for evals.json and grading.json formats.
+Load [schemas.md](./references/schemas.md) for evals.json and grading.json formats.
 
 ## Reference Files
 

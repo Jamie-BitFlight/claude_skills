@@ -15,7 +15,14 @@ from __future__ import annotations
 import logging
 import re
 import sys
+from io import TextIOWrapper
 from pathlib import Path
+
+# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if isinstance(sys.stderr, TextIOWrapper):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -248,7 +255,7 @@ def create_resource_file(parent_dir: Path, subdir: str, filename: str, content: 
     resource_dir.mkdir(exist_ok=True)
 
     resource_file = resource_dir / filename
-    resource_file.write_text(content)
+    resource_file.write_text(content, encoding="utf-8")
 
     if executable:
         resource_file.chmod(0o755)
@@ -288,7 +295,7 @@ def init_skill(skill_name: str, path: str) -> Path | None:
 
     skill_md_path = skill_dir / "SKILL.md"
     try:
-        skill_md_path.write_text(skill_content)
+        skill_md_path.write_text(skill_content, encoding="utf-8")
         logger.info("Created SKILL.md")
     except (PermissionError, OSError):
         logger.exception("Error creating SKILL.md")

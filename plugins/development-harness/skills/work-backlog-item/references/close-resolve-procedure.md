@@ -1,26 +1,26 @@
-# Close / Resolve Procedure (ADR-9)
+# Close / Resolve Procedure (Phase 5)
 
-Full Step 9 workflow. Trigger: `$0` is `close` or `resolve`.
+Full Phase 5 (Close/Resolve) workflow. Trigger: `$0` is `close` or `resolve`.
 
 Extract the operation from `$0` and the argument from `$1`+:
 
 - `$0` = `close`: `$1`+ = title, `#N`, bare number, or URL → dismiss without completion (reason required)
 - `$0` = `resolve`: `$1`+ = title, `#N`, bare number, or URL → mark DONE with evidence trail (summary required)
 
-## 9a: Find Item
+## Step 5.2: Find Item
 
 Call the `mcp__plugin_dh_backlog__backlog_view` tool with `selector="{$1}"` (accepts URLs, `#N`, bare numbers, and title substrings).
 
 - If the returned dict contains an `error` key, report and stop.
 - Extract `title` from the returned dict and use it as the working title.
 
-If the view command found a local file (`file_path` in JSON), use it. Otherwise scan `~/.dh/projects/{slug}/backlog/` per-item files for a title match.
+The `backlog_view` response is the single source of truth for item lookup. Do not scan filesystem paths.
 
-- Zero matches: report "No backlog item found matching: {$1}" and stop.
-- Multiple matches: list all matches and ask user to pick one.
-- Item already in `## Completed` section: report "Item already closed on {Completed date}" and stop.
+- If the returned dict contains an `error` key with "not found": report "No backlog item found matching: {$1}" and stop.
+- If multiple candidates are returned: list all matches and ask user to pick one.
+- If the item status is already `completed`: report "Item already closed on {Completed date}" and stop.
 
-## 9b: Close path — dismiss without completion
+## Step 5.3: Close path — dismiss without completion
 
 If operation is `close`:
 
@@ -46,7 +46,7 @@ If operation is `close`:
 
 Then stop.
 
-## 9b.5: Resolve path — status:verified gate (SAM items only)
+## Step 5.4: Resolve path — status:verified gate (SAM items only)
 
 If operation is `resolve`:
 
@@ -54,9 +54,9 @@ If operation is `resolve`:
 
 2. If `**Plan**:` is present, check the GitHub Issue labels for `status:verified`:
    - Use `mcp__plugin_dh_backlog__backlog_view` with `selector="{title}"` and inspect the `labels` list in the returned dict.
-   - If `status:verified` is present in `labels`, proceed to 9c.
+   - If `status:verified` is present in `labels`, proceed to Step 5.5.
    - If `status:verified` is absent:
-     - If `--force` flag was passed, print a warning and proceed to 9c:
+     - If `--force` flag was passed, print a warning and proceed to Step 5.5:
 
        <eg>
        Warning: status:verified label is absent for "{title}". Proceeding with --force.
@@ -79,32 +79,34 @@ If operation is `resolve`:
 
        Then stop.
 
-## 9c: Resolve path — checklist verification
+## Step 5.5: Resolve path — checklist verification
 
 If operation is `resolve`:
 
-1. Extract `**Plan**:` field from the matched item. If absent, skip to 9e (no plan = simple resolve with summary only).
+1. Extract `**Plan**:` field from the matched item. If absent, skip to Step 5.7 (no plan = simple resolve with summary only).
 
-2. Read the plan file. Count:
-   - `total_tasks` — lines matching `- \[ \]` or `- \[x\]`
-   - `checked_tasks` — lines matching `- \[x\]`
+2. Extract the plan address from the plan path (e.g., `plan/P398-backlog-lifecycle-process-gaps.yaml` → `P398`). Call:
 
-3. If `checked_tasks < total_tasks`:
+   ```text
+   mcp__plugin_dh_sam__sam_status(plan="{address}")
+   ```
+
+   From the response, read `status_counts`. A plan is complete when `status_counts.not_started == 0` and `status_counts.in_progress == 0` and `status_counts.blocked == 0`.
+
+3. If any tasks are not complete (`not_started > 0` or `in_progress > 0` or `blocked > 0`):
 
 <eg>
-Checklist incomplete: {checked_tasks}/{total_tasks} tasks done.
-
-Remaining:
-{list of unchecked task lines}
+Plan incomplete: {status_counts.complete}/{total} tasks done.
+Not started: {not_started} | In progress: {in_progress} | Blocked: {blocked}
 
 Complete all tasks before resolving, or use /work-backlog-item close {title} to dismiss.
 </eg>
 
 Then stop.
 
-## 9d: Resolve path — typed acceptance-criteria verification
+## Step 5.6: Resolve path — typed acceptance-criteria verification
 
-4. Extract `**Acceptance Criteria**:` from the per-item file (`~/.dh/projects/{slug}/backlog/{priority}-{slug}.md`) or from the backlog item body. The field format is a bullet list following the header:
+4. Extract acceptance criteria from the `backlog_view` response. Call `mcp__plugin_dh_backlog__backlog_view` with `selector="{title}"` and `summary=false`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
 
    ```markdown
    **Acceptance Criteria**:
@@ -138,7 +140,7 @@ Then stop.
    </eg>
 
 7. Collect agent verdict:
-   - **Overall PASS** (all criteria met): proceed to 9e
+   - **Overall PASS** (all criteria met): proceed to Step 5.7
    - **Overall FAIL** (any criterion failed): report gaps, do not resolve:
 
 <eg>
@@ -152,7 +154,7 @@ Address the failing criteria before resolving, or use /work-backlog-item close {
 
 Then stop.
 
-## 9e: Check for open PR
+## Step 5.7: Invoke backlog resolve
 
 8. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
 
@@ -172,9 +174,7 @@ git log --oneline -20 --grep="Fixes #N\|Closes #N"
 
   Then stop.
 
-- **No open PR / no linked issue**: proceed to 9f.
-
-## 9f: Invoke backlog resolve
+- **No open PR / no linked issue**: proceed to invoke backlog resolve below.
 
 9. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
 
@@ -196,12 +196,32 @@ git log --oneline -20 --grep="Fixes #N\|Closes #N"
 
 12. Check the returned dict for an `error` key. Report the result to the user.
 
+13. Before emitting Handoff E, determine whether all milestone issues are resolved:
+
+    a. Read the `milestone` field from the `backlog_resolve` response. If the resolved item has no `milestone` field (or `milestone` is null/empty), skip Handoff E — no milestone context exists.
+
+    b. If a milestone is present, call:
+
+       ```text
+       mcp__plugin_dh_backlog__backlog_list(status='open')
+       ```
+
+       Count the returned items whose `milestone` field matches the resolved item's milestone. This is the `open_issues` count.
+
+    c. Emit Handoff E only when `open_issues == 0`:
+
+       ```text
+       NEXT: skill="complete-milestone" args="{milestone number}" condition="all milestone issues status:done OR status:resolved AND open_issues == 0"
+       ```
+
+    d. If `open_issues > 0`, skip Handoff E — the milestone is not yet ready for completion.
+
 ## --force flag
 
 The `--force` flag bypasses two gates in the resolve path:
 
-- **Step 9b.5** (`status:verified` gate): Skips the check that `status:verified` is present on the GitHub Issue. Use when you are confident quality gates have passed but the label was not applied automatically (e.g., the `/complete-implementation` hook failed to apply it).
-- **Step 9e** (open PR check): Bypasses the check for an open PR with `Fixes #N`. Use when you want to resolve the local cache entry immediately even though a PR is still open.
+- **Step 5.4** (`status:verified` gate): Skips the check that `status:verified` is present on the GitHub Issue. Use when you are confident quality gates have passed but the label was not applied automatically (e.g., the `/complete-implementation` hook failed to apply it).
+- **Step 5.7** (open PR check): Bypasses the check for an open PR with `Fixes #N`. Use when you want to resolve the local cache entry immediately even though a PR is still open.
 
 In both cases `--force` prints a warning before proceeding so the bypass is visible in the session transcript.
 

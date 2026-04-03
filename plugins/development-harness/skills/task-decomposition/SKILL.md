@@ -108,12 +108,26 @@ Role-to-agent resolution happens at execution time via the language manifest.
 
 ## Input
 
-- Contextualized `ARTIFACT:PLAN` at `.planning/harness/PLAN.md`
+Retrieve the contextualized plan via MCP:
+
+```text
+artifact_read(issue_number={issue}, artifact_type="architect")
+```
+
+Returns `{type, path, content, status, messages, warnings}`. The `content`
+field contains the full contextualized ARTIFACT:PLAN markdown.
 
 ## Output
 
-Individual task files at `.planning/harness/tasks/TASK-{NNN}.md` using the
-task template from `/dh:generate-task`.
+Create a SAM task plan via MCP:
+
+```text
+sam_create(slug="{feature-slug}", goal="{plan goal}", tasks_yaml="{YAML task list}", issue={issue_number})
+```
+
+Passing `issue={issue_number}` auto-registers the task plan as
+`artifact_type="task-plan"` in the artifact system, making it accessible
+to worktree-isolated agents via `sam_read`.
 
 Each file contains YAML frontmatter followed by CLEAR-ordered sections:
 

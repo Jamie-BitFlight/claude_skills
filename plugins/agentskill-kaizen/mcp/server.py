@@ -19,6 +19,9 @@ Exposes process mining, pattern mining, frustration detection,
 and session clustering as MCP tools for the transcript-analyst agent.
 
 Tools:
+    get_transcript_jsonl_schema - Full session JSONL schema markdown (same as resource below)
+Resources:
+    kaizen://session-log/schema - Canonical session log schema (markdown); use resources/read
     extract_tool_sequences - Parse JSONL transcripts into tool-call sequences
     discover_process_model - Heuristic Miner process discovery via PM4Py
     check_conformance - Token-based replay conformance checking
@@ -81,6 +84,38 @@ _FRUSTRATION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 mcp = FastMCP("kaizen-analysis", mask_error_details=False)
+
+
+def _session_log_schema_path() -> pathlib.Path:
+    """Path to the bundled session log schema reference (markdown).
+
+    Content is kept in sync with ``plugins/plugin-creator/.../claude-session-log-schema-reference.md``.
+
+    Returns:
+        Absolute path to ``session-log-schema.md`` under this plugin.
+    """
+    return (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "skills"
+        / "transcript-analysis"
+        / "references"
+        / "session-log-schema.md"
+    )
+
+
+def _read_session_log_schema_text() -> str:
+    """Load session log schema markdown or raise ``ToolError`` if missing.
+
+    Returns:
+        Full markdown body of ``session-log-schema.md``.
+
+    Raises:
+        ToolError: If the schema file is not present on disk.
+    """
+    path = _session_log_schema_path()
+    if not path.is_file():
+        raise ToolError(f"Session log schema reference not found at {path}")
+    return path.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +308,50 @@ def _resolve_sequences(
     if not resolved:
         raise ToolError(f"No {target_name} tool sequences found in matched files")
     return resolved
+
+
+# TODO: Restore Annotated[..., Field(...)] parameter annotations once
+# https://github.com/PrefectHQ/fastmcp/issues/3238 is resolved.
+@mcp.resource("kaizen://session-log/schema")
+def session_log_schema_resource() -> str:
+    """Claude Code session JSONL schema (markdown) for MCP ``resources/read``.
+
+    Same markdown as ``get_transcript_jsonl_schema``. Canonical content aligns with
+    ``plugin-creator`` ``claude-session-log-schema-reference.md`` (copied into this plugin).
+
+    Returns:
+        Schema markdown, or a short error markdown if the file is missing.
+    """
+    try:
+        return _read_session_log_schema_text()
+    except ToolError as exc:
+        return f"# Session log schema unavailable\n\n{exc}\n"
+
+
+@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+async def get_transcript_jsonl_schema() -> str:
+    """Return the complete Claude Code session JSONL schema (markdown).
+
+    Same body as MCP resource ``kaizen://session-log/schema`` (prefer ``resources/read``
+    when the client supports it). Content matches
+    ``plugin-creator/skills/hooks-guide/references/claude-session-log-schema-reference.md``
+    (shipped copy: ``session-log-schema.md``).
+
+    Use before writing DuckDB SQL: field paths, record types, and directory layout are here.
+    The cookbook in ``duckdb-queries.md`` is examples only — compose any SQL with
+    ``json_extract`` / JSON operators using paths from this document.
+
+    Next step: ``kaizen-duckdb`` MCP ``execute_query`` with
+    ``read_ndjson_auto('/absolute/path/to/*.jsonl', columns={line: 'JSON'})`` (absolute paths;
+    no tilde in SQL). See ``plugins/agentskill-kaizen/docs/cross-platform-notes.md``.
+
+    Returns:
+        Full session log schema markdown.
+
+    Raises:
+        ToolError: If the schema file is missing from the plugin install.
+    """
+    return await asyncio.to_thread(_read_session_log_schema_text)
 
 
 # TODO: Restore Annotated[..., Field(...)] parameter annotations once

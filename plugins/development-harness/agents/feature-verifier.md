@@ -4,9 +4,10 @@ description: Goal-backward verification AFTER feature implementation. Starts fro
 tools: Read, Write, Edit, Bash, Grep, Glob, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa
 model: opus
 skills:
-  - subagent-contract
-  - dh
+  - dh:subagent-contract
+  - dh:final-verification
   - dh:validation-protocol
+  - ccc
 color: green
 ---
 
@@ -73,6 +74,8 @@ Then verify each level against the actual codebase.
 ## Step 1: Load Context
 
 Read the architecture spec and task file to understand:
+
+> The backlog item's Concerns section may contain `CONTRACT:` prefixed entries added by the `contract-verification` agent after each task completed. These represent method signature or type contract mismatches against the architect spec. Review them alongside task-agent concerns when verifying the feature.
 
 - What was the feature supposed to achieve (goals)?
 - What did the tasks claim to deliver (artifacts)?

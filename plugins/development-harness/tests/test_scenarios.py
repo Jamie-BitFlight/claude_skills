@@ -2,7 +2,7 @@
 
 Tests are organized by the skill/agent workflow that generates each call
 pattern. All tests go through the full operations layer — mocking only at
-the github.py boundary and filesystem (via conftest fixtures).
+the gh_client.py boundary and filesystem (via conftest fixtures).
 
 Uses in-memory FastMCP Client transport (``Client(mcp)``).
 No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
@@ -49,8 +49,8 @@ class TestCreateBacklogItem:
                 "priority": "P1",
                 "description": "A test item",
                 "source": "test",
-                "create_issue": True,
                 "force": True,
+                "gate_token": "problems-not-solutions",
             },
         )
 
@@ -137,7 +137,7 @@ class TestWorkBacklogItem:
         assert isinstance(result["priority"], str)
         assert result["issue"] == "#42"
         assert isinstance(result["body"], str)
-        assert isinstance(result["groomed"], bool)
+        assert isinstance(result["groomed"], str)
         assert isinstance(result["labels"], list)
         assert isinstance(result["milestone"], str)
 
@@ -208,13 +208,13 @@ class TestWorkBacklogItem:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_update_create_github_issue(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 10: backlog_update with create_issue=True creates a GitHub issue."""
+    async def test_update_creates_github_issue_when_missing(self, backlog_dir, mock_github, write_test_item):
+        """Scenario 10: backlog_update creates a GitHub issue when the item lacks one."""
         write_test_item("Issue Create Test", priority="P1")
         mock_github["try_get_github"].return_value = MagicMock()
         mock_github["create_issue_for_item"].return_value = 99
 
-        result = await _call("backlog_update", {"selector": "Issue Create Test", "create_issue": True})
+        result = await _call("backlog_update", {"selector": "Issue Create Test"})
 
         assert result["title"] == "Issue Create Test"
         assert result["issue_num"] == 99
@@ -571,7 +571,13 @@ class TestErrorPaths:
 
         result = await _call(
             "backlog_add",
-            {"title": "Duplicate Detection Test", "priority": "P1", "description": "A duplicate", "force": False},
+            {
+                "title": "Duplicate Detection Test",
+                "priority": "P1",
+                "description": "A duplicate",
+                "force": False,
+                "gate_token": "problems-not-solutions",
+            },
         )
 
         assert "error" in result
@@ -587,6 +593,125 @@ class TestErrorPaths:
         assert result["items"] == []
         assert result["count"] == 0
         assert "error" not in result
+
+
+# ---------------------------------------------------------------------------
+# Recursion guard routing tests
+# ---------------------------------------------------------------------------
+
+
+class TestRecursionGuardScenarios:
+    """Tests for recursion guard routing paths.
+
+    These tests verify that backlog_add correctly handles items whose source
+    field carries guard-originated patterns (depth-limit, BLOCKED-FOR-PLANNING,
+    out-of-scope, in-scope default). Each test documents one routing branch.
+    """
+
+    async def test_depth_limit_routes_remaining_to_backlog(self, backlog_dir, mock_github):
+        """Guard 1: depth-limit source pattern creates a backlog item with source preserved."""
+        mock_github["try_get_github"].return_value = None
+
+        result = await _call(
+            "backlog_add",
+            {
+                "title": "fix type errors in auth module",
+                "priority": "P1",
+                "description": "Follow-up identified when recursion depth limit was reached",
+                "source": "Depth limit exceeded on #42 at depth 5",
+                "force": True,
+                "gate_token": "problems-not-solutions",
+            },
+        )
+
+        assert "error" not in result
+        assert result["title"] == "fix type errors in auth module"
+        assert isinstance(result["file_path"], str)
+        # Verify the source was persisted to the file frontmatter
+        file_text = (backlog_dir / result["file_path"].split("/")[-1]).read_text(encoding="utf-8")
+        assert "Depth limit exceeded on #42 at depth 5" in file_text
+
+    async def test_rtca_blocked_stop_does_not_create_duplicate(self, backlog_dir, mock_github):
+        """Guard 2: BLOCKED-FOR-PLANNING source — second add with same title is rejected as duplicate."""
+        mock_github["try_get_github"].return_value = None
+
+        first = await _call(
+            "backlog_add",
+            {
+                "title": "rt-ica blocked follow-up item",
+                "priority": "P2",
+                "description": "Blocked for planning — needs scoping before implementation",
+                "source": "BLOCKED-FOR-PLANNING",
+                "force": True,
+                "gate_token": "problems-not-solutions",
+            },
+        )
+        assert "error" not in first
+        assert isinstance(first["file_path"], str)
+
+        # Second call with same title and force=False — duplicate check must fire
+        second = await _call(
+            "backlog_add",
+            {
+                "title": "rt-ica blocked follow-up item",
+                "priority": "P2",
+                "description": "Blocked for planning — needs scoping before implementation",
+                "source": "BLOCKED-FOR-PLANNING",
+                "force": False,
+                "gate_token": "problems-not-solutions",
+            },
+        )
+
+        assert "error" in second
+        assert "similar" in second["error"].lower() or "duplicate" in second["error"].lower()
+
+    async def test_out_of_scope_routes_to_backlog_at_classification(self, backlog_dir, mock_github):
+        """Out-of-scope quality gate source — item created with out-of-scope pattern preserved."""
+        mock_github["try_get_github"].return_value = None
+
+        result = await _call(
+            "backlog_add",
+            {
+                "title": "out of scope finding title",
+                "priority": "P2",
+                "description": "Separate domain concern identified during quality gate",
+                "source": "Quality gate follow-up from #42 — out-of-scope: separate domain concern",
+                "force": True,
+                "gate_token": "problems-not-solutions",
+            },
+        )
+
+        assert "error" not in result
+        assert result["title"] == "out of scope finding title"
+        assert isinstance(result["file_path"], str)
+        # Verify the out-of-scope source pattern was preserved in file frontmatter
+        file_text = (backlog_dir / result["file_path"].split("/")[-1]).read_text(encoding="utf-8")
+        assert "Quality gate follow-up from #42" in file_text
+        assert "out-of-scope" in file_text
+
+    async def test_in_scope_default_warns_when_scope_absent(self, backlog_dir, mock_github):
+        """In-scope default: item with no explicit scope section proceeds normally as in-scope.
+
+        Guard behavior: WARNING emitted when ## Scope absent; item proceeds as in-scope.
+        """
+        mock_github["try_get_github"].return_value = None
+
+        result = await _call(
+            "backlog_add",
+            {
+                "title": "in-scope default follow-up",
+                "priority": "P1",
+                "description": "Item created when scope section absent — defaults to in-scope",
+                "source": "in-scope default",
+                "force": True,
+                "gate_token": "problems-not-solutions",
+            },
+        )
+
+        # In-scope default: item proceeds and is created without error
+        assert "error" not in result
+        assert result["title"] == "in-scope default follow-up"
+        assert isinstance(result["file_path"], str)
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -636,8 +761,8 @@ class TestLifecycles:
                 "priority": "P1",
                 "description": "Full lifecycle test",
                 "source": "test",
-                "create_issue": True,
                 "force": True,
+                "gate_token": "problems-not-solutions",
             },
         )
         assert create_result["title"] == "Lifecycle Close Item"
@@ -681,8 +806,8 @@ class TestLifecycles:
                 "priority": "P1",
                 "description": "Will be resolved",
                 "source": "test",
-                "create_issue": True,
                 "force": True,
+                "gate_token": "problems-not-solutions",
             },
         )
         assert create_result["issue_num"] == 71
@@ -1123,21 +1248,25 @@ class TestCompactBacklogView:
         """Scenario C1a: backlog_view(include_content=False) returns sections_metadata list.
 
         Tests: compact mode response shape
-        How: write item with groomed section content, call backlog_view with
-             include_content=False, assert sections_metadata is a list of dicts
-             with name/num_entries/num_struck keys.
+        How: write item with groomed section content via yaml_io (YAML format),
+             call backlog_view with include_content=False, assert sections_metadata
+             is a list of dicts with name/num_entries/num_struck keys.
         Why: callers that only need a section inventory should not pay the cost
              of transferring full body content.
         """
+        from backlog_core.models import Entry, Section
+        from backlog_core.yaml_io import load_item, save_item
+
         filepath = write_test_item("Compact View Test Item")
-        # Append a section with entries so sections_metadata is non-empty
-        filepath.write_text(
-            filepath.read_text(encoding="utf-8")
-            + "\n### Groomed (2026-03-22)\n\n"
-            + "- [2026-03-22] First entry content.\n"
-            + "- [2026-03-22] Second entry content.\n",
-            encoding="utf-8",
+        # Add a structured section with entries (YAML format — not raw markdown append)
+        item = load_item(filepath)
+        item.sections["Groomed (2026-03-22)"] = Section(
+            entries=[
+                Entry(id="2026-03-22", content="First entry content."),
+                Entry(id="2026-03-22", content="Second entry content."),
+            ]
         )
+        save_item(item, filepath)
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call(
@@ -1193,7 +1322,7 @@ class TestCompactBacklogView:
         assert isinstance(result["priority"], str)
         assert isinstance(result["file_path"], str)
         assert result["file_path"] != ""
-        assert isinstance(result["groomed"], bool)
+        assert isinstance(result["groomed"], str)
         assert isinstance(result["labels"], list)
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
@@ -1209,14 +1338,16 @@ class TestCompactBacklogView:
              when they are supplied, preserving backward compatibility for callers
              that always pass pagination params.
         """
+        from backlog_core.models import Entry, Section
+        from backlog_core.yaml_io import load_item, save_item
+
         filepath = write_test_item("Pagination Compact Item")
-        filepath.write_text(
-            filepath.read_text(encoding="utf-8")
-            + "\n### Groomed (2026-03-22)\n\n"
-            + "- [2026-03-22] Entry one.\n"
-            + "- [2026-03-22] Entry two.\n",
-            encoding="utf-8",
+        # Add a structured section with entries (YAML format — not raw markdown append)
+        item = load_item(filepath)
+        item.sections["Groomed (2026-03-22)"] = Section(
+            entries=[Entry(id="2026-03-22", content="Entry one."), Entry(id="2026-03-22", content="Entry two.")]
         )
+        save_item(item, filepath)
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call(
@@ -1232,8 +1363,8 @@ class TestCompactBacklogView:
 
         assert "error" not in result
         assert "sections_metadata" in result
-        assert "body" not in result
-        assert "sections" not in result
+        assert not result.get("body"), "Compact mode must have no body content"
+        assert not result.get("sections"), "Compact mode must have no sections content"
 
     async def test_default_include_content_true_unchanged(self, backlog_dir, mock_github, write_test_item):
         """Scenario C1e: backlog_view without include_content returns full body (backward compat).
@@ -1251,7 +1382,7 @@ class TestCompactBacklogView:
 
         assert "error" not in result
         assert "body" in result, "Default mode must include 'body' key"
-        assert "sections_metadata" not in result, "Default mode must not include 'sections_metadata' key"
+        assert not result.get("sections_metadata"), "Default mode must have no sections_metadata content"
 
     async def test_e2e_combined_type_and_title_filters(self, backlog_dir, mock_github, write_test_item):
         """Combined filters narrow results correctly through the full MCP path."""

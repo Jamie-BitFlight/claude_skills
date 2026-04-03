@@ -29,14 +29,22 @@ import re
 import shutil
 import subprocess
 import sys
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Annotated, NoReturn
+
+# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
+# reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if isinstance(sys.stderr, TextIOWrapper):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import dh_paths
 import typer
 from rich.console import Console
 from rich.table import Table
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.models import PlanStatus, TaskStatus
@@ -54,12 +62,18 @@ from sam_schema.core.query import (
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
+_PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (FileNotFoundError, FormatDetectionError, ValueError, TypeError)
+
+_SYNC_ERRORS: tuple[type[Exception], ...]
 try:
+    from backlog_core.models import BacklogError
     from backlog_core.operations import sync_items as _sync_backlog
 
     _BACKLOG_CORE_AVAILABLE = True
+    _SYNC_ERRORS = (BacklogError, OSError, ValueError)
 except ImportError:
     _BACKLOG_CORE_AVAILABLE = False
+    _SYNC_ERRORS = (OSError, ValueError)
 
 app = typer.Typer(name="sam", help="SAM task/plan file interface.", no_args_is_help=True)
 
@@ -224,19 +238,24 @@ def _output_rich_status(status_data: dict[str, object]) -> None:
 
     feature = str(status_data.get("feature", ""))
     total = status_data.get("total_tasks", 0)
-    completion = status_data.get("completion_pct", 0.0)
+    raw_completion = status_data.get("completion_pct", 0.0)
+    completion = float(raw_completion) if isinstance(raw_completion, (int, float)) else 0.0
     has_cycles = status_data.get("has_cycles", False)
 
     meta = Table(title=f"Plan: {feature}", show_header=False)
     meta.add_column("Field", style="cyan")
     meta.add_column("Value", style="green")
     meta.add_row("Total tasks", str(total))
-    meta.add_row("Completion", f"{float(completion):.1f}%")  # type: ignore[arg-type]
+    meta.add_row("Completion", f"{completion:.1f}%")
     meta.add_row("Has cycles", str(has_cycles))
     console.print(meta)
 
     raw_by_status = status_data.get("by_status")
-    by_status: dict[str, int] = raw_by_status if isinstance(raw_by_status, dict) else {}  # type: ignore[assignment]
+    by_status: dict[str, int] = (
+        {str(k): int(v) for k, v in raw_by_status.items() if isinstance(v, int)}
+        if isinstance(raw_by_status, dict)
+        else {}
+    )
     if by_status:
         st_table = Table(title="By Status", show_header=True, header_style="bold")
         st_table.add_column("Status", style="cyan")
@@ -354,7 +373,7 @@ def list_plans(
             }
             if search is None or _plan_summary_matches(summary, search):
                 all_items.append(summary)
-        except Exception as exc:  # noqa: BLE001
+        except _PLAN_LOAD_ERRORS as exc:
             typer.echo(f"Warning: skipping {candidate.name}: {exc}", err=True)
 
     total = len(all_items)
@@ -551,7 +570,7 @@ def status(
                 entry = ps.model_dump(mode="json")
                 entry["path"] = str(candidate)
                 results.append(entry)
-            except Exception as exc:  # noqa: BLE001
+            except _PLAN_LOAD_ERRORS as exc:
                 # Skip unreadable plan files when listing all; emit to stderr
                 typer.echo(f"Warning: skipping {candidate}: {exc}", err=True)
                 continue
@@ -678,7 +697,7 @@ def update(
     task_id = f"T{task_ref}" if task_ref is not None and task_ref.isdigit() else task_ref
 
     # Parse --set field=value pairs
-    parsed_fields: dict[str, str] = {}
+    parsed_fields: dict[str, str | int | list[str]] = {}
     for pair in set_field:
         if "=" not in pair:
             _err(f"--set value must be in 'field=value' format, got: {pair!r}")
@@ -791,7 +810,7 @@ def validate(
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
-    except Exception as exc:  # noqa: BLE001
+    except (ValueError, TypeError) as exc:
         _output_json({"valid": False, "errors": [str(exc)], "warnings": []})
         raise typer.Exit(1) from None
 
@@ -969,7 +988,7 @@ def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
     """
     try:
         result = load_plan(plan_path)
-    except Exception:  # noqa: BLE001
+    except _PLAN_LOAD_ERRORS:
         return _migrate_one_fallback(plan_path, dry_run)
 
     source_format = result.source_format
@@ -1042,7 +1061,7 @@ def _update_backlog_refs(old_path: Path, new_path: Path, backlog_dir: Path) -> i
         _, fm_text, body = parts
         try:
             fm_data = y.load(fm_text)
-        except Exception:  # noqa: BLE001, S112
+        except YAMLError:
             continue
         if not isinstance(fm_data, dict):
             continue
@@ -1056,7 +1075,7 @@ def _update_backlog_refs(old_path: Path, new_path: Path, backlog_dir: Path) -> i
             new_raw = f"---\n{buf.getvalue()}---{body}"
             md_file.write_text(new_raw, encoding="utf-8")
             updated += 1
-        except Exception:  # noqa: BLE001, S112
+        except (YAMLError, OSError):
             continue
 
     return updated
@@ -1164,7 +1183,7 @@ def _migrate_all(plan_dir: Path, dry_run: bool, skip_sync: bool, backlog_dir: Pa
 
         try:
             written, _ = _migrate_one(plan_path, dry_run)
-        except Exception as exc:  # noqa: BLE001
+        except (*_PLAN_LOAD_ERRORS, OSError) as exc:
             msg = f"  Error migrating {plan_path.name}: {exc}"
             typer.echo(msg, err=True)
             errors.append(msg)
@@ -1200,8 +1219,8 @@ def _attempt_backlog_sync() -> None:
     if _BACKLOG_CORE_AVAILABLE:
         try:
             _sync_backlog()
-        except Exception:  # noqa: BLE001
-            typer.echo("Warning: backlog_core sync failed; falling back to CLI.", err=True)
+        except _SYNC_ERRORS as sync_exc:
+            typer.echo(f"Warning: backlog_core sync failed; falling back to CLI. ({sync_exc})", err=True)
         else:
             typer.echo("Backlog synced to GitHub.")
             return
@@ -1219,7 +1238,7 @@ def _attempt_backlog_sync() -> None:
             typer.echo("Backlog synced to GitHub.")
         else:
             typer.echo(f"Warning: backlog sync failed (exit {proc.returncode}): {proc.stderr.strip()}", err=True)
-    except Exception as exc:  # noqa: BLE001
+    except (subprocess.SubprocessError, OSError) as exc:
         typer.echo(f"Warning: backlog sync unavailable: {exc}", err=True)
 
 

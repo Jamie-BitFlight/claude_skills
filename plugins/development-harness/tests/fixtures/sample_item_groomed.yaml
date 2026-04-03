@@ -1,0 +1,53 @@
+title: Add YAML-based backlog item storage
+description: Implement pure-YAML file I/O for backlog items to replace legacy markdown format.
+type_: ''
+section: ''
+metadata:
+  source: engineering-team
+  added: '2026-01-15'
+  priority: P1
+  item_type: Feature
+  status: open
+  issue: '#42'
+  last_synced: ''
+  groomed: 'true'
+  plan: ''
+  topic: ''
+  research_first: ''
+  files: ''
+  suggested_location: ''
+sections:
+  fact_check:
+    entries:
+    - id: '2026-01-15T10:00:00Z'
+      content: YAML is the standard format for structured data in this codebase.
+      struck: false
+      struck_reason: ''
+      struck_at: ''
+    - id: '2026-01-16T08:00:00Z'
+      content: ruamel.yaml preserves comments and ordering.
+      struck: false
+      struck_reason: ''
+      struck_at: ''
+  rt_ica:
+    entries:
+    - id: '2026-01-15T11:00:00Z'
+      content: RT-ICA analysis complete. Scope is well-defined.
+      struck: false
+      struck_reason: ''
+      struck_at: ''
+  issue_classification:
+    entries:
+    - id: '2026-01-15T12:00:00Z'
+      content: Feature request from backlog migration initiative.
+      struck: false
+      struck_reason: ''
+      struck_at: ''
+  groomed:
+    date: '2026-01-15'
+    subsections:
+      Priority: High — needed for milestone 2 backlog migration.
+      Impact: All backlog operations will use pure YAML after this lands.
+      Benefits: Removes markdown parsing complexity and enables typed models.
+      Acceptance Criteria: "- [ ] load_item and save_item round-trip correctly\n\
+        - [ ] detect_format returns yaml for .yaml files"

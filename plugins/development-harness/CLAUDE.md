@@ -76,7 +76,9 @@ The full resolution protocol is documented in [./skills/development-harness/refe
 
 ## State Management
 
-All artifacts are written to the per-project state directory (`~/.dh/projects/{project-slug}/plan/`) resolved via `dh_paths.plan_dir()`. The `{project-slug}` is derived from the absolute project root path (replacing `/` with `-`). The base state directory can be overridden via the `DH_STATE_HOME` environment variable (used in CI and testing).
+All artifacts are written to the per-project state directory (`~/.dh/projects/{project-slug}/plan/`). The `{project-slug}` is derived from the absolute project root path (replacing `/` with `-`). The base state directory can be overridden via the `DH_STATE_HOME` environment variable (used in CI and testing).
+
+Skills and agents access plan artifacts via MCP tools — not via `dh_paths` directly. See the Artifact Manifest System section below for the discovery and access pattern.
 
 **Token pattern:** `ARTIFACT:{TYPE}({SCOPE_OR_ID})`
 
@@ -292,9 +294,116 @@ Do NOT use when:
 
 ---
 
+## Required Reading by Task Type
+
+Load these documents based on what you are doing. They contain the system design knowledge required for that work to succeed.
+
+**Modifying the pipeline process, stage sequencing, or touchpoint gates:**
+
+- Load [Default Development Flow](./skills/development-harness/references/default-development-flow.md) — defines the S1-S7 pipeline, ARL gates, and stage handoffs
+- Load [Artifact Conventions](./skills/development-harness/references/artifact-conventions.md) — artifact naming, required sections per type, cross-referencing tokens
+
+**Modifying data structures, domain models, or task/plan schemas:**
+
+- Load [Domain model source](./sam_schema/core/models.py) — authoritative `Task` and `Plan` Pydantic models. This is the source of truth for all field definitions.
+- Load [Task File Format](./docs/TASK_FILE_FORMAT.md) — field reference, authorized writers, sam CLI usage. **Drift warning**: this is a snapshot. Verify fields against `models.py` before relying on it for implementation.
+- Load [Workflow Architecture Diagram](./docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, SAM state machine, hook trigger conditions
+
+**Modifying the backlog lifecycle, grooming, or issue state machine:**
+
+- Load [Backlog Item Lifecycle](./docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation through closure
+- Load [Backend Providers](./docs/backend-providers.md) — pluggable backend abstractions, GitHub/GitLab/Linear capabilities
+
+**Modifying artifact handling, divergence detection, or plan management:**
+
+- Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
+- Load [Artifact Conventions](./skills/development-harness/references/artifact-conventions.md) — storage model, file naming, cross-reference tokens
+
+**Modifying or extending the SDLC layer architecture (Layer 0/1/2 design):**
+
+- Load [Layer 0 README](./docs/sdlc-layers/layer-0/README.md) — framework design: evidence discipline, orchestrator discipline, context-fit complexity, RT-ICA gate, verification protocol
+- Load [Layer 1 README](./docs/sdlc-layers/layer-1/README.md) — language plugin design: harness role mapping, workflow pattern taxonomy, linting discovery protocol
+- Load [Layer 2 README](./docs/sdlc-layers/layer-2/README.md) — stack profile design: profile schema, profile templates
+- Load [ARL Meta Layer](./docs/sdlc-layers/arl-meta-layer.md) — ARL human probing design across layers
+
+Note: Four layer-0 design documents (artifact-conventions, task-file-format, sam-pipeline, arl-touchpoints) were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
+
+### Documentation Update Triggers
+
+After completing your work, update the architectural documents above if your changes fall into these categories:
+
+| Change type | Update required |
+|---|---|
+| Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
+| Data structure change (new field, changed type, new entity) | Yes — update `models.py` first, then Task File Format |
+| New or removed MCP tool | Yes — update Workflow Architecture Diagram |
+| New artifact type or changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle |
+| Refactoring (same behavior, different code structure) | No |
+| Agent prompt changes (better instructions, same behavior) | No |
+| UI/UX changes | No |
+
+---
+
 ## Layer Model
 
-This harness implements the **SDLC Layer Separation Architecture**. Layer 0 = framework (this harness); Layer 1 = language plugin; Layer 2 = stack profile (optional). See [docs/sdlc-layers/](./docs/sdlc-layers/) and [docs/sdlc-layers/layer-2/](./docs/sdlc-layers/layer-2/).
+This harness implements the **SDLC Layer Separation Architecture**. Layer 0 = framework (this harness); Layer 1 = language plugin; Layer 2 = stack profile (optional). See [docs/sdlc-layers/](./docs/sdlc-layers/).
+
+Layer-0 operational specifications (pipeline flow, artifact conventions, touchpoint model, task format) live in the skill references and docs — see "Required Reading by Task Type" above. Layer-0 design principles (evidence discipline, orchestrator discipline, context-fit complexity) live in [docs/sdlc-layers/layer-0/](./docs/sdlc-layers/layer-0/).
+
+---
+
+## Testing MCP Servers Against Fresh Source Code
+
+Built-in MCP tool calls (`mcp__plugin_dh_backlog__*`, `mcp__plugin_dh_sam__*`) run against the **plugin cache**, not the current source. After modifying `backlog_core/` or `sam_schema/`, the cache is stale until a session restart + version bump. To test changes immediately, use `fastmcp` CLI against the source files:
+
+Run all commands from the **project root** (where `pyproject.toml` lives). `$(pwd)` resolves to the project root at execution time.
+
+**Backlog server** (`scripts/run_backlog_server.py`):
+
+```bash
+# List all 42 tools
+uv run fastmcp list \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_backlog_server.py"
+
+# View a backlog item (full content)
+uv run fastmcp call \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
+  --target backlog_view \
+  --input-json '{"selector": "groom-milestone", "summary": false}'
+
+# Search backlog items
+uv run fastmcp call \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
+  --target backlog_list \
+  --input-json '{"search": "sdlc", "limit": 3}'
+```
+
+**SAM server** (`scripts/run_sam_server.py`):
+
+```bash
+# List all 8 tools
+uv run fastmcp list \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_sam_server.py"
+
+# List all plans
+uv run fastmcp call \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_sam_server.py" \
+  --target sam_list \
+  --input-json '{}'
+```
+
+**Why `--command` is required**: The server files use relative imports (`from . import models`) and sibling packages (`import dh_paths`). Running `fastmcp call server.py` directly breaks module resolution. The `--command` flag launches the runner script as a subprocess with the correct Python path, matching how the plugin cache launches the server.
+
+**Backend selection during testing**: Prefix `fastmcp call` commands with `BACKLOG_BACKEND=sqlite` or `BACKLOG_BACKEND=memory` to test against a non-GitHub backend without requiring live credentials:
+
+```bash
+BACKLOG_BACKEND=memory uv run fastmcp call \
+  --command "uv run python $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
+  --target backlog_list \
+  --input-json '{}'
+```
+
+**When to use this vs built-in MCP calls**: Use `fastmcp call` to verify behavior after editing `backlog_core/` or `sam_schema/` source files. Use built-in MCP calls for normal workflow operations where the cached server is sufficient.
 
 ---
 
@@ -302,7 +411,15 @@ This harness implements the **SDLC Layer Separation Architecture**. Layer 0 = fr
 
 When discussing, extending, or adding backend providers for the development harness — including state management, task management, planning, issues, jobs, milestones, or boards — read [docs/backend-providers.md](./docs/backend-providers.md) first. Amend that document with any new points, references, discoveries, or user inputs that arise during the conversation.
 
-The development harness supports pluggable backends via Protocol-based abstractions. The current implementation uses GitHub. Future backends include GitLab, Linear, and Supabase. Each backend uses its platform's native primitives — see the reference doc for verified capabilities and official documentation URLs per platform.
+The backlog MCP server uses a `BacklogBackend` Protocol (`backlog_core/backend_protocol.py`) to decouple all operations from any specific storage platform. Three backends are available:
+
+- `github` (default) — GitHub Issues via GraphQL + PyGithub REST. Requires `GITHUB_TOKEN`.
+- `sqlite` — local 6-table SQLite schema, WAL mode. No external credentials.
+- `memory` — in-memory test double. No persistence.
+
+Select via `BACKLOG_BACKEND` env var or `[backend] name` in `backend.toml` (project root or `~/.dh/`). Default is `github` when neither is set — existing deployments require no changes.
+
+Future platform backends (GitLab, Linear, Supabase) will implement the same Protocol. See [docs/backend-providers.md](./docs/backend-providers.md) for the full Protocol reference, method groups, configuration examples, and platform capability comparison.
 
 The backlog MCP server also exposes `profile_load` (agent_profile tool) for loading named agent profiles that specialize task-worker behavior at dispatch time. Profile definitions live in the backlog server configuration; see [docs/backend-providers.md](./docs/backend-providers.md) for the module boundary.
 

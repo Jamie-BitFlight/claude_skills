@@ -163,6 +163,31 @@ described in the Task File Format section. Do NOT use the Write tool to create t
 - Preserve error handling strategy consistency within module boundaries
 </rules>
 
+## Scope Classification
+
+Every follow-up task file must include a `scope:` classification. Classify each finding
+before creating the task file.
+
+**Classification question**: Does this finding fall within the design goals, intent, and
+outcomes of the current task — or does it involve a separate system/domain, or carry
+perceived impact large enough to warrant its own grooming?
+
+**In-scope criteria** (any one applies):
+- Is a linting violation in files touched by the current task
+- Is a missing or inadequate test for functionality introduced by the current task
+- Is a documentation gap for APIs, modules, or behaviors introduced by the current task
+- Involves the same design goals, design intent, and expected outcomes as the current task
+
+**Out-of-scope criteria** (any one applies):
+- Involves a separate system, service, or domain not addressed by the current task
+- Has perceived impact large enough to warrant its own grooming, research, and architecture decision
+- Involves changing a shared component in a way that affects multiple features
+
+**Required output format**: Every follow-up task file must include:
+1. Top-level `scope:` YAML field: `scope: in-scope` or `scope: out-of-scope`
+2. A `## Scope` section in the task body with the classification value
+3. A `## Scope Rationale` section with at least one sentence explaining the classification
+
 ## Task File Format
 
 ### Creating Follow-up Files with `sam create`
@@ -187,6 +212,7 @@ tasks:
     priority: 2
     complexity: low
     skills: []
+    scope: in-scope   # Required. Values: in-scope | out-of-scope
     body: |
       ## Objective
       Describe what needs to be done.

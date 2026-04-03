@@ -68,7 +68,7 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
 
 2. **Produce artifacts at every stage**
    - Use `ARTIFACT:{TYPE}({ID})` tokens in artifact headers; cross-reference predecessor/successor.
-   - In claude_skills: Store in `.planning/harness/` with naming `discovery-{feature-slug}.md`, `plan-{feature-slug}.md`, `task-{id}-{task-slug}.md`, etc.
+   - In claude_skills: Register via MCP — `artifact_register(issue_number, artifact_type, path, agent, content)` for discovery and plan artifacts, `sam_create(slug, goal, tasks_yaml, issue)` for task plans. Artifacts are stored in the artifact manifest and accessible to all agents including worktree-isolated sessions.
 
 3. **Apply structural gates, not instructions**
    - Run quality gates (format, lint, typecheck, test) after each stage.

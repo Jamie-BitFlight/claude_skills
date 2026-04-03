@@ -126,7 +126,7 @@ Omit `parent_issue_number` if the story issue number is not known. The hook trea
 `None` and skips GitHub sync.
 
 If `parent_issue_number` is known and `github_issue` field is set in the task YAML, call
-`backlog_core.github.update_task_status(repo, github_issue, "in-progress")` after the
+`backlog_core.gh_client.update_task_status(repo, github_issue, "in-progress")` after the
 `claim-task` step to sync the in-progress status to GitHub. Failure is non-fatal — continue
 regardless.
 
@@ -150,7 +150,7 @@ regardless.
 
 ### DN-1: {Brief title}
 
-- **Plan artifact**: ~/.dh/projects/{project-slug}/plan/architect-{slug}.md, section "{section name}"
+- **Plan artifact**: `artifact_read(issue_number={N}, artifact_type="architect")`, section "{section name}"
 - **Plan claim**: "{quoted text from plan artifact}"
 - **Actual implementation**: "{what was actually done and why}"
 - **Classification**: design-refinement | intent-divergence

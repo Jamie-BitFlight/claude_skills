@@ -70,7 +70,7 @@ def _parse_table_row(row: str) -> ArtifactEntry | None:
     cells = [c.strip() for c in stripped.strip("|").split("|")]
     if len(cells) < _TABLE_COLUMN_COUNT:
         return None
-    type_cell, path_cell, status_cell, agent_cell, created_cell = (cells[0], cells[1], cells[2], cells[3], cells[4])
+    type_cell, path_cell, status_cell, agent_cell, created_cell = cells[:5]
     # Skip header row ("Type") and separator row ("---")
     if type_cell.lower() in {"type", "---", "------"} or type_cell.startswith("-"):
         return None

@@ -67,6 +67,8 @@ Work against the acceptance criteria. Use the verification steps to confirm prog
 
 When all acceptance criteria are met and verification steps pass:
 
+> After you mark the task complete, the orchestrator may spawn the `contract-verification` agent to check that the method signatures and type contracts in your output match the architect spec. Any mismatches are reported as `CONTRACT:` prefixed concerns in the backlog item — they do not block the next task but surface during quality gates.
+
 ```text
 mcp__plugin_dh_sam__sam_state(plan="P{N}", task="T{M}", status="complete")
 ```

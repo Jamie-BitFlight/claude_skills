@@ -10,7 +10,9 @@ import json as _json
 import logging as _logging
 import os as _os
 import re as _re
+import shutil
 import sqlite3
+import subprocess
 import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
@@ -22,19 +24,16 @@ import dh_paths as _dh_paths
 import dispatch_schema as _ds
 import tiktoken
 from fastmcp import Context, FastMCP
+from fastmcp.server.lifespan import lifespan
+from github import GithubException as _GithubException
 from pydantic import Field, ValidationError as _ValidationError
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
 from . import models as _models, operations
 from .artifact_provider import GitHubArtifactProvider
 from .artifact_registry import ArtifactRegistry
+from .backend_protocol import IssueNode as _IssueNode, get_config as _get_config
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
-from .github import (
-    IssueNode as _IssueNode,
-    get_github as _get_github,
-    probe_backend_status as _probe_backend_status,
-    sync_issues_graphql as _sync_issues_graphql,
-)
 from .models import (
     ArtifactContent,
     ArtifactEntry,
@@ -54,6 +53,8 @@ from .models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
@@ -61,10 +62,91 @@ _LIST_TOKEN_BUDGET = 4_400
 _enc: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
 
 # Fields searched by default when no field-specific prefix is given.
-_SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
+# ``body`` contains the full item content (description + all section entries)
+# built by operations._build_item_body so that plain-text and regex searches
+# cover the complete backlog item, not just the 4 metadata fields.
+_SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type", "body")
 
 # Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
 _REGEX_SLASH_MIN_LEN = 2
+
+# Sentinel: prevents _bootstrap_beads from running more than once per process.
+# Tests reset via monkeypatch.setattr("backlog_core.server._beads_bootstrapped", False).
+# TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
+_beads_bootstrapped: bool = False
+
+
+def _bootstrap_beads(project_dir: Path) -> None:
+    """Auto-bootstrap beads toolchain (bd binary, .beads/ database, Claude hooks).
+
+    Runs at server startup via the FastMCP lifespan hook. Blocked by module-level
+    sentinel so it executes at most once per process, even when multiple
+    ``Client(mcp)`` connections are opened in tests.
+
+    All subprocess calls use ``check=False`` and ``capture_output=True`` to avoid
+    raising exceptions or polluting the MCP transport with subprocess output.
+    Full binary paths (from ``shutil.which``) are used in subprocess calls to
+    satisfy S607 (no partial executable paths).
+
+    Args:
+        project_dir: Resolved project root path (from ``models.get_repo_root()``).
+    """
+    global _beads_bootstrapped  # noqa: PLW0603
+    if _beads_bootstrapped:
+        return
+
+    log = _logging.getLogger(__name__)
+
+    bd_path = shutil.which("bd")
+    if bd_path:
+        # Happy path: bd is already on PATH.
+        if not (project_dir / ".beads").exists():
+            subprocess.run([bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True)
+        subprocess.run(
+            [bd_path, "setup", "claude", "--project", "--stealth"], cwd=project_dir, check=False, capture_output=True
+        )
+        _beads_bootstrapped = True
+        return
+
+    # bd not on PATH — try installing via npm.
+    npm_path = shutil.which("npm")
+    if not npm_path:
+        log.warning("beads bootstrap skipped: npm not available")
+        _beads_bootstrapped = True
+        return
+
+    subprocess.run([npm_path, "install", "-g", "@beads/bd"], check=False, capture_output=True)
+
+    bd_path = shutil.which("bd")
+    if not bd_path:
+        log.warning("beads bootstrap skipped: npm install failed silently")
+        _beads_bootstrapped = True
+        return
+
+    # Install succeeded; initialise and set up.
+    subprocess.run([bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True)
+    subprocess.run(
+        [bd_path, "setup", "claude", "--project", "--stealth"], cwd=project_dir, check=False, capture_output=True
+    )
+    _beads_bootstrapped = True
+
+
+@lifespan
+async def _beads_lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """FastMCP lifespan hook: bootstrap beads before server accepts tool calls.
+
+    Runs ``_bootstrap_beads`` in a thread executor to avoid blocking the event
+    loop during startup (subprocess calls may take several seconds).
+
+    Args:
+        server: FastMCP server instance (provided by FastMCP at startup).
+
+    Yields:
+        None after bootstrap completes.
+    """
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _bootstrap_beads, _models.get_repo_root())
+    yield
 
 
 def _item_field_text(item: dict[str, str | bool], field: str) -> str:
@@ -72,17 +154,34 @@ def _item_field_text(item: dict[str, str | bool], field: str) -> str:
     return str(item.get(field, "") or "").casefold()
 
 
-def _item_matches_term(item: dict[str, str | bool], term: str) -> bool:
+def _build_haystack(item: dict[str, str | bool]) -> str:
+    """Return a single casefolded string combining all default search fields.
+
+    Building the haystack is O(fields) per item.  Pre-computing it once before
+    evaluating multiple terms avoids rebuilding it for every (item, term) pair.
+    """
+    return " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
+
+
+def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | None = None) -> bool:
     """Return True if a single search term matches the item.
 
     Supported term forms (evaluated in order):
     - ``/pattern/`` or ``regex:pattern`` — compiled regex matched against all
-      default search fields joined with a space.
+      default search fields joined with a space (title, section, topic, type,
+      and full body content).
     - ``field:value`` — substring match restricted to a named field
-      (``title``, ``section``, ``topic``, ``type``).  Unknown field names fall
-      back to full-text substring match.
+      (``title``, ``section``, ``topic``, ``type``, ``body``).  Unknown field
+      names fall back to full-text substring match.
     - plain text — case-insensitive substring match across all default fields
       (existing behaviour, fully preserved).
+
+    Args:
+        item: Backlog item dict.
+        term: A single search term (no AND/OR operators).
+        haystack: Pre-computed full-text string from ``_build_haystack``.
+            When provided, avoids rebuilding the haystack inside this call.
+            Pass ``None`` (default) to let this function build it on demand.
     """
     term = term.strip()
     if not term:
@@ -97,8 +196,8 @@ def _item_matches_term(item: dict[str, str | bool], term: str) -> bool:
             # Invalid regex — fall through to plain substring match on the raw term.
             pass
         else:
-            haystack = " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
-            return bool(pattern.search(haystack))
+            hs = haystack if haystack is not None else _build_haystack(item)
+            return bool(pattern.search(hs))
 
     # Field-specific form: field:value
     if ":" in term:
@@ -111,25 +210,236 @@ def _item_matches_term(item: dict[str, str | bool], term: str) -> bool:
 
     # Plain text — existing case-insensitive substring match across all fields.
     needle = term.casefold()
-    return needle in " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
+    hs = haystack if haystack is not None else _build_haystack(item)
+    return needle in hs
+
+
+# ---------------------------------------------------------------------------
+# Search expression AST — predicates defined first so the parser can annotate
+# return types without forward references.
+# ---------------------------------------------------------------------------
+
+
+class _Predicate:
+    """Base class for search predicates.
+
+    Subclasses implement ``__call__(item, haystack) -> bool``.
+    """
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        """Evaluate the predicate against a single backlog item.
+
+        Args:
+            item: Backlog item dict.
+            haystack: Pre-computed full-text string from ``_build_haystack``.
+
+        Returns:
+            True if the item matches the predicate.
+        """
+        raise NotImplementedError
+
+
+@dataclasses.dataclass
+class _TermPred(_Predicate):
+    """Match a single leaf term against an item."""
+
+    term: str
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        return _item_matches_term(item, self.term, haystack)
+
+
+@dataclasses.dataclass
+class _AndPred(_Predicate):
+    """Conjunction: both sub-predicates must match."""
+
+    left: _Predicate
+    right: _Predicate
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        return self.left(item, haystack) and self.right(item, haystack)
+
+
+@dataclasses.dataclass
+class _OrPred(_Predicate):
+    """Disjunction: at least one sub-predicate must match."""
+
+    left: _Predicate
+    right: _Predicate
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        return self.left(item, haystack) or self.right(item, haystack)
+
+
+@dataclasses.dataclass
+class _NotPred(_Predicate):
+    """Negation: the sub-predicate must not match."""
+
+    operand: _Predicate
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        return not self.operand(item, haystack)
+
+
+class _TruePred(_Predicate):
+    """Always-true predicate used as a safe no-op fallback."""
+
+    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Tokenizer and recursive-descent parser
+# ---------------------------------------------------------------------------
+
+
+def _tokenize_search(search: str) -> list[str]:
+    """Tokenize a search query into a flat list of tokens.
+
+    Tokens are one of: ``(``, ``)``, ``AND``, ``OR``, ``NOT``, or a bare term
+    string.  Keywords are matched case-insensitively and emitted in uppercase.
+    Whitespace between tokens is consumed.  Terms that contain colons (field
+    prefixes), slashes (regex), or other non-keyword text are preserved as-is.
+
+    Args:
+        search: Raw search query string.
+
+    Returns:
+        List of string tokens.
+    """
+    tokens: list[str] = []
+    i = 0
+    n = len(search)
+    while i < n:
+        if search[i].isspace():
+            i += 1
+            continue
+        if search[i] in "()":
+            tokens.append(search[i])
+            i += 1
+            continue
+        j = i
+        while j < n and not search[j].isspace() and search[j] not in "()":
+            j += 1
+        word = search[i:j]
+        upper = word.upper()
+        tokens.append(upper if upper in {"AND", "OR", "NOT"} else word)
+        i = j
+    return tokens
+
+
+class _SearchParser:
+    """Recursive descent parser for search queries.
+
+    Grammar (precedence: NOT > AND > OR)::
+
+        expr     := or_expr
+        or_expr  := and_expr ( OR and_expr )*
+        and_expr := not_expr ( AND not_expr )*
+        not_expr := NOT not_expr | atom
+        atom     := LPAREN expr RPAREN | TERM
+
+    The parse result is a ``_Predicate`` callable ``(item, haystack) -> bool``.
+    """
+
+    def __init__(self, tokens: list[str]) -> None:
+        self._tokens = tokens
+        self._pos = 0
+
+    def _peek(self) -> str | None:
+        """Return the next token without consuming it, or None at end-of-input."""
+        if self._pos < len(self._tokens):
+            return self._tokens[self._pos]
+        return None
+
+    def _consume(self) -> str:
+        """Consume and return the next token.
+
+        Returns:
+            The token at the current position.
+        """
+        tok = self._tokens[self._pos]
+        self._pos += 1
+        return tok
+
+    def parse(self) -> _Predicate:
+        """Parse all tokens and return a root predicate.
+
+        Remaining unparsed tokens after the top-level ``or_expr`` are joined
+        with implicit AND so that malformed partial queries still match
+        sensibly rather than silently ignoring trailing terms.
+
+        Returns:
+            Callable predicate representing the full expression.
+        """
+        pred = self._parse_or()
+        while self._peek() is not None and self._peek() not in {")", "OR"}:
+            if self._peek() == "AND":
+                self._consume()
+            right = self._parse_not()
+            pred = _AndPred(pred, right)
+        return pred
+
+    def _parse_or(self) -> _Predicate:
+        left = self._parse_and()
+        while self._peek() == "OR":
+            self._consume()
+            right = self._parse_and()
+            left = _OrPred(left, right)
+        return left
+
+    def _parse_and(self) -> _Predicate:
+        left = self._parse_not()
+        while self._peek() == "AND":
+            self._consume()
+            right = self._parse_not()
+            left = _AndPred(left, right)
+        return left
+
+    def _parse_not(self) -> _Predicate:
+        if self._peek() == "NOT":
+            self._consume()
+            operand = self._parse_not()
+            return _NotPred(operand)
+        return self._parse_atom()
+
+    def _parse_atom(self) -> _Predicate:
+        tok = self._peek()
+        if tok == "(":
+            self._consume()
+            pred = self._parse_or()
+            if self._peek() == ")":
+                self._consume()
+            return pred
+        if tok is not None and tok not in {"AND", "OR", "NOT", ")"}:
+            self._consume()
+            return _TermPred(tok)
+        # Empty or unexpected token — safe no-op fallback.
+        return _TruePred()
 
 
 def _apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
     """Filter items using the full-text search query syntax.
 
-    Query syntax (case-insensitive keywords):
+    Query syntax (operator precedence: NOT > AND > OR):
+
     - ``term1 OR term2``  — item matches if either term matches.
     - ``term1 AND term2`` — item matches only if both terms match.
-    - Bare text without AND/OR — original substring behaviour (single term).
+    - ``NOT term`` — item matches only if the term does *not* match.
+    - ``(term1 OR term2) AND term3`` — parenthetical grouping controls precedence.
+    - Bare text without operators — original substring behaviour (single term).
 
-    OR and AND keywords are whitespace-delimited and case-insensitive.  Mixed
-    AND/OR in a single query is not supported; AND takes precedence when both
-    appear.
+    Operators are whitespace-delimited and case-insensitive.
 
     Each individual term supports:
+
     - ``/regex/`` or ``regex:pattern`` — regex match
     - ``field:value`` — field-specific substring match
     - plain text — substring match across all default fields
+
+    Args:
+        items: Backlog item dicts to filter.
+        search: Query string.
 
     Returns:
         Filtered list of items that match the search query.
@@ -138,20 +448,663 @@ def _apply_search_filter(items: list[dict[str, str | bool]], search: str) -> lis
     if not search:
         return items
 
-    # Tokenise on whitespace-delimited AND / OR operators (case-insensitive).
-    upper = search.upper()
-    if " AND " in upper:
-        # Split on first-level AND; each part is a term (may itself contain spaces
-        # for field:value terms like "title:auth deploy").
-        and_parts = _re.split(r"(?i)\s+AND\s+", search)
-        return [item for item in items if all(_item_matches_term(item, part) for part in and_parts)]
+    tokens = _tokenize_search(search)
+    parser = _SearchParser(tokens)
+    predicate = parser.parse()
 
-    if " OR " in upper:
-        or_parts = _re.split(r"(?i)\s+OR\s+", search)
-        return [item for item in items if any(_item_matches_term(item, part) for part in or_parts)]
+    result = []
+    for item in items:
+        hs = _build_haystack(item)
+        if predicate(item, hs):
+            result.append(item)
+    return result
 
-    # No operator — treat entire query as a single term (existing behaviour).
-    return [item for item in items if _item_matches_term(item, search)]
+
+# ---------------------------------------------------------------------------
+# Primitive 1: match_context helpers
+# ---------------------------------------------------------------------------
+
+# Snippet window: characters before and after the match position.
+# Used as the default when snippet_context is not supplied to _make_snippet.
+_SNIPPET_WINDOW = 60
+
+# Default snippet_context value (pre + post budget combined).
+_DEFAULT_SNIPPET_CONTEXT = 2 * _SNIPPET_WINDOW
+
+
+def _parse_body_sections(body: str) -> list[tuple[str, str]]:
+    """Parse a markdown body string into (section_slug, text) tuples.
+
+    Splits on ``## Heading`` lines. Text before the first heading is attributed
+    to ``"body:preamble"``.
+
+    Args:
+        body: Raw markdown body string.
+
+    Returns:
+        List of (section_slug, text) pairs in document order.
+    """
+    sections: list[tuple[str, str]] = []
+    current_slug = "body:preamble"
+    current_parts: list[str] = []
+    for line in body.splitlines(keepends=True):
+        if line.startswith("## "):
+            if current_parts:
+                sections.append((current_slug, "".join(current_parts)))
+            heading = line[3:].strip()
+            current_slug = "body:" + heading.lower().replace(" ", "-")
+            current_parts = []
+        else:
+            current_parts.append(line)
+    if current_parts:
+        sections.append((current_slug, "".join(current_parts)))
+    return sections
+
+
+def _make_snippet(text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT) -> str:
+    """Extract a snippet around a match position with sliding-window budget.
+
+    The total character budget is *snippet_context*, split equally between the
+    text before and after the match.  Unused budget on either side is
+    redistributed to the other side so the window is as wide as possible.
+
+    Args:
+        text: The full text in which the match was found.
+        start: Match start index.
+        end: Match end (exclusive) index.
+        snippet_context: Total characters to show before and after the match
+            (combined).  Defaults to ``2 * _SNIPPET_WINDOW`` (120) to preserve
+            prior behaviour when callers do not supply the argument.
+
+    Returns:
+        Up to *snippet_context* + (end-start) characters centred on the match,
+        with leading/trailing ``...`` markers when content was truncated.
+    """
+    raw, matched, _snip_start, _snip_end = _make_snippet_parts(text, start, end, snippet_context)
+    del matched
+    return raw
+
+
+def _make_snippet_parts(
+    text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> tuple[str, str, int, int]:
+    """Compute snippet parts for a match, enabling both plain and formatted output.
+
+    Implements the sliding-window budget: pre and post budgets each receive half
+    of *snippet_context*; any unused budget on one side is redistributed to the
+    other so the window stays as wide as possible.
+
+    Args:
+        text: The full text in which the match was found.
+        start: Match start index (inclusive).
+        end: Match end index (exclusive).
+        snippet_context: Total character budget split across pre and post sides.
+
+    Returns:
+        Tuple of (raw_snippet, matched_text, snip_start, snip_end) where
+        raw_snippet is the text[snip_start:snip_end] with leading/trailing
+        ``...`` markers, matched_text is text[start:end], and snip_start/
+        snip_end are the absolute window boundaries in *text*.
+    """
+    pre_budget = snippet_context // 2
+    post_budget = snippet_context // 2
+
+    # Sliding window: redistribute surplus from whichever side is near a boundary.
+    actual_pre = min(pre_budget, start)
+    surplus_pre = pre_budget - actual_pre
+    adjusted_post = post_budget + surplus_pre
+
+    actual_post = min(adjusted_post, len(text) - end)
+    surplus_post = post_budget - min(post_budget, len(text) - end)  # surplus from original split
+    if surplus_post > 0:
+        pre_budget += surplus_post
+        actual_pre = min(pre_budget, start)
+
+    snip_start = start - actual_pre
+    snip_end = end + actual_post
+    snippet = text[snip_start:snip_end]
+    if snip_start > 0:
+        snippet = "..." + snippet
+    if snip_end < len(text):
+        snippet += "..."
+    return snippet, text[start:end], snip_start, snip_end
+
+
+def _format_match_text(
+    field: str, match_index: int, text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> str:
+    """Format a single match entry as a human-readable snippet line.
+
+    The section label ``[segment: field]`` is always shown and is NOT counted
+    against the character budget.  The sliding window applies only to the
+    haystack text excluding the label.
+
+    Format::
+
+        N::[segment: field]:: ...pre-text...MATCHED TERM...post-text...
+
+    where ``...`` prefix/suffix are present only when content was truncated.
+
+    Args:
+        field: Field or section slug (e.g. ``"title"``, ``"body:acceptance-criteria"``).
+        match_index: 1-based index of this match within the item.
+        text: The full haystack text (section content, not including the label).
+        start: Match start index within *text*.
+        end: Match end index (exclusive) within *text*.
+        snippet_context: Total character budget for pre + post context.
+
+    Returns:
+        Formatted match line string.
+    """
+    raw_snippet, matched, ss, se = _make_snippet_parts(text, start, end, snippet_context)
+    del matched, ss, se
+    return f"{match_index}::[segment: {field}]:: {raw_snippet}"
+
+
+_META_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
+
+
+def _match_body_sections(
+    item: dict[str, str | bool],
+    term: str,
+    needle_fn: Callable[[str], tuple[int, int] | None],
+    snippet_context: int = _DEFAULT_SNIPPET_CONTEXT,
+) -> list[dict[str, str]]:
+    """Return match entries for all body sections where needle_fn returns a span.
+
+    Args:
+        item: Backlog item dict.
+        term: The original search term (stored in each match entry).
+        needle_fn: Callable that takes a text string and returns a (start, end)
+            span tuple on match, or ``None`` when there is no match.
+        snippet_context: Total character budget passed to ``_make_snippet``.
+
+    Returns:
+        List of match-context dicts for body sections that matched.
+    """
+    body_str = str(item.get("body", "") or "")
+    matches: list[dict[str, str]] = []
+    for section_slug, section_text in _parse_body_sections(body_str):
+        span = needle_fn(section_text)
+        if span is not None:
+            matches.append({
+                "field": section_slug,
+                "term": term,
+                "snippet": _make_snippet(section_text, *span, snippet_context=snippet_context),
+            })
+    return matches
+
+
+def _collect_regex_matches(
+    item: dict[str, str | bool], term: str, pattern_str: str, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> list[dict[str, str]] | None:
+    """Collect matches for a regex term.
+
+    Args:
+        item: Backlog item dict.
+        term: The original search term.
+        pattern_str: Raw regex pattern extracted from the term.
+        snippet_context: Total character budget passed to ``_make_snippet``.
+
+    Returns:
+        List of match-context dicts, or ``None`` if the regex is invalid
+        (caller should fall through to plain-text matching).
+    """
+    try:
+        pattern = _re.compile(pattern_str, _re.IGNORECASE)
+    except _re.error:
+        return None
+    matches: list[dict[str, str]] = []
+    for field in _META_FIELDS:
+        field_text = str(item.get(field, "") or "")
+        m = pattern.search(field_text)
+        if m:
+            matches.append({
+                "field": field,
+                "term": term,
+                "snippet": _make_snippet(field_text, m.start(), m.end(), snippet_context=snippet_context),
+            })
+    matches.extend(
+        _match_body_sections(
+            item,
+            term,
+            lambda t: (m.start(), m.end()) if (m := pattern.search(t)) else None,
+            snippet_context=snippet_context,
+        )
+    )
+    return matches
+
+
+def _collect_field_matches(
+    item: dict[str, str | bool],
+    term: str,
+    field_name: str,
+    value_needle: str,
+    snippet_context: int = _DEFAULT_SNIPPET_CONTEXT,
+) -> list[dict[str, str]]:
+    """Collect matches for a field:value term.
+
+    Args:
+        item: Backlog item dict.
+        term: The original search term.
+        field_name: The field to search (e.g. ``"title"``, ``"body"``).
+        value_needle: Casefolded substring to find.
+        snippet_context: Total character budget passed to ``_make_snippet``.
+
+    Returns:
+        List of match-context dicts.
+    """
+    if field_name == "body":
+        return _match_body_sections(
+            item,
+            term,
+            lambda t: (pos, pos + len(value_needle)) if (pos := t.casefold().find(value_needle)) != -1 else None,
+            snippet_context=snippet_context,
+        )
+    field_text = str(item.get(field_name, "") or "")
+    pos = field_text.casefold().find(value_needle)
+    if pos != -1:
+        return [
+            {
+                "field": field_name,
+                "term": term,
+                "snippet": _make_snippet(field_text, pos, pos + len(value_needle), snippet_context=snippet_context),
+            }
+        ]
+    return []
+
+
+def _collect_plain_matches(
+    item: dict[str, str | bool], term: str, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> list[dict[str, str]]:
+    """Collect matches for a plain-text term across all fields.
+
+    Args:
+        item: Backlog item dict.
+        term: The original search term (used as the needle after casefolding).
+        snippet_context: Total character budget passed to ``_make_snippet``.
+
+    Returns:
+        List of match-context dicts.
+    """
+    needle = term.casefold()
+    matches: list[dict[str, str]] = []
+    for field in _META_FIELDS:
+        field_text = str(item.get(field, "") or "")
+        pos = field_text.casefold().find(needle)
+        if pos != -1:
+            matches.append({
+                "field": field,
+                "term": term,
+                "snippet": _make_snippet(field_text, pos, pos + len(needle), snippet_context=snippet_context),
+            })
+    matches.extend(
+        _match_body_sections(
+            item,
+            term,
+            lambda t: (pos, pos + len(needle)) if (pos := t.casefold().find(needle)) != -1 else None,
+            snippet_context=snippet_context,
+        )
+    )
+    return matches
+
+
+def _collect_match_context(
+    item: dict[str, str | bool], term: str, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> list[dict[str, str]]:
+    """Return match context entries for *term* against *item*.
+
+    Each returned dict has ``field``, ``term``, and ``snippet`` keys.
+    Body matches are attributed to the named markdown section (e.g.
+    ``"body:acceptance-criteria"``), not the bare string ``"body"``.
+
+    Args:
+        item: Backlog item dict.
+        term: A single search term (no AND/OR/NOT operators).
+        snippet_context: Total character budget passed to the snippet helpers.
+
+    Returns:
+        List of match-context dicts (empty when the term does not match).
+    """
+    term = term.strip()
+    if not term:
+        return []
+
+    # Regex form: /pattern/ or regex:pattern
+    if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
+        pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
+        result = _collect_regex_matches(item, term, pattern_str, snippet_context=snippet_context)
+        if result is not None:
+            return result
+        # Invalid regex — fall through to plain text.
+
+    # Field-specific form: field:value
+    if ":" in term:
+        field, _, value = term.partition(":")
+        field_name = field.strip().lower()
+        value_needle = value.strip().casefold()
+        if field_name in _SEARCH_FIELDS:
+            return _collect_field_matches(item, term, field_name, value_needle, snippet_context=snippet_context)
+        # Unknown field prefix — fall through to plain text.
+
+    return _collect_plain_matches(item, term, snippet_context=snippet_context)
+
+
+def _extract_leaf_terms(search: str) -> list[str]:
+    """Extract all leaf (non-operator) terms from a search query string.
+
+    Args:
+        search: Raw search query string.
+
+    Returns:
+        List of term strings in left-to-right order.
+    """
+    OPERATORS = frozenset({"AND", "OR", "NOT"})
+    tokens = _tokenize_search(search)
+    return [t for t in tokens if t not in OPERATORS and t not in {"(", ")"}]
+
+
+def _enrich_with_match_context(
+    items: list[dict[str, str | bool]], search: str | None, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+) -> list[dict[str, object]]:
+    """Add ``matches`` and ``match_header`` keys to each item based on the search query terms.
+
+    Only items that already passed the search filter are enriched.
+
+    Each match entry contains ``field``, ``term``, ``snippet``, and ``text`` keys.
+    The ``text`` key holds a formatted line::
+
+        N::[segment: field]:: ...pre-text...MATCHED TERM...post-text...
+
+    where N is the 1-based match index within the item.
+
+    The ``match_header`` key on each item holds ``#number - title`` for
+    grouped display: the header appears once, then each ``text`` line follows.
+
+    Args:
+        items: Items filtered by ``_apply_search_filter``.
+        search: The original search query string, or ``None``.
+        snippet_context: Total character budget for pre + post context per match.
+
+    Returns:
+        New list of dicts (widened to ``dict[str, object]``) with ``matches``
+        and ``match_header`` added to each item.
+    """
+    enriched: list[dict[str, object]] = []
+    terms = _extract_leaf_terms(search) if search else []
+    for item in items:
+        wide: dict[str, object] = dict(item)
+        raw_matches: list[dict[str, str]] = []
+        for term in terms:
+            raw_matches.extend(_collect_match_context(item, term, snippet_context=snippet_context))
+
+        number = str(item.get("issue", item.get("number", ""))).lstrip("#")
+        title = str(item.get("title", ""))
+        wide["match_header"] = f"#{number} - {title}" if number else title
+
+        # Annotate each match with a 1-based index and formatted text line.
+        annotated: list[dict[str, str]] = []
+        for idx, match in enumerate(raw_matches, start=1):
+            entry = dict(match)
+            entry["text"] = f"     {idx}::[segment: {match['field']}]:: {match['snippet']}"
+            annotated.append(entry)
+
+        wide["matches"] = annotated
+        enriched.append(wide)
+    return enriched
+
+
+# ---------------------------------------------------------------------------
+# Deduplication helper
+# ---------------------------------------------------------------------------
+
+# NOTE: FastMCP v3 provides list_page_size for paginating MCP component lists
+# (tools/resources/prompts) and per-request Depends() caching. Neither applies
+# here — tool result content pagination and token counting are application-level
+# concerns with no FastMCP built-in equivalent.
+
+
+def _dedup_by_issue_number(items: list[dict[str, str | bool]]) -> list[dict[str, str | bool]]:
+    """Deduplicate items by issue number, preserving first-seen order.
+
+    When an item appears more than once in the list (e.g. because the upstream
+    cache contained a duplicate entry), only the first occurrence is kept.
+    Items without a numeric ``issue`` or ``number`` field are preserved as-is
+    and cannot be de-duplicated — they each appear once.
+
+    Args:
+        items: Raw item dicts from operations.list_items.
+
+    Returns:
+        Deduplicated list with the same dict objects (no copy).
+    """
+    seen: set[str] = set()
+    result: list[dict[str, str | bool]] = []
+    for item in items:
+        raw = str(item.get("issue", item.get("number", "")))
+        key = raw.lstrip("#").strip()
+        if key and key.isdigit():
+            if key in seen:
+                continue
+            seen.add(key)
+        result.append(item)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Token-based match pagination helper
+# ---------------------------------------------------------------------------
+
+
+def _compute_match_tokens(item: dict[str, object]) -> int:
+    """Count tokens for the match_context output of a single enriched item.
+
+    Counts tokens across the match_header and all match text lines for the item,
+    using the shared cl100k_base encoder.  This represents the token cost of
+    displaying this item's match output.
+
+    Args:
+        item: An enriched item dict (output of _enrich_with_match_context).
+
+    Returns:
+        Token count for this item's match output.
+    """
+    # Serialize the match output (header + all match text lines) and count tokens.
+    # We use json.dumps on the relevant keys rather than subscript access to stay
+    # type-safe: item is dict[str, object] so individual values are object.
+    return len(_enc.encode(_json.dumps({"h": item.get("match_header"), "m": item.get("matches")})))
+
+
+def _paginate_match_items(
+    enriched: list[dict[str, object]], page: int, tokens_per_page: int, page_token_limit: int
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Split enriched match-context items into token-sized pages.
+
+    Partitions ``enriched`` into pages where each page holds items up to
+    ``tokens_per_page`` tokens.  Only activates pagination when total tokens
+    across all items exceeds ``page_token_limit``.
+
+    Args:
+        enriched: All enriched items (already filtered and deduped).
+        page: 1-based page number requested by the caller.
+        tokens_per_page: Maximum tokens per page.
+        page_token_limit: Minimum total tokens before pagination activates.
+
+    Returns:
+        Tuple of (page_items, match_pages_meta) where match_pages_meta is a
+        dict suitable for inclusion in the tool response.
+    """
+    token_counts = [_compute_match_tokens(item) for item in enriched]
+    total_tokens = sum(token_counts)
+
+    if total_tokens <= page_token_limit:
+        return enriched, {
+            "current_page": 1,
+            "total_pages": 1,
+            "tokens_per_page": tokens_per_page,
+            "total_match_tokens": total_tokens,
+            "paginated": False,
+        }
+
+    # Build page boundaries by accumulating token counts.
+    pages: list[list[dict[str, object]]] = []
+    current_page_items: list[dict[str, object]] = []
+    current_page_tokens = 0
+    for item, cost in zip(enriched, token_counts, strict=True):
+        if current_page_items and current_page_tokens + cost > tokens_per_page:
+            pages.append(current_page_items)
+            current_page_items = [item]
+            current_page_tokens = cost
+        else:
+            current_page_items.append(item)
+            current_page_tokens += cost
+    if current_page_items:
+        pages.append(current_page_items)
+
+    total_pages = max(1, len(pages))
+    safe_page = max(1, min(page, total_pages))
+    page_items = pages[safe_page - 1]
+
+    return page_items, {
+        "current_page": safe_page,
+        "total_pages": total_pages,
+        "tokens_per_page": tokens_per_page,
+        "total_match_tokens": total_tokens,
+        "paginated": True,
+    }
+
+
+def _maybe_add_pagination_notice(match_pages: dict[str, object], out: Output, response: dict[str, object]) -> None:
+    """Add a human-readable truncation message to ``out`` when on page 1 of a paginated result.
+
+    Mutates ``out`` by appending a message, then re-merges ``out.to_dict()`` into
+    ``response`` so the response messages list reflects the addition.
+
+    Args:
+        match_pages: The match_pages metadata dict from _paginate_match_items.
+        out: The Output collector for this request.
+        response: The in-progress response dict to update in-place.
+    """
+    if not (match_pages.get("paginated") and match_pages.get("current_page") == 1):
+        return
+    total_pages = match_pages["total_pages"]
+    tpp = match_pages["tokens_per_page"]
+    out.info(
+        f"Match output truncated: showing page 1 of {total_pages} ({tpp} tokens/page). "
+        f"Use page=2..{total_pages} to see remaining results."
+    )
+    response.update(out.to_dict())
+
+
+# ---------------------------------------------------------------------------
+# Primitive 2: item_depth helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_body_section_names(body: str) -> list[str]:
+    """Return the list of section names present in a markdown body string.
+
+    Args:
+        body: Raw markdown body string.
+
+    Returns:
+        List of section heading strings in document order.
+    """
+    return [line[3:].strip() for line in body.splitlines() if line.startswith("## ")]
+
+
+def _parse_body_section_first_lines(body: str) -> dict[str, str]:
+    """Return a mapping of section name to the first non-empty content line.
+
+    Args:
+        body: Raw markdown body string.
+
+    Returns:
+        Dict mapping section heading to first non-empty content line.
+    """
+    result: dict[str, str] = {}
+    current_heading: str | None = None
+    found_first: bool = False
+    for line in body.splitlines():
+        if line.startswith("## "):
+            current_heading = line[3:].strip()
+            found_first = False
+            result[current_heading] = ""
+        elif current_heading is not None and not found_first and line.strip():
+            result[current_heading] = line.strip()
+            found_first = True
+    return result
+
+
+# Minimum depth level that adds full description and section previews.
+_ITEM_DEPTH_FULL: int = 2
+
+# Depth level that retains the raw body field (full item content).
+_ITEM_DEPTH_BODY: int = 3
+
+# Maximum description snippet length for item_depth=1.
+_DESCRIPTION_SNIPPET_LEN: int = 300
+
+
+def _apply_item_depth(item: dict[str, object], depth: int) -> dict[str, object]:
+    """Augment a list-entry item dict according to the requested depth level.
+
+    - ``0`` -- no changes (returns item cast to dict[str, object]).
+    - ``1`` -- adds ``description_snippet`` (<=300 chars) and ``section_names``.
+    - ``2`` -- adds ``full_description`` and ``section_first_lines``.
+    - ``3`` -- body already in the dict; no additional mutation.
+
+    Args:
+        item: A single backlog list entry dict.
+        depth: Requested depth level (0-3).
+
+    Returns:
+        New dict widened to ``dict[str, object]`` with depth-specific keys added.
+    """
+    wide: dict[str, object] = dict(item)
+    if depth <= 0:
+        return wide
+    body = str(item.get("body", "") or "")
+    description = str(item.get("description", "") or "")
+    if depth >= 1:
+        wide["description_snippet"] = description[:_DESCRIPTION_SNIPPET_LEN]
+        wide["section_names"] = _parse_body_section_names(body)
+    if depth >= _ITEM_DEPTH_FULL:
+        wide["full_description"] = description
+        wide["section_first_lines"] = _parse_body_section_first_lines(body)
+    # depth 1 and 2: remove body (replaced by structured depth fields above).
+    # depth 3: body is the full content — retain it for callers that need it.
+    if depth < _ITEM_DEPTH_BODY:
+        wide.pop("body", None)
+    return wide
+
+
+# ---------------------------------------------------------------------------
+# Primitive 3: backlog_view section filter
+# ---------------------------------------------------------------------------
+
+_VIEW_ALWAYS_INCLUDE: frozenset[str] = frozenset({"number", "title", "status", "type", "priority"})
+
+
+def _filter_view_sections(response: dict[str, object], sections: list[str]) -> dict[str, object]:
+    """Filter the backlog_view response to only the requested sections.
+
+    Identity fields (number, title, status, type, priority) are always included.
+    The ``sections`` dict in the response is filtered to the named keys only.
+    All other top-level keys are preserved.
+
+    Args:
+        response: Full serialised ViewItemResult dict.
+        sections: List of section name strings to include.
+
+    Returns:
+        Filtered response dict (same object, mutated in place).
+    """
+    requested: frozenset[str] = frozenset(sections)
+    raw_sections = response.get("sections")
+    if isinstance(raw_sections, dict):
+        response["sections"] = {k: v for k, v in raw_sections.items() if k in requested}
+    return response
 
 
 def _parse_args() -> argparse.Namespace:
@@ -179,6 +1132,10 @@ def _parse_args() -> argparse.Namespace:
 _args = _parse_args()
 _init_models(_args.project_dir)
 
+# Gate passphrase required by backlog_add to enforce skill-mediated item creation.
+# Callers must load /dh:create-backlog-item to obtain this value.
+_BACKLOG_ADD_GATE_PHRASE = "problems-not-solutions"
+
 mcp = FastMCP(
     "backlog",
     instructions=(
@@ -187,6 +1144,7 @@ mcp = FastMCP(
         "backlog items including add, list, view, update, groom, close, resolve, and sync."
     ),
     version="0.1.0",
+    lifespan=_beads_lifespan,
 )
 
 
@@ -199,10 +1157,15 @@ async def backlog_add(
     type_: Annotated[
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
-    create_issue: Annotated[bool, Field(description="Create a GitHub issue for this item")] = True,
     force: Annotated[bool, Field(description="Skip fuzzy duplicate check")] = False,
+    gate_token: Annotated[
+        str | None,
+        Field(
+            description="Required gate token. Must be 'problems-not-solutions'. Obtain by loading /dh:create-backlog-item skill."
+        ),
+    ] = None,
 ) -> dict:
-    """Add a new item to the backlog. Creates a per-item file and optionally a GitHub issue.
+    """Add a new item to the backlog. Creates a per-item file and a GitHub issue.
 
     Use priority P0 for must-have, P1 for should-have, P2 for could-have,
     or Ideas for exploratory items.
@@ -211,6 +1174,10 @@ async def backlog_add(
         Dict with file_path, title, priority, issue number (if created),
         and output messages/warnings. On error, dict contains an error key.
     """
+    if gate_token != _BACKLOG_ADD_GATE_PHRASE:
+        return {
+            "error": "Direct backlog_add calls are not permitted. Load and follow /dh:create-backlog-item — it will provide the required gate_token."
+        }
     out = Output()
     try:
         result = await asyncio.to_thread(
@@ -220,13 +1187,25 @@ async def backlog_add(
             description=description,
             source=source,
             type_=type_,
-            create_issue=create_issue,
             force=force,
             output=out,
         )
         return {**result, **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
+
+
+def _probe_backend_status() -> _BackendStatus:
+    """Delegate to the configured backend's probe_backend_status().
+
+    Extracted as a module-level function so tests can patch
+    ``backlog_core.server._probe_backend_status`` without reaching into the
+    backend object directly.
+
+    Returns:
+        BackendStatus populated by the active backend implementation.
+    """
+    return _get_config().backend.probe_backend_status()
 
 
 def _format_backend_status_message(status: _BackendStatus) -> str:
@@ -305,13 +1284,14 @@ async def backlog_list(
         str | None,
         Field(
             description=(
-                "Full-text search across title, section, topic, and type simultaneously. "
-                "Supports OR/AND operators (e.g. 'auth OR deploy'), "
+                "Full-text search across the complete item content — title, section, topic, "
+                "type, description, acceptance criteria, and all section body text. "
+                "Supports OR/AND/NOT operators (e.g. 'auth OR deploy', 'backlog NOT quality'), "
+                "parenthetical grouping ('(auth OR deploy) AND quality'), "
                 "regex patterns (/pattern/ or regex:pattern), "
-                "field-specific search (title:auth, type:bug, topic:devops, section:P1), "
-                "and plain case-insensitive substring matching (existing behaviour). "
-                "OR/AND are whitespace-delimited and case-insensitive. "
-                "Mixed AND/OR in a single query is not supported; AND takes precedence. "
+                "field-specific search (title:auth, type:bug, topic:devops, section:P1, body:sdlc-layers), "
+                "and plain case-insensitive substring matching. "
+                "Operator precedence: NOT > AND > OR. "
                 "Combine with other filters (section=, type=, topic=) to narrow results further."
             )
         ),
@@ -329,6 +1309,85 @@ async def backlog_list(
             ),
         ),
     ] = 0,
+    count_only: Annotated[
+        bool,
+        Field(
+            description=(
+                'When True, return only {"count": N} without fetching item content. '
+                "Use to check result-set size before committing to a full fetch."
+            )
+        ),
+    ] = False,
+    match_context: Annotated[
+        bool,
+        Field(
+            description=(
+                "When True, each returned item includes a 'matches' list showing where search "
+                "terms were found (field, term, snippet, text). Body matches are attributed to the named "
+                "section (e.g. 'body:acceptance-criteria'). Only meaningful when search is also set. "
+                "Default False preserves the existing response shape."
+            )
+        ),
+    ] = False,
+    snippet_context: Annotated[
+        int,
+        Field(
+            ge=0,
+            description=(
+                "Total character budget for the pre + post context window around each match. "
+                "Split equally: up to snippet_context//2 chars before and after the matched text. "
+                "Unused budget on one side is redistributed to the other (sliding window). "
+                "Only applies when match_context=True. Default 1024."
+            ),
+        ),
+    ] = 1024,
+    item_depth: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=3,
+            description=(
+                "Controls how much content is returned per item. "
+                "0 (default): compact format — number, title, status, type, priority only. "
+                "1: adds description_snippet (first 300 chars) and section_names list. "
+                "2: adds full_description and section_first_lines dict. "
+                "3: full item content including complete body. "
+                "Use depth=3 only with small limit values (≤5) to avoid large responses."
+            ),
+        ),
+    ] = 0,
+    page: Annotated[
+        int,
+        Field(
+            ge=1,
+            description=(
+                "When match_context=True and total match tokens exceed page_token_limit, "
+                "selects which page of results to return (1-based). "
+                "Ignored when match_context=False — use offset/limit for non-match pagination."
+            ),
+        ),
+    ] = 1,
+    tokens_per_page: Annotated[
+        int,
+        Field(
+            ge=1,
+            description=(
+                "Maximum tokens of match_context output per page. "
+                "Only active when match_context=True and total tokens exceed page_token_limit."
+            ),
+        ),
+    ] = 1000,
+    page_token_limit: Annotated[
+        int,
+        Field(
+            ge=1,
+            description=(
+                "If total match_context output tokens across all matching items exceeds this "
+                "value, pagination is activated and only the items for the requested page are "
+                "returned. When match_context=False this parameter has no effect."
+            ),
+        ),
+    ] = 4000,
 ) -> dict:
     """List all open backlog items.
 
@@ -340,19 +1399,30 @@ async def backlog_list(
     Use type_ to filter by metadata.type exact match (e.g. Bug, Feature).
     Use topic to filter by metadata.topic substring match.
     Use include_closed=true to include items with terminal status (done, resolved, closed).
-    Use search for full-text search across title, section, topic, and type.
-    Search supports OR/AND operators (e.g. 'auth OR deploy'), regex (/pattern/ or regex:pattern),
-    field-specific syntax (title:auth, type:bug, topic:devops), and plain substring matching.
+    Use search for full-text search across the complete item content (title, section, topic,
+    type, description, and all section body text including acceptance criteria and impact radius).
+    Search supports OR/AND/NOT operators (e.g. 'auth OR deploy', 'backlog NOT quality'),
+    parenthetical grouping ((auth OR deploy) AND quality), regex (/pattern/ or regex:pattern),
+    field-specific syntax (title:auth, type:bug, topic:devops, body:sdlc-layers), and plain substring matching.
+    Use count_only=true to return only {"count": N} without fetching item content.
     Use offset and limit to paginate results. When limit=0, auto-pagination keeps the
     response under 4400 tokens (cl100k_base encoding). When has_more=true, call again
     with the offset shown in next_call.
+    When match_context=True, use page/tokens_per_page/page_token_limit to control
+    token-based pagination of match output. When match_pages.paginated=true, use
+    page=2..N to retrieve subsequent pages.
 
     Returns:
         Dict with items list, count, pagination object, and output messages/warnings.
         Each item includes state (open/closed) and status (workflow status from status:* labels).
         pagination contains offset, limit, total, and has_more. When has_more=true,
         next_call provides the suggested follow-up call string.
+        When match_context=True, match_pages contains current_page, total_pages,
+        tokens_per_page, total_match_tokens, and paginated flag.
+        When count_only=True, returns only {"count": N}.
         On error, dict contains an error key.
+        Items are deduplicated by issue number — if the cache contained duplicate
+        entries, only the first occurrence of each issue number is returned.
     """
     out = Output()
     try:
@@ -386,7 +1456,16 @@ async def backlog_list(
     if search is not None:
         all_items = _apply_search_filter(all_items, search)
 
+    # Deduplicate by issue number — the cache may contain duplicate entries for
+    # the same issue (observed: #260 appeared twice when multiple match paths
+    # selected the same item).  Keyed on numeric issue number; first occurrence wins.
+    all_items = _dedup_by_issue_number(all_items)
+
     total = len(all_items)
+
+    # count_only short-circuit: return only the item count without page content.
+    if count_only:
+        return {"count": total}
 
     # ADR-5: cache_open_count reflects the same filter as the items list.
     backend_status.cache_open_count = total
@@ -412,18 +1491,85 @@ async def backlog_list(
     page_items = all_items[offset : offset + effective_limit]
     has_more = (offset + effective_limit) < total
 
+    # Primitive 2 and 1: enrich page items when depth or match context is requested.
+    # Order matters: match context must read body BEFORE item_depth removes it.
+    # Step 1 — add match snippets (reads body from original page_items)
+    # Step 2 — apply token-based pagination (match_context=True only)
+    # Step 3 — apply depth (may remove body from the already-enriched items)
+    # Use a widened list type to accommodate the richer value types added by enrichment.
+    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
+    match_pages: dict[str, object] | None = None
+
+    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
+    if match_context:
+        enriched_items, match_pages = _paginate_match_items(
+            _enrich_with_match_context(page_items, search, snippet_context=snippet_context),
+            page=page,
+            tokens_per_page=tokens_per_page,
+            page_token_limit=page_token_limit,
+        )
+    else:
+        enriched_items = page_items
+        match_pages = None
+
+    if item_depth > 0:
+        enriched_items = [_apply_item_depth(dict(it), item_depth) for it in enriched_items]
+
     pagination: dict = {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more}
     response: dict = {
         **result,
-        "items": page_items,
-        "count": len(page_items),
+        "items": enriched_items,
+        "count": len(enriched_items),
         "pagination": pagination,
         "backend": backend_status.model_dump(),
         **out.to_dict(),
     }
     if has_more:
         response["next_call"] = f"backlog_list(offset={offset + effective_limit}, limit={effective_limit})"
+    if match_pages is not None:
+        response["match_pages"] = match_pages
+        _maybe_add_pagination_notice(match_pages, out, response)
     return response
+
+
+def _build_compact_manifest(
+    result: _models.ViewItemResult, full_response: dict[str, object], selector: str
+) -> dict[str, object]:
+    """Build the compact routing manifest returned by ``backlog_view(summary=True)``.
+
+    Args:
+        result: Typed ViewItemResult from view_item.
+        full_response: Full serialised response dict (used only for size hint).
+        selector: Original selector string for _hint message.
+
+    Returns:
+        Compact dict with issue_number, title, labels, status, plan_path,
+        and size hint for the full response.
+    """
+    full_chars = len(_json.dumps(full_response))
+    plan_match = _re.search(r"^[Pp]lan:\s*(\S+)", result.body, _re.MULTILINE)
+    plan_path: str | None = plan_match.group(1) if plan_match else None
+    issue_number: int | None = None
+    num_match = _re.search(r"(\d+)", result.issue)
+    if num_match:
+        issue_number = int(num_match.group(1))
+    status: str = "closed" if result.state == "closed" else "open"
+    compact: dict[str, object] = {
+        "issue_number": issue_number,
+        "title": result.title,
+        "labels": result.labels,
+        "status": status,
+        "plan_path": plan_path,
+        "_summary": True,
+        "_full_chars": full_chars,
+        "_hint": (
+            f"Load full content: backlog_view(selector='{selector}', summary=False)\n"
+            f"Load specific sections: backlog_view(selector='{selector}', summary=False, section='<index, title, or /regex/>')"
+        ),
+    }
+    if result.sections_index:
+        compact["sections_index"] = result.sections_index
+    return compact
 
 
 @mcp.tool
@@ -432,7 +1578,12 @@ async def backlog_view(
     summary: Annotated[
         bool,
         Field(
-            description="When True (default), returns a compact 5-field routing manifest (issue_number, title, labels, status, plan_path) plus _full_chars and _hint. When False, returns the full response unchanged."
+            description=(
+                "When True (default), returns a compact routing manifest with issue_number, title, labels, "
+                "status, plan_path, sections_index (all available sections as [N] Title (count) lines), "
+                "_full_chars, and _hint showing how to load full content or specific sections. "
+                "When False, returns the full response unchanged."
+            )
         ),
     ] = True,
     include_content: Annotated[
@@ -450,6 +1601,28 @@ async def backlog_view(
     since: Annotated[
         str | None, Field(description="ISO date/datetime. Only entries at or after this timestamp are included.")
     ] = None,
+    section: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Section filter for YAML items (no effect on GitHub-only items with a raw body). "
+                "Accepts: numeric index '2', comma-separated indices '0,2,4', "
+                "regex '/impact.*/', or substring match 'RT-ICA'. "
+                "When provided, body and sections in the response reflect only the matched section(s)."
+            )
+        ),
+    ] = None,
+    sections: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "When provided, filter the returned sections dict to only the named sections. "
+                "Identity fields (number, title, status, type, priority) are always included. "
+                "Invalid or missing section names are silently omitted — no error is raised. "
+                "Default None returns the full response unchanged."
+            )
+        ),
+    ] = None,
 ) -> dict:
     """View a single backlog item or GitHub issue in detail.
 
@@ -459,11 +1632,23 @@ async def backlog_view(
     Use include_content=False to get a compact response with section names and
     entry counts only, omitting the full body and entry content.
     Use summary=False to receive the full response; summary=True (default) returns
-    a 5-field routing manifest with _full_chars so the caller knows what was skipped.
+    a compact routing manifest that always includes sections_index so callers know
+    exactly which sections exist before deciding what to load.
+    Use section to filter the response to specific sections by index, title, or regex.
+    Use sections=[...] to return only the named sections plus identity fields
+    (number, title, status, type, priority).
+
+    Progressive disclosure pattern:
+        Step 1 — call with summary=True (default) to get sections_index and metadata.
+        Step 2 — load only the sections needed:
+            backlog_view(selector="...", summary=False, section="Fact-Check")
+            backlog_view(selector="...", summary=False, section="0,1,3")
+            backlog_view(selector="...", summary=False, section="/acceptance|plan/")
 
     Returns:
         When summary=True (default): compact dict with issue_number, title, labels,
-        status, plan_path, _summary, _full_chars, and _hint.
+        status, plan_path, sections_index (all sections as [N] Title (count) lines),
+        _summary, _full_chars, and _hint with section-loading syntax.
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings.
         On error, dict contains an error key.
@@ -485,35 +1670,16 @@ async def backlog_view(
             limit=limit,
             show=parsed_show,
             since=since,
+            section=section,
             output=out,
         )
-        full_response = {**result, **out.to_dict()}
+        full_response = result.model_dump()
         if not summary:
+            # Primitive 3: filter to named sections when requested.
+            if sections is not None:
+                full_response = _filter_view_sections(full_response, sections)
             return full_response
-        # Build compact routing manifest.
-        full_chars = len(_json.dumps(full_response))
-        body_text = str(result.get("body") or "")
-        plan_match = _re.search(r"^[Pp]lan:\s*(\S+)", body_text, _re.MULTILINE)
-        plan_path: str | None = plan_match.group(1) if plan_match else None
-        issue_field = str(result.get("issue") or "")
-        issue_number: int | None = None
-        num_match = _re.search(r"(\d+)", issue_field)
-        if num_match:
-            issue_number = int(num_match.group(1))
-        labels_raw = result.get("labels", [])
-        labels: list[str] = labels_raw if isinstance(labels_raw, list) else []
-        state = str(result.get("state") or "")
-        status: str = "closed" if state == "closed" else "open"
-        return {
-            "issue_number": issue_number,
-            "title": result.get("title", ""),
-            "labels": labels,
-            "status": status,
-            "plan_path": plan_path,
-            "_summary": True,
-            "_full_chars": full_chars,
-            "_hint": f"Call backlog_view(selector='{selector}', summary=False) for full body, comments, and timeline",
-        }
+        return _build_compact_manifest(result, full_response, selector)
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
@@ -641,9 +1807,6 @@ async def backlog_update(
         str | None,
         Field(description="Set item status (e.g. 'in-progress'). Updates GitHub issue labels when applicable."),
     ] = None,
-    create_issue: Annotated[
-        bool, Field(description="Create a GitHub issue for this item if it lacks one (P0/P1 items only)")
-    ] = False,
     section: Annotated[
         str | None, Field(description="Section name for groomed content update (use with content parameter)")
     ] = None,
@@ -678,7 +1841,7 @@ async def backlog_update(
         ),
     ] = False,
 ) -> dict:
-    """Update a backlog item: attach a plan, set status, create a GitHub issue, or write groomed content.
+    """Update a backlog item: attach a plan, set status, or write groomed content.
 
     For groomed content, provide section + content for section updates.
     Use entry_id to replace a specific entry, or replace_section=True to
@@ -699,7 +1862,6 @@ async def backlog_update(
             selector=selector,
             plan=plan,
             status=status,
-            create_issue=create_issue,
             section=section,
             content=content,
             title=title,
@@ -744,20 +1906,47 @@ async def backlog_groom(
             )
         ),
     ] = False,
+    sections: Annotated[
+        dict[str, str] | None,
+        Field(
+            description=(
+                "Batch section writes: mapping of section name to raw content. "
+                "Mutually exclusive with section, content, entry_id, replace_section, reason, and append. "
+                "Each section is written with entry-block wrapping applied automatically. "
+                "GitHub sync is performed after all local writes complete."
+            )
+        ),
+    ] = None,
+    mark_groomed: Annotated[
+        bool,
+        Field(
+            description=(
+                "When True, advance item status to groomed after content is written: set local frontmatter "
+                "status to 'groomed', remove status:needs-grooming label (idempotent), and add status:groomed "
+                "label (created if absent). Default False preserves existing behavior."
+            )
+        ),
+    ] = False,
 ) -> dict:
     """Write groomed content into a backlog item's per-item file and sync to its GitHub issue.
 
     Provide section + content for section updates. Use entry_id to replace
     a specific entry, or replace_section=True to strike all entries and
     append new content. Set append=True to add content after existing section
-    text without entry-block wrapping. When the item has a GitHub issue, the
-    groomed content is synced there automatically.
+    text without entry-block wrapping. Use sections for atomic multi-section
+    writes in a single call — mutually exclusive with section/content/etc.
+    When the item has a GitHub issue, the groomed content is synced there
+    automatically.
 
     Returns:
         Dict with groomed item title, synced status, and output
         messages/warnings. On error, dict contains an error key.
     """
     out = Output()
+    if sections is not None and any((section, content, entry_id, replace_section, reason, append)):
+        return {
+            "error": "sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
+        }
     try:
         await ctx.info(f"Grooming item: {selector}")
         result = await asyncio.to_thread(
@@ -770,6 +1959,8 @@ async def backlog_groom(
             replace_section=replace_section,
             reason=reason,
             append=append,
+            sections=sections,
+            mark_groomed=mark_groomed,
         )
         for w in out.warnings:
             await ctx.warning(w)
@@ -950,6 +2141,7 @@ async def backlog_update_sam_task_status(
 # ---------------------------------------------------------------------------
 
 _artifact_registry = ArtifactRegistry()
+# TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
 _artifact_provider: GitHubArtifactProvider | None = None
 
 
@@ -981,13 +2173,10 @@ def _get_artifact_provider() -> GitHubArtifactProvider:
     """
     global _artifact_provider  # noqa: PLW0603
     if _artifact_provider is None:
-        repo = _models.DEFAULT_REPO
+        repo = _models.get_default_repo()
         if not repo:
             raise GitHubUnavailableError("DEFAULT_REPO not set — GitHub credentials or repo slug missing")
-        _artifact_provider = GitHubArtifactProvider(
-            repo=repo,
-            root_worktree=_models._REPO_ROOT,  # noqa: SLF001
-        )
+        _artifact_provider = GitHubArtifactProvider(repo=repo, root_worktree=_models.get_repo_root())
     return _artifact_provider
 
 
@@ -1560,14 +2749,11 @@ def _try_register_dispatch_plan_artifact(issue_number: int, plan_path: Path) -> 
     """
     log = _logging.getLogger(__name__)
     try:
-        repo = _models.DEFAULT_REPO
+        repo = _models.get_default_repo()
         if not repo:
             log.warning("dispatch_create_plan: skipping artifact registration — DEFAULT_REPO not set")
             return
-        provider = GitHubArtifactProvider(
-            repo=repo,
-            root_worktree=_models._REPO_ROOT,  # noqa: SLF001
-        )
+        provider = GitHubArtifactProvider(repo=repo, root_worktree=_models.get_repo_root())
         entry = ArtifactEntry(
             artifact_type=ArtifactType.DISPATCH_PLAN,
             path=str(plan_path),
@@ -1578,12 +2764,12 @@ def _try_register_dispatch_plan_artifact(issue_number: int, plan_path: Path) -> 
         updated_manifest = _artifact_registry.register(manifest, entry)
         provider.set_manifest(issue_number, updated_manifest)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for issue #%d", plan_path, issue_number)
-    except Exception:
+    except (BacklogError, _GithubException) as exc:
         log.warning(
-            "dispatch_create_plan: artifact registration failed for issue #%d (path=%s)",
+            "dispatch_create_plan: artifact registration failed for issue #%d (path=%s): %s",
             issue_number,
             plan_path,
-            exc_info=True,
+            exc,
         )
 
 
@@ -1656,10 +2842,12 @@ async def dispatch_stale_check(
         return {"error": str(exc), "milestone_number": milestone_number, "plan_path": str(plan_path)}
 
     def _fetch_milestone_issue_numbers() -> list[int]:
-        gh_repo = _get_github(repo)
+        gh_repo = _get_config().backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        open_issues = _sync_issues_graphql(gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number)
-        closed_issues = _sync_issues_graphql(
+        open_issues = _get_config().backend.sync_issues_graphql(
+            gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
+        )
+        closed_issues = _get_config().backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
         )
         return [issue["number"] for issue in open_issues + closed_issues]
@@ -1668,7 +2856,7 @@ async def dispatch_stale_check(
         current_numbers = await asyncio.to_thread(_fetch_milestone_issue_numbers)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
-    except Exception as exc:  # noqa: BLE001
+    except (BacklogError, _GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
     result = await asyncio.to_thread(_ds.detect_stale_plan, plan, current_numbers)
@@ -1870,9 +3058,9 @@ async def dispatch_conflicts(
     """
 
     def _fetch_items_with_impact_radius() -> list[_ImpactRadiusItem]:
-        gh_repo = _get_github(repo)
+        gh_repo = _get_config().backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        issue_nodes: list[_IssueNode] = _sync_issues_graphql(
+        issue_nodes: list[_IssueNode] = _get_config().backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
         items: list[_ImpactRadiusItem] = []
@@ -1888,7 +3076,7 @@ async def dispatch_conflicts(
         items = await asyncio.to_thread(_fetch_items_with_impact_radius)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
-    except Exception as exc:  # noqa: BLE001
+    except (BacklogError, _GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
     conflict_groups = await asyncio.to_thread(operations.analyze_impact_radius_conflicts, items)
@@ -1905,6 +3093,7 @@ async def dispatch_conflicts(
 
 #: Lazily created YAML parser for migration helpers (preserve_quotes prevents
 #: round-trip mutations when loading frontmatter).
+# TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
 _migrate_yaml: _YAML | None = None
 
 
@@ -1953,7 +3142,7 @@ def _migrate_extract_issue(file_path: Path) -> int | None:
     if file_path.suffix in {".yaml", ".yml"}:
         try:
             raw_data = yaml.load(text)
-        except Exception:  # noqa: BLE001
+        except _YAMLError:
             return None
     else:
         fm_match = _re.match(r"^---\r?\n(.*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)", text, _re.DOTALL)
@@ -1961,7 +3150,7 @@ def _migrate_extract_issue(file_path: Path) -> int | None:
             return None
         try:
             raw_data = yaml.load(fm_match.group(1))
-        except Exception:  # noqa: BLE001
+        except _YAMLError:
             return None
 
     if isinstance(raw_data, dict):
@@ -2276,7 +3465,7 @@ def _migrate_dry_run(issue_number: int | None) -> dict:
         issue number — filtered entries are counted in ``would_skip`` but not
         included individually.
     """
-    repo_root = _models._REPO_ROOT  # noqa: SLF001
+    repo_root = _models.get_repo_root()
     candidates, filtered_count = _migrate_discover_candidates(repo_root, issue_number, [])
 
     details: list[dict] = []
@@ -2325,7 +3514,7 @@ def _migrate_queue_manifest_only(
     """
     try:
         manifest = provider.get_manifest(issue_number)
-    except Exception:  # noqa: BLE001
+    except (BacklogError, _GithubException):
         out.warn(f"Could not read existing manifest for issue #{issue_number}. Skipping manifest check.")
         return candidates
 
@@ -2358,7 +3547,7 @@ def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
         skipped entries are counted in ``skipped`` but not listed individually
         to keep the response compact.
     """
-    repo_root = _models._REPO_ROOT  # noqa: SLF001
+    repo_root = _models.get_repo_root()
     provider = _get_artifact_provider()
 
     backlog_items: list[dict] = []
@@ -2369,7 +3558,7 @@ def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
         elif isinstance(raw, dict):
             raw_backlog = raw.get("items", [])
             backlog_items = [x for x in raw_backlog if isinstance(x, dict)] if isinstance(raw_backlog, list) else []
-    except Exception:  # noqa: BLE001
+    except (BacklogError, OSError):
         out.warn("Could not fetch backlog items for slug matching. Continuing without fallback.")
 
     candidates, filtered_count = _migrate_discover_candidates(repo_root, issue_number, backlog_items)
@@ -2394,7 +3583,7 @@ def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
             _ok, action_msg = _migrate_register_one(provider, rel_path, atype, issue)
             migrated += 1
             run_details.append({"path": rel_path, "type": str(atype), "issue": issue, "outcome": action_msg})
-        except Exception as exc:  # noqa: BLE001
+        except (BacklogError, _GithubException, OSError) as exc:
             failed += 1
             run_details.append({"path": rel_path, "type": str(atype), "issue": issue, "outcome": f"FAILED: {exc}"})
 
@@ -2448,7 +3637,7 @@ async def artifact_migrate(
     if dry_run:
         try:
             result = await asyncio.to_thread(_migrate_dry_run, issue_number)
-        except Exception as exc:  # noqa: BLE001
+        except OSError as exc:
             return {"error": f"Discovery failed: {exc}", **out.to_dict()}
         return {**result, **out.to_dict()}
 
@@ -2456,7 +3645,7 @@ async def artifact_migrate(
         result = await asyncio.to_thread(_migrate_live_run, issue_number, out)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), **out.to_dict()}
-    except Exception as exc:  # noqa: BLE001
+    except (BacklogError, _GithubException, OSError) as exc:
         return {"error": f"Migration failed: {exc}", **out.to_dict()}
 
     return {**result, **out.to_dict()}
@@ -2467,6 +3656,7 @@ async def artifact_migrate(
 # ---------------------------------------------------------------------------
 
 #: Lazily created singleton DispatchStateManager.
+# TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
 _dispatch_state_mgr: _DispatchStateManager | None = None
 
 #: Path to the spawn.py script resolved once at module level.
@@ -2842,7 +4032,7 @@ async def _run_spawn_item(
                 counters.failed += 1
                 warnings.append(f"Item #{issue_num} failed: process exited with no result")
 
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, sqlite3.Error) as exc:
             error_msg = f"Spawn error: {exc}"
             await asyncio.to_thread(mgr.set_item_failed, milestone, wave_num, issue_num, error_msg)
             counters.failed += 1

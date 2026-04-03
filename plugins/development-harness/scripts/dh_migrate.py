@@ -2,13 +2,11 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "typer>=0.21.0",
-#   "rich>=13.0",
+#   "typer>=0.21.2",
 #   "ruamel.yaml>=0.18.0",
 #   "pydantic>=2.12.3",
 #   "pygithub>=2.8.1",
 #   "gitpython>=3.1.0",
-#   "python-frontmatter>=1.1.0",
 # ]
 # ///
 """dh_migrate — migrate project state from legacy .claude/ layout to ~/.dh/.
@@ -35,8 +33,19 @@ import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Annotated, cast
+from typing import TYPE_CHECKING, Annotated, cast
+
+# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
+# reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
+if isinstance(sys.stdout, TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if isinstance(sys.stderr, TextIOWrapper):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+if TYPE_CHECKING:
+    from backlog_core.artifact_provider import GitHubArtifactProvider
 
 # ---------------------------------------------------------------------------
 # Bootstrap: make the development-harness package importable from within the
@@ -53,6 +62,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from ruamel.yaml import YAML, YAMLError
 
 app = typer.Typer(
     name="dh_migrate", help="Migrate DH project state from legacy .claude/ layout to ~/.dh/.", no_args_is_help=True
@@ -248,7 +258,7 @@ def migrate(
                 _merge_dir(src, dest, console)
             else:
                 shutil.move(str(src), str(dest))
-        except Exception as exc:  # noqa: BLE001 — shutil.move/copytree raise varied OS-level errors
+        except OSError as exc:
             msg = f"Failed to move {src} → {dest}: {exc}"
             err_console.print(f":cross_mark: {msg}")
             errors.append(msg)
@@ -457,11 +467,9 @@ def _read_issue_number_from_yaml(path: Path) -> int | None:
         Positive integer issue number, or ``None``.
     """
     try:
-        from ruamel.yaml import YAML  # noqa: PLC0415 — deferred import
-
         yaml = YAML(typ="safe")
         data = yaml.load(path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 — YAML parse errors are not fatal here
+    except (OSError, YAMLError):
         return None
     else:
         if not isinstance(data, dict):
@@ -486,8 +494,6 @@ def _read_issue_number_from_markdown_frontmatter(path: Path) -> int | None:
         Positive integer issue number, or ``None``.
     """
     try:
-        from ruamel.yaml import YAML  # noqa: PLC0415
-
         text = path.read_text(encoding="utf-8")
         if not text.startswith("---"):
             return None
@@ -497,7 +503,7 @@ def _read_issue_number_from_markdown_frontmatter(path: Path) -> int | None:
         fm_text = text[3:end].strip()
         yaml = YAML(typ="safe")
         data = yaml.load(fm_text)
-    except Exception:  # noqa: BLE001
+    except (OSError, YAMLError):
         return None
     else:
         if not isinstance(data, dict):
@@ -576,8 +582,6 @@ def _parse_backlog_file_data(text: str) -> dict[str, object] | None:
     Returns:
         Parsed YAML dict, or ``None`` when frontmatter is absent or unparseable.
     """
-    from ruamel.yaml import YAML  # noqa: PLC0415
-
     if not text.startswith("---"):
         return None
     end = text.find("\n---", 3)
@@ -672,7 +676,7 @@ def _build_slug_index(backlog_dir: Path) -> dict[str, int]:
     for md_file in backlog_dir.glob("*.md"):
         try:
             data = _parse_backlog_file_data(md_file.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001, S112
+        except (OSError, YAMLError):
             continue
 
         if data is None:
@@ -901,7 +905,7 @@ def _print_rows_table(title: str, rows: list[tuple[str, str, int | None, str]]) 
     console.print(table)
 
 
-def _register_one(provider: object, rel: str, artifact_type: str, issue_number: int) -> str:
+def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str, issue_number: int) -> str:
     """Register a single artifact and return the outcome status string.
 
     Imports model types lazily — only called after GitHub connectivity is confirmed.
@@ -915,7 +919,13 @@ def _register_one(provider: object, rel: str, artifact_type: str, issue_number: 
     Returns:
         One of ``"REGISTERED"``, ``"SKIPPED"``, or ``"FAILED"``.
     """
-    from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType  # noqa: PLC0415
+    from backlog_core.models import (  # noqa: PLC0415
+        ArtifactEntry,
+        ArtifactManifest,
+        ArtifactStatus,
+        ArtifactType,
+        BacklogError,
+    )
 
     try:
         art_type_enum = ArtifactType(artifact_type)
@@ -924,8 +934,8 @@ def _register_one(provider: object, rel: str, artifact_type: str, issue_number: 
         return "FAILED"
 
     try:
-        manifest = provider.get_manifest(issue_number)  # type: ignore[union-attr]
-    except Exception as exc:  # noqa: BLE001
+        manifest = provider.get_manifest(issue_number)
+    except BacklogError as exc:
         err_console.print(f":cross_mark: Failed to get manifest for issue #{issue_number}: {exc}")
         return "FAILED"
 
@@ -948,8 +958,8 @@ def _register_one(provider: object, rel: str, artifact_type: str, issue_number: 
     )
 
     try:
-        provider.set_manifest(issue_number, updated_manifest)  # type: ignore[union-attr]
-    except Exception as exc:  # noqa: BLE001
+        provider.set_manifest(issue_number, updated_manifest)
+    except BacklogError as exc:
         err_console.print(f":cross_mark: Failed to register {rel} on issue #{issue_number}: {exc}")
         return "FAILED"
     else:

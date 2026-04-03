@@ -2,9 +2,9 @@
 
 Provides five PyGithub functions for creating, inspecting, merging, deleting,
 and listing milestone integration branches.  All functions follow the
-established patterns from ``github.py``: ``get_github()`` for auth,
+established patterns from ``gh_client.py``: ``get_github()`` for auth,
 ``Output`` parameter for status messages, ``GithubException`` catch-and-warn,
-``_repo()`` for repo slug resolution.
+:func:`~backlog_core.models.resolve_repo` for repo slug resolution.
 
 Branch naming convention: ``milestone/{N}-{slug}``
   e.g. ``milestone/3-v1.1-milestone-workflow``
@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING
 
 from github import GithubException
 
-from .github import _HTTP_NOT_FOUND, _repo, get_github
-from .models import BacklogError, BranchConflictError, BranchInfo, MergeResult, Output
+from .gh_client import _HTTP_NOT_FOUND, get_github
+from .models import BacklogError, BranchConflictError, BranchInfo, MergeResult, Output, resolve_repo
 
 if TYPE_CHECKING:
     from github.Branch import Branch
@@ -33,7 +33,6 @@ BRANCH_PREFIX = "milestone/"
 
 # GitHub API status code for merge conflicts
 _HTTP_CONFLICT = 409
-_HTTP_NO_CONTENT = 204
 _HTTP_UNPROCESSABLE = 422
 
 # Slug validation: must start with alphanumeric and contain only alphanumeric, dots, underscores, hyphens
@@ -101,7 +100,7 @@ def _get_repo(repo: str) -> Repository:
     Raises:
         GitHubUnavailableError: If ``GITHUB_TOKEN`` is not set.
     """
-    return get_github(_repo(repo))
+    return get_github(resolve_repo(repo))
 
 
 def _branch_info_from_branch(branch: Branch) -> BranchInfo:
@@ -166,7 +165,7 @@ def create_integration_branch(
         base = gh_repo.get_branch(base_branch)
     except GithubException as exc:
         if exc.status == _HTTP_NOT_FOUND:
-            msg = f"Base branch '{base_branch}' not found in {_repo(repo)}"
+            msg = f"Base branch '{base_branch}' not found in {resolve_repo(repo)}"
             raise BacklogError(msg) from exc
         raise
 
@@ -178,7 +177,7 @@ def create_integration_branch(
         gh_repo.create_git_ref(ref=ref_path, sha=base_sha)
     except GithubException as exc:
         if exc.status == _HTTP_UNPROCESSABLE:
-            msg = f"Branch '{name}' already exists in {_repo(repo)}"
+            msg = f"Branch '{name}' already exists in {resolve_repo(repo)}"
             if output:
                 output.warn(msg)
             raise BacklogError(msg) from exc

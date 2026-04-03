@@ -6,7 +6,7 @@ SAM artifact naming, file layout, and cross-referencing conventions for the deve
 
 ## Principle
 
-Every stage in the SAM pipeline produces a file-based artifact. These artifacts are the only communication channel between stages. No stage relies on conversation memory — each reads its predecessor's artifact and writes its own. This is the stateless property of SAM.
+Every stage in the SAM pipeline produces a named artifact. These artifacts are the only communication channel between stages. No stage relies on conversation memory — each reads its predecessor's artifact via MCP and writes its own via MCP. This is the stateless property of SAM.
 
 ---
 
@@ -39,23 +39,40 @@ created: 2026-02-15
 
 ---
 
-## File Layout
+## Storage Model
 
-All artifacts are stored in `.planning/harness/` relative to the project root.
+Artifacts are stored and retrieved via two distinct MCP systems. No stage reads or writes filesystem paths directly — all access goes through MCP tool calls.
 
-**Directory structure:**
+### Artifact System
 
-```text
-.planning/
-  harness/
-    discovery-{feature-slug}.md
-    plan-{feature-slug}.md
-    context-{feature-slug}.md
-    task-{task-id}-{task-slug}.md     (one per task)
-    execution-{task-id}-{task-slug}.md (one per task)
-    review-{feature-slug}.md
-    verification-{feature-slug}.md
-```
+Document-level artifacts (discovery, plan, context integration) are managed by the backlog MCP server:
+
+- **Write:** `artifact_register(issue_number, artifact_type, path, agent, content)` — registers the artifact and uploads content to a GitHub Issue comment for worktree-isolated access.
+- **Read:** `artifact_read(issue_number, artifact_type)` — returns `{type, path, content, status}`. Resolves from GitHub Issue comments first, filesystem fallback second.
+- **List:** `artifact_list(issue_number, artifact_type=None)` — enumerates registered artifacts for an issue.
+
+Artifact types used in the S1–S7 pipeline:
+
+- `"feature-context"` — S1 Discovery output
+- `"architect"` — S2 Plan output (updated by S3 Context Integration)
+- `"task-plan"` — S4 Task Decomposition output (auto-registered by `sam_create`)
+
+### SAM System
+
+Task plans and task-level state are managed by the SAM MCP server:
+
+- **Create:** `sam_create(slug, goal, tasks_yaml, issue={issue_number})` — creates a task plan YAML and auto-registers it as `artifact_type="task-plan"`.
+- **Read:** `sam_read(plan, task)` — returns a `TaskAssignment` dict with plan-level context and task fields.
+- **Update:** `sam_update(address, append_section, section_content)` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
+
+Task plan YAML files are stored in `~/.dh/projects/{project-slug}/plan/` by the SAM MCP server. Access is exclusively via MCP tools — never via direct filesystem paths.
+
+### Backlog System
+
+Backlog item metadata and grooming state are accessed via:
+
+- **View:** `backlog_view(selector, summary=false)` — returns full item context including `sections` dict (groomed fields), labels, and priority.
+- **List:** `backlog_list()` — enumerates all backlog items for scanning and counting.
 
 ---
 
@@ -226,27 +243,26 @@ Each artifact references its immediate predecessor and the tasks it relates to.
 
 ---
 
-## Coexistence with Other Planning Tools
+## Artifact Lifecycle
 
-The `.planning/harness/` directory is scoped to the development harness. Other tools use their own subdirectories:
+Artifacts persist after feature completion for auditability. The MCP servers manage storage — no manual filesystem cleanup is required.
 
-- `.planning/gsd/` — GSD (Get Stuff Done) planning tool
-- `.planning/backlog/` — Backlog items and grooming
-- `.planning/` root — Shared or tool-agnostic planning documents
-
-The harness never reads or writes outside `.planning/harness/`. No naming collisions occur because each tool uses its own prefix and subdirectory.
+- **GitHub Issue artifacts** (registered via `artifact_register` with `content`) are stored as Issue comments and persist with the issue.
+- **SAM task plans** (in `~/.dh/projects/{slug}/plan/`) persist until explicitly removed via SAM tools or manual deletion of the state directory.
+- **Backlog item cache** (in `~/.dh/projects/{slug}/backlog/`) is synced from GitHub Issues and can be refreshed via `backlog_sync`.
 
 ---
 
-## Cleanup
+## Related Documents
 
-Artifacts persist after feature completion for auditability. The harness does not auto-delete artifacts.
+Read these together to get the full system picture:
 
-**Manual cleanup:** Users can delete `.planning/harness/` or specific feature artifacts after verification.
-
-**Gitignore recommendation:** Add `.planning/` to `.gitignore` unless the team wants planning artifacts in version control.
-
----
+- [Default Development Flow](./default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
+- [Workflow Architecture Diagram](../../../docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
+- [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
+- [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Task File Format](../../../docs/TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
+- [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
 
 ## Sources
 

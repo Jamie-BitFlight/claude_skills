@@ -2,6 +2,7 @@
 name: rt-ica
 description: Reverse Thinking - Information Completeness Assessment. Mandatory pre-planning checkpoint that blocks planning until prerequisites are verified. Use when receiving specs, PRDs, tickets, RFCs, architecture designs, or any multi-step engineering task. Integrates with CoVe-style planning pipelines. Invoke BEFORE creating plans, delegating to agents, or defining acceptance criteria.
 user-invocable: true
+context: fork
 ---
 
 # RT-ICA: Reverse Thinking - Information Completeness Assessment
@@ -117,6 +118,8 @@ Include conditions in these categories (where applicable):
 | Delivery constraints        | Timeline, release process, approvals                    |
 | Verification needs          | Tests, canaries, acceptance criteria, observability     |
 | Risks/Failure modes         | Rollback, data loss, security exposure                  |
+| Replacement coverage        | Full capability inventory of module being replaced, coverage matrix against replacement tool |
+| Data Deletion Fidelity      | When goal text signals source data will be deleted (keywords: "delete", "remove", "drop", "migrate from X", "replace X with Y", "convert format", "remove source after migration"): acceptance criteria must include a content completeness check against real production data AND an explicit deletion gate. If absent: classify as MISSING. |
 
 </condition_categories>
 
@@ -277,6 +280,10 @@ Speculation is the signal that refinement is needed. The goal is not to suppress
 - Keep missing-input questions minimal and high signal
 - Prefer early validation tasks for DERIVABLE items
 - Block planning when information is insufficient — localize the block to affected tasks where possible, not the entire plan
+
+**Data Deletion Fidelity is never waivable:**
+
+When any condition in the "Data Deletion Fidelity" category is MISSING, the decision is BLOCKED. This condition is **not eligible for assumption-based planning** (the exception clause in Step 5 does not apply). Deletion of source data without a fidelity gate is not a recoverable assumption — it is an irreversible data loss risk.
 
 </guardrails>
 

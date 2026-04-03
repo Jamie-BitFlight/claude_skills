@@ -161,6 +161,7 @@ class TestQGPlanCreation:
 
         # Act
         plan = _create_qg_plan(plan_dir)
+        assert plan.source_path is not None
         result = load_plan(plan.source_path)
 
         # Assert
@@ -180,6 +181,7 @@ class TestQGPlanCreation:
 
         # Act
         plan = _create_qg_plan(plan_dir)
+        assert plan.source_path is not None
         result = load_plan(plan.source_path)
         agents = [t.agent for t in result.plan.tasks]
 
@@ -200,6 +202,7 @@ class TestQGPlanCreation:
 
         # Act
         plan = _create_qg_plan(plan_dir)
+        assert plan.source_path is not None
         result = load_plan(plan.source_path)
 
         # Assert
@@ -221,6 +224,7 @@ class TestQGPlanCreation:
 
         # Act
         plan = _create_qg_plan(plan_dir)
+        assert plan.source_path is not None
         result = load_plan(plan.source_path)
         actual_deps = [t.dependencies for t in result.plan.tasks]
 
@@ -242,6 +246,7 @@ class TestQGPlanCreation:
 
         # Act
         plan = _create_qg_plan(plan_dir, impl_plan_address=impl_addr)
+        assert plan.source_path is not None
         result = load_plan(plan.source_path)
 
         # Assert
@@ -271,6 +276,7 @@ class TestQGPlanCreation:
             plan_dir=plan_dir,
             issue=990,
         )
+        assert plan_model.source_path is not None
         result = load_plan(plan_model.source_path)
 
         # Assert
@@ -409,6 +415,7 @@ class TestQGReadinessSequencing:
         plan_dir = tmp_path / "plan"
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
+        assert plan.source_path is not None
 
         # Act
         ready = get_ready_tasks(plan.source_path)

@@ -27,12 +27,12 @@ import dh_paths
 import tiktoken
 from backlog_core.artifact_provider import GitHubArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry as _ArtifactRegistry
-from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType
+from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
 from fastmcp import FastMCP
 from pydantic import Field
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
-from sam_schema.core.addressing import resolve_plan_address
+from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.models import TaskStatus
 from sam_schema.core.query import (
     claim_task,
@@ -44,9 +44,19 @@ from sam_schema.core.query import (
     update_plan_fields,
     update_status,
 )
+from sam_schema.readers.detect import FormatDetectionError
 
 _log = logging.getLogger(__name__)
 _artifact_registry = _ArtifactRegistry()
+
+_PLAN_READ_ERRORS: tuple[type[Exception], ...] = (
+    FileNotFoundError,
+    AddressingError,
+    FormatDetectionError,
+    KeyError,
+    ValueError,
+    TypeError,
+)
 
 _PLAN_DIR_SENTINEL = "plan"
 
@@ -130,7 +140,7 @@ def sam_read(
         # Plan-only read: return Plan metadata without TaskAssignment wrapper.
         read_result = load_plan(plan_path)
         return read_result.plan.model_dump(mode="json", by_alias=True, exclude_none=True)
-    except Exception as exc:  # noqa: BLE001
+    except _PLAN_READ_ERRORS as exc:
         return {"error": str(exc)}
 
 
@@ -158,7 +168,7 @@ def sam_state(
         plan_path = resolve_plan_address(plan, _resolve_plan_dir(plan_dir))
         result = update_status(plan_path, task, new_status)
         return result.model_dump(mode="json")
-    except Exception as exc:  # noqa: BLE001
+    except (FileNotFoundError, AddressingError, FormatDetectionError, KeyError, ValueError) as exc:
         return {"error": str(exc)}
 
 
@@ -211,7 +221,7 @@ def sam_ready(
             "source_path": str(loaded_plan.source_path or plan_path),
             "issue": loaded_plan.issue,
         }
-    except Exception as exc:  # noqa: BLE001
+    except _PLAN_READ_ERRORS as exc:
         return {"error": str(exc)}
 
 
@@ -236,7 +246,7 @@ def sam_status(
         plan_path = resolve_plan_address(plan, _resolve_plan_dir(plan_dir))
         result = get_plan_status(plan_path)
         return result.model_dump(mode="json")
-    except Exception as exc:  # noqa: BLE001
+    except (FileNotFoundError, AddressingError, FormatDetectionError, ValueError) as exc:
         return {"error": str(exc)}
 
 
@@ -385,7 +395,7 @@ def sam_list(
             }
             if search is None or _plan_matches_search(plan_dict, search):
                 all_items.append(summary)
-        except Exception as exc:  # noqa: BLE001
+        except (FileNotFoundError, FormatDetectionError, ValueError, TypeError) as exc:
             warnings.append(f"Skipped {candidate.name}: {exc}")
 
     return _paginate_results(
@@ -420,9 +430,28 @@ def _try_register_task_plan_artifact(issue_number: int, plan_path: Path) -> None
         updated_manifest = _artifact_registry.register(manifest, entry)
         provider.set_manifest(issue_number, updated_manifest)
         _log.info("sam_create: registered task-plan artifact %s for issue #%d", plan_path, issue_number)
-    except Exception:  # noqa: BLE001
+
+        try:
+            content = plan_path.read_text(encoding="utf-8")
+            provider.store_artifact_content(
+                issue_number, artifact_type=ArtifactType.TASK_PLAN.value, path=str(plan_path), content=content
+            )
+            _log.info("sam_create: uploaded task-plan content to GitHub issue #%d", issue_number)
+        except (BacklogError, OSError) as upload_exc:
+            _log.warning(
+                "sam_create: artifact content upload failed for issue #%d (path=%s): %s",
+                issue_number,
+                plan_path,
+                upload_exc,
+                exc_info=True,
+            )
+    except (BacklogError, ValueError, OSError) as exc:
         _log.warning(
-            "sam_create: artifact registration failed for issue #%d (path=%s)", issue_number, plan_path, exc_info=True
+            "sam_create: artifact registration failed for issue #%d (path=%s): %s",
+            issue_number,
+            plan_path,
+            exc,
+            exc_info=True,
         )
 
 
@@ -475,7 +504,7 @@ def sam_create(
                 with contextlib.suppress(ValueError):
                     plan_number = int(stem.split("-", 1)[0][1:])
         result = {"path": str(plan.source_path), "plan_number": plan_number, "task_count": len(plan.tasks)}
-    except Exception as exc:  # noqa: BLE001
+    except (YAMLError, ValueError, OSError) as exc:
         return {"error": str(exc)}
     else:
         # Auto-register the new plan file as a task-plan artifact when the plan
@@ -532,7 +561,7 @@ def sam_update(
 
         plan_path = resolve_plan_address(plan_part, _resolve_plan_dir(plan_dir))
 
-        set_fields: dict[str, str] | None = None
+        set_fields: dict[str, str | int | list[str]] | None = None
         if set_fields_json is not None:
             raw_fields: Any = json.loads(set_fields_json)
             if not isinstance(raw_fields, dict):
@@ -547,7 +576,7 @@ def sam_update(
             append_section_name=append_section,
             section_content=section_content,
         )
-    except Exception as exc:  # noqa: BLE001
+    except (FileNotFoundError, AddressingError, KeyError, ValueError, OSError) as exc:
         return {"error": str(exc)}
     else:
         return {"updated": True, "address": address}
@@ -579,7 +608,7 @@ def sam_claim(
         updated_task = claim_task(plan_path, task)
     except (ValueError, KeyError) as exc:
         return {"claimed": False, "error": str(exc)}
-    except Exception as exc:  # noqa: BLE001
+    except (FileNotFoundError, AddressingError, FormatDetectionError, OSError) as exc:
         return {"error": str(exc)}
     else:
         return {"claimed": True, "task_id": updated_task.id, "started": updated_task.started}

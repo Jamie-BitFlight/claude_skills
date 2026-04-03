@@ -1,0 +1,31 @@
+title: Fix entry parsing in YAML loader
+description: Entry blocks with struck state must round-trip through YAML correctly.
+type_: ''
+section: ''
+metadata:
+  source: qa-team
+  added: '2026-02-01'
+  priority: P0
+  item_type: Bug
+  status: in-progress
+  issue: '#99'
+  last_synced: ''
+  groomed: ''
+  plan: ''
+  topic: ''
+  research_first: ''
+  files: ''
+  suggested_location: ''
+sections:
+  fact_check:
+    entries:
+    - id: '2026-02-01T09:00:00Z'
+      content: Original analysis before new findings.
+      struck: true
+      struck_reason: superseded by deeper investigation
+      struck_at: '2026-02-02T14:00:00Z'
+    - id: '2026-02-03T10:00:00Z'
+      content: Updated analysis confirming the bug is in the YAML loader.
+      struck: false
+      struck_reason: ''
+      struck_at: ''

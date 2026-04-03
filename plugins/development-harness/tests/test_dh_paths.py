@@ -256,7 +256,7 @@ class TestGitProjectRoot:
         fake_git_dir.mkdir()
         captured: list[list[str]] = []
 
-        def _capture(args, **kwargs):  # type: ignore[no-untyped-def]
+        def _capture(args: list[str], **kwargs: object) -> object:
             captured.append(args)
             return type("CP", (), {"stdout": str(fake_git_dir) + "\n", "returncode": 0})()
 
@@ -309,7 +309,7 @@ class TestGitProjectRoot:
         git_b.mkdir()
         call_count: dict[str, int] = {"n": 0}
 
-        def _tracking(args, **kwargs):  # type: ignore[no-untyped-def]
+        def _tracking(args: list[str], **kwargs: object) -> object:
             call_count["n"] += 1
             cwd_used = str(kwargs.get("cwd", ""))
             git_dir = git_a if str(dir_a) in cwd_used else git_b
