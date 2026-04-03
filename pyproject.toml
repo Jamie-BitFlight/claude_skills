@@ -239,9 +239,10 @@ unfixable = ["F401"]
 "**/backlog_core/operations.py" = ["SLF001"]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 "**/backlog_core/server.py" = ["RUF029"]
-# dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
+# dh_paths, kage-bunshin spawn, and close_test_issues call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["S607"]
 "**/kage-bunshin/scripts/spawn.py" = ["S607"]
+"scripts/close_test_issues.py" = ["S607"]
 "**/skill-creator/**/*.py" = [
     "ANN",
     "ANN",

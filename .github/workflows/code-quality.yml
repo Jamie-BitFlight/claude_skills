@@ -302,12 +302,8 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Close any orphaned [MCP-TEST-*] issues left by failed teardown
-          REPO="${{ github.repository }}"
-          gh issue list -R "$REPO" --state open \
-            --search "[MCP-TEST-" --limit 200 --json number,title \
-            | python3 -c "import json, subprocess, sys, os; repo=os.environ['REPO']; issues=[i for i in json.load(sys.stdin) if '[MCP-TEST-' in i['title']]; [subprocess.run(['gh','issue','close',str(i['number']),'-R',repo,'--comment','Closed by CI emergency sweep: orphaned e2e test issue'],check=False) for i in issues]; print(f'Swept {len(issues)} orphaned test issues')"
+          REPO: ${{ github.repository }}
+        run: uv run scripts/close_test_issues.py
 
   # =============================================================================
   # Summary job that requires all checks to pass
