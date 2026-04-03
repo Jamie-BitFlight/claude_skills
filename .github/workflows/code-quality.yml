@@ -183,7 +183,13 @@ jobs:
       - name: Run file hygiene hooks
         env:
           SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
-        run: uv run -q prek run --all-files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE=$(git merge-base HEAD origin/main)
+            uv run -q prek run --from-ref "$BASE" --to-ref HEAD
+          else
+            uv run -q prek run --all-files
+          fi
 
   # =============================================================================
   # Python: pytest test suite

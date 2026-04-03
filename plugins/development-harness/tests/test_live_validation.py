@@ -102,18 +102,27 @@ def live_items(tmp_path_factory, monkeypatch_class):
             )
         else:
             try:
-                from backlog_core.models import discover_repo
+                from backlog_core.models import RepoDiscoveryError, discover_repo
 
-                g = Github(auth=Auth.Token(token))
-                repo = g.get_repo(discover_repo())
-                for issue_num in ctx["issues"]:
-                    try:
-                        issue = repo.get_issue(issue_num)
-                        issue.edit(state="closed")
-                    except GithubException:
-                        logger.warning(
-                            "Failed to close test issue #%d — will remain open as orphan", issue_num, exc_info=True
-                        )
+                try:
+                    repo_slug = discover_repo()
+                except RepoDiscoveryError:
+                    # repo_root is a temp non-git dir and GITHUB_REPO is unset;
+                    # fall back to the pre-patched default_repo if available
+                    repo_slug = existing.default_repo if existing is not None else ""
+                if not repo_slug:
+                    logger.warning("Cannot determine repo slug for teardown cleanup of issues: %s", ctx["issues"])
+                else:
+                    g = Github(auth=Auth.Token(token))
+                    repo = g.get_repo(repo_slug)
+                    for issue_num in ctx["issues"]:
+                        try:
+                            issue = repo.get_issue(issue_num)
+                            issue.edit(state="closed")
+                        except GithubException:
+                            logger.warning(
+                                "Failed to close test issue #%d — will remain open as orphan", issue_num, exc_info=True
+                            )
             except GithubException:
                 logger.warning(
                     "Failed to connect to GitHub for teardown cleanup of issues: %s", ctx["issues"], exc_info=True

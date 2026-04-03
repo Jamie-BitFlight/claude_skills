@@ -66,8 +66,12 @@ def fetch_open_issues(repo: str) -> list[dict[str, Any]]:
     return [issue for page in pages for issue in page]
 
 
-def close_issue(repo: str, number: int) -> None:
-    """Close a single issue with an explanatory comment."""
+def close_issue(repo: str, number: int) -> bool:
+    """Close a single issue with an explanatory comment.
+
+    Returns:
+        True if the issue was closed successfully, False otherwise.
+    """
     result = subprocess.run(
         [
             "gh",
@@ -88,6 +92,8 @@ def close_issue(repo: str, number: int) -> None:
             f"Emergency cleanup: failed to close issue #{number} (exit {result.returncode}): {result.stderr.strip()}",
             file=sys.stderr,
         )
+        return False
+    return True
 
 
 def main() -> None:
@@ -104,12 +110,17 @@ def main() -> None:
         sys.exit(1)
 
     issues = fetch_open_issues(repo)
-    orphans = [i for i in issues if "[MCP-TEST-" in i.get("title", "")]
+    orphans = [i for i in issues if "[MCP-TEST-" in i.get("title", "") and "pull_request" not in i]
 
+    swept = 0
+    failed = 0
     for issue in orphans:
-        close_issue(repo, issue["number"])
+        if close_issue(repo, issue["number"]):
+            swept += 1
+        else:
+            failed += 1
 
-    print(f"Swept {len(orphans)} orphaned test issues")
+    print(f"Swept {swept} orphaned test issues" + (f", failed {failed}" if failed else ""))
 
 
 if __name__ == "__main__":
