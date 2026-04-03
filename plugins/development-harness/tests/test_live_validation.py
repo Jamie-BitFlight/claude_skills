@@ -125,6 +125,7 @@ class TestLiveLifecycle:
                 "description": "Live validation test item",
                 "source": "test",
                 "force": True,
+                "gate_token": "problems-not-solutions",
             },
         )
 
