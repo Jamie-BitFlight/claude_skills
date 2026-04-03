@@ -16,6 +16,7 @@ research/
 │   ├── copilotkit.md                  # React-first agentic frontend framework with bi-directional state sync and AG-UI protocol (28.9K stars)
 │   ├── liteagents.md                  # Multi-tool AI development toolkit with 11 agents and session memory
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
+│   ├── mission-control.md             # Autonomous product engine: 24/7 research → ideation → build → PR (MIT, v2.4.0)
 │   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native (3.6K stars)
 │   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
