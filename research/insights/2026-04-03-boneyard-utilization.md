@@ -39,8 +39,8 @@ import { Skeleton } from 'boneyard-js/react'
 // In App component:
 const isLoadingInitial = state.wsConnected && state.sessions.length === 0
 
-<Skeleton 
-  name="session-list" 
+<Skeleton
+  name="session-list"
   loading={isLoadingInitial}
   color="rgba(0,0,0,0.08)"
   darkColor="rgba(255,255,255,0.06)"
@@ -55,8 +55,8 @@ const isLoadingInitial = state.wsConnected && state.sessions.length === 0
 
 **3. Wrap Transcript in App.tsx (line 154):**
 ```tsx
-<Skeleton 
-  name="transcript" 
+<Skeleton
+  name="transcript"
   loading={state.selectedId && state.events.get(state.selectedId)?.length === 0}
 >
   <Transcript sessionId={state.selectedId} events={selectedEvents} />
@@ -102,4 +102,3 @@ The Controls component (lines 155–158 in App.tsx) operates on selected session
 **Why no integration in non-React systems?**
 
 The codebase contains no other frontend applications. The monorepo is primarily CLI tooling, agents, and skills — all server-side. The dot-dash frontend is the only consumer of real-time data with user-facing loading delays.
-
