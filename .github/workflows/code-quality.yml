@@ -186,15 +186,7 @@ jobs:
       - name: Run file hygiene hooks
         env:
           SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.sha }}
-          GH_EVENT: ${{ github.event_name }}
-        run: |
-          if [ "$GH_EVENT" = "pull_request" ]; then
-            uv run -q prek run --from-ref "$PR_BASE" --to-ref "$PR_HEAD"
-          else
-            uv run -q prek run --all-files
-          fi
+        run: uv run -q prek run --all-files
 
   # =============================================================================
   # Python: pytest test suite
