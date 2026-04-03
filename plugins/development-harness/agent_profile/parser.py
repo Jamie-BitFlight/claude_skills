@@ -37,16 +37,33 @@ def _load_md_frontmatter(text: str) -> tuple[dict[str, Any], str]:
         Tuple of (metadata_dict, body_string). Returns ({}, text) when no
         valid frontmatter block is found.
     """
-    parts = text.split("---", 2)
-    if len(parts) < 3:  # noqa: PLR2004
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
         return {}, text
+
+    closing_index = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.rstrip("\r\n") == "---":
+            closing_index = index
+            break
+
+    if closing_index is None:
+        return {}, text
+
     y = YAML(typ="rt")
     y.width = 2147483647
+    frontmatter_text = "".join(lines[1:closing_index])
+    body = "".join(lines[closing_index + 1 :]).strip()
+
     try:
-        raw = y.load(parts[1]) or {}
+        raw = y.load(frontmatter_text) or {}
     except YAMLError:
-        return {}, parts[2].strip()
-    return dict(raw), parts[2].strip()
+        return {}, text
+
+    try:
+        return dict(raw), body
+    except (TypeError, ValueError):
+        return {}, text
 
 
 def _load_frontmatter_from_path(path: Path) -> tuple[dict[str, Any], str]:

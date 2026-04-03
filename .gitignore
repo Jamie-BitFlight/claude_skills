@@ -65,6 +65,7 @@ package-lock.json
 # DEPRECATED: these in-repo directories are replaced by the three-tier DH state architecture.
 # Ignored here so old-layout files do not appear as untracked during/after migration.
 # New canonical locations: ~/.dh/projects/{slug}/backlog/, ~/.dh/projects/{slug}/plan/, etc.
+.dh/projects/
 .claude/backlog/
 .claude/reports/
 plan/

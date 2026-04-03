@@ -113,10 +113,6 @@ def save_item(item: BacklogItem, path: Path | None = None) -> None:
         src = Path(raw)
         if src.suffix == ".md":
             resolved = src.with_suffix(".yaml")
-            if src.exists():
-                bak = src.with_suffix(".md.bak")
-                src.rename(bak)
-                _log.warning("Auto-migrated %s to %s", src, resolved)
         else:
             resolved = src
 
@@ -126,6 +122,16 @@ def save_item(item: BacklogItem, path: Path | None = None) -> None:
     yaml.width = sys.maxsize
     with resolved.open("w", encoding="utf-8") as fh:
         yaml.dump(data, fh)
+
+    # After successful write, backup the legacy .md source (safe: YAML already written)
+    if path is None:
+        raw = item.file_path
+        if raw:
+            src = Path(raw)
+            if src.suffix == ".md" and src.exists():
+                bak = src.with_suffix(".md.bak")
+                src.rename(bak)
+                _log.warning("Auto-migrated %s to %s", src, resolved)
 
     item.file_path = str(resolved.resolve())
 
