@@ -185,7 +185,7 @@ jobs:
           SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE=$(git merge-base HEAD origin/main)
+            BASE=$(git merge-base HEAD origin/$GITHUB_BASE_REF)
             uv run -q prek run --from-ref "$BASE" --to-ref HEAD
           else
             uv run -q prek run --all-files
