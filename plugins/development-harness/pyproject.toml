@@ -49,6 +49,7 @@ markers = [
     "unit: marks tests as unit tests",
     "critical: marks tests requiring property-based or mutation testing",
     "e2e: marks tests as end-to-end tests",
+    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
 ]
 
 [tool.coverage.run]
