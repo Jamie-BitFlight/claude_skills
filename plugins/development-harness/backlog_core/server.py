@@ -145,7 +145,19 @@ async def _beads_lifespan(server: FastMCP) -> AsyncIterator[None]:
         None after bootstrap completes.
     """
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _bootstrap_beads, _models.get_repo_root())
+    try:
+        repo_root = _models.get_repo_root()
+    except RuntimeError as exc:
+        # No project root discoverable (non-git cwd, no env vars set).
+        # Beads bootstrap is best-effort; skip rather than crash.
+        _logging.getLogger(__name__).warning("beads bootstrap skipped: %s", exc)
+        yield
+        return
+    try:
+        await loop.run_in_executor(None, _bootstrap_beads, repo_root)
+    except OSError as exc:
+        # bd binary absent or other OS-level failure — bootstrap is best-effort.
+        _logging.getLogger(__name__).warning("beads bootstrap skipped: %s", exc)
     yield
 
 
@@ -1130,7 +1142,13 @@ def _parse_args() -> argparse.Namespace:
 
 
 _args = _parse_args()
-_init_models(_args.project_dir)
+# Only eagerly initialise when the caller supplied an explicit project directory.
+# Without --project-dir the server may start from a non-git cwd (e.g. installed
+# as a plugin); in that case get_config() lazily auto-initialises on first use
+# via environment variables or git discovery, which is less likely to crash at
+# import time.
+if _args.project_dir is not None:
+    _init_models(_args.project_dir)
 
 # Gate passphrase required by backlog_add to enforce skill-mediated item creation.
 # Callers must load /dh:create-backlog-item to obtain this value.
@@ -1195,6 +1213,22 @@ async def backlog_add(
         return {"error": str(e), **out.to_dict()}
 
 
+def _assert_config() -> None:
+    """Raise :exc:`BacklogError` when BacklogConfig has not been initialised.
+
+    Converts the :exc:`RuntimeError` from :func:`models.get_config` into a
+    :exc:`BacklogError` so tool handlers that already catch ``BacklogError``
+    return structured JSON instead of crashing.
+
+    Raises:
+        BacklogError: When no project root is discoverable and no env vars are set.
+    """
+    try:
+        _models.get_config()
+    except RuntimeError as exc:
+        raise BacklogError(str(exc)) from exc
+
+
 def _probe_backend_status() -> _BackendStatus:
     """Delegate to the configured backend's probe_backend_status().
 
@@ -1202,10 +1236,18 @@ def _probe_backend_status() -> _BackendStatus:
     ``backlog_core.server._probe_backend_status`` without reaching into the
     backend object directly.
 
+    Returns a default ``NOT_CHECKED`` status when BacklogConfig has not been
+    initialised (e.g. the server was started outside a git repository without
+    environment variables set).
+
     Returns:
-        BackendStatus populated by the active backend implementation.
+        BackendStatus populated by the active backend implementation, or a
+        default NOT_CHECKED status when config is unavailable.
     """
-    return _get_config().backend.probe_backend_status()
+    try:
+        return _get_config().backend.probe_backend_status()
+    except (RuntimeError, ValueError):
+        return _BackendStatus(availability=_BackendAvailability.NOT_CHECKED)
 
 
 def _format_backend_status_message(status: _BackendStatus) -> str:
@@ -1426,6 +1468,7 @@ async def backlog_list(
     """
     out = Output()
     try:
+        _assert_config()
         result, backend_status = await asyncio.gather(
             asyncio.to_thread(
                 operations.list_items,

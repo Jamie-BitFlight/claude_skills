@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import logging
 import os
 import re
 import sys
+import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import git
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -67,19 +69,45 @@ class BacklogConfig:
 # Single mutable config cell — replaces the three bare module globals.
 _config: BacklogConfig | None = None
 
+# Guards lazy initialisation in get_config() against concurrent callers.
+_config_lock = threading.Lock()
+
+_log = logging.getLogger(__name__)
+
 
 def get_config() -> BacklogConfig:
     """Return the active :class:`BacklogConfig`.
 
+    When :func:`init_paths` has not been called, attempts lazy auto-initialisation
+    by inferring the project root from the environment and git discovery.  If
+    auto-initialisation succeeds a warning is logged so it remains visible.  If
+    no project root can be discovered a :exc:`RuntimeError` is raised with
+    instructions for the caller.
+
     Returns:
-        The :class:`BacklogConfig` set by the last call to :func:`init_paths`.
+        The :class:`BacklogConfig` set by the last call to :func:`init_paths`,
+        or auto-initialised from the inferred project root.
 
     Raises:
-        RuntimeError: When :func:`init_paths` has not been called yet.
+        RuntimeError: When :func:`init_paths` has not been called and project
+            root discovery also fails (e.g. process cwd is not inside a git
+            repository and none of ``DH_PROJECT_ROOT``, ``CLAUDE_PROJECT_DIR``
+            are set).
     """
     if _config is None:
-        raise RuntimeError("BacklogConfig is not initialised — call init_paths() before accessing config.")
-    return _config
+        with _config_lock:
+            if _config is None:
+                try:
+                    root = _resolve_repo_root()
+                except RuntimeError as exc:
+                    raise RuntimeError(
+                        "BacklogConfig is not initialised — call init_paths() before accessing config, "
+                        "or set one of DH_PROJECT_ROOT / CLAUDE_PROJECT_DIR so the project root can be "
+                        "inferred automatically."
+                    ) from exc
+                _log.warning("BacklogConfig auto-initialised from inferred project root: %s", root)
+                init_paths(project_dir=str(root))
+    return cast("BacklogConfig", _config)  # init_paths() always sets _config
 
 
 def get_repo_root() -> Path:
@@ -136,7 +164,10 @@ def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
         default_repo = _validate_repo_slug(repo)
     else:
         discover_repo.cache_clear()
-        default_repo = discover_repo()
+        try:
+            default_repo = _discover_repo_with_root(repo_root)
+        except RepoDiscoveryError:
+            default_repo = ""
     _config = BacklogConfig(repo_root=repo_root, backlog_dir=backlog_dir, default_repo=default_repo)
 
 
@@ -172,14 +203,6 @@ def __getattr__(name: str) -> Path | str:
     if name == "_REPO_ROOT":
         return get_config().repo_root
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-# Initialise at import time so existing code that reads module attrs before
-# calling init_paths() still works (matches pre-refactor behaviour).
-_initial_repo_root = _resolve_repo_root()
-_config = BacklogConfig(
-    repo_root=_initial_repo_root, backlog_dir=_dh_paths.backlog_dir(_initial_repo_root), default_repo=""
-)
 
 
 # ---------------------------------------------------------------------------
@@ -263,21 +286,28 @@ def _discover_via_env() -> str | None:
     return _validate_repo_slug(value)
 
 
-def _discover_via_git() -> str | None:
+def _discover_via_git(repo_root: Path | None = None) -> str | None:
     """Parse the ``origin`` remote URL via GitPython to extract ``owner/repo``.
 
-    Opens :class:`git.Repo` at :func:`get_repo_root` (resolved project root
-    from :func:`dh_paths.infer_project_root`, ``DH_PROJECT_ROOT``, etc.), with
-    ``search_parent_directories=True`` so a subdirectory of a worktree still
-    resolves.  Does **not** use the process cwd — MCP stdio servers often
-    start with cwd outside the user's repository (plugin cache, ``/``, IDE).
+    Opens :class:`git.Repo` at *repo_root* (or :func:`get_repo_root` when not
+    supplied), with ``search_parent_directories=True`` so a subdirectory of a
+    worktree still resolves.  Does **not** fall back to the process cwd — MCP
+    stdio servers often start with cwd outside the user's repository (plugin
+    cache, ``/``, IDE).
+
+    Args:
+        repo_root: Repository root path.  When ``None``, resolved via
+            :func:`get_repo_root`.  Pass an explicit value during
+            :func:`init_paths` to avoid the recursive ``get_config()`` call
+            that would occur before :data:`_config` is set.
 
     Returns:
         Validated ``owner/repo`` slug, or ``None`` when no git repository is
         found, there is no ``origin`` remote, or the URL cannot be parsed.
     """
+    root = repo_root if repo_root is not None else get_repo_root()
     try:
-        repo = git.Repo(get_repo_root(), search_parent_directories=True)
+        repo = git.Repo(root, search_parent_directories=True)
         url = repo.remote().url
     except (git.InvalidGitRepositoryError, git.NoSuchPathError, ValueError):
         return None
@@ -288,6 +318,41 @@ def _discover_via_git() -> str | None:
             if _REPO_SLUG_RE.match(slug):
                 return slug
     return None
+
+
+def _discover_repo_with_root(repo_root: Path) -> str:
+    """Discover the ``owner/repo`` slug using an already-resolved *repo_root*.
+
+    Identical resolution priority to :func:`discover_repo` but accepts an
+    explicit root so callers that already have it (e.g. :func:`init_paths`)
+    do not trigger a recursive :func:`get_config` call.
+
+    Args:
+        repo_root: Resolved path to the repository root.
+
+    Returns:
+        Repository slug in ``owner/repo`` format, or an empty string when all
+        discovery methods fail.
+
+    Raises:
+        RepoDiscoveryError: When no discovery method succeeds.
+    """
+    methods_tried: list[str] = []
+    details: list[str] = []
+
+    methods_tried.append("GITHUB_REPO environment variable")
+    slug = _discover_via_env()
+    if slug is not None:
+        return slug
+    details.append("GITHUB_REPO environment variable: not set or empty")
+
+    methods_tried.append("Git remote (origin) via GitPython")
+    slug = _discover_via_git(repo_root)
+    if slug is not None:
+        return slug
+    details.append("Git remote (origin): no git repository found or URL could not be parsed")
+
+    raise RepoDiscoveryError(methods_tried=methods_tried, details=details)
 
 
 @functools.lru_cache(maxsize=1)
@@ -312,24 +377,7 @@ def discover_repo() -> str:
     Raises:
         RepoDiscoveryError: When no discovery method succeeds.
     """
-    methods_tried: list[str] = []
-    details: list[str] = []
-
-    # 1. Environment variable
-    methods_tried.append("GITHUB_REPO environment variable")
-    slug = _discover_via_env()
-    if slug is not None:
-        return slug
-    details.append("GITHUB_REPO environment variable: not set or empty")
-
-    # 2. GitPython remote URL parsing
-    methods_tried.append("Git remote (origin) via GitPython")
-    slug = _discover_via_git()
-    if slug is not None:
-        return slug
-    details.append("Git remote (origin): no git repository found or URL could not be parsed")
-
-    raise RepoDiscoveryError(methods_tried=methods_tried, details=details)
+    return _discover_repo_with_root(get_repo_root())
 
 
 def resolve_repo(repo: str) -> str:

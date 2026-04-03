@@ -4,6 +4,11 @@ description: Checkout repo and set up uv + Python 3.11 with caching
 runs:
   using: composite
   steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        persist-credentials: false
+
     - name: Setup uv
       uses: astral-sh/setup-uv@v7
       with:

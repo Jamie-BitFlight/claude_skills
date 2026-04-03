@@ -67,9 +67,6 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
-      - name: Install dependencies
-        run: uv sync --group dev
-
       - name: Run ty
         run: uv run -q ty check .
 
@@ -186,14 +183,12 @@ jobs:
       - name: Run file hygiene hooks
         env:
           SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.sha }}
-          GH_EVENT: ${{ github.event_name }}
         run: |
-          if [ "$GH_EVENT" = "pull_request" ]; then
-            uv run -q prek run --from-ref "$PR_BASE" --to-ref "$PR_HEAD"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
+            uv run prek run --from-ref "${BASE}" --to-ref "origin/${GITHUB_HEAD_REF}"
           else
-            uv run -q prek run --all-files
+            uv run prek run --all-files
           fi
 
   # =============================================================================
@@ -209,9 +204,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
-
-      - name: Install dependencies
-        run: uv sync --group dev
 
       - name: Run pytest
         run: uv run -q pytest
@@ -271,11 +263,41 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
-      - name: Install dependencies
-        run: uv sync --group dev
-
       - name: Run cross-backend tests
-        run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v
+        run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v -m cross_backend
+
+  # =============================================================================
+  # Python: End-to-end live validation tests
+  # Runs only on main push and manual dispatch — not on PRs.
+  # Creates real GitHub issues in a test sandbox repo and cleans up after.
+  # Advisory: NOT wired into quality-gate until stable run history established.
+  # =============================================================================
+  test-e2e:
+    name: Python / E2E live tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Run e2e tests
+        timeout-minutes: 10
+        run: uv run -q pytest -m e2e -v plugins/development-harness/tests/test_live_validation.py
+
+      - name: Emergency cleanup (always runs)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: uv run scripts/close_test_issues.py
 
   # =============================================================================
   # Summary job that requires all checks to pass

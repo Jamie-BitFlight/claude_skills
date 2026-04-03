@@ -1,243 +1,41 @@
 # Copilot Coding Agent Instructions
 
-Trust these instructions first. Only perform additional exploration if information is incomplete or found to be in error.
+This file contains only project decisions that differ from defaults and routing pointers to authoritative sources. Read the source files for discoverable details — do not rely on summaries here.
 
-## Repository Overview
+## Project Decisions (Differ from Defaults)
 
-This repository is a **Claude Code Marketplace Plugin Collection** containing 22+ plugins that extend Claude's capabilities with specialized skills, commands, and agents. The plugins cover Python development, code quality, Git/CI-CD, AI/LLM tools, documentation, and agent orchestration.
+**Package manager**: All Python commands use `uv run` — never invoke `python` or `pytest` directly.
 
-**Project Type**: Plugin marketplace for Claude Code CLI
-**Languages**: Markdown (primary for skills/commands/agents), Python 3.11+ (scripts)
-**Package Manager**: uv (Astral's extremely fast Python package manager)
-**Python Version**: 3.11+ required
+**Hook runner**: This repo uses `prek` (Rust-based), not `pre-commit`. Same `.pre-commit-config.yaml` config, different binary. Install hooks with `uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge`.
 
-## Directory Structure
+**Commit scope is required**: Conventional Commits are enforced with `--force-scope`. Every commit needs a scope — `feat(scope): msg`. Never use `--no-verify`; fix hook failures instead. See `.agent/rules/git-commits.md`.
 
-```text
-claude_skills/
-├── .claude/                  # Claude Code local config (symlinked skills/commands/agents)
-│   ├── agents/               # Agent markdown files
-│   ├── commands/             # Command markdown files
-│   └── skills/               # Skill directories (symlinks to plugins/)
-├── .claude-plugin/           # Repository-level marketplace config
-│   └── marketplace.json      # Plugin registry manifest
-├── plugins/                  # All 22 plugins live here
-│   └── {plugin-name}/
-│       ├── .claude-plugin/
-│       │   └── plugin.json   # Plugin manifest
-│       ├── skills/           # Skill directories (SKILL.md + references/)
-│       ├── commands/         # Command markdown files (optional)
-│       ├── agents/           # Agent markdown files (optional)
-│       └── README.md
-├── sessions/                 # cc-sessions framework (task management)
-├── scripts/                  # Utility scripts
-├── marketplace.json          # Local marketplace config (in .claude-plugin/)
-├── pyproject.toml            # Python project config (linting, type checking)
-├── .pre-commit-config.yaml   # Pre-commit/prek hooks config
-└── CLAUDE.md                 # AI-facing project instructions
-```
+**Python-specific decisions** (see `pyproject.toml [tool.ruff]` for all settings):
+- Always add `from __future__ import annotations` as the first import in every Python file
+- `requests` is banned — use `httpx` instead
+- Standalone scripts use PEP 723 shebang: `#!/usr/bin/env -S uv run --quiet --script`
 
-## Build and Development Commands
+**Backlog is MCP-driven**: Never edit `.claude/backlog/` files directly — use `mcp__plugin_dh_backlog__*` tools. GitHub Issues are the source of truth; `.claude/backlog/` is local cache only.
 
-### Environment Setup (Required First)
+**Workspace member**: `plugins/development-harness` is a uv workspace member. Its `backlog-core` package resolves via `backlog-core = { workspace = true }` in `pyproject.toml`.
 
-Always run these commands before any other operations:
+**conftest isolation**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from the root pytest run (conftest name collision). Test it independently: `cd` into the directory and run `uv run pytest`.
 
-```bash
-# Install Python dependencies and create virtual environment
-uv sync
+**Symlinks on Windows**: Git symlinks (mode 120000) become plain text files on Windows. The `repair-symlinks` pre-commit hook fixes this. Symlinked Python directories are excluded from `ruff` and `ty` to avoid parse errors.
 
-# This creates .venv/ and installs all dependencies from pyproject.toml
-# Must complete successfully before running any uv run commands
-```
+**Two type checkers run in CI**: `uv run ty check .` (primary) and basedpyright (secondary). Both must pass. See `pyproject.toml [tool.ty]` for override rules.
 
-### Testing Plugins Locally
+## Where to Find Things
 
-To test plugins during development:
-
-```bash
-# Option 1: Load specific plugins for this session
-claude --plugin-dir ./plugins/python3-development --plugin-dir ./plugins/holistic-linting
-
-# Option 2: Add local marketplace for persistent enable/disable
-/plugin marketplace add ./.claude-plugin/marketplace.json
-
-# Install plugins you need (--scope local keeps it gitignored)
-/plugin install python3-development@jamie-bitflight-skills --scope local
-
-# Disable when not needed
-/plugin disable python3-development@jamie-bitflight-skills
-
-# Re-enable when needed
-/plugin enable python3-development@jamie-bitflight-skills
-```
-
-### Linting and Formatting
-
-Always run linting before committing changes:
-
-```bash
-# Run ruff linter with auto-fix on specific files
-uv run ruff check --fix path/to/file.py
-
-# Run ruff formatter
-uv run ruff format path/to/file.py
-
-# Run ty type checking
-uv run ty check path/to/file.py
-
-# Run pre-commit hooks on specific files (preferred method)
-uv run prek run --files path/to/file.py
-
-# Run all pre-commit hooks on all files (slow, use sparingly)
-uv run prek run --all-files
-```
-
-**Important Notes**:
-
-- The repository uses `prek` (Rust-based pre-commit replacement), not `pre-commit`
-- Some hooks may fail on first run due to network requirements (shellcheck-py)
-- Run individual hooks when full pre-commit fails: `uv run prek run ruff --files <file>`
-
-### Pre-commit Hook List
-
-The following hooks run on commit:
-
-| Hook                                       | Purpose                         |
-| ------------------------------------------ | ------------------------------- |
-| `ruff`                                     | Python linting with auto-fix    |
-| `ruff-format`                              | Python formatting               |
-| `markdownlint-cli2`                        | Markdown linting                |
-| `prettier`                                 | YAML, JSON, Markdown formatting |
-| `check-yaml`, `check-json`, `check-toml`   | Syntax validation               |
-| `trailing-whitespace`, `end-of-file-fixer` | Whitespace normalization        |
-| `ty-check`                                 | Python type checking            |
-| `basedpyright`                             | Additional Python type checking |
-| `conventional-pre-commit`                  | Commit message validation       |
-
-## Plugin Structure
-
-Each plugin must contain:
-
-```text
-plugins/{plugin-name}/
-├── .claude-plugin/
-│   └── plugin.json           # Required: plugin manifest
-├── skills/
-│   └── {skill-name}/
-│       ├── SKILL.md          # Required: skill definition with YAML frontmatter
-│       └── references/       # Optional: reference documentation
-├── commands/                 # Optional: slash command definitions (.md files)
-├── agents/                   # Optional: agent definitions (.md files)
-└── README.md                 # Optional: user-facing documentation
-```
-
-### plugin.json Schema
-
-```json
-{
-  "name": "plugin-name",
-  "description": "Description with ACTION->TRIGGER->OUTCOME format",
-  "version": "1.0.0",
-  "skills": ["./skills/skill-name"],
-  "commands": ["./commands"],
-  "agents": ["./agents"]
-}
-```
-
-### SKILL.md Format
-
-Skills require YAML frontmatter:
-
-```markdown
----
-name: skill-name
-description: Description with trigger conditions
----
-
-# Skill Title
-
-Content with rules, examples, and references...
-```
-
-## Coding Standards
-
-### Python Files
-
-- Target Python 3.11+
-- Use `from __future__ import annotations` in all files
-- Follow Google docstring convention
-- Type hints required for all public functions
-- Max line length: 120 characters
-- Use native generics (list[str] not List[str])
-
-### Markdown Files
-
-- Skills are AI-facing documentation, NOT user documentation
-- Use imperative language ("The model MUST...")
-- Include XML tags for structured sections
-- Cite all sources with URLs and access dates
-- Use relative paths with `./` prefix for file references
-
-### Commit Messages
-
-Use Conventional Commits format:
-
-```text
-type(scope): description
-
-Types: feat, fix, docs, style, refactor, test, chore
-Scope: skill name or component
-```
-
-## Known Issues and Workarounds
-
-### Pre-commit Network Failures
-
-Some hooks require network access and may fail in restricted environments:
-
-```bash
-# If full pre-commit fails, run individual hooks
-uv run prek run ruff ruff-format markdownlint-cli2 --files <changed-files>
-```
-
-### Ruff Format Trailing Comma
-
-The project uses `skip-magic-trailing-comma = true`. Ruff may report files as needing reformatting for trailing comma differences. Run `uv run ruff format <file>` to fix.
-
-### EXE003 Shebang Warning
-
-Scripts using `uv run --script` shebang pattern trigger EXE003. This is intentionally ignored in `pyproject.toml`.
-
-## Validation Checklist
-
-Before submitting changes:
-
-1. Run `uv sync` if dependencies changed
-2. Run `uv run ruff check --fix` and `uv run ruff format` on Python files
-3. Run `uv run ty check` on Python files
-4. Verify plugin structure: `/plugin validate ./plugins/plugin-name`
-5. Check markdown links are relative with `./` prefix
-6. Ensure SKILL.md has valid YAML frontmatter
-7. Use Conventional Commits format for commit messages
-
-## File Locations Quick Reference
-
-| Purpose              | Location                          |
-| -------------------- | --------------------------------- |
-| Linting config       | `pyproject.toml` [tool.ruff]      |
-| Type checking config | `pyproject.toml` [tool.ty]        |
-| Pre-commit hooks     | `.pre-commit-config.yaml`         |
-| Markdown lint config | `.markdownlint-cli2.jsonc`        |
-| Plugin registry      | `.claude-plugin/marketplace.json` |
-| Project instructions | `CLAUDE.md`                       |
-| Session framework    | `sessions/CLAUDE.sessions.md`     |
-
-## Critical Reminders
-
-- Skills are AI-facing documentation written for Claude, not humans
-- Always use `uv run` prefix for Python commands
-- Test new plugins with `claude --plugin-dir ./plugins/plugin-name`
-- Paths in skills use `./` relative prefix
-- CI runs via `.github/workflows/code-quality.yml` with quality gate pattern
-- Environment setup for coding agent defined in `.github/workflows/copilot-setup-steps.yml`
+| What you need                          | Where to look                                    |
+| -------------------------------------- | ------------------------------------------------ |
+| AI project instructions (Claude Code)  | `.claude/CLAUDE.md`                              |
+| Linting / formatting config            | `pyproject.toml` → `[tool.ruff]`                 |
+| Type checking config & overrides       | `pyproject.toml` → `[tool.ty]`                   |
+| Test paths & pytest config             | `pyproject.toml` → `[tool.pytest.ini_options]`   |
+| Pre-commit hook definitions            | `.pre-commit-config.yaml`                        |
+| CI jobs and quality gate               | `.github/workflows/code-quality.yml`             |
+| MCP server definitions                 | `.mcp.json`                                      |
+| Plugin structure reference             | `plugins/plugin-creator/skills/claude-plugins-reference-2026/SKILL.md` |
+| Writing lean AI-facing instructions    | `plugins/plugin-creator/skills/optimize/SKILL.md` |
+| Commit message rules                   | `.agent/rules/git-commits.md`                    |
