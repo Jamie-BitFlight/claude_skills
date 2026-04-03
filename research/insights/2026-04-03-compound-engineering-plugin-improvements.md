@@ -15,7 +15,7 @@
 **Local system**: `.claude/skills/swarm-patterns/SKILL.md`, `.claude/agents/code-review.md`
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Deferred -- pending issue creation (see below)
+**Backlog**: #1430 created
 
 ### Current state
 
