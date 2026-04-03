@@ -13,15 +13,15 @@
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
     },
     "backlog": {
-      "command": "uv",
-      "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py"],
+      "command": "bash",
+      "args": ["-lc", "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py\""],
       "env": {
         "DH_PROJECT_ROOT": "${workspaceFolder}"
       }
     },
     "sam": {
-      "command": "uv",
-      "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"],
+      "command": "bash",
+      "args": ["-lc", "uv run --script \"${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py\""],
       "env": {
         "DH_PROJECT_ROOT": "${workspaceFolder}"
       }
