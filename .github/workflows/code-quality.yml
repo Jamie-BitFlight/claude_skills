@@ -30,10 +30,10 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Lint with Ruff
-        run: uv run -q prek run ruff --all-files
+        run: uv run -q ruff check --output-format=github .
 
       - name: Check formatting with Ruff
-        run: uv run -q prek run ruff-format --all-files
+        run: uv run -q ruff format --check .
 
   # =============================================================================
   # Python: Type checking with basedpyright
