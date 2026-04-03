@@ -124,7 +124,6 @@ class TestLiveLifecycle:
                 "priority": "P1",
                 "description": "Live validation test item",
                 "source": "test",
-                "create_issue": True,
                 "force": True,
             },
         )
