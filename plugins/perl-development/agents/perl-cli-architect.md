@@ -213,11 +213,14 @@ sub init_color_mode {
 # 3. Test edge cases (empty input, errors)
 # 4. Match exit codes
 
+use IPC::System::Simple qw(capturex);
+
 sub ensure_compatibility {
     my ($original_cmd, @test_cases) = @_;
 
     for my $case (@test_cases) {
-        my $original = `$original_cmd $case 2>&1`;
+        # capturex passes cmd and args as a list — no shell involved, no injection risk
+        my $original = capturex($original_cmd, $case);
         my $ours = capture_our_output($case);
 
         warn "Mismatch for '$case'" unless $original eq $ours;
