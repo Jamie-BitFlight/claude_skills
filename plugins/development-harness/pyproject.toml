@@ -33,6 +33,8 @@ addopts = [
     "--tb=short",
     "--import-mode=importlib",
     "-v",
+    "-m",
+    "not e2e",
 ]
 testpaths = ["tests", "tests_sam", "tests_backlog"]
 pythonpath = [
