@@ -151,7 +151,7 @@ def _isolate_backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     # Prevent tests from creating real GitHub issues.
     # Without this, add_item() hits the live API when GITHUB_TOKEN is set,
     # creating orphan issues that are never cleaned up.
-    monkeypatch.setattr(ops, "try_get_github", lambda: None)
+    monkeypatch.setattr(ops, "try_get_github", lambda repo="": None)
 
 
 # ---------------------------------------------------------------------------

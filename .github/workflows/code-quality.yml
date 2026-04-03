@@ -302,7 +302,8 @@ jobs:
         run: uv sync --group dev
 
       - name: Run e2e tests
-        run: uv run -q pytest -m e2e -v --timeout=120 plugins/development-harness/tests/test_live_validation.py
+        timeout-minutes: 10
+        run: uv run -q pytest -m e2e -v plugins/development-harness/tests/test_live_validation.py
 
       - name: Emergency cleanup (always runs)
         if: always()
