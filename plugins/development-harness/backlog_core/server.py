@@ -115,7 +115,12 @@ def _bootstrap_beads(project_dir: Path) -> None:
         _beads_bootstrapped = True
         return
 
-    subprocess.run([npm_path, "install", "-g", "@beads/bd"], check=False, capture_output=True)
+    try:
+        subprocess.run([npm_path, "install", "-g", "@beads/bd"], check=False, capture_output=True, timeout=10)
+    except subprocess.TimeoutExpired:
+        log.warning("beads bootstrap skipped: npm install timed out after 10s")
+        _beads_bootstrapped = True
+        return
 
     bd_path = shutil.which("bd")
     if not bd_path:
@@ -124,9 +129,15 @@ def _bootstrap_beads(project_dir: Path) -> None:
         return
 
     # Install succeeded; initialise and set up.
-    subprocess.run([bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True)
     subprocess.run(
-        [bd_path, "setup", "claude", "--project", "--stealth"], cwd=project_dir, check=False, capture_output=True
+        [bd_path, "init", "--stealth", "--quiet"], cwd=project_dir, check=False, capture_output=True, timeout=10
+    )
+    subprocess.run(
+        [bd_path, "setup", "claude", "--project", "--stealth"],
+        cwd=project_dir,
+        check=False,
+        capture_output=True,
+        timeout=10,
     )
     _beads_bootstrapped = True
 
