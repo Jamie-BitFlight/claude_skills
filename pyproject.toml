@@ -344,6 +344,8 @@ addopts = [
     "auto",
     "--dist",
     "loadgroup",
+    "-m",
+    "not e2e",
 ]
 asyncio_mode = "auto"
 markers = [

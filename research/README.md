@@ -16,6 +16,7 @@ research/
 │   ├── copilotkit.md                  # React-first agentic frontend framework with bi-directional state sync and AG-UI protocol (28.9K stars)
 │   ├── liteagents.md                  # Multi-tool AI development toolkit with 11 agents and session memory
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
+│   ├── mission-control.md             # Autonomous product engine: 24/7 research → ideation → build → PR (MIT, v2.4.0)
 │   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native (3.6K stars)
 │   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
@@ -171,6 +172,7 @@ research/
 ├── skill-generation-tools/            # Tools that create AI skills/prompts
 │   ├── claude-code-skills-alirezarezvani.md # 170 modular skill packages for Claude Code, Codex, Gemini CLI across 9 domains (2.5K+ stars)
 │   ├── clawhub.md                     # Skill registry for AI agents with vector search
+│   ├── compound-engineering-plugin.md # Every Inc's planning-first (80%) workflow: brainstorm → plan → review → work → compound (MIT, v2.61.0)
 │   ├── claude-code-templates.md       # 100+ Claude Code agents/commands/skills/MCPs/hooks via npx installer and aitmpl.com (21.8K stars)
 │   ├── claude-skillz.md               # 18+ behavioral skills, 12 personas, Claude Launcher utility
 │   ├── codex-skills.md                # 19-skill catalog for OpenAI Codex CLI with npx installer (116 stars)
@@ -678,6 +680,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | Document                                               | Description                                                                                                                  | Last Updated |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | [biome.md](./developer-tools/biome.md)                 | Biome - Rust-based web toolchain with formatter (97% Prettier compat, ~35× faster), linter (450+ rules), import organizer, and v2 type-aware linting without TypeScript compiler (23.8K stars) | 2026-02-23   |
+| [boneyard.md](./developer-tools/boneyard.md)           | Boneyard v1.5.1 - React skeleton screen generator with DOM snapshot extraction, responsive breakpoint capture via CLI, and zero-configuration auto-dark-mode detection | 2026-04-03   |
 | [byobu.md](./developer-tools/byobu.md)                 | Byobu v6.14 — enhanced terminal multiplexer wrapper for tmux/screen with unified F-key layer, 40+ status bar plugins, XDG config layering, and backend switching (1.5K stars) | 2026-03-01   |
 | [animejs.md](./developer-tools/animejs.md)             | Lightweight JavaScript animation engine with declarative API, timelines, staggering, and 30+ easing functions                        | 2026-01-31   |
 | [anything_about_game_ai_resources.md](./developer-tools/anything_about_game_ai_resources.md) | Anything About Game — curated 878-line AI tools taxonomy for game dev: 27+ categories covering AIGC, MCP servers, agent frameworks, Unity integrations, 3D/audio generation (3.8K stars, Apache 2.0, active 2026-03-23) | 2026-03-24   |
@@ -860,6 +863,7 @@ Architecture documentation, living documentation, and code-to-architecture extra
 | Document                                                          | Description                                                                                                                | Last Updated |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | [living-architecture.md](./documentation-tools/living-architecture.md) | Living Architecture (Rivière) - operational flow architecture extraction from code with AI-assisted workflows (79 stars) | 2026-02-20   |
+| [minimal-gallery.md](./documentation-tools/minimal-gallery.md) | Minimal Gallery - Curated website design inspiration gallery operating since 2013; 30+ categories, weekly newsletter, selective submission policy | 2026-04-03   |
 
 **Key Topics**:
 
@@ -1195,6 +1199,8 @@ AI-powered visual creation platforms and design intelligence tools for video, im
 | [diode.md](./ai-design-tools/diode.md) | Diode - Browser-based 3D hardware simulator for building, programming, and simulating circuits with Arduino support; shut down 2022, site still operational | 2026-03-12   |
 | [open-pencil.md](./ai-design-tools/open-pencil.md) | OpenPencil v0.10.0 - Open-source Figma alternative: native .fig read/write, 87+ AI design tools, MCP server (stdio+HTTP), P2P collaboration via WebRTC+Yjs, CanvasKit WASM renderer (2.8K stars) | 2026-03-19   |
 | [omma-build.md](./ai-design-tools/omma-build.md) | Omma - Spline's AI creative studio generating interactive websites, 3D scenes, and web apps from natural language; parallel multi-agent architecture (code + 3D + media + data agents); $29/mo (launched 2026-03-24) | 2026-03-29   |
+| [dark-design.md](./ai-design-tools/dark-design.md) | dark.design - Curated gallery of dark-themed websites with Framer templates and membership ($19/year); built with Framer and Outseta; 10 industry categories, 16+ templates | 2026-04-03   |
+| [godly.md](./ai-design-tools/godly.md) | Godly - Hand-picked curation of 1,000+ web design examples launched July 2021 by Rejiggle; emphasizes bold experimental design and indie makers with optional submission tracking | 2026-04-03   |
 
 **Key Topics**:
 
