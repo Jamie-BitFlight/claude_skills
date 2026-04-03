@@ -172,6 +172,7 @@ research/
 ├── skill-generation-tools/            # Tools that create AI skills/prompts
 │   ├── claude-code-skills-alirezarezvani.md # 170 modular skill packages for Claude Code, Codex, Gemini CLI across 9 domains (2.5K+ stars)
 │   ├── clawhub.md                     # Skill registry for AI agents with vector search
+│   ├── compound-engineering-plugin.md # Every Inc's planning-first (80%) workflow: brainstorm → plan → review → work → compound (MIT, v2.61.0)
 │   ├── claude-code-templates.md       # 100+ Claude Code agents/commands/skills/MCPs/hooks via npx installer and aitmpl.com (21.8K stars)
 │   ├── claude-skillz.md               # 18+ behavioral skills, 12 personas, Claude Launcher utility
 │   ├── codex-skills.md                # 19-skill catalog for OpenAI Codex CLI with npx installer (116 stars)
