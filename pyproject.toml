@@ -345,10 +345,11 @@ addopts = [
     "--dist",
     "loadgroup",
     "-m",
-    "not e2e",
+    "not e2e and not cross_backend",
 ]
 asyncio_mode = "auto"
 markers = [
+    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "demos: marks tests as demonstration tests",
     "e2e: marks tests as end-to-end tests",
     "integration: marks tests as integration tests",
