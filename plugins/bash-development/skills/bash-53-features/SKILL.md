@@ -275,7 +275,7 @@ benchmark() {
 
     start="${EPOCHREALTIME}"
     for ((i = 0; i < iterations; i++)); do
-        result=${echo test;}
+        result=${ echo test; }
     done
     end="${EPOCHREALTIME}"
     printf 'In-shell: %.4f seconds\n' \

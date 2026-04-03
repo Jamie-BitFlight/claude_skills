@@ -1405,9 +1405,9 @@ task_output() {
 
         raw_task_output=$(trim "${*:-}")
         highlight_color="${LOG_BLOCK_TEXT_FOREGROUND:-}"
-        if [ -n "${highlight_color+x}" ]; then
-            highlighted_log=$(highlight_with "${highlight_color}" "${2:-}")
-            printf "\n%b%b%b%b\n" "${COLOR_ITALIC}" "${highlight_color:-}" "${raw_task_output}" "${COLOR_RESET:-}"
+        if [ -n "${highlight_color}" ]; then
+            highlighted_log=$(highlight_with "${highlight_color}" "${raw_task_output}")
+            printf "\n%b%b%b\n" "${COLOR_ITALIC}" "${highlighted_log}" "${COLOR_RESET:-}"
         else
             printf "\n%b\n" "${raw_task_output}"
         fi
