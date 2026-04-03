@@ -4,7 +4,9 @@
 **Repository**: <https://github.com/0xGF/boneyard>
 **NPM**: <https://www.npmjs.org/package/boneyard-js>
 **License**: MIT
+**Research Date**: 2026-04-03
 **Last Updated**: 2026-04-03
+**Next Review Recommended**: 2026-07-03
 
 ---
 

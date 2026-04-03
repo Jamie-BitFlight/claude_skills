@@ -1,7 +1,13 @@
 ---
-title: dark.design
-created: 2026-04-03
-last_reviewed: 2026-04-03
+name: dark.design
+description: Curated gallery of dark-themed websites and Framer templates for design inspiration, discovery, and ecommerce
+license: Proprietary
+metadata:
+  topic: dark.design
+  category: ai-design-tools
+  source_url: https://www.dark.design/
+  verified: "2026-04-03"
+  next_review: "2026-07-03"
 ---
 
 # dark.design

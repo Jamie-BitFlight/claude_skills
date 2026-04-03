@@ -1,6 +1,6 @@
 # Utilization Proposals: Boneyard
 
-**Research entry**: ./research/developer-tools/boneyard.md
+**Research entry**: ../developer-tools/boneyard.md
 **Generated**: 2026-04-03
 **Integration surfaces found**: 2 (NPM SDK | CLI tool)
 **Proposals written**: 1
@@ -57,7 +57,7 @@ const isLoadingInitial = state.wsConnected && state.sessions.length === 0
 ```tsx
 <Skeleton
   name="transcript"
-  loading={state.selectedId && state.events.get(state.selectedId)?.length === 0}
+  loading={!!state.selectedId && state.events.get(state.selectedId)?.length === 0}
 >
   <Transcript sessionId={state.selectedId} events={selectedEvents} />
 </Skeleton>
@@ -78,7 +78,7 @@ import './bones/registry'  // Populates the in-memory bones registry
 import { App } from './App'
 ```
 
-**5. No app code changes needed beyond step 2** — the `<Skeleton>` component auto-resolves bones by name and uses `ResizeObserver` to track responsive behavior automatically.
+**5. No additional app code changes are needed beyond steps 2–4** — after wrapping `SessionList` and `Transcript` with `<Skeleton>` and importing `./bones/registry` in `src/main.tsx`, the `<Skeleton>` component auto-resolves bones by name and uses `ResizeObserver` to track responsive behavior automatically.
 
 ---
 

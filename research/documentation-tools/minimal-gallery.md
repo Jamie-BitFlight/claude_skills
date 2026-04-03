@@ -1,10 +1,13 @@
 ---
-title: "Minimal Gallery"
-slug: "minimal-gallery"
-resource_url: "https://minimal.gallery"
-created: 2026-04-03
-freshness_reviewed: 2026-04-03
-category: "documentation-tools"
+name: "Minimal Gallery"
+description: "Curated website design inspiration gallery featuring hand-selected examples across industries and design styles"
+license: Proprietary
+metadata:
+  topic: minimal-gallery
+  category: documentation-tools
+  source_url: https://minimal.gallery
+  verified: "2026-04-03"
+  next_review: "2026-07-03"
 ---
 
 # Minimal Gallery
@@ -134,7 +137,7 @@ The gallery does not integrate with Claude Code, provide APIs, or serve as infra
 - **Minimal Gallery homepage**: <https://minimal.gallery> (accessed 2026-04-03)
 - **About page**: <https://minimal.gallery/about> (accessed 2026-04-03)
 - **Contact**: <hey@some.studio> (for sponsorships, inquiries)
-- **Legal notice**: piet.page/legal (referenced on site)
+- **Legal notice**: <https://piet.page/legal> (referenced on site)
 - **Creator**: Piet Terheyden
 
 ## Freshness Tracking

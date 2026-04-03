@@ -1,9 +1,13 @@
 ---
-title: "Godly: Astronomically Good Web Design Inspiration"
-description: "Curated gallery of 1,000+ high-quality websites focusing on bold, innovative design and interactive excellence"
-resource_url: "https://godly.website"
-date_researched: "2026-04-03"
-freshness_reviewed: "2026-04-03"
+name: "Godly"
+description: "Curated gallery of 1,000+ web design examples emphasizing bold, experimental design and interactive excellence"
+license: Proprietary
+metadata:
+  topic: godly
+  category: ai-design-tools
+  source_url: https://godly.website
+  verified: "2026-04-03"
+  next_review: "2026-07-03"
 ---
 
 # Godly: Astronomically Good Web Design Inspiration
