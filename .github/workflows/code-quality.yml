@@ -184,14 +184,9 @@ jobs:
         env:
           SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
         run: |
-          set -x
-          echo "GITHUB_BASE_REF=${GITHUB_BASE_REF}"
-          echo "HEAD=$(git rev-parse HEAD)"
-          git branch -r | head -20
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE=$(git merge-base HEAD origin/${GITHUB_BASE_REF})
-            echo "BASE=${BASE}"
-            uv run prek run --from-ref "${BASE}" --to-ref HEAD
+            BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
+            uv run prek run --from-ref "${BASE}" --to-ref "origin/${GITHUB_HEAD_REF}"
           else
             uv run prek run --all-files
           fi
