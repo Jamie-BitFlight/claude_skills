@@ -1329,6 +1329,7 @@ Automated content generation tools that produce changelogs, release notes, blog 
 | Document | Description | Last Updated |
 | -------- | ----------- | ------------ |
 | [notra.md](./ai-writing-tools/notra.md) | Notra - SaaS tool that auto-generates publish-ready changelogs, blog posts, and social updates by monitoring GitHub, Linear, and Slack activity; drafts content matching configured brand voice (proprietary SaaS) | 2026-03-04 |
+| [stop-slop.md](./ai-writing-tools/stop-slop.md) | Stop Slop — editorial skill removing AI-generated writing patterns via 8 core rules + 60+ phrase catalog + structural anti-patterns + 5-dimensional scoring rubric; framework for prose clarity and authenticity (MIT) | 2026-04-03 |
 
 **Key Topics**:
 
