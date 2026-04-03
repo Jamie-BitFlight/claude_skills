@@ -195,26 +195,27 @@ Two type checkers run in CI:
 ### Known ty overrides (in `pyproject.toml [tool.ty]`)
 
 - Test files get relaxed rules (`call-non-callable = "warn"`, etc.)
-- `plugins/agentskill-kaizen/**` has `call-non-callable = "warn"` (prefixspan incomplete stubs)
-- Symlinked directories excluded: `plugins/uv/skills/uv`, `plugins/development-harness/skills/implementation-manager`
+- `plugins/agentskill-kaizen/**` has `call-non-callable = "warn"` (prefixspan incomplete stubs) and `unresolved-attribute = "warn"` (lazy import pattern)
+- Symlinked directories excluded from ty src: `plugins/uv/skills/uv` only (Windows symlink files would be parsed as Python)
 
 ## CI Pipeline (`.github/workflows/code-quality.yml`)
 
 Quality Gate requires ALL of these to pass:
 
-| Job                | What it does                                |
-| ------------------ | ------------------------------------------- |
-| `lint-python`      | Ruff lint + format (via prek)               |
-| `typecheck-python` | basedpyright                                |
-| `typecheck-ty`     | ty (Astral)                                 |
-| `lint-js`          | Biome (JS/TS/JSON)                          |
-| `lint-markdown`    | markdownlint-cli2                           |
-| `lint-shell`       | shellcheck + shfmt                          |
-| `validate-plugins` | skilllint (plugin/skill structure)          |
-| `manifest-sync`    | Auto-sync plugin manifests                  |
-| `file-hygiene`     | trailing whitespace, line endings, etc.     |
-| `test-python`      | pytest                                      |
-| `test-node`        | npm test (if defined)                       |
+| Job                    | What it does                                       |
+| ---------------------- | -------------------------------------------------- |
+| `lint-python`          | Ruff lint + format (via prek)                      |
+| `typecheck-python`     | basedpyright                                       |
+| `typecheck-ty`         | ty (Astral)                                        |
+| `lint-js`              | Biome (JS/TS/JSON)                                 |
+| `lint-markdown`        | markdownlint-cli2                                  |
+| `lint-shell`           | shellcheck + shfmt                                 |
+| `validate-plugins`     | skilllint (plugin/skill structure)                 |
+| `manifest-sync`        | Auto-sync plugin manifests                         |
+| `file-hygiene`         | trailing whitespace, line endings, etc.            |
+| `test-python`          | pytest                                             |
+| `test-node`            | npm test (if defined)                              |
+| `test-cross-backend`   | pytest matrix: memory + sqlite backends            |
 
 ## Backlog & Planning System
 
