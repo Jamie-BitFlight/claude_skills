@@ -275,7 +275,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run cross-backend tests
-        run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v
+        run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v -m cross_backend
 
   # =============================================================================
   # Python: End-to-end live validation tests
