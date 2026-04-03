@@ -345,13 +345,11 @@ addopts = [
     "--dist",
     "loadgroup",
     "-m",
-    "not e2e",
-    # test_cross_backend.py has a dedicated CI job (test-cross-backend matrix)
-    # and carries no e2e marker, so -m not e2e does not exclude it.
-    "--ignore=plugins/development-harness/tests/test_cross_backend.py",
+    "not e2e and not cross_backend",
 ]
 asyncio_mode = "auto"
 markers = [
+    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "demos: marks tests as demonstration tests",
     "e2e: marks tests as end-to-end tests",
     "integration: marks tests as integration tests",

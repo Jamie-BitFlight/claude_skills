@@ -9,6 +9,9 @@ environment and ensure GITHUB_TOKEN is configured.
 
 asyncio_mode = "auto" is set globally in pyproject.toml.
 
+Marked with ``pytest.mark.cross_backend`` — excluded from the default pytest
+run and executed exclusively by the ``test-cross-backend`` CI matrix job.
+
 Test layout:
     fixtures            — backend factory, BacklogItem factory
     TestBackendStatus   — probe_backend_status returns REACHABLE
@@ -40,6 +43,8 @@ from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMet
 if TYPE_CHECKING:
     from backlog_core.backend_protocol import BacklogBackend
 
+
+pytestmark = pytest.mark.cross_backend
 
 # ---------------------------------------------------------------------------
 # Constants
