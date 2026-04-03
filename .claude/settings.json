@@ -10,6 +10,8 @@
       "Glob",
       "Grep",
       "Read",
+      "Write",
+      "Edit",
       "mcp__ref__*",
       "mcp__exa__*",
       "mcp__context7__*",
@@ -21,6 +23,9 @@
       "Bash(diffstat:*)",
       "Bash(npm:*)",
       "Bash(bd:*)",
+      "Bash(mkdir:*)",
+      "Bash(uv run prek:*)",
+      "Bash(uvx skilllint:*)",
       "Bash(uv run fastmcp :*)"
     ],
     "deny": []
