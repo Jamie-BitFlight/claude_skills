@@ -12,9 +12,10 @@ import logging
 import os
 import re
 import sys
+import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import git
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -68,6 +69,9 @@ class BacklogConfig:
 # Single mutable config cell — replaces the three bare module globals.
 _config: BacklogConfig | None = None
 
+# Guards lazy initialisation in get_config() against concurrent callers.
+_config_lock = threading.Lock()
+
 _log = logging.getLogger(__name__)
 
 
@@ -91,20 +95,19 @@ def get_config() -> BacklogConfig:
             are set).
     """
     if _config is None:
-        try:
-            root = _resolve_repo_root()
-        except RuntimeError as exc:
-            raise RuntimeError(
-                "BacklogConfig is not initialised — call init_paths() before accessing config, "
-                "or set one of DH_PROJECT_ROOT / CLAUDE_PROJECT_DIR so the project root can be "
-                "inferred automatically."
-            ) from exc
-        _log.warning("BacklogConfig auto-initialised from inferred project root: %s", root)
-        init_paths(project_dir=str(root))
-    cfg = _config
-    if cfg is None:
-        raise RuntimeError("init_paths() did not set _config")
-    return cfg
+        with _config_lock:
+            if _config is None:
+                try:
+                    root = _resolve_repo_root()
+                except RuntimeError as exc:
+                    raise RuntimeError(
+                        "BacklogConfig is not initialised — call init_paths() before accessing config, "
+                        "or set one of DH_PROJECT_ROOT / CLAUDE_PROJECT_DIR so the project root can be "
+                        "inferred automatically."
+                    ) from exc
+                _log.warning("BacklogConfig auto-initialised from inferred project root: %s", root)
+                init_paths(project_dir=str(root))
+    return cast("BacklogConfig", _config)  # init_paths() always sets _config
 
 
 def get_repo_root() -> Path:
@@ -374,24 +377,7 @@ def discover_repo() -> str:
     Raises:
         RepoDiscoveryError: When no discovery method succeeds.
     """
-    methods_tried: list[str] = []
-    details: list[str] = []
-
-    # 1. Environment variable
-    methods_tried.append("GITHUB_REPO environment variable")
-    slug = _discover_via_env()
-    if slug is not None:
-        return slug
-    details.append("GITHUB_REPO environment variable: not set or empty")
-
-    # 2. GitPython remote URL parsing
-    methods_tried.append("Git remote (origin) via GitPython")
-    slug = _discover_via_git()
-    if slug is not None:
-        return slug
-    details.append("Git remote (origin): no git repository found or URL could not be parsed")
-
-    raise RepoDiscoveryError(methods_tried=methods_tried, details=details)
+    return _discover_repo_with_root(get_repo_root())
 
 
 def resolve_repo(repo: str) -> str:

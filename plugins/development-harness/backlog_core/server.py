@@ -147,13 +147,17 @@ async def _beads_lifespan(server: FastMCP) -> AsyncIterator[None]:
     loop = asyncio.get_running_loop()
     try:
         repo_root = _models.get_repo_root()
-    except RuntimeError:
+    except RuntimeError as exc:
         # No project root discoverable (non-git cwd, no env vars set).
         # Beads bootstrap is best-effort; skip rather than crash.
-        _logging.getLogger(__name__).warning("beads bootstrap skipped: project root not discoverable at startup")
+        _logging.getLogger(__name__).warning("beads bootstrap skipped: %s", exc)
         yield
         return
-    await loop.run_in_executor(None, _bootstrap_beads, repo_root)
+    try:
+        await loop.run_in_executor(None, _bootstrap_beads, repo_root)
+    except OSError as exc:
+        # bd binary absent or other OS-level failure — bootstrap is best-effort.
+        _logging.getLogger(__name__).warning("beads bootstrap skipped: %s", exc)
     yield
 
 
@@ -1242,7 +1246,7 @@ def _probe_backend_status() -> _BackendStatus:
     """
     try:
         return _get_config().backend.probe_backend_status()
-    except RuntimeError:
+    except (RuntimeError, ValueError):
         return _BackendStatus(availability=_BackendAvailability.NOT_CHECKED)
 
 
