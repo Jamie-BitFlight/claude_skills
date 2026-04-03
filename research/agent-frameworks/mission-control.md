@@ -6,9 +6,9 @@
 
 The system is built on **Next.js 14** with **TypeScript** and uses **SQLite** for persistence. Agents are executed via the **OpenClaw Gateway** (a separate AI runtime), with communication over WebSocket. The platform supports multi-agent orchestration via "Convoy Mode" (parallel execution with dependency graphs) and includes a Tinder-style swipe interface for human approval of AI-generated ideas.
 
-**Current version**: v2.4.0 (released 2026-03-22)  
-**License**: MIT  
-**Repository**: https://github.com/crshdn/mission-control
+**Current version**: v2.4.0 (released 2026-03-22)
+**License**: MIT
+**Repository**: <https://github.com/crshdn/mission-control>
 
 ---
 
@@ -213,21 +213,21 @@ npm run build && npx next start -p 4000
 
 ## References
 
-- **Repository**: https://github.com/crshdn/mission-control (accessed 2026-04-03)
-- **README**: https://github.com/crshdn/mission-control/blob/main/README.md (accessed 2026-04-03)
-- **CHANGELOG**: https://github.com/crshdn/mission-control/blob/main/CHANGELOG.md (accessed 2026-04-03)
-- **Production Guide**: https://github.com/crshdn/mission-control/blob/main/PRODUCTION_SETUP.md (accessed 2026-04-03)
-- **Karpathy AutoResearch**: https://github.com/karpathy/autoresearch (pattern reference)
-- **Next.js**: https://nextjs.org/ (framework)
-- **OpenClaw Gateway**: https://github.com/open-claw/open-claw-gateway (AI runtime)
-- **Discord**: https://discord.gg/3u62kySzM (community)
+- **Repository**: <https://github.com/crshdn/mission-control> (accessed 2026-04-03)
+- **README**: <https://github.com/crshdn/mission-control/blob/main/README.md> (accessed 2026-04-03)
+- **CHANGELOG**: <https://github.com/crshdn/mission-control/blob/main/CHANGELOG.md> (accessed 2026-04-03)
+- **Production Guide**: <https://github.com/crshdn/mission-control/blob/main/PRODUCTION_SETUP.md> (accessed 2026-04-03)
+- **Karpathy AutoResearch**: <https://github.com/karpathy/autoresearch> (pattern reference)
+- **Next.js**: <https://nextjs.org/> (framework)
+- **OpenClaw Gateway**: <https://github.com/open-claw/open-claw-gateway> (AI runtime)
+- **Discord**: <https://discord.gg/3u62kySzM> (community)
 
 ---
 
 ## Freshness Tracking
 
-**Current Version**: v2.4.0 (released 2026-03-22)  
-**Last Updated**: 2026-04-03  
+**Current Version**: v2.4.0 (released 2026-03-22)
+**Last Updated**: 2026-04-03
 **Next Review**: 2026-07-03
 
 | Section | Confidence | Basis |

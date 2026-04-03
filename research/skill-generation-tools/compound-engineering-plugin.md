@@ -6,8 +6,8 @@ The Compound Engineering Plugin is a comprehensive AI-powered development toolki
 
 Published as `@every-env/compound-plugin` on npm. Latest version: **2.61.0** (released 2026-04-01). License: MIT.
 
-**Homepage**: https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it
-**Repository**: https://github.com/EveryInc/compound-engineering-plugin
+**Homepage**: <https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it>
+**Repository**: <https://github.com/EveryInc/compound-engineering-plugin>
 **Author**: Kieran Klaassen and Every Inc.
 
 ## Problem Addressed
@@ -364,15 +364,15 @@ This plugin directly addresses multi-agent orchestration patterns and skill desi
 
 ## References
 
-- **GitHub Repository**: https://github.com/EveryInc/compound-engineering-plugin (accessed 2026-04-03)
+- **GitHub Repository**: <https://github.com/EveryInc/compound-engineering-plugin> (accessed 2026-04-03)
 - **NPM Package**: `@every-env/compound-plugin` v2.61.0 (accessed 2026-04-03)
 - **Plugin Manifest**: `.claude-plugin/plugin.json` in repo (accessed 2026-04-03)
 - **README**: `plugins/compound-engineering/README.md` — agent inventory, skill descriptions, installation instructions (accessed 2026-04-03)
 - **AGENTS.md** (plugin instructions): `.claude-plugin/AGENTS.md` — versioning, compliance checklist, skill patterns (accessed 2026-04-03)
 - **CHANGELOG**: Root `CHANGELOG.md` — release history, v2.61.0 (2026-04-01), v2.60.0 (2026-03-31), linked-versions policy (accessed 2026-04-03)
 - **Package.json**: Scripts (dev, convert, cli:install, release:validate), dependencies (citty, js-yaml), devDependencies (semantic-release) (accessed 2026-04-03)
-- **Article**: "My AI had already fixed the code before I saw it" — https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it (accessed 2026-04-03, homepage link from plugin manifest)
-- **Every's Article**: "Compound Engineering: How Every codes with agents" — https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents (linked in README, accessed 2026-04-03)
+- **Article**: "My AI had already fixed the code before I saw it" — <https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it> (accessed 2026-04-03, homepage link from plugin manifest)
+- **Every's Article**: "Compound Engineering: How Every codes with agents" — <https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents> (linked in README, accessed 2026-04-03)
 
 ## Cross-References
 
