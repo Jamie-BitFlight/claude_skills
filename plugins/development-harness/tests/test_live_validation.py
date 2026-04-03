@@ -109,8 +109,7 @@ def live_items(tmp_path_factory, monkeypatch_class):
                 for issue_num in ctx["issues"]:
                     try:
                         issue = repo.get_issue(issue_num)
-                        if issue.state == "open":
-                            issue.edit(state="closed")
+                        issue.edit(state="closed")
                     except GithubException:
                         logger.warning(
                             "Failed to close test issue #%d — will remain open as orphan", issue_num, exc_info=True

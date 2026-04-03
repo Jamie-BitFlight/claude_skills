@@ -24,9 +24,10 @@ import json
 import os
 import subprocess
 import sys
+from typing import Any
 
 
-def fetch_open_issues(repo: str) -> list[dict]:  # type: ignore[type-arg]
+def fetch_open_issues(repo: str) -> list[dict[str, Any]]:
     """Fetch all open issues via paginated gh API calls.
 
     Uses --paginate so gh handles traversal of all pages — no invented limit.
@@ -59,8 +60,6 @@ def fetch_open_issues(repo: str) -> list[dict]:  # type: ignore[type-arg]
         print(f"Emergency cleanup: unexpected payload type {type(pages).__name__}, skipping", file=sys.stderr)
         return []
 
-    # --slurp wraps each page in an outer list, so pages is list[list[dict]].
-    # Guard against gh returning a flat list[dict] (single page, no slurp wrapper).
     if pages and not isinstance(pages[0], list):
         pages = [pages]
 
@@ -69,7 +68,7 @@ def fetch_open_issues(repo: str) -> list[dict]:  # type: ignore[type-arg]
 
 def close_issue(repo: str, number: int) -> None:
     """Close a single issue with an explanatory comment."""
-    subprocess.run(
+    result = subprocess.run(
         [
             "gh",
             "issue",
@@ -80,8 +79,15 @@ def close_issue(repo: str, number: int) -> None:
             "--comment",
             "Closed by CI emergency sweep: orphaned e2e test issue",
         ],
+        capture_output=True,
+        text=True,
         check=False,
     )
+    if result.returncode != 0:
+        print(
+            f"Emergency cleanup: failed to close issue #{number} (exit {result.returncode}): {result.stderr.strip()}",
+            file=sys.stderr,
+        )
 
 
 def main() -> None:
@@ -95,7 +101,7 @@ def main() -> None:
     repo = args.repo
     if not repo:
         print("Emergency cleanup: REPO not set and --repo not supplied, skipping", file=sys.stderr)
-        sys.exit(0)
+        sys.exit(1)
 
     issues = fetch_open_issues(repo)
     orphans = [i for i in issues if "[MCP-TEST-" in i.get("title", "")]
