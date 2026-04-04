@@ -26,7 +26,7 @@
       "Bash(mkdir:*)",
       "Bash(uv run prek:*)",
       "Bash(uvx skilllint:*)",
-      "Bash(uv run fastmcp :*)"
+      "Bash(uv run fastmcp:*)"
     ],
     "deny": []
   },
