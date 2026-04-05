@@ -82,7 +82,8 @@ research/
 │   ├── pilot.md                       # Autonomous development pipeline wrapping Claude Code CLI (BSL 1.1)
 │   ├── tembo.md                       # Cloud AI coding agent orchestration (Claude Code, Codex, Cursor, Amp, OpenCode)
 │   ├── 1code.md                       # Electron desktop app wrapping Claude Code + Codex with worktree isolation (5.2K stars)
-│   └── maverick.md                    # Claude Code plugin + CLI with enforcement chain, 3 workflow modes, upskill auto-generation, AWS worker fleet (alpha)
+│   ├── maverick.md                    # Claude Code plugin + CLI with enforcement chain, 3 workflow modes, upskill auto-generation, AWS worker fleet (alpha)
+│   └── soulforge.md                   # Graph-powered AI coding agent with multi-agent orchestration, live codebase indexing, and task-specific model routing (v2.4.0, 93 stars)
 ├── context-management/                # Memory, context window, and RAG tools
 │   ├── claude-mem.md                  # Persistent memory compression for Claude Code (15K+ stars)
 │   ├── jina-ai.md                     # Search foundation: Reader API, multilingual embeddings, rerankers (acquired by Elastic 2025)
