@@ -1,6 +1,17 @@
 {
   "description": "Development-harness plugin hooks — task completion reminders and session hygiene",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-session-id.cjs\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
     "TaskCompleted": [
       {
         "hooks": [
