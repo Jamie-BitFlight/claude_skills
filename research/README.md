@@ -1175,6 +1175,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | [the-unwind-ai.md](./ai-research-tools/the-unwind-ai.md) | The Unwind AI - AI builder newsletter with 740+ posts, companion awesome-llm-apps repo (95K+ stars, Apache 2.0)               | 2026-02-19   |
 | [samuraizer.md](./ai-research-tools/samuraizer.md) | Samuraizer - Full-stack AI knowledge base for security research: URL/PDF analysis via Gemini 2.5 Flash, semantic search, RAG chat, knowledge graph (D3.js), Telegram bot (Flask+React+SQLite, MIT) | 2026-03-25   |
 | [OpenSpace.md](./ai-research-tools/OpenSpace.md) | OpenSpace — self-evolving skills engine for AI agents: autonomous skill development, 46% token reduction via reuse, collective skill sharing across agent networks (1.7K stars, MIT, v0.1.0) | 2026-03-28   |
+| [meta-harness.md](./ai-research-tools/meta-harness.md) | Meta-Harness — End-to-end optimization framework for model harnesses (LLM context management infrastructure) using agentic proposer with execution traces | 2026-04-06   |
 
 **Key Topics**:
 
