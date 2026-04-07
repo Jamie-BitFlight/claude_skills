@@ -16,10 +16,6 @@
         "--api-key",
         "$CONTEXT7_API_KEY"
       ]
-    },
-    "octocode": {
-      "command": "npx",
-      "args": ["-y", "octocode-mcp@latest"]
     }
   }
 }
