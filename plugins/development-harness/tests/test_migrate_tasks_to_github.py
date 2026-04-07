@@ -328,11 +328,11 @@ def test_writes_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     tasks = parse_task_file(task_file)
     assert len(tasks) == 1
 
-    monkeypatch.chdir(tmp_path)
-
     # Act: call _write_cache directly (bypasses GitHub API).
+    # Pass tmp_path as project_root so dh_paths.context_dir() does not attempt
+    # git auto-detection (which fails in a tmp directory with no git repo).
     task_rec = tasks[0]
-    cache_path = _write_cache("my-feature", 480, [(task_rec, 481)])
+    cache_path = _write_cache("my-feature", 480, [(task_rec, 481)], project_root=tmp_path)
 
     # Assert: file exists.
     assert cache_path.exists()

@@ -502,18 +502,22 @@ def _write_github_issue_field(task: TaskRecord, issue_number: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _write_cache(slug: str, parent_issue: int, created: list[tuple[TaskRecord, int]]) -> Path:
+def _write_cache(
+    slug: str, parent_issue: int, created: list[tuple[TaskRecord, int]], project_root: Path | None = None
+) -> Path:
     """Write the sam-tasks cache file after migration.
 
     Args:
         slug: Feature slug.
         parent_issue: Parent GitHub issue number.
         created: List of (TaskRecord, issue_number) pairs.
+        project_root: Explicit project root for resolving the cache directory.
+            Defaults to git auto-detection when ``None``.
 
     Returns:
         Path to the written cache file.
     """
-    cache_dir = dh_paths.context_dir()
+    cache_dir = dh_paths.context_dir(project_root)
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / f"sam-tasks-{slug}.json"
 

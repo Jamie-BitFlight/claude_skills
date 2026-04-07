@@ -39,6 +39,14 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import implementation_manager as im
 from implementation_manager import Task, TaskPriority, TaskStatus, app
 
+# dh_paths is part of the development-harness package; add its directory to
+# sys.path so it is importable from outside the plugin tree.
+_DH_DIR = Path(__file__).resolve().parents[2] / "plugins" / "development-harness"
+if str(_DH_DIR) not in sys.path:
+    sys.path.insert(0, str(_DH_DIR))
+
+import dh_paths
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -313,7 +321,9 @@ def test_ready_tasks_github_writes_cache(tmp_path: Path, mocker: MockerFixture) 
     from typer.testing import CliRunner
 
     slug = "my-feature"
-    cache_path = tmp_path / ".claude" / "context" / f"sam-tasks-{slug}.json"
+    # Compute the same path that implementation_manager computes at runtime:
+    # dh_paths.context_dir(project_path) / f"sam-tasks-{slug}.json"
+    cache_path = dh_paths.context_dir(tmp_path) / f"sam-tasks-{slug}.json"
 
     def _fetch_and_write_cache(parent_issue_number: int, feature_slug: str, cp: Path) -> list[Task]:
         # Simulate fetch_tasks_from_github writing the cache file
