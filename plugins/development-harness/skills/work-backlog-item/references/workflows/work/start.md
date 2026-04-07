@@ -30,7 +30,7 @@ Track progress using your task list. Check off each step as it completes.
    - Step 5.4: Simplify (code changes only)
    - Step 5.5: Post-planning output
 6. [ ] **Report** — present planning summary to user
-7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit`)
+7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<summary of changes>"`)
 
 ## Error Routing
 

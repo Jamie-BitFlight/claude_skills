@@ -162,7 +162,7 @@ Only use the `agents` key when placing agent files outside `agents/`:
 }
 ```
 
-To keep the default `agents/` directory active while adding a non-default path, include `"./agents/"` in the array.
+If all agents are in the default `agents/` directory, omit the `agents` key entirely — auto-discovery handles registration. If agents exist in non-default paths, enumerate every agent file explicitly as individual paths in the array — do not use directory strings.
 
 SOURCE: <https://code.claude.com/docs/en/plugins.md> — "agents/" listed as default auto-discovered location in Plugin structure overview table (accessed 2026-04-07); replace-on-declare behavior confirmed by incident record in `.claude/rules/plugin-development.md` (2026-03-17: 17 of 19 agents invisible when 2-entry `agents` key declared in plugin.json)
 

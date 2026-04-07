@@ -15,7 +15,7 @@ paths:
 | Field | Type | Example |
 |-------|------|---------|
 | `commands` | string or array | `"./custom/cmd.md"` or `["./cmd1.md"]` |
-| `agents` | string or array | `"./custom/agents/"` or `["./agent.md"]` |
+| `agents` | array | `["./agents/agent.md"]` |
 | `skills` | string or array | `"./custom/skills/"` |
 | `hooks` | string or object | `"./hooks.json"` |
 | `mcpServers` | string or object | `"./mcp-config.json"` |
