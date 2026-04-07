@@ -1,42 +1,46 @@
 # Workflow: Work Backlog Item
 
+Read [scope.md](./scope.md) before proceeding. All work actions operate within that scope boundary.
+
 ## Checklist
 
 Track progress using your task list. Check off each step as it completes.
 
-1. [ ] **Locate** (`locate.md`) — find and extract the backlog item's fields
-   - Step 1.1: Interactive browser (no arguments only)
-   - Step 1.2: Issue-first path (`#N`, bare number, or URL)
-   - Step 1.3: Find by title substring
-   - Step 1.4: Extract item fields
+1. [ ] Read `scope.md` — align all actions with the work scope boundary
+2. [ ] **Locate** (`locate.md`) — find and extract the backlog item's fields
+   - Step 2.1: Interactive browser (no arguments only)
+   - Step 2.2: Issue-first path (`#N`, bare number, or URL)
+   - Step 2.3: Find by title substring
+   - Step 2.4: Extract item fields
    - If item already has a Plan field: invoke `/dh:implement-feature` and stop
-2. [ ] **Validate** (`validate.md`) — verify item state and sync with GitHub
-   - Step 2.1: Already-implemented check
-   - Step 2.2–2.4: GitHub issue sync, creation, in-progress label
-   - Step 2.5: Discovery gate (feature/refactor items only)
+3. [ ] **Validate** (`validate.md`) — verify item state and sync with GitHub
+   - Step 3.1: Already-implemented check
+   - Step 3.2–3.4: GitHub issue sync, creation, in-progress label
+   - Step 3.5: Discovery gate (feature/refactor items only)
    - If discovery gate STOP: report and stop
-3. [ ] **Prepare** (`prepare.md`) — groom if needed, RT-ICA gate, feasibility gate
-   - Step 3.1: Auto-groom (if needed)
-   - Step 3.2: RT-ICA gate — if BLOCKED, stop and present MISSING conditions
-   - Step 3.3: RT-ICA date stamp
-   - Step 3.4: Feasibility gate — if BLOCKED, stop
-4. [ ] **Plan** (`plan.md`) — compose feature request and invoke SAM planning
-   - Step 4.1: Compose feature request
-   - Step 4.2: Invoke SAM planning via `/dh:add-new-feature`
-   - Step 4.3: Update backlog with plan reference
-   - Step 4.4: Simplify (code changes only)
-   - Step 4.5: Post-planning output
-5. [ ] **Report** — present planning summary to user
+4. [ ] **Prepare** (`prepare.md`) — groom if needed, RT-ICA gate, feasibility gate
+   - Step 4.1: Auto-groom (if needed)
+   - Step 4.2: RT-ICA gate — if BLOCKED, stop and present MISSING conditions
+   - Step 4.3: RT-ICA date stamp
+   - Step 4.4: Feasibility gate — if BLOCKED, stop
+5. [ ] **Plan** (`plan.md`) — compose feature request and invoke SAM planning
+   - Step 5.1: Compose feature request
+   - Step 5.2: Invoke SAM planning via `/dh:add-new-feature`
+   - Step 5.3: Update backlog with plan reference
+   - Step 5.4: Simplify (code changes only)
+   - Step 5.5: Post-planning output
+6. [ ] **Report** — present planning summary to user
+7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit`)
 
 ## Error Routing
 
 | Condition | Action |
 |---|---|
 | No item found matching input | Report "No backlog item found matching: {input}", stop |
-| Item already implemented (Step 2.1) | Resolve via `backlog_resolve`, stop |
-| Discovery gate STOP (Step 2.5) | Report failure, stop |
-| RT-ICA BLOCKED (Step 3.2) | `backlog_update(selector='<item_ref/>', status='blocked')`, present MISSING conditions, stop |
-| Feasibility gate BLOCKED (Step 3.4) | Report BLOCKED output, stop |
+| Item already implemented (Step 3.1) | Resolve via `backlog_resolve`, stop |
+| Discovery gate STOP (Step 3.5) | Report failure, stop |
+| RT-ICA BLOCKED (Step 4.2) | `backlog_update(selector='<item_ref/>', status='blocked')`, present MISSING conditions, stop |
+| Feasibility gate BLOCKED (Step 4.4) | Report BLOCKED output, stop |
 
 ### STOP Notification Protocol
 

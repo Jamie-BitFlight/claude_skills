@@ -1,6 +1,6 @@
 {
   "name": "process-siren",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
   "author": {
     "name": "Jamie Nelson",

@@ -77,7 +77,6 @@ flowchart TD
 - Files: `Read`, `Write`, `Edit` — not `cat`, `sed`, `echo >`
 - Search: `Grep`, `Glob` — not `find`, `ls -R`
 - Python: `Bash(uv run script.py)`
-- Mermaid validation: `mcp__claude_ai_Mermaid_Chart__validate_and_render_mermaid_diagram` — validate all Mermaid diagrams before committing
 - Large File Write Strategy: `.claude/rules/large-file-write-strategy.md`
 
 **Reference notation the user may mention, or when you want to tell the user about a command or agent:**

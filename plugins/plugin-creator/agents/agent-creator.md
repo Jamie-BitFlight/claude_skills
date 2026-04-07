@@ -138,33 +138,38 @@ flowchart TD
     Start([Where should agent be available?]) --> Q1{Scope?}
     Q1 -->|Project-specific, team access| Project[".claude/agents/{name}.md<br>git-tracked"]
     Q1 -->|Personal, reusable across projects| User["~/.claude/agents/{name}.md<br>not git-tracked"]
-    Q1 -->|Distributable plugin| Plugin["{plugin}/agents/{name}.md<br>+ update plugin.json"]
+    Q1 -->|Distributable plugin| Plugin["{plugin}/agents/{name}.md<br>auto-discovered from agents/"]
     Project --> Validate[Run validator]
     User --> Validate
-    Plugin --> UpdateJSON["Read plugin.json<br>Read existing agents array — carry forward ALL entries<br>Add new agent path<br>Write updated plugin.json"]
-    UpdateJSON --> Validate
+    Plugin --> Validate
     Validate --> Done([Report location and result])
 ```
 
-**Plugin.json update pattern** — add agent to `agents` array (required for all agents):
+**Plugin.json update pattern** — agents in the default `agents/` directory are auto-discovered. No plugin.json entry is needed or wanted for them.
 
-> **AUTO-DISCOVERY WARNING — ALL OR NOTHING**
-> The `agents` array overrides auto-discovery entirely when present. Any agent path NOT listed becomes invisible to Claude Code. Always read the existing `agents` array first and preserve every entry. Never write a single-entry array unless this is genuinely the only agent in the plugin.
+> **AUTO-DISCOVERY — ALL OR NOTHING**
+> Agents in `agents/` are registered automatically. The `agents` key in `plugin.json` exists only for agents stored outside the default `agents/` directory. When `agents` is declared, it **replaces** auto-discovery entirely — every agent not listed becomes invisible. If you must use it, always read the existing array first and carry forward every entry.
+
+Only use the `agents` key when placing agent files outside `agents/`:
 
 ```json
 {
   "agents": [
+    "./custom-dir/my-agent.md",
     "./agents/existing-agent-1.md",
-    "./agents/existing-agent-2.md",
-    "./agents/{new-agent-name}.md"
+    "./agents/existing-agent-2.md"
   ]
 }
 ```
 
+To keep the default `agents/` directory active while adding a non-default path, include `"./agents/"` in the array.
+
+SOURCE: <https://code.claude.com/docs/en/plugins.md> — "agents/" listed as default auto-discovered location in Plugin structure overview table (accessed 2026-04-07); replace-on-declare behavior confirmed by incident record in `.claude/rules/plugin-development.md` (2026-03-17: 17 of 19 agents invisible when 2-entry `agents` key declared in plugin.json)
+
 **Skills vs agents registration distinction:**
 
-- **Agents** always require explicit `agents` array entries — Claude Code does not auto-discover agents.
-- **Skills** in `skills/` are auto-discovered by Claude Code when no `skills` field exists in `plugin.json`. Do NOT add skill paths to `plugin.json` for skills under the standard `skills/` directory.
+- **Agents** in `agents/` are auto-discovered — do NOT add them to `plugin.json`. Only declare the `agents` key for agents in non-default locations, and be aware that doing so overrides auto-discovery entirely.
+- **Skills** in `skills/` are auto-discovered — do NOT add skill paths to `plugin.json` for skills under the standard `skills/` directory.
 
 ### Phase 6 — Validation
 

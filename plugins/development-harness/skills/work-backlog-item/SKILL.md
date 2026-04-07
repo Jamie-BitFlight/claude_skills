@@ -61,7 +61,8 @@ flowchart TD
 
     RouteCheck -->|"create"| CreateItemRef{"valid item_ref<br>already available?"}
     CreateItemRef -->|"Yes — existing ref from input<br>or GitHub issue URL"| CreateSkip(["STOP — item already exists, creation not needed"])
-    CreateItemRef -->|"No — no existing ref"| RunCreate["Run create workflow<br>references/workflows/create/start.md"]
+    CreateItemRef -->|"No — no existing ref"| CreateScope["Read scope.md<br>references/workflows/create/scope.md"]
+    CreateScope --> RunCreate["Run create workflow<br>references/workflows/create/start.md"]
     RunCreate --> CreateDone{"item_ref now exists<br>in parsed state?"}
     CreateDone -->|"No — creation failed"| CreateFail(["STOP — report creation failure"])
     CreateDone -->|"Yes — item created"| CreateEnd(["STOP — creation complete"])

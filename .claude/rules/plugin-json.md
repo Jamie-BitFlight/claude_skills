@@ -25,7 +25,7 @@ paths:
 ## Path Rules
 
 - All paths must start with `./`
-- Custom paths supplement default directories — they do not replace them
+- Declaring the `agents` key replaces auto-discovery entirely — every agent not listed becomes invisible. Omit the key to use auto-discovery for all agents in `agents/`.
 - `agents` field must be an array of individual file paths — `["./agents/file.md"]` — not a directory string `"./agents/"`
 - Plugins cannot reference files outside their directory (`../shared-utils` fails after installation)
 
@@ -44,4 +44,4 @@ claude plugin validate {plugin-directory}
 | `name: Required` | Missing name field | Add `"name": "plugin-name"` |
 | Invalid JSON syntax | Malformed JSON | Validate with `python3 -m json.tool plugin.json` |
 
-**SOURCE:** Lines 75-91 of claude-plugins-reference-2026/SKILL.md; verified via `skilllint`
+**SOURCE:** <https://code.claude.com/docs/en/plugins.md> — "agents/" listed as default auto-discovered location (accessed 2026-04-07); replace-on-declare behavior confirmed by incident record in `.claude/rules/plugin-development.md` (2026-03-17: 17 of 19 agents invisible when 2-entry `agents` key declared)

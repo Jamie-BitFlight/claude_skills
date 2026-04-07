@@ -140,9 +140,9 @@ NEXT-token handoff model where separate skills passed control to each other.
 
 | Stage | Route | Workflow file | Produces | Status on completion |
 |---|---|---|---|---|
-| Create | `create` | `workflows/create/start.md` | `item_ref` (`#N`), backend issue | `needs-grooming` |
-| Groom | `groom` | `workflows/groom/start.md` | DEEP item with 7 required sections | `groomed` |
-| Work | `work` | (remaining SKILL.md logic) | SAM plan, implementation | `in-progress` → `done` |
+| Create | `create` | `workflows/create/scope.md` + `start.md` | `item_ref` (`#N`), backend issue | `needs-grooming` |
+| Groom | `groom` | `workflows/groom/scope.md` + `start.md` | DEEP item with 7 required sections | `groomed` |
+| Work | `work` | `workflows/work/scope.md` + `start.md` | SAM plan, implementation | `in-progress` → `done` |
 
 ### Stage Transitions
 
@@ -498,7 +498,9 @@ SOURCE: Architect spec Issue #398, Section 9 (AC7 severity policy decision) (acc
 
 ## References
 
+- [Create Scope](../skills/work-backlog-item/references/workflows/create/scope.md) — Create stage scope boundary
 - [Create Workflow](../skills/work-backlog-item/references/workflows/create/start.md) — create stage procedure
+- [Work Scope](../skills/work-backlog-item/references/workflows/work/scope.md) — Work stage scope boundary
 - [Groom Workflow](../skills/work-backlog-item/references/workflows/groom/groom.md) — groom stage index
 - [Groom Finalize](../skills/work-backlog-item/references/workflows/groom/finalize.md) — output validation and write procedure
 - [Backend Providers](./backend-providers.md) — BacklogBackend Protocol, available backends, configuration

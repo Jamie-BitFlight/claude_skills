@@ -1,7 +1,7 @@
 {
   "name": "dh",
   "description": "Language-agnostic development process harness implementing the Stateless Agent Methodology (SAM) 7-stage pipeline with ARL human touchpoint model and Voltron-style language plugin composition. Provides orchestration, workflows, planning, verification, and testing methodology that any language plugin can compose with.",
-  "version": "7.6.4",
+  "version": "7.7.0",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
@@ -30,9 +30,5 @@
         "@modelcontextprotocol/server-sequential-thinking@latest"
       ]
     }
-  },
-  "agents": [
-    "./agents/dh-context-gathering.md",
-    "./agents/backlog-item-groomer.md"
-  ]
+  }
 }
