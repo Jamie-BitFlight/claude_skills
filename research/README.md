@@ -492,6 +492,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [solace-agent-mesh.md](./agent-frameworks/solace-agent-mesh.md)       | Solace Agent Mesh — event-driven multi-agent AI framework with Solace Platform messaging for agent delegation, artifact sharing, and scalable peer-to-peer agent collaboration (Apache-2.0) | 2026-03-28   |
 | [gitagent.md](./agent-frameworks/gitagent.md)                         | GitAgent v0.1.7 — framework-agnostic, git-native AI agent standard; define agents as git repos with AGENT.yaml spec (system prompts, tool schemas, compliance policies); exporters for Claude Code, OpenAI, LangChain, CrewAI, AutoGen; "Clone a repo, get an agent" (MIT) | 2026-03-29   |
 | [Trellis.md](./agent-frameworks/Trellis.md)                           | Multi-platform AI coding framework supporting 12 platforms with spec injection, task management, and parallel execution via worktrees | 2026-04-06   |
+| [arxitect.md](./agent-frameworks/arxitect.md)                         | Arxitect — Claude Code plugin enforcing software design principles via 3 specialized architecture reviewers (API Design, OO Design, Clean Architecture) and an implement-review-feedback loop; works with Claude Code, Cursor, Codex, Gemini CLI (v1.1.1, MIT) | 2026-04-08   |
 
 **Key Topics**:
 
