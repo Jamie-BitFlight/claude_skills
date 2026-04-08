@@ -280,3 +280,17 @@ SOURCE: README.md lines 217-219 (accessed 2026-04-08) + inferred from code struc
 | Limitations | medium | Most caveats inferred from feature limitations documented in README and ARCHITECTURE (caching, clustering sensitivity); some inferred from code structure |
 
 **Next review**: 2026-07-08 (3 months from access date)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Microsoft GraphRAG](../context-management/microsoft-graphrag.md) | context-management | knowledge graph extraction and community detection for semantic relationship discovery |
+| [Samuraizer](../ai-research-tools/samuraizer.md) | ai-research-tools | semantic knowledge base with D3.js graph visualization and cross-document relationship mapping |
+| [Living Architecture](../documentation-tools/living-architecture.md) | documentation-tools | extracts operational flow architecture from code; shared AST-to-visualization pipeline |
+| [Anthropic Agent Skills Repository](./anthropics-skills.md) | skill-generation-tools | official skill specification and multimodal capabilities for autonomous code understanding |
+| [SkillKit](./skillkit.md) | skill-generation-tools | universal package manager translating skills across 32 agents; shared architecture for multi-platform deployment |
+| [Claude Code Skills Library (alirezarezvani)](./claude-code-skills-alirezarezvani.md) | skill-generation-tools | production skill ecosystem; 9-phase quality gates and stdlib-only Python validation matching graphify's multimodal approach |
+| [Rope](../code-auditing/rope.md) | code-auditing | AST-based Python refactoring library; shared tree-sitter foundation and scope-aware symbol resolution patterns |

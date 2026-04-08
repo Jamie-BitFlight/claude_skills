@@ -305,6 +305,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | [cocoindex-code.md](./mcp-ecosystem/cocoindex-code.md)       | CocoIndex Code — embedded MCP server for semantic code search via AST analysis and embeddings; zero-config, 30+ languages, ~70% token savings, incremental indexing (Apache-2.0) | 2026-03-10   |
 | [mcpskills-cli.md](./mcp-ecosystem/mcpskills-cli.md)         | mcpskills-cli — CLI converting MCP server tools to static SKILL.md files in bash/python/node/go/rust; credential storage, Jinja2 templates, single or per-tool output (14 stars) | 2026-03-13   |
 | [gitnexus.md](./mcp-ecosystem/gitnexus.md)                   | GitNexus — graph-based code intelligence MCP server with 7 tools (query, context, impact, detect_changes, rename, cypher), 13-language support, precomputed clustering, Claude Code hooks integration (17.5K stars) | 2026-03-19   |
+| [codegraphcontext.md](./mcp-ecosystem/codegraphcontext.md)   | CodeGraphContext (CGC) — repository-to-graph tool with 20+ MCP tools, Tree-Sitter AST parsing, Cypher queries, KùzuDB default, 14-language support, CLI + MCP server dual mode, caller/callee analysis, dead code detection (v0.4.0 alpha) | 2026-04-08   |
 
 **Key Topics**:
 
@@ -382,6 +383,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [obsidian-skills.md](./skill-generation-tools/obsidian-skills.md)     | Obsidian Skills - 5 modular Agent Skills for Obsidian (markdown, bases, JSON Canvas, CLI, defuddle) by Steph Ango (13.3K stars) | 2026-03-12   |
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
 | [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
+| [graphify.md](./skill-generation-tools/graphify.md)           | graphify v3 — dual AST+LLM extraction pipeline, 19-language tree-sitter support, confidence-tagged edges (EXTRACTED/INFERRED/AMBIGUOUS), 71.5x token reduction on mixed corpora, multi-format export (HTML/JSON/Markdown/SVG/GraphML/Cypher/Obsidian), PreToolUse hook integration | 2026-04-08   |
 
 **Key Topics**:
 
