@@ -637,6 +637,7 @@ High-performance API frameworks for building backend services, tool endpoints, a
 | [pocketbase.md](./api-frameworks/pocketbase.md) | PocketBase - open-source Go backend in 1 file: embedded SQLite, realtime subscriptions, auth (password/OTP/OAuth2/MFA), file storage, admin dashboard (56K+ stars) | 2026-02-23   |
 | [tornado.md](./api-frameworks/tornado.md)  | Python web framework and async networking library for WebSockets and long-polling (22K+ stars, 95M+ downloads/month) | 2026-02-05   |
 | [modelence.md](./api-frameworks/modelence.md) | Modelence - AI-native TypeScript/Node.js backend framework with MongoDB, auth, real-time stores, WebSockets, observability, cron, rate limiting, and managed cloud deploy (YC-backed, Apache 2.0) | 2026-03-04   |
+| [violit.md](./api-frameworks/violit.md) | Violit - reactive Python web framework replacing Streamlit's full-script reruns with fine-grained state reactivity; WebSocket + HTMX dual engine; Streamlit-compatible API; desktop mode via pywebview (368 stars, MIT, v0.5.2) | 2026-04-10   |
 
 **Key Topics**:
 
