@@ -634,6 +634,20 @@ State is stored in TTLCache with 1800s TTL (from `state.py` line 37). For long-r
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [FastAPI](./fastapi.md) | api-frameworks | Modern Python web framework; Violit layers reactive UI on top of FastAPI-compatible async patterns |
+| [Tornado](./tornado.md) | api-frameworks | Python web framework with native WebSocket support; complementary for live-update dashboards requiring persistent connections |
+| [Motia](./motia.md) | api-frameworks | Unified backend framework; alternative approach to state management and handler composition vs Violit's fine-grained reactivity |
+| [PocketBase](./pocketbase.md) | api-frameworks | Self-contained backend with realtime subscriptions and admin dashboard; Violit handles interactive frontend while PocketBase provides backend |
+| [AnyIO](../async-libraries/anyio.md) | async-libraries | Backend-agnostic async concurrency; Violit's async runtime depends on core patterns like this |
+| [Trio](../async-libraries/trio.md) | async-libraries | Structured concurrency library; alternative async foundation to asyncio that Violit could integrate with |
+| [Ultra-MCP](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | React dashboard with real-time state updates; shares reactive UI architecture patterns with Violit's signal-based model |
+
+---
+
 ## Entry Metadata
 
 - **Resource Type**: Python Framework / API
