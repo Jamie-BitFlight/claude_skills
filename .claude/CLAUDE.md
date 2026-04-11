@@ -312,16 +312,18 @@ Skills `/dh:create-backlog-item` and `/dh:work-backlog-item` invoke these tools.
 
 **Automatic version bumping**: `plugin.json` and `marketplace.json` are automatically bumped and staged by the pre-commit hook when any plugin file is modified. Do not manually edit version fields — the hook handles this. After a successful commit, the updated versions are already included.
 
-**MCP server validation**: After modifying any MCP server in a plugin, validate the changes by loading the `/fastmcp-creator:fastmcp-client-cli` skill and running:
+**MCP server validation**: After modifying any MCP server in a plugin, validate the changes by loading the `/fastmcp-creator:fastmcp-client-cli` skill and running against the plugin source directory (not the cache):
 
 ```bash
-# Find the server script from the plugin's mcpServers config in plugin.json
-PLUGIN_ROOT=~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>
-uv run fastmcp list --command "uv run --script ${PLUGIN_ROOT}/scripts/<server_script>.py"
-uv run fastmcp call --command "uv run --script ${PLUGIN_ROOT}/scripts/<server_script>.py" <tool_name> [args]
+# Run from the repo root — target the plugin source script directly
+uv run fastmcp list --command "uv run --script plugins/<plugin-name>/scripts/<server_script>.py"
+uv run fastmcp call --command "uv run --script plugins/<plugin-name>/scripts/<server_script>.py" <tool_name> [args]
+
+# Example: development-harness backlog server
+uv run fastmcp list --command "uv run --script plugins/development-harness/scripts/run_backlog_server.py"
 ```
 
-Note: `fastmcp discover` does not surface plugin-delivered MCP servers — use `--command` with the script path from `plugin.json` `mcpServers` config.
+Note: `fastmcp discover` does not surface plugin-delivered MCP servers — use `--command` with the server script path.
 
 ---
 
