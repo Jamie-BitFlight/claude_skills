@@ -60,8 +60,19 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`)
 mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
 ```
 
-2. Extract: `title`, `description`, `sections['acceptance criteria']`,
-   `sections['expected behavior']`, `sections['impact radius']`, and any other populated sections.
+2. Normalize section keys to lowercase before lookup:
+
+   ```text
+   sections_lower = {k.lower(): v for k, v in response["sections"].items()}
+   ```
+
+   Extract: `title`, `description`, `sections_lower.get('acceptance criteria')`,
+   `sections_lower.get('expected behavior')`, `sections_lower.get('impact radius')`,
+   and any other populated sections.
+
+   Section values may be a list of entries — use `'\n'.join(entries)` to get the full text
+   when the value is a list rather than a string.
+
 3. Use the loaded content as the goal input for the RT-ICA procedure below.
 4. After completing the assessment, write the RT-ICA result back to the item:
 

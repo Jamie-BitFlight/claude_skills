@@ -25,8 +25,16 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42'
 mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
 ```
 
-2. Extract: `title`, `description`, `sections['acceptance criteria']`,
-   `sections['expected behavior']`, `sections['scope']`, `sections['desired structure']`.
+2. Normalize section keys to lowercase before lookup:
+
+   ```text
+   sections_lower = {k.lower(): v for k, v in response["sections"].items()}
+   ```
+
+   Extract: `title`, `description`, `sections_lower.get('acceptance criteria')`,
+   `sections_lower.get('expected behavior')`, `sections_lower.get('scope')`,
+   `sections_lower.get('desired structure')`.
+
 3. Use these as the initial problem statement — skip Step 2 (clarifying questions) if the
    description is unambiguous and the required sections are non-empty.
 4. Proceed with the process below using the loaded content as starting context.

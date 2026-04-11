@@ -32,10 +32,16 @@ mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type
 mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
 ```
 
-Inspect `response["sections"]`. If **all three** of the following are non-empty:
-- `acceptance criteria`
-- `expected behavior`
-- `desired structure` (or `scope` as equivalent)
+Normalize section keys to lowercase before lookup:
+
+```text
+sections_lower = {k.lower(): v for k, v in response["sections"].items()}
+```
+
+Inspect `sections_lower`. If **all three** of the following are non-empty:
+- `sections_lower.get('acceptance criteria')`
+- `sections_lower.get('expected behavior')`
+- `sections_lower.get('desired structure')` (or `sections_lower.get('scope')` as equivalent)
 
 → **Synthesize** a feature-context artifact directly from those sections instead of invoking discovery:
 
@@ -43,7 +49,7 @@ Inspect `response["sections"]`. If **all three** of the following are non-empty:
 mcp__plugin_dh_backlog__artifact_register(
     issue_number={issue_number},
     artifact_type='feature-context',
-    path='plan/feature-context-{slug}.md',
+    path='plan/feature-context-{N}.md',
     agent='discovery',
     content='# ARTIFACT:DISCOVERY\n\n## Feature\n{item title}\n\n## Problem Statement\n{item description}\n\n## Goals\n{acceptance criteria section content}\n\n## Expected Behavior\n{expected behavior section content}\n\n## Desired Structure\n{desired structure / scope section content}\n\n## Open Questions\n- None (synthesized from groomed backlog item)'
 )

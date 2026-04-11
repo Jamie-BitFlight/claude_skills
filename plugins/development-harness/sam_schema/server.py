@@ -625,3 +625,89 @@ def sam_active_task(
 
         case _:  # pragma: no cover
             raise ValueError(f"sam_active_task: unhandled action '{config.action}'")
+
+
+# ---------------------------------------------------------------------------
+# Deprecation shims — legacy tools replaced by sam_plan / sam_task / sam_active_task
+# ---------------------------------------------------------------------------
+
+_DEPRECATION_MSG = (
+    "This tool is deprecated. Use sam_task (action='read'/'claim'/'state'/'update') "
+    "or sam_plan (action='read'/'create'/'list'/'status'/'ready'/'update') instead."
+)
+
+
+@mcp.tool
+def sam_read(
+    plan: Annotated[str, Field(description="Plan address (deprecated)")],
+    task: Annotated[str | None, Field(description="Task ID (deprecated)")] = None,
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_task(action='read') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_state(
+    plan: Annotated[str, Field(description="Plan address (deprecated)")],
+    task: Annotated[str, Field(description="Task ID (deprecated)")],
+    status: Annotated[str, Field(description="New status (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_task(action='state') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_ready(
+    plan: Annotated[str, Field(description="Plan address (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_plan(action='ready') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_status(
+    plan: Annotated[str, Field(description="Plan address (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_plan(action='status') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_list(plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan") -> dict:
+    """Deprecated. Use sam_plan(action='list') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_create(
+    slug: Annotated[str, Field(description="Plan slug (deprecated)")],
+    goal: Annotated[str, Field(description="Plan goal (deprecated)")],
+    tasks_yaml: Annotated[str, Field(description="Tasks YAML (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_plan(action='create') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_update(
+    address: Annotated[str, Field(description="Plan or task address (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+    context: Annotated[str | None, Field(description="Context to set (deprecated)")] = None,
+) -> dict:
+    """Deprecated. Use sam_plan(action='update') or sam_task(action='update') instead."""
+    raise ToolError(_DEPRECATION_MSG)
+
+
+@mcp.tool
+def sam_claim(
+    plan: Annotated[str, Field(description="Plan address (deprecated)")],
+    task: Annotated[str, Field(description="Task ID (deprecated)")],
+    plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
+) -> dict:
+    """Deprecated. Use sam_task(action='claim') instead."""
+    raise ToolError(_DEPRECATION_MSG)
