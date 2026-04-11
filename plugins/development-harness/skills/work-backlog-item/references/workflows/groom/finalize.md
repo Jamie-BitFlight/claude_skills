@@ -42,10 +42,13 @@ Changes from snapshot:
 Decision: {APPROVED|BLOCKED}
 ```
 
-5. Store the report content as `{rt_ica_final_content}` — it will be included in the batch
-   write at the end of this workflow to ensure atomic persistence with `mark_groomed=True`.
-   Do NOT write it individually here; the batch write in the Write Groomed Content step
-   covers it and prevents duplicate entries.
+5. Write final RT-ICA to item (replaces the initial snapshot). Store the report content as
+   `{rt_ica_final_content}` — it will be included in the batch write at the end of this workflow
+   to ensure atomic persistence with `mark_groomed=True`:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{final report}')
+```
 
    Retain `{rt_ica_final_content}` in scope for the Write Groomed Content step.
 
@@ -189,7 +192,7 @@ Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-
 `Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
 
 ```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')
 ```
 
 **`mark_groomed=True`** performs these transitions via the active backend:

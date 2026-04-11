@@ -25,18 +25,8 @@ Call `mcp__plugin_dh_backlog__backlog_view(selector="{title}", summary=false)`.
 
 Extract file paths using this priority order:
 
-1. Normalize section keys to lowercase before lookup:
-
-   ```text
-   sections_lower = {k.lower(): v for k, v in response["sections"].items()}
-   ```
-
-2. Primary key: `sections_lower.get('impact radius')` (matches "Impact Radius" as written by the impact-analyst swarm agent)
-3. Fallback key: `sections_lower.get('resources')` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
-
-   ```text
-   section = sections_lower.get('impact radius') or sections_lower.get('resources')
-   ```
+1. Primary key: `response["sections"]["impact radius"]` (lowercase, as written by the impact-analyst swarm agent)
+2. Fallback key: `response["sections"]["resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
 
 Use a regex to find all path-like tokens (e.g., `\S+\.\w+` patterns or lines beginning with a path segment) in whichever section is found.
 
@@ -67,11 +57,10 @@ If one or more qualifying commits exist → proceed to Phase 2.
 
 ```mermaid
 flowchart TD
-    Start(["Step 3.1: groomed=date confirmed"]) --> Normalize["Normalize: sections_lower = {k.lower(): v for k, v in sections.items()}"]
-    Normalize --> ExtractIR["Try sections_lower.get('impact radius')"]
+    Start(["Step 3.1: groomed=date confirmed"]) --> ExtractIR["Try sections['impact radius'] (lowercase key)"]
     ExtractIR --> IRPresent{"Key present<br>with file paths?"}
     IRPresent -->|"Yes"| HasFiles
-    IRPresent -->|"No — absent or empty"| Fallback["Try sections_lower.get('resources') as fallback<br>(older grooming template)"]
+    IRPresent -->|"No — absent or empty"| Fallback["Try sections['resources'] as fallback<br>(older grooming template)"]
     Fallback --> HasFiles{"File paths found<br>in either section?"}
     HasFiles -->|"No files in either section"| Skip(["Skip staleness check<br>→ rt-ica-gate.md"])
     HasFiles -->|"Files found"| Phase1["Phase 1: git log --oneline<br>--after=groomed_date --diff-filter=AMRD<br>-- {impact_radius_files}"]
