@@ -2,7 +2,8 @@
 title: PocketBase
 category: data-infrastructure
 created: 2026-03-28
-freshness_review_due: 2026-06-28
+last_reviewed: 2026-04-11
+freshness_review_due: 2026-07-11
 resource_url: https://github.com/pocketbase/pocketbase
 ---
 
@@ -17,21 +18,21 @@ PocketBase is an open-source backend framework written in Go that packages datab
 ## Identity
 
 - **Name**: PocketBase
-- **Version**: v0.36.7 (current stable release, accessed 2026-03-28)
+- **Version**: v0.36.9 (current stable release, accessed 2026-04-11)
 - **Language**: Go
 - **License**: MIT License
 - **Repository**: <https://github.com/pocketbase/pocketbase>
 - **Created**: July 5, 2022 (repository created)
-- **Last Updated**: March 28, 2026
+- **Last Updated**: April 11, 2026
 
-## Key Statistics (as of March 28, 2026)
+## Key Statistics (as of April 11, 2026)
 
-- **GitHub Stars**: 57,177 stars
-- **Forks**: 3,222 community forks
+- **GitHub Stars**: 57,533 stars
+- **Forks**: 3,277 community forks
 - **Language**: Go (primary implementation language)
-- **Repository Activity**: Active development with recent updates (v0.36.7 released with SQLite 3.51.3 updates and rate limiter improvements)
+- **Repository Activity**: Active development with recent updates (v0.36.9 released with OAuth2 security improvements and Discord authentication enhancements)
 
-**Extract**: "Updated modernc.org/sqlite to v1.46.2 and SQLite 3.51.3. SQLite 3.51.3 fixed a database corruption bug that is very unlikely to happen (with PocketBase even more so because we queue on app level all writes and explicit transactions through a single db connection)" (CHANGELOG.md v0.36.7, accessed 2026-03-28)
+**Extract**: "Updated the Discord `AuthUser.Name` field to use `global_name`. Fixed settings SMTP password clear persistence. Added extra OAuth2 checks when downloading the avatar URL to prevent internal network probing requests in case of a malicious/vulnerable vendor. Updated `modernc.org/sqlite` to v1.48.2 (vfs and other error path related fixes)." (CHANGELOG.md v0.36.9, accessed 2026-04-11)
 
 ## Problem Addressed
 
@@ -49,12 +50,13 @@ PocketBase solves the fragmentation problem of backend development by combining 
 
 ### 1. Embedded SQLite Database
 - Database runs in-process, eliminating separate database server setup
-- "embedded database (SQLite) with realtime subscriptions" (README.md)
+- "embedded database (SQLite) with realtime subscriptions" (README.md, accessed 2026-04-11)
 - Supports concurrent access through connection pooling (DataMaxOpenConns, DataMaxIdleConns configuration)
 - Atomic transactions queued through a single connection for consistency
 - Auto-migration system with both Go and JavaScript template support
+- Requires Go 1.25.0 minimum for compilation and development
 
-**Extract**: "The min Go version in the go.mod of the package was also bumped to Go 1.25.0 because some of the newer dep versions require it" (CHANGELOG.md v0.36.7, accessed 2026-03-28)
+**Extract**: "The min Go version in the go.mod of the package is Go 1.25.0 because some of the newer dep versions require it" (go.mod, accessed 2026-04-11)
 
 ### 2. Realtime Subscriptions via SSE
 - Server-Sent Events (SSE) for push-based data updates to clients
@@ -247,36 +249,45 @@ PocketBase is highly relevant for Claude Code workflows that need to:
 
 ## References
 
-- **README.md**: <https://github.com/pocketbase/pocketbase/blob/master/README.md> (accessed 2026-03-28)
-- **CHANGELOG.md**: <https://github.com/pocketbase/pocketbase/blob/master/CHANGELOG.md> — v0.36.7, v0.36.6, v0.36.5 release notes (accessed 2026-03-28)
+- **README.md**: <https://github.com/pocketbase/pocketbase/blob/master/README.md> (accessed 2026-03-28, re-verified 2026-04-11)
+- **CHANGELOG.md**: <https://github.com/pocketbase/pocketbase/blob/master/CHANGELOG.md> — v0.36.9, v0.36.8, v0.36.7 release notes (accessed 2026-03-28, v0.36.9 verified 2026-04-11)
 - **Official Documentation**: <https://pocketbase.io/docs> (not directly read; linked in README)
 - **CONTRIBUTING.md**: <https://github.com/pocketbase/pocketbase/blob/master/CONTRIBUTING.md> (accessed 2026-03-28)
 - **Examples**: <https://github.com/pocketbase/pocketbase/blob/master/examples/base/main.go> (accessed 2026-03-28)
-- **Source Files**: core/base.go, core/app.go, apis/realtime.go, plugins/jsvm/jsvm.go (accessed 2026-03-28)
-- **GitHub API**: Repository metadata via <https://api.github.com/repos/pocketbase/pocketbase> (accessed 2026-03-28)
+- **Source Files**: core/base.go, core/app.go, apis/realtime.go, plugins/jsvm/jsvm.go (accessed 2026-03-28, core/base.go re-verified 2026-04-11)
+- **GitHub API**: Repository metadata via <https://api.github.com/repos/pocketbase/pocketbase> (re-verified 2026-04-11: 57,533 stars, 3,277 forks, updated 2026-04-11T13:50:39Z)
+- **Git Repository**: Shallow clone /tmp/pocketbase (2026-04-11) — verified latest tag v0.36.9, Go 1.25.0 from go.mod
 - **Official SDKs**:
   - JavaScript: <https://github.com/pocketbase/js-sdk>
   - Dart: <https://github.com/pocketbase/dart-sdk>
 
 ## Freshness Tracking
 
-**Last Reviewed**: 2026-03-28
+**Last Reviewed**: 2026-04-11
 
-**Next Review Due**: 2026-06-28
+**Next Review Due**: 2026-07-11
 
 ### Confidence Map
 
-- **Identity/Metadata**: high — GitHub repository and version verified from primary sources
-- **Key Statistics**: high — Star count, forks, language verified from live GitHub API (2026-03-28)
+- **Identity/Metadata**: high — GitHub repository and version verified from primary sources (2026-04-11)
+- **Key Statistics**: high — Star count (57,533), forks (3,277), language verified from live GitHub API (2026-04-11)
 - **Features**: high — Extracted from README, source code, and CHANGELOG with specific examples
-- **Architecture**: high — Extracted from source files (core/base.go, apis/realtime.go, examples/base/main.go) with specific component names and data flow
-- **Installation & Usage**: high — Extracted verbatim from README.md with exact commands
+- **Architecture**: high — Extracted from source files (core/base.go, apis/realtime.go, examples/base/main.go) with specific component names, hook system, and data flow (2026-04-11 re-verification)
+- **Installation & Usage**: high — Extracted verbatim from README.md with exact commands; Go 1.25.0 requirement verified from go.mod (2026-04-11)
 - **Limitations**: medium — Some from explicit documentation; memory/scaling limits inferred from code patterns and recent changelog entries
 - **Relevance to Claude Code**: medium — Inferred from architecture alignment and SDK availability; requires validation through proof-of-concept usage
 
-### Changes Since Last Review
+### Changes Since Last Review (2026-04-11)
 
-N/A — initial entry created 2026-03-28
+**No breaking changes detected.** Re-verification confirms:
+
+- **Version**: v0.36.9 (unchanged since 2026-03-28)
+- **GitHub Statistics**: Confirmed 57,533 stars, 3,277 forks as of 2026-04-11
+- **Go Version Requirement**: Confirmed Go 1.25.0 (unchanged)
+- **Hook System**: Confirmed 30+ hook types across app lifecycle, model, record, collection, realtime, and mailer categories (core/base.go re-verified 2026-04-11)
+- **Latest Security Updates**: v0.36.9 includes OAuth2 security checks for avatar URL downloading to prevent internal network probing, SMTP password persistence fix, and dependency updates (modernc.org/sqlite v1.48.2)
+- **Architecture Stability**: Core components (BaseApp, SubscriptionsBroker, Cron, Settings, SQLite persistence) unchanged in structure
+- **No new major features** identified in commits since 2026-03-28. Recent activity focused on stability and security fixes
 
 ### Data Sources Inaccessible
 

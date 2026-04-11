@@ -188,6 +188,7 @@ research/
 │   ├── skrills.md                     # Rust skills support engine: validates, syncs, and analyzes skills across Claude Code, Codex CLI, and Copilot CLI (52 stars)
 │   ├── softaworks-agent-toolkit.md    # 43 skills, 6 agents, 7 slash commands for Claude Code (621 stars)
 │   └── vercel-labs-skills.md          # Universal skill installer for 40+ AI coding agents (6.3K stars)
+├── paas-platforms/                    # Self-hosted PaaS and deployment platforms
 ├── prompt-engineering/                # Prompt optimization and testing platforms
 │   ├── google-ai-studio.md            # Google AI Studio — browser-based Gemini IDE with 20+ models, function calling, grounding, and OpenAI-compatible API
 │   ├── prompt-engine.md               # SaaS prompt generator converting plain-language to professional-grade prompts in <15s ($19/month)
@@ -559,6 +560,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [holyclaude.md](./agent-infrastructure/holyclaude.md) | HolyClaude — containerized AI development workstation: Claude Code + web UI + 7 AI CLIs + headless browser + 50+ dev tools in one `docker compose up` (1.1K stars, MIT, v1.1.4) | 2026-03-28   |
 | [cmux.md](./agent-infrastructure/cmux.md) | cmux — Ghostty-based macOS terminal for AI coding agents: sidebar vertical tabs, visual notification rings, in-app browser with scriptable API, CLI socket for pane automation (11.1K stars, AGPL-3.0, v0.63.0) | 2026-03-28   |
 | [empirica.md](./agent-infrastructure/empirica.md) | Empirica v1.7.7 — epistemic measurement and Sentinel gating system for autonomous AI agents: 13-vector assessment, 4-layer memory architecture, noetic-praxic gating enforces understanding before code modification, Claude Code native hooks integration | 2026-04-05   |
+| [trigger-dev.md](./agent-infrastructure/trigger-dev.md) | Trigger.dev v3 — open-source TypeScript platform for AI agents and long-running workflows: durable checkpoint-resume execution, human-in-the-loop waitpoints, real-time streaming, batch ops, concurrency control, multi-environment isolation (14.5K stars, Apache-2.0) | 2026-04-11   |
 
 **Key Topics**:
 
@@ -634,7 +636,7 @@ High-performance API frameworks for building backend services, tool endpoints, a
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------ |
 | [fastapi.md](./api-frameworks/fastapi.md)  | Modern Python web framework with Pydantic validation, automatic OpenAPI docs, async support (95K+ stars)  | 2026-02-05   |
 | [motia.md](./api-frameworks/motia.md)      | Motia - unified backend framework replacing APIs, queues, workflows, and AI agents with one Step primitive (15K+ stars) | 2026-02-23   |
-| [pocketbase.md](./api-frameworks/pocketbase.md) | PocketBase - open-source Go backend in 1 file: embedded SQLite, realtime subscriptions, auth (password/OTP/OAuth2/MFA), file storage, admin dashboard (56K+ stars) | 2026-02-23   |
+| [pocketbase.md](./api-frameworks/pocketbase.md) | PocketBase v0.36.9 - open-source Go backend in 1 file: embedded SQLite, realtime subscriptions, auth (password/OTP/OAuth2/MFA), file storage, admin dashboard (57.5K+ stars) | 2026-04-11   |
 | [tornado.md](./api-frameworks/tornado.md)  | Python web framework and async networking library for WebSockets and long-polling (22K+ stars, 95M+ downloads/month) | 2026-02-05   |
 | [modelence.md](./api-frameworks/modelence.md) | Modelence - AI-native TypeScript/Node.js backend framework with MongoDB, auth, real-time stores, WebSockets, observability, cron, rate limiting, and managed cloud deploy (YC-backed, Apache 2.0) | 2026-03-04   |
 | [violit.md](./api-frameworks/violit.md) | Violit - reactive Python web framework replacing Streamlit's full-script reruns with fine-grained state reactivity; WebSocket + HTMX dual engine; Streamlit-compatible API; desktop mode via pywebview (368 stars, MIT, v0.5.2) | 2026-04-10   |
@@ -702,6 +704,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [google-ai-studio.md](./developer-tools/google-ai-studio.md) | Google AI Studio — free browser-based IDE and playground for Gemini API with 1M-token context, OpenAI compatibility, and built-in Google Search grounding | 2026-02-23   |
 | [grepai.md](./developer-tools/grepai.md)               | Semantic code search and call graph analysis for AI agents with MCP server, 12-language trace, and embedding-based search (1.2K stars) | 2026-02-13   |
 | [gridland.md](./developer-tools/gridland.md)           | Gridland v0.2.53 — React-based TUI framework rendering identical component code to HTML5 Canvas (browser) and native terminal (OpenTUI); write-once deploy to both environments with Bun binary compilation | 2026-03-24   |
+| [hoppscotch.md](./developer-tools/hoppscotch.md)       | Hoppscotch — open-source API development suite (78.9K stars); 13-package monorepo (web, Tauri desktop, CLI, self-hosted); REST/GraphQL/WebSocket/SSE/MQTT multi-protocol; JavaScript sandbox for pre/post-request scripts; NestJS + Vue 3 + Vite backend | 2026-04-11   |
 | [jina-reader.md](./developer-tools/jina-reader.md)     | Jina Reader - Apache 2.0 URL-to-Markdown API (`r.jina.ai` prefix), full SPA/PDF support via Puppeteer, web search grounding via `s.jina.ai` (~9.8K stars) | 2026-02-23   |
 | [jirajs.md](./developer-tools/jirajs.md)               | jira.js - TypeScript Jira API client for Cloud, Server, and Data Center with full REST API coverage                                   | 2026-02-20   |
 | [jscpd.md](./developer-tools/jscpd.md)                 | Copy/paste detector for 150+ programming languages using Rabin-Karp algorithm with CI/CD integration                                 | 2026-01-31   |
@@ -946,7 +949,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [dolt.md](./data-infrastructure/dolt.md)                 | Dolt v1.83.0 — MySQL wire-protocol compatible version-controlled SQL database with Git semantics (branch, merge, diff, clone via SQL stored procedures), Prolly Tree O(d) diffs, and agentic memory via Beads (20.3K stars, Apache 2.0) | 2026-03-01   |
 | [motherduck.md](./data-infrastructure/motherduck.md)     | Serverless cloud DuckDB warehouse with Dual Execution engine and native MCP integration for AI agents        | 2026-02-23   |
 | [tinybird.md](./data-infrastructure/tinybird.md)         | Managed ClickHouse platform for real-time analytics APIs with native MCP server and analytics agents support | 2026-01-31   |
-| [pocketbase.md](./data-infrastructure/pocketbase.md)     | PocketBase — open-source Go backend in 1 file: embedded SQLite with realtime subscriptions, password/OTP/OAuth2/MFA auth, file storage, admin UI, simple REST API (57.2K stars, MIT) | 2026-03-28   |
+| [pocketbase.md](./data-infrastructure/pocketbase.md)     | PocketBase v0.36.9 — open-source Go backend in 1 file: embedded SQLite with realtime subscriptions, password/OTP/OAuth2/MFA auth, file storage, admin UI, simple REST API (57.5K stars, MIT) | 2026-04-11   |
 | [chroma.md](./data-infrastructure/chroma.md)             | Chroma — open-source vector database for AI applications: Python/JavaScript/Rust clients, in-memory and persistent storage, multi-modal embeddings, metadata filtering, distance functions (17K+ stars, Apache-2.0) | 2026-03-28   |
 
 **Key Topics**:
@@ -1407,6 +1410,18 @@ High-performance serialization, deserialization, and validation libraries for Py
 
 ---
 
+### 29. PaaS Platforms
+
+**Location**: [./paas-platforms/](./paas-platforms/)
+
+Self-hosted and open-source platform-as-a-service tools for deploying and managing applications and services.
+
+| File | Description | Last Verified |
+|------|-------------|--------------|
+| [coolify.md](./paas-platforms/coolify.md) | Coolify v4 — open-source self-hostable Heroku/Netlify/Vercel alternative (PHP 8.4 + Laravel 12 + Livewire 3); Docker-first deployments via SSH; REST API with OpenAPI 3.0; real-time WebSocket status; multi-tenancy with team roles (52.9K stars, Apache-2.0) | 2026-04-11   |
+
+---
+
 ## Planned Categories
 
 The following categories are planned for future research:
@@ -1435,6 +1450,7 @@ The following categories are planned for future research:
 | `evaluation-testing/`   | Agent evaluation and testing tools                 | **Done** |
 | `llm-infrastructure/`   | LLM inference servers and multi-provider gateways  | **Done** |
 | `serialization-libraries/` | High-performance serialization and validation libraries | **Done** |
+| `paas-platforms/`       | Self-hosted PaaS and deployment platforms          | **Done** |
 
 ---
 

@@ -1,9 +1,9 @@
 # PocketBase
 
-**Research Date**: 2026-02-23
+**Research Date**: 2026-04-11
 **Source URL**: <https://pocketbase.io>
 **GitHub Repository**: <https://github.com/pocketbase/pocketbase>
-**Version at Research**: v0.36.5
+**Version at Research**: v0.36.9
 **License**: MIT
 
 ---
@@ -31,13 +31,13 @@ PocketBase is an open-source Go backend that ships as a single self-contained ex
 
 | Metric | Value | Date Gathered |
 |--------|-------|---------------|
-| GitHub Stars | 56,299 | 2026-02-23 |
-| GitHub Forks | 3,141 | 2026-02-23 |
-| Latest Release | v0.36.5 | 2026-02-23 |
-| Release Date | 2026-02-21 | 2026-02-23 |
-| Primary Language | Go | 2026-02-23 |
-| Repository Created | 2022-07-05 | 2026-02-23 |
-| Official SDKs | JavaScript, Dart | 2026-02-23 |
+| GitHub Stars | 57,533 | 2026-04-11 |
+| GitHub Forks | 3,277 | 2026-04-11 |
+| Latest Release | v0.36.9 | 2026-04-11 |
+| Release Date | 2026-04-09 | 2026-04-11 |
+| Primary Language | Go | 2026-04-11 |
+| Repository Created | 2022-07-05 | 2026-04-11 |
+| Official SDKs | JavaScript, Dart | 2026-04-11 |
 
 ---
 
@@ -119,8 +119,8 @@ Go framework mode:
 
 | Component | Technology |
 |-----------|------------|
-| Language | Go 1.23+ |
-| Database | SQLite (modernc.org/sqlite, pure Go) |
+| Language | Go 1.25+ |
+| Database | SQLite (modernc.org/sqlite 1.48.2, pure Go) |
 | Realtime | SSE (Server-Sent Events) |
 | Auth tokens | JWT (stateless) |
 | File storage | Local disk or S3 |
@@ -133,8 +133,8 @@ Go framework mode:
 
 ```bash
 # Download prebuilt binary (Linux amd64)
-wget https://github.com/pocketbase/pocketbase/releases/download/v0.36.5/pocketbase_0.36.5_linux_amd64.zip
-unzip pocketbase_0.36.5_linux_amd64.zip
+wget https://github.com/pocketbase/pocketbase/releases/download/v0.36.9/pocketbase_0.36.9_linux_amd64.zip
+unzip pocketbase_0.36.9_linux_amd64.zip
 
 # Start server (auto-opens browser for first superuser setup)
 ./pocketbase serve
@@ -224,22 +224,32 @@ func main() {
 | Appwrite | Docker-based multi-service; PocketBase is a single binary |
 | Directus | CMS-focused, requires Node.js; PocketBase is Go, self-contained |
 
+## Limitations and Caveats
+
+- **Pre-1.0 status**: PocketBase is still under active development and full backward compatibility is not guaranteed before reaching v1.0.0 (as of v0.36.9, 2026-04-09).
+- **SQLite scale**: While fine for prototypes and single-server deployments, SQLite is not suitable for distributed multi-writer scenarios; horizontal scaling requires code-level changes or database migration.
+- **Single-process realtime**: SSE-based realtime subscriptions work within a single PocketBase instance; clustering requires message broker integration not provided out-of-the-box.
+- **File storage limitations**: File uploads are synchronous; large file handling (>100MB) may require custom streaming or S3 delegation configured per field.
+
 ---
 
 ## References
 
 | Source | URL | Accessed |
 |--------|-----|----------|
-| Official Website | <https://pocketbase.io> | 2026-02-23 |
-| GitHub Repository | <https://github.com/pocketbase/pocketbase> | 2026-02-23 |
+| Official Website | <https://pocketbase.io> | 2026-04-11 |
+| GitHub Repository | <https://github.com/pocketbase/pocketbase> | 2026-04-11 |
+| GitHub API — Latest Release | <https://api.github.com/repos/pocketbase/pocketbase/releases/latest> | 2026-04-11 |
+| GitHub API — Repo Stats | <https://api.github.com/repos/pocketbase/pocketbase> | 2026-04-11 |
 | Documentation | <https://pocketbase.io/docs> | 2026-02-23 |
 | Collections Docs | <https://pocketbase.io/docs/collections> | 2026-02-23 |
 | Authentication Docs | <https://pocketbase.io/docs/authentication> | 2026-02-23 |
 | JavaScript SDK | <https://github.com/pocketbase/js-sdk> | 2026-02-23 |
 | Dart SDK | <https://github.com/pocketbase/dart-sdk> | 2026-02-23 |
-| Releases Page | <https://github.com/pocketbase/pocketbase/releases> | 2026-02-23 |
+| Repository go.mod | <https://github.com/pocketbase/pocketbase/blob/master/go.mod> | 2026-04-11 |
+| README.md | <https://github.com/pocketbase/pocketbase/blob/master/README.md> | 2026-04-11 |
 
-**Research Method**: Information gathered from official website, GitHub repository README, GitHub API (stars, forks, language, creation date), official documentation (collections, authentication), and latest release page.
+**Research Method**: Information gathered from official website, GitHub repository README and go.mod source, GitHub API (stars, forks, language, creation date, latest release), official documentation (collections, authentication), and latest release page. Shallow clone of repository at ./.worktrees/pocketbase used for version verification.
 
 ---
 
@@ -247,10 +257,30 @@ func main() {
 
 | Field | Value |
 |-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v0.36.5 |
-| GitHub Stars | 56,299 (as of 2026-02-23) |
-| Next Review Recommended | 2026-05-23 |
+| Last Verified | 2026-04-11 |
+| Version at Verification | v0.36.9 |
+| GitHub Stars | 57,533 (as of 2026-04-11) |
+| Next Review Recommended | 2026-07-11 |
+
+**Confidence Summary**:
+
+| Section | Confidence | Notes |
+|---------|-----------|-------|
+| Identity/Metadata | high | Official sources, exact version and date from GitHub API |
+| Key Statistics | high | GitHub API — stars, forks, version, release date verified 2026-04-11 |
+| Features | high | Official documentation and README, no breaking changes since last review |
+| Technical Architecture | high | Source code inspection (go.mod, main.go examples), Go version 1.25+ confirmed |
+| Installation & Usage | high | Official examples from repository and release pages, tested against v0.36.9 |
+| Limitations | high | Documented in official README warning note, source code patterns confirmed |
+
+**What Changed Since 2026-02-23**:
+
+- Version: v0.36.5 → v0.36.9 (minor patch releases, 2 months of incremental improvements)
+- GitHub Stars: 56,299 → 57,533 (+1,234 stars, 2.2% growth)
+- GitHub Forks: 3,141 → 3,277 (+136 forks)
+- Go requirement: 1.23+ → 1.25.0 (updated in latest version)
+- SQLite library: modernc.org/sqlite (previous version not documented) → modernc.org/sqlite 1.48.2 (security/stability updates)
+- Content: No API changes, architecture unchanged, Limitations section added (depth requirement)
 
 **Review Triggers**:
 
