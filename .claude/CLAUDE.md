@@ -312,7 +312,16 @@ Skills `/dh:create-backlog-item` and `/dh:work-backlog-item` invoke these tools.
 
 **Automatic version bumping**: `plugin.json` and `marketplace.json` are automatically bumped and staged by the pre-commit hook when any plugin file is modified. Do not manually edit version fields — the hook handles this. After a successful commit, the updated versions are already included.
 
-**MCP server validation**: After modifying any MCP server in a plugin, validate the changes by first loading the `/fastmcp-creator:fastmcp-client-cli` skill, then using `fastmcp list` and `fastmcp call` to verify tools are registered and behave correctly.
+**MCP server validation**: After modifying any MCP server in a plugin, validate the changes by loading the `/fastmcp-creator:fastmcp-client-cli` skill and running:
+
+```bash
+# Find the server script from the plugin's mcpServers config in plugin.json
+PLUGIN_ROOT=~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>
+uv run fastmcp list --command "uv run --script ${PLUGIN_ROOT}/scripts/<server_script>.py"
+uv run fastmcp call --command "uv run --script ${PLUGIN_ROOT}/scripts/<server_script>.py" <tool_name> [args]
+```
+
+Note: `fastmcp discover` does not surface plugin-delivered MCP servers — use `--command` with the script path from `plugin.json` `mcpServers` config.
 
 ---
 
