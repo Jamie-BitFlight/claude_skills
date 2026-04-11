@@ -8,7 +8,7 @@ metadata:
   priority: P1
   type: Feature
   status: needs-grooming
-  # groomed: YYYY-MM-DD       # set by groom-backlog-item when all 7 sections present
+  # groomed: YYYY-MM-DD       # set by groom-backlog-item when all required sections present (see finalize.md)
   # issue: '#N'               # set by backlog script on GitHub issue creation
   # milestone: N              # set by group-items-to-milestone
   # plan: plan/slug.md        # set by work-backlog-item when SAM plan created

@@ -9,7 +9,7 @@ SOURCE: Architect spec Issue #398, Section 7 (Groomer Output Validation AC3)
 
 ## Required Section Schema
 
-All 8 sections must be present in the groomer output with minimum content. Section
+All required sections must be present in the groomer output with minimum content (defined in finalize.md validation table). Section
 names are exact string matches against `backlog_view(selector=title, summary=false).sections`.
 
 | Section | Required | Minimum content |
@@ -21,6 +21,7 @@ names are exact string matches against `backlog_view(selector=title, summary=fal
 | `Reproducibility` | Required | Non-empty — may be "N/A for feature items" but must be present |
 | `Issue Classification` | Required | Contains `Type:` field with valid type value |
 | `Priority` | Required | Contains `Effort:` field |
+| `Design Intent Alignment` | Required | Contains `Alignment assessment:` field with ALIGNED/DIVERGENT/NOT_APPLICABLE |
 
 ## Optional Sections (Not Validated for Presence)
 
@@ -62,8 +63,8 @@ Located between end of Steps 4–8 swarm and the `backlog_groom(mark_groomed=Tru
 flowchart TD
     SwarmComplete(["Steps 4-8 swarm complete"]) --> GatherSections["Read backlog_view(selector=title, summary=false).sections"]
 
-    GatherSections --> PresenceCheck["Check all 8 required sections present<br>Apply minimum content checks per schema"]
-    PresenceCheck --> PresenceResult{"All 8 sections present<br>with minimum content?"}
+    GatherSections --> PresenceCheck["Check all required sections present (see finalize.md)<br>Apply minimum content checks per schema"]
+    PresenceCheck --> PresenceResult{"All required sections present<br>with minimum content?"}
 
     PresenceResult -->|"Yes"| ScopeCheck["Scan groomer sections for prohibited patterns"]
     PresenceResult -->|"No — sections missing"| MissingList["Build list of missing section names"]

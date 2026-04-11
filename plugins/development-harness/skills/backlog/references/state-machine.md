@@ -45,7 +45,7 @@ stateDiagram-v2
 | State | Description | GitHub label |
 |---|---|---|
 | `needs-grooming` | Item created, not yet fact-checked or groomed | `status:needs-grooming` |
-| `groomed` | All 7 canonical sections present, RT-ICA APPROVED | `status:groomed` |
+| `groomed` | All required sections present (defined in finalize.md), RT-ICA APPROVED | `status:groomed` |
 | `blocked` | RT-ICA BLOCKED — missing information prevents grooming or work | `status:blocked` |
 | `in-milestone` | Assigned to a GitHub milestone, awaiting work | `status:in-milestone` |
 | `in-progress` | Work started, plan file created, implementation underway | `status:in-progress` |
@@ -60,8 +60,8 @@ stateDiagram-v2
 ### `needs-grooming` → `groomed`
 
 ```
-Trigger:    /groom-backlog-item completes Step 9 with all 7 sections present
-Precondition: RT-ICA Decision is APPROVED; all 7 canonical sections written
+Trigger:    /groom-backlog-item completes Step 9 with all required sections present (defined in finalize.md)
+Precondition: RT-ICA Decision is APPROVED; all required canonical sections written (defined in finalize.md)
 Action:     backlog script sets metadata.groomed = today's date
              GitHub label: remove status:needs-grooming, add status:groomed
 ```
@@ -193,7 +193,7 @@ priority:Ideas
 
 **`status:in-progress` timing**: The in-progress label MUST be set only after the RT-ICA gate returns APPROVED and the SAM plan file is created. Setting it during "checking RT-ICA" or "starting grooming" is incorrect and produces misleading state.
 
-**`metadata.groomed` timing**: Only set when ALL 7 canonical sections are present in the item file (see [./item-schema.md](./item-schema.md)). Partial grooming is not groomed.
+**`metadata.groomed` timing**: Only set when ALL required sections are present in the item file (defined in finalize.md; see [./item-schema.md](./item-schema.md)). Partial grooming is not groomed.
 
 **`blocked` and `in-progress` are exclusive**: An item cannot be both blocked and in-progress. If AC verification fails during close, revert to `blocked`, do not close.
 

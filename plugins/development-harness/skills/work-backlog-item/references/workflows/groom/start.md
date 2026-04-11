@@ -61,7 +61,7 @@ Track progress using your task list. Check off each step as it completes.
    - RT-ICA final pass: re-assess conditions, self-resolve DERIVABLE/MISSING, write final report
      - If BLOCKED: present MISSING conditions to user, wait for answers, re-check
      - If APPROVED: continue
-   - Output validation gate: verify 8 required sections present with minimum content
+   - Output validation gate: verify all required sections present with minimum content (defined in finalize.md)
      - If missing: retry same model with targeted prompt (up to 3 attempts, then blocked)
      - If pass: continue
    - Write groomed content via `backlog_groom(selector='{item_ref}', sections={...}, mark_groomed=True)`

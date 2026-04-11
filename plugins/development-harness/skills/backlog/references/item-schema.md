@@ -20,7 +20,7 @@ metadata:
   priority: P0|P1|P2|Ideas   # REQUIRED — priority tier
   type: Feature|Bug|Refactor|Docs|Chore   # REQUIRED
   status: needs-grooming|groomed|blocked|in-milestone|in-progress|done|resolved|closed   # REQUIRED
-  groomed: YYYY-MM-DD     # optional — set by groom-backlog-item when all 8 sections present
+  groomed: YYYY-MM-DD     # optional — set by groom-backlog-item when all required sections present (defined in finalize.md)
   issue: '#N'             # optional — GitHub issue number (string with # prefix)
   milestone: integer      # optional — GitHub milestone number
   plan: string            # optional — relative path to SAM task file
@@ -39,7 +39,7 @@ metadata:
 | `metadata.priority` | create-backlog-item | Set at creation |
 | `metadata.type` | create-backlog-item | Set at creation |
 | `metadata.status` | all skills | Updated on state transitions (see state-machine.md) |
-| `metadata.groomed` | groom-backlog-item | Set when all 8 required sections present |
+| `metadata.groomed` | groom-backlog-item | Set when all required sections present (defined in finalize.md) |
 | `metadata.issue` | backlog script | Set on GitHub issue creation |
 | `metadata.milestone` | group-items-to-milestone | Set on milestone assignment |
 | `metadata.plan` | work-backlog-item | Set when SAM task file created |
@@ -154,7 +154,7 @@ Overall: FAIL (2/3 criteria met)
 | Newly created | All frontmatter fields | Description, optionally AC + Research First + Suggested Location |
 | Fact-checked | + | + Fact-Check section |
 | RT-ICA assessed | + | + RT-ICA section |
-| Fully groomed | `metadata.groomed` set | All 8 canonical sections: Fact-Check, RT-ICA, Reproducibility, Dependencies, Skills, Agents, Prior Work |
+| Fully groomed | `metadata.groomed` set | All required sections present (defined in finalize.md validation table) |
 | In-milestone | `metadata.milestone` set, `metadata.status: in-milestone` | (same as fully groomed) |
 | In-progress | `metadata.plan` set, `metadata.status: in-progress` | + plan file exists at path |
 | Done | `metadata.status: done` | + Acceptance Criteria Verification section (all criteria PASS) |

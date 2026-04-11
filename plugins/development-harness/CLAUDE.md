@@ -221,20 +221,20 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 
 ---
 
-## Skills Overview (30)
+## Skills Overview
 
 **Main orchestration:**
 
 - `/dh:development-harness` - Entry point. Detects language, resolves roles, orchestrates S1-S7.
 
-**SAM workflow (4):**
+**SAM workflow:**
 
 - `/dh:add-new-feature` - Plan a feature: discovery, analysis, architecture, task decomposition
 - `/dh:implement-feature` - Execute tasks from a SAM task file via agent delegation loop
 - `/dh:start-task` - Start or complete a specific task inside a SAM task file
 - `/dh:complete-implementation` - Quality gates after all tasks are COMPLETE
 
-**Workflow stages (7):**
+**Workflow stages:**
 
 - `/dh:discovery` - S1 feature and codebase understanding
 - `/dh:planning` - S2 plan generation with RT-ICA
@@ -244,7 +244,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 - `/dh:forensic-review` - S6 verify task completion
 - `/dh:final-verification` - S7 certify feature completion
 
-**Planning tools (4):**
+**Planning tools:**
 
 - `/dh:clear-cove-task-design` - Task design methodology
 - `/dh:generate-task` - Generate individual task files
@@ -255,7 +255,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 
 - `/dh:implementation-manager` - Coordinate implementation across tasks
 
-**Backlog management (4):**
+**Backlog management:**
 
 - `/dh:backlog` - Backlog overview and operations reference
 - `/dh:create-backlog-item` - Create new backlog items
@@ -273,7 +273,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 - `/dh:analyze-test-failures` - Diagnose and categorize test failures
 - `/dh:test-failure-mindset` - Systematic approach to understanding test failures
 
-**Other (4):**
+**Other:**
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
@@ -282,7 +282,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 
 ---
 
-## Agents Overview (21)
+## Agents Overview
 
 **Planning and decomposition:**
 
