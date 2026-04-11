@@ -211,7 +211,7 @@ mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', c
 it with the final report from the RT-ICA Final Pass step above:
 
 ```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
 ```
 
 Then call the final status transition:

@@ -103,7 +103,7 @@ to `--after={groomed_date}` date-based filtering only in the diff command below.
 Spawn an agent with the following inputs:
 
 - The item's full description (from `backlog_view` `description` field)
-- The item's acceptance criteria (from `sections['acceptance criteria']`)
+- The item's acceptance criteria (from `sections_lower.get('acceptance criteria')`)
 - The output of: `git diff {groom_date_sha}..HEAD -- {impact_radius_files}`
 
 The agent must return **exactly one** of these tokens:
