@@ -312,6 +312,8 @@ Skills `/dh:create-backlog-item` and `/dh:work-backlog-item` invoke these tools.
 
 **Automatic version bumping**: `plugin.json` and `marketplace.json` are automatically bumped and staged by the pre-commit hook when any plugin file is modified. Do not manually edit version fields — the hook handles this. After a successful commit, the updated versions are already included.
 
+**MCP server validation**: After modifying any MCP server in a plugin, validate the changes by first loading the `/fastmcp-creator:fastmcp-client-cli` skill, then using `fastmcp list` and `fastmcp call` to verify tools are registered and behave correctly.
+
 ---
 
 - SAM Feature Implementation Workflow: `.claude/rules/local-workflow.md`
