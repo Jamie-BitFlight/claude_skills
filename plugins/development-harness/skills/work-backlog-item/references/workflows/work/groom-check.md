@@ -22,10 +22,15 @@ is a separate check at a different stage and is not unified with this one.
 ### Extract Impact Radius files
 
 Call `mcp__plugin_dh_backlog__backlog_view(selector="{title}", summary=false)`.
-Extract file paths from `response["sections"]["impact radius"]` (key is lowercase).
-Use a regex to find all path-like tokens (e.g., `\S+\.\w+` patterns or lines beginning with a path segment).
 
-If the `impact radius` section is absent or contains no file paths:
+Extract file paths using this priority order:
+
+1. Primary key: `response["sections"]["impact radius"]` (lowercase, as written by the impact-analyst swarm agent)
+2. Fallback key: `response["sections"]["resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
+
+Use a regex to find all path-like tokens (e.g., `\S+\.\w+` patterns or lines beginning with a path segment) in whichever section is found.
+
+If neither section is present or neither contains file paths:
 skip Phase 1 and Phase 2 — proceed directly to [rt-ica-gate.md](./rt-ica-gate.md) with cached groom content.
 
 Record the extracted paths as `{impact_radius_files}` (space-separated list for git CLI).
@@ -52,9 +57,12 @@ If one or more qualifying commits exist → proceed to Phase 2.
 
 ```mermaid
 flowchart TD
-    Start(["Step 3.1: groomed=date confirmed"]) --> ExtractIR["Extract file paths from<br>sections['impact radius'] (lowercase key)"]
-    ExtractIR --> HasFiles{"File paths found?"}
-    HasFiles -->|"No files in impact radius"| Skip(["Skip staleness check<br>→ rt-ica-gate.md"])
+    Start(["Step 3.1: groomed=date confirmed"]) --> ExtractIR["Try sections['impact radius'] (lowercase key)"]
+    ExtractIR --> IRPresent{"Key present<br>with file paths?"}
+    IRPresent -->|"Yes"| HasFiles
+    IRPresent -->|"No — absent or empty"| Fallback["Try sections['resources'] as fallback<br>(older grooming template)"]
+    Fallback --> HasFiles{"File paths found<br>in either section?"}
+    HasFiles -->|"No files in either section"| Skip(["Skip staleness check<br>→ rt-ica-gate.md"])
     HasFiles -->|"Files found"| Phase1["Phase 1: git log --oneline<br>--after=groomed_date --diff-filter=AMRD<br>-- {impact_radius_files}"]
     Phase1 --> FilterFunctional["Filter to functional commits:<br>subject starts with feat|fix|refactor|perf|revert<br>OR changed file has .py|.ts|.yaml|.json"]
     FilterFunctional --> AnyCommits{"Functional commits<br>found?"}

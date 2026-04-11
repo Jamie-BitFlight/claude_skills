@@ -42,11 +42,15 @@ Changes from snapshot:
 Decision: {APPROVED|BLOCKED}
 ```
 
-5. Write final RT-ICA to item (replaces the initial snapshot):
+5. Write final RT-ICA to item (replaces the initial snapshot). Store the report content as
+   `{rt_ica_final_content}` — it will be included in the batch write at the end of this workflow
+   to ensure atomic persistence with `mark_groomed=True`:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{final report}')
 ```
+
+   Retain `{rt_ica_final_content}` in scope for the Write Groomed Content step.
 
 6. Final decision:
 
@@ -155,12 +159,17 @@ Final step — write groomed content via MCP and mark the item as groomed.
 
 When all groomer subsections are ready (end of swarm), write them in a single call using the
 `sections` parameter combined with `mark_groomed=True`. This writes all content and advances
-status atomically via the active backend:
+status atomically via the active backend.
+
+**RT-ICA MUST be included in this batch write.** The `{rt_ica_final_content}` produced during
+the RT-ICA Final Pass above must be passed here — this guarantees the RT-ICA section is always
+present after grooming and the rt-ica-gate can find it fresh without re-running:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(
     selector='{item_ref}',
     sections={
+        "RT-ICA": "{rt_ica_final_content}",
         "Reproducibility": "{reproducibility section text}",
         "Priority": "{priority section text}",
         "Acceptance Criteria": "{acceptance criteria text}",
@@ -171,6 +180,19 @@ mcp__plugin_dh_backlog__backlog_groom(
     },
     mark_groomed=True
 )
+```
+
+After the batch write, verify the RT-ICA section was persisted:
+
+```text
+mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
+```
+
+Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-DD` and
+`Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')
 ```
 
 **`mark_groomed=True`** performs these transitions via the active backend:
@@ -188,7 +210,14 @@ mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', c
 # ... each section as it completes ...
 ```
 
-Then call the final status transition separately:
+**Before** calling `mark_groomed=True`, verify the RT-ICA section is present. If missing, write
+it with the final report from the RT-ICA Final Pass step above:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')
+```
+
+Then call the final status transition:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)

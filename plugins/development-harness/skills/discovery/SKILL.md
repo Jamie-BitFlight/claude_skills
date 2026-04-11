@@ -15,6 +15,25 @@ discussion with the user BEFORE any design or implementation begins.
 
 You ask WHO, WHAT, WHEN, WHY — never HOW. Solutions belong to later stages.
 
+## Self-Initialization from Backlog Item
+
+When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42')`):
+
+1. Load item context before doing anything else:
+
+```text
+mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
+```
+
+2. Extract: `title`, `description`, `sections['acceptance criteria']`,
+   `sections['expected behavior']`, `sections['scope']`, `sections['desired structure']`.
+3. Use these as the initial problem statement — skip Step 2 (clarifying questions) if the
+   description is unambiguous and the required sections are non-empty.
+4. Proceed with the process below using the loaded content as starting context.
+
+Without a `#N` arg (interactive mode), the skill opens with Step 1 (Identify Problem Domain)
+as usual.
+
 ## When to Use
 
 - Starting a new feature or capability

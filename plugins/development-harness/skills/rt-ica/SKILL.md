@@ -50,6 +50,29 @@ flowchart TD
 
 **Dynamic vs static constraints:** RT-ICA produces dynamic constraints — discovered fresh from the current goal, disposable after use. These provide visibility into edges that would cause problems if crossed blindly: scope creep, missing user opinions, abstract requirements that need to become definite. This is different from static process constraints (hardcoded gates, enforcement hooks, "MUST do X before Y" rules baked into workflow definitions) which carry maintenance cost and go stale. RT-ICA's value is turning the abstract into the definite for each specific task.
 
+## Self-Initialization from Backlog Item
+
+When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`):
+
+1. Load item context before doing anything else:
+
+```text
+mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
+```
+
+2. Extract: `title`, `description`, `sections['acceptance criteria']`,
+   `sections['expected behavior']`, `sections['impact radius']`, and any other populated sections.
+3. Use the loaded content as the goal input for the RT-ICA procedure below.
+4. After completing the assessment, write the RT-ICA result back to the item:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(selector="#N", section="RT-ICA", content="{RT-ICA SUMMARY block}")
+```
+
+Without a `#N` arg, the skill expects the goal/input to be provided inline in the invocation
+context. Invoking without args and without inline context returns BLOCKED — always pass `#N`
+when invoking from a workflow step that has an item reference.
+
 ## Activation Triggers
 
 <activation_triggers>

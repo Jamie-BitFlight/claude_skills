@@ -22,8 +22,11 @@ flowchart TD
 When the flowchart routes to "Run dh:rt-ica":
 
 ```text
-Skill(skill: "dh:rt-ica")
+Skill(skill: "dh:rt-ica", args: "{item_ref}")
 ```
+
+Pass `{item_ref}` (the `#N` identifier) so the skill can load item context via `backlog_view`
+before running — without it the skill returns BLOCKED immediately asking for context.
 
 Log re-run reason: `RT-ICA re-run: {staleness reason — date older than 7 days / updated_at
 newer than RT-ICA date}` to the item's RT-ICA section as a prefix before the new result.

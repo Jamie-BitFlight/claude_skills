@@ -26,13 +26,39 @@ mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type
 
 → **CONTINUE** to RT-ICA snapshot.
 
-3. If `count == 0`: invoke discovery skill.
+3. If `count == 0`: check whether the item already has rich groomed sections.
 
 ```text
-Skill(skill='dh:discovery')
+mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
 ```
 
-4. Verify artifact was registered:
+Inspect `response["sections"]`. If **all three** of the following are non-empty:
+- `acceptance criteria`
+- `expected behavior`
+- `desired structure` (or `scope` as equivalent)
+
+→ **Synthesize** a feature-context artifact directly from those sections instead of invoking discovery:
+
+```text
+mcp__plugin_dh_backlog__artifact_register(
+    issue_number={issue_number},
+    artifact_type='feature-context',
+    path='plan/feature-context-{slug}.md',
+    agent='discovery',
+    content='# ARTIFACT:DISCOVERY\n\n## Feature\n{item title}\n\n## Problem Statement\n{item description}\n\n## Goals\n{acceptance criteria section content}\n\n## Expected Behavior\n{expected behavior section content}\n\n## Desired Structure\n{desired structure / scope section content}\n\n## Open Questions\n- None (synthesized from groomed backlog item)'
+)
+```
+
+→ Load the just-registered artifact via `artifact_read`, **CONTINUE** to RT-ICA snapshot.
+Discovery is pure overhead for well-groomed items — skip it when these sections exist.
+
+4. If `count == 0` and rich groomed sections are absent: invoke discovery skill.
+
+```text
+Skill(skill='dh:discovery', args='{item_ref}')
+```
+
+5. Verify artifact was registered:
 
 ```text
 mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type='feature-context')
@@ -42,7 +68,7 @@ mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type
 - `count == 0` → retry ONCE:
 
 ```text
-Skill(skill='dh:discovery')
+Skill(skill='dh:discovery', args='{item_ref}')
 mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type='feature-context')
 ```
 
@@ -54,8 +80,9 @@ STOP — dh:discovery completed but no feature-context artifact was registered
 for issue {item_ref}. Re-run /dh:discovery manually and retry.
 ```
 
-**When <mode/> is `auto`**: After discovery returns, do NOT yield to the user. Verify artifact
-immediately and proceed without presenting a summary or requesting confirmation.
+**When <mode/> is `auto`**: After discovery returns (or artifact is synthesized), do NOT yield to
+the user. Verify artifact immediately and proceed without presenting a summary or requesting
+confirmation.
 
 ## RT-ICA Initial Snapshot
 

@@ -258,11 +258,22 @@ Revision Protocol:
 
 The `sam_plan(action='create')` MCP tool validates all required fields at creation time. The YAML template below is the authoritative field reference for this agent.
 
-**Creating the plan file**: Generate task definitions as YAML, then use the SAM MCP tool:
+**REQUIRED: ALL plans MUST be registered via the SAM MCP tool.** Writing PLAN.md or PLAN/ files
+to disk without calling `sam_plan(action='create')` produces a disk-only plan that validators
+cannot locate — the plan-validator reads exclusively from SAM (`sam_plan(action='read')`), never
+from the filesystem. Disk-only writes cause false BLOCKED results because the validator reads
+stale or absent SAM state instead of the actual plan.
+
+**Creating the plan file**: Generate task definitions as YAML, then call `sam_plan(action='create')`:
 
 ```text
 mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{YAML_CONTENT}"})
 ```
+
+After `sam_plan` succeeds, the plan ID returned (e.g., `P037`) is the canonical reference for
+all downstream tools. Record it and pass it to the plan-validator and any other consumers.
+PLAN.md / PLAN/ disk files are optional human-readable summaries — they do not replace SAM
+registration and must never be written as the only plan artifact.
 
 Where `$YAML_CONTENT` is a YAML document with the structure:
 
@@ -555,10 +566,17 @@ In addition to existing requirements:
 
 ### Phase 4: Plan Creation (UPDATED)
 
-Add:
+Steps (in order):
 
-- Optional TASK/ export (if requested)
-- Sync checkpoints reference task acceptance criteria and verification outputs
+1. **Register with SAM** (REQUIRED — do this first):
+   Call `sam_plan(action='create')` with the YAML produced in Phase 3. Record the returned plan
+   ID. Do NOT write disk files before SAM registration succeeds.
+
+2. **Optional disk output** (for human reference only):
+   If user explicitly requested PLAN.md or TASK/ files, write them after SAM registration. These
+   are supplementary — validators and downstream agents use the SAM plan ID, not disk paths.
+
+3. Sync checkpoints reference task acceptance criteria and verification outputs.
 
 ### Phase 5: Plan Validation (UPDATED)
 
