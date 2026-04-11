@@ -9,7 +9,6 @@ asyncio_mode = "auto" is set in pyproject.toml — no @pytest.mark.asyncio neede
 
 T07: Rewrites all sam_read/sam_state/sam_ready/sam_status/sam_create/sam_update/sam_claim
 MCP tests to call sam_task/sam_plan with the new consolidated config dicts.
-Old tools are deprecation shims — 8 new shim tests verify each raises ToolError via MCP.
 """
 
 from __future__ import annotations
@@ -65,7 +64,7 @@ def plan_dir(tmp_path: Path) -> Path:
 
 
 async def test_server_lists_expected_tools() -> None:
-    """Server exposes exactly the eleven documented tools via the MCP protocol.
+    """Server exposes exactly the three documented tools via the MCP protocol.
 
     Tests: tool registration completeness through the MCP protocol.
     How: Call list_tools() via in-memory Client.
@@ -77,19 +76,7 @@ async def test_server_lists_expected_tools() -> None:
 
     # Assert
     tool_names = {t.name for t in tools}
-    assert tool_names == {
-        "sam_read",
-        "sam_state",
-        "sam_ready",
-        "sam_status",
-        "sam_list",
-        "sam_create",
-        "sam_update",
-        "sam_claim",
-        "sam_plan",
-        "sam_task",
-        "sam_active_task",
-    }
+    assert tool_names == {"sam_plan", "sam_task", "sam_active_task"}
 
 
 def test_server_instructions_are_set() -> None:
@@ -709,118 +696,3 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
     assert "task_count" in item
     assert "path" in item
     assert item["task_count"] == 1
-
-
-# ---------------------------------------------------------------------------
-# Deprecation shim MCP tests — all old tools must raise ToolError via MCP
-# ---------------------------------------------------------------------------
-
-
-async def test_mcp_sam_read_shim_raises_tool_error(plan_dir: Path) -> None:
-    """sam_read shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_read deprecation shim through MCP.
-    How: Call sam_read with minimal args; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_read", {"plan": "P1", "plan_dir": str(plan_dir)})
-
-
-async def test_mcp_sam_state_shim_raises_tool_error(plan_dir: Path) -> None:
-    """sam_state shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_state deprecation shim through MCP.
-    How: Call sam_state with plan+task+status; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool(
-                "sam_state", {"plan": "P1", "task": "T1", "status": "in-progress", "plan_dir": str(plan_dir)}
-            )
-
-
-async def test_mcp_sam_ready_shim_raises_tool_error(plan_dir: Path) -> None:
-    """sam_ready shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_ready deprecation shim through MCP.
-    How: Call sam_ready with plan+plan_dir; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_ready", {"plan": "P1", "plan_dir": str(plan_dir)})
-
-
-async def test_mcp_sam_status_shim_raises_tool_error(plan_dir: Path) -> None:
-    """sam_status shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_status deprecation shim through MCP.
-    How: Call sam_status with plan+plan_dir; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_status", {"plan": "P1", "plan_dir": str(plan_dir)})
-
-
-async def test_mcp_sam_list_shim_raises_tool_error(tmp_path: Path) -> None:
-    """sam_list shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_list deprecation shim through MCP.
-    How: Call sam_list with plan_dir; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_list", {"plan_dir": str(tmp_path)})
-
-
-async def test_mcp_sam_create_shim_raises_tool_error(tmp_path: Path) -> None:
-    """sam_create shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_create deprecation shim through MCP.
-    How: Call sam_create with slug+goal+tasks_yaml; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Task\n"
-        "    status: not-started\n"
-        "    agent: a\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool(
-                "sam_create", {"slug": "shim-test", "goal": "Goal", "tasks_yaml": tasks_yaml, "plan_dir": str(tmp_path)}
-            )
-
-
-async def test_mcp_sam_update_shim_raises_tool_error(tmp_path: Path) -> None:
-    """sam_update shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_update deprecation shim through MCP.
-    How: Call sam_update with address+plan_dir; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_update", {"address": "P1", "plan_dir": str(tmp_path)})
-
-
-async def test_mcp_sam_claim_shim_raises_tool_error(plan_dir: Path) -> None:
-    """sam_claim shim raises ToolError via MCP protocol with migration message.
-
-    Tests: sam_claim deprecation shim through MCP.
-    How: Call sam_claim with plan+task+plan_dir; expect ToolError matching "deprecated".
-    Why: Old MCP callers must receive ToolError, not a result dict.
-    """
-    with pytest.raises(ToolError, match="deprecated"):
-        async with Client(mcp) as client:
-            await client.call_tool("sam_claim", {"plan": "P1", "task": "T01", "plan_dir": str(plan_dir)})

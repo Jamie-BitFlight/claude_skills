@@ -1,6 +1,6 @@
 """Tests for sam_schema.server — MCP tool functions.
 
-Tests: sam_task and sam_plan (new consolidated tools) plus deprecation shims.
+Tests: sam_task and sam_plan (new consolidated tools).
 How: Write real plan files to tmp_path, create a plan directory with
      tasks-{N}-{slug}.yaml naming so resolve_plan_address can find them,
      then call each MCP tool function directly and assert on returned dicts.
@@ -8,14 +8,13 @@ Why: server.py has zero test coverage; the tools are the primary interface
      used by Claude Code agents to query and mutate SAM plans.
 """
 # T07: sam_read/sam_state/sam_ready/sam_status/sam_create/sam_update/sam_claim replaced
-# with sam_task/sam_plan consolidated tools. Old tools are deprecation shims.
+# with sam_task/sam_plan consolidated tools.
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import pytest
-from fastmcp.exceptions import ToolError
 from sam_schema.core.action_models import (
     ClaimTaskConfig,
     CreatePlanConfig,
@@ -869,148 +868,3 @@ def test_sam_claim_invalid_plan_returns_error(tmp_path: Path) -> None:
     # Act / Assert
     with pytest.raises(PlanNotFoundError):
         sam_task(plan="P99", task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
-
-
-# ---------------------------------------------------------------------------
-# Deprecation shims — all old tools must raise ToolError
-# ---------------------------------------------------------------------------
-
-from sam_schema.server import sam_claim, sam_create, sam_list, sam_read, sam_ready, sam_state, sam_status, sam_update
-
-
-def test_sam_read_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_read deprecation shim raises ToolError with migration message.
-
-    Tests: sam_read shim raises on any call.
-    How: Call sam_read with minimal valid args.
-    Why: Old callers must see ToolError with migration hint pointing to sam_task/sam_plan.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_read(plan="P1", task="T1", plan_dir=str(p_dir))
-
-
-def test_sam_state_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_state deprecation shim raises ToolError with migration message.
-
-    Tests: sam_state shim raises on any call.
-    How: Call sam_state with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_state(plan="P1", task="T1", status="in-progress", plan_dir=str(p_dir))
-
-
-def test_sam_ready_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_ready deprecation shim raises ToolError with migration message.
-
-    Tests: sam_ready shim raises on any call.
-    How: Call sam_ready with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_ready(plan="P1", plan_dir=str(p_dir))
-
-
-def test_sam_status_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_status deprecation shim raises ToolError with migration message.
-
-    Tests: sam_status shim raises on any call.
-    How: Call sam_status with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_status(plan="P1", plan_dir=str(p_dir))
-
-
-def test_sam_list_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_list deprecation shim raises ToolError with migration message.
-
-    Tests: sam_list shim raises on any call.
-    How: Call sam_list with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_list(plan_dir=str(p_dir))
-
-
-def test_sam_create_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_create deprecation shim raises ToolError with migration message.
-
-    Tests: sam_create shim raises on any call.
-    How: Call sam_create with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Task\n"
-        "    status: not-started\n"
-        "    agent: a\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_create(slug="shim-test", goal="Goal", tasks_yaml=tasks_yaml, plan_dir=str(p_dir))
-
-
-def test_sam_update_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_update deprecation shim raises ToolError with migration message.
-
-    Tests: sam_update shim raises on any call.
-    How: Call sam_update with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_update(address="P1", plan_dir=str(p_dir), context="test")
-
-
-def test_sam_claim_shim_raises_tool_error_with_migration_message(tmp_path: Path) -> None:
-    """sam_claim deprecation shim raises ToolError with migration message.
-
-    Tests: sam_claim shim raises on any call.
-    How: Call sam_claim with minimal valid args.
-    Why: Old callers must see ToolError with migration hint.
-    """
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-
-    # Act / Assert
-    with pytest.raises(ToolError, match="deprecated"):
-        sam_claim(plan="P1", task="T01", plan_dir=str(p_dir))
