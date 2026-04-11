@@ -160,17 +160,9 @@ Overall: FAIL (2/3 criteria met)
 | Done | `metadata.status: done` | + Acceptance Criteria Verification section (all criteria PASS) |
 | Closed | `metadata.status: closed` | Terminal — set by complete-milestone only |
 
-An item is **fully groomed** only when ALL 8 of these sections are present in the item file (in this order):
+An item is **fully groomed** only when all required sections are present in the item file. The authoritative list of required sections and minimum content requirements is defined in the [finalize.md validation table](../../work-backlog-item/references/workflows/groom/finalize.md) (lines 99–107).
 
-1. `Fact-Check` — must contain V/R/I counts
-2. `RT-ICA` — must contain `Decision: APPROVED` or `Decision: BLOCKED`
-3. `Reproducibility`
-4. `Dependencies`
-5. `Skills` — content or explicit "None"
-6. `Agents` — content or explicit "None"
-7. `Prior Work`
-
-`metadata.groomed` MUST NOT be set until all 8 are present. Partial grooming (e.g., only Fact-Check and RT-ICA written) is NOT considered groomed — groom-backlog-item resumes from the first missing section rather than restarting.
+`metadata.groomed` MUST NOT be set until all required sections pass the presence check (defined in finalize.md validation table). Partial grooming (e.g., only Fact-Check and RT-ICA written) is NOT considered groomed — groom-backlog-item resumes from the first missing section rather than restarting.
 
 ---
 

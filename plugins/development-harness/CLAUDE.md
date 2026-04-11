@@ -262,12 +262,12 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 - `/dh:work-backlog-item` - Work on a backlog item through its lifecycle
 - `/dh:groom-backlog-item` - Groom and prioritize backlog items
 
-**Milestone management (2):**
+**Milestone management:**
 
 - `/dh:groom-milestone` - Groom milestone issues into dispatch plans
 - `/dh:work-milestone` - Execute milestone tasks in isolated worktrees
 
-**Testing (3):**
+**Testing:**
 
 - `/dh:comprehensive-test-review` - Review test coverage and quality
 - `/dh:analyze-test-failures` - Diagnose and categorize test failures
