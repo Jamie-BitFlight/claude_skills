@@ -96,6 +96,8 @@ See the [Backlog Lifecycle reference](../../docs/backlog-lifecycle.md) for the c
 **SAM** — Stateless Agent Methodology. See [sam-definition.md](./references/workflows/work/sam-definition.md) for what SAM is and how to embody it. SAM lives in `../stateless-agent-methodology/` (or `bitflight-devops/stateless-agent-methodology` on GitHub).
 Primary source of truth is **GitHub Issues** (labels + milestone = canonical status). Agents interact with backlog items exclusively through MCP tools (`backlog_view`, `backlog_update`, `backlog_list`, etc.).
 
+**MCP server availability**: Both `plugin:dh:backlog` and `plugin:dh:sam` take 10–30 seconds to initialize after a session restart. If a tool is unavailable or `ToolSearch` reports "still connecting", follow [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) before making any MCP call.
+
 When invoked with no arguments, shows an interactive browser. When invoked with `#N` or a title substring, proceeds directly to the planning workflow.
 
 ## Arguments

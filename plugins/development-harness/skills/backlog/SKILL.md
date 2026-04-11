@@ -11,6 +11,8 @@ Skills and agents invoke MCP tools or the CLI — no direct `Write`/`Edit` on pe
 
 ## Primary Interface (MCP)
 
+**Server availability**: If any `mcp__plugin_dh_backlog__*` tool is unavailable or `ToolSearch` returns "still connecting", apply the retry procedure in [mcp-connection-check.md](./references/mcp-connection-check.md) before proceeding (up to 5 × 30-second retries).
+
 All 12 tools return a `dict`. On error the dict contains an `"error"` key. On success it
 contains result data keys plus `messages: list[str]` and `warnings: list[str]` (always present,
 may be empty). Always check for `"error"` before consuming result fields.

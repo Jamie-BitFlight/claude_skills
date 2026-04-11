@@ -21,6 +21,8 @@ $ARGUMENTS
 
 ---
 
+**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server takes 10–30 seconds to initialize after a session restart. If unavailable or `ToolSearch` reports "still connecting", follow [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) before proceeding.
+
 ## Parse Arguments
 
 - `task_file_path` (required): path to a `plan/tasks-*.md` file
