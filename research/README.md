@@ -75,6 +75,7 @@ research/
 │   ├── the-unwind-ai.md              # AI builder newsletter with 95K+ star open-source companion repo
 │   └── samuraizer.md                 # Samuraizer - Full-stack AI knowledge base: semantic search, RAG chat, knowledge graph, Telegram bot (Flask+React+Gemini)
 ├── coding-agents/                     # Autonomous AI coding agent platforms
+├── customer-support-platforms/        # Open-source customer support and live chat platforms
 │   ├── accomplish.md                  # Local-first AI desktop agent with MCP tools, 15 providers, permission-gated execution (9K+ stars)
 │   ├── cline.md                       # Open-source autonomous coding agent with human-in-the-loop approvals (Apache-2.0)
 │   ├── openai-codex-cli.md            # OpenAI Codex CLI — Rust-based coding agent with OS sandbox, MCP server/client, Starlark exec policy (62.5K stars)
@@ -909,6 +910,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [1code.md](./coding-agents/1code.md) | 1Code — Electron desktop app wrapping Claude Code CLI and OpenAI Codex with git worktree isolation, tRPC router (20 namespaces), SQLite session tracking, MCP plugin management, voice input; Pro/Max tiers for background agents and sync (5.2K stars, MIT) | 2026-03-17   |
 | [maverick.md](./coding-agents/maverick.md) | Maverick — Claude Code plugin (28 skills + 4 agents) + CLI with enforcement chain (best-practice → project skill → local verify → CI → agent review → human review), three workflow modes (do-issue-solo, do-issue-guided, do-task-solo), upskill auto-generation from codebase, and AWS EC2/SQS/Lambda worker fleet for autonomous issue resolution (alpha) | 2026-03-23   |
 | [hyperagents.md](./coding-agents/hyperagents.md) | HyperAgents — Meta research framework for self-referential self-improving agents; MetaAgent iteratively modifies codebase, TaskAgent solves domains (Balrog, Genesis, IMO, Polyglot, Paper Review, Search Arena); Docker-containerized evaluation, LiteLLM multi-model support, evolutionary optimization loop (CC BY-NC-SA 4.0) | 2026-03-29   |
+| [trigger-dev-examples.md](./coding-agents/trigger-dev-examples.md) | Trigger.dev Examples — 29 TypeScript/Python example projects covering 5 AI agent patterns (prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer); Next.js/Remix integrations; real-time streaming via Socket.io; OpenAI/Anthropic/Mastra integrations (Apache-2.0) | 2026-04-11   |
 
 **Key Topics**:
 
@@ -1410,7 +1412,19 @@ High-performance serialization, deserialization, and validation libraries for Py
 
 ---
 
-### 29. PaaS Platforms
+### 29. Customer Support Platforms
+
+**Location**: [./customer-support-platforms/](./customer-support-platforms/)
+
+Open-source customer support, live chat, and communication platforms relevant to agent-accessible conversation infrastructure.
+
+| File | Description | Last Verified |
+|------|-------------|--------------|
+| [papercups.md](./customer-support-platforms/papercups.md) | Papercups — open-source Elixir/Phoenix customer support platform (maintenance mode since 2021); React frontend with Ant Design; multi-channel (Slack, email, SMS/Twilio); PostgreSQL + Redis; real-time via Phoenix PubSub; Heroku/Docker self-hosted; demonstrates durable Phoenix OTP patterns for conversation management (MIT) | 2026-04-11   |
+
+---
+
+### 30. PaaS Platforms
 
 **Location**: [./paas-platforms/](./paas-platforms/)
 
@@ -1450,6 +1464,7 @@ The following categories are planned for future research:
 | `evaluation-testing/`   | Agent evaluation and testing tools                 | **Done** |
 | `llm-infrastructure/`   | LLM inference servers and multi-provider gateways  | **Done** |
 | `serialization-libraries/` | High-performance serialization and validation libraries | **Done** |
+| `customer-support-platforms/` | Open-source customer support and live chat platforms | **Done** |
 | `paas-platforms/`       | Self-hosted PaaS and deployment platforms          | **Done** |
 
 ---
