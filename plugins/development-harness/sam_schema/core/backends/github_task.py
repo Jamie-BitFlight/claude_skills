@@ -14,9 +14,9 @@ or GraphQL calls are made from this module.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.task_backend_types import (
@@ -70,11 +70,6 @@ _META_ROW_RE = re.compile(r"^\|\s*(?P<key>[^|]+?)\s*\|\s*(?P<value>[^|]*?)\s*\|$
 _TASK_TITLE_RE = re.compile(r"^\[(?P<tid>T\d+)\] (?P<title>.+)$")
 _PLAN_SLUG_RE = re.compile(r"<!-- sam-plan-slug: (?P<slug>[^>]+?) -->")
 _GOAL_RE = re.compile(r"## Goal\n\n(?P<goal>.+?)(?=\n\n##|\Z)", re.DOTALL)
-
-
-def _now_iso() -> str:
-    """Return current UTC timestamp as ISO 8601 string."""
-    return datetime.now(tz=UTC).isoformat()
 
 
 def _status_from_labels(labels: list[LabelNode]) -> str:

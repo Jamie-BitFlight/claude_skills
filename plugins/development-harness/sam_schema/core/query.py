@@ -55,7 +55,8 @@ def create_plan(
 
     The output file is named ``{plan_dir}/{plan_id}-{slug}.yaml`` where
     ``plan_id`` is ``P`` + first 8 hex characters of a UUID4 (e.g. ``Pa1b2c3d4``).
-    When ``issue`` is provided, it is stored in the ``plan_ref`` field only;
+    When ``issue`` is provided, it is stored in the ``issue`` field of the Plan model.
+    ``plan_ref`` is computed in server responses only and is not a Plan model field;
     it does not influence the plan's own ID.
 
     Each dict in ``tasks`` is validated against the ``Task`` Pydantic model
@@ -78,11 +79,19 @@ def create_plan(
 
     Raises:
         ValueError: If any task dict is invalid per the ``Task`` model.
-        OSError: If the plan file cannot be written.
+        OSError: If the plan file cannot be written, or if a UUID collision
+            occurs after 3 attempts (negligible in practice).
     """
-    plan_id_str = _new_plan_id()
-    file_name = f"{plan_id_str}-{slug}.yaml"
-    output_path = plan_dir / file_name
+    MAX_ID_ATTEMPTS = 3
+    for _attempt in range(MAX_ID_ATTEMPTS):
+        plan_id_str = _new_plan_id()
+        file_name = f"{plan_id_str}-{slug}.yaml"
+        output_path = plan_dir / file_name
+        if not output_path.exists():
+            break
+    else:
+        msg = f"UUID collision: failed to generate a unique plan ID after {MAX_ID_ATTEMPTS} attempts"
+        raise OSError(msg)
 
     validated_tasks: list[Task] = []
     for i, raw_task in enumerate(tasks):

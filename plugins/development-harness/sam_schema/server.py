@@ -272,7 +272,10 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     """Create a new plan from YAML task definitions.
 
     Returns:
-        Dict with ``plan_number`` and ``task_count`` keys.
+        Dict with ``plan_id``, ``plan_ref``, and ``task_count`` keys.
+        ``plan_ref`` is computed in the server response as ``#{issue},{plan_id}``
+        when an issue number is present, or just ``plan_id`` otherwise.
+        It is not stored in the Plan model.
     """
     yaml_parser: Any = YAML()
     parsed: dict[str, Any] = yaml_parser.load(config.tasks_yaml)
@@ -297,7 +300,9 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
     """List all plans with optional search and auto-pagination.
 
     Returns:
-        Paginated dict with ``items``, ``total``, ``offset``, and ``limit`` keys.
+        Paginated dict with ``items``, ``count``, ``pagination``, ``messages``,
+        ``warnings``, and ``errors`` keys. Each item contains ``feature``,
+        ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
     backend = _get_backend(plan_dir)
     summaries = backend.list_plans(search=config.search)
