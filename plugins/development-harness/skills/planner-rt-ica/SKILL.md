@@ -8,6 +8,15 @@ disable-model-invocation: false
 
 # Planner RT-ICA (Planning-Phase Input Completeness Analysis)
 
+## Sister skill — when to use which
+
+| If you are… | Load |
+|---|---|
+| Grooming a backlog item, generating a plan, decomposing tasks under uncertainty | **`dh:planner-rt-ica`** (this skill — non-blocking) |
+| At the S2 implementation gate where missing inputs must halt the pipeline | **`dh:rt-ica`** (the blocking sister skill) |
+
+`dh:planner-rt-ica` and `dh:rt-ica` are deliberately split: same framework, different cost-of-being-wrong. During planning, a `MISSING` condition is a research task. At the implementation gate, the same `MISSING` is a halt event because the agent would otherwise guess. Do not consolidate.
+
 ## Role
 
 This skill adapts RT-ICA for **planning contexts**.

@@ -7,6 +7,15 @@ context: fork
 
 # RT-ICA: Reverse Thinking - Information Completeness Assessment
 
+## Sister skill — when to use which
+
+| If you are… | Load |
+|---|---|
+| At the S2 implementation gate where missing inputs must halt the pipeline | **`dh:rt-ica`** (this skill — blocking) |
+| Grooming a backlog item, generating a plan, decomposing tasks under uncertainty | **`dh:planner-rt-ica`** (the non-blocking sister skill) |
+
+`dh:rt-ica` and `dh:planner-rt-ica` are deliberately split: same framework, different cost-of-being-wrong. At the implementation gate, a `MISSING` condition is a halt event because the agent would otherwise guess. During planning or grooming, the same `MISSING` is a research task or a question for the human. Do not consolidate.
+
 ## Purpose
 
 RT-ICA surfaces what the executor needs to know before it can act without stopping.

@@ -20,13 +20,15 @@ You are blocked until both `impact-analyst` and `fact-checker` have written thei
 
 ## Phase 1 — Load the RT-ICA methodology skill
 
-Load the RT-ICA skill for the complete framework definition:
+Load the planner-phase RT-ICA skill for the complete framework definition:
 
 ```text
-Skill(skill="dh:rt-ica")
+Skill(skill="dh:planner-rt-ica")
 ```
 
-This gives you the formal definitions of AVAILABLE, DERIVABLE, and MISSING, the decision rules for transitioning a condition between states, and the BLOCKED-vs-READY verdict rules. Do not paraphrase the framework from memory — load the skill.
+This gives you the formal definitions of AVAILABLE, DERIVABLE, and MISSING, the decision rules for transitioning a condition between states, and the BLOCKED-vs-READY verdict rules used during grooming. Do not paraphrase the framework from memory — load the skill.
+
+**Use `dh:planner-rt-ica`, not `dh:rt-ica`.** You run inside the grooming swarm — your `BLOCKED` verdict gates the groomer teammate's section production, not the SAM implementation pipeline. A `MISSING` condition during grooming becomes a research task or a question for the human, not a halt-the-feature event. The implementation-gate variant `dh:rt-ica` is loaded by S2 planning agents that must refuse to proceed on incomplete information.
 
 ## Phase 2 — Load the inputs
 
@@ -147,7 +149,7 @@ SendMessage(team=<team_name>, from=<self>, to=*, content="RT_ICA_BLOCKED_CONDITI
 
 ## Behavioral Constraints
 
-- **Load the /dh:rt-ica skill — do not paraphrase the framework** — the authoritative definition of AVAILABLE, DERIVABLE, and MISSING lives in that skill. Using a paraphrase risks drift.
+- **Load the /dh:planner-rt-ica skill — do not paraphrase the framework** — the authoritative definition of AVAILABLE, DERIVABLE, and MISSING for grooming-phase use lives in that skill. Using a paraphrase risks drift. Do not load `/dh:rt-ica` — that variant is the implementation-phase gate and applies stricter blocking semantics than grooming requires.
 - **Every AVAILABLE condition cites evidence** — no citation, not AVAILABLE. "Obvious" does not justify AVAILABLE; evidence does.
 - **Every DERIVABLE condition states a derivation path** — no path, not DERIVABLE. If you cannot state how to derive it, it is MISSING.
 - **REFUTED is not INCONCLUSIVE** — REFUTED means the claim is wrong, so the condition is MISSING. INCONCLUSIVE means unverified, so DERIVABLE by running the verification.

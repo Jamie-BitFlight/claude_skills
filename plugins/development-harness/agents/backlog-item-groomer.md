@@ -4,7 +4,7 @@ description: Produce groomed content for a backlog item — discovers related sk
 tools: Read, Grep, Glob, Skill, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve, mcp__plugin_dh_backlog__backlog_sync, mcp__plugin_dh_backlog__backlog_normalize, mcp__plugin_dh_backlog__backlog_pull
 model: sonnet
 skills:
-  - dh:rt-ica
+  - dh:planner-rt-ica
 mcpServers:
   backlog:
     command: uv
@@ -34,22 +34,22 @@ Receives a backlog item and returns groomed content in the standard template for
 ### Step 0 — RT-ICA Assessment
 
 <rt_ica_decision>
-IF RT-ICA summary was provided in input: use it directly; skip to Step 1. Focus discovery on filling MISSING conditions and validating DERIVABLE ones.
+IF RT-ICA summary was provided in input (e.g., from `rtica-assessor` teammate output): use it directly; skip to Step 1. Focus discovery on filling MISSING conditions and validating DERIVABLE ones.
 
-IF no RT-ICA summary was provided: perform the following assessment and include it at the top of the output manifest.
+IF no RT-ICA summary was provided: load the canonical framework before assessing.
 </rt_ica_decision>
 
-RT-ICA procedure:
+Load the planner-phase RT-ICA skill — do not paraphrase the framework from memory:
 
-1. **Goal statement**: One sentence — what does completing this backlog item achieve?
-2. **Reverse prerequisites**: Work backwards from the goal; list each condition that must be true for success.
-3. **Availability check**: For each condition, assign exactly one status:
-   - `AVAILABLE` — explicitly present in item description or research questions
-   - `DERIVABLE` — safely inferable from codebase context (state the basis)
-   - `MISSING` — not present, not safely inferable
-4. **Decision**: `BLOCKED` if any condition is `MISSING`; `APPROVED` otherwise.
+```text
+Skill(skill="dh:planner-rt-ica")
+```
 
-NOTE: This step requires reasoning judgment. If the orchestrator has pre-computed RT-ICA, prefer that result.
+Use `dh:planner-rt-ica` (non-blocking, grooming-phase) — NOT `dh:rt-ica` (blocking, pre-implementation gate). During grooming, a `MISSING` condition becomes a research task or a question for the human, not a halt. The implementation-gate variant is loaded later in the SAM pipeline by agents that must refuse to proceed on incomplete information.
+
+The skill provides the authoritative definitions of `AVAILABLE`, `DERIVABLE`, and `MISSING` and the planner-phase output format. Apply that framework to the item and include the resulting assessment at the top of the output manifest.
+
+NOTE: If the orchestrator or `rtica-assessor` has pre-computed RT-ICA, prefer that result over running your own pass.
 
 ### Step 1 — Find Supporting Skills
 
