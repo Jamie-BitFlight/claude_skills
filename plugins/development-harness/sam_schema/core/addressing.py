@@ -27,8 +27,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Pattern: P{NNN}-{slug}.yaml / P{NNN}-{slug}.md / P{NNN}-{slug}/
-_P_NUMERIC_RE = re.compile(r"^P(\d+)-")
+# Pattern: P{NNN}-{slug}.yaml or P{hex8}-{slug}.yaml (UUID-derived IDs).
+# Matches both legacy zero-padded numeric IDs (P001, P042) and the new
+# UUID-derived hex IDs (Pa1b2c3d4). Captured group is the ID suffix (digits or hex).
+_P_NUMERIC_RE = re.compile(r"^P([0-9a-f]+)-", re.IGNORECASE)
 
 # Pattern: QG{NNN}-{slug}.yaml / QG{NNN}-{slug}.md / QG{NNN}-{slug}/
 _QG_NUMERIC_RE = re.compile(r"^QG(\d+)-", re.IGNORECASE)

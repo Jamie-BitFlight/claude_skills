@@ -538,10 +538,12 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
         config=CreatePlanConfig(slug="test-create", goal="Test goal", tasks_yaml=tasks_yaml), plan_dir=str(p_dir)
     )
 
+    import re
+
     # Assert
     assert "error" not in result
     assert result["task_count"] == 1
-    assert result["plan_number"] == 1
+    assert re.match(r"^P[0-9a-f]{8}$", result["plan_id"]), f"Expected UUID plan_id, got: {result['plan_id']!r}"
 
 
 def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
@@ -570,9 +572,9 @@ def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
     )
     assert "error" not in create_result
 
-    # Act — read back the task through sam_task using plan_number from create result
-    plan_number = create_result["plan_number"]
-    read_result = sam_task(plan=f"P{plan_number}", task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
+    # Act — read back the task through sam_task using plan_id from create result
+    plan_id = create_result["plan_id"]
+    read_result = sam_task(plan=plan_id, task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
 
     # Assert
     assert "error" not in read_result
@@ -597,13 +599,15 @@ def test_sam_create_invalid_tasks_yaml_returns_error(tmp_path: Path) -> None:
         sam_plan(config=CreatePlanConfig(slug="bad", goal="Bad goal", tasks_yaml="not_tasks: []"), plan_dir=str(p_dir))
 
 
-def test_sam_create_assigns_incrementing_plan_numbers(tmp_path: Path) -> None:
-    """sam_plan(create) assigns monotonically increasing plan numbers.
+def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
+    """sam_plan(create) assigns unique UUID-derived plan IDs for each plan.
 
-    Tests: sam_plan create plan number assignment.
-    How: Create two plans; second should have plan_number = 2.
-    Why: Correct numbering is required for address resolution to work.
+    Tests: sam_plan create plan ID uniqueness.
+    How: Create two plans; each must have a distinct UUID-format plan_id.
+    Why: UUID IDs prevent collisions regardless of filesystem state.
     """
+    import re
+
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
@@ -625,7 +629,9 @@ def test_sam_create_assigns_incrementing_plan_numbers(tmp_path: Path) -> None:
     # Assert
     assert "error" not in r1
     assert "error" not in r2
-    assert r2["plan_number"] == r1["plan_number"] + 1
+    assert re.match(r"^P[0-9a-f]{8}$", r1["plan_id"]), f"Expected UUID plan_id, got: {r1['plan_id']!r}"
+    assert re.match(r"^P[0-9a-f]{8}$", r2["plan_id"]), f"Expected UUID plan_id, got: {r2['plan_id']!r}"
+    assert r1["plan_id"] != r2["plan_id"], "Each plan must get a unique plan_id"
 
 
 # ---------------------------------------------------------------------------
@@ -658,11 +664,11 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
         config=CreatePlanConfig(slug="update-ctx", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
     )
     assert "error" not in create_result
-    plan_number = create_result["plan_number"]
+    plan_id = create_result["plan_id"]
 
     # Act
     update_result = sam_plan(
-        config=UpdatePlanConfig(context="Shared context narrative."), plan=f"P{plan_number}", plan_dir=str(p_dir)
+        config=UpdatePlanConfig(context="Shared context narrative."), plan=plan_id, plan_dir=str(p_dir)
     )
 
     # Assert
@@ -670,7 +676,7 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
     assert update_result.get("updated") is True
 
     # Verify via sam_task that context is persisted
-    read_result = sam_task(plan=f"P{plan_number}", task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
+    read_result = sam_task(plan=plan_id, task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
     assert "error" not in read_result
     assert read_result.get("plan-context") == "Shared context narrative."
 
@@ -700,12 +706,12 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
         config=CreatePlanConfig(slug="append-sec", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
     )
     assert "error" not in create_result
-    plan_number = create_result["plan_number"]
-    plan_path = p_dir / f"P{plan_number:03d}-append-sec.yaml"
+    plan_id = create_result["plan_id"]
+    plan_path = p_dir / f"{plan_id}-append-sec.yaml"
 
     # Act
     update_result = sam_task(
-        plan=f"P{plan_number}",
+        plan=plan_id,
         task="T01",
         config=UpdateTaskConfig(append_section="Divergence Notes", section_content="No divergence observed."),
         plan_dir=str(p_dir),
@@ -768,10 +774,10 @@ def test_sam_claim_not_started_task_returns_claimed_true(tmp_path: Path) -> None
         config=CreatePlanConfig(slug="claim-test", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
     )
     assert "error" not in create_result
-    plan_number = create_result["plan_number"]
+    plan_id = create_result["plan_id"]
 
     # Act
-    result = sam_task(plan=f"P{plan_number}", task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+    result = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
 
     # Assert
     assert result.get("claimed") is True
@@ -804,13 +810,13 @@ def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None
         config=CreatePlanConfig(slug="double-claim", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
     )
     assert "error" not in create_result
-    plan_number = create_result["plan_number"]
+    plan_id = create_result["plan_id"]
 
-    first = sam_task(plan=f"P{plan_number}", task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+    first = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
     assert first.get("claimed") is True
 
     # Act — second claim
-    second = sam_task(plan=f"P{plan_number}", task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+    second = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
 
     # Assert
     assert second.get("claimed") is False
@@ -843,11 +849,11 @@ def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:
         config=CreatePlanConfig(slug="missing-task", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
     )
     assert "error" not in create_result
-    plan_number = create_result["plan_number"]
+    plan_id = create_result["plan_id"]
 
     # Act / Assert
     with pytest.raises(TaskNotFoundError, match="T99"):
-        sam_task(plan=f"P{plan_number}", task="T99", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+        sam_task(plan=plan_id, task="T99", config=ClaimTaskConfig(), plan_dir=str(p_dir))
 
 
 def test_sam_claim_invalid_plan_returns_error(tmp_path: Path) -> None:
@@ -868,12 +874,14 @@ def test_sam_claim_invalid_plan_returns_error(tmp_path: Path) -> None:
 
 
 def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
-    """sam_plan(create) without issue returns plan_ref as plain P-format identifier.
+    """sam_plan(create) without issue returns plan_ref as plain UUID-format identifier.
 
     Tests: plan_ref field in create response — no-issue path.
-    How: Create a plan with no issue; verify plan_ref is "P001".
-    Why: plan_ref must be globally addressable; without issue it falls back to P<NNN>.
+    How: Create a plan with no issue; verify plan_ref matches P[hex8] pattern.
+    Why: plan_ref must be globally addressable; without issue it is the plan_id itself.
     """
+    import re
+
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
@@ -895,17 +903,18 @@ def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
 
     # Assert
     assert "error" not in result
-    assert result["plan_ref"] == "P001"
+    assert re.match(r"^P[0-9a-f]{8}$", result["plan_ref"]), f"Expected UUID plan_ref, got: {result['plan_ref']!r}"
 
 
 def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
-    """sam_plan(create) with issue returns plan_ref as '#<issue>,P<NNN>' composite identifier.
+    """sam_plan(create) with issue returns plan_ref as '#<issue>,P<hex8>' composite identifier.
 
     Tests: plan_ref field in create response — issue-scoped path.
-    How: Create a plan with issue=42; verify plan_ref is "#42,P042" (backend uses issue
-         number as plan number when issue is provided).
-    Why: plan_ref must be globally unique when an issue is associated (PR #1725 review comment).
+    How: Create a plan with issue=42; verify plan_ref is "#42,P<hex8>".
+    Why: plan_ref must be globally unique when an issue is associated; UUID IDs prevent collisions.
     """
+    import re
+
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
@@ -926,6 +935,6 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
         plan_dir=str(p_dir),
     )
 
-    # Assert — when issue=42, backend names the plan file P042, so plan_number=42
+    # Assert — plan_ref includes issue number and UUID plan_id
     assert "error" not in result
-    assert result["plan_ref"] == "#42,P042"
+    assert re.match(r"^#42,P[0-9a-f]{8}$", result["plan_ref"]), f"Expected '#42,P<hex8>', got: {result['plan_ref']!r}"

@@ -639,13 +639,13 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
             config=CreatePlanConfig(slug="roundtrip", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
         )
         assert "error" not in result, f"sam_create failed: {result}"
-        plan_number = result["plan_number"]
-        plan_path = _Path(p_dir) / f"P{plan_number:03d}-roundtrip.yaml"
+        plan_id = result["plan_id"]
+        plan_path = _Path(p_dir) / f"{plan_id}-roundtrip.yaml"
 
         # Act: update task with a Task model that has non-empty dependencies
-        task_data = backend.read_task(f"P{plan_number}", "T01")
+        task_data = backend.read_task(plan_id, "T01")
         updated_task = _Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
-        backend.update_task(f"P{plan_number}", updated_task)
+        backend.update_task(plan_id, updated_task)
 
         # Assert: read the raw YAML file — dependencies must be a sequence, not a string
         yaml = YAML()

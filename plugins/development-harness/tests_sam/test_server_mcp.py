@@ -308,10 +308,12 @@ async def test_mcp_sam_create_creates_plan_file(tmp_path: Path) -> None:
 
     # Assert
     data = result.data
+    import re
+
     assert isinstance(data, dict)
     assert "error" not in data
     assert data["task_count"] == 1
-    assert data["plan_number"] == 1
+    assert re.match(r"^P[0-9a-f]{8}$", data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -348,12 +350,11 @@ async def test_mcp_sam_claim_returns_claimed_true(tmp_path: Path) -> None:
                 "plan_dir": str(p_dir),
             },
         )
-        plan_number = create_result.data["plan_number"]
+        plan_id = create_result.data["plan_id"]
 
         # Act
         result = await client.call_tool(
-            "sam_task",
-            {"plan": f"P{plan_number}", "task": "T01", "config": {"action": "claim"}, "plan_dir": str(p_dir)},
+            "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}, "plan_dir": str(p_dir)}
         )
 
     # Assert
@@ -393,8 +394,7 @@ async def test_mcp_sam_claim_double_claim_returns_claimed_false(tmp_path: Path) 
                 "plan_dir": str(p_dir),
             },
         )
-        plan_number = create_result.data["plan_number"]
-        plan_addr = f"P{plan_number}"
+        plan_addr = create_result.data["plan_id"]
 
         first = await client.call_tool(
             "sam_task", {"plan": plan_addr, "task": "T01", "config": {"action": "claim"}, "plan_dir": str(p_dir)}
@@ -445,8 +445,7 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
                 "plan_dir": str(p_dir),
             },
         )
-        plan_number = create_result.data["plan_number"]
-        plan_addr = f"P{plan_number}"
+        plan_addr = create_result.data["plan_id"]
 
         # Act
         update_result = await client.call_tool(
@@ -711,10 +710,12 @@ async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
         result = await client.call_tool("sam_plan", {"config": {"action": "list"}, "plan_dir": str(multi_plan_dir)})
 
     # Assert — all items have plan_ref present and matching P-format (no issue in fixture)
+    # Plans in this fixture used tasks-{N}-{slug} naming (legacy format), so plan_id is the
+    # filename stem's P-prefix portion. Legacy files expose their plan_id from the file stem.
     items = result.data["items"]
     assert len(items) > 0
     for item in items:
         assert "plan_ref" in item
         plan_ref = item["plan_ref"]
         assert plan_ref is not None
-        assert re.match(r"^P\d+$", plan_ref), f"Expected P<digits> format, got: {plan_ref!r}"
+        assert re.match(r"^P[0-9a-f\d]+", plan_ref), f"Expected P-format plan_ref, got: {plan_ref!r}"

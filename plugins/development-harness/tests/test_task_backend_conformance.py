@@ -19,13 +19,7 @@ from typing import TYPE_CHECKING
 import pytest
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.backends.memory import InMemoryTaskProvider
-from sam_schema.core.exceptions import (
-    DocumentNotFoundError,
-    PlanExistsError,
-    PlanNotFoundError,
-    TaskNotFoundError,
-    TaskValidationError,
-)
+from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.task_backend import TaskBackend
 
 if TYPE_CHECKING:
@@ -127,14 +121,24 @@ class TestTaskBackendConformance:
         assert read_back["tasks"][0]["title"] == "First task"
 
     def test_create_plan_duplicate_raises(self, backend: TaskBackend) -> None:
-        """Creating two plans with the same issue number should raise PlanExistsError."""
+        """Creating two plans with the same issue number assigns distinct UUID plan IDs.
+
+        With UUID-derived IDs, the issue number is stored in metadata only and does not
+        constrain plan_id uniqueness. Each create call generates a new UUID plan_id.
+        """
+        import re
+
         # Arrange
         tasks = [_make_task_def("T01", "Task")]
 
-        # Act / Assert
-        backend.create_plan("slug-a", "Goal A", tasks, issue=9001)
-        with pytest.raises(PlanExistsError):
-            backend.create_plan("slug-b", "Goal B", tasks, issue=9001)
+        # Act — two plans for the same issue succeed (UUID IDs are collision-resistant)
+        plan_a = backend.create_plan("slug-a", "Goal A", tasks, issue=9001)
+        plan_b = backend.create_plan("slug-b", "Goal B", tasks, issue=9001)
+
+        # Assert — each plan gets a unique UUID plan_id
+        assert re.match(r"^P[0-9a-f]{8}$", plan_a["plan_id"]), f"Expected UUID plan_id, got: {plan_a['plan_id']!r}"
+        assert re.match(r"^P[0-9a-f]{8}$", plan_b["plan_id"]), f"Expected UUID plan_id, got: {plan_b['plan_id']!r}"
+        assert plan_a["plan_id"] != plan_b["plan_id"], "Two create calls must produce distinct plan IDs"
 
     def test_read_nonexistent_plan_raises(self, backend: TaskBackend) -> None:
         """Reading a plan that does not exist should raise PlanNotFoundError."""

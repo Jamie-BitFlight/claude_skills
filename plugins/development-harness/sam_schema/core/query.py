@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import re
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -28,66 +29,18 @@ from sam_schema.writers.yaml_writer import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Matches the new P{NNN}-{slug}.yaml naming scheme to extract the numeric plan number.
-_P_NUMERIC_RE = re.compile(r"^P(\d+)-")
 _LEGACY_TASKS_RE = re.compile(r"^tasks-(\d+)-")
 
 
-def _next_plan_number(plan_dir: Path) -> int:
-    """Scan ``plan_dir`` for the highest existing plan number and return the next one.
-
-    Recognises both the new ``P{NNN}-{slug}`` naming scheme and the legacy
-    ``tasks-{N}-{slug}`` pattern so that numbering is monotonically increasing
-    across mixed directories.
-
-    Args:
-        plan_dir: Directory to search. Need not exist; returns 1 if absent.
+def _new_plan_id() -> str:
+    """Generate a collision-resistant plan ID using UUID4.
 
     Returns:
-        The next available plan number (highest found + 1, minimum 1).
+        A plan ID string of the form ``P`` + first 8 hex characters of a UUID4,
+        e.g. ``"Pa1b2c3d4"``. Collision probability is negligible for any
+        realistic number of plans per directory.
     """
-    if not plan_dir.exists():
-        return 1
-
-    highest = 0
-    for entry in plan_dir.iterdir():
-        name = entry.name
-        m = _P_NUMERIC_RE.match(name)
-        if m:
-            highest = max(highest, int(m.group(1)))
-            continue
-        m2 = _LEGACY_TASKS_RE.match(name)
-        if m2:
-            highest = max(highest, int(m2.group(1)))
-    return highest + 1
-
-
-def _find_collision(plan_dir: Path, plan_number: int) -> Path | None:
-    """Return the path of an existing plan file with ``plan_number``, or ``None``.
-
-    Checks both the canonical ``P{N}-*.yaml`` naming scheme and the legacy
-    ``tasks-{N}-*.md`` pattern so that issue-number collisions are caught
-    regardless of which format a plan was created with.
-
-    Args:
-        plan_dir: Directory to search. Returns ``None`` if the directory is absent.
-        plan_number: Plan number to check for collisions.
-
-    Returns:
-        Path of the first colliding file found, or ``None`` if none exists.
-    """
-    if not plan_dir.exists():
-        return None
-
-    for entry in plan_dir.iterdir():
-        name = entry.name
-        m = _P_NUMERIC_RE.match(name)
-        if m and int(m.group(1)) == plan_number:
-            return entry
-        m2 = _LEGACY_TASKS_RE.match(name)
-        if m2 and int(m2.group(1)) == plan_number:
-            return entry
-    return None
+    return "P" + uuid.uuid4().hex[:8]
 
 
 def create_plan(
@@ -98,13 +51,12 @@ def create_plan(
     context: str | None = None,
     issue: int | None = None,
 ) -> Plan:
-    """Create a new plan, assign a plan number, validate tasks, and write to disk.
+    """Create a new plan, assign a UUID-derived plan ID, validate tasks, and write to disk.
 
-    The output file is named ``{plan_dir}/P{NNN}-{slug}.yaml``.  When
-    ``issue`` is provided, ``NNN`` is the issue number itself so that the
-    plan file and the GitHub issue share an unambiguous identifier.  When
-    ``issue`` is omitted, ``NNN`` is the next sequential number derived by
-    scanning ``plan_dir``.
+    The output file is named ``{plan_dir}/{plan_id}-{slug}.yaml`` where
+    ``plan_id`` is ``P`` + first 8 hex characters of a UUID4 (e.g. ``Pa1b2c3d4``).
+    When ``issue`` is provided, it is stored in the ``plan_ref`` field only;
+    it does not influence the plan's own ID.
 
     Each dict in ``tasks`` is validated against the ``Task`` Pydantic model
     before the plan is written; invalid task dicts raise ``ValueError`` with the
@@ -118,30 +70,18 @@ def create_plan(
                ``dependencies``, ``priority``, ``complexity``).
         plan_dir: Directory in which to create the plan file.
         context: Optional plan-level context string (markdown prose).
-        issue: Optional GitHub issue number.  When provided, the issue number
-               is used directly as the plan number.  Raises ``ValueError`` if a
-               plan with that number already exists.
+        issue: Optional GitHub issue number stored in the plan metadata.
+               Does not affect the plan ID.
 
     Returns:
         The created ``Plan`` model (with ``source_path`` set to the written path).
 
     Raises:
-        ValueError: If any task dict is invalid per the ``Task`` model, or if
-                    a plan with the given issue number already exists.
+        ValueError: If any task dict is invalid per the ``Task`` model.
         OSError: If the plan file cannot be written.
     """
-    if issue is not None:
-        plan_number = issue
-        existing = _find_collision(plan_dir, plan_number)
-        if existing is not None:
-            msg = (
-                f"Plan P{plan_number} already exists: {existing}. "
-                f"Use a different issue number or rename the existing plan."
-            )
-            raise ValueError(msg)
-    else:
-        plan_number = _next_plan_number(plan_dir)
-    file_name = f"P{plan_number:03d}-{slug}.yaml"
+    plan_id_str = _new_plan_id()
+    file_name = f"{plan_id_str}-{slug}.yaml"
     output_path = plan_dir / file_name
 
     validated_tasks: list[Task] = []
@@ -154,7 +94,6 @@ def create_plan(
             msg = f"Task at index {i} failed validation: {exc}"
             raise ValueError(msg) from exc
 
-    plan_id_str = f"P{plan_number:03d}"
     plan = Plan(
         plan_id=plan_id_str,
         feature=slug,

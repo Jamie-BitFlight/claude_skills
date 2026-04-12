@@ -180,9 +180,10 @@ class InMemoryTaskProvider:
     has no side effects outside this instance. No filesystem access and no
     external dependencies.
 
-    Plan IDs are auto-assigned as ``P1``, ``P2``, etc. in insertion order
-    when no ``issue`` is provided. When ``issue`` is provided, the plan ID
-    is ``P{issue}``.
+    Plan IDs are auto-assigned as ``P`` + first 8 hex chars of a UUID4
+    (e.g. ``Pa1b2c3d4``) for every new plan, regardless of whether an
+    ``issue`` is provided. The ``issue`` value is stored in plan metadata
+    but does not influence the plan ID.
     """
 
     def __init__(self) -> None:
@@ -191,8 +192,6 @@ class InMemoryTaskProvider:
         self._plans: dict[str, PlanData] = {}
         # content_ref -> DocumentData
         self._documents: dict[str, DocumentData] = {}
-        # Monotonically increasing counter for auto-assigned plan IDs.
-        self._next_plan_num: int = 1
 
     # ------------------------------------------------------------------
     # Plan lifecycle
@@ -226,11 +225,7 @@ class InMemoryTaskProvider:
             PlanExistsError: When the resolved plan_id already exists.
             TaskValidationError: When any task definition is missing required fields.
         """
-        if issue is not None:
-            plan_id = f"P{issue}"
-        else:
-            plan_id = f"P{self._next_plan_num}"
-            self._next_plan_num += 1
+        plan_id = "P" + uuid.uuid4().hex[:8]
 
         if plan_id in self._plans:
             raise PlanExistsError(plan_id)

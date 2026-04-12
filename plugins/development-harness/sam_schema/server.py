@@ -11,7 +11,6 @@ Tools:
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 from datetime import UTC, datetime
@@ -284,17 +283,11 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     plan_data = backend.create_plan(
         slug=config.slug, goal=config.goal, tasks=task_defs, context=config.context, issue=config.issue
     )
-    plan_number: int | None = None
     plan_id_str = plan_data["plan_id"]
-    if plan_id_str.startswith("P"):
-        with contextlib.suppress(ValueError):
-            plan_number = int(plan_id_str[1:])
-    plan_ref: str | None
-    if plan_number is not None:
-        plan_ref = f"#{config.issue},P{plan_number:03d}" if config.issue is not None else f"P{plan_number:03d}"
-    else:
-        plan_ref = None
-    result: dict[str, Any] = {"plan_number": plan_number, "task_count": len(plan_data["tasks"]), "plan_ref": plan_ref}
+    plan_ref: str | None = (
+        (f"#{config.issue},{plan_id_str}" if config.issue is not None else plan_id_str) if plan_id_str else None
+    )
+    result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"]), "plan_ref": plan_ref}
     if config.issue is not None and plan_data["source_path"]:
         _try_register_task_plan_artifact(config.issue, Path(plan_data["source_path"]))
     return result
@@ -315,7 +308,7 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
             "description": s["description"],
             "task_count": s["task_count"],
             "issue": s.get("issue"),
-            "plan_ref": (f"#{s['issue']},P{s['plan_id'][1:]}" if s.get("issue") else s.get("plan_id")),
+            "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
         }
         for s in summaries
     ]

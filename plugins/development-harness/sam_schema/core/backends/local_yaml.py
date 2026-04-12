@@ -38,8 +38,10 @@ if TYPE_CHECKING:
 
 __all__ = ["LocalYamlTaskProvider"]
 
-# Extract plan_id from a plan file stem, e.g. "P912" from "P912-migrate-...".
-_P_STEM_RE = re.compile(r"^(P\d+)-")
+# Extract plan_id from a plan file stem.
+# Matches both legacy numeric IDs (e.g. "P912" from "P912-migrate-...")
+# and UUID-derived hex IDs (e.g. "Pa1b2c3d4" from "Pa1b2c3d4-migrate-...").
+_P_STEM_RE = re.compile(r"^(P[0-9a-f]+)-", re.IGNORECASE)
 _TASKS_STEM_RE = re.compile(r"^tasks-(\d+)-")
 _TASK_VALIDATION_RE = re.compile(r"Task at index (\d+) failed validation: (.+)", re.DOTALL)
 

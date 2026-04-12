@@ -138,10 +138,11 @@ async def test_sam_task_read_returns_task_assignment(client: Client, task_backen
     Why: Verifies MCP schema validation and JSON round-trip of a nested TaskAssignment.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "read"}})
+    result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
 
     # Assert
     data = result.data
@@ -159,11 +160,12 @@ async def test_sam_task_read_missing_task_raises_tool_error(client: Client, task
     Why: FastMCP converts unhandled TaskNotFoundError to ToolError.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act / Assert
     with pytest.raises(ToolError, match="T99"):
-        await client.call_tool("sam_task", {"plan": "P1", "task": "T99", "config": {"action": "read"}})
+        await client.call_tool("sam_task", {"plan": plan_id, "task": "T99", "config": {"action": "read"}})
 
 
 async def test_sam_task_read_missing_plan_raises_tool_error(client: Client) -> None:
@@ -193,10 +195,11 @@ async def test_sam_task_claim_transitions_to_in_progress(client: Client, task_ba
     Why: Claim is the primary write operation that prevents duplicate dispatch.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "claim"}})
+    result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
     # Assert
     data = result.data
@@ -215,11 +218,12 @@ async def test_sam_task_claim_double_claim_returns_claimed_false(
     Why: Duplicate dispatch prevention must work through the MCP protocol.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
-    await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "claim"}})
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
+    await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
     # Act
-    result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "claim"}})
+    result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
     # Assert
     data = result.data
@@ -238,10 +242,11 @@ async def test_sam_task_claim_complete_task_returns_claimed_false(
     Why: Completed tasks must not be re-claimed — confirms guard fires for all non-not-started states.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def(status="complete")])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def(status="complete")])
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "claim"}})
+    result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
     # Assert
     assert result.data["claimed"] is False
@@ -261,11 +266,12 @@ async def test_sam_task_state_updates_task_status(client: Client, task_backend: 
     Why: Status mutation is the primary write operation in the task workflow.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
     result = await client.call_tool(
-        "sam_task", {"plan": "P1", "task": "T01", "config": {"action": "state", "status": "in-progress"}}
+        "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "in-progress"}}
     )
 
     # Assert
@@ -282,11 +288,12 @@ async def test_sam_task_state_complete_sets_status(client: Client, task_backend:
     Why: Agents use state to mark tasks done after verification steps pass.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
     result = await client.call_tool(
-        "sam_task", {"plan": "P1", "task": "T01", "config": {"action": "state", "status": "complete"}}
+        "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "complete"}}
     )
 
     # Assert
@@ -303,12 +310,13 @@ async def test_sam_task_state_invalid_status_raises_tool_error(
     Why: FastMCP converts unhandled TaskValidationError to ToolError.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act / Assert
     with pytest.raises(ToolError):
         await client.call_tool(
-            "sam_task", {"plan": "P1", "task": "T01", "config": {"action": "state", "status": "not-a-valid-status"}}
+            "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "not-a-valid-status"}}
         )
 
 
@@ -325,20 +333,25 @@ async def test_sam_task_update_set_fields_patches_task(client: Client, task_back
     Why: Agents patch task fields mid-execution to record divergence notes.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
     result = await client.call_tool(
         "sam_task",
-        {"plan": "P1", "task": "T01", "config": {"action": "update", "set_fields_json": '{"title": "Updated title"}'}},
+        {
+            "plan": plan_id,
+            "task": "T01",
+            "config": {"action": "update", "set_fields_json": '{"title": "Updated title"}'},
+        },
     )
 
     # Assert
     assert result.data["updated"] is True
-    assert result.data["address"] == "P1/T01"
+    assert result.data["address"] == f"{plan_id}/T01"
 
     # Verify the change persisted (round-trip)
-    read_result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "read"}})
+    read_result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
     assert read_result.data["task"]["title"] == "Updated title"
 
 
@@ -352,13 +365,14 @@ async def test_sam_task_update_append_section_stores_content(
     Why: start-task skill appends progress sections to task bodies during execution.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
     result = await client.call_tool(
         "sam_task",
         {
-            "plan": "P1",
+            "plan": plan_id,
             "task": "T01",
             "config": {"action": "update", "append_section": "Progress Notes", "section_content": "Work in progress."},
         },
@@ -366,7 +380,7 @@ async def test_sam_task_update_append_section_stores_content(
 
     # Assert
     assert result.data["updated"] is True
-    assert result.data["address"] == "P1/T01"
+    assert result.data["address"] == f"{plan_id}/T01"
 
 
 async def test_sam_task_update_invalid_json_raises_tool_error(
@@ -379,12 +393,13 @@ async def test_sam_task_update_invalid_json_raises_tool_error(
     Why: json.loads raises ValueError which FastMCP wraps as ToolError.
     """
     # Arrange
-    task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act / Assert
     with pytest.raises(ToolError):
         await client.call_tool(
-            "sam_task", {"plan": "P1", "task": "T01", "config": {"action": "update", "set_fields_json": "not-json"}}
+            "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "update", "set_fields_json": "not-json"}}
         )
 
 
@@ -394,12 +409,14 @@ async def test_sam_task_update_invalid_json_raises_tool_error(
 
 
 async def test_sam_plan_create_returns_plan_number_and_task_count(client: Client) -> None:
-    """sam_plan action=create returns plan_number and task_count on success.
+    """sam_plan action=create returns plan_id and task_count on success.
 
     Tests: sam_plan create happy path.
     How: Pass two-task YAML string; verify the return shape.
-    Why: plan_number is used by subsequent tool calls; task_count confirms parsing.
+    Why: plan_id is used by subsequent tool calls; task_count confirms parsing.
     """
+    import re
+
     # Act
     result = await client.call_tool(
         "sam_plan",
@@ -408,7 +425,7 @@ async def test_sam_plan_create_returns_plan_number_and_task_count(client: Client
 
     # Assert
     data = result.data
-    assert data["plan_number"] == 1
+    assert re.match(r"^P[0-9a-f]{8}$", data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
     assert data["task_count"] == 2
 
 
@@ -431,9 +448,9 @@ async def test_sam_plan_create_sets_plan_goal(client: Client) -> None:
             }
         },
     )
-    plan_number = create_result.data["plan_number"]
+    plan_id = create_result.data["plan_id"]
 
-    read_result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": f"P{plan_number}"})
+    read_result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": plan_id})
 
     # Assert
     assert read_result.data.get("goal") == "Specific goal string"
@@ -474,10 +491,11 @@ async def test_sam_plan_read_returns_plan_fields(client: Client, task_backend: I
     Why: Plan read is used by orchestrators to load goal/context before dispatch.
     """
     # Arrange
-    task_backend.create_plan("read-plan", "Read test goal", [_task_def()])
+    plan_data = task_backend.create_plan("read-plan", "Read test goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": "P1"})
+    result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": plan_id})
 
     # Assert
     data = result.data
@@ -624,10 +642,13 @@ async def test_sam_plan_status_returns_progress_summary(client: Client, task_bac
     Why: Orchestrators use status to decide when to close a plan.
     """
     # Arrange
-    task_backend.create_plan("progress-plan", "Progress goal", [_task_def("T01", status="complete"), _task_def("T02")])
+    plan_data = task_backend.create_plan(
+        "progress-plan", "Progress goal", [_task_def("T01", status="complete"), _task_def("T02")]
+    )
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_plan", {"config": {"action": "status"}, "plan": "P1"})
+    result = await client.call_tool("sam_plan", {"config": {"action": "status"}, "plan": plan_id})
 
     # Assert
     data = result.data
@@ -665,12 +686,13 @@ async def test_sam_plan_ready_returns_tasks_with_satisfied_deps(
     Why: Orchestrators call ready to discover which tasks can be dispatched next.
     """
     # Arrange
-    task_backend.create_plan(
+    plan_data = task_backend.create_plan(
         "ready-plan", "Ready goal", [_task_def("T01", status="complete"), _task_def("T02", deps=["T01"])]
     )
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_plan", {"config": {"action": "ready"}, "plan": "P1"})
+    result = await client.call_tool("sam_plan", {"config": {"action": "ready"}, "plan": plan_id})
 
     # Assert
     data = result.data
@@ -688,10 +710,11 @@ async def test_sam_plan_ready_full_returns_complete_task_fields(
     Why: full=True is needed when agents require all task fields, not just the 7-field manifest.
     """
     # Arrange
-    task_backend.create_plan("full-plan", "Full goal", [_task_def("T01")])
+    plan_data = task_backend.create_plan("full-plan", "Full goal", [_task_def("T01")])
+    plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_plan", {"config": {"action": "ready", "full": True}, "plan": "P1"})
+    result = await client.call_tool("sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
 
     # Assert
     data = result.data
@@ -729,16 +752,17 @@ async def test_sam_plan_update_sets_context_field(client: Client, task_backend: 
     Why: Context is set by the context-gathering agent after discovery.
     """
     # Arrange
-    task_backend.create_plan("update-plan", "Update goal", [_task_def()])
+    plan_data = task_backend.create_plan("update-plan", "Update goal", [_task_def()])
+    plan_id = plan_data["plan_id"]
 
     # Act
     result = await client.call_tool(
-        "sam_plan", {"config": {"action": "update", "context": "New context text"}, "plan": "P1"}
+        "sam_plan", {"config": {"action": "update", "context": "New context text"}, "plan": plan_id}
     )
 
     # Assert
     assert result.data["updated"] is True
-    assert result.data["address"] == "P1"
+    assert result.data["address"] == plan_id
 
 
 async def test_sam_plan_update_missing_plan_raises_tool_error(client: Client) -> None:
@@ -901,8 +925,9 @@ async def test_sam_active_task_update_patches_task_via_active_context(
          re-specify plan/task on every call.
     """
     # Arrange
-    task_backend.create_plan("active-plan", "Active goal", [_task_def("T01")])
-    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}})
+    plan_data = task_backend.create_plan("active-plan", "Active goal", [_task_def("T01")])
+    plan_id = plan_data["plan_id"]
+    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": plan_id, "task": "T01"}})
 
     # Act
     result = await client.call_tool(
@@ -914,7 +939,7 @@ async def test_sam_active_task_update_patches_task_via_active_context(
     assert result.data["updated"] is True
 
     # Verify patch persisted through sam_task read
-    read_result = await client.call_tool("sam_task", {"plan": "P1", "task": "T01", "config": {"action": "read"}})
+    read_result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
     assert read_result.data["task"]["title"] == "Updated via active context"
 
 

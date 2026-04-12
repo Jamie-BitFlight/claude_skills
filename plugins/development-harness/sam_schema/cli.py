@@ -609,7 +609,7 @@ def create(
 
     Output (JSON)::
 
-        {"path": "plan/P001-auth-system.yaml", "plan_number": 1, "task_count": 3}
+        {"path": "plan/Pa1b2c3d4-auth-system.yaml", "plan_id": "Pa1b2c3d4", "task_count": 3}
 
     Args:
         slug: Short slug identifier for the plan.
@@ -644,14 +644,14 @@ def create(
 
     source_path = plan.source_path
     path_str = str(source_path) if source_path is not None else str(plan_dir)
-    # Extract numeric plan number from written path stem
-    plan_number: int | None = None
+    # Extract UUID-based plan_id from written path stem (e.g. Pa1b2c3d4-slug.yaml -> Pa1b2c3d4)
+    plan_id: str | None = None
     if source_path is not None:
-        m = re.match(r"^P(\d+)-", source_path.name)
+        m = re.match(r"^(P[0-9a-f]+)-", source_path.name, re.IGNORECASE)
         if m:
-            plan_number = int(m.group(1))
+            plan_id = m.group(1)
 
-    result: dict[str, object] = {"path": path_str, "plan_number": plan_number, "task_count": len(plan.tasks)}
+    result: dict[str, object] = {"path": path_str, "plan_id": plan_id, "task_count": len(plan.tasks)}
     _output_json(result)
 
 
