@@ -14,7 +14,6 @@ import sqlite3
 import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
-from io import StringIO as _StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -24,7 +23,7 @@ import tiktoken
 from fastmcp import Context, FastMCP
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
-from pydantic import Field, ValidationError as _ValidationError
+from pydantic import Field
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
 from . import models as _models, operations
@@ -3166,19 +3165,9 @@ async def dispatch_stale_check(
         title="Create Dispatch Plan", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )
-async def dispatch_create_plan(  # noqa: PLR0911
+async def dispatch_create_plan(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-    plan_yaml: Annotated[
-        str,
-        Field(
-            description=(
-                "YAML string containing the full dispatch plan. Must include top-level keys: "
-                "'milestone' (with number, title, integration-branch), 'waves' (list of wave dicts "
-                "with items), and optionally 'conflict-groups' and 'quality-gates'. "
-                "Both kebab-case and snake_case keys are accepted."
-            )
-        ),
-    ],
+    plan: Annotated[_ds.DispatchPlan, Field(description="The dispatch plan for this milestone.")],
     overwrite: Annotated[
         bool,
         Field(
@@ -3209,13 +3198,14 @@ async def dispatch_create_plan(  # noqa: PLR0911
 ) -> dict:
     """Create or overwrite a dispatch plan YAML file for a milestone.
 
-    Accepts a YAML string, validates it against the ``DispatchPlan`` Pydantic
-    model, writes it atomically to ``plan/milestone-{N}-dispatch.yaml``, and
-    optionally validates structural integrity after writing.
+    Accepts a typed ``DispatchPlan`` model, writes it atomically to
+    ``plan/milestone-{N}-dispatch.yaml``, and optionally validates structural
+    integrity after writing.
 
     Args:
         milestone_number: GitHub milestone number.
-        plan_yaml: Full dispatch plan as a YAML string.
+        plan: The dispatch plan for this milestone. ``plan.milestone.number``
+            must match ``milestone_number``.
         overwrite: When ``False`` (default) returns an error if the plan file
             already exists.
         validate: When ``True`` (default) runs ``validate_plan_integrity`` after
@@ -3231,60 +3221,19 @@ async def dispatch_create_plan(  # noqa: PLR0911
     out = Output()
     plan_path = _dispatch_plan_path(milestone_number)
 
-    # 1. Parse YAML
-    try:
-        yaml_parser = _YAML()
-        parsed = yaml_parser.load(_StringIO(plan_yaml))
-    except _YAMLError as exc:
+    # Verify plan.milestone.number matches the milestone_number parameter
+    if plan.milestone.number != milestone_number:
         return {
-            "error": f"Invalid YAML: {exc}",
+            "error": (
+                f"Milestone number mismatch: parameter is {milestone_number} "
+                f"but plan.milestone.number is {plan.milestone.number}"
+            ),
             "milestone_number": milestone_number,
             "plan_path": str(plan_path),
             **out.to_dict(),
         }
 
-    # 2. Verify parsed result is a mapping
-    if not isinstance(parsed, dict):
-        return {
-            "error": "plan_yaml must be a YAML mapping (dict), not a list or scalar",
-            "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
-            **out.to_dict(),
-        }
-
-    # 3. Check milestone.number consistency; inject if absent
-    milestone_section = parsed.get("milestone")
-    if isinstance(milestone_section, dict):
-        yaml_number = milestone_section.get("number")
-        if yaml_number is not None and int(yaml_number) != milestone_number:
-            return {
-                "error": (
-                    f"Milestone number mismatch: parameter is {milestone_number} "
-                    f"but YAML milestone.number is {yaml_number}"
-                ),
-                "milestone_number": milestone_number,
-                "plan_path": str(plan_path),
-                **out.to_dict(),
-            }
-        if yaml_number is None:
-            milestone_section["number"] = milestone_number
-    else:
-        # No milestone key — inject a minimal one so model_validate can proceed
-        parsed["milestone"] = {"number": milestone_number}
-
-    # 4. Validate against DispatchPlan
-    try:
-        plan = _ds.DispatchPlan.model_validate(parsed)
-    except _ValidationError as exc:
-        violations = "; ".join(f"{e['loc']}: {e['msg']}" for e in exc.errors())
-        return {
-            "error": f"Plan validation failed: {violations}",
-            "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
-            **out.to_dict(),
-        }
-
-    # 5. Check for existing file when overwrite is False
+    # Check for existing file when overwrite is False
     if not overwrite and plan_path.exists():
         return {
             "error": (f"Plan file already exists: {plan_path}. Pass overwrite=True to replace it."),
