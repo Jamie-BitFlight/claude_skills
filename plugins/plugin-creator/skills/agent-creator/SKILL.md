@@ -256,11 +256,12 @@ B) **User-level** - Available in all your projects (saved to `~/.claude/agents/`
 - Checked into git: No
 - Team access: No (personal only)
 
-C) **Plugin** - Part of a plugin (saved to plugin directory + update plugin.json)
+C) **Plugin** - Part of a plugin (saved to plugin directory; auto-discovered from `agents/`)
 
 - Use when: Agent is part of a distributable plugin
 - Checked into git: Yes (if plugin is versioned)
 - Team access: Via plugin installation
+- plugin.json: **Do NOT touch** — agents in `agents/` are auto-discovered by Claude Code
 
 </scope_decision>
 
@@ -283,24 +284,22 @@ C) **Plugin** - Part of a plugin (saved to plugin directory + update plugin.json
 1. ASK: "Which plugin should contain this agent?"
 2. VERIFY plugin exists at specified path
 3. SAVE agent to `{plugin-path}/agents/{agent-name}.md`
-4. READ `{plugin-path}/.claude-plugin/plugin.json`
-5. UPDATE plugin.json to add agent to `agents` array:
+4. **DO NOT TOUCH `plugin.json`.** Claude Code auto-discovers every `.md` file in the plugin's `agents/` directory. Writing the `agents` array — even to add one entry — OVERRIDES auto-discovery: the declared list becomes the *complete* list and every unlisted agent becomes invisible.
 
-   > **AUTO-DISCOVERY WARNING — ALL OR NOTHING**
-   > The `agents` array is an explicit allowlist. Declaring even one path overrides auto-discovery entirely — any agent NOT listed becomes invisible. Before adding the new agent, read the existing `agents` array and carry forward every existing entry. Never write a single-entry array unless this is the first agent in the plugin.
-
-   ```json
-   {
-     "agents": [
-       "./agents/existing-agent-1.md",
-       "./agents/existing-agent-2.md",
-       "./agents/{agent-name}.md"
-     ]
-   }
+   > **AUTO-DISCOVERY RULE — DO NOT REGISTER**
+   > Agents in the default `agents/` directory are auto-discovered. The `agents` array in `plugin.json` exists ONLY for agents stored in non-default paths. Never introduce the `agents` key for agents in the default location.
+   >
+   > **Incident history**:
+   > - 2026-03-17: `python3-development` committed a 2-entry `agents` array; 17 of 19 agents disappeared.
+   > - 2026-04-12: `development-harness` commit 30260566 auto-added a 2-entry `agents` array via a buggy pre-commit hook; 21 of 23 agents would have disappeared. Hook fixed in the same session; this instruction block corrected at the same time.
+   >
+   > If the plugin already has an `agents` array (Mode B — manual allowlist for non-default paths), READ it first, carry forward every existing entry, and append the new one. Never write a single-entry array.
+5. VALIDATE plugin.json still has no `agents` key (unless the plugin uses non-default paths):
+   ```bash
+   ! grep -q '"agents"' {plugin-path}/.claude-plugin/plugin.json
    ```
-6. VALIDATE plugin.json syntax
-7. RUN plugin validation: `claude plugin validate {plugin-path}`
-8. RUN agent frontmatter validation: `uvx skilllint@latest check {plugin-path}/agents/{agent-name}.md`
+6. RUN plugin validation: `claude plugin validate {plugin-path}`
+7. RUN agent frontmatter validation: `uvx skilllint@latest check {plugin-path}/agents/{agent-name}.md`
 
 ### Phase 8: Post-Creation Validation
 
@@ -1060,7 +1059,7 @@ WHEN finished:
 2. VERIFY it passes validation checklist (Phase 6)
 3. ASK user where to save (project/user/plugin) using AskUserQuestion
 4. SAVE to appropriate location based on scope (Phase 7)
-5. UPDATE plugin.json if agent is part of a plugin
+5. CONFIRM plugin.json was NOT modified (default-path agents are auto-discovered; writing the `agents` key would mask every other agent in the plugin)
 6. RUN validation on agent file and plugin (if applicable) (Phase 8)
 7. REPORT file location and validation results
 8. REMIND user to test the agent with example prompts

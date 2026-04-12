@@ -1,6 +1,6 @@
 {
   "name": "rwr",
-  "version": "2.6.4",
+  "version": "2.6.5",
   "description": "Documentation and authoring workflow router: audit docs vs code drift, sync docs after changes, optimize prompts and SKILL.md files, validate GLFM and Markdown formatting, summarize files/URLs/images with fidelity enforcement. Use when: docs are out of date, CLAUDE.md needs improving, SKILL.md needs optimizing, checking if documentation matches code, summarizing files or URLs.",
   "author": {
     "name": "Jamie Nelson",

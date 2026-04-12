@@ -724,6 +724,152 @@ class TestUpdateComponentArrays:
         assert "./skills/keep/SKILL.md" in skills
 
 
+class TestAgentAutoDiscoveryRegression:
+    """Regression guard for the 2026-03-17 / 2026-04-12 auto-discovery masking bug.
+
+    Adding a new agent file to ``agents/`` MUST NOT cause _update_component_arrays
+    to introduce an ``agents`` array in plugin.json. Doing so overrides Claude
+    Code's auto-discovery and silently masks every other agent in the plugin.
+
+    See:
+        - .claude/rules/plugin-development.md (canonical rule)
+        - plugins/plugin-creator/scripts/auto_sync_manifests.py docstring of
+          _is_standard_path_component (incident history)
+    """
+
+    def test_new_agent_does_not_create_agents_key_when_absent(self) -> None:
+        """The pre-commit fix: new default-path agents must not introduce the array.
+
+        Tests: _update_component_arrays for default-path agents in Mode A
+        How: Plugin.json has no agents key; add a new agents/foo.md component
+        Why: 2026-04-12 commit 30260566 introduced an agents array containing
+            only the new file, masking 21 of 23 dh agents. The fix is to leave
+            plugin.json untouched and rely on Claude Code's auto-discovery.
+        """
+        # Arrange
+        data: dict[str, list[str] | str] = {"name": "dh", "version": "7.9.6"}
+        changes: _ComponentChangesDict = {
+            "added": [
+                {"component_type": "agent", "component_path": "agents/classifier.md"},
+                {"component_type": "agent", "component_path": "agents/rtica-assessor.md"},
+            ],
+            "deleted": [],
+            "modified": [],
+        }
+
+        # Act
+        modified = auto_sync._update_component_arrays(data, changes)
+
+        # Assert
+        assert modified is True, "modified flag should be True so the version still bumps"
+        assert "agents" not in data, (
+            "default-path agents must NOT introduce an agents key — auto-discovery handles them"
+        )
+
+    def test_new_agent_appends_to_existing_array_in_mode_b(self) -> None:
+        """Mode B: when the array already exists, new entries are appended.
+
+        Tests: _update_component_arrays for default-path agents in Mode B
+        How: Plugin.json already has an agents key (manual allowlist mode);
+             add a new agents/foo.md component
+        Why: When the user has explicitly opted into the manual allowlist
+            (e.g. for non-default agent paths), every new agent must be
+            carried forward or it becomes invisible.
+        """
+        # Arrange
+        data: dict[str, list[str] | str] = {"name": "dh", "version": "7.9.6", "agents": ["./custom/agents/legacy.md"]}
+        changes: _ComponentChangesDict = {
+            "added": [{"component_type": "agent", "component_path": "agents/new-agent.md"}],
+            "deleted": [],
+            "modified": [],
+        }
+
+        # Act
+        modified = auto_sync._update_component_arrays(data, changes)
+
+        # Assert
+        assert modified is True
+        agents = data["agents"]
+        assert isinstance(agents, list)
+        assert "./custom/agents/legacy.md" in agents, "existing entries must be carried forward"
+        assert "./agents/new-agent.md" in agents, "new entries must be appended in Mode B"
+
+    def test_new_default_path_command_does_not_create_commands_key(self) -> None:
+        """Same auto-discovery rule applies to commands/*.md.
+
+        Tests: _update_component_arrays for default-path commands in Mode A
+        How: Plugin.json has no commands key; add a new commands/foo.md
+        Why: Commands obey the same auto-discovery semantics as agents and
+            skills. The original bug only manifested for agents because the
+            agent branch lacked the standard-path guard, but the same fix
+            now covers all three component types.
+        """
+        # Arrange
+        data: dict[str, list[str] | str] = {"name": "p", "version": "1.0.0"}
+        changes: _ComponentChangesDict = {
+            "added": [{"component_type": "command", "component_path": "commands/cmd.md"}],
+            "deleted": [],
+            "modified": [],
+        }
+
+        # Act
+        modified = auto_sync._update_component_arrays(data, changes)
+
+        # Assert
+        assert modified is True
+        assert "commands" not in data
+
+    def test_non_default_path_agent_still_registered(self) -> None:
+        """Sanity check: agents in non-default paths still get explicit registration.
+
+        Tests: _update_component_arrays for non-default-path agents
+        How: Add an agent at custom/agents/foo.md (not under agents/)
+        Why: Auto-discovery only covers the default location. Agents in custom
+            paths must still be registered explicitly or Claude Code cannot
+            see them.
+        """
+        # Arrange
+        data: dict[str, list[str] | str] = {"name": "p", "version": "1.0.0"}
+        changes: _ComponentChangesDict = {
+            "added": [{"component_type": "agent", "component_path": "custom/agents/special.md"}],
+            "deleted": [],
+            "modified": [],
+        }
+
+        # Act
+        modified = auto_sync._update_component_arrays(data, changes)
+
+        # Assert
+        assert modified is True
+        assert "agents" in data
+        agents = data["agents"]
+        assert isinstance(agents, list)
+        assert "./custom/agents/special.md" in agents
+
+    def test_is_standard_path_component_classification(self) -> None:
+        """The classifier must recognise default locations for all three types.
+
+        Tests: _is_standard_path_component coverage
+        How: Exercise every (field, path) shape that pre-commit detection emits
+        Why: Lock in the contract so future changes cannot accidentally
+            re-enable the auto-discovery override bug.
+        """
+        # Standard-path agents — the regression we are fixing
+        assert auto_sync._is_standard_path_component("agents", "agents/foo.md") is True
+        assert auto_sync._is_standard_path_component("agents", "agents/bar.md") is True
+        # Non-default agents — must remain explicit
+        assert auto_sync._is_standard_path_component("agents", "custom/agents/foo.md") is False
+        assert auto_sync._is_standard_path_component("agents", "agents/sub/nested.md") is False
+        # Standard-path commands
+        assert auto_sync._is_standard_path_component("commands", "commands/cmd.md") is True
+        assert auto_sync._is_standard_path_component("commands", "custom/commands/cmd.md") is False
+        # Standard-path skills (preserves prior behaviour)
+        assert auto_sync._is_standard_path_component("skills", "skills/my-skill") is True
+        assert auto_sync._is_standard_path_component("skills", "skills/my-skill/SKILL.md") is False
+        # Unknown field
+        assert auto_sync._is_standard_path_component("hooks", "hooks/foo.json") is False
+
+
 class TestUpdatePluginJsonFileNotFound:
     """Test update_plugin_json when plugin.json does not exist."""
 

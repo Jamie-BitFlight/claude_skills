@@ -132,6 +132,15 @@ repos:
         pass_filenames: false
         files: ^plugins/
 
+      - id: check-agent-auto-discovery
+        name: Guard against plugin.json masking auto-discovered agents/commands
+        entry: uv run -q --no-sync plugins/plugin-creator/scripts/check_agent_auto_discovery.py
+        language: system
+        stages: [pre-commit]
+        pass_filenames: true
+        files: ^plugins/.*/\.claude-plugin/plugin\.json$
+        always_run: false
+
       - id: skilllint
         name: Validate and fix plugins, skills, agents, commands
         entry: uvx skilllint@latest check --fix

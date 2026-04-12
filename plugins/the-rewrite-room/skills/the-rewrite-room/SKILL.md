@@ -77,7 +77,7 @@ flowchart TD
 **Verification checklist — all four required before the command is declared complete:**
 
 - [ ] Agent file exists at `plugins/the-rewrite-room/agents/rewrite-room-<name>.md`
-- [ ] Agent registered in `.claude-plugin/plugin.json` agents array as `"./agents/rewrite-room-<name>.md"`
+- [ ] `.claude-plugin/plugin.json` does NOT have an `agents` key (default-path agents are auto-discovered; writing the key would mask the rest)
 - [ ] Command row in Command Reference table — Entry Agent column contains the agent name (not the skill name)
 - [ ] Branch in Workflow Index mermaid points to the agent node (not the skill directory)
 

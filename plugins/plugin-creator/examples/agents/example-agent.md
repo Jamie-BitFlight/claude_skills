@@ -78,18 +78,13 @@ Agents can be located in:
 - **Project-level:** `.claude/agents/agent-name.md` - Version controlled, shared with team
 - **Plugin:** `plugins/plugin-name/agents/agent-name.md` - Bundled in a plugin
 
-When creating an agent in a plugin, update the plugin's `.claude-plugin/plugin.json`:
+When creating an agent in a plugin, drop the `.md` file into the plugin's `agents/` directory. **Do not** update `plugin.json` — every `.md` file under `agents/` is auto-discovered by Claude Code.
 
-```json
-{
-  "name": "my-plugin",
-  "agents": ["./agents/example-agent.md"]
-}
-```
+**Do not add the `agents` key to `plugin.json` for default-path agents.** Writing the key (even to add a single entry) OVERRIDES auto-discovery: the declared list becomes the complete set and every agent not listed becomes invisible. See `.claude/rules/plugin-development.md` for the 2026-03-17 / 2026-04-12 incident history.
 
-**Important:** The `agents` field in plugin.json must be an array of individual file paths, not a directory string.
+The `agents` key exists ONLY for agents stored in non-default paths (e.g. `custom/agents/my-agent.md`). When used, it must be an array of individual file paths and must list EVERY agent file (default-path and non-default-path) — never a directory string.
 
-**Skills vs agents registration distinction:** This explicit registration requirement applies to agents only. Skills placed under the plugin's `skills/` directory are auto-discovered by Claude Code — no `plugin.json` update is needed for skills. Adding a `skills` field to `plugin.json` opts the plugin into manual allowlist mode (SK009 fires as an INFO reminder).
+**Skills vs agents registration parity:** Skills, agents, and commands all obey the same auto-discovery semantics. Skills in `skills/`, agents in `agents/`, and commands in `commands/` are auto-discovered without any `plugin.json` entry. Adding the corresponding key opts the plugin into manual allowlist mode and requires every file to be listed explicitly.
 
 ## Creating Agents
 
@@ -105,7 +100,7 @@ The skill will:
 2. Suggest templates from existing agents
 3. Generate validated frontmatter
 4. Save to appropriate location (user/project/plugin)
-5. Update plugin.json if creating a plugin agent
+5. Confirm plugin.json was NOT modified for default-path plugin agents (auto-discovered)
 6. Validate the created file
 
 ## Usage

@@ -89,7 +89,7 @@ Use when you have 20+ commands with multi-level categorization.
 
 ## Agent Organization
 
-Agents live in `agents/` by default. All agents must be registered in the `agents` array in `plugin.json` — Claude Code does not auto-discover agents. When the `agents` array exists, every agent file must be listed or it becomes invisible.
+Agents live in `agents/` by default. Every `.md` file in the plugin's `agents/` directory is auto-discovered by Claude Code — **do not** add an `agents` array to `plugin.json` for agents in this default location. Writing the `agents` key (even to add one entry) OVERRIDES auto-discovery: the declared list becomes the complete set and every unlisted agent becomes invisible. The `agents` array exists ONLY for agents stored in non-default paths — and when used, every agent file (default-path and non-default-path) must be listed explicitly. See `.claude/rules/plugin-development.md` for the 2026-03-17 / 2026-04-12 incident history.
 
 ### Role-Based
 
