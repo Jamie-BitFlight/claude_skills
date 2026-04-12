@@ -48,32 +48,83 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Map from plugin.json field name to the default directory and the file
-# predicate that auto-discovery uses.
-_AUTO_DISCOVERED: dict[str, tuple[str, str]] = {
-    # field_name: (default_subdir, kind)
-    "agents": ("agents", "agent"),
-    "commands": ("commands", "command"),
+# Map from plugin.json field name to the default directory, the file kind,
+# and the discovery shape ("md-file" for agents/commands or "skill-dir" for
+# skills). Discovery shape governs both how paths are discovered on disk and
+# how registered paths in plugin.json are normalized for comparison.
+_AUTO_DISCOVERED: dict[str, tuple[str, str, str]] = {
+    # field_name: (default_subdir, kind, shape)
+    "agents": ("agents", "agent", "md-file"),
+    "commands": ("commands", "command", "md-file"),
+    "skills": ("skills", "skill", "skill-dir"),
 }
 
 # Maximum sample size shown in violation messages before truncating to "+N more"
 _VIOLATION_SAMPLE_LIMIT = 5
 
 
-def _discover_default_files(plugin_dir: Path, subdir: str) -> set[str]:
+def _discover_default_files(plugin_dir: Path, subdir: str, shape: str) -> set[str]:
     """Return the set of relative paths that auto-discovery would register.
 
     Each path is in the same canonical form that ``auto_sync_manifests.py``
-    emits: ``./<subdir>/<filename>``.
+    emits.
+
+    Args:
+        plugin_dir: Plugin root directory.
+        subdir: Default auto-discovery subdirectory name.
+        shape: Either ``"md-file"`` (agents/commands — every ``*.md`` file
+            directly under ``subdir``) or ``"skill-dir"`` (skills — every
+            one-level subdirectory containing a ``SKILL.md``).
+
+    Returns:
+        Set of canonical ``./<subdir>/<name>`` paths. For ``md-file`` shape
+        the name includes the ``.md`` suffix; for ``skill-dir`` shape it is
+        the bare directory name.
     """
     target = plugin_dir / subdir
     if not target.is_dir():
         return set()
-    return {
-        f"./{subdir}/{p.name}"
-        for p in sorted(target.iterdir())
-        if p.is_file() and p.suffix == ".md" and not p.name.startswith(".")
-    }
+
+    if shape == "md-file":
+        return {
+            f"./{subdir}/{p.name}"
+            for p in sorted(target.iterdir())
+            if p.is_file() and p.suffix == ".md" and not p.name.startswith(".")
+        }
+
+    if shape == "skill-dir":
+        # Skills are one-level-deep subdirectories under skills/ containing
+        # a SKILL.md file. Skill directories with no SKILL.md are not
+        # auto-discovered and therefore not considered masked.
+        return {
+            f"./{subdir}/{p.name}"
+            for p in sorted(target.iterdir())
+            if p.is_dir() and not p.name.startswith(".") and (p / "SKILL.md").is_file()
+        }
+
+    msg = f"unknown discovery shape: {shape!r}"
+    raise ValueError(msg)
+
+
+def _normalize_registered(entry: str, shape: str) -> str:
+    """Normalize a plugin.json array entry to the canonical discovery form.
+
+    Handles the two-form equivalence for skills (``./skills/foo`` and
+    ``./skills/foo/SKILL.md`` refer to the same skill) and missing ``./``
+    prefixes.
+
+    Args:
+        entry: Raw string from the plugin.json array.
+        shape: Discovery shape — ``"md-file"`` or ``"skill-dir"``.
+
+    Returns:
+        Canonical path string matching what ``_discover_default_files``
+        emits for the same component.
+    """
+    normalized = entry if entry.startswith("./") else f"./{entry.lstrip('/')}"
+    if shape == "skill-dir" and normalized.endswith("/SKILL.md"):
+        normalized = normalized[: -len("/SKILL.md")]
+    return normalized
 
 
 def _check_one_plugin(plugin_json: Path) -> list[str]:
@@ -94,7 +145,7 @@ def _check_one_plugin(plugin_json: Path) -> list[str]:
 
     violations: list[str] = []
 
-    for field_name, (subdir, kind) in _AUTO_DISCOVERED.items():
+    for field_name, (subdir, kind, shape) in _AUTO_DISCOVERED.items():
         if field_name not in data:
             continue  # Mode A — auto-discovery active, no risk
 
@@ -113,8 +164,8 @@ def _check_one_plugin(plugin_json: Path) -> list[str]:
             )
             continue
 
-        registered = {str(item) for item in registered_raw}
-        on_disk_default = _discover_default_files(plugin_dir, subdir)
+        registered = {_normalize_registered(str(item), shape) for item in registered_raw}
+        on_disk_default = _discover_default_files(plugin_dir, subdir, shape)
 
         # Files that auto-discovery WOULD register but plugin.json does NOT.
         # These are now invisible because declaring the key disabled auto-discovery.
@@ -146,8 +197,9 @@ def main(argv: list[str]) -> int:
 
     Returns:
         Exit code 0 when every scanned plugin.json is clean. Exit code 1 when
-        any plugin.json declares a component array (``agents``, ``commands``)
-        that masks files in the corresponding default auto-discovery directory.
+        any plugin.json declares a component array (``agents``, ``commands``,
+        ``skills``) that masks files in the corresponding default
+        auto-discovery directory.
     """
     if len(argv) > 1:
         # Pre-commit passes specific staged files. Filter to plugin.json files.

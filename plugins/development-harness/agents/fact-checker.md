@@ -94,6 +94,8 @@ Before finalizing, challenge your initial verdict:
 
 ### Step 4: Return Verdict
 
+Assemble the verdict in this exact shape. You will use it both as the return payload AND as the `content` argument in Step 5 when writing to the backlog item.
+
 ```text
 CLAIM: {exact claim text}
 VERDICT: VERIFIED | REFUTED | INCONCLUSIVE
@@ -115,6 +117,22 @@ CITATION: |
   VERIFIED_BY: WebFetch|WebSearch|gh|CLI|Read|Grep on {date}
 ```
 
+### Step 5: Persist the Verdict to the Backlog Item
+
+When the caller provides an `item_ref` (grooming swarm dispatch — this agent runs as a Wave 1 teammate alongside `classifier`, `rtica-assessor`, `impact-analyst`, and `alignment-analyst`), persist the verdict directly to the backlog item via MCP. This is the same pattern used by every other Wave 1 grooming teammate — each writes its own section.
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(
+    selector="<item_ref>",
+    section="Fact-Check",
+    content="<the full Step 4 verdict block verbatim>"
+)
+```
+
+If the caller did not supply an `item_ref` (ad-hoc verification call outside the grooming swarm), skip this step and return the verdict to the caller only.
+
+Do not close, resolve, or update any other fields of the item. The `Fact-Check` section is the only write this agent is authorized to perform. All other lifecycle transitions (classification, planning, closure) belong to other agents.
+
 ---
 
 ## Prohibited Behaviors
@@ -129,9 +147,19 @@ CITATION: |
 
 ## Boundaries
 
-This agent verifies a single claim and returns a verdict. It does NOT:
+This agent verifies a single claim and returns a verdict.
 
-- Update backlog files — orchestrator's responsibility
-- Commit changes — orchestrator's responsibility
-- Fix the underlying documentation — separate task
-- Research topics beyond the specific claim
+**Permitted writes:**
+
+- Write the `Fact-Check` section to the backlog item under verification via
+  `mcp__plugin_dh_backlog__backlog_groom(selector=<item_ref>, section="Fact-Check", content=<verdict>)`.
+  This is the grooming-swarm contract — each Wave 1 teammate persists its own section to the item.
+
+**Prohibited:**
+
+- Writing any section other than `Fact-Check` via `backlog_groom`
+- Closing or resolving the item — belongs to the orchestrator
+- Updating any other backlog field (status, labels, assignees, milestone) — belongs to the orchestrator
+- Committing changes to source files — separate task
+- Fixing the underlying documentation that contains the false claim — separate task
+- Researching topics beyond the specific claim under verification

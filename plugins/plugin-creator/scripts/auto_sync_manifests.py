@@ -947,7 +947,9 @@ def _normalize_skill_ref(ref: str) -> str:
     """Normalize a skill reference for comparison.
 
     Both ``./skills/foo`` and ``./skills/foo/SKILL.md`` refer to the same skill.
-    This normalizes to the directory form.
+    The ``./`` prefix is optional in some hand-edited plugin.json files
+    (e.g. ``skills/foo``), so it is stripped here as well. This normalizes
+    to the bare directory form.
 
     Args:
         ref: Skill reference path from plugin.json
@@ -955,29 +957,61 @@ def _normalize_skill_ref(ref: str) -> str:
     Returns:
         Normalized path for comparison
     """
-    if ref.endswith("/SKILL.md"):
-        return ref[: -len("/SKILL.md")]
-    return ref
+    normalized = ref.removeprefix("./")
+    return normalized.removesuffix("/SKILL.md")
 
 
-def _reconcile_stale_only(
+def _strip_ref_prefix(ref: str) -> str:
+    """Strip the leading ``./`` from a component reference for path predicates.
+
+    Args:
+        ref: Component reference path as it appears in plugin.json.
+
+    Returns:
+        The same path with any leading ``./`` removed, matching the bare
+        form used by ``_is_standard_path_component``.
+    """
+    return ref.removeprefix("./")
+
+
+def _reconcile_mode_b(
     data: dict[str, list[str] | str], field_name: str, disk_items: list[str], plugin_name: str, *, dry_run: bool
 ) -> bool:
-    """Remove stale entries from a component array without adding new ones.
+    """Reconcile a component array that is already present in plugin.json.
 
-    Used in Mode B (explicit field present): the user manages the allowlist
-    manually.  New skills added to disk are NOT auto-included; only entries
-    that no longer exist on disk are removed to keep the manifest clean.
+    Mode B invariant: when the key is present, the declared list overrides
+    auto-discovery and becomes the *complete* set of registered components.
+    Any default-path component on disk that is not in the list becomes
+    invisible — the 2026-03-17 / 2026-04-12 masking pattern.
+
+    This function keeps the invariant true by:
+
+    1. Adding every default-path item discovered on disk that is not already
+       in the registered list. New files added to disk after the key was
+       created are no longer silently dropped.
+    2. Removing stale default-path entries that refer to files no longer
+       present on disk.
+    3. Preserving non-default-path entries (explicit references to files
+       outside ``agents/`` / ``commands/`` / ``skills/`` one-level roots)
+       untouched. Those entries are legitimate because Claude Code's
+       auto-discovery would not pick them up; the user deliberately placed
+       them outside the default location.
+
+    A cleaner fix for many plugins is to remove the key entirely so
+    auto-discovery handles everything. This function does not perform that
+    rewrite — it only maintains the all-or-nothing invariant for plugins
+    that keep the key.
 
     Args:
         data: Plugin.json data dictionary (mutated in place unless dry_run)
         field_name: Array field name (``skills``, ``agents``, ``commands``)
-        disk_items: All items discovered on disk (used to detect stale entries)
+        disk_items: Default-path items discovered on disk (authority set for
+            the default directory only — non-default paths are not included)
         plugin_name: Plugin name for logging
         dry_run: If True, only report
 
     Returns:
-        True if any stale entries were found (or would be removed in dry_run)
+        True if drift was detected (entries added or removed)
     """
     raw = data.get(field_name, [])
     registered = list(raw) if isinstance(raw, list) else [raw] if isinstance(raw, str) else []
@@ -985,12 +1019,24 @@ def _reconcile_stale_only(
         return False
 
     normalize = field_name == "skills"
-    stale = _find_stale_items(registered, disk_items, normalize=normalize)
 
-    if not stale:
+    # Add: default-path disk items that are not yet registered.
+    missing = _find_missing_items(disk_items, registered, normalize=normalize)
+
+    # Remove stale: only prune default-path entries whose on-disk file is
+    # gone. Non-default-path entries are preserved regardless — they are
+    # explicit declarations that auto-discovery cannot satisfy.
+    stale: list[str] = []
+    for reg in registered:
+        if not _is_standard_path_component(field_name, _strip_ref_prefix(reg)):
+            continue  # Non-default path — preserve untouched
+        if not any(_refs_match(reg, item, normalize=normalize) for item in disk_items):
+            stale.append(reg)
+
+    if not missing and not stale:
         return False
 
-    _apply_drift_changes(data, field_name, [], stale, plugin_name, dry_run=dry_run)
+    _apply_drift_changes(data, field_name, missing, stale, plugin_name, dry_run=dry_run)
     return True
 
 
@@ -1005,12 +1051,18 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
         drift.  The same applies to the ``commands`` field for standard-path
         invocable skills.
 
-    **Mode B — Manual selection (explicit ``skills`` field present)**
-        The explicit list acts as an allowlist.  New skills added to disk are
-        NOT auto-included; the user must add them manually.  Only entries that
-        no longer exist on disk are removed to keep the manifest clean.
+    **Mode B — Explicit field present**
+        The declared list overrides auto-discovery — the array becomes the
+        *complete* set Claude Code sees.  Reconciliation keeps that invariant
+        true by adding every default-path component found on disk that is
+        not already in the array, removing stale default-path entries whose
+        files no longer exist, and preserving non-default-path entries
+        untouched.  The preferred long-term fix is to remove the key so
+        auto-discovery handles everything, but that rewrite is out of scope
+        for reconcile mode.
 
-    The same Mode A / Mode B logic applies to the ``commands`` field.
+    The same Mode A / Mode B logic applies to the ``agents`` and ``commands``
+    fields.
 
     Args:
         plugin_name: Name of the plugin
@@ -1052,9 +1104,11 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     #       write the field. Writing an empty or partial list would silently
     #       mask every unlisted file.
     #
-    #   Mode B (field present): treat the list as a manual allowlist. Remove
-    #       stale entries that no longer exist on disk (keeps the manifest
-    #       clean) but do NOT add new entries — the user manages the list.
+    #   Mode B (field present): the declared list overrides auto-discovery,
+    #       so it must remain complete. Add every default-path item on disk
+    #       that is not already registered, remove stale default-path entries
+    #       whose files are gone, and preserve non-default-path entries
+    #       untouched. A partial list would silently mask unlisted files.
     #
     # A previous revision of this script violated this rule for agents:
     # "agents always require explicit registration" was a false assumption
@@ -1068,19 +1122,19 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     if "skills" not in data:
         pass  # Mode A
     else:
-        has_drift |= _reconcile_stale_only(data, "skills", disk_skills, plugin_name, dry_run=dry_run)
+        has_drift |= _reconcile_mode_b(data, "skills", disk_skills, plugin_name, dry_run=dry_run)
 
     # --- Agents reconciliation ---
     if "agents" not in data:
         pass  # Mode A — auto-discovery handles agents/*.md
     else:
-        has_drift |= _reconcile_stale_only(data, "agents", disk_agents, plugin_name, dry_run=dry_run)
+        has_drift |= _reconcile_mode_b(data, "agents", disk_agents, plugin_name, dry_run=dry_run)
 
     # --- Commands reconciliation ---
     if "commands" not in data:
         pass  # Mode A
     else:
-        has_drift |= _reconcile_stale_only(data, "commands", disk_commands_full, plugin_name, dry_run=dry_run)
+        has_drift |= _reconcile_mode_b(data, "commands", disk_commands_full, plugin_name, dry_run=dry_run)
 
     if has_drift and not dry_run:
         current_version = cast("str", data.get("version", "0.0.0"))
