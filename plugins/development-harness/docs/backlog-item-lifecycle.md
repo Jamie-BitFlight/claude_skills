@@ -200,7 +200,7 @@ flowchart TD
     P2_GROOMED_CHECK -->|"Yes — already groomed today<br>with all sections present"| P2_DRIFT["Step 2.5: Drift Check<br>Mode A: Plan Drift<br>Mode B: Grooming Drift<br>Then STOP — do not proceed to Step 3"]
     P2_GROOMED_CHECK -->|"No — not groomed today<br>or sections missing"| P2_EXTRACT["Step 3: Extract item details<br>title, description, research questions,<br>source, suggested_location"]
 
-    P2_EXTRACT --> P2_RTICA_INIT["Step 3.5: RT-ICA Initial Snapshot<br>(Actor: orchestrator or rtica-assessor)<br>Categorize info as:<br>AVAILABLE / DERIVABLE / MISSING<br>Write via backlog_groom section='RT-ICA'"]
+    P2_EXTRACT --> P2_RTICA_INIT["Step 3.5: RT-ICA Initial Snapshot<br>(Actor: orchestrator)<br>Categorize info as:<br>AVAILABLE / DERIVABLE / MISSING<br>using extracted item details only<br>Write via backlog_groom section='RT-ICA'"]
 
     P2_RTICA_INIT --> P2_SCOPE["Step 3.6: Scope Sizing<br>Choose: MINIMAL / NARROW /<br>STANDARD / FULL<br>Sizes the swarm agents"]
 
@@ -238,7 +238,7 @@ flowchart TD
 | P2_SKIP | orchestrator | validity/done-check result | skip report | terminal (for this item) |
 | P2_DRIFT | orchestrator | plan state, groomed content, codebase state | drift report (Mode A or B) | terminal (STOP — do not proceed to Step 3) |
 | P2_EXTRACT | orchestrator | item file content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
-| P2_RTICA_INIT | orchestrator or `rtica-assessor` | extracted item details | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
+| P2_RTICA_INIT | orchestrator | extracted item details only (Wave 1 sections not yet produced) | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
 | P2_SCOPE | orchestrator | RT-ICA distribution (AVAILABLE/DERIVABLE/MISSING counts) | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_SWARM |
 | P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel teammates) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
 | P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel teammates) | Wave 1 outputs, item details | RT-ICA reassessment, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
