@@ -208,8 +208,8 @@ flowchart TD
 
     subgraph P2_SWARM [Steps 4-8: Parallel Grooming Swarm]
         direction TB
-        P2_WAVE1["Wave 1 (parallel):<br>• fact-checker teammate<br>• impact-analyst teammate"]
-        P2_WAVE2["Wave 2 (blocked by Wave 1):<br>• rtica-assessor teammate<br>• classifier teammate<br>• alignment-analyst teammate"]
+        P2_WAVE1["Wave 1 (parallel):<br>• fact-checker teammate<br>• impact-analyst teammate<br>• classifier teammate"]
+        P2_WAVE2["Wave 2 (blocked by Wave 1):<br>• rtica-assessor teammate<br>• alignment-analyst teammate"]
         P2_WAVE3["Wave 3 (blocked by Wave 2):<br>• groomer teammate"]
         P2_WAVE1 --> P2_WAVE2
         P2_WAVE2 --> P2_WAVE3
@@ -240,8 +240,8 @@ flowchart TD
 | P2_EXTRACT | orchestrator | item file content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
 | P2_RTICA_INIT | orchestrator or `rtica-assessor` | extracted item details | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
 | P2_SCOPE | orchestrator | RT-ICA distribution (AVAILABLE/DERIVABLE/MISSING counts) | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_SWARM |
-| P2_WAVE1 | `fact-checker` + `impact-analyst` (parallel teammates) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')` | both complete → P2_WAVE2 |
-| P2_WAVE2 | `rtica-assessor` + `classifier` + `alignment-analyst` (parallel teammates) | Wave 1 outputs, item details | RT-ICA reassessment, Issue Classification via `backlog_groom(section='Issue Classification')`, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
+| P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel teammates) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
+| P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel teammates) | Wave 1 outputs, item details | RT-ICA reassessment, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
 | P2_WAVE3 | `groomer` teammate | all prior sections | Reproducibility, Priority, Impact, Benefits, Expected Behavior, AC, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
 | P2_RTICA_FINAL | orchestrator or `rtica-assessor` | full swarm output, all groomed sections | final RT-ICA assessment (replaces P2_RTICA_INIT snapshot), self-resolution attempts | always → P2_DECISION |
 | P2_DECISION | orchestrator | RT-ICA final result | APPROVED or BLOCKED determination | APPROVED → P2_WRITE, BLOCKED → P2_BLOCKED |
@@ -253,8 +253,8 @@ flowchart TD
 
 - **fact-checker** (Wave 1) — Verifies item claims against primary sources. Produces `Fact-Check Summary` with VERIFIED/REFUTED/INCONCLUSIVE counts and citations. REFUTED claims become MISSING conditions in RT-ICA. INCONCLUSIVE become DERIVABLE. Writes via `backlog_groom(section="Fact-Check")`.
 - **impact-analyst** (Wave 1) — Assesses blast radius. Writes via `backlog_groom(section="Impact Radius")`.
+- **classifier** (Wave 1) — Classifies the issue type using a 5-branch decision tree (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design). No blocking dependencies. Writes via `backlog_groom(section="Issue Classification")`. For `defect` items, also produces a Root-Cause Analysis section via the find-cause skill. For `recurring-pattern` items, runs frequency analysis against resolved items via `backlog_list`.
 - **rtica-assessor** (Wave 2) — Runs RT-ICA analysis with swarm context. Blocked by fact-checker and impact-analyst completion.
-- **classifier** (Wave 2) — Classifies the issue type. Writes via `backlog_groom(section="Issue Classification")`.
 - **alignment-analyst** (Wave 2) — Compares existing implementation against the item's design intent (Description field). Samples affected systems from the Impact Radius section. Produces: Alignment assessment (ALIGNED | DIVERGENT | NOT_APPLICABLE), divergences table (Area, Expected, Actual, Severity, File), and summary counts. Writes via `backlog_groom(section="Design Intent Alignment")`. Blocked by impact-analyst completion.
 - **groomer** (Wave 3) — Reads all prior sections. Produces: Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Each subsection written individually via `backlog_groom(section="{subsection name}")`.
 

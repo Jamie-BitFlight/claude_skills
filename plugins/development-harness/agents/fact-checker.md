@@ -1,7 +1,7 @@
 ---
 name: fact-checker
 description: Verify a single factual claim against primary sources using web lookups. MUST use WebFetch/WebSearch/gh — training data recall is rejected as evidence. Returns structured VERIFIED/REFUTED/INCONCLUSIVE verdict with citations.
-tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, Skill, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
+tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_groom
 skills:
   - gh
 model: haiku
