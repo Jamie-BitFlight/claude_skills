@@ -286,7 +286,10 @@ class LocalYamlTaskProvider:
             result = query.load_plan(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
-        return _plan_to_plan_data(result.plan, plan_id)
+        # Prefer the plan_id stored in the record; fall back to filename-derived
+        # value for backwards compatibility with pre-existing files.
+        effective_plan_id = result.plan.plan_id or _plan_id_from_path(path)
+        return _plan_to_plan_data(result.plan, effective_plan_id)
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return lightweight summaries for all plans, optionally filtered.
@@ -312,7 +315,9 @@ class LocalYamlTaskProvider:
                     text = f"{plan.feature} {plan.goal or ''} {plan.description}"
                     if search.lower() not in text.lower():
                         continue
-                plan_id = _plan_id_from_path(candidate)
+                # Prefer the plan_id stored in the record; fall back to filename-derived
+                # value for backwards compatibility with pre-existing files.
+                plan_id = plan.plan_id or _plan_id_from_path(candidate)
                 summary: PlanSummary = {
                     "plan_id": plan_id,
                     "feature": plan.feature,

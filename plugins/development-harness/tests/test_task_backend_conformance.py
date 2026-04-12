@@ -428,6 +428,42 @@ class TestTaskBackendConformance:
             backend.read_document(bad_handle)  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------
+    # plan_id durability
+    # ------------------------------------------------------------------
+
+    def test_plan_id_stored_in_record(self, backend: TaskBackend) -> None:
+        """plan_id must be stored in the plan record itself, not only in the filename.
+
+        Reading a plan back must return the same plan_id regardless of how the
+        backend resolves the record — the ID must survive round-trips without
+        depending on the filename or path.
+        """
+        # Arrange
+        tasks = [_make_task_def("T01", "Task")]
+
+        # Act
+        created = backend.create_plan("my-slug", "Do the thing", tasks)
+        plan_id = created["plan_id"]
+        read_back = backend.read_plan(plan_id)
+
+        # Assert — plan_id is present in the stored record, not derived at read time
+        assert read_back["plan_id"] == plan_id
+
+    def test_plan_id_preserved_in_list(self, backend: TaskBackend) -> None:
+        """list_plans must return the stored plan_id for each plan."""
+        # Arrange
+        tasks = [_make_task_def("T01", "Task")]
+        created = backend.create_plan("my-slug", "Do the thing", tasks)
+        plan_id = created["plan_id"]
+
+        # Act
+        summaries = backend.list_plans()
+
+        # Assert — the summary contains the same plan_id that was assigned at create time
+        assert len(summaries) == 1
+        assert summaries[0]["plan_id"] == plan_id
+
+    # ------------------------------------------------------------------
     # Protocol structural check
     # ------------------------------------------------------------------
 

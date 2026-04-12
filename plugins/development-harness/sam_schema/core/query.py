@@ -154,7 +154,9 @@ def create_plan(
             msg = f"Task at index {i} failed validation: {exc}"
             raise ValueError(msg) from exc
 
+    plan_id_str = f"P{plan_number:03d}"
     plan = Plan(
+        plan_id=plan_id_str,
         feature=slug,
         goal=goal,
         context=context,

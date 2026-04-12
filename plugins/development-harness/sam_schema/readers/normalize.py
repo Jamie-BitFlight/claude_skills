@@ -392,6 +392,7 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
     ac = plan_meta.get("acceptance-criteria") or plan_meta.get("acceptance_criteria")
 
     plan = Plan(
+        plan_id=_coerce_str(plan_meta.get("plan-id") or plan_meta.get("plan_id")),
         feature=str(feature),
         version=str(plan_meta.get("version", "1.0")),
         description=str(plan_meta.get("description", "")),

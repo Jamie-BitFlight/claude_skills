@@ -260,6 +260,14 @@ class Plan(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    # Backend-assigned plan identifier (e.g. "P912").  Persisted in the YAML
+    # body so that the ID survives state-directory wipes or backend migrations.
+    # None on Plan instances created before this field was introduced; in that
+    # case the local backend falls back to deriving the ID from the filename.
+    plan_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("plan-id", "plan_id"), serialization_alias="plan-id"
+    )
+
     feature: str
     version: str = "1.0"
     description: str = ""
