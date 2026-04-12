@@ -46,5 +46,9 @@ flowchart TD
 
 ## Step 4.5: Post-Planning Output
 
-- **Interactive mode**: Load [post-planning.md](./post-planning.md) for the report template.
-- **When <mode/> is `auto`**: Load [post-planning.md](./post-planning.md) for the continuation procedure.
+```mermaid
+flowchart TD
+    Q{What is mode?}
+    Q -->|"interactive (default)"| Report["Load [post-planning.md](./post-planning.md)<br>Output the interactive summary template<br>Present to user — stop here"]
+    Q -->|"auto"| Continue["Do NOT stop for user input<br>Return to start.md and execute step 6<br>(Invoke implement-feature), then step 7<br>(Invoke complete-implementation), then step 8<br>(Close or resolve item) in order"]
+```
