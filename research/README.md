@@ -641,6 +641,7 @@ High-performance API frameworks for building backend services, tool endpoints, a
 | [tornado.md](./api-frameworks/tornado.md)  | Python web framework and async networking library for WebSockets and long-polling (22K+ stars, 95M+ downloads/month) | 2026-02-05   |
 | [modelence.md](./api-frameworks/modelence.md) | Modelence - AI-native TypeScript/Node.js backend framework with MongoDB, auth, real-time stores, WebSockets, observability, cron, rate limiting, and managed cloud deploy (YC-backed, Apache 2.0) | 2026-03-04   |
 | [violit.md](./api-frameworks/violit.md) | Violit - reactive Python web framework replacing Streamlit's full-script reruns with fine-grained state reactivity; WebSocket + HTMX dual engine; Streamlit-compatible API; desktop mode via pywebview (368 stars, MIT, v0.5.2) | 2026-04-10   |
+| [robyn.md](./api-frameworks/robyn.md) | Robyn — high-performance async Python web framework combining Python expressiveness with Rust runtime (PyO3 bindings); WebSockets, SSE, Pydantic validation, GraphQL, CORS; multi-process/multi-threaded execution model; built-in Rust server (no ASGI required) (7.2K stars) | 2026-04-12   |
 
 **Key Topics**:
 
@@ -752,6 +753,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [worktrunk.md](./developer-tools/worktrunk.md) | Worktrunk v0.33.0 — CLI for git worktree management designed for parallel AI agent workflows; branch-name addressing instead of filesystem paths, simple create/switch/remove commands, MIT OR Apache-2.0 | 2026-03-28   |
 | [tui-studio.md](./developer-tools/tui-studio.md) | TUI Studio — Figma-like visual editor for terminal UI applications; drag-and-drop component placement, real-time ANSI preview, one-click code export to 6 frameworks (Ink, BubbleTea, Blessed, Textual, OpenTUI, Tview); proprietary SaaS | 2026-03-29   |
 | [pretext.md](./developer-tools/pretext.md) | Pretext v0.0.3 — DOM-free multiline text measurement and layout library; canvas-based measurement, pure arithmetic line breaking, 100% browser accuracy (7,680/7,680 tests), CJK/Arabic/Thai/BiDi support, ~19ms prepare() for 500-text batch, 0.09ms/call layout() (8K stars) | 2026-03-29   |
+| [pyscript.md](./developer-tools/pyscript.md) | PyScript 2026.3.1 — open-source platform bringing Python to web browsers via WebAssembly; dual interpreters (Pyodide + MicroPython 170KB); Python-JavaScript FFI; pyscript.web Pythonic DOM API; worker-based execution via Donkey/Bridge API (18.7K stars, Apache-2.0) | 2026-04-12   |
 
 **Key Topics**:
 
@@ -953,6 +955,8 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [tinybird.md](./data-infrastructure/tinybird.md)         | Managed ClickHouse platform for real-time analytics APIs with native MCP server and analytics agents support | 2026-01-31   |
 | [pocketbase.md](./data-infrastructure/pocketbase.md)     | PocketBase v0.36.9 — open-source Go backend in 1 file: embedded SQLite with realtime subscriptions, password/OTP/OAuth2/MFA auth, file storage, admin UI, simple REST API (57.5K stars, MIT) | 2026-04-11   |
 | [chroma.md](./data-infrastructure/chroma.md)             | Chroma — open-source vector database for AI applications: Python/JavaScript/Rust clients, in-memory and persistent storage, multi-modal embeddings, metadata filtering, distance functions (17K+ stars, Apache-2.0) | 2026-03-28   |
+| [pandera.md](./data-infrastructure/pandera.md) | Pandera v0.30.1 — statistical data validation library with multi-backend support (pandas, polars, PySpark, dask, modin); object-based and Pydantic-style APIs; hypothesis-based property testing; FastAPI integration (4.2K stars, MIT, 2.1M weekly PyPI downloads) | 2026-04-12   |
+| [polars-documentation.md](./data-infrastructure/polars-documentation.md) | Polars — Rust-native DataFrame engine with lazy API, expression-based parallelism, SIMD vectorization, streaming for out-of-core processing; Python/Rust/Node.js/R bindings; 70ms import time; Apache Arrow columnar format (38.1K stars, MIT) | 2026-04-12   |
 
 **Key Topics**:
 
@@ -1079,6 +1083,7 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 | [microgpt-playground.md](./ml-infrastructure/microgpt-playground.md) | microgpt Playground - browser-native GPT training and inference demo, zero-dependency JavaScript port of Karpathy's microgpt.py (65 stars) | 2026-02-23   |
 | [trainloop.md](./ml-infrastructure/trainloop.md) | TrainLoop - managed RL fine-tuning platform: 3-line SDK for production signal collection, reward model training (DPO/GRPO), OpenAI-compatible deployment; 50x error reduction reported (YC W25) | 2026-03-12   |
 | [zvec.md](./ml-infrastructure/zvec.md) | zvec - Alibaba's embedded vector database built on Proxima engine; in-process SQLite-style deployment, dense+sparse vectors, Python/Node.js/C++, Apache 2.0 (8.9K stars) | 2026-03-15   |
+| [jax.md](./ml-infrastructure/jax.md) | JAX 0.9.2 — Composable transformations for Python+NumPy: JIT compilation (XLA), automatic differentiation (grad), vectorization (vmap), distributed execution (pmap); CPU/GPU/TPU/Apple Silicon support; Python 3.11+; 35.3K stars | 2026-04-12   |
 
 **Key Topics**:
 
@@ -1433,6 +1438,18 @@ Self-hosted and open-source platform-as-a-service tools for deploying and managi
 | File | Description | Last Verified |
 |------|-------------|--------------|
 | [coolify.md](./paas-platforms/coolify.md) | Coolify v4 — open-source self-hostable Heroku/Netlify/Vercel alternative (PHP 8.4 + Laravel 12 + Livewire 3); Docker-first deployments via SSH; REST API with OpenAPI 3.0; real-time WebSocket status; multi-tenancy with team roles (52.9K stars, Apache-2.0) | 2026-04-11   |
+
+---
+
+### 31. Database Libraries
+
+**Location**: [./database-libraries/](./database-libraries/)
+
+Embedded and in-process database clients for Python, focused on analytical and OLAP workloads.
+
+| File | Description | Last Verified |
+|------|-------------|--------------|
+| [duckdb-python-client.md](./database-libraries/duckdb-python-client.md) | DuckDB Python Client v1.5.1 — in-process OLAP database with zero external dependencies; DB-API 2.0 (PEP 249) + Relational API; reads CSV/Parquet/JSON/ORC/Iceberg from local and cloud (S3/GCS/Azure); Python 3.9+ (tested 3.10–3.14); pybind11 C++ extension | 2026-04-12   |
 
 ---
 
