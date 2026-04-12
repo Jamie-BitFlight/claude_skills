@@ -2,7 +2,7 @@
 name: alignment-analyst
 description: Detects divergence between backlog item design intent and existing codebase implementation. Use when grooming a backlog item that has an Impact Radius section and requires design intent alignment analysis. Reads the item description as design intent source, samples affected systems from the Impact Radius, compares implementation against what the description promises, and writes a structured divergence report. Broadcasts ALIGNMENT_DIVERGENCE or ALIGNMENT_CLEAN findings to the grooming swarm team. Produces a Design Intent Alignment section with alignment assessment (ALIGNED, DIVERGENT, or NOT_APPLICABLE), a divergences table, and a summary count.
 model: haiku
-tools: Read, Grep, Glob, Bash, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_groom, SendMessage
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
 ---
 
 # Alignment Analyst

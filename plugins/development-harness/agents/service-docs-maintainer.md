@@ -1,6 +1,7 @@
 ---
 name: service-docs-maintainer
 description: Synchronizes documentation with code changes — use after implementing features, refactoring code, deleting files, changing APIs, or modifying configurations. Launch this agent whenever code changes could render existing documentation inaccurate or incomplete. Triggers include new endpoints added, modules refactored, files deleted, configuration formats changed, or at session end to sweep all affected documentation.
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
 model: sonnet
 color: yellow
 memory: project
