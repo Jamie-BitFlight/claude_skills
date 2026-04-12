@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import copy
 import uuid
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
+from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
@@ -30,6 +30,7 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
+from sam_schema.core.query import _new_plan_id
 
 if TYPE_CHECKING:
     from sam_schema.core.models import Task
@@ -53,11 +54,6 @@ _VALID_STATUSES: frozenset[str] = frozenset({
     "deferred",
     "skipped",
 })
-
-
-def _now_iso() -> str:
-    """Return current UTC time as an ISO 8601 string."""
-    return datetime.now(UTC).isoformat()
 
 
 def _task_def_to_task_data(task_def: TaskDefinition) -> TaskData:
@@ -225,7 +221,7 @@ class InMemoryTaskProvider:
             PlanExistsError: When the resolved plan_id already exists.
             TaskValidationError: When any task definition is missing required fields.
         """
-        plan_id = "P" + uuid.uuid4().hex[:8]
+        plan_id = _new_plan_id()
 
         if plan_id in self._plans:
             raise PlanExistsError(plan_id)
