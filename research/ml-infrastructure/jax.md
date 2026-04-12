@@ -84,7 +84,7 @@ JAX is built on a functional, composable design that separates concerns across m
 
 **Primitive Operations Layer**: JAX decomposes all operations (including control flow) into a set of primitives with defined transformation rules. Each primitive registers handlers for forward-mode and reverse-mode differentiation, vectorization, and lowering to XLA.
 
-**Compiler Backend**: JAX lowers its intermediate representation (IR) to OpenXLA, which performs hardware-specific optimization and code generation. XLA provides the abstraction for targeting CPU, GPU (NVIDIA CUDA/cuDNN, AMD ROCM), and TPU (Google TPU, Apple Metal).
+**Compiler Backend**: JAX lowers its intermediate representation (IR) to OpenXLA, which performs hardware-specific optimization and code generation. XLA provides the abstraction for targeting CPU, GPU (NVIDIA CUDA/cuDNN, AMD ROCM, Apple Metal), and TPU (Google TPU).
 
 **Key Design Decisions**:
 

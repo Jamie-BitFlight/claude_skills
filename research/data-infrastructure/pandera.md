@@ -118,7 +118,7 @@ pip install pandera
 # With optional backends and integrations
 pip install pandera[pyspark]      # PySpark support
 pip install pandera[polars]       # Polars support
-pip install pandera[hypothes]     # Hypothesis/data synthesis
+pip install pandera[hypothesis]   # Hypothesis/data synthesis
 pip install pandera[mypy]         # mypy integration
 pip install pandera[fastapi]      # FastAPI integration
 ```
