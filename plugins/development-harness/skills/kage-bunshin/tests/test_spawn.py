@@ -376,13 +376,11 @@ def test_build_parser_spawn_effort_flag_listed_in_help(capsys: pytest.CaptureFix
         parser.parse_args(["spawn", "--help"])
     help_text = capsys.readouterr().out
     assert "--effort" in help_text
-    assert "low" in help_text
-    assert "medium" in help_text
-    assert "high" in help_text
-    assert "max" in help_text
+    for level in _spawn.EFFORT_LEVELS:
+        assert level in help_text
 
 
-@pytest.mark.parametrize("level", ["low", "medium", "high", "max"])
+@pytest.mark.parametrize("level", _spawn.EFFORT_LEVELS)
 def test_build_spawn_shell_cmd_injects_effort_level_when_set(level: str):
     argv = _spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=level)
     effort_arg = f"CLAUDE_CODE_EFFORT_LEVEL={level}"

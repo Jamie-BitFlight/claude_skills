@@ -46,6 +46,4 @@ Assign `--effort` based on the cognitive requirement of the task, not the agent 
 
 **Default (omit `--effort`)**: inherits model default.
 
-**Selection principle**: Match effort to the reasoning depth required, not the agent tier.
-
 **How to pass**: `spawn.py ... spawn --effort {level}` or `dispatch_spawn(effort="{level}")`. The spawned `claude` process receives `CLAUDE_CODE_EFFORT_LEVEL={level}` in its environment.

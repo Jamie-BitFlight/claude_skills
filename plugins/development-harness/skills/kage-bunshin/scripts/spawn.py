@@ -86,6 +86,7 @@ from typing import Any, NoReturn
 _DEFAULT_MODEL = "sonnet"
 _NAME_MAX_CHARS = 30
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+EFFORT_LEVELS: tuple[str, ...] = ("low", "medium", "high", "max")
 # Timeout waiting for the claude tmux session to appear after spawn.
 _SPAWN_WAIT_SECONDS = 30
 # Timeout waiting for a session to exit gracefully after Ctrl-C.
@@ -572,7 +573,6 @@ def _build_spawn_shell_cmd(
     #   KAGE_BUNSHIN_CHILD=1                  — skip sibling alerts, block recursive spawns
     #   KAGE_BUNSHIN_PARENT_SESSION_ID=<id>   — write notifications to the correct file
     #   KAGE_BUNSHIN_TMUX_SESSION=<name>      — identify this session in notifications
-    #   CLAUDE_CODE_EFFORT_LEVEL=<level>      — set compute effort tier (optional)
     parts: list[str] = [
         "env",
         "KAGE_BUNSHIN_CHILD=1",
@@ -1089,7 +1089,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_spawn.add_argument(
         "--effort",
         default=None,
-        choices=["low", "medium", "high", "max"],
+        choices=list(EFFORT_LEVELS),
         metavar="LEVEL",
         help="Effort level for the spawned session: low, medium, high, or max (default: inherit from model).",
     )

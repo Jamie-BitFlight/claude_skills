@@ -15,7 +15,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -53,6 +53,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
+
+EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
@@ -4166,7 +4168,7 @@ def _build_spawn_cmd(
     model: str,
     phase: str,
     integration_branch: str,
-    effort: Literal["low", "medium", "high", "max"] | None = None,
+    effort: EffortLevel | None = None,
 ) -> list[str]:
     """Construct the spawn.py subprocess command for one dispatch item.
 
@@ -4264,7 +4266,7 @@ async def _run_spawn_item(
     model: str,
     phase: str,
     integration_branch: str,
-    effort: Literal["low", "medium", "high", "max"] | None = None,
+    effort: EffortLevel | None = None,
 ) -> None:
     """Spawn one dispatch item, monitor it, and update shared counters.
 
@@ -4355,7 +4357,7 @@ async def dispatch_spawn(
         str, Field(description="Dispatch phase: 'groom' (no worktree) or 'work' (with worktree)")
     ] = "work",
     effort: Annotated[
-        Literal["low", "medium", "high", "max"] | None,
+        EffortLevel | None,
         Field(
             description=(
                 "Effort level for spawned sessions (sets CLAUDE_CODE_EFFORT_LEVEL). "
