@@ -23,6 +23,7 @@ from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import DispatchItemRecord
 from backlog_core.server import mcp
 from fastmcp.client import Client
+from fastmcp.exceptions import ToolError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -665,38 +666,30 @@ class TestDispatchSpawn:
 # ---------------------------------------------------------------------------
 
 
-def _make_valid_plan_yaml(milestone: int = 10, issue: int = 101) -> str:
-    """Return a minimal valid dispatch plan YAML string for TestDispatchCreatePlan.
+def _make_valid_plan_dict(milestone: int = 10, issue: int = 101) -> dict:
+    """Return a minimal valid dispatch plan dict for TestDispatchCreatePlan.
 
     Args:
         milestone: Milestone number to embed in the plan.
         issue: Issue number for the single wave item.
 
     Returns:
-        YAML string conforming to the DispatchPlan schema with one wave and one item.
+        Dict conforming to the DispatchPlan JSON schema with one wave and one item.
     """
-    return f"""\
-milestone:
-  number: {milestone}
-  title: Test Milestone {milestone}
-  integration-branch: main
-waves:
-  - wave: 1
-    items:
-      - title: Issue {issue}
-        issue: {issue}
-        priority: P2
-"""
+    return {
+        "milestone": {"number": milestone, "title": f"Test Milestone {milestone}", "integration_branch": "main"},
+        "waves": [{"wave": 1, "items": [{"title": f"Issue {issue}", "issue": issue, "priority": "P2"}]}],
+    }
 
 
 @pytest.fixture
-def valid_plan_yaml() -> str:
-    """Provide a minimal valid dispatch plan YAML string for milestone 10.
+def valid_plan_dict() -> dict:
+    """Provide a minimal valid dispatch plan dict for milestone 10.
 
     Returns:
-        YAML string with milestone number 10, one wave, one item (issue 101).
+        Dict with milestone number 10, one wave, one item (issue 101).
     """
-    return _make_valid_plan_yaml(milestone=10, issue=101)
+    return _make_valid_plan_dict(milestone=10, issue=101)
 
 
 @pytest.fixture
@@ -728,7 +721,7 @@ def existing_plan_file(tmp_path: Path, mocker: MockerFixture) -> Path:
         Path to the pre-written dispatch plan file.
     """
     plan_path = tmp_path / "milestone-10-dispatch.yaml"
-    plan_path.write_text(_make_valid_plan_yaml())
+    plan_path.write_text(_make_dispatch_plan_yaml())
     mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_path)
     return plan_path
 
@@ -736,14 +729,14 @@ def existing_plan_file(tmp_path: Path, mocker: MockerFixture) -> Path:
 class TestDispatchCreatePlan:
     """Integration tests for the dispatch_create_plan MCP tool.
 
-    Tests the full creation lifecycle: valid YAML acceptance (kebab-case and
-    snake_case keys), overwrite protection, milestone number consistency,
+    Tests the full creation lifecycle: typed plan dict acceptance (kebab-case and
+    snake_case alias keys), overwrite protection, milestone number consistency,
     post-write integrity validation, and best-effort artifact registration.
     All calls use the FastMCP in-memory Client against the real ``mcp``
     application instance; no HTTP transport is used.
 
     Fixtures:
-        valid_plan_yaml: Minimal valid YAML for milestone 10 with one wave/item.
+        valid_plan_dict: Minimal valid plan dict for milestone 10 with one wave/item.
         plan_target_path: Non-existent path in tmp_path for creation tests.
         patch_create_plan_path: Patches _dispatch_plan_path to non-existent tmp path.
         existing_plan_file: Pre-written plan file for overwrite/exists tests.
@@ -753,62 +746,51 @@ class TestDispatchCreatePlan:
     # Happy-path tests
     # ------------------------------------------------------------------
 
-    async def test_create_plan_valid_yaml(self, valid_plan_yaml: str, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan writes a file and returns success metadata for valid YAML.
+    async def test_create_plan_valid_yaml(self, valid_plan_dict: dict, patch_create_plan_path: Path) -> None:
+        """dispatch_create_plan writes a file and returns success metadata for a valid plan dict.
 
         Tests: dispatch_create_plan — happy path
-        How: Call the tool with a minimal valid YAML for milestone 10. Verify the
-             response has no error key, plan_path matches the patched path, wave_count
-             and item_count are correct, and is_valid is True (default validate=True).
-        Why: Callers depend on plan_path, wave_count, and item_count to confirm the
-             plan was accepted and written before invoking dispatch_wave_start.
+        How: Call the tool with a minimal valid plan dict for milestone 10. Verify the
+             response has no error key, wave_count and item_count are correct, and
+             is_valid is True (default validate=True).
+        Why: Callers depend on wave_count and item_count to confirm the plan was accepted
+             and written before invoking dispatch_wave_start.
         """
         # Arrange
         target = patch_create_plan_path
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": valid_plan_yaml}
-            )
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
         # Assert
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["milestone_number"] == 10
-        assert data["plan_path"] == str(target)
         assert data["wave_count"] == 1
         assert data["item_count"] == 1
         assert data["is_valid"] is True
         assert target.exists()
 
     async def test_create_plan_kebab_case_keys(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan accepts kebab-case YAML keys.
+        """dispatch_create_plan accepts kebab-case alias keys in the plan dict.
 
         Tests: dispatch_create_plan — kebab-case key acceptance
-        How: Provide YAML with 'integration-branch' and 'conflict-groups' in kebab-case.
+        How: Provide a dict with 'integration-branch' and 'conflict-groups' in kebab-case.
              Verify the tool accepts and writes without error.
         Why: The DispatchPlan schema uses AliasChoices for both forms; callers
-             from groom-milestone produce kebab-case YAML by convention.
+             from groom-milestone produce kebab-case dicts by convention.
         """
-        # Arrange
-        plan_yaml = """\
-milestone:
-  number: 10
-  title: Test Milestone
-  integration-branch: feature/test
-conflict-groups: []
-waves:
-  - wave: 1
-    items:
-      - title: Issue 101
-        issue: 101
-        priority: P1
-"""
+        # Arrange — use kebab-case alias keys that Pydantic resolves via AliasChoices
+        plan_dict = {
+            "milestone": {"number": 10, "title": "Test Milestone", "integration-branch": "feature/test"},
+            "conflict-groups": [],
+            "waves": [{"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P1"}]}],
+        }
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan_yaml": plan_yaml})
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": plan_dict})
 
         # Assert
         data: dict[str, Any] = result.data
@@ -817,32 +799,24 @@ waves:
         assert patch_create_plan_path.exists()
 
     async def test_create_plan_snake_case_keys(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan accepts snake_case YAML keys.
+        """dispatch_create_plan accepts snake_case alias keys in the plan dict.
 
         Tests: dispatch_create_plan — snake_case key acceptance
-        How: Provide YAML with 'integration_branch' and 'conflict_groups' in snake_case.
+        How: Provide a dict with 'integration_branch' and 'conflict_groups' in snake_case.
              Verify the tool accepts and writes without error.
         Why: The AliasChoices on DispatchPlan fields accept both forms; both must work
              so callers are not forced to canonicalise keys before calling.
         """
-        # Arrange
-        plan_yaml = """\
-milestone:
-  number: 10
-  title: Test Milestone
-  integration_branch: main
-conflict_groups: []
-waves:
-  - wave: 1
-    items:
-      - title: Issue 202
-        issue: 202
-        priority: P0
-"""
+        # Arrange — use snake_case keys (the other alias form)
+        plan_dict = {
+            "milestone": {"number": 10, "title": "Test Milestone", "integration_branch": "main"},
+            "conflict_groups": [],
+            "waves": [{"wave": 1, "items": [{"title": "Issue 202", "issue": 202, "priority": "P0"}]}],
+        }
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan_yaml": plan_yaml})
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": plan_dict})
 
         # Assert
         data: dict[str, Any] = result.data
@@ -850,11 +824,11 @@ waves:
         assert data["item_count"] == 1
         assert patch_create_plan_path.exists()
 
-    async def test_create_plan_validate_false(self, valid_plan_yaml: str, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_validate_false(self, valid_plan_dict: dict, patch_create_plan_path: Path) -> None:
         """dispatch_create_plan skips integrity validation when validate=False.
 
         Tests: dispatch_create_plan — validate=False path
-        How: Call with validate=False and a valid YAML. Verify is_valid is None in
+        How: Call with validate=False and a valid plan dict. Verify is_valid is None in
              the response and the file is still written.
         Why: Callers that have already validated externally can skip the post-write
              check for performance; is_valid=None signals validation was not run.
@@ -865,7 +839,7 @@ waves:
         # Act
         async with Client(mcp) as client:
             result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": valid_plan_yaml, "validate": False}
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "validate": False}
             )
 
         # Assert
@@ -885,26 +859,23 @@ waves:
              prior one atomically; overwrite=True is the groom-milestone use case.
         """
         # Arrange — existing_plan_file fixture has already written one item
-        new_yaml = """\
-milestone:
-  number: 10
-  title: Updated Milestone
-  integration-branch: main
-waves:
-  - wave: 1
-    items:
-      - title: Issue 101
-        issue: 101
-        priority: P2
-      - title: Issue 102
-        issue: 102
-        priority: P3
-"""
+        new_plan = {
+            "milestone": {"number": 10, "title": "Updated Milestone", "integration_branch": "main"},
+            "waves": [
+                {
+                    "wave": 1,
+                    "items": [
+                        {"title": "Issue 101", "issue": 101, "priority": "P2"},
+                        {"title": "Issue 102", "issue": 102, "priority": "P3"},
+                    ],
+                }
+            ],
+        }
 
         # Act
         async with Client(mcp) as client:
             result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": new_yaml, "overwrite": True}
+                "dispatch_create_plan", {"milestone_number": 10, "plan": new_plan, "overwrite": True}
             )
 
         # Assert
@@ -914,7 +885,7 @@ waves:
         assert existing_plan_file.exists()
 
     async def test_create_plan_with_issue(
-        self, valid_plan_yaml: str, patch_create_plan_path: Path, mocker: MockerFixture
+        self, valid_plan_dict: dict, patch_create_plan_path: Path, mocker: MockerFixture
     ) -> None:
         """dispatch_create_plan attempts artifact registration when issue is provided.
 
@@ -930,7 +901,7 @@ waves:
         # Act
         async with Client(mcp) as client:
             result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": valid_plan_yaml, "issue": 42}
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
             )
 
         # Assert
@@ -942,105 +913,85 @@ waves:
     # Error-case tests
     # ------------------------------------------------------------------
 
-    async def test_create_plan_invalid_yaml(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan returns an error dict for malformed YAML input.
+    async def test_create_plan_invalid_plan_structure(self, patch_create_plan_path: Path) -> None:
+        """dispatch_create_plan raises ToolError when the plan dict fails Pydantic validation.
 
-        Tests: dispatch_create_plan — YAML parse failure
-        How: Pass a string that is not valid YAML (unbalanced braces). Verify
-             the response contains an 'error' key and no file is written.
-        Why: Callers must receive a structured error, not an unhandled exception,
-             when YAML is malformed so they can surface it to the operator.
+        Tests: dispatch_create_plan — Pydantic validation failure for structurally invalid input
+        How: Pass a dict where milestone.number is a string instead of an int. Verify
+             the call raises ToolError (FastMCP rejects at the MCP layer before the
+             tool function runs) and no file is written.
+        Why: With the typed plan parameter, Pydantic validates the input before the
+             function is called; invalid types raise ToolError rather than returning
+             an error dict.
         """
-        # Arrange
-        bad_yaml = "{{invalid: yaml: string"
+        # Arrange — milestone.number must be int >= 1; pass a string to trigger validation error
+        bad_plan = {
+            "milestone": {"number": "not-a-number", "title": "Bad Plan", "integration_branch": "main"},
+            "waves": [{"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P2"}]}],
+        }
 
-        # Act
+        # Act + Assert — FastMCP raises ToolError for Pydantic validation failures
         async with Client(mcp) as client:
-            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan_yaml": bad_yaml})
+            with pytest.raises(ToolError, match=r"int_parsing|not-a-number|integer"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": bad_plan})
 
-        # Assert
-        data: dict[str, Any] = result.data
-        assert "error" in data
-        assert "Invalid YAML" in data["error"] or "YAML" in data["error"]
         assert not patch_create_plan_path.exists()
 
-    async def test_create_plan_yaml_not_mapping(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan returns an error when YAML parses to a list, not a dict.
+    async def test_create_plan_missing_milestone_field(self, patch_create_plan_path: Path) -> None:
+        """dispatch_create_plan raises ToolError when the plan dict is missing the milestone block.
 
-        Tests: dispatch_create_plan — non-mapping YAML rejection
-        How: Pass a YAML list string. Verify the response has an error key describing
-             that a mapping is required.
-        Why: The DispatchPlan schema requires a mapping at the root; a list or scalar
-             cannot be fed to model_validate() and must be rejected early.
+        Tests: dispatch_create_plan — missing required top-level field
+        How: Pass a dict with only waves and no milestone key. Verify the call raises
+             ToolError (FastMCP rejects at the MCP layer) and no file is written.
+        Why: The DispatchPlan schema requires milestone; Pydantic raises before the
+             function runs, so callers receive a ToolError for missing required fields.
         """
-        # Arrange
-        list_yaml = "- item1\n- item2\n"
+        # Arrange — no milestone key at all
+        no_milestone_plan = {"waves": [{"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P2"}]}]}
 
-        # Act
+        # Act + Assert — FastMCP raises ToolError for missing required field
         async with Client(mcp) as client:
-            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan_yaml": list_yaml})
+            with pytest.raises(ToolError, match=r"milestone|missing|required"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": no_milestone_plan})
 
-        # Assert
-        data: dict[str, Any] = result.data
-        assert "error" in data
-        assert "mapping" in data["error"].lower() or "dict" in data["error"].lower()
+        assert not patch_create_plan_path.exists()
 
     async def test_create_plan_missing_required_field(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan returns a validation error when 'waves' is absent.
+        """dispatch_create_plan raises ToolError when 'waves' is absent from the plan dict.
 
-        Tests: dispatch_create_plan — Pydantic validation failure for missing field
-        How: Provide YAML with a valid milestone block but no 'waves' key. Verify the
-             response contains an error key mentioning validation failure.
-        Why: waves is required (min_length=1); callers must receive a descriptive error
-             rather than a generic crash when they omit required fields.
+        Tests: dispatch_create_plan — Pydantic validation failure for missing required field
+        How: Provide a dict with a valid milestone block but no 'waves' key. Verify the
+             call raises ToolError (FastMCP rejects before the function runs).
+        Why: waves is required (min_length=1); Pydantic rejects at the MCP layer so
+             callers receive a ToolError with a descriptive message.
         """
-        # Arrange
-        no_waves_yaml = """\
-milestone:
-  number: 10
-  title: Missing waves
-  integration-branch: main
-"""
+        # Arrange — valid milestone but no waves key
+        no_waves_plan = {"milestone": {"number": 10, "title": "Missing waves", "integration_branch": "main"}}
 
-        # Act
+        # Act + Assert — FastMCP raises ToolError for missing required field
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": no_waves_yaml}
-            )
-
-        # Assert
-        data: dict[str, Any] = result.data
-        assert "error" in data
-        assert "validation" in data["error"].lower() or "waves" in data["error"].lower()
+            with pytest.raises(ToolError, match=r"waves|missing|required"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": no_waves_plan})
 
     async def test_create_plan_empty_waves(self, patch_create_plan_path: Path) -> None:
-        """dispatch_create_plan returns an error when waves is an empty list.
+        """dispatch_create_plan raises ToolError when waves is an empty list.
 
         Tests: dispatch_create_plan — min_length=1 enforcement on waves
-        How: Provide YAML with waves: [] (empty list). Verify the error response
-             mentions the validation constraint on waves.
-        Why: DispatchPlan.waves has min_length=1; an empty list would produce a plan
-             that cannot be dispatched and must be rejected at creation time.
+        How: Provide a dict with waves: [] (empty list). Verify the call raises
+             ToolError (FastMCP rejects the min_length constraint before the function runs).
+        Why: DispatchPlan.waves has min_length=1; Pydantic enforces this at the MCP
+             layer so an empty list is rejected before reaching the tool function.
         """
-        # Arrange
-        empty_waves_yaml = """\
-milestone:
-  number: 10
-  title: Empty waves
-  integration-branch: main
-waves: []
-"""
+        # Arrange — empty waves list violates min_length=1
+        empty_waves_plan = {
+            "milestone": {"number": 10, "title": "Empty waves", "integration_branch": "main"},
+            "waves": [],
+        }
 
-        # Act
+        # Act + Assert — FastMCP raises ToolError for min_length violation
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": empty_waves_yaml}
-            )
-
-        # Assert
-        data: dict[str, Any] = result.data
-        assert "error" in data
-        assert "validation" in data["error"].lower() or "waves" in data["error"].lower()
+            with pytest.raises(ToolError, match=r"waves|too_short|min"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": empty_waves_plan})
 
     async def test_create_plan_file_exists_no_overwrite(self, existing_plan_file: Path) -> None:
         """dispatch_create_plan returns an error when the file exists and overwrite=False.
@@ -1056,7 +1007,7 @@ waves: []
         # Act
         async with Client(mcp) as client:
             result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": _make_valid_plan_yaml()}
+                "dispatch_create_plan", {"milestone_number": 10, "plan": _make_valid_plan_dict()}
             )
 
         # Assert
@@ -1073,25 +1024,15 @@ waves: []
         Why: A mismatch means the caller is writing a plan for a different milestone
              than the YAML describes; this would corrupt the plan directory naming.
         """
-        # Arrange
-        mismatched_yaml = """\
-milestone:
-  number: 20
-  title: Wrong milestone
-  integration-branch: main
-waves:
-  - wave: 1
-    items:
-      - title: Issue 101
-        issue: 101
-        priority: P2
-"""
+        # Arrange — milestone_number=10 but plan embeds number=20
+        mismatched_plan = {
+            "milestone": {"number": 20, "title": "Wrong milestone", "integration_branch": "main"},
+            "waves": [{"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P2"}]}],
+        }
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": mismatched_yaml}
-            )
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": mismatched_plan})
 
         # Assert
         data: dict[str, Any] = result.data
@@ -1099,7 +1040,7 @@ waves:
         assert "mismatch" in data["error"].lower() or "10" in data["error"]
 
     async def test_create_plan_symlink_target(
-        self, valid_plan_yaml: str, patch_create_plan_path: Path, mocker: MockerFixture
+        self, valid_plan_dict: dict, patch_create_plan_path: Path, mocker: MockerFixture
     ) -> None:
         """dispatch_create_plan returns an error when write_dispatch_plan raises ValueError.
 
@@ -1121,9 +1062,7 @@ waves:
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": valid_plan_yaml}
-            )
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
         # Assert
         data: dict[str, Any] = result.data
@@ -1149,29 +1088,17 @@ waves:
         of this known key-collision in the success return dict (divergence DN-1 in T02).
         """
         # Arrange — issue 101 appears in both waves
-        duplicate_yaml = """\
-milestone:
-  number: 10
-  title: Duplicate issue test
-  integration-branch: main
-waves:
-  - wave: 1
-    items:
-      - title: Issue 101
-        issue: 101
-        priority: P2
-  - wave: 2
-    items:
-      - title: Issue 101 again
-        issue: 101
-        priority: P3
-"""
+        duplicate_plan = {
+            "milestone": {"number": 10, "title": "Duplicate issue test", "integration_branch": "main"},
+            "waves": [
+                {"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P2"}]},
+                {"wave": 2, "items": [{"title": "Issue 101 again", "issue": 101, "priority": "P3"}]},
+            ],
+        }
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": duplicate_yaml}
-            )
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": duplicate_plan})
 
         # Assert — file is written and integrity check reports failure
         data: dict[str, Any] = result.data
@@ -1194,31 +1121,17 @@ waves:
         of this known key-collision in the success return dict (divergence DN-1 in T02).
         """
         # Arrange — issue 102 depends on 999 which is not in the plan
-        broken_deps_yaml = """\
-milestone:
-  number: 10
-  title: Broken depends_on test
-  integration-branch: main
-waves:
-  - wave: 1
-    items:
-      - title: Issue 101
-        issue: 101
-        priority: P2
-  - wave: 2
-    items:
-      - title: Issue 102
-        issue: 102
-        priority: P3
-        depends-on:
-          - 999
-"""
+        broken_deps_plan = {
+            "milestone": {"number": 10, "title": "Broken depends_on test", "integration_branch": "main"},
+            "waves": [
+                {"wave": 1, "items": [{"title": "Issue 101", "issue": 101, "priority": "P2"}]},
+                {"wave": 2, "items": [{"title": "Issue 102", "issue": 102, "priority": "P3", "depends_on": [999]}]},
+            ],
+        }
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool(
-                "dispatch_create_plan", {"milestone_number": 10, "plan_yaml": broken_deps_yaml}
-            )
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": broken_deps_plan})
 
         # Assert — file is written and integrity check reports failure
         data: dict[str, Any] = result.data
