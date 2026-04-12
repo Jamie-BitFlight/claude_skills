@@ -119,6 +119,7 @@ Use the kage-bunshin spawn script — it handles worktree creation, `.venv`/`nod
 
 ```bash
 SPAWN="plugins/development-harness/skills/kage-bunshin/scripts/spawn.py"
+MODEL="${MODEL:-sonnet}"
 PIDS=()
 SPAWN_INFO=()
 

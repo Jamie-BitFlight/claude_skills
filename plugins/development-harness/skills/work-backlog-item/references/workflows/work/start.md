@@ -26,7 +26,7 @@ flowchart TD
    - Step 2.2: Issue-first path (`#N`, bare number, or URL)
    - Step 2.3: Find by title substring
    - Step 2.4: Extract item fields
-   - If item already has a Plan field: invoke `Skill(skill="dh:implement-feature", args="{plan_address}")` and stop
+   - If item already has a Plan field: invoke `Skill(skill: "dh:implement-feature", args: "{plan_address}")` and stop
 3. [ ] **Validate** ([validate.md](./validate.md)) — verify item state and sync with GitHub
    - Step 3.1: Already-implemented check
    - Step 3.2–3.4: GitHub issue sync, creation, in-progress label
@@ -39,12 +39,12 @@ flowchart TD
    - Step 4.4: Feasibility gate — if BLOCKED, stop
 5. [ ] **Plan** ([plan.md](./plan.md)) — compose feature request and invoke SAM planning
    - Step 5.1: Compose feature request
-   - Step 5.2: Invoke SAM planning via `Skill(skill="dh:add-new-feature", args="{feature_request}")`
+   - Step 5.2: Invoke SAM planning via `Skill(skill: "dh:add-new-feature", args: "{feature_request}")`
    - Step 5.3: Update backlog with plan reference
    - Step 5.4: Simplify (code changes only)
    - Step 5.5: Load [post-planning.md](./post-planning.md) for the interactive summary template
 6. [ ] **Present summary to user** — output the planning summary report from post-planning.md
-7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<summary of changes>"`)
+7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<type>(<scope>): <description>"`)
 
 **Auto mode checklist** — steps to add to TodoWrite when `<mode/>` is `auto`:
 
@@ -53,10 +53,10 @@ flowchart TD
 3. [ ] **Validate** ([validate.md](./validate.md)) — verify item state and sync with GitHub (same sub-steps as interactive)
 4. [ ] **Prepare** ([prepare.md](./prepare.md)) — groom if needed, RT-ICA gate, feasibility gate (same sub-steps as interactive)
 5. [ ] **Plan** ([plan.md](./plan.md)) — compose feature request and invoke SAM planning (Steps 5.1–5.4; Step 5.5 runs the auto-mode branch: continue to step 6 without stopping)
-6. [ ] **Invoke implement-feature** — `Skill(skill="dh:implement-feature", args="{plan_address}")` — do not stop for user input
-7. [ ] **Invoke complete-implementation** — `Skill(skill="dh:complete-implementation", args="{plan_address}")` — do not stop for user input
+6. [ ] **Invoke implement-feature** — `Skill(skill: "dh:implement-feature", args: "{plan_address}")` — do not stop for user input
+7. [ ] **Invoke complete-implementation** — `Skill(skill: "dh:complete-implementation", args: "{plan_address}")` — do not stop for user input
 8. [ ] **Close or resolve item** — follow the close/resolve path to mark the item done (see [post-planning.md](./post-planning.md))
-9. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<summary of changes>"`)
+9. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "docs(workflow): update work backlog item instructions"`)
 
 ## Error Routing
 

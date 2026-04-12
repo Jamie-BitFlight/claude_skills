@@ -14,7 +14,7 @@ This is NOT a subagent or teammate — it is an independent CLI process with its
 All operations go through `${CLAUDE_SKILL_DIR}/scripts/spawn.py`:
 
 ```text
-spawn.py --session-id ID spawn  --name X [--model MODEL] [--max-budget N] "prompt"
+spawn.py --session-id ID spawn  --name X [--model MODEL] [--max-budget N] [--effort LEVEL] "prompt"
 spawn.py --session-id ID send   --name X "message"
 spawn.py --session-id ID read   --name X
 spawn.py --session-id ID status --name X
@@ -120,6 +120,7 @@ $SPAWN spawn --name my-session --max-budget 5.00 "Your prompt"
 - `--name` — Session name (auto-derived from first 30 chars of prompt if omitted)
 - `--model` — Model for the spawned session (default: sonnet)
 - `--max-budget` — Maximum USD spend cap
+- `--effort` — Effort level (low, medium, high, max) for reasoning depth. Injects CLAUDE_CODE_EFFORT_LEVEL into the child env.
 
 **Output** (JSON to stdout):
 
