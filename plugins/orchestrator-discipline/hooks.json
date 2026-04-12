@@ -28,6 +28,15 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prevent-bash-tool-misuse.cjs\""
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-block-explore-for-analysis.cjs\""
+          }
+        ]
       }
     ]
   }
