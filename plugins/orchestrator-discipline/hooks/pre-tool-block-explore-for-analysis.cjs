@@ -26,7 +26,9 @@ const fs = require('node:fs');
  * Keywords that signal a reasoning/analysis task. Matched case-insensitively
  * against both `description` and `prompt` fields of the Agent tool input.
  *
- * Word-boundary anchored so 'analyzer' matches but 'canalize' does not.
+ * Each entry is matched as a whole word or whole phrase (word-boundary
+ * anchored). 'analyze' matches 'analyze', 'Analyze', and 'ANALYZE' but
+ * not 'analyzer' or 'canalize'.
  */
 const ANALYSIS_KEYWORDS = [
   'analyze',
@@ -53,7 +55,7 @@ const ANALYSIS_KEYWORDS = [
   'refactor',
   'trade-off',
   'tradeoff',
-  'plan ',
+  'plan',
   'planning',
   'diagnose',
   'diagnosis',
@@ -82,13 +84,32 @@ const KEYWORD_PATTERN = new RegExp(
 );
 
 /**
+ * Strips quoted substrings so that keywords appearing as search targets
+ * (e.g. `grep for the word 'review'` or "find files mentioning \"audit\"")
+ * do not trigger the analysis-keyword match. Covers single-quoted,
+ * double-quoted, and backticked spans. Escaped quotes inside strings are
+ * not handled — the hook only needs a coarse filter, not a full parser.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripQuotedSpans(text) {
+  return text
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/'[^']*'/g, ' ')
+    .replace(/"[^"]*"/g, ' ');
+}
+
+/**
  * Returns the first analysis keyword found in the given text, or null.
+ * Quoted/backticked substrings are stripped first so that keywords used
+ * as search targets do not block legitimate pattern-search tasks.
  * @param {string} text
  * @returns {string|null}
  */
 function findAnalysisKeyword(text) {
   if (!text) return null;
-  const match = KEYWORD_PATTERN.exec(text);
+  const stripped = stripQuotedSpans(text);
+  const match = KEYWORD_PATTERN.exec(stripped);
   return match ? match[1] : null;
 }
 
@@ -112,6 +133,16 @@ function main() {
     event = JSON.parse(raw);
   } catch {
     // Malformed JSON — let the tool proceed; another hook may handle it
+    process.exit(0);
+  }
+
+  // Skip enforcement for subagent sessions — only the orchestrator is gated.
+  // When running inside a subagent, the hook input includes agent_id and
+  // agent_type fields that are absent in the orchestrator session. Matches
+  // the pattern used by prevent-bash-tool-misuse.cjs, pre-tool-diagnostic-
+  // command-gate.cjs, and pre-tool-orchestrator-read-warning.cjs (verified
+  // 2026-03-23).
+  if (event.agent_id) {
     process.exit(0);
   }
 
