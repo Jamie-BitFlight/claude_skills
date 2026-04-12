@@ -865,3 +865,67 @@ def test_sam_claim_invalid_plan_returns_error(tmp_path: Path) -> None:
     # Act / Assert
     with pytest.raises(PlanNotFoundError):
         sam_task(plan="P99", task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+
+
+def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
+    """sam_plan(create) without issue returns plan_ref as plain P-format identifier.
+
+    Tests: plan_ref field in create response — no-issue path.
+    How: Create a plan with no issue; verify plan_ref is "P001".
+    Why: plan_ref must be globally addressable; without issue it falls back to P<NNN>.
+    """
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    tasks_yaml = (
+        "tasks:\n"
+        "  - task: T01\n"
+        "    title: First task\n"
+        "    status: not-started\n"
+        "    agent: test-agent\n"
+        "    dependencies: []\n"
+        "    priority: 1\n"
+        "    complexity: low\n"
+    )
+
+    # Act
+    result = sam_plan(
+        config=CreatePlanConfig(slug="ref-no-issue", goal="Test goal", tasks_yaml=tasks_yaml), plan_dir=str(p_dir)
+    )
+
+    # Assert
+    assert "error" not in result
+    assert result["plan_ref"] == "P001"
+
+
+def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
+    """sam_plan(create) with issue returns plan_ref as '#<issue>,P<NNN>' composite identifier.
+
+    Tests: plan_ref field in create response — issue-scoped path.
+    How: Create a plan with issue=42; verify plan_ref is "#42,P042" (backend uses issue
+         number as plan number when issue is provided).
+    Why: plan_ref must be globally unique when an issue is associated (PR #1725 review comment).
+    """
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    tasks_yaml = (
+        "tasks:\n"
+        "  - task: T01\n"
+        "    title: First task\n"
+        "    status: not-started\n"
+        "    agent: test-agent\n"
+        "    dependencies: []\n"
+        "    priority: 1\n"
+        "    complexity: low\n"
+    )
+
+    # Act
+    result = sam_plan(
+        config=CreatePlanConfig(slug="ref-with-issue", goal="Test goal", tasks_yaml=tasks_yaml, issue=42),
+        plan_dir=str(p_dir),
+    )
+
+    # Assert — when issue=42, backend names the plan file P042, so plan_number=42
+    assert "error" not in result
+    assert result["plan_ref"] == "#42,P042"

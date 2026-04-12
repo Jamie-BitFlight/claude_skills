@@ -695,3 +695,26 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
     assert "description" in item
     assert "task_count" in item
     assert item["task_count"] == 1
+
+
+async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
+    """sam_plan list items include plan_ref with correct P-format when no issue is set.
+
+    Tests: plan_ref field in list response — global composite identifier (PR #1725).
+    How: Call sam_plan list; verify each item has plan_ref matching 'P<digits>' pattern.
+    Why: Callers need plan_ref to construct globally unique plan addresses without issue scope.
+    """
+    import re
+
+    # Act
+    async with Client(mcp) as client:
+        result = await client.call_tool("sam_plan", {"config": {"action": "list"}, "plan_dir": str(multi_plan_dir)})
+
+    # Assert — all items have plan_ref present and matching P-format (no issue in fixture)
+    items = result.data["items"]
+    assert len(items) > 0
+    for item in items:
+        assert "plan_ref" in item
+        plan_ref = item["plan_ref"]
+        assert plan_ref is not None
+        assert re.match(r"^P\d+$", plan_ref), f"Expected P<digits> format, got: {plan_ref!r}"
