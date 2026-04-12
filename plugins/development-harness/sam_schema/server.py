@@ -273,7 +273,7 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     """Create a new plan from YAML task definitions.
 
     Returns:
-        Dict with ``path``, ``plan_number``, and ``task_count`` keys.
+        Dict with ``plan_number`` and ``task_count`` keys.
     """
     yaml_parser: Any = YAML()
     parsed: dict[str, Any] = yaml_parser.load(config.tasks_yaml)
@@ -289,11 +289,7 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     if plan_id_str.startswith("P"):
         with contextlib.suppress(ValueError):
             plan_number = int(plan_id_str[1:])
-    result: dict[str, Any] = {
-        "path": str(plan_data["source_path"] or ""),
-        "plan_number": plan_number,
-        "task_count": len(plan_data["tasks"]),
-    }
+    result: dict[str, Any] = {"plan_number": plan_number, "task_count": len(plan_data["tasks"])}
     if config.issue is not None and plan_data["source_path"]:
         _try_register_task_plan_artifact(config.issue, Path(plan_data["source_path"]))
     return result
@@ -308,13 +304,7 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
     backend = _get_backend(plan_dir)
     summaries = backend.list_plans(search=config.search)
     all_items: list[dict[str, Any]] = [
-        {
-            "feature": s["feature"],
-            "goal": s["goal"],
-            "description": s["description"],
-            "task_count": s["task_count"],
-            "path": str(s["source_path"] or s["plan_id"]),
-        }
+        {"feature": s["feature"], "goal": s["goal"], "description": s["description"], "task_count": s["task_count"]}
         for s in summaries
     ]
     return _paginate_results(
@@ -332,7 +322,7 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     """List tasks ready for dispatch.
 
     Returns:
-        Dict with ``ready_tasks``, ``count``, ``feature``, ``source_path``, and ``issue`` keys.
+        Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue`` keys.
     """
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
@@ -356,7 +346,6 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
         "ready_tasks": ready_tasks,
         "count": len(tasks_data),
         "feature": plan_data["feature"],
-        "source_path": str(plan_data["source_path"] or plan),
         "issue": plan_data["issue"],
     }
 

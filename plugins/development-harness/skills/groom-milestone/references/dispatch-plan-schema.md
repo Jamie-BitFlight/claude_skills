@@ -155,14 +155,14 @@ This section clarifies how `/work-milestone` uses the dispatch plan when spawnin
 
 ## Creating Plans via MCP
 
-Use the `dispatch_create_plan` MCP tool (on the backlog server) to create or update dispatch plans. The YAML content shown in the schema example above is exactly what the `plan_yaml` parameter accepts.
+Use the `dispatch_create_plan` MCP tool (on the backlog server) to create or update dispatch plans. The `plan` parameter accepts a typed DispatchPlan object matching the schema above.
 
 **Parameters:**
 
 - `milestone_number` — GitHub milestone number; the tool writes to `plan/milestone-{N}-dispatch.yaml`
-- `plan_yaml` — YAML string containing the full dispatch plan (accepts both kebab-case and snake_case keys)
+- `plan` — typed DispatchPlan object containing the full dispatch plan (accepts both kebab-case and snake_case keys)
 - `overwrite` — Allow replacing an existing plan file; set to `True` when re-grooming (default: `False`)
 - `validate` — Run `validate_plan_integrity()` after writing and include results in response (default: `True`)
 - `issue` — Optional GitHub issue number; when provided, auto-registers the plan file as a `dispatch-plan` artifact
 
-**Response:** Returns `plan_path`, `wave_count`, `item_count`, `is_valid`, `errors`, and `warnings`. On error, the response contains an `error` key with a description.
+**Response:** Returns `milestone_number`, `wave_count`, `item_count`, `is_valid`, `errors`, `warnings`, and `messages`. On error, the response contains an `error` key with a description.

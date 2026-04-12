@@ -3062,21 +3062,17 @@ async def dispatch_read(milestone_number: Annotated[int, Field(description="GitH
     the plan file does not exist or fails YAML/schema validation.
 
     Returns:
-        Dict with ``milestone_number``, ``plan_path``, and ``plan`` (full plan
+        Dict with ``milestone_number`` and ``plan`` (full plan
         as a nested dict), or ``error`` on failure.
     """
     plan_path = _dispatch_plan_path(milestone_number)
     try:
         plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
     except FileNotFoundError:
-        return {
-            "error": f"Dispatch plan not found: {plan_path}",
-            "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
-        }
+        return {"error": f"Dispatch plan not found: {plan_path}", "milestone_number": milestone_number}
     except ValueError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number, "plan_path": str(plan_path)}
-    return {"milestone_number": milestone_number, "plan_path": str(plan_path), "plan": plan.model_dump()}
+        return {"error": str(exc), "milestone_number": milestone_number}
+    return {"milestone_number": milestone_number, "plan": plan.model_dump()}
 
 
 @mcp.tool(
@@ -3103,9 +3099,9 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
     try:
         plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
     except (FileNotFoundError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number, "plan_path": str(plan_path)}
+        return {"error": str(exc), "milestone_number": milestone_number}
     result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
-    return {"milestone_number": milestone_number, "plan_path": str(plan_path), **dataclasses.asdict(result)}
+    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
 
 
 @mcp.tool(
@@ -3136,7 +3132,7 @@ async def dispatch_stale_check(
     try:
         plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
     except (FileNotFoundError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number, "plan_path": str(plan_path)}
+        return {"error": str(exc), "milestone_number": milestone_number}
 
     def _fetch_milestone_issue_numbers() -> list[int]:
         gh_repo = _get_config().backend.get_github(repo)
@@ -3157,7 +3153,7 @@ async def dispatch_stale_check(
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
     result = await asyncio.to_thread(_ds.detect_stale_plan, plan, current_numbers)
-    return {"milestone_number": milestone_number, "plan_path": str(plan_path), **dataclasses.asdict(result)}
+    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
 
 
 @mcp.tool(
@@ -3214,7 +3210,7 @@ async def dispatch_create_plan(
             plan file as a ``dispatch-plan`` artifact (best-effort).
 
     Returns:
-        Success dict with ``milestone_number``, ``plan_path``, ``wave_count``,
+        Success dict with ``milestone_number``, ``wave_count``,
         ``item_count``, ``is_valid``, ``errors``, ``warnings``, and ``messages``.
         Error dict contains an ``error`` key.
     """
@@ -3229,7 +3225,6 @@ async def dispatch_create_plan(
                 f"but plan.milestone.number is {plan.milestone.number}"
             ),
             "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
             **out.to_dict(),
         }
 
@@ -3238,7 +3233,6 @@ async def dispatch_create_plan(
         return {
             "error": (f"Plan file already exists: {plan_path}. Pass overwrite=True to replace it."),
             "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
             **out.to_dict(),
         }
 
@@ -3249,16 +3243,10 @@ async def dispatch_create_plan(
         return {
             "error": f"Cannot write plan (symlink target rejected): {exc}",
             "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
             **out.to_dict(),
         }
     except OSError as exc:
-        return {
-            "error": f"Failed to write plan file: {exc}",
-            "milestone_number": milestone_number,
-            "plan_path": str(plan_path),
-            **out.to_dict(),
-        }
+        return {"error": f"Failed to write plan file: {exc}", "milestone_number": milestone_number, **out.to_dict()}
 
     out.info(f"Wrote dispatch plan to {plan_path}")
 
@@ -3281,7 +3269,6 @@ async def dispatch_create_plan(
 
     return {
         "milestone_number": milestone_number,
-        "plan_path": str(plan_path),
         "wave_count": wave_count,
         "item_count": item_count,
         "is_valid": is_valid,

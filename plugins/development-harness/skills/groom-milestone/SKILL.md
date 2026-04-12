@@ -74,7 +74,7 @@ flowchart TD
 
     Prioritize["Step 8: Priority Ordering<br>Action: Order items by:<br>1. Dependency constraints (blocked-by first)<br>2. Priority label (P0 > P1 > P2)<br>3. Conflict group (parallel-safe first)<br>Output: ordered list with wave assignments"]
 
-    Prioritize --> WavePlan["Step 9: Build Dispatch Plan<br>Action: Assign items to waves.<br>Wave 1: all items with no dependencies and no conflict group overlap.<br>Wave 2: items unblocked after Wave 1. Continue until all items assigned.<br>Verify wave ordering and dependency references.<br>Construct YAML string from wave assignments.<br>Call dispatch_create_plan(milestone_number=N, plan_yaml=yaml_str) to persist plan atomically.<br>For re-grooming a stale plan, pass overwrite=True.<br>Call dispatch_wave_start per wave to register state.<br>Output: plan/milestone-{N}-dispatch.yaml"]
+    Prioritize --> WavePlan["Step 9: Build Dispatch Plan<br>Action: Assign items to waves.<br>Wave 1: all items with no dependencies and no conflict group overlap.<br>Wave 2: items unblocked after Wave 1. Continue until all items assigned.<br>Verify wave ordering and dependency references.<br>Construct DispatchPlan object from wave assignments.<br>Call dispatch_create_plan(milestone_number=N, plan=dispatch_plan) to persist plan atomically.<br>For re-grooming a stale plan, pass overwrite=True.<br>Call dispatch_wave_start per wave to register state.<br>Output: plan/milestone-{N}-dispatch.yaml"]
 
     WavePlan --> Report["Step 10: Report<br>Output: milestone summary with wave assignments,<br>conflict groups, estimated parallelism per wave,<br>and next command: /work-milestone {N}"]
 
@@ -92,11 +92,11 @@ flowchart TD
 
 The backlog MCP server exposes these dispatch tools used at plan-write time:
 
-- `dispatch_create_plan(milestone_number, plan_yaml, overwrite, validate, issue)` — Step 9: validates and persists the dispatch plan YAML atomically; use overwrite=True when re-grooming a stale plan
+- `dispatch_create_plan(milestone_number, plan, overwrite, validate, issue)` — Step 9: validates and persists the dispatch plan atomically; `plan` is a typed DispatchPlan object; use overwrite=True when re-grooming a stale plan
 - `dispatch_wave_start(milestone, wave_num, items)` — Step 9: registers each wave in the dispatch state database; call after dispatch_create_plan to initialise wave state
 - `dispatch_wave_status(milestone, wave_num)` — available after `/work-milestone` launches; returns item-level progress with stale PID detection
 
-The dispatch plan is persisted via the `dispatch_create_plan` MCP tool, which validates the YAML against the DispatchPlan schema and writes atomically. The schema for `plan_yaml` is defined in [./references/dispatch-plan-schema.md](./references/dispatch-plan-schema.md). The conflict analysis and wave assignment logic (Steps 5–9) runs in-session — it does not call external module functions.
+The dispatch plan is persisted via the `dispatch_create_plan` MCP tool, which validates the DispatchPlan object against the schema and writes atomically. The DispatchPlan schema is defined in [./references/dispatch-plan-schema.md](./references/dispatch-plan-schema.md). The conflict analysis and wave assignment logic (Steps 5–9) runs in-session — it does not call external module functions.
 
 ## Error Handling
 
