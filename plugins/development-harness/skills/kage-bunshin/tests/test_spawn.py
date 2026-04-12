@@ -389,6 +389,7 @@ def _make_spawn_args(
     ns.model = model
     ns.max_budget = max_budget
     ns.session_id = session_id
+    ns.effort = None
     return ns
 
 
