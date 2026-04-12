@@ -25,6 +25,7 @@ from backlog_core.artifact_registry import ArtifactRegistry as _ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from mcp.types import ToolAnnotations
 from pydantic import Field
 from ruamel.yaml import YAML
 
@@ -377,7 +378,11 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
     return {"updated": True, "address": plan}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="SAM Plan Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
 def sam_plan(
     config: Annotated[
         PlanActionConfig,
@@ -445,7 +450,11 @@ def sam_plan(
             raise ValueError(f"sam_plan: unhandled action '{config.action}'")
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="SAM Task Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
 def sam_task(
     plan: Annotated[str, Field(description="Plan address (e.g., 'P1' or slug)")],
     task: Annotated[str, Field(description="Task ID within the plan (e.g., 'T3')")],
@@ -536,7 +545,15 @@ def sam_task(
             raise ValueError(f"sam_task: unhandled action '{config.action}'")
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="SAM Active Task Context",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 def sam_active_task(
     config: Annotated[
         ActiveTaskActionConfig, Field(description="Action config. Set 'action' to: get | set | update | clear")

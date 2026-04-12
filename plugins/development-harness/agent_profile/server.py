@@ -20,6 +20,7 @@ import logging
 from typing import Annotated
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from agent_profile.discovery import find_agent, get_plugins_root, scan_all_agents
@@ -32,7 +33,12 @@ logger = logging.getLogger(__name__)
 mcp: FastMCP = FastMCP("agent-profile")
 
 
-@mcp.tool(name="load")
+@mcp.tool(
+    name="load",
+    annotations=ToolAnnotations(
+        title="Load Agent Profile", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    ),
+)
 def _load(
     agent_name: Annotated[
         str,
@@ -100,7 +106,12 @@ def _load(
     return profile.model_dump(mode="json")
 
 
-@mcp.tool(name="list")
+@mcp.tool(
+    name="list",
+    annotations=ToolAnnotations(
+        title="List Agent Profiles", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    ),
+)
 def _list(
     plugin: Annotated[
         str | None,

@@ -23,6 +23,7 @@ import dispatch_schema as _ds
 import tiktoken
 from fastmcp import Context, FastMCP
 from github import GithubException as _GithubException
+from mcp.types import ToolAnnotations
 from pydantic import Field, ValidationError as _ValidationError
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
@@ -1147,7 +1148,11 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Add Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_add(
     title: Annotated[str, Field(description="Item title")],
     priority: Annotated[str, Field(description="Priority level: P0, P1, P2, or Ideas")],
@@ -1267,7 +1272,11 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
     )
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Backlog Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list(
     from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
@@ -1689,7 +1698,11 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
     return compact
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="View Backlog Item", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_view(
     selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
     summary: Annotated[
@@ -1819,7 +1832,11 @@ async def backlog_view(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Sync Backlog", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
@@ -1846,7 +1863,11 @@ async def backlog_sync(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Close Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_close(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     reason: Annotated[
@@ -1890,7 +1911,11 @@ async def backlog_close(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Resolve Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_resolve(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     summary: Annotated[str, Field(description="What was done — 1-2 sentence completion summary (required)")],
@@ -1934,7 +1959,11 @@ async def backlog_resolve(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Update Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_update(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
@@ -2012,7 +2041,11 @@ async def backlog_update(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Groom Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_groom(
     ctx: Context,
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
@@ -2106,7 +2139,15 @@ async def backlog_groom(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Normalize Backlog Items",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
@@ -2134,7 +2175,11 @@ async def backlog_normalize(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Pull Backlog Items", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_pull(
     ctx: Context,
     selector: Annotated[
@@ -2184,7 +2229,11 @@ async def backlog_pull(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Create SAM Task", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_create_sam_task(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
     task_id: Annotated[str, Field(description="Feature-scoped task ID, e.g. 'T1'")],
@@ -2227,7 +2276,11 @@ async def backlog_create_sam_task(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Get SAM Tasks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_get_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
     refresh_cache: Annotated[bool, Field(description="Write updated cache after fetching")] = True,
@@ -2248,7 +2301,15 @@ async def backlog_get_sam_tasks(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Update SAM Task Status",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    )
+)
 async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (without #)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
@@ -2315,7 +2376,11 @@ def _get_artifact_provider() -> ArtifactBackend:
     return _artifact_provider
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Register Artifact", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def artifact_register(
     issue_number: Annotated[int, Field(description="GitHub issue number")],
     artifact_type: Annotated[
@@ -2429,7 +2494,11 @@ async def artifact_register(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Artifacts", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def artifact_list(
     issue_number: Annotated[int, Field(description="GitHub issue number")],
     artifact_type: Annotated[str | None, Field(description="Filter by artifact type (optional)")] = None,
@@ -2464,7 +2533,11 @@ async def artifact_list(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Get Artifact", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def artifact_get(
     issue_number: Annotated[int, Field(description="GitHub issue number")],
     artifact_type: Annotated[str, Field(description="Artifact type to retrieve")],
@@ -2498,7 +2571,11 @@ async def artifact_get(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Read Artifact", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def artifact_read(
     issue_number: Annotated[int, Field(description="GitHub issue number")],
     artifact_type: Annotated[str, Field(description="Artifact type whose content to read")],
@@ -2559,7 +2636,11 @@ async def artifact_read(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Get Ready SAM Tasks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (without #)")],
 ) -> dict:
@@ -2581,7 +2662,11 @@ async def backlog_get_ready_sam_tasks(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Strike Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_strike_entry(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     entry_id: Annotated[str, Field(description="Timestamp ID of the entry to strike")],
@@ -2608,7 +2693,11 @@ async def backlog_strike_entry(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Labels", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum labels to return")] = 100) -> dict:
     """List repository labels (read-only).
 
@@ -2629,7 +2718,11 @@ async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum l
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Merged PRs", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_merged_prs(
     search: Annotated[
         str | None,
@@ -2663,7 +2756,11 @@ async def backlog_list_merged_prs(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Milestones", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_milestones(
     state: Annotated[str, Field(description="Milestone state filter: open | closed | all")] = "open",
 ) -> dict:
@@ -2685,7 +2782,11 @@ async def backlog_list_milestones(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Get Soonest Milestone", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_get_soonest_milestone() -> dict:
     """Return the open milestone with the earliest due date.
 
@@ -2708,7 +2809,11 @@ async def backlog_get_soonest_milestone() -> dict:
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Create Milestone", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_create_milestone(
     title: Annotated[str, Field(description="Milestone title (required, must be non-empty)")],
     description: Annotated[str, Field(description="Optional milestone description")] = "",
@@ -2735,7 +2840,11 @@ async def backlog_create_milestone(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Issues", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_issues(
     milestone: Annotated[str | None, Field(description="Filter by milestone title")] = None,
     labels: Annotated[str | None, Field(description="Comma-separated label names to filter by")] = None,
@@ -2758,7 +2867,11 @@ async def backlog_list_issues(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Comment on Issue", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_comment_issue(
     issue_number: Annotated[int, Field(description="GitHub issue number (without #)")],
     body: Annotated[str, Field(description="Comment body (Markdown)")],
@@ -2777,7 +2890,11 @@ async def backlog_comment_issue(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Issue Comments", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_comments(
     issue_number: Annotated[int, Field(description="GitHub issue number (without #)")],
     limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
@@ -2800,7 +2917,11 @@ async def backlog_list_comments(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Read Issue Comment", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_read_comment(
     issue_number: Annotated[int, Field(description="GitHub issue number (without #)")],
     comment_id: Annotated[
@@ -2827,7 +2948,11 @@ async def backlog_read_comment(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Projects", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
@@ -2846,7 +2971,11 @@ async def backlog_list_projects(
         return {"error": str(e), **out.to_dict()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Create Project", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
 async def backlog_create_project(
     title: Annotated[str, Field(description="Project title")],
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
@@ -2922,7 +3051,11 @@ def _try_register_dispatch_plan_artifact(issue_number: int, plan_path: Path) -> 
         )
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Read Dispatch Plan", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
 async def dispatch_read(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
     """Read a dispatch plan for the given milestone.
 
@@ -2947,7 +3080,15 @@ async def dispatch_read(milestone_number: Annotated[int, Field(description="GitH
     return {"milestone_number": milestone_number, "plan_path": str(plan_path), "plan": plan.model_dump()}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Validate Dispatch Plan",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 async def dispatch_validate(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
     """Validate an existing dispatch plan's structural integrity.
 
@@ -2968,7 +3109,15 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
     return {"milestone_number": milestone_number, "plan_path": str(plan_path), **dataclasses.asdict(result)}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Check Dispatch Staleness",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    )
+)
 async def dispatch_stale_check(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
@@ -3012,7 +3161,11 @@ async def dispatch_stale_check(
     return {"milestone_number": milestone_number, "plan_path": str(plan_path), **dataclasses.asdict(result)}
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Create Dispatch Plan", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def dispatch_create_plan(  # noqa: PLR0911
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     plan_yaml: Annotated[
@@ -3189,7 +3342,15 @@ async def dispatch_create_plan(  # noqa: PLR0911
     }
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Analyze Dispatch Conflicts",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    )
+)
 async def dispatch_conflicts(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
@@ -3750,7 +3911,11 @@ def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Migrate Artifacts", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
 async def artifact_migrate(
     issue_number: Annotated[
         int | None, Field(description="Migrate artifacts for a specific issue number only. Omit to scan all issues.")
@@ -3843,7 +4008,15 @@ def _dispatch_state_manager() -> _DispatchStateManager:
     return _dispatch_state_mgr
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Start Dispatch Wave",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    )
+)
 async def dispatch_wave_start(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number from dispatch plan (1-based)")],
@@ -3889,7 +4062,15 @@ async def dispatch_wave_start(
     }
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Update Dispatch Item Status",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 async def dispatch_item_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     issue: Annotated[int, Field(description="Issue number of the item")],
@@ -3949,7 +4130,15 @@ async def dispatch_item_status(
     return await asyncio.to_thread(_find_and_update)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Query Dispatch Wave Status",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 async def dispatch_wave_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number to query (1-based)")],
@@ -4195,7 +4384,16 @@ async def _run_spawn_item(
         )
 
 
-@mcp.tool(task=True)
+@mcp.tool(
+    task=True,
+    annotations=ToolAnnotations(
+        title="Spawn Dispatch Wave",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def dispatch_spawn(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[
