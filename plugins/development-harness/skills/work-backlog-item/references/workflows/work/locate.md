@@ -38,10 +38,10 @@ From the matched item's entry in the `mcp__plugin_dh_backlog__backlog_list` retu
 - `research_first` — from `backlog_view` response body, `**Research first**:` line (optional)
 - `suggested_location` — from `backlog_view` response body, `**Suggested location**:` line (optional)
 
-If the item already has a `**Plan**:` field, extract the plan address from the YAML filename (e.g., `plan/P1079-machine-readable-inter-item-dependencies.yaml` → `P1079`). Invoke immediately:
+If the item already has a `**Plan**:` field, extract the plan address from the YAML filename (e.g., `plan/Pf3a4b5c6-machine-readable-inter-item-dependencies.yaml` → `Pf3a4b5c6`). Invoke immediately:
 
 ```text
-Skill(skill: "dh:implement-feature", args: "P{NNN}")
+Skill(skill: "dh:implement-feature", args: "P{id}")
 ```
 
 After extracting fields, proceed to `validate.md` (Step 2.1) before continuing.

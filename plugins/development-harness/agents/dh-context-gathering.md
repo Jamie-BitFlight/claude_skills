@@ -27,7 +27,7 @@ You are part of the feature development workflow for Python projects. A task fil
    mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
    ```
 
-   Replace `P{N}` with the plan address (e.g., `P1`, `P719`, or slug `integrate-sam-schema`). This returns a JSON object containing the plan goal, context, and all task fields.
+   Replace `P{N}` with the plan address (e.g., `P1`, `Pc7d8e9f0`, or slug `integrate-sam-schema`). This returns a JSON object containing the plan goal, context, and all task fields.
 
 2. LOCATE and READ the linked architecture spec (found in `architecture` field of the JSON response)
 3. Understand what needs to be built/fixed/refactored

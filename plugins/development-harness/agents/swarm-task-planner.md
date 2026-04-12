@@ -270,7 +270,7 @@ stale or absent SAM state instead of the actual plan.
 mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{YAML_CONTENT}"})
 ```
 
-After `sam_plan` succeeds, the plan ID returned (e.g., `P037`) is the canonical reference for
+After `sam_plan` succeeds, the plan ID returned (e.g., `Pd7e8f9a0`) is the canonical reference for
 all downstream tools. Record it and pass it to the plan-validator and any other consumers.
 PLAN.md / PLAN/ disk files are optional human-readable summaries — they do not replace SAM
 registration and must never be written as the only plan artifact.

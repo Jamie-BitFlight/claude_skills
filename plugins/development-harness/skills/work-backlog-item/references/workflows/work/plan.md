@@ -29,7 +29,7 @@ Call the `mcp__plugin_dh_backlog__backlog_update` tool to add the Plan:
 | Parameter | Value |
 |-----------|-------|
 | `selector` | `"{title}"` |
-| `plan` | `"P{NNN}"` (plan address — backend signal, not a file path) |
+| `plan` | `"P{id}"` (plan address — backend signal, not a file path) |
 
 If the item has `**Issue**: #N`, record it in the plan file header comment. Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` in task-level commit messages — issue closure is handled exclusively by `/complete-implementation` in its final commit step.
 

@@ -199,21 +199,21 @@ file is created.
 
 ```bash
 uv run .claude/skills/backlog/scripts/backlog.py update "{title}" \
-  --plan "~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml" \
+  --plan "~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml" \
   --status in-progress \
   -R Jamie-BitFlight/claude_skills
 ```
 
 **What gets written**:
 
-- `metadata.plan: ~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml` in per-item file frontmatter
+- `metadata.plan: ~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml` in per-item file frontmatter
 - `metadata.status: in-progress` in frontmatter
 - GitHub label: current status label removed, `status:in-progress` added
 
 **Critical constraint**: `status:in-progress` MUST NOT be set before RT-ICA returns APPROVED
 and the plan file exists. Setting it during grooming or RT-ICA checking is incorrect.
 
-**Where data lives**: Both local and GitHub. Plan file exists at `~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml`.
+**Where data lives**: Both local and GitHub. Plan file exists at `~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml`.
 
 ---
 
@@ -226,7 +226,7 @@ acceptance criteria verification passes.
 
 ```bash
 uv run .claude/skills/backlog/scripts/backlog.py close "{title}" \
-  --plan "~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml" \
+  --plan "~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml" \
   --checklist-pass \
   [-R Jamie-BitFlight/claude_skills]
 ```
@@ -502,7 +502,7 @@ GitHub Issue #42:
 ```text
 ~/.dh/projects/{slug}/backlog/p1-{slug}.md  — MODIFIED
   frontmatter:
-    metadata.plan: "~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml"
+    metadata.plan: "~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml"
     metadata.status: in-progress
 
 GitHub Issue #42:

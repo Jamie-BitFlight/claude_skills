@@ -565,7 +565,7 @@ class TaskBackend(Protocol):
         ...
 
     def read_plan(self, plan_id: str) -> PlanData:
-        """Read a plan by backend-assigned identifier (e.g. 'P912')."""
+        """Read a plan by backend-assigned identifier (e.g. 'Pd9e0f1a2')."""
         ...
 
     def list_plans(

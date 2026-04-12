@@ -46,7 +46,7 @@ Each worker gets exactly the context needed — no more.
 Agent(
   team_name="feature-slug-wave-1",
   name="T42-worker",
-  prompt="Your ROLE_TYPE is sub-agent. You are working on P500/T42."
+  prompt="Your ROLE_TYPE is sub-agent. You are working on Pf1a2b3c4/T42."
 )
 ```
 

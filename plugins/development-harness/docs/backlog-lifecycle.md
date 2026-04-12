@@ -251,7 +251,7 @@ and configuration.
 | `status` | MCP tools | Current lifecycle state (`needs-grooming`, `groomed`, `blocked`, etc.) |
 | `priority` | `backlog_add` | P0, P1, P2, or Ideas |
 | `groomed` | `backlog_groom` | Date when grooming completed (set after all required sections present — defined in finalize.md) |
-| `plan` | `backlog_update(plan=...)` | SAM plan address (`P{NNN}`) — a backend reference, not a file path |
+| `plan` | `backlog_update(plan=...)` | SAM plan address (`P{id}`) — a backend reference, not a file path |
 | `issue` | `backlog_add` | Backend issue identifier (`#N` format) |
 | `milestone` | `group-items-to-milestone` | Milestone identifier |
 | Groomed sections | `backlog_groom` | RT-ICA, Impact Radius, Fact-Check, and other groomed subsections |
@@ -259,10 +259,10 @@ and configuration.
 ### SAM Plan Files
 
 Created by `add-new-feature` Phase 4 via `sam_create`. Managed by the SAM MCP server.
-Access via `sam_read(plan="P{NNN}")` and `sam_list(search="{slug}")` — not via filesystem path.
+Access via `sam_read(plan="P{id}")` and `sam_list(search="{slug}")` — not via filesystem path.
 
 The plan address is written to the backlog item via
-`backlog_update(selector='{item_ref}', plan='P{NNN}')`. The `plan` field is a backend
+`backlog_update(selector='{item_ref}', plan='P{id}')`. The `plan` field is a backend
 reference, not a filesystem path.
 
 SOURCE: Codebase architecture analysis Issue #398 (accessed 2026-03-30), Section 2.
@@ -376,7 +376,7 @@ metadata:
   groomed: {YYYY-MM-DD} | null
   issue: {item_ref #N} | null
   milestone: {milestone identifier} | null
-  plan: {plan address P{NNN}} | null
+  plan: {plan address P{id}} | null
   updated_at: {ISO timestamp}
 ```
 

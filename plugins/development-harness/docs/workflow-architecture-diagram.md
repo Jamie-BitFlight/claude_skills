@@ -227,7 +227,7 @@ Read by `task_status_hook.py` PostToolUse handler.
 
 ```json
 {
-  "task_file_path": "~/.dh/projects/{slug}/plan/P719-my-feature.yaml",
+  "task_file_path": "~/.dh/projects/{slug}/plan/Pc7d8e9f0-my-feature.yaml",
   "task_id": "T04",
   "parent_issue_number": 719
 }
@@ -263,7 +263,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `~/.dh/projects/{slug}/plan/feature-context-{slug}.md` | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/codebase/{FOCUS}.md` | `codebase-analyzer` | `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/architect-{slug}.md` | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
-| `~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml` | `swarm-task-planner` via `sam_plan create` | `/implement-feature`, `sam_plan ready`, `sam_plan status`, all execution agents |
+| `~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml` | `swarm-task-planner` via `sam_plan create` | `/implement-feature`, `sam_plan ready`, `sam_plan status`, all execution agents |
 | `~/.dh/projects/{slug}/plan/T0-baseline-{slug}.yaml` | `t0-baseline-capture` | `tn-verification-gate` |
 | `~/.dh/projects/{slug}/plan/TN-verification-{slug}.yaml` | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |
 | `~/.dh/projects/{slug}/plan/QG{NNN}-qg-{slug}.yaml` | `/complete-implementation` via `build_quality_gate_plan` + `sam_create` | SAM dispatch loop (T1–T6 quality gate tasks) |
@@ -303,7 +303,7 @@ The `parent_issue_number` (GitHub issue) propagates through these fields:
 flowchart TD
     GH["GitHub Issue #N<br>created by backlog_add"]
     BI["BacklogItem.issue field<br>(string, e.g. '719')"]
-    PF["plan file name<br>~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml<br>issue: N in plan YAML"]
+    PF["plan file name<br>~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml<br>issue: N in plan YAML"]
     CTX["~/.dh/projects/{slug}/context/active-task-{sid}.json<br>parent_issue_number: N<br>written by /start-task"]
     HOOK["task_status_hook.py<br>reads parent_issue_number<br>syncs completion to GitHub sub-issue"]
     TF["Task field: github_issue<br>linked sub-issue number"]
@@ -415,7 +415,7 @@ Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered
 
 ### QG Plan File Location
 
-The QG plan file is written by `sam_plan(action="create")` to `plan/QG{NNN}-qg-{slug}.yaml` (in the project plan directory). The `QG{N}` address is used in all subsequent `sam_plan(action="ready")`, `sam_task(action="claim")`, `sam_task(action="state")`, and `sam_plan(action="status")` calls for this quality gate run. The `QG{NNN}` number is auto-assigned by SAM (sequential, separate from implementation plan numbering `P{NNN}`).
+The QG plan file is written by `sam_plan(action="create")` to `plan/QG{NNN}-qg-{slug}.yaml` (in the project plan directory). The `QG{N}` address is used in all subsequent `sam_plan(action="ready")`, `sam_task(action="claim")`, `sam_task(action="state")`, and `sam_plan(action="status")` calls for this quality gate run. The `QG{NNN}` number is auto-assigned by SAM (sequential, separate from implementation plan numbering `P{id}`).
 
 ---
 

@@ -53,7 +53,7 @@ These artifacts are produced by agents during planning phases. They may be updat
 | Feature context | `artifact_read(issue_number, 'feature-context')` | `feature-researcher` agent | `context-refinement` agent |
 | Codebase analysis | `artifact_read(issue_number, 'codebase-analysis')` | `codebase-analyzer` agent | Not updated (informational snapshot) |
 | Architecture spec | `artifact_read(issue_number, 'architect')` | `python-cli-design-spec` agent | `context-refinement` agent |
-| Task plan | `sam_read(plan="P{NNN}")` | `swarm-task-planner` agent | Status fields by hooks; Context Manifest by `context-refinement` |
+| Task plan | `sam_read(plan="P{id}")` | `swarm-task-planner` agent | Status fields by hooks; Context Manifest by `context-refinement` |
 | Context Manifest | Embedded in task file (via `sam_read`) | `context-gathering` agent | `context-refinement` agent (existing behavior) |
 
 ---
@@ -225,7 +225,7 @@ artifacts:
     created_at: "2026-03-15T01:00:00Z"
     agent: python-cli-design-spec
   - type: task-plan
-    path: plan/P719-my-feature.yaml
+    path: plan/Pc7d8e9f0-my-feature.yaml
     status: current
     created_at: "2026-03-15T02:00:00Z"
     agent: swarm-task-planner

@@ -16,7 +16,7 @@ You MUST convert the user's request into **durable SAM artifacts** registered vi
 - `feature-context-{slug}.md` (discovery)
 - `codebase/{FOCUS}.md` (optional, analysis)
 - `architect-{slug}.md` (architecture/design spec)
-- `P{NNN}-{slug}.yaml` (executable task plan with Agents, deps, and verification)
+- `P{id}-{slug}.yaml` (executable task plan with Agents, deps, and verification)
 
 <feature_request>
 $ARGUMENTS
@@ -345,7 +345,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 Delegate to `@dh:swarm-task-planner` to:
 
-- create `plan/P{NNN}-{slug}.yaml` (via `sam create`)
+- create `plan/P{id}-{slug}.yaml` (via `sam create`)
 - ensure every task has:
   - **Status**, **Dependencies**, **Priority**, **Complexity**, **Agent**
   - Acceptance Criteria (3+)
@@ -397,20 +397,20 @@ back to the backlog item:
 mcp__plugin_dh_backlog__artifact_register(
     issue_number={issue},
     artifact_type="task-plan",
-    path="plan/P{NNN}-{slug}.yaml",  # state-relative path; auto-registered by sam_plan when issue is set
+    path="plan/P{id}-{slug}.yaml",  # state-relative path; auto-registered by sam_plan when issue is set
     agent="swarm-task-planner"
 )
 
 mcp__plugin_dh_backlog__backlog_update(
     selector="{title}",
-    plan="P{NNN}"
+    plan="P{id}"
 )
 ```
 
 The `backlog_update(plan=...)` call writes the plan address into the backlog item's `metadata.plan`
 field. This is a backend signal — it records that a plan exists and its address, not a filesystem
 path. `work-backlog-item` uses this to route directly to `implement-feature` on subsequent
-invocations. The SAM MCP resolves `P{NNN}` to the full plan without filesystem access.
+invocations. The SAM MCP resolves `P{id}` to the full plan without filesystem access.
 
 ---
 

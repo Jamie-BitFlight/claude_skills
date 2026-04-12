@@ -53,7 +53,7 @@ sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 
 Extract:
 
-- `task_file_path` — the path to the task YAML file (e.g., `plan/P{NNN}-{slug}.yaml`)
+- `task_file_path` — the path to the task YAML file (e.g., `plan/P{id}-{slug}.yaml`)
 - `issue_number` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)

@@ -1,6 +1,6 @@
 # Known Patterns — backlog_core Section Replacement
 
-## YAML Format (Current — Post P964 Migration)
+## YAML Format (Current — Post Pe1f2a3b4 Migration)
 
 Backlog items are stored as `.yaml` files. Groomed fields (priority, effort, decision, fact-check,
 rt-ica) are top-level YAML keys on the `BacklogItem` model. Updates go through
@@ -9,13 +9,13 @@ rt-ica) are top-level YAML keys on the `BacklogItem` model. Updates go through
 To update a single field on a `BacklogItem`, mutate the field and call `save_item(item, path)`.
 There are no section-level helpers for the YAML format — the model is the single source of truth.
 
-SOURCE: P964 YAML migration — `_md_append_or_replace_section`, `_md_replace_groomed_subsection`,
+SOURCE: Pe1f2a3b4 YAML migration — `_md_append_or_replace_section`, `_md_replace_groomed_subsection`,
 and `_md_build_section_block` were removed from `operations.py` after zero callers remained
 (confirmed by grep, 2026-03-31).
 
 ## Legacy `.md` Format (Historical Reference Only)
 
-The following patterns applied to `.md` backlog files before the P964 YAML migration. They are
+The following patterns applied to `.md` backlog files before the Pe1f2a3b4 YAML migration. They are
 preserved here for archaeological reference — the implementation no longer exists.
 
 ### Markdown Heading Regex Must Use `[^\n]*`

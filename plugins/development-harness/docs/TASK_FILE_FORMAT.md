@@ -119,27 +119,27 @@ uv run sam migrate tasks-{N}-{slug}.md             # Migrate legacy format (CLI 
 Plan files are stored under the per-project state directory (`~/.dh/projects/{project-slug}/plan/`), resolved via `dh_paths.plan_dir()`. The `{project-slug}` is computed from the absolute project root path by replacing `/` with `-`.
 
 ```text
-~/.dh/projects/{project-slug}/plan/P{NNN}-{slug}.yaml            # single-file plan (under 500 lines)
-~/.dh/projects/{project-slug}/plan/P{NNN}-{slug}/                # directory plan (500+ lines)
-    P{NNN}-PLAN.yaml               # plan-level metadata, goal, context, task list
-    P{NNN}-ARCHITECT.md            # architecture spec
-    P{NNN}-CONTEXT.md              # feature context
+~/.dh/projects/{project-slug}/plan/P{id}-{slug}.yaml            # single-file plan (under 500 lines)
+~/.dh/projects/{project-slug}/plan/P{id}-{slug}/                # directory plan (500+ lines)
+    P{id}-PLAN.yaml               # plan-level metadata, goal, context, task list
+    P{id}-ARCHITECT.md            # architecture spec
+    P{id}-CONTEXT.md              # feature context
     tasks/
         T01.yaml
         T02.yaml
 ```
 
-`{NNN}` is a zero-padded sequential number assigned by `sam create`. `{slug}` is lowercase-hyphenated from the feature name.
+`{id}` is a hex string assigned by `sam create`. `{slug}` is lowercase-hyphenated from the feature name.
 
 ### Addressing
 
 ```text
-P{N}/T{M}     -- task M in plan N (numeric match, leading zeros ignored)
-P719/T04      -- task T04 in plan P719
-my-slug/T1    -- task T1 in plan matching slug "my-slug"
+P{id}/T{M}        -- task M in plan with id (hex match)
+Pc7d8e9f0/T04     -- task T04 in plan Pc7d8e9f0
+my-slug/T1        -- task T1 in plan matching slug "my-slug"
 ```
 
-`sam read P1/T3` globs the plan directory under `dh_paths.plan_dir()` for `P001-*/` and finds `T03.yaml` (or the T03 section in a single-file plan).
+`sam read P1/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan).
 
 ### Legacy Names
 
@@ -411,7 +411,7 @@ echo "$YAML_CONTENT" | uv run sam create my-feature \
   --stdin \
   --format json
 
-# Output: { "path": "~/.dh/projects/{project-slug}/plan/P719-my-feature.yaml", "plan_number": 719, "task_count": 14 }
+# Output: { "path": "~/.dh/projects/{project-slug}/plan/Pc7d8e9f0-my-feature.yaml", "plan_id": "Pc7d8e9f0", "task_count": 14 }
 ```
 
 Stdin YAML structure:
@@ -438,17 +438,17 @@ context: "Shared context"
 
 ```bash
 # Read a task — returns TaskAssignment (plan context + task details)
-uv run sam read P719/T04 --format json
+uv run sam read Pc7d8e9f0/T04 --format json
 
 # Read a plan — returns Plan JSON
-uv run sam read P719 --format json
+uv run sam read Pc7d8e9f0 --format json
 ```
 
 TaskAssignment response shape (see [TaskAssignment Schema](./assignment-schema.json)):
 
 ```json
 {
-  "plan_number": 719,
+  "plan_id": "Pc7d8e9f0",
   "plan_slug": "my-feature",
   "plan_goal": "Route all SAM workflow I/O through sam CLI",
   "plan_context": "Background context shared across all tasks",
@@ -470,13 +470,13 @@ TaskAssignment response shape (see [TaskAssignment Schema](./assignment-schema.j
 
 ```bash
 # Set plan context
-uv run sam update P719 --context "Background context for all tasks"
+uv run sam update Pc7d8e9f0 --context "Background context for all tasks"
 
 # Set a specific field
-uv run sam update P719 --set acceptance-criteria-structured=true
+uv run sam update Pc7d8e9f0 --set acceptance-criteria-structured=true
 
 # Append a section to a task body
-uv run sam update P719/T04 \
+uv run sam update Pc7d8e9f0/T04 \
   --append-section "Divergence Notes" \
   --section-content "### DN-1: Brief title\n..."
 ```
@@ -484,15 +484,15 @@ uv run sam update P719/T04 \
 ### sam state — Transition task status
 
 ```bash
-uv run sam state P719/T04 complete
-uv run sam state P719/T04 blocked
+uv run sam state Pc7d8e9f0/T04 complete
+uv run sam state Pc7d8e9f0/T04 blocked
 # Valid values: not-started | in-progress | complete | blocked | deferred | skipped
 ```
 
 ### sam claim — Claim a task (mark in-progress)
 
 ```bash
-uv run sam claim P719/T04 --format json
+uv run sam claim Pc7d8e9f0/T04 --format json
 # Output: { "claimed": true, "task_id": "T04", "started": "2026-03-15T13:00:00Z" }
 # Exit code 1: already claimed, not found, or status != not-started
 ```
@@ -500,7 +500,7 @@ uv run sam claim P719/T04 --format json
 ### sam ready — List ready tasks
 
 ```bash
-uv run sam ready P719 --format json
+uv run sam ready Pc7d8e9f0 --format json
 # Output: { "feature": "my-feature", "ready_tasks": [...], "count": 3 }
 # A task is ready when status=not-started and all dependencies are complete.
 ```
@@ -508,14 +508,14 @@ uv run sam ready P719 --format json
 ### sam status — Plan progress summary
 
 ```bash
-uv run sam status P719
+uv run sam status Pc7d8e9f0
 # Output: plan progress with task counts by status, blocked tasks, next ready tasks
 ```
 
 ### sam validate — Validate plan against schema
 
 ```bash
-uv run sam validate P719 --format json
+uv run sam validate Pc7d8e9f0 --format json
 # Output: { "valid": true/false, "errors": [...], "warnings": [...] }
 ```
 
@@ -524,7 +524,7 @@ uv run sam validate P719 --format json
 ```bash
 uv run sam migrate tasks-3-integrate-sam-schema.md
 # Converts YAML frontmatter .md file to pure YAML .yaml file
-# Output: ~/.dh/projects/{project-slug}/plan/P719-integrate-sam-schema.yaml
+# Output: ~/.dh/projects/{project-slug}/plan/Pc7d8e9f0-integrate-sam-schema.yaml
 ```
 
 ---
@@ -543,19 +543,19 @@ The `sam` CLI reads but does not write these legacy formats:
 
 ### Number Collision Warning
 
-When a canonical `P{NNN}-{slug}.yaml` file and a legacy `tasks-{NNN}-{slug}.md` file share the same number (both under `plan_dir()`), the canonical file takes precedence. The `sam` CLI emits a warning to stderr:
+When a canonical `P{id}-{slug}.yaml` file and a legacy `tasks-{NNN}-{slug}.md` file share the same identifier (both under `plan_dir()`), the canonical file takes precedence. The `sam` CLI emits a warning to stderr:
 
 ```text
-WARNING: P698 resolved to 'P698-research-curator-code-analysis.yaml' but a legacy file
-also exists with the same number: tasks-698-gates-subprocess-timeout.md.
-Run 'sam migrate P698' to remove the legacy file.
+WARNING: Pb5c6d7e8 resolved to 'Pb5c6d7e8-research-curator-code-analysis.yaml' but a legacy file
+also exists with the same slug: tasks-698-gates-subprocess-timeout.md.
+Run 'sam migrate Pb5c6d7e8' to remove the legacy file.
 ```
 
-To resolve: migrate or rename the legacy file so numbers are unique.
+To resolve: migrate or rename the legacy file so identifiers are unique.
 
 ### File Path Rejection
 
-Passing a raw file path (e.g., `tasks-698-foo.md`) as an address is rejected with a clear error. Use plan addresses (`P698`, `gates-subprocess-timeout`) instead.
+Passing a raw file path (e.g., `tasks-698-foo.md`) as an address is rejected with a clear error. Use plan addresses (`Pb5c6d7e8`, `gates-subprocess-timeout`) instead.
 
 ### Migration Path
 
@@ -566,7 +566,7 @@ Migrate a legacy plan to the canonical format:
 #    Legacy files are resolved from dh_paths.plan_dir() automatically
 uv run sam migrate tasks-3-my-feature.md
 
-# 2. Rename to P{NNN} convention (dry run first)
+# 2. Rename to P{id} convention (dry run first)
 uv run python scripts/rename_plan_files.py --dry-run
 uv run python scripts/rename_plan_files.py
 
@@ -598,7 +598,7 @@ Disabled hooks take precedence over profile and exit 0 after consuming stdin (Cl
 
 ### Deprecation Timeline
 
-- **2026-Q1**: `tasks-{N}-{slug}` naming deprecated. New plans use `P{NNN}-{slug}.yaml`.
+- **2026-Q1**: `tasks-{N}-{slug}` naming deprecated. New plans use `P{id}-{slug}.yaml`.
 - **2026-Q2**: Legacy markdown bold-field format (`**Status**: ...`) removed from read path after all plans migrated.
 - **Future**: `task_format.py` and `implementation_manager.py` fallback parsers removed once all consumers use `sam` CLI.
 

@@ -83,7 +83,7 @@ If operation is `resolve`:
 
 1. Extract `**Plan**:` field from the matched item. If absent, skip to Step 5.7 (no plan = simple resolve with summary only).
 
-2. Extract the plan address from the plan path (e.g., `plan/P398-backlog-lifecycle-process-gaps.yaml` → `P398`). Call:
+2. Extract the plan address from the plan path (e.g., `plan/Pe9f0a1b2-backlog-lifecycle-process-gaps.yaml` → `Pe9f0a1b2`). Call:
 
    ```text
    mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="{address}")
@@ -115,7 +115,7 @@ If operation is `resolve`:
 
    Parse each `-` line as a separate criterion.
 
-5. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: item title, plan address (e.g., `P{NNN}`), checklist status (100%), and each criterion listed individually as "Criterion N: {text}". Instruct the agent to: read the plan via `sam_plan(action='read')`, search `git log --oneline -20`, check relevant files for each criterion, and return per-criterion PASS/FAIL with file:line evidence. Required return format:
+5. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: item title, plan address (e.g., `P{id}`), checklist status (100%), and each criterion listed individually as "Criterion N: {text}". Instruct the agent to: read the plan via `sam_plan(action='read')`, search `git log --oneline -20`, check relevant files for each criterion, and return per-criterion PASS/FAIL with file:line evidence. Required return format:
 
    ```text
    [PASS] {criterion} — verified at {file}:{line} (or commit {sha})
@@ -186,7 +186,7 @@ If operation is `resolve`:
 
     - `selector`: `"{title}"` or `"#{N}"`
     - `summary`: `"{summary}"`
-    - `plan`: `"{plan_address}"` (if present — e.g., `"P{NNN}"`)
+    - `plan`: `"{plan_address}"` (if present — e.g., `"P{id}"`)
     - `method`: `"{method}"` (if provided)
     - `notes`: `"{notes}"` (if provided)
     - `follow_ups`: `"{follow_ups}"` (if provided)

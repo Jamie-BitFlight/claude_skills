@@ -86,7 +86,7 @@ Skills and agents access plan artifacts via MCP tools — not via `dh_paths` dir
 
 - `plan/feature-context-{slug}.md` - S1 output
 - `plan/architect-{slug}.md` - architecture output
-- `plan/P{NNN}-{slug}.yaml` - task plan
+- `plan/P{id}-{slug}.yaml` - task plan
 - `plan/T0-baseline-{slug}.yaml` - pre-implementation baseline
 - `plan/TN-verification-{slug}.yaml` - post-implementation verification
 - `backlog/*.md` - backlog item cache (synced from GitHub Issues)
@@ -102,7 +102,7 @@ The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related 
 
 Two distinct types of plan data exist:
 
-- **SAM task plan YAML files** (`P{NNN}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.
+- **SAM task plan YAML files** (`P{id}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.
 - **Plan artifact markdown files** (`plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`, etc.) — written to the repo root worktree's `plan/` directory. Not visible from isolated worktrees. Access via `artifact_read(issue_number, artifact_type)` — not filesystem path.
 
 ---

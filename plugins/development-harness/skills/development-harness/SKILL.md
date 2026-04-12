@@ -41,7 +41,7 @@ flowchart TD
 
     Q1 -->|Plan AND execute a backlog item<br>end-to-end through closure| Work["/dh:work-backlog-item {title|#N|--auto}<br>Handles: auto-groom, RT-ICA gate, SAM planning,<br>GitHub sync, close, resolve<br>STOPS if item already has a Plan field"]
 
-    Q1 -->|Plan a feature — produce SAM artifacts<br>without executing| Plan["/dh:add-new-feature {feature description}<br>Phases: discovery → codebase analysis →<br>architecture spec → task decomposition →<br>validation → context manifest<br>Output: feature slug + P{NNN} task plan"]
+    Q1 -->|Plan a feature — produce SAM artifacts<br>without executing| Plan["/dh:add-new-feature {feature description}<br>Phases: discovery → codebase analysis →<br>architecture spec → task decomposition →<br>validation → context manifest<br>Output: feature slug + P{id} task plan"]
 
     Q1 -->|Execute an existing plan —<br>task plan already produced| Execute["/dh:implement-feature {plan path or slug}<br>Loops ready tasks, dispatches agents,<br>calls complete-implementation when all tasks COMPLETE"]
 

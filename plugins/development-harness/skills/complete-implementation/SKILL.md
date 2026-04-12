@@ -247,8 +247,8 @@ The issue-only path does not produce follow-up task files. Skip directly to "Fin
 
 Extract the plan address `P{N}` from the task file path:
 
-- `plan/P003-integrate-sam-schema.yaml` → plan number `003` → address `P003`
-- Strip `plan/P` prefix, take the leading integer NNN, format as `P{NNN}`
+- `plan/Pb3c4d5e6-integrate-sam-schema.yaml` → plan id `b3c4d5e6` → address `Pb3c4d5e6`
+- Strip `plan/P` prefix, take the hex id, format as `P{id}`
 
 Use `P{N}` in all `sam` CLI calls below.
 
@@ -258,7 +258,7 @@ Use `P{N}` in all `sam` CLI calls below.
 
 Before invoking Phase 1, check for a TN verification report produced by `tn-verification-gate` (which reads the T0 baseline written by `t0-baseline-capture`).
 
-Extract `{slug}` from the task file path (`plan/P{NNN}-{slug}.yaml` — strip the `P{NNN}-` prefix and `.yaml` suffix).
+Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the `P{id}-` prefix and `.yaml` suffix).
 
 Read the TN-verification artifact via `artifact_read(issue_number={N}, artifact_type="TN-verification")`. Fallback: if no artifact is registered, read `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"`.
 
@@ -305,7 +305,7 @@ Before proceeding to Artifact Discovery, check for migration signals.
 Check:
 1. Issue title — contains: "migrat", "convert format", "replace .md", "format conversion", "move from", "transition from"
 2. Issue body / description section — same keywords
-3. P{NNN}.yaml tasks — read each task's `acceptance_criteria` field for: "delete", "remove source", "after migration complete", "drop the source"
+3. P{id}.yaml tasks — read each task's `acceptance_criteria` field for: "delete", "remove source", "after migration complete", "drop the source"
 
 Note: `acceptance_criteria` is a dedicated `str` field on the Task model (`sam_schema/core/models.py`) — it can be read directly, not parsed out of a body blob.
 
@@ -381,7 +381,7 @@ If no concerns section exists, proceed to Phase 1.
 
 After the pre-phases complete, set up the SAM-enforced quality gate plan for the 6 phases.
 
-Extract `{slug}` from the task file path (`plan/P{NNN}-{slug}.yaml` — strip the `P{NNN}-` prefix and `.yaml` suffix).
+Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the `P{id}-` prefix and `.yaml` suffix).
 
 ### Step 1: Check for existing QG plan
 
@@ -623,7 +623,7 @@ If `artifact_read` returns an error or the artifact is absent, fall back to the 
 mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{slug}-followup"})
 ```
 
-Where `{slug}` is extracted from the parent task file path (`plan/P{NNN}-{slug}.yaml` — strip `P{NNN}-` prefix and `.yaml` suffix).
+Where `{slug}` is extracted from the parent task file path (`plan/P{id}-{slug}.yaml` — strip `P{id}-` prefix and `.yaml` suffix).
 
 If both `artifact_read` and the SAM search return empty: skip the entire routing section (no follow-ups to route).
 
@@ -634,10 +634,10 @@ If both `artifact_read` and the SAM search return empty: skip the entire routing
 For each follow-up file, derive a search slug from the filename using this algorithm:
 
 ```text
-Input:  plan/P008-data-validation-followup-1.yaml
-Step 1: Strip directory prefix      --> P008-data-validation-followup-1.yaml
-Step 2: Strip .yaml extension       --> P008-data-validation-followup-1
-Step 3: Strip P{NNN}- prefix        --> data-validation-followup-1
+Input:  plan/Pc5d6e7f8-data-validation-followup-1.yaml
+Step 1: Strip directory prefix      --> Pc5d6e7f8-data-validation-followup-1.yaml
+Step 2: Strip .yaml extension       --> Pc5d6e7f8-data-validation-followup-1
+Step 3: Strip P{id}- prefix         --> data-validation-followup-1
 Step 4: Strip -followup-{k} suffix  --> data-validation
 Step 5: Replace hyphens with spaces --> data validation
 Output: "data validation"
@@ -691,7 +691,7 @@ If both strategies return zero results, treat as "no match found" and proceed to
 **Error handling**: If either `mcp__plugin_dh_backlog__backlog_list` call fails, log the error, skip
 that strategy, and continue to the next strategy (or to Step 4 as "no match found" if all
 strategies fail). If the follow-up filename does not match the expected
-`P{NNN}-{slug}-followup-{k}.yaml` pattern, log a warning and use the full filename (without
+`P{id}-{slug}-followup-{k}.yaml` pattern, log a warning and use the full filename (without
 directory prefix and `.yaml` extension) as the derived slug.
 
 ### Step 3: Classify Follow-up Findings
@@ -729,10 +729,10 @@ Based on Step 2 result, for each follow-up file:
 
 **Match found** -- attach follow-up as plan to the existing backlog item:
 
-Extract the plan address from the follow-up file path: `plan/P{NNN}-{slug}-followup-{k}.yaml` → `P{NNN}`.
+Extract the plan address from the follow-up file path: `plan/P{id}-{slug}-followup-{k}.yaml` → `P{id}`.
 
 ```text
-mcp__plugin_dh_backlog__backlog_update(selector="{matched_item_title}", plan="P{NNN}")
+mcp__plugin_dh_backlog__backlog_update(selector="{matched_item_title}", plan="P{id}")
 ```
 
 **No match found** -- create a new backlog item, then attach the follow-up as plan:
@@ -744,7 +744,7 @@ Skill(skill: "dh:create-backlog-item", args: "--auto {derived_title}")
 Then attach the follow-up as the plan (extract plan address first — see above):
 
 ```text
-mcp__plugin_dh_backlog__backlog_update(selector="{derived_title}", plan="P{NNN}")
+mcp__plugin_dh_backlog__backlog_update(selector="{derived_title}", plan="P{id}")
 ```
 
 **Error handling**:
@@ -809,7 +809,7 @@ If no BLOCKED-FOR-PLANNING signal: continue to Condition 1 (ADR-3).
 
 For each follow-up file, evaluate two conditions. BOTH must be true for recursion.
 
-**Condition 1 -- Same session scope (ADR-3)**: The follow-up file's slug matches the parent task file's slug. Extract the slug from each filename: strip the `P{NNN}-` prefix, then strip `-followup-{k}.yaml` for the follow-up or `.yaml` for the parent. Compare the two slugs.
+**Condition 1 -- Same session scope (ADR-3)**: The follow-up file's slug matches the parent task file's slug. Extract the slug from each filename: strip the `P{id}-` prefix, then strip `-followup-{k}.yaml` for the follow-up or `.yaml` for the parent. Compare the two slugs.
 
 **Condition 2 -- High priority (ADR-2)**: Read the follow-up file content and extract the `## Priority` section. Only `High` qualifies for immediate recursion.
 
@@ -848,7 +848,7 @@ After all six phases and follow-up routing complete, apply the `status:verified`
 Derive the search slug from the task file path (same algorithm as Recursive Follow-up Handling):
 
 ```text
-plan/P003-integrate-sam-schema.yaml → slug: integrate-sam-schema
+plan/Pb3c4d5e6-integrate-sam-schema.yaml → slug: integrate-sam-schema
 ```
 
 Search the backlog:
@@ -934,9 +934,9 @@ Store the first result. Check `item.plan` as a boolean only (is it set and non-e
 If item found AND item.plan is set (non-empty):
   Resolve the plan address via SAM — do NOT pass item.plan directly:
     mcp__plugin_dh_sam__sam_list(search="{slug}")
-  Use the plan address P{NNN} from the result.
+  Use the plan address P{id} from the result.
   Clear context and run:
-    /dh:implement-feature P{NNN}
+    /dh:implement-feature P{id}
 
 If item found AND item.plan is NOT set:
   Clear context and run:

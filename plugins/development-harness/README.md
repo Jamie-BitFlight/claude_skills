@@ -50,7 +50,7 @@ All outputs land in `~/.dh/projects/{your-project}/plan/` as named files. The Gi
 Executes a SAM task plan produced by `/dh:add-new-feature`.
 
 ```text
-/dh:implement-feature plan/P001-jwt-authentication.yaml
+/dh:implement-feature plan/Pa1b2c3d4-jwt-authentication.yaml
 ```
 
 What happens:
@@ -66,7 +66,7 @@ What happens:
 Claims and executes a single task from a SAM plan. Used directly when you want to run one task at a time rather than the full loop.
 
 ```text
-/dh:start-task plan/P001-jwt-authentication.yaml T3
+/dh:start-task plan/Pa1b2c3d4-jwt-authentication.yaml T3
 ```
 
 Writes an active-task context file for hook tracking. Records divergence classification (`design-refinement` vs `intent-divergence`) when what gets built differs from what was planned.
@@ -76,7 +76,7 @@ Writes an active-task context file for hook tracking. Records divergence classif
 Runs quality gates after all tasks are complete. Takes either a plan file path or a GitHub issue number.
 
 ```text
-/dh:complete-implementation plan/P001-jwt-authentication.yaml
+/dh:complete-implementation plan/Pa1b2c3d4-jwt-authentication.yaml
 /dh:complete-implementation #42
 ```
 
@@ -259,7 +259,7 @@ flowchart TD
     Human2 --> S3
     ARL1 -->|No| S3[S3 Context Integration<br>context-gathering]
     S3 -->|contextualized plan| S4[S4 Task Decomposition<br>swarm-task-planner]
-    S4 -->|P001-slug.yaml| ARL2{ARL Check<br>High complexity?}
+    S4 -->|Pa1b2c3d4-slug.yaml| ARL2{ARL Check<br>High complexity?}
     ARL2 -->|Yes| Human3([Escalate to human])
     Human3 --> S5
     ARL2 -->|No| S5[S5 Execution<br>parallel task agents]
@@ -347,7 +347,7 @@ All state lives outside the repository at `~/.dh/projects/{project-slug}/`:
 plan/
   feature-context-{slug}.md       Discovery output (S1)
   architect-{slug}.md             Architecture specification (S2)
-  P{NNN}-{slug}.yaml              Task plan (S4)
+  P{id}-{slug}.yaml               Task plan (S4)
   T0-baseline-{slug}.yaml         Pre-implementation baseline
   TN-verification-{slug}.yaml     Post-implementation verification
   QG{NNN}-qg-{slug}.yaml          Quality gate plan
@@ -396,7 +396,7 @@ Claude runs 6 research phases. You're consulted if any required information is g
 **Step 2: Execute the plan**
 
 ```text
-/dh:implement-feature plan/P001-rate-limiting.yaml
+/dh:implement-feature plan/Pa1b2c3d4-rate-limiting.yaml
 ```
 
 Claude queries ready tasks. If tasks T1 (implement middleware) and T2 (write tests) are both ready and independent, it spawns parallel agents. Each agent claims its task, implements it, and the hook marks it complete. T0 captures your test suite state before any code changes. TN verifies all acceptance criteria after implementation.
@@ -404,7 +404,7 @@ Claude queries ready tasks. If tasks T1 (implement middleware) and T2 (write tes
 **Step 3: Run quality gates**
 
 ```text
-/dh:complete-implementation plan/P001-rate-limiting.yaml
+/dh:complete-implementation plan/Pa1b2c3d4-rate-limiting.yaml
 ```
 
 Code review, feature verification, integration check, documentation drift audit, documentation update, context refinement — all run in sequence. The GitHub issue receives `status:verified` when all gates pass.

@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Use when a SAM task plan exists and you need to execute the implementation loop — picks up ready tasks, delegates each to its specified agent, and relies on hooks to update task timestamps and status. Activates when a plan address (P{NNN}) or feature slug is provided after planning is complete. Task plans are managed by the SAM MCP server (sam_plan, sam_task).
+description: Use when a SAM task plan exists and you need to execute the implementation loop — picks up ready tasks, delegates each to its specified agent, and relies on hooks to update task timestamps and status. Activates when a plan address (P{id}) or feature slug is provided after planning is complete. Task plans are managed by the SAM MCP server (sam_plan, sam_task).
 argument-hint: <task-file-path or feature-slug>
 user-invocable: true
 ---

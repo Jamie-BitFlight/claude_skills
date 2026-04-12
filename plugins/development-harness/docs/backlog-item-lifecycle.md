@@ -369,7 +369,7 @@ The following diagram is the authoritative procedure for Phase 4 — Planning (/
 
 ```mermaid
 flowchart TD
-    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect-{slug}.md + feature-context<br>Output: plan/P{NNN}-{slug}.yaml via sam_create<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
+    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect-{slug}.md + feature-context<br>Output: plan/P{id}-{slug}.yaml via sam_create<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
 
     P4_DECOMPOSE --> P4_BOOKEND{"acceptance-criteria-structured<br>non-empty?"}
     P4_BOOKEND -->|"Non-empty — generate bookends"| P4_BOOKEND_GEN["swarm-task-planner generates<br>T0 (baseline) + TN (verification)<br>bookend tasks inside the plan<br>T0: priority 1, deps []<br>TN: deps = all non-bookend task IDs"]
@@ -388,7 +388,7 @@ flowchart TD
 
     P4_CONTEXT["Phase 6: Context Manifest<br>Agent: @dh:dh-context-gathering<br>Writes context manifest INTO the plan<br>via sam_update (not a separate file)<br>Maps each task to files, artifacts,<br>external context it needs"]
 
-    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='plan/P{NNN}-{slug}.yaml')<br>Links plan to backlog item"]
+    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='plan/P{id}-{slug}.yaml')<br>Links plan to backlog item"]
     P4_LINK --> P4_DONE(["add-new-feature complete<br>Report slug + task file path<br>Next: /dh:implement-feature"])
 ```
 
@@ -396,7 +396,7 @@ flowchart TD
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P4_DECOMPOSE | `@dh:swarm-task-planner` | `plan/architect-{slug}.md`, `plan/feature-context-{slug}.md` | `plan/P{NNN}-{slug}.yaml` via `sam_create`, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
+| P4_DECOMPOSE | `@dh:swarm-task-planner` | `plan/architect-{slug}.md`, `plan/feature-context-{slug}.md` | `plan/P{id}-{slug}.yaml` via `sam_create`, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
 | P4_BOOKEND | orchestrator | `acceptance-criteria-structured` field | bookend decision | non-empty → P4_BOOKEND_GEN, empty → P4_NO_BOOKEND |
 | P4_BOOKEND_GEN | `@dh:swarm-task-planner` | structured acceptance criteria | T0 task (priority 1, deps=[]) + TN task (deps=all non-bookend IDs) inside plan | always → P4_REGISTER |
 | P4_NO_BOOKEND | orchestrator | — | no bookend tasks | always → P4_REGISTER |
@@ -412,11 +412,11 @@ flowchart TD
 
 **plan-validator returns READY or BLOCKED** (not PASS/BLOCKED as previously documented). BLOCKED includes specific gaps that must be fixed before retrying.
 
-**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside `P{NNN}-{slug}.yaml` with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
+**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside `P{id}-{slug}.yaml` with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
 
-**context-gathering writes into the plan YAML** via `sam_update`, not to a separate file. The plan file path remains `~/.dh/projects/{project-slug}/plan/P{NNN}-{slug}.yaml`.
+**context-gathering writes into the plan YAML** via `sam_update`, not to a separate file. The plan file path remains `~/.dh/projects/{project-slug}/plan/P{id}-{slug}.yaml`.
 
-**Status advance**: `backlog_update(selector="{title}", plan="plan/P{NNN}-{slug}.yaml")` links the SAM plan file to the GitHub issue. The `status` field transition to `in-progress` happens via `work-backlog-item` Step 7.
+**Status advance**: `backlog_update(selector="{title}", plan="plan/P{id}-{slug}.yaml")` links the SAM plan file to the GitHub issue. The `status` field transition to `in-progress` happens via `work-backlog-item` Step 7.
 
 **Failure paths**:
 
