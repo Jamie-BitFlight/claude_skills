@@ -31,7 +31,6 @@ Read the plan file passed to you (the task file for this feature). Extract:
 
 - `feature` field (the slug — used to construct the output path)
 - `acceptance_criteria_structured` list (or `acceptance-criteria-structured` in YAML)
-- `plan_path` (the path to the plan file itself, for inclusion in output)
 
 ```bash
 # The plan file path is provided in your task delegation prompt.
@@ -70,7 +69,6 @@ Build the T0 baseline YAML string in memory — do not write it to disk. The sch
 ```yaml
 feature: "{slug}"
 captured_at: "2026-03-15T10:00:00Z"
-plan_path: "~/.dh/projects/{project-slug}/plan/tasks-5-{slug}.md"
 criteria_count: 2
 results:
   - criterion-id: AC-1
@@ -97,7 +95,6 @@ results:
 |-------|------|-------------|
 | `feature` | str | The plan's `feature` field (the slug) |
 | `captured_at` | str (ISO 8601 UTC) | Timestamp when T0 agent ran |
-| `plan_path` | str | Relative path to the plan file |
 | `criteria_count` | int | Number of criteria executed |
 | `results` | list | One entry per AcceptanceCriterion |
 | `results[].criterion-id` | str | The `criterion-id` from the plan |

@@ -87,7 +87,6 @@ Assemble the TN verification result as a YAML string in memory (do not write to 
 ```yaml
 feature: "{slug}"
 verified_at: "2026-03-15T14:00:00Z"
-plan_path: "~/.dh/projects/{project-slug}/plan/tasks-5-{slug}.md"
 t0_baseline_source: "artifact:T0-baseline:issue={issue_number}"
 verdict: "PASS"  # or "FAIL"
 criteria_count: 2
@@ -114,7 +113,6 @@ results:
 |-------|------|-------------|
 | `feature` | str | Feature slug |
 | `verified_at` | str (ISO 8601 UTC) | When TN agent ran |
-| `plan_path` | str | State-relative path to the plan file (under `dh_paths.plan_dir()`) |
 | `t0_baseline_source` | str | MCP artifact reference for the T0 baseline — `artifact:T0-baseline:issue={issue_number}` |
 | `verdict` | str | `"PASS"` or `"FAIL"` |
 | `criteria_count` | int | Total criteria evaluated |
