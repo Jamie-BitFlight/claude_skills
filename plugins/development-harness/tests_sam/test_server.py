@@ -540,7 +540,6 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
 
     # Assert
     assert "error" not in result
-    assert "path" in result
     assert result["task_count"] == 1
     assert result["plan_number"] == 1
 
@@ -702,7 +701,7 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     )
     assert "error" not in create_result
     plan_number = create_result["plan_number"]
-    plan_path = create_result["path"]
+    plan_path = p_dir / f"P{plan_number:03d}-append-sec.yaml"
 
     # Act
     update_result = sam_task(
@@ -717,9 +716,7 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     assert update_result.get("updated") is True
 
     # Verify by reading the raw file — the section should be appended to task body
-    from pathlib import Path as _Path
-
-    raw = _Path(plan_path).read_text(encoding="utf-8")
+    raw = plan_path.read_text(encoding="utf-8")
     assert "Divergence Notes" in raw
     assert "No divergence observed." in raw
 

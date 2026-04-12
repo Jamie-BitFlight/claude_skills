@@ -694,5 +694,4 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
     assert "goal" in item
     assert "description" in item
     assert "task_count" in item
-    assert "path" in item
     assert item["task_count"] == 1

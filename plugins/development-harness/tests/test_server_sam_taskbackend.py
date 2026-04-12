@@ -640,7 +640,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
         )
         assert "error" not in result, f"sam_create failed: {result}"
         plan_number = result["plan_number"]
-        plan_path = _Path(result["path"])
+        plan_path = _Path(p_dir) / f"P{plan_number:03d}-roundtrip.yaml"
 
         # Act: update task with a Task model that has non-empty dependencies
         task_data = backend.read_task(f"P{plan_number}", "T01")
