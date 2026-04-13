@@ -285,11 +285,52 @@ cannot locate — the plan-validator reads exclusively from SAM (`sam_plan(actio
 from the filesystem. Disk-only writes cause false BLOCKED results because the validator reads
 stale or absent SAM state instead of the actual plan.
 
-**Creating the plan file**: Generate task definitions as YAML, then call `sam_plan(action='create')`:
+### Plan Creation Path Selection
+
+Before calling `sam_plan`, estimate the total number of tasks the plan will contain (including bookend tasks T0 and TN when generated).
+
+| Estimated task count | `tasks_yaml` payload | Required path |
+|---|---|---|
+| < 16 tasks | < 20 KB | Monolithic `create` — single call |
+| >= 16 tasks OR payload >= 20 KB | any | Incremental append — three-step sequence |
+
+**Self-note**: `swarm-task-planner` itself produces large `tasks_yaml` payloads for complex feature plans. For 16+ task plans, the monolithic `create` call risks a streaming stall mid-emission — the exact failure mode documented in #1770. Use the incremental path for your own output to avoid this.
+
+#### Path A — Monolithic create (< 16 tasks, payload < 20 KB)
 
 ```text
 mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{YAML_CONTENT}"})
 ```
+
+#### Path B — Incremental append (>= 16 tasks OR payload >= 20 KB)
+
+Execute the three-step sequence in order:
+
+**Step 1** — Create a drafting plan with an empty task list:
+
+```text
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{tasks: []}"})
+```
+
+Record the returned plan ID (e.g., `P1770`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return a drafting marker instead of task counts until Step 3. This prevents the dispatch loop from seeing a partial plan.
+
+**Step 2** — Append each task individually (repeat N times, one call per task):
+
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "append_task", "task_yaml": "{SINGLE_TASK_YAML}"})
+```
+
+`SINGLE_TASK_YAML` is the YAML block for one task only. Append tasks in dependency order (T0 first, then implementation tasks, TN last). Do NOT call `append_task` concurrently for the same plan — the backend assumes single-writer access.
+
+**Step 3** — Finalize the plan (clears drafting state, makes the plan visible to the dispatch loop):
+
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "finalize"})
+```
+
+After `finalize` succeeds, the plan transitions from `state="drafting"` to `state="ready"`.
+
+**Creating the plan file**: Generate task definitions as YAML, then call `sam_plan` using the appropriate path above.
 
 After `sam_plan` succeeds, the plan ID returned (e.g., `Pd7e8f9a0`) is the canonical reference for
 all downstream tools. Record it and pass it to the plan-validator and any other consumers.
