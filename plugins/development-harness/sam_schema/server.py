@@ -386,15 +386,16 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
     """Append a single task to an existing plan.
 
-    Parses ``config.task_yaml`` via ruamel round-trip YAML and delegates to
-    ``backend.append_task``.  The server is the YAML-parse boundary; the
-    backend receives a plain dict.
+    Converts ``config.task`` (a validated :class:`TaskDefinition` model) to a
+    snake_case dict via ``model_dump`` and delegates to ``backend.append_task``.
+    Pydantic handles alias normalisation (kebab-case → snake_case) at the MCP
+    boundary; no YAML parsing or re-normalisation is required downstream.
 
     See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
 
     Args:
         plan: Plan address (e.g., ``P1`` or slug).
-        config: AppendTaskConfig carrying the single-task YAML string.
+        config: AppendTaskConfig carrying the validated TaskDefinition.
         plan_dir: Plan directory path passed through to ``_get_backend``.
 
     Returns:
@@ -404,13 +405,7 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
     """
-    import collections.abc  # noqa: PLC0415
-
-    yaml_parser: Any = YAML()
-    parsed: Any = yaml_parser.load(config.task_yaml)
-    if not isinstance(parsed, collections.abc.Mapping):
-        raise TypeError("task_yaml must parse to a YAML mapping with task fields")
-    task_dict: dict[str, Any] = dict(parsed)
+    task_dict: dict[str, Any] = config.task.model_dump(by_alias=False, exclude_none=True)
     backend = _get_backend(plan_dir)
     return backend.append_task(plan, task_dict)
 

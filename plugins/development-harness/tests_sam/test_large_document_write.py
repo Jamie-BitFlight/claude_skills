@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from sam_schema.core.action_models import TaskDefinition
 from sam_schema.core.backends.memory import InMemoryTaskProvider
 from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
@@ -29,8 +30,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_task_yaml(task_id: str, idx: int, deps: list[str] | None = None) -> str:
-    """Produce a single-task YAML string for use with append_task.
+def _make_task_yaml(task_id: str, idx: int, deps: list[str] | None = None) -> TaskDefinition:
+    """Produce a single TaskDefinition for use with append_task.
 
     Args:
         task_id: Identifier for the task (e.g. ``'T01'``).
@@ -38,18 +39,17 @@ def _make_task_yaml(task_id: str, idx: int, deps: list[str] | None = None) -> st
         deps: Optional list of dependency task IDs.
 
     Returns:
-        YAML string for a single task compatible with AppendTaskConfig.task_yaml.
+        TaskDefinition instance compatible with AppendTaskConfig.task.
     """
-    deps_yaml = ", ".join(f'"{d}"' for d in (deps or []))
-    return (
-        f"id: {task_id}\n"
-        f"title: Task {idx:02d} title text\n"
-        "status: not-started\n"
-        "agent: test-agent\n"
-        f"dependencies: [{deps_yaml}]\n"
-        "priority: 2\n"
-        "complexity: low\n"
-        f"description: Description for task {idx:02d}.\n"
+    return TaskDefinition(
+        id=task_id,
+        title=f"Task {idx:02d} title text",
+        status="not-started",
+        agent="test-agent",
+        dependencies=list(deps or []),
+        priority=2,
+        complexity="low",
+        description=f"Description for task {idx:02d}.",
     )
 
 
@@ -207,7 +207,7 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
 
     for i in range(1, n + 1):
         task_id = f"T{i:02d}"
-        append_result = sam_plan(config=AppendTaskConfig(task_yaml=_make_task_yaml(task_id, i)), plan=incr_id)
+        append_result = sam_plan(config=AppendTaskConfig(task=_make_task_yaml(task_id, i)), plan=incr_id)
         assert "error" not in append_result, f"append_task failed at T{i:02d}: {append_result}"
 
     # Act — read both plans
@@ -261,7 +261,7 @@ def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: I
     # Arrange — append remaining 45 tasks
     for i in range(initial + 1, total + 1):
         task_id = f"T{i:02d}"
-        append_result = sam_plan(config=AppendTaskConfig(task_yaml=_make_task_yaml(task_id, i)), plan=plan_id)
+        append_result = sam_plan(config=AppendTaskConfig(task=_make_task_yaml(task_id, i)), plan=plan_id)
         assert "error" not in append_result, f"append_task failed at T{i:02d}: {append_result}"
 
     # Act

@@ -1000,18 +1000,20 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
     set_task_config(TaskConfig(backend=mock_backend))
 
     try:
-        task_yaml = (
-            "id: T1\n"
-            "title: First task\n"
-            "status: not-started\n"
-            "agent: test-agent\n"
-            "dependencies: []\n"
-            "priority: 2\n"
-            "complexity: low\n"
+        from sam_schema.core.action_models import TaskDefinition
+
+        task_def = TaskDefinition(
+            id="T1",
+            title="First task",
+            status="not-started",
+            agent="test-agent",
+            dependencies=[],
+            priority=2,
+            complexity="low",
         )
 
         # Act
-        result = sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan="P1")
+        result = sam_plan(config=AppendTaskConfig(task=task_def), plan="P1")
 
         # Assert — backend.append_task called once
         assert "error" not in result, f"append_task returned error: {result}"
@@ -1046,18 +1048,20 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
         )
         plan_id = create_result["plan_id"]
 
-        task_yaml = (
-            "id: T1\n"
-            "title: First task\n"
-            "status: not-started\n"
-            "agent: test-agent\n"
-            "dependencies: []\n"
-            "priority: 2\n"
-            "complexity: low\n"
+        from sam_schema.core.action_models import TaskDefinition
+
+        task_def = TaskDefinition(
+            id="T1",
+            title="First task",
+            status="not-started",
+            agent="test-agent",
+            dependencies=[],
+            priority=2,
+            complexity="low",
         )
 
         # Act
-        result = sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+        result = sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
 
         # Assert
         assert "error" not in result, f"Expected success but got error: {result}"
@@ -1086,13 +1090,13 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
     set_task_config(TaskConfig(backend=backend))
 
     try:
-        task_yaml = (
-            "id: T1\ntitle: Task\nstatus: not-started\nagent: a\ndependencies: []\npriority: 2\ncomplexity: low\n"
-        )
+        from sam_schema.core.action_models import TaskDefinition
+
+        task_def = TaskDefinition(id="T1", title="Task", agent="a")
 
         # Act / Assert
         with pytest.raises(PlanNotFoundError, match="P99999"):
-            sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan="P99999")
+            sam_plan(config=AppendTaskConfig(task=task_def), plan="P99999")
     finally:
         reset_task_config()
 
@@ -1119,16 +1123,16 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
         create_result = sam_plan(config=CreatePlanConfig(slug="dup-task", goal="Goal", tasks_yaml="tasks: []"))
         plan_id = create_result["plan_id"]
 
-        task_yaml = (
-            "id: T1\ntitle: Task\nstatus: not-started\nagent: a\ndependencies: []\npriority: 2\ncomplexity: low\n"
-        )
+        from sam_schema.core.action_models import TaskDefinition
+
+        task_def = TaskDefinition(id="T1", title="Task", agent="a")
 
         # First append succeeds
-        sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+        sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
 
         # Act / Assert — second append with same ID must raise
         with pytest.raises((TaskValidationError, ValueError)):
-            sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+            sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
     finally:
         reset_task_config()
 

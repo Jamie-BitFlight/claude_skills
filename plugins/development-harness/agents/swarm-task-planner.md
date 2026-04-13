@@ -296,10 +296,10 @@ Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="draftin
 **Step 2** — Append each task individually (repeat N times, one call per task):
 
 ```text
-mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "append_task", "task_yaml": "{task_definition}"})
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "append_task", "task": {task_dict}})
 ```
 
-`task_definition` is the YAML content for one task only — the value passed to `AppendTaskConfig.task_yaml` (the current API field; see backlog item #1775 for the planned typed `TaskDefinition` replacement). Append tasks in dependency order (T0 first, then implementation tasks, TN last). Do NOT call `append_task` concurrently for the same plan — the backend assumes single-writer access.
+`task_dict` is a JSON object matching the `TaskDefinition` model shape. Required fields: `id` (str, e.g. `"T01"`), `title` (str). Optional fields: `status` (default `"not-started"`), `agent` (str), `dependencies` (list of task ID strings), `priority` (int 1–5), `complexity` (`"low"`, `"medium"`, or `"high"`). The MCP schema self-describes all available fields — pass a dict, not a YAML string. Append tasks in dependency order (T0 first, then implementation tasks, TN last). Do NOT call `append_task` concurrently for the same plan — the backend assumes single-writer access.
 
 **Step 3** — Finalize the plan (clears drafting state, makes the plan visible to the dispatch loop):
 

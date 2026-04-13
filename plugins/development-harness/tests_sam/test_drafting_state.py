@@ -71,6 +71,8 @@ if TYPE_CHECKING:
 # Helpers
 # ---------------------------------------------------------------------------
 
+from sam_schema.core.action_models import TaskDefinition
+
 _MINIMAL_TASK_DEF = {
     "id": "T1",
     "title": "First task",
@@ -81,14 +83,8 @@ _MINIMAL_TASK_DEF = {
     "complexity": "low",
 }
 
-_MINIMAL_TASK_YAML = (
-    "id: T1\n"
-    "title: First task\n"
-    "status: not-started\n"
-    "agent: test-agent\n"
-    "dependencies: []\n"
-    "priority: 2\n"
-    "complexity: low\n"
+_MINIMAL_TASK = TaskDefinition(
+    id="T1", title="First task", status="not-started", agent="test-agent", dependencies=[], priority=2, complexity="low"
 )
 
 _EMPTY_TASKS_YAML = "tasks: []"
@@ -159,7 +155,7 @@ def test_ready_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemo
     create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
     plan_id = create_result["plan_id"]
 
-    sam_plan(config=AppendTaskConfig(task_yaml=_MINIMAL_TASK_YAML), plan=plan_id)
+    sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
 
     # Act
     ready = sam_plan(config=ReadyPlanConfig(), plan=plan_id)
@@ -189,7 +185,7 @@ def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backen
     create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
     plan_id = create_result["plan_id"]
 
-    sam_plan(config=AppendTaskConfig(task_yaml=_MINIMAL_TASK_YAML), plan=plan_id)
+    sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
 
     # Act
     read_result = sam_plan(config=ReadPlanConfig(), plan=plan_id)
@@ -224,7 +220,7 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
     # Arrange
     create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
     plan_id = create_result["plan_id"]
-    sam_plan(config=AppendTaskConfig(task_yaml=_MINIMAL_TASK_YAML), plan=plan_id)
+    sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)
 
     # Act
@@ -250,7 +246,7 @@ def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskPr
     # Arrange
     create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
     plan_id = create_result["plan_id"]
-    sam_plan(config=AppendTaskConfig(task_yaml=_MINIMAL_TASK_YAML), plan=plan_id)
+    sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)
 
     # Act
