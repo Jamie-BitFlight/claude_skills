@@ -119,7 +119,14 @@ field contains the full contextualized ARTIFACT:PLAN markdown.
 
 ## Output
 
-Create a SAM task plan via MCP:
+### Choosing a plan-creation path
+
+| Plan size | Preferred path |
+|-----------|----------------|
+| Small (fewer than 16 tasks, `tasks_yaml` under 20 KB) | Monolithic — single `sam_plan create` call |
+| Large (16+ tasks or `tasks_yaml` exceeds 20 KB) | Incremental — `create` → N × `append_task` → `finalize` |
+
+#### Monolithic path (small plans)
 
 ```text
 sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks_yaml": "{YAML task list}", "issue": {issue_number}})
@@ -128,6 +135,37 @@ sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan go
 Passing `issue={issue_number}` auto-registers the task plan as
 `artifact_type="task-plan"` in the artifact system, making it accessible
 to worktree-isolated agents via `sam_task(action='read')`.
+
+#### Incremental path (large plans — preferred when 16+ tasks or >20 KB)
+
+Use three calls to avoid payload limits:
+
+1. Create a drafting plan (empty tasks list enters `state="drafting"`):
+
+   ```text
+   sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks_yaml": "{tasks: []}", "issue": {issue_number}})
+   ```
+
+   The response includes the assigned plan number `P{N}`. While `state="drafting"`,
+   `sam_plan status` and `sam_plan ready` return a drafting marker instead of task
+   counts — the plan is not visible to the dispatch loop.
+
+2. Append each task one at a time (repeat for every task):
+
+   ```text
+   sam_plan(plan="P{N}", config={"action": "append_task", "task_yaml": "{single task YAML}"})
+   ```
+
+3. Finalize — clears `state="drafting"` and makes the plan ready for dispatch:
+
+   ```text
+   sam_plan(plan="P{N}", config={"action": "finalize"})
+   ```
+
+**Single-writer constraint**: `append_task` is NOT safe under concurrent writers. Do not
+call `append_task` for the same plan from multiple agents or sessions simultaneously. For
+the full single-writer contract, see the `CLAUDE.md` gotcha note in
+`plugins/development-harness/CLAUDE.md`.
 
 Each file contains YAML frontmatter followed by CLEAR-ordered sections:
 
