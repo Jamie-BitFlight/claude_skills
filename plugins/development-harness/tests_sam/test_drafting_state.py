@@ -1,58 +1,14 @@
-"""Tests for drafting-state semantics introduced by #1770.
+"""Tests for drafting-state lifecycle introduced by #1770.
 
-DESIGN DECISIONS (binding for the green phase implementer)
-==========================================================
+Covers the create-empty → drafting → append_task → finalize → ready lifecycle:
 
-1. Drafting-state representation
-   --------------------------------
-   CHOICE: ``state: Literal["drafting", "ready"]`` field on the Plan Pydantic model
-   (option b from the backlog item).
+- Test D: ``status`` and ``ready`` return a drafting marker for a mid-append plan.
+- Test E: ``read`` returns the task list plus a drafting marker for a mid-append plan.
+- Test F: after ``finalize``, ``status`` and ``ready`` return normal dispatchable data.
 
-   Rationale: A two-value StrEnum-style field is more explicit than a bare bool
-   and maps cleanly to the existing Plan model pattern (see ``TaskStatus``,
-   ``Complexity`` etc.).  A ``state`` field also allows additional future states
-   without a breaking field rename.
-
-   Consequence: ``Plan.state`` must exist and default to ``"ready"`` so all
-   existing tests continue to pass without change.  Plans created with an empty
-   ``tasks_yaml='{tasks: []}'`` payload receive ``state="drafting"`` from
-   ``create_plan``.  ``append_task`` calls do NOT change ``state`` — it stays
-   ``"drafting"`` until ``finalize`` is called.
-
-2. Finalize mechanism
-   --------------------
-   CHOICE: New ``sam_plan(action='finalize', plan=P)`` routing (option a from
-   the backlog item).
-
-   Rationale: A dedicated action is self-documenting at the MCP call-site,
-   makes the state transition explicit in server logs, and avoids the risk of
-   a raw ``set_fields_json='{"state": "ready"}'`` call accidentally clearing
-   a drafting plan before the review step.
-
-   Consequence: A new ``FinalizePlanConfig`` model with ``action: Literal["finalize"]``
-   must be added to ``action_models.py`` and wired into the ``sam_plan`` match
-   block in ``server.py``.
-
-3. AppendTaskConfig shape
-   -----------------------
-   CHOICE: New ``AppendTaskConfig(action="append_task", plan_id=..., task_yaml=...)``
-   where:
-   - ``action: Literal["append_task"]``
-   - ``task_yaml: str`` — single-task YAML string with the same schema as one
-     element of the ``tasks`` list in ``CreatePlanConfig.tasks_yaml``.
-     Example: ``"id: T3\\ntitle: My task\\nstatus: not-started\\n..."``
-   - The ``plan`` parameter on the MCP tool wrapper carries the plan address
-     (same pattern as ``read``, ``status``, ``ready``).
-
-   ``task_yaml`` mirrors the ``tasks_yaml`` naming convention of ``CreatePlanConfig``
-   (singular form for a single task).
-
-AC coverage
------------
-Test D — ``status`` and ``ready`` return ``drafting`` marker for mid-append plan
-Test E — ``read`` returns task list plus ``drafting`` marker for mid-append plan
-Test F — after ``finalize``, ``status`` and ``ready`` return normal dispatchable data
-Test G — (deferred to agent plan-validator tests; plan-validator is out of scope here)
+For the single-writer concurrency contract and the architectural rationale behind
+the ``state`` field and ``finalize`` action, see
+``plugins/development-harness/docs/adrs/ADR-1770-1-single-writer-task-backend.md``.
 """
 
 from __future__ import annotations

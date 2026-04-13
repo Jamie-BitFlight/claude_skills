@@ -867,7 +867,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
-    AC #2: sam_plan(action='append_task', plan=P, task_yaml=...) must append
+    AC #2: sam_plan(action='append_task', plan=P, task=<TaskDefinition>) must append
     a single task and return a success acknowledgment.
 
     Arrange: create a plan with empty tasks_yaml; inject mock backend.
@@ -942,7 +942,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
     success indicator (e.g. 'appended': True or 'task_id': 'T1').
 
     Arrange: create plan via InMemoryTaskProvider; append one task.
-    Act: call sam_plan(action='append_task', plan=P, task_yaml=...).
+    Act: call sam_plan(action='append_task', plan=P, task=<TaskDefinition>).
     Assert: result contains 'appended': True or 'task_id': 'T1' and no 'error' key.
     """
     from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig

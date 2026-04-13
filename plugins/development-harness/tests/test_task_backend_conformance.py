@@ -564,7 +564,7 @@ class TestTaskBackendConformance:
         plan_id = created["plan_id"]
 
         # Act / Assert — appending a duplicate ID must be rejected
-        with pytest.raises((TaskValidationError, ValueError)):
+        with pytest.raises(TaskValidationError):
             backend.append_task(plan_id, _make_task_def("T01", "Duplicate"))
 
     def test_append_multiple_tasks_preserves_order(self, backend: TaskBackend) -> None:

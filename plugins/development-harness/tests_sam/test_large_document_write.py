@@ -110,7 +110,7 @@ def _extract_task_fields(task: Mapping[str, Any]) -> dict[str, Any]:
 def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskProvider) -> None:
     """Monolithic create with 50 tasks completes and round-trips field content correctly.
 
-    AC #18 Test A: sam_plan(action='create', tasks_yaml=<50 tasks>) must succeed
+    AC #18 Test A: sam_plan(action='create', tasks=<50 TaskDefinition objects>) must succeed
     and all task fields must survive the round-trip through the backend.
 
     Arrange: build a 50-task tasks_yaml string.
