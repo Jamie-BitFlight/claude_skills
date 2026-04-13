@@ -224,6 +224,11 @@ class GitHubTaskProvider:
         """Store the IssueBackend and DocumentBackend dependency instances."""
         self._issue_backend = issue_backend
         self._doc_backend = doc_backend
+        # Per-plan task-ID cache — avoids O(N²) sub-issue fetches during
+        # incremental append_task workflows.  Keyed by plan_id (str).
+        # Populated lazily on first append_task call per plan; invalidated on
+        # finalize_plan to force a fresh read if the plan is re-used.
+        self._task_id_cache: dict[str, set[str]] = {}
 
     def _get_repo(self) -> tuple[Repository, str, str]:
         """Return (repo, owner, repo_name) from the IssueBackend."""
@@ -502,16 +507,22 @@ class GitHubTaskProvider:
         """
         self._fetch_plan_node(plan_id)
 
-        existing_ids: set[str] = set()
-        for n in self._fetch_task_nodes(plan_id):
-            meta_id = _parse_metadata(n["body"]).get("task_id")
-            if meta_id:
-                existing_ids.add(meta_id)
-            else:
-                m = _TASK_TITLE_RE.match(n["title"])
-                if m:
-                    existing_ids.add(m.group("tid"))
-        validate_appended_task(task, existing_ids, plan_id)
+        # Populate cache on first call per plan, then reuse — eliminates O(N²)
+        # GitHub API calls when appending N tasks in sequence.
+        if plan_id not in self._task_id_cache:
+            fetched: set[str] = set()
+            for n in self._fetch_task_nodes(plan_id):
+                meta_id = _parse_metadata(n["body"]).get("task_id")
+                if meta_id:
+                    fetched.add(meta_id)
+                else:
+                    m = _TASK_TITLE_RE.match(n["title"])
+                    if m:
+                        fetched.add(m.group("tid"))
+            self._task_id_cache[plan_id] = fetched
+
+        validate_appended_task(task, self._task_id_cache[plan_id], plan_id)
+        self._task_id_cache[plan_id].add(task.id)
 
         task_body = _render_task_body(task, plan_id)
         status_val = str(task.status)
@@ -541,9 +552,14 @@ class GitHubTaskProvider:
         """
         node = self._fetch_plan_node(plan_id)
         body = node["body"]
+        # No-op guard: already ready — drafting marker absent, nothing to write.
+        if _DRAFTING_MARKER not in body:
+            return {"finalized": True, "state": PlanState.READY}
         new_body = re.sub(r"\n?" + re.escape(_DRAFTING_MARKER), "", body)
         repo, _, _ = self._get_repo()
         self._issue_backend._update_issue_graphql(repo, node["id"], body=new_body)  # type: ignore[arg-type]
+        # Invalidate task-ID cache so subsequent reads pick up the current state.
+        self._task_id_cache.pop(plan_id, None)
         return {"finalized": True, "state": PlanState.READY}
 
     def store_document(

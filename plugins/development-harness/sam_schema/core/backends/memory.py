@@ -528,6 +528,9 @@ class InMemoryTaskProvider:
         """
         if plan_id not in self._plans:
             raise PlanNotFoundError(plan_id)
+        # No-op guard: already ready — skip write, return early.
+        if self._plans[plan_id].get("state") == PlanState.READY:
+            return {"finalized": True, "state": PlanState.READY}
         self._plans[plan_id]["state"] = PlanState.READY
         return {"finalized": True, "state": PlanState.READY}
 

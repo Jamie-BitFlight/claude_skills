@@ -195,6 +195,10 @@ class LocalYamlTaskProvider:
 
             plan_dir = dh_paths.plan_dir()
         self._plan_dir: Path = plan_dir
+        # Per-plan task-ID cache — avoids repeated YAML parse+deserialize when
+        # calling append_task multiple times on the same plan in sequence.
+        # Keyed by plan_id (str); invalidated on finalize_plan.
+        self._task_id_cache: dict[str, set[str]] = {}
 
     def _resolve_path(self, plan_id: str) -> Path:
         """Resolve a plan_id to its filesystem path.
@@ -562,8 +566,12 @@ class LocalYamlTaskProvider:
         result = query.load_plan(path)
         plan = result.plan
 
-        existing_ids = {t.id for t in plan.tasks}
-        validate_appended_task(task, existing_ids, plan_id)
+        # Use cache on subsequent calls; populate from plan on first call.
+        if plan_id not in self._task_id_cache:
+            self._task_id_cache[plan_id] = {t.id for t in plan.tasks}
+
+        validate_appended_task(task, self._task_id_cache[plan_id], plan_id)
+        self._task_id_cache[plan_id].add(task.id)
 
         new_tasks = [*plan.tasks, task]
         updated_plan = plan.model_copy(update={"tasks": new_tasks})
@@ -593,8 +601,14 @@ class LocalYamlTaskProvider:
         result = query.load_plan(path)
         plan = result.plan
 
+        # No-op guard: already ready — skip write, return early.
+        if plan.state == PlanState.READY:
+            return {"finalized": True, "state": PlanState.READY}
+
         updated_plan = plan.model_copy(update={"state": PlanState.READY})
         write_plan(updated_plan, path, force_single=True)
+        # Invalidate task-ID cache so subsequent appends read fresh state.
+        self._task_id_cache.pop(plan_id, None)
 
         return {"finalized": True, "state": PlanState.READY}
 
