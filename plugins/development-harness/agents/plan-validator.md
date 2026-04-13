@@ -71,7 +71,7 @@ Same methodology (goal-backward), different timing, different subject matter.
 
 ## Drafting State Handling
 
-Plans created with `tasks_yaml='{tasks: []}'` enter `state="drafting"`. This is an explicit
+Plans created with `tasks=[]` enter `state="drafting"`. This is an explicit
 intermediate state cleared only by `sam_plan(action='finalize')`. A drafting plan is a valid
 work-in-progress artifact — NOT a malformed or incomplete final plan.
 

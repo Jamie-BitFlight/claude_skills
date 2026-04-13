@@ -266,7 +266,7 @@ def generate_slug(input_text: str) -> str:
 Create the document using the SAM MCP tool:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "Feature context for {feature name}", "tasks_yaml": ""})
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "Feature context for {feature name}", "tasks": []})
 ```
 
 Then append the document content as a markdown section using:

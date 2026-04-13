@@ -286,7 +286,7 @@ def generate_slug(topic: str, mode: str) -> str:
 Create the research document using the SAM MCP tool:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "research-{mode}-{slug}", "goal": "{mode} research for {topic}", "tasks_yaml": ""})
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "research-{mode}-{slug}", "goal": "{mode} research for {topic}", "tasks": []})
 ```
 
 Then append the document content as a markdown section using:

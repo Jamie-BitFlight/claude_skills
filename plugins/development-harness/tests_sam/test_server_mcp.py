@@ -274,34 +274,30 @@ async def test_mcp_sam_create_creates_plan_file(tmp_path: Path) -> None:
     """sam_plan create creates a plan file and returns metadata via MCP protocol.
 
     Tests: sam_plan create MCP protocol happy path.
-    How: Pass valid tasks_yaml string via call_tool with config={"action": "create", ...}.
-    Why: Verifies YAML string argument passes MCP serialization unchanged.
+    How: Pass valid typed task list via call_tool with config={"action": "create", ...}.
+    Why: Verifies typed task list passes MCP serialization unchanged.
     """
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: MCP test task\n"
-        "    status: not-started\n"
-        "    agent: test-agent\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
+    tasks = [
+        {
+            "id": "T01",
+            "title": "MCP test task",
+            "status": "not-started",
+            "agent": "test-agent",
+            "dependencies": [],
+            "priority": 1,
+            "complexity": "low",
+        }
+    ]
 
     # Act
     async with Client(mcp) as client:
         result = await client.call_tool(
             "sam_plan",
             {
-                "config": {
-                    "action": "create",
-                    "slug": "mcp-create",
-                    "goal": "MCP create goal",
-                    "tasks_yaml": tasks_yaml,
-                },
+                "config": {"action": "create", "slug": "mcp-create", "goal": "MCP create goal", "tasks": tasks},
                 "plan_dir": str(p_dir),
             },
         )
@@ -331,22 +327,23 @@ async def test_mcp_sam_claim_returns_claimed_true(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Claim test task\n"
-        "    status: not-started\n"
-        "    agent: test-agent\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
+    tasks = [
+        {
+            "id": "T01",
+            "title": "Claim test task",
+            "status": "not-started",
+            "agent": "test-agent",
+            "dependencies": [],
+            "priority": 1,
+            "complexity": "low",
+        }
+    ]
 
     async with Client(mcp) as client:
         create_result = await client.call_tool(
             "sam_plan",
             {
-                "config": {"action": "create", "slug": "claim-mcp", "goal": "Claim goal", "tasks_yaml": tasks_yaml},
+                "config": {"action": "create", "slug": "claim-mcp", "goal": "Claim goal", "tasks": tasks},
                 "plan_dir": str(p_dir),
             },
         )
@@ -375,22 +372,23 @@ async def test_mcp_sam_claim_double_claim_returns_claimed_false(tmp_path: Path) 
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Double claim task\n"
-        "    status: not-started\n"
-        "    agent: test-agent\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
+    tasks = [
+        {
+            "id": "T01",
+            "title": "Double claim task",
+            "status": "not-started",
+            "agent": "test-agent",
+            "dependencies": [],
+            "priority": 1,
+            "complexity": "low",
+        }
+    ]
 
     async with Client(mcp) as client:
         create_result = await client.call_tool(
             "sam_plan",
             {
-                "config": {"action": "create", "slug": "double-claim-mcp", "goal": "Goal", "tasks_yaml": tasks_yaml},
+                "config": {"action": "create", "slug": "double-claim-mcp", "goal": "Goal", "tasks": tasks},
                 "plan_dir": str(p_dir),
             },
         )
@@ -426,22 +424,23 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    tasks_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Update test\n"
-        "    status: not-started\n"
-        "    agent: test-agent\n"
-        "    dependencies: []\n"
-        "    priority: 1\n"
-        "    complexity: low\n"
-    )
+    tasks = [
+        {
+            "id": "T01",
+            "title": "Update test",
+            "status": "not-started",
+            "agent": "test-agent",
+            "dependencies": [],
+            "priority": 1,
+            "complexity": "low",
+        }
+    ]
 
     async with Client(mcp) as client:
         create_result = await client.call_tool(
             "sam_plan",
             {
-                "config": {"action": "create", "slug": "update-mcp", "goal": "Update goal", "tasks_yaml": tasks_yaml},
+                "config": {"action": "create", "slug": "update-mcp", "goal": "Update goal", "tasks": tasks},
                 "plan_dir": str(p_dir),
             },
         )

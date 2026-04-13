@@ -53,30 +53,29 @@ def _make_task_yaml(task_id: str, idx: int, deps: list[str] | None = None) -> Ta
     )
 
 
-def _make_tasks_yaml(count: int, start: int = 1) -> str:
-    """Build a multi-task tasks_yaml block for CreatePlanConfig.
+def _make_tasks_list(count: int, start: int = 1) -> list[TaskDefinition]:
+    """Build a list of TaskDefinition instances for CreatePlanConfig.
 
     Args:
         count: Number of tasks to generate.
         start: Starting sequential index (default 1).
 
     Returns:
-        YAML string with a top-level ``tasks:`` key containing ``count`` tasks.
+        List of TaskDefinition instances with deterministic content.
     """
-    task_lines = []
-    for i in range(start, start + count):
-        task_id = f"T{i:02d}"
-        task_lines.extend((
-            f"  - id: {task_id}",
-            f"    title: Task {i:02d} title text",
-            "    status: not-started",
-            "    agent: test-agent",
-            "    dependencies: []",
-            "    priority: 2",
-            "    complexity: low",
-            f"    description: Description for task {i:02d}.",
-        ))
-    return "tasks:\n" + "\n".join(task_lines) + "\n"
+    return [
+        TaskDefinition(
+            id=f"T{i:02d}",
+            title=f"Task {i:02d} title text",
+            status="not-started",
+            agent="test-agent",
+            dependencies=[],
+            priority=2,
+            complexity="low",
+            description=f"Description for task {i:02d}.",
+        )
+        for i in range(start, start + count)
+    ]
 
 
 def _extract_task_fields(task: Mapping[str, Any]) -> dict[str, Any]:
@@ -145,10 +144,10 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
 
     # Arrange
     n = 50
-    tasks_yaml = _make_tasks_yaml(n)
+    tasks = _make_tasks_list(n)
 
     # Act
-    result = sam_plan(config=CreatePlanConfig(slug="large-plan", goal="Large plan goal", tasks_yaml=tasks_yaml))
+    result = sam_plan(config=CreatePlanConfig(slug="large-plan", goal="Large plan goal", tasks=tasks))
     assert "error" not in result, f"create failed: {result}"
     plan_id = result["plan_id"]
 
@@ -189,19 +188,13 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
 
     # Arrange — monolithic reference
     mono_result = sam_plan(
-        config=CreatePlanConfig(slug="mono-plan", goal="Monolithic reference", tasks_yaml=_make_tasks_yaml(n))
+        config=CreatePlanConfig(slug="mono-plan", goal="Monolithic reference", tasks=_make_tasks_list(n))
     )
     assert "error" not in mono_result
     mono_id = mono_result["plan_id"]
 
     # Arrange — incremental subject: create empty, then append 50 tasks
-    incr_result = sam_plan(
-        config=CreatePlanConfig(
-            slug="incr-plan",
-            goal="Monolithic reference",  # same goal for comparability
-            tasks_yaml="tasks: []",
-        )
-    )
+    incr_result = sam_plan(config=CreatePlanConfig(slug="incr-plan", goal="Monolithic reference", tasks=[]))
     assert "error" not in incr_result
     incr_id = incr_result["plan_id"]
 
@@ -251,9 +244,7 @@ def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: I
 
     # Arrange — create with first 5 tasks
     create_result = sam_plan(
-        config=CreatePlanConfig(
-            slug="mixed-plan", goal="Mixed create goal", tasks_yaml=_make_tasks_yaml(initial, start=1)
-        )
+        config=CreatePlanConfig(slug="mixed-plan", goal="Mixed create goal", tasks=_make_tasks_list(initial, start=1))
     )
     assert "error" not in create_result
     plan_id = create_result["plan_id"]

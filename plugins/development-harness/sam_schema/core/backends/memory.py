@@ -40,7 +40,7 @@ if TYPE_CHECKING:
         PlanData,
         PlanSummary,
         TaskData,
-        TaskDefinition,
+        TaskDefinitionDict,
     )
 
 __all__ = ["InMemoryTaskProvider"]
@@ -56,8 +56,8 @@ _VALID_STATUSES: frozenset[str] = frozenset({
 })
 
 
-def _task_def_to_task_data(task_def: TaskDefinition) -> TaskData:
-    """Convert a TaskDefinition input TypedDict to a TaskData output TypedDict.
+def _task_def_to_task_data(task_def: TaskDefinitionDict) -> TaskData:
+    """Convert a TaskDefinitionDict input TypedDict to a TaskData output TypedDict.
 
     Applies defaults for all optional fields absent from the input.
 
@@ -197,7 +197,7 @@ class InMemoryTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinition],
+        tasks: list[TaskDefinitionDict],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -481,7 +481,7 @@ class InMemoryTaskProvider:
             new_context = f"{existing}{separator}{heading}\n\n{content}"
         task["context_notes"] = new_context  # type: ignore[typeddict-item]
 
-    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
         """Append a single task definition to an existing plan.
 
         Validates the task definition via the Task Pydantic model, checks for
@@ -519,7 +519,7 @@ class InMemoryTaskProvider:
         if task.id in existing_ids:
             raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
 
-        task_data = _task_def_to_task_data(cast("TaskDefinition", task_def))
+        task_data = _task_def_to_task_data(cast("TaskDefinitionDict", task_def))
         self._plans[plan_id]["tasks"].append(task_data)
 
         return {"appended": True, "task_id": task.id}
@@ -527,7 +527,7 @@ class InMemoryTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Finalize a drafting plan, transitioning its state to 'ready'.
 
-        Clears the drafting marker set during create_plan when tasks_yaml was
+        Clears the drafting marker set during create_plan when the tasks list was
         empty. After finalize, sam_plan status and sam_plan ready return normal
         progress data instead of a drafting marker.
 

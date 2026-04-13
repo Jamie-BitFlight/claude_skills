@@ -25,7 +25,7 @@ from sam_schema.core.task_backend import TaskBackend
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from sam_schema.core.task_backend_types import TaskDefinition
+    from sam_schema.core.task_backend_types import TaskDefinitionDict
 
 
 # ---------------------------------------------------------------------------
@@ -44,13 +44,13 @@ def _make_task_def(
     skills: list[str] | None = None,
     body: str = "",
     description: str = "",
-) -> TaskDefinition:
-    """Construct a minimal TaskDefinition for test data.
+) -> TaskDefinitionDict:
+    """Construct a minimal TaskDefinitionDict for test data.
 
     All parameters have sensible defaults so callers only need to supply
     the fields relevant to the test under execution.
     """
-    td: TaskDefinition = {
+    td: TaskDefinitionDict = {
         "id": task_id,
         "title": title,
         "status": status,
@@ -492,14 +492,14 @@ class TestTaskBackendConformance:
         and make it visible on the subsequent read_plan call.
 
         Arrange: create a plan with zero tasks.
-        Act: call backend.append_task with a TaskDefinition for T01.
+        Act: call backend.append_task with a TaskDefinitionDict for T01.
         Assert: read_plan returns a plan with exactly one task; task fields match.
         """
         # Arrange
         created = backend.create_plan("my-slug", "Do the thing", [])
         plan_id = created["plan_id"]
 
-        task_def: TaskDefinition = _make_task_def("T01", "First appended task")
+        task_def: TaskDefinitionDict = _make_task_def("T01", "First appended task")
 
         # Act
         backend.append_task(plan_id, task_def)

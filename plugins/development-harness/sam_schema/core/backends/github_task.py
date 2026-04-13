@@ -25,7 +25,7 @@ from sam_schema.core.task_backend_types import (
     PlanData,
     PlanSummary,
     TaskData,
-    TaskDefinition,
+    TaskDefinitionDict,
 )
 
 if TYPE_CHECKING:
@@ -82,7 +82,7 @@ def _status_from_labels(labels: list[LabelNode]) -> str:
     return "not-started"
 
 
-def _render_metadata_section(task_def: TaskDefinition, plan_id: str) -> str:
+def _render_metadata_section(task_def: TaskDefinitionDict, plan_id: str) -> str:
     """Render the ``<!-- sam-task-metadata:begin/end -->`` table block."""
     rows: list[tuple[str, str]] = [
         ("task_id", task_def["id"]),
@@ -130,7 +130,7 @@ def _render_plan_body(slug: str, goal: str, context: str | None, ac: str | None)
     return "\n\n".join(parts)
 
 
-def _render_task_body(task_def: TaskDefinition, plan_id: str) -> str:
+def _render_task_body(task_def: TaskDefinitionDict, plan_id: str) -> str:
     """Render the full sub-issue body for a task."""
     parts = [_render_metadata_section(task_def, plan_id)]
     if body := task_def.get("body"):
@@ -275,7 +275,7 @@ class GitHubTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinition],
+        tasks: list[TaskDefinitionDict],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -485,7 +485,7 @@ class GitHubTaskProvider:
             "has_cycles": _has_cycles(tasks),
         }
 
-    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
         """Append a single task to an existing plan as a GitHub sub-issue.
 
         Single-writer contract: callers must serialize writes to the same plan.
@@ -493,7 +493,7 @@ class GitHubTaskProvider:
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).
-            task_def: Task definition dict or TaskDefinition to append.
+            task_def: Task definition dict or TaskDefinitionDict to append.
 
         Returns:
             Dict with ``appended`` (True), ``task_id`` (str), and ``github_issue`` (int).
@@ -526,7 +526,7 @@ class GitHubTaskProvider:
         if task.id in existing_ids:
             raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
 
-        task_def_typed = cast("TaskDefinition", task_def)
+        task_def_typed = cast("TaskDefinitionDict", task_def)
         task_body = _render_task_body(task_def_typed, plan_id)
         status_label = _STATUS_TO_LABEL.get(task_def_typed.get("status", "not-started"), "sam:not-started")
         repo, _, _ = self._get_repo()

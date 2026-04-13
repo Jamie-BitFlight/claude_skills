@@ -38,8 +38,8 @@ mcp__plugin_dh_sam__sam_plan(config={"action":"list"})
     -- List all plans
 mcp__plugin_dh_sam__sam_plan(config={"action":"list","search":"text"})
     -- List plans with case-insensitive substring filter
-mcp__plugin_dh_sam__sam_plan(config={"action":"create","slug":"...","goal":"...","tasks_yaml":"..."})
-    -- Create a new plan from YAML task definitions
+mcp__plugin_dh_sam__sam_plan(config={"action":"create","slug":"...","goal":"...","tasks":[...]})
+    -- Create a new plan from a list of task definition objects
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"read"})
     -- Read plan summary (Plan fields)
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"status"})
@@ -58,14 +58,14 @@ mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"finalize"})
 
 #### Incremental Append Workflow
 
-For large plans (rule of thumb: 16+ tasks or `tasks_yaml` payload exceeding ~20 KB), use the
-three-call incremental workflow instead of a single monolithic `create` call:
+For large plans (rule of thumb: 16+ tasks), use the three-call incremental workflow instead of a
+single monolithic `create` call:
 
 ```text
-1. sam_plan(action='create', tasks_yaml='{tasks: []}')
+1. sam_plan(action='create', tasks=[])
    -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2").
 
-2. sam_plan(plan='P{id}', action='append_task', task_yaml=<single task YAML>) × N
+2. sam_plan(plan='P{id}', action='append_task', task=<single task dict>) × N
    -- Appends one task at a time. Each call validates the task via Task.model_validate().
    -- state remains "drafting" throughout. Callers must serialize writes (single-writer
       assumption — concurrent append_task calls for the same plan are not safe).
@@ -86,8 +86,8 @@ This prevents partial plans from being dispatched before all tasks have been app
 
 | Condition | Recommendation |
 |-----------|---------------|
-| < 16 tasks and `tasks_yaml` < ~20 KB | Monolithic `create` (single call) |
-| 16+ tasks or `tasks_yaml` > ~20 KB | Incremental: `create` → `append_task` × N → `finalize` |
+| < 16 tasks | Monolithic `create` (single call with `tasks=[...]`) |
+| 16+ tasks | Incremental: `create(tasks=[])` → `append_task` × N → `finalize` |
 
 **sam_active_task** — session-scoped active task context:
 

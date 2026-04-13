@@ -10,9 +10,13 @@ Fixture design follows AAA pattern with full type annotations and pytest-mock
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
+
+if TYPE_CHECKING:
+    from sam_schema.core.task_backend_types import TaskDefinitionDict
 
 # ---------------------------------------------------------------------------
 # Path constants
@@ -54,7 +58,7 @@ def make_task_def(
     status: str = "not-started",
     deps: list[str] | None = None,
     agent: str = "test-agent",
-) -> dict[str, object]:
+) -> TaskDefinitionDict:
     """Return a minimal task definition dict suitable for InMemoryTaskProvider.create_plan.
 
     Used by test_consolidated_tools.  Centralised here to eliminate duplication.

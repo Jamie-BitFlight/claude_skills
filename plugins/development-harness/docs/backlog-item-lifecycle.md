@@ -543,7 +543,7 @@ flowchart TD
     P6_CONCERNS_VERIFY --> P6_QG_CREATE
 
     P6_QG_CREATE{"Check for existing QG plan<br>sam_list(search='qg-{slug}')<br>Result?"}
-    P6_QG_CREATE -->|"No existing plan"| P6_QG_BUILD["build_quality_gate_plan(<br>slug, issue, impl_plan_address)<br>from sam_schema.core.quality_gates<br><br>sam_create(slug='qg-{slug}',<br>goal='Quality gate enforcement',<br>tasks_yaml, issue)"]
+    P6_QG_CREATE -->|"No existing plan"| P6_QG_BUILD["build_quality_gate_plan(<br>slug, issue, impl_plan_address)<br>from sam_schema.core.quality_gates<br><br>sam_create(slug='qg-{slug}',<br>goal='Quality gate enforcement',<br>tasks=[...], issue)"]
     P6_QG_CREATE -->|"Existing plan —<br>some tasks remain non-terminal"| P6_QG_RESET["Reset BLOCKED tasks to not-started<br>via sam_state per task<br>Re-enter dispatch loop"]
     P6_QG_CREATE -->|"Existing plan —<br>all tasks terminal"| P6_VERIFY_GATE
 

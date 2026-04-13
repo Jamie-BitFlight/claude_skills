@@ -102,10 +102,10 @@ The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related 
 
 **Gotcha — Large plans must use the incremental append workflow:**
 
-For plans with 16+ tasks or a `tasks_yaml` payload exceeding ~20 KB, use the three-call
-incremental workflow instead of a single monolithic `sam_plan create`:
+For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
+`sam_plan create`:
 
-1. `sam_plan(action='create', tasks_yaml='{tasks: []}')` — creates a drafting plan; returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
+1. `sam_plan(action='create', tasks=[])` — creates a drafting plan; returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
 2. `sam_plan(plan='Pa1b2c3d4', action='append_task', task=<TaskDefinition dict>)` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
 3. `sam_plan(plan='Pa1b2c3d4', action='finalize')` — clears drafting state, plan becomes ready
 

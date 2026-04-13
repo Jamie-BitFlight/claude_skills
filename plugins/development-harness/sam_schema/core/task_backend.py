@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         PlanData,
         PlanSummary,
         TaskData,
-        TaskDefinition,
+        TaskDefinitionDict,
     )
 
 __all__ = ["TaskBackend"]
@@ -57,7 +57,7 @@ class TaskBackend(Protocol):
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinition],
+        tasks: list[TaskDefinitionDict],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -234,7 +234,7 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
         """Append a single task to an existing plan.
 
         **Concurrency — single-writer assumption**: ``TaskBackend.append_task`` is NOT

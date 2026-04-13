@@ -16,14 +16,20 @@ from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
-__all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData", "TaskDefinition"]
+__all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData", "TaskDefinitionDict"]
 
 
-class TaskDefinition(TypedDict):
-    """Input type for creating tasks in a plan.
+class TaskDefinitionDict(TypedDict):
+    """Internal backend-contract type for creating tasks in a plan.
 
     Passed as elements of the ``tasks`` list in
     :meth:`~sam_schema.core.task_backend.TaskBackend.create_plan`.
+
+    This is the *backend-contract* TypedDict used between the query layer and
+    backend implementations.  It is distinct from
+    ``sam_schema.core.action_models.TaskDefinition``, which is the
+    *MCP-boundary* Pydantic model.  The server layer converts the Pydantic model
+    to this dict via ``TaskDefinition.model_dump(by_alias=False, exclude_none=True)``.
 
     Required fields define the minimum viable task; all other fields
     are optional and default to empty/None in the backend implementation.

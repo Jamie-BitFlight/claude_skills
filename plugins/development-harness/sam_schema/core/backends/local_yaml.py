@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         PlanData,
         PlanSummary,
         TaskData,
-        TaskDefinition,
+        TaskDefinitionDict,
     )
 
 __all__ = ["LocalYamlTaskProvider"]
@@ -225,7 +225,7 @@ class LocalYamlTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinition],
+        tasks: list[TaskDefinitionDict],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -543,7 +543,7 @@ class LocalYamlTaskProvider:
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
 
-    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
         """Append a single task to an existing plan.
 
         Resolves the plan path, loads the current plan via ruamel round-trip YAML,
@@ -556,7 +556,7 @@ class LocalYamlTaskProvider:
 
         Args:
             plan_id: Plan identifier.
-            task_def: Single-task definition dict or TaskDefinition TypedDict.
+            task_def: Single-task definition dict or TaskDefinitionDict TypedDict.
 
         Returns:
             ``{"appended": True, "task_id": task.id}``

@@ -71,23 +71,13 @@ if TYPE_CHECKING:
 # Helpers
 # ---------------------------------------------------------------------------
 
-from sam_schema.core.action_models import TaskDefinition
-
-_MINIMAL_TASK_DEF = {
-    "id": "T1",
-    "title": "First task",
-    "status": "not-started",
-    "agent": "test-agent",
-    "dependencies": [],
-    "priority": 2,
-    "complexity": "low",
-}
+from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
 
 _MINIMAL_TASK = TaskDefinition(
     id="T1", title="First task", status="not-started", agent="test-agent", dependencies=[], priority=2, complexity="low"
 )
 
-_EMPTY_TASKS_YAML = "tasks: []"
+_DRAFTING_PLAN_CONFIG = CreatePlanConfig(slug="test-plan", goal="Test goal", tasks=[])
 
 
 # ---------------------------------------------------------------------------
@@ -121,15 +111,15 @@ def test_status_returns_drafting_marker_on_mid_append_plan(memory_backend: InMem
     AC #12: status returns a drafting marker instead of dispatchable task data
     when the plan is in drafting state.
 
-    Arrange: create a plan with empty tasks_yaml so it enters drafting state.
+    Arrange: create a plan with empty tasks list so it enters drafting state.
     Act: call sam_plan(action='status', plan=P).
     Assert: response contains a 'drafting' key that is truthy, or a 'state'
             key with value 'drafting'.
     """
-    from sam_schema.core.action_models import CreatePlanConfig, StatusPlanConfig
+    from sam_schema.core.action_models import StatusPlanConfig
 
     # Arrange — create plan in drafting state
-    result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
+    result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
     plan_id = result["plan_id"]
 
     # Act
@@ -149,10 +139,10 @@ def test_ready_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemo
     Act: call sam_plan(action='ready', plan=P).
     Assert: response contains 'drafting' marker; 'ready_tasks' is absent or empty.
     """
-    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, ReadyPlanConfig
+    from sam_schema.core.action_models import AppendTaskConfig, ReadyPlanConfig
 
     # Arrange
-    create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
+    create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
     plan_id = create_result["plan_id"]
 
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
@@ -179,10 +169,10 @@ def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backen
     Act: call sam_plan(action='read', plan=P).
     Assert: response includes the appended task AND a 'drafting' or 'state' marker.
     """
-    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, ReadPlanConfig
+    from sam_schema.core.action_models import AppendTaskConfig, ReadPlanConfig
 
     # Arrange
-    create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
+    create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
     plan_id = create_result["plan_id"]
 
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
@@ -215,10 +205,10 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
     Act: call sam_plan(action='status', plan=P).
     Assert: response does NOT contain drafting marker; total_tasks == 1.
     """
-    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, FinalizePlanConfig, StatusPlanConfig
+    from sam_schema.core.action_models import AppendTaskConfig, FinalizePlanConfig, StatusPlanConfig
 
     # Arrange
-    create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
+    create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
     plan_id = create_result["plan_id"]
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)
@@ -241,10 +231,10 @@ def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskPr
     Act: call sam_plan(action='ready', plan=P).
     Assert: response does NOT contain drafting marker; ready_tasks contains T1.
     """
-    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, FinalizePlanConfig, ReadyPlanConfig
+    from sam_schema.core.action_models import AppendTaskConfig, FinalizePlanConfig, ReadyPlanConfig
 
     # Arrange
-    create_result = sam_plan(config=CreatePlanConfig(slug="test-plan", goal="Test goal", tasks_yaml=_EMPTY_TASKS_YAML))
+    create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
     plan_id = create_result["plan_id"]
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)

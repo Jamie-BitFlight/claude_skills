@@ -70,18 +70,20 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
    - Use `ARTIFACT:{TYPE}({ID})` tokens in artifact headers; cross-reference predecessor/successor.
    - In claude_skills: Register via MCP — `artifact_register(issue_number, artifact_type, path, agent, content)` for discovery and plan artifacts. For task plans, choose a creation path based on plan size:
 
-     **Monolithic path** (fewer than 16 tasks, `tasks_yaml` under 20 KB):
+     **Monolithic path** (fewer than 16 tasks):
 
      ```text
-     sam_plan(action='create', slug, goal, tasks_yaml=<full YAML>, issue)
+     sam_plan(action='create', slug, goal, tasks=[{task_dict}, ...], issue)
      ```
 
-     **Incremental path** (16+ tasks or `tasks_yaml` exceeds 20 KB — preferred for large plans):
+     `tasks` is a list of task definition objects. Required fields: `id`, `title`. Optional: `status`, `agent`, `dependencies`, `priority`, `complexity`.
+
+     **Incremental path** (16+ tasks — preferred for large plans):
 
      1. Create a drafting plan — passing an empty task list enters `state="drafting"`:
 
         ```text
-        sam_plan(action='create', slug, goal, tasks_yaml='{tasks: []}', issue)
+        sam_plan(action='create', slug, goal, tasks=[], issue)
         ```
 
         While `state="drafting"`, `sam_plan status` and `sam_plan ready` return a drafting
@@ -90,7 +92,7 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
      2. Append tasks one at a time:
 
         ```text
-        sam_plan(plan='P{N}', action='append_task', task_yaml=<single task YAML>)
+        sam_plan(plan='P{N}', action='append_task', task={single_task_dict})
         ```
 
      3. Finalize — clears `state="drafting"` → `state="ready"`:

@@ -65,7 +65,7 @@ skill_activation: /dh:task-decomposition
 purpose: Break the validated plan into executable, independently-delegatable task files with acceptance criteria and dependency ordering.
 inputs: Amended PLAN artifact
 outputs: One TASK file per work unit, with acceptance criteria, agent routing, and dependency graph
-artifact_access: sam_plan(action=create, slug, goal, tasks_yaml, issue=issue_number) / sam_task(plan, task, config={action:read})
+artifact_access: sam_plan(action=create, slug, goal, tasks=[...], issue=issue_number) / sam_task(plan, task, config={action:read})
 ```
 
 #### S5 — `execution`

@@ -27,35 +27,39 @@ if TYPE_CHECKING:
 # Helpers
 # ---------------------------------------------------------------------------
 
-# YAML for sam_plan(action="create") tests — uses "id:" key for InMemoryTaskProvider.
-_TWO_TASK_YAML = (
-    "tasks:\n"
-    "  - id: T01\n"
-    "    title: First task\n"
-    "    status: not-started\n"
-    "    agent: test-agent\n"
-    "    dependencies: []\n"
-    "    priority: 1\n"
-    "    complexity: low\n"
-    "  - id: T02\n"
-    "    title: Second task\n"
-    "    status: not-started\n"
-    "    agent: test-agent\n"
-    "    dependencies: [T01]\n"
-    "    priority: 2\n"
-    "    complexity: medium\n"
-)
+# Task lists for sam_plan(action="create") tests.
+_TWO_TASK_LIST = [
+    {
+        "id": "T01",
+        "title": "First task",
+        "status": "not-started",
+        "agent": "test-agent",
+        "dependencies": [],
+        "priority": 1,
+        "complexity": "low",
+    },
+    {
+        "id": "T02",
+        "title": "Second task",
+        "status": "not-started",
+        "agent": "test-agent",
+        "dependencies": ["T01"],
+        "priority": 2,
+        "complexity": "medium",
+    },
+]
 
-_SINGLE_TASK_YAML = (
-    "tasks:\n"
-    "  - id: T01\n"
-    "    title: Only task\n"
-    "    status: not-started\n"
-    "    agent: test-agent\n"
-    "    dependencies: []\n"
-    "    priority: 1\n"
-    "    complexity: low\n"
-)
+_SINGLE_TASK_LIST = [
+    {
+        "id": "T01",
+        "title": "Only task",
+        "status": "not-started",
+        "agent": "test-agent",
+        "dependencies": [],
+        "priority": 1,
+        "complexity": "low",
+    }
+]
 
 
 from tests_sam.conftest import make_task_def as _task_def
@@ -420,7 +424,7 @@ async def test_sam_plan_create_returns_plan_number_and_task_count(client: Client
     # Act
     result = await client.call_tool(
         "sam_plan",
-        {"config": {"action": "create", "slug": "new-plan", "goal": "Build something", "tasks_yaml": _TWO_TASK_YAML}},
+        {"config": {"action": "create", "slug": "new-plan", "goal": "Build something", "tasks": _TWO_TASK_LIST}},
     )
 
     # Assert
@@ -444,7 +448,7 @@ async def test_sam_plan_create_sets_plan_goal(client: Client) -> None:
                 "action": "create",
                 "slug": "goal-plan",
                 "goal": "Specific goal string",
-                "tasks_yaml": _SINGLE_TASK_YAML,
+                "tasks": _SINGLE_TASK_LIST,
             }
         },
     )
@@ -456,12 +460,12 @@ async def test_sam_plan_create_sets_plan_goal(client: Client) -> None:
     assert read_result.data.get("goal") == "Specific goal string"
 
 
-async def test_sam_plan_create_invalid_yaml_raises_tool_error(client: Client) -> None:
-    """sam_plan action=create raises ToolError when tasks_yaml lacks a 'tasks' key.
+async def test_sam_plan_create_invalid_task_missing_id_raises_tool_error(client: Client) -> None:
+    """sam_plan action=create raises ToolError when a task dict lacks required 'id' field.
 
-    Tests: sam_plan create YAML validation.
-    How: Pass YAML with no 'tasks' top-level key.
-    Why: The server validates the parsed YAML structure before calling the backend.
+    Tests: sam_plan create task validation.
+    How: Pass a task dict missing the required 'id' field.
+    Why: Pydantic validates task fields at the MCP boundary; missing required fields raise ToolError.
     """
     # Act / Assert
     with pytest.raises(ToolError):
@@ -472,7 +476,7 @@ async def test_sam_plan_create_invalid_yaml_raises_tool_error(client: Client) ->
                     "action": "create",
                     "slug": "bad",
                     "goal": "Bad plan",
-                    "tasks_yaml": "not_tasks: true\nother: value",
+                    "tasks": [{"title": "Task without id"}],
                 }
             },
         )

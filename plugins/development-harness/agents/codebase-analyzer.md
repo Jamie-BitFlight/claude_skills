@@ -643,7 +643,7 @@ For each finding, record:
 Create the codebase analysis document using the SAM MCP tool. Use the focus-area name (e.g., `codebase-patterns`, `codebase-architecture`) as the slug:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "codebase-{focus}", "goal": "Codebase {focus} analysis", "tasks_yaml": ""})
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "codebase-{focus}", "goal": "Codebase {focus} analysis", "tasks": []})
 ```
 
 Then append the document content as a markdown section:

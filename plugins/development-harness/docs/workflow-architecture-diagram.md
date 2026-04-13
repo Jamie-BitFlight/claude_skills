@@ -298,15 +298,15 @@ Readiness rule: a task is ready when `status == not-started` AND all dependency 
 
 ## 4a. Incremental Plan Creation Lifecycle
 
-Plans with 16+ tasks or a `tasks_yaml` payload exceeding ~20 KB should use the incremental
-append workflow instead of a single monolithic `create` call. The plan passes through a
-`drafting` intermediate state that prevents partial plans from being dispatched.
+Plans with 16+ tasks should use the incremental append workflow instead of a single monolithic
+`create` call. The plan passes through a `drafting` intermediate state that prevents partial
+plans from being dispatched.
 
 ```mermaid
 flowchart TD
-    Start([Planner needs large plan]) --> Create["sam_plan(action='create',<br>tasks_yaml='{tasks: []}')"]
+    Start([Planner needs large plan]) --> Create["sam_plan(action='create',<br>tasks=[])"]
     Create --> Drafting["Plan state = drafting<br>Plan ID assigned (e.g. Pd9e0f1a2)"]
-    Drafting --> AppendLoop["sam_plan(plan='P{N}',<br>action='append_task',<br>task_yaml=single_task) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
+    Drafting --> AppendLoop["sam_plan(plan='P{N}',<br>action='append_task',<br>task=single_task_dict) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
     AppendLoop --> AppendLoop
     AppendLoop --> Finalize["sam_plan(plan='P{N}', action='finalize')"]
     Finalize --> Ready["Plan state = ready<br>Tasks visible to sam_plan ready/status"]
@@ -319,8 +319,8 @@ flowchart TD
 
 **Key invariants**:
 
-- `state="drafting"` is set by `create` when `tasks_yaml='{tasks: []}'` (empty task list).
-- `state="ready"` is set by `create` when `tasks_yaml` contains at least one task (monolithic path).
+- `state="drafting"` is set by `create` when `tasks=[]` (empty task list).
+- `state="ready"` is set by `create` when `tasks` contains at least one task definition (monolithic path).
 - `append_task` leaves `state` unchanged — it never transitions drafting → ready.
 - `finalize` is the only operation that transitions `drafting` → `ready`.
 - Single-writer assumption: `TaskBackend.append_task` is NOT required to be atomic under
@@ -410,7 +410,7 @@ flowchart TD
     Start(["/complete-implementation<br>invoked"]) --> PrePhase["Pre-phases<br>TN verification, artifact discovery,<br>concern processing"]
     PrePhase --> CheckQG{QG plan<br>exists?}
     CheckQG -->|"No — first run"| GenYAML["build_quality_gate_plan<br>produces 6-task YAML"]
-    GenYAML --> CreatePlan["sam_plan(config={action:create,slug:'qg-{slug}',<br>tasks_yaml:...,issue:N})<br>→ QG{NNN}-qg-{slug}.yaml"]
+    GenYAML --> CreatePlan["sam_plan(config={action:create,slug:'qg-{slug}',<br>tasks:[...],issue:N})<br>→ QG{NNN}-qg-{slug}.yaml"]
     CheckQG -->|"Yes — resume"| ResetBlocked["Reset BLOCKED tasks<br>to NOT_STARTED via sam_task state"]
     CreatePlan --> DispatchLoop
     ResetBlocked --> DispatchLoop

@@ -107,16 +107,17 @@ _PLAN_SUMMARY: dict = {
     "source_path": "/tmp/P001-test.yaml",
 }
 
-_MINIMAL_TASKS_YAML = (
-    "tasks:\n"
-    "  - task: T1\n"
-    "    title: Do something\n"
-    "    status: not-started\n"
-    "    agent: test-agent\n"
-    "    dependencies: []\n"
-    "    priority: 2\n"
-    "    complexity: simple\n"
-)
+_MINIMAL_TASKS_LIST = [
+    {
+        "id": "T1",
+        "title": "Do something",
+        "status": "not-started",
+        "agent": "test-agent",
+        "dependencies": [],
+        "priority": 2,
+        "complexity": "low",
+    }
+]
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ async def test_sam_create_routes_through_backend_create_plan(backend_mock: Magic
     # Act
     await _call(
         "sam_plan",
-        {"config": {"action": "create", "slug": "test-slug", "goal": "test goal", "tasks_yaml": _MINIMAL_TASKS_YAML}},
+        {"config": {"action": "create", "slug": "test-slug", "goal": "test goal", "tasks": _MINIMAL_TASKS_LIST}},
     )
 
     # Assert
@@ -613,7 +614,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from pathlib import Path as _Path
 
     from ruamel.yaml import YAML
-    from sam_schema.core.action_models import CreatePlanConfig
+    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
     from sam_schema.core.models import Task as _Task
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
@@ -622,21 +623,14 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     # Arrange: create plan via LocalYamlTaskProvider so the file is real YAML
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_yaml = (
-        "tasks:\n"
-        "  - task: T01\n"
-        "    title: Task One\n"
-        "    status: not-started\n"
-        "    agent: a\n"
-        "    dependencies: []\n"
-        "    priority: 2\n"
-        "    complexity: low\n"
+    minimal_task = TaskDefinition(
+        id="T01", title="Task One", status="not-started", agent="a", priority=2, complexity="low"
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))
     try:
         result = sam_plan(
-            config=CreatePlanConfig(slug="roundtrip", goal="Goal", tasks_yaml=minimal_yaml), plan_dir=str(p_dir)
+            config=CreatePlanConfig(slug="roundtrip", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
         )
         assert "error" not in result, f"sam_create failed: {result}"
         plan_id = result["plan_id"]

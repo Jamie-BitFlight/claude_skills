@@ -16,7 +16,7 @@
        "action": "create",
        "slug": "quick-{slug}",
        "goal": "{goal from description or acceptance_criteria}",
-       "tasks_yaml": "tasks:\n  - id: T1\n    title: \"{description}\"\n    status: not-started\n    agent: task-worker\n    dependencies: []\n    priority: 1\n    complexity: low\n    accuracy-risk: low\n    skills: []\n    reason: \"Quick fix task\"\n    handoff: \"Done when acceptance criteria met\""
+       "tasks": [{"id": "T1", "title": "{description}", "status": "not-started", "agent": "task-worker", "dependencies": [], "priority": 1, "complexity": "low"}]
      }
    )
    ```

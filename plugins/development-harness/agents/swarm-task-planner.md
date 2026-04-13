@@ -268,27 +268,29 @@ stale or absent SAM state instead of the actual plan.
 
 Before calling `sam_plan`, estimate the total number of tasks the plan will contain (including bookend tasks T0 and TN when generated).
 
-| Estimated task count | `tasks_yaml` payload | Required path |
-|---|---|---|
-| < 16 tasks | < 20 KB | Monolithic `create` — single call |
-| >= 16 tasks OR payload >= 20 KB | any | Incremental append — three-step sequence |
+| Estimated task count | Required path |
+|---|---|
+| < 16 tasks | Monolithic `create` — single call |
+| >= 16 tasks | Incremental append — three-step sequence |
 
-**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends the full `tasks_yaml` payload in a single MCP call; large payloads increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this. See #1770 for the architectural decision record.
+**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends all task objects in a single MCP call; large task lists increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this. See #1770 for the architectural decision record.
 
-#### Path A — Monolithic create (< 16 tasks, payload < 20 KB)
+#### Path A — Monolithic create (< 16 tasks)
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{YAML_CONTENT}"})
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks": [{task_dict}, ...]})
 ```
 
-#### Path B — Incremental append (>= 16 tasks OR payload >= 20 KB)
+`tasks` is a list of task definition objects. Required fields per object: `id` (str, e.g. `"T01"`), `title` (str). Optional fields: `status` (default `"not-started"`), `agent` (str), `dependencies` (list of task ID strings), `priority` (int 1–5), `complexity` (`"low"`, `"medium"`, or `"high"`).
+
+#### Path B — Incremental append (>= 16 tasks)
 
 Execute the three-step sequence in order:
 
 **Step 1** — Create a drafting plan with an empty task list:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{tasks: []}"})
+mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks": []})
 ```
 
 Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return a drafting marker instead of task counts until Step 3. This prevents the dispatch loop from seeing a partial plan.
@@ -299,7 +301,7 @@ Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="draftin
 mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "append_task", "task": {task_dict}})
 ```
 
-`task_dict` is a JSON object matching the `TaskDefinition` model shape. Required fields: `id` (str, e.g. `"T01"`), `title` (str). Optional fields: `status` (default `"not-started"`), `agent` (str), `dependencies` (list of task ID strings), `priority` (int 1–5), `complexity` (`"low"`, `"medium"`, or `"high"`). The MCP schema self-describes all available fields — pass a dict, not a YAML string. Append tasks in dependency order (T0 first, then implementation tasks, TN last). Do NOT call `append_task` concurrently for the same plan — the backend assumes single-writer access.
+`task_dict` is a JSON object matching the `TaskDefinition` model shape. Required fields: `id` (str, e.g. `"T01"`), `title` (str). Optional fields: `status` (default `"not-started"`), `agent` (str), `dependencies` (list of task ID strings), `priority` (int 1–5), `complexity` (`"low"`, `"medium"`, or `"high"`). Append tasks in dependency order (T0 first, then implementation tasks, TN last). Do NOT call `append_task` concurrently for the same plan — the backend assumes single-writer access.
 
 **Step 3** — Finalize the plan (clears drafting state, makes the plan visible to the dispatch loop):
 
@@ -309,7 +311,7 @@ mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "finalize"})
 
 After `finalize` succeeds, the plan transitions from `state="drafting"` to `state="ready"`.
 
-**Creating the plan file**: Generate task definitions as YAML, then call `sam_plan` using the appropriate path above.
+**Creating the plan file**: Build task definitions as typed objects, then call `sam_plan` using the appropriate path above.
 
 After `sam_plan` succeeds, the plan ID returned (e.g., `Pa1b2c3d4`) is the canonical reference for
 all downstream tools. Record it and pass it to the plan-validator and any other consumers.

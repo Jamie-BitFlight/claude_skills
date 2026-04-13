@@ -26,7 +26,6 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from ruamel.yaml import YAML
 
 from sam_schema.core.action_models import (
     ActiveTaskActionConfig,
@@ -49,7 +48,7 @@ from sam_schema.core.task_config import TaskConfig, create_task_backend, get_tas
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
-    from sam_schema.core.task_backend_types import TaskDefinition
+    from sam_schema.core.task_backend_types import TaskDefinitionDict
 
 _log = logging.getLogger(__name__)
 _artifact_registry = _ArtifactRegistry()
@@ -270,7 +269,7 @@ def _sam_plan_read(plan: str, plan_dir: str) -> dict:
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
-    """Create a new plan from YAML task definitions.
+    """Create a new plan from a typed list of task definitions.
 
     Returns:
         Dict with ``plan_id``, ``plan_ref``, and ``task_count`` keys.
@@ -278,11 +277,9 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
         when an issue number is present, or just ``plan_id`` otherwise.
         It is not stored in the Plan model.
     """
-    yaml_parser: Any = YAML()
-    parsed: dict[str, Any] = yaml_parser.load(config.tasks_yaml)
-    if not isinstance(parsed, dict) or "tasks" not in parsed:
-        raise ValueError("tasks_yaml must be a YAML string with a top-level 'tasks' key")
-    task_defs = cast("list[TaskDefinition]", parsed["tasks"])
+    task_defs = cast(
+        "list[TaskDefinitionDict]", [t.model_dump(by_alias=False, exclude_none=True) for t in config.tasks]
+    )
     backend = _get_backend(plan_dir)
     plan_data = backend.create_plan(
         slug=config.slug, goal=config.goal, tasks=task_defs, context=config.context, issue=config.issue
@@ -461,7 +458,7 @@ def sam_plan(
 
     Actions that do not use ``plan``:
 
-    - ``create``: Create a new plan from YAML task definitions.
+    - ``create``: Create a new plan from a typed list of task definitions.
     - ``list``: List all plans with optional search and auto-pagination.
 
     Args:

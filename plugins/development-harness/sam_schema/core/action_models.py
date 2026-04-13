@@ -255,7 +255,12 @@ class ReadPlanConfig(BaseModel):
 
 
 class CreatePlanConfig(BaseModel):
-    """Create a new plan from YAML task definitions."""
+    """Create a new plan from a typed list of task definitions.
+
+    Pass ``tasks=[]`` to create a plan in drafting state for incremental
+    building via ``append_task``.  Pass a non-empty list to create a ready
+    plan in a single call (monolithic path).
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -268,16 +273,16 @@ class CreatePlanConfig(BaseModel):
         ),
     )
     goal: str = Field(..., description="Human-readable goal statement for the plan.")
-    tasks_yaml: str = Field(
-        ...,
+    tasks: list[TaskDefinition] = Field(
+        default_factory=list,
         description=(
-            "YAML string with a top-level 'tasks' key containing a list of task dicts. "
-            "Required task fields per Task model: id (str, e.g. 'T1'), title (str), "
-            "status ('not-started'), agent (str, e.g. 'dh:code-reviewer'), "
-            "dependencies (list of task IDs, e.g. ['T1', 'T2']), "
-            "priority (int 1-5, where 1=highest), "
+            "Ordered list of task definitions. "
+            "Required task fields per Task model: id (str, e.g. 'T1'), title (str). "
+            "Optional fields: status (default 'not-started'), agent (str), "
+            "dependencies (list of task IDs), priority (int 1-5, where 1=highest), "
             "complexity ('low', 'medium', or 'high'). "
-            "All other Task fields are optional."
+            "Pass an empty list to create a plan in drafting state for incremental "
+            "building via append_task + finalize."
         ),
     )
     context: str | None = Field(
@@ -366,8 +371,8 @@ class AppendTaskConfig(BaseModel):
     """Append a single task to an existing plan.
 
     Enables incremental plan building — callers emit one task at a time rather than
-    submitting the full ``tasks_yaml`` payload in a single ``create`` call. Plans
-    created with an empty ``tasks_yaml`` enter a ``drafting`` state; ``append_task``
+    submitting the full ``tasks`` list in a single ``create`` call. Plans
+    created with an empty ``tasks`` list enter a ``drafting`` state; ``append_task``
     keeps them in ``drafting`` until ``finalize`` is invoked.
 
     The ``task`` field accepts a :class:`TaskDefinition` instance. Pydantic validates
@@ -397,7 +402,7 @@ class AppendTaskConfig(BaseModel):
 class FinalizePlanConfig(BaseModel):
     """Transition a plan out of ``drafting`` state into executable state.
 
-    Plans created with an empty ``tasks_yaml`` (the incremental build pattern)
+    Plans created with an empty ``tasks`` list (the incremental build pattern)
     start in ``drafting``. ``sam_plan(action='read')`` returns the tasks and a
     ``drafting`` marker; ``status`` and ``ready`` return a ``drafting`` marker
     instead of dispatchable task data. ``finalize`` clears ``drafting`` after

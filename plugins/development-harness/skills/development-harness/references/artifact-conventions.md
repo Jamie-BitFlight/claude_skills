@@ -61,7 +61,7 @@ Artifact types used in the S1–S7 pipeline:
 
 Task plans and task-level state are managed by the SAM MCP server:
 
-- **Create:** `sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks_yaml": tasks_yaml, "issue": issue_number})` — creates a task plan YAML and auto-registers it as `artifact_type="task-plan"`.
+- **Create:** `sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [task_dict, ...], "issue": issue_number})` — creates a task plan and auto-registers it as `artifact_type="task-plan"`. Pass `tasks=[]` to create a drafting plan for incremental append.
 - **Read:** `sam_task(plan, task, config={"action": "read"})` — returns a `TaskAssignment` dict with plan-level context and task fields.
 - **Update:** `sam_task(plan, task, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
 

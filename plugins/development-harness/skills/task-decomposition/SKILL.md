@@ -123,27 +123,29 @@ field contains the full contextualized ARTIFACT:PLAN markdown.
 
 | Plan size | Preferred path |
 |-----------|----------------|
-| Small (fewer than 16 tasks, `tasks_yaml` under 20 KB) | Monolithic — single `sam_plan create` call |
-| Large (16+ tasks or `tasks_yaml` exceeds 20 KB) | Incremental — `create` → N × `append_task` → `finalize` |
+| Small (fewer than 16 tasks) | Monolithic — single `sam_plan create` call |
+| Large (16+ tasks) | Incremental — `create` → N × `append_task` → `finalize` |
 
 #### Monolithic path (small plans)
 
 ```text
-sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks_yaml": "{YAML task list}", "issue": {issue_number}})
+sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks": [{task_dict}, ...], "issue": {issue_number}})
 ```
+
+`tasks` is a list of task definition objects. Required fields: `id` (str), `title` (str). Optional: `status`, `agent`, `dependencies`, `priority`, `complexity`.
 
 Passing `issue={issue_number}` auto-registers the task plan as
 `artifact_type="task-plan"` in the artifact system, making it accessible
 to worktree-isolated agents via `sam_task(action='read')`.
 
-#### Incremental path (large plans — preferred when 16+ tasks or >20 KB)
+#### Incremental path (large plans — preferred when 16+ tasks)
 
-Use three calls to avoid payload limits:
+Use three calls to avoid large single-call payloads:
 
 1. Create a drafting plan (empty tasks list enters `state="drafting"`):
 
    ```text
-   sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks_yaml": "{tasks: []}", "issue": {issue_number}})
+   sam_plan(config={"action": "create", "slug": "{feature-slug}", "goal": "{plan goal}", "tasks": [], "issue": {issue_number}})
    ```
 
    The response includes the assigned plan number `P{N}`. While `state="drafting"`,
@@ -153,7 +155,7 @@ Use three calls to avoid payload limits:
 2. Append each task one at a time (repeat for every task):
 
    ```text
-   sam_plan(plan="P{N}", config={"action": "append_task", "task_yaml": "{single task YAML}"})
+   sam_plan(plan="P{N}", config={"action": "append_task", "task": {single_task_dict}})
    ```
 
 3. Finalize — clears `state="drafting"` and makes the plan ready for dispatch:
