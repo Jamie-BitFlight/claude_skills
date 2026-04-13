@@ -19,15 +19,15 @@ discriminated union `config` parameter where `action` selects the operation.
 **sam_task** — task-scoped operations (requires `plan` and `task`):
 
 ```text
-mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"read"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"read"})
     -- Read task (returns TaskAssignment with plan context + task fields)
-mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"claim"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"claim"})
     -- Claim task (transition from not-started to in-progress)
-mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"state","status":"complete"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"state","status":"complete"})
     -- Transition task status (complete | blocked | deferred | skipped)
-mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","set_fields_json":"{...}"})
     -- Patch task fields (JSON object {"field": "value", ...})
-mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"update","append_section":"Heading","section_content":"..."})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","append_section":"Heading","section_content":"..."})
     -- Append a markdown section to the task body
 ```
 
@@ -40,19 +40,19 @@ mcp__plugin_dh_sam__sam_plan(config={"action":"list","search":"text"})
     -- List plans with case-insensitive substring filter
 mcp__plugin_dh_sam__sam_plan(config={"action":"create","slug":"...","goal":"...","tasks_yaml":"..."})
     -- Create a new plan from YAML task definitions
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"read"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"read"})
     -- Read plan summary (Plan fields)
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"status"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"status"})
     -- Plan progress summary (task counts, completion %)
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"ready"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"ready"})
     -- List tasks ready for dispatch (not-started, all deps resolved)
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"update","context":"..."})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","context":"..."})
     -- Update plan context field
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":"{...}"})
     -- Patch plan-level fields
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"append_task","task_yaml":"<single-task YAML string>"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"append_task","task_yaml":"<single-task YAML string>"})
     -- Append a single task to a drafting plan (plan must be in state="drafting")
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"finalize"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"finalize"})
     -- Finalize a drafting plan: clear state="drafting" → state="ready", making tasks dispatchable
 ```
 
@@ -65,12 +65,12 @@ three-call incremental workflow instead of a single monolithic `create` call:
 1. sam_plan(action='create', tasks_yaml='{tasks: []}')
    -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2").
 
-2. sam_plan(plan='P{N}', action='append_task', task_yaml=<single task YAML>) × N
+2. sam_plan(plan='P{id}', action='append_task', task_yaml=<single task YAML>) × N
    -- Appends one task at a time. Each call validates the task via Task.model_validate().
    -- state remains "drafting" throughout. Callers must serialize writes (single-writer
       assumption — concurrent append_task calls for the same plan are not safe).
 
-3. sam_plan(plan='P{N}', action='finalize')
+3. sam_plan(plan='P{id}', action='finalize')
    -- Clears state="drafting" → state="ready". Plan is now visible to sam_plan ready/status.
 ```
 
@@ -92,7 +92,7 @@ This prevents partial plans from being dispatched before all tasks have been app
 **sam_active_task** — session-scoped active task context:
 
 ```text
-mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})
+mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{id}","task":"T{M}"})
     -- Register active task for current session (replaces direct active-task-{sid}.json writes)
 mcp__plugin_dh_sam__sam_active_task(config={"action":"get"})
     -- Retrieve active task context for current session
@@ -133,18 +133,18 @@ The following 8 tools are replaced by the 3-tool interface above. They return a
 When MCP is unavailable, use the `uv run sam` CLI:
 
 ```bash
-uv run sam list                                    # List all plans
-uv run sam list --search "my-feature"              # List with search filter
+uv run sam list                                      # List all plans
+uv run sam list --search "my-feature"                # List with search filter
 echo "$YAML" | uv run sam create {slug} --goal "..." --stdin  # Create plan
-uv run sam read P{N} --format json                 # Read plan summary
-uv run sam read P{N}/T{M} --format json            # Read task (TaskAssignment)
-uv run sam update P{N} --context "..."             # Update plan context
-uv run sam state P{N}/T{M} {status}                # Transition task status
-uv run sam claim P{N}/T{M}                         # Claim a task
-uv run sam ready P{N} --format json                # List ready tasks
-uv run sam status P{N}                             # Plan progress summary
-uv run sam validate P{N} --format json             # Validate plan (CLI only)
-uv run sam migrate tasks-{N}-{slug}.md             # Migrate legacy format (CLI only)
+uv run sam read P{id} --format json                  # Read plan summary (e.g. Pc7d8e9f0)
+uv run sam read P{id}/T{M} --format json             # Read task (e.g. Pc7d8e9f0/T04)
+uv run sam update P{id} --context "..."              # Update plan context
+uv run sam state P{id}/T{M} {status}                 # Transition task status
+uv run sam claim P{id}/T{M}                          # Claim a task
+uv run sam ready P{id} --format json                 # List ready tasks
+uv run sam status P{id}                              # Plan progress summary
+uv run sam validate P{id} --format json              # Validate plan (CLI only)
+uv run sam migrate tasks-{N}-{slug}.md               # Migrate legacy format (CLI only)
 ```
 
 ---
@@ -401,13 +401,13 @@ Task metadata fields are owned by specific components. The SAM MCP server and `s
 | Field | Written By | Via |
 |-------|-----------|-----|
 | All task fields at creation | `swarm-task-planner` agent | `sam create {slug} --goal "..." --stdin` |
-| `status: in-progress`, `started` | `start-task` skill | `sam claim P{N}/T{M}` |
-| `status: complete`, `completed` | `task_status_hook.py` SubagentStop handler | `sam state P{N}/T{M} complete` |
-| `status: blocked` | Agent or human operator | `sam state P{N}/T{M} blocked` |
+| `status: in-progress`, `started` | `start-task` skill | `sam claim P{id}/T{M}` (e.g. `Pc7d8e9f0/T04`) |
+| `status: complete`, `completed` | `task_status_hook.py` SubagentStop handler | `sam state P{id}/T{M} complete` |
+| `status: blocked` | Agent or human operator | `sam state P{id}/T{M} blocked` |
 | `last-activity` | `task_status_hook.py` PostToolUse handler | `sam_schema` API — skipped if status is `complete` |
-| `context` | `context-gathering` agent | `sam update P{N} --context "..."` |
-| Plan metadata | orchestrator or `add-new-feature` skill | `sam update P{N} --set field=value` |
-| `divergence-notes`, body sections | executing agent via `start-task` skill | `sam update P{N}/T{M} --append-section "..."` |
+| `context` | `context-gathering` agent | `sam update P{id} --context "..."` |
+| Plan metadata | orchestrator or `add-new-feature` skill | `sam update P{id} --set field=value` |
+| `divergence-notes`, body sections | executing agent via `start-task` skill | `sam update P{id}/T{M} --append-section "..."` |
 
 ### Field Ownership Rules
 
