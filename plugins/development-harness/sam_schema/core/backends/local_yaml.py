@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from sam_schema.core import query
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
+from sam_schema.core.backends._utils import validate_appended_task
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
     PlanExistsError,
@@ -541,13 +542,8 @@ class LocalYamlTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan.
 
-        The task has already been validated at the MCP boundary. This method
-        checks for duplicate IDs, appends the task, and writes back using
-        write_plan with force_single=True.
-
-        **Single-writer assumption (ADR-1770-1)**: This method is NOT safe under
-        concurrent writers. Callers must serialize writes to the same plan. Behavior
-        under concurrent ``append_task`` calls for the same plan is **undefined**.
+        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
+        single-writer contract (callers must serialise writes to the same plan).
 
         Args:
             plan_id: Plan identifier.
@@ -566,9 +562,8 @@ class LocalYamlTaskProvider:
         result = query.load_plan(path)
         plan = result.plan
 
-        existing_ids = [t.id for t in plan.tasks]
-        if task.id in existing_ids:
-            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
+        existing_ids = {t.id for t in plan.tasks}
+        validate_appended_task(task, existing_ids, plan_id)
 
         new_tasks = [*plan.tasks, task]
         updated_plan = plan.model_copy(update={"tasks": new_tasks})
@@ -579,12 +574,9 @@ class LocalYamlTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Finalize a drafting plan by setting its state to ready.
 
-        Resolves the plan path, loads the current plan, sets ``state="ready"``,
-        and writes back using ``write_plan`` with ``force_single=True``.
-
-        **Single-writer assumption (ADR-1770-1)**: This method is NOT safe under
-        concurrent writers. Callers must serialize writes to the same plan. Behavior
-        under concurrent ``finalize_plan`` calls for the same plan is **undefined**.
+        Loads the plan, sets ``state="ready"``, writes back via ``write_plan``.
+        See ADR-1770-1 for the single-writer contract (callers must serialise
+        writes to the same plan).
 
         Args:
             plan_id: Plan identifier.

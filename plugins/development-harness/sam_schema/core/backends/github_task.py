@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from sam_schema.core.backends._utils import _now_iso
+from sam_schema.core.backends._utils import _now_iso, validate_appended_task
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.models import PlanState, Task
@@ -486,13 +486,8 @@ class GitHubTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan as a GitHub sub-issue.
 
-        The task has already been validated at the MCP boundary. This method
-        checks for duplicate IDs and creates the sub-issue on GitHub.
-        Body and label inputs are rendered from ``task.model_dump(mode="python")``
-        so all enum coercions are applied before rendering — no raw dict access.
-
-        Single-writer contract: callers must serialize writes to the same plan.
-        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
+        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
+        single-writer contract (callers must serialise writes to the same plan).
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).
@@ -516,8 +511,7 @@ class GitHubTaskProvider:
                 m = _TASK_TITLE_RE.match(n["title"])
                 if m:
                     existing_ids.add(m.group("tid"))
-        if task.id in existing_ids:
-            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
+        validate_appended_task(task, existing_ids, plan_id)
 
         task_body = _render_task_body(task, plan_id)
         status_val = str(task.status)
@@ -532,11 +526,9 @@ class GitHubTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Transition a plan from drafting state to ready state.
 
-        Clears the ``<!-- sam:state=drafting -->`` marker from the plan issue body
-        and updates the issue via GraphQL. After finalize, the plan is dispatchable.
-
-        Single-writer contract: callers must serialize writes to the same plan.
-        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
+        Clears the ``<!-- sam:state=drafting -->`` marker from the issue body.
+        See ADR-1770-1 for the single-writer contract (callers must serialise
+        writes to the same plan).
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).

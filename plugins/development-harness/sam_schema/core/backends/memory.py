@@ -21,7 +21,7 @@ import copy
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
-from sam_schema.core.backends._utils import _now_iso
+from sam_schema.core.backends._utils import _now_iso, validate_appended_task
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
@@ -486,11 +486,8 @@ class InMemoryTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan.
 
-        The task has already been validated at the MCP boundary (TaskDefinition →
-        Task). This method only checks for duplicate task IDs and persists.
-
-        Single-writer contract: callers must serialize writes to the same plan.
-        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
+        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
+        single-writer contract (callers must serialise writes to the same plan).
 
         Args:
             plan_id: Backend-assigned plan identifier.
@@ -507,8 +504,7 @@ class InMemoryTaskProvider:
             raise PlanNotFoundError(plan_id)
 
         existing_ids = {t["id"] for t in self._plans[plan_id]["tasks"]}
-        if task.id in existing_ids:
-            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
+        validate_appended_task(task, existing_ids, plan_id)
 
         task_data = _task_def_to_task_data(cast("TaskDefinitionDict", task.model_dump(by_alias=False)))
         self._plans[plan_id]["tasks"].append(task_data)
@@ -518,12 +514,8 @@ class InMemoryTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Finalize a drafting plan, transitioning its state to 'ready'.
 
-        Clears the drafting marker set during create_plan when the tasks list was
-        empty. After finalize, sam_plan status and sam_plan ready return normal
-        progress data instead of a drafting marker.
-
-        Single-writer contract: callers must serialize writes to the same plan.
-        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
+        Clears the drafting marker set during create_plan. See ADR-1770-1 for the
+        single-writer contract (callers must serialise writes to the same plan).
 
         Args:
             plan_id: Backend-assigned plan identifier.
