@@ -482,18 +482,47 @@ class InMemoryTaskProvider:
         task["context_notes"] = new_context  # type: ignore[typeddict-item]
 
     def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
-        """Stub — append_task not yet implemented on InMemoryTaskProvider.
+        """Append a single task definition to an existing plan.
 
-        See TaskBackend.append_task for the single-writer contract and #1770 for the ADR.
+        Validates the task definition via the Task Pydantic model, checks for
+        duplicate task IDs, and appends the new task to the plan's task list.
+
+        Single-writer contract: callers must serialize writes to the same plan.
+        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
 
         Args:
-            plan_id: Plan identifier.
-            task_def: Single-task definition dict.
+            plan_id: Backend-assigned plan identifier.
+            task_def: Single-task definition dict. Must contain at minimum ``id``
+                and ``title``. Validated via ``Task.model_validate`` before appending.
+
+        Returns:
+            Dict with ``appended`` (True) and ``task_id`` (the appended task's ID).
 
         Raises:
-            NotImplementedError: Always — see #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id is not known.
+            TaskValidationError: When task_def fails Pydantic validation or contains
+                a task ID already present in the plan.
         """
-        raise NotImplementedError("InMemoryTaskProvider.append_task not yet implemented — see #1770")
+        import pydantic  # noqa: PLC0415
+
+        from sam_schema.core.models import Task  # noqa: PLC0415
+
+        if plan_id not in self._plans:
+            raise PlanNotFoundError(plan_id)
+
+        try:
+            task = Task.model_validate(task_def)
+        except pydantic.ValidationError as exc:
+            raise TaskValidationError(0, str(exc)) from exc
+
+        existing_ids = {t["id"] for t in self._plans[plan_id]["tasks"]}
+        if task.id in existing_ids:
+            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
+
+        task_data = _task_def_to_task_data(cast("TaskDefinition", task_def))
+        self._plans[plan_id]["tasks"].append(task_data)
+
+        return {"appended": True, "task_id": task.id}
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Stub — finalize_plan not yet implemented on InMemoryTaskProvider.
