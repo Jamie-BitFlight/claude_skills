@@ -100,6 +100,26 @@ Full conventions in [./skills/development-harness/references/artifact-convention
 
 The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related MCP tools defaults to `"plan"`. This does NOT mean `{repo_root}/plan/`. The SAM MCP server resolves it through `dh_paths.plan_dir()`, which produces `~/.dh/projects/{project-slug}/plan/`. The repo's `plan/` directory contains only stub placeholders; all real plan YAML files live in the DH state directory outside the repo.
 
+**Gotcha — Large plans must use the incremental append workflow:**
+
+For plans with 16+ tasks or a `tasks_yaml` payload exceeding ~20 KB, use the three-call
+incremental workflow instead of a single monolithic `sam_plan create`:
+
+1. `sam_plan(action='create', tasks_yaml='{tasks: []}')` — creates a drafting plan
+2. `sam_plan(plan='P{N}', action='append_task', task_yaml=<single task>)` × N — appends tasks one at a time
+3. `sam_plan(plan='P{N}', action='finalize')` — clears drafting state, plan becomes ready
+
+While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` return a drafting
+marker instead of task counts — this prevents dispatching a partial plan. Only `finalize` makes
+the plan visible to the dispatch loop.
+
+**Gotcha — `append_task` is single-writer only:**
+
+`TaskBackend.append_task` is NOT safe under concurrent writers. Do NOT call `append_task` for
+the same plan from multiple agents or sessions simultaneously. The single-writer assumption is
+part of the architectural contract: callers must serialize writes, and backends are not required
+to detect or recover from concurrent appends. Behavior under concurrent writes is **undefined**.
+
 Two distinct types of plan data exist:
 
 - **SAM task plan YAML files** (`P{id}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.

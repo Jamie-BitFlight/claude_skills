@@ -167,7 +167,17 @@ All protocol methods are synchronous. The MCP layer wraps calls in `asyncio.to_t
 
 - **Plan lifecycle**: `create_plan`, `read_plan`, `list_plans`, `update_plan_fields`
 - **Task access**: `read_task`, `claim_task`, `update_task_status`, `update_task_fields`, `append_task_section`, `get_ready_tasks`, `get_plan_status`
+- **Incremental append**: `append_task`, `finalize_plan`
 - **Documents**: `store_document`, `read_document`
+
+`append_task` adds a single validated task to a plan that is in `state="drafting"`. The method
+validates the task via `Task.model_validate()` before writing. **Single-writer assumption**:
+`append_task` is NOT required to be atomic under concurrent writers. Callers must serialize
+writes to the same plan. Behavior under concurrent `append_task` calls for the same plan is
+**undefined** — backends are not required to detect, reject, or recover from concurrent appends.
+
+`finalize_plan` transitions a plan from `state="drafting"` to `state="ready"`, making its tasks
+visible to `get_ready_tasks` and `get_plan_status`. Both methods return `dict[str, Any]`.
 
 ### Available Backends
 
@@ -542,6 +552,7 @@ Defined in `sam_schema/core/task_backend.py`. All protocol methods are synchrono
 
 - **Plan lifecycle**: `create_plan`, `read_plan`, `list_plans`, `update_plan_fields`
 - **Task access**: `read_task`, `claim_task`, `update_task_status`, `update_task_fields`, `append_task_section`, `get_ready_tasks`, `get_plan_status`
+- **Incremental append**: `append_task`, `finalize_plan`
 - **Documents**: `store_document`, `read_document`
 
 #### Protocol Interface (13 methods)

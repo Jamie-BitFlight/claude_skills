@@ -13,6 +13,7 @@
 - [2. Data Structure Shapes](#2-data-structure-shapes)
 - [3. Publisher-Consumer Map](#3-publisher-consumer-map)
 - [4. SAM Task State Lifecycle](#4-sam-task-state-lifecycle)
+- [4a. Incremental Plan Creation Lifecycle](#4a-incremental-plan-creation-lifecycle)
 - [5. Cross-System Dependency Chain](#5-cross-system-dependency-chain)
 - [6. Hook Trigger Conditions](#6-hook-trigger-conditions)
 - [7. Quality Gate SAM Dispatch Flow](#7-quality-gate-sam-dispatch-flow)
@@ -263,7 +264,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `~/.dh/projects/{slug}/plan/feature-context-{slug}.md` | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/codebase/{FOCUS}.md` | `codebase-analyzer` | `swarm-task-planner` |
 | `~/.dh/projects/{slug}/plan/architect-{slug}.md` | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
-| `~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml` | `swarm-task-planner` via `sam_plan create` | `/implement-feature`, `sam_plan ready`, `sam_plan status`, all execution agents |
+| `~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml` | `swarm-task-planner` via `sam_plan create` (monolithic) or `sam_plan create` → `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan ready`, `sam_plan status`, all execution agents |
 | `~/.dh/projects/{slug}/plan/T0-baseline-{slug}.yaml` | `t0-baseline-capture` | `tn-verification-gate` |
 | `~/.dh/projects/{slug}/plan/TN-verification-{slug}.yaml` | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |
 | `~/.dh/projects/{slug}/plan/QG{NNN}-qg-{slug}.yaml` | `/complete-implementation` via `build_quality_gate_plan` + `sam_create` | SAM dispatch loop (T1–T6 quality gate tasks) |
@@ -292,6 +293,39 @@ flowchart TD
 ```
 
 Readiness rule: a task is ready when `status == not-started` AND all dependency task IDs have terminal status. Terminal statuses: `complete`, `blocked`, `skipped`. SKIPPED counts as terminal for dependency evaluation — when T5 is skipped, T6 becomes ready.
+
+---
+
+## 4a. Incremental Plan Creation Lifecycle
+
+Plans with 16+ tasks or a `tasks_yaml` payload exceeding ~20 KB should use the incremental
+append workflow instead of a single monolithic `create` call. The plan passes through a
+`drafting` intermediate state that prevents partial plans from being dispatched.
+
+```mermaid
+flowchart TD
+    Start([Planner needs large plan]) --> Create["sam_plan(action='create',<br>tasks_yaml='{tasks: []}')"]
+    Create --> Drafting["Plan state = drafting<br>Plan ID assigned (e.g. Pd9e0f1a2)"]
+    Drafting --> AppendLoop["sam_plan(plan='P{N}',<br>action='append_task',<br>task_yaml=single_task) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
+    AppendLoop --> AppendLoop
+    AppendLoop --> Finalize["sam_plan(plan='P{N}', action='finalize')"]
+    Finalize --> Ready["Plan state = ready<br>Tasks visible to sam_plan ready/status"]
+    Ready --> Dispatch([Dispatch loop begins])
+
+    DraftingGuard["Drafting guard<br>sam_plan read → drafting marker<br>sam_plan status → drafting marker<br>sam_plan ready → drafting marker"]
+    Drafting -.->|"consumer calls status/ready"| DraftingGuard
+    AppendLoop -.->|"consumer calls status/ready"| DraftingGuard
+```
+
+**Key invariants**:
+
+- `state="drafting"` is set by `create` when `tasks_yaml='{tasks: []}'` (empty task list).
+- `state="ready"` is set by `create` when `tasks_yaml` contains at least one task (monolithic path).
+- `append_task` leaves `state` unchanged — it never transitions drafting → ready.
+- `finalize` is the only operation that transitions `drafting` → `ready`.
+- Single-writer assumption: `TaskBackend.append_task` is NOT required to be atomic under
+  concurrent writers. Callers must serialize writes to the same plan. Behavior under
+  concurrent `append_task` calls for the same plan is **undefined**.
 
 ---
 

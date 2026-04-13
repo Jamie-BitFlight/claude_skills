@@ -50,7 +50,44 @@ mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"update","context":".
     -- Update plan context field
 mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"update","set_fields_json":"{...}"})
     -- Patch plan-level fields
+mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"append_task","task_yaml":"<single-task YAML string>"})
+    -- Append a single task to a drafting plan (plan must be in state="drafting")
+mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"finalize"})
+    -- Finalize a drafting plan: clear state="drafting" → state="ready", making tasks dispatchable
 ```
+
+#### Incremental Append Workflow
+
+For large plans (rule of thumb: 16+ tasks or `tasks_yaml` payload exceeding ~20 KB), use the
+three-call incremental workflow instead of a single monolithic `create` call:
+
+```text
+1. sam_plan(action='create', tasks_yaml='{tasks: []}')
+   -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2").
+
+2. sam_plan(plan='P{N}', action='append_task', task_yaml=<single task YAML>) × N
+   -- Appends one task at a time. Each call validates the task via Task.model_validate().
+   -- state remains "drafting" throughout. Callers must serialize writes (single-writer
+      assumption — concurrent append_task calls for the same plan are not safe).
+
+3. sam_plan(plan='P{N}', action='finalize')
+   -- Clears state="drafting" → state="ready". Plan is now visible to sam_plan ready/status.
+```
+
+**Drafting state semantics**: While a plan is in `state="drafting"`:
+
+- `sam_plan(action='read')` returns the plan with the drafting marker (`{state: "drafting"}` or `{drafting: True}`)
+- `sam_plan(action='status')` returns the drafting marker instead of task counts
+- `sam_plan(action='ready')` returns the drafting marker instead of a ready-tasks list
+
+This prevents partial plans from being dispatched before all tasks have been appended.
+
+**When to choose incremental vs monolithic**:
+
+| Condition | Recommendation |
+|-----------|---------------|
+| < 16 tasks and `tasks_yaml` < ~20 KB | Monolithic `create` (single call) |
+| 16+ tasks or `tasks_yaml` > ~20 KB | Incremental: `create` → `append_task` × N → `finalize` |
 
 **sam_active_task** — session-scoped active task context:
 
