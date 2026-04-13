@@ -69,6 +69,7 @@ _METADATA_END = "<!-- sam-task-metadata:end -->"
 _META_ROW_RE = re.compile(r"^\|\s*(?P<key>[^|]+?)\s*\|\s*(?P<value>[^|]*?)\s*\|$")
 _TASK_TITLE_RE = re.compile(r"^\[(?P<tid>T\d+)\] (?P<title>.+)$")
 _PLAN_SLUG_RE = re.compile(r"<!-- sam-plan-slug: (?P<slug>[^>]+?) -->")
+_DRAFTING_MARKER = "<!-- sam:state=drafting -->"
 _GOAL_RE = re.compile(r"## Goal\n\n(?P<goal>.+?)(?=\n\n##|\Z)", re.DOTALL)
 
 
@@ -534,13 +535,27 @@ class GitHubTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Transition a plan from drafting state to ready state.
 
+        Clears the ``<!-- sam:state=drafting -->`` marker from the plan issue body
+        and updates the issue via GraphQL. After finalize, the plan is dispatchable.
+
+        Single-writer contract: callers must serialize writes to the same plan.
+        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
+
         Args:
             plan_id: Plan identifier (GitHub issue number string).
 
+        Returns:
+            Dict with ``finalized`` (True) and ``state`` ("ready").
+
         Raises:
-            NotImplementedError: See #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id does not correspond to a SAM plan issue.
         """
-        raise NotImplementedError  # see #1770
+        node = self._fetch_plan_node(plan_id)
+        body = node["body"]
+        new_body = re.sub(r"\n?" + re.escape(_DRAFTING_MARKER), "", body)
+        repo, _, _ = self._get_repo()
+        self._issue_backend._update_issue_graphql(repo, node["id"], body=new_body)  # type: ignore[arg-type]
+        return {"finalized": True, "state": "ready"}
 
     def store_document(
         self, plan_id: str, task_id: str | None, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"
