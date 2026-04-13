@@ -86,6 +86,7 @@ from typing import Any, NoReturn
 _DEFAULT_MODEL = "sonnet"
 _NAME_MAX_CHARS = 30
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+EFFORT_LEVELS: tuple[str, ...] = ("low", "medium", "high", "max")
 # Timeout waiting for the claude tmux session to appear after spawn.
 _SPAWN_WAIT_SECONDS = 30
 # Timeout waiting for a session to exit gracefully after Ctrl-C.
@@ -544,7 +545,7 @@ def check_session_limit(session_id: str, state_dir: Path) -> tuple[bool, str]:
 
 
 def _build_spawn_shell_cmd(
-    name: str, model: str, max_budget: float | None, session_id: str, tmux_session_name: str
+    name: str, model: str, max_budget: float | None, session_id: str, tmux_session_name: str, effort: str | None = None
 ) -> list[str]:
     """Build the command argv list for launching claude in interactive tmux mode.
 
@@ -560,6 +561,10 @@ def _build_spawn_shell_cmd(
             so child hooks can write to the correct notifications file.
         tmux_session_name: The tmux session name being created — injected as
             KAGE_BUNSHIN_TMUX_SESSION so child hooks can identify themselves.
+        effort: Optional effort level (low, medium, high, max) injected as
+            CLAUDE_CODE_EFFORT_LEVEL env var so the child session uses the
+            correct compute budget. When None, no env var is injected and
+            claude uses its default effort for the selected model.
 
     Returns:
         Argv list suitable for passing directly to subprocess or tmux new-session.
@@ -573,14 +578,10 @@ def _build_spawn_shell_cmd(
         "KAGE_BUNSHIN_CHILD=1",
         f"KAGE_BUNSHIN_PARENT_SESSION_ID={session_id}",
         f"KAGE_BUNSHIN_TMUX_SESSION={tmux_session_name}",
-        "claude",
-        "--dangerously-skip-permissions",
-        "--worktree",
-        name,
-        "--tmux",
-        "--model",
-        model,
     ]
+    if effort is not None:
+        parts.append(f"CLAUDE_CODE_EFFORT_LEVEL={effort}")
+    parts += ["claude", "--dangerously-skip-permissions", "--worktree", name, "--tmux", "--model", model]
     if max_budget is not None:
         parts += ["--max-budget-usd", str(max_budget)]
     return parts
@@ -637,7 +638,12 @@ def cmd_spawn(args: argparse.Namespace) -> None:
     # --worktree creates an isolated git worktree for the session.
     # --tmux keeps claude alive in its own named tmux session.
     claude_argv = _build_spawn_shell_cmd(
-        name, args.model, args.max_budget, session_id=args.session_id, tmux_session_name=claude_tmux_session
+        name,
+        args.model,
+        args.max_budget,
+        session_id=args.session_id,
+        tmux_session_name=claude_tmux_session,
+        effort=args.effort,
     )
 
     # tmux new-session -d provides the TTY that --tmux requires.
@@ -1080,6 +1086,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_spawn.add_argument("--name", default=None, help="Session name (auto-derived from prompt if omitted).")
     p_spawn.add_argument("--model", default=_DEFAULT_MODEL, help=f"Model to use (default: {_DEFAULT_MODEL}).")
     p_spawn.add_argument("--max-budget", type=float, default=None, metavar="USD", help="Maximum USD spend.")
+    p_spawn.add_argument(
+        "--effort",
+        default=None,
+        choices=list(EFFORT_LEVELS),
+        metavar="LEVEL",
+        help="Effort level for the spawned session: low, medium, high, or max (default: inherit from model).",
+    )
     p_spawn.set_defaults(func=cmd_spawn)
 
     # send

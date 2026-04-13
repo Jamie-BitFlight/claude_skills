@@ -45,7 +45,7 @@ flowchart TD
 
     CreateWorktrees --> WriteLocks["Step 5b: Write Lock Files<br>For each worktree:<br>Write .claude/kage-bunshin.lock<br>(prevents recursive spawning)"]
 
-    WriteLocks --> SpawnSessions["Step 5c: Spawn Kage-Bunshin Sessions<br>For each worktree: cd into it, then:<br>claude -p --model sonnet<br>--permission-mode auto --output-format json<br>'Load /dh:work-backlog-item #{issue}'<br>Each session is a FULL orchestrator —<br>has Agent tool, TeamCreate, all MCP.<br>All sessions launch as background processes."]
+    WriteLocks --> SpawnSessions["Step 5c: Spawn Kage-Bunshin Sessions<br>For each worktree: cd into it, then:<br>claude -p --model {model} [--effort {level}]<br>--permission-mode auto --output-format json<br>'Load /dh:work-backlog-item #{issue}'<br>Each session is a FULL orchestrator —<br>has Agent tool, TeamCreate, all MCP.<br>All sessions launch as background processes."]
 
     SpawnSessions --> WaitReturn["Step 6: Wait for All Sessions<br>Poll PIDs for exit.<br>Read result JSON from each<br>/tmp/kb-work-{issue}.json"]
 
@@ -119,6 +119,7 @@ Use the kage-bunshin spawn script — it handles worktree creation, `.venv`/`nod
 
 ```bash
 SPAWN="plugins/development-harness/skills/kage-bunshin/scripts/spawn.py"
+MODEL="${MODEL:-sonnet}"
 PIDS=()
 SPAWN_INFO=()
 
@@ -126,7 +127,7 @@ for ISSUE in "${WAVE_ISSUES[@]}"; do
   OUTPUT=$($SPAWN --worktree \
     --branch "${INTEGRATION_BRANCH}" \
     --name "work-item-${ISSUE}" \
-    --model sonnet \
+    --model "${MODEL}" \
     "Load /dh:work-backlog-item #${ISSUE}. Execute the full work flow. \
      You are in a worktree on integration branch ${INTEGRATION_BRANCH}. \
      Use MCP tools for plan artifact discovery — plan/ files are in the root worktree. \
@@ -182,7 +183,7 @@ done
 
 The `--model` flag on the kage-bunshin controls the spawned session's orchestrator model only. Sub-agents spawned inside that session use their own model per their agent frontmatter definition.
 
-Recommended: `--model sonnet` for spawned sessions. Haiku viability as orchestrator is an open experiment.
+Recommended: `--model sonnet` for spawned sessions (configurable via `dispatch_spawn` `model` parameter). Haiku viability as orchestrator is an open experiment. Use `--effort` to tune reasoning depth independently of model selection.
 
 ## Agent Result Handling
 

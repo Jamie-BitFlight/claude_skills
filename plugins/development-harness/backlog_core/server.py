@@ -15,7 +15,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -53,6 +53,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
+
+EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
@@ -4160,7 +4162,13 @@ class _WaveCounters:
 
 
 def _build_spawn_cmd(
-    milestone: int, issue_num: int, item_title: str, model: str, phase: str, integration_branch: str
+    milestone: int,
+    issue_num: int,
+    item_title: str,
+    model: str,
+    phase: str,
+    integration_branch: str,
+    effort: EffortLevel | None = None,
 ) -> list[str]:
     """Construct the spawn.py subprocess command for one dispatch item.
 
@@ -4171,11 +4179,15 @@ def _build_spawn_cmd(
         model: Model identifier string passed to spawn.py.
         phase: ``'work'`` adds ``--worktree``; any other value omits it.
         integration_branch: If non-empty, appended as ``--branch <value>``.
+        effort: Effort level passed to spawn.py as ``--effort``; ``None``
+            omits the flag and lets the model default apply.
 
     Returns:
         List of strings suitable for ``asyncio.create_subprocess_exec``.
     """
     cmd: list[str] = ["uv", "run", str(_SPAWN_SCRIPT), "--model", model, "--name", f"dispatch-{milestone}-{issue_num}"]
+    if effort is not None:
+        cmd += ["--effort", effort]
     if phase == "work":
         cmd.append("--worktree")
     if integration_branch:
@@ -4254,6 +4266,7 @@ async def _run_spawn_item(
     model: str,
     phase: str,
     integration_branch: str,
+    effort: EffortLevel | None = None,
 ) -> None:
     """Spawn one dispatch item, monitor it, and update shared counters.
 
@@ -4271,9 +4284,11 @@ async def _run_spawn_item(
         model: Model identifier string.
         phase: ``'work'`` or ``'groom'``.
         integration_branch: Branch name for ``--branch`` flag; empty to omit.
+        effort: Effort level forwarded to spawn.py as ``--effort``; ``None``
+            uses the model default.
     """
     async with semaphore:
-        cmd = _build_spawn_cmd(milestone, issue_num, item_title, model, phase, integration_branch)
+        cmd = _build_spawn_cmd(milestone, issue_num, item_title, model, phase, integration_branch, effort=effort)
         pid = -1
         result_file = ""
         try:
@@ -4341,6 +4356,15 @@ async def dispatch_spawn(
     phase: Annotated[
         str, Field(description="Dispatch phase: 'groom' (no worktree) or 'work' (with worktree)")
     ] = "work",
+    effort: Annotated[
+        EffortLevel | None,
+        Field(
+            description=(
+                "Effort level for spawned sessions (sets CLAUDE_CODE_EFFORT_LEVEL). "
+                "Choices: low, medium, high, max. None (default) uses model default."
+            )
+        ),
+    ] = None,
 ) -> dict:
     """Spawn and monitor kage-bunshin sessions for a dispatch wave.
 
@@ -4356,6 +4380,17 @@ async def dispatch_spawn(
     5. On item failure: marks failed, continues with remaining items.
     6. Returns a :class:`~backlog_core.models.DispatchSpawnSummary` when all
        waves complete.
+
+    Args:
+        milestone: GitHub milestone number.
+        wave_num: Starting wave number (1-based); all subsequent waves run too.
+        ctx: FastMCP context (injected automatically).
+        max_concurrent: Maximum number of sessions running in parallel.
+        model: Model identifier forwarded to each spawned session.
+        phase: ``'work'`` adds ``--worktree``; ``'groom'`` omits it.
+        effort: Effort level forwarded to spawn.py as ``--effort``. Accepts
+            ``low``, ``medium``, ``high``, or ``max``. ``None`` (default)
+            omits the flag and lets the model default apply.
 
     Returns:
         Dict with :class:`~backlog_core.models.DispatchSpawnSummary` fields
@@ -4408,6 +4443,7 @@ async def dispatch_spawn(
                 model=model,
                 phase=phase,
                 integration_branch=integration_branch,
+                effort=effort,
             )
             for item in wave.items
         ])

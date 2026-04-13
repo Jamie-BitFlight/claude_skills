@@ -370,6 +370,29 @@ def test_build_spawn_shell_cmd_omits_max_budget_when_none():
     assert "--max-budget-usd" not in argv
 
 
+def test_build_parser_spawn_effort_flag_listed_in_help(capsys: pytest.CaptureFixture[str]) -> None:
+    parser = _spawn._build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["spawn", "--help"])
+    help_text = capsys.readouterr().out
+    assert "--effort" in help_text
+    for level in _spawn.EFFORT_LEVELS:
+        assert level in help_text
+
+
+@pytest.mark.parametrize("level", _spawn.EFFORT_LEVELS)
+def test_build_spawn_shell_cmd_injects_effort_level_when_set(level: str):
+    argv = _spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=level)
+    effort_arg = f"CLAUDE_CODE_EFFORT_LEVEL={level}"
+    assert effort_arg in argv
+    assert argv.index(effort_arg) < argv.index("claude")
+
+
+def test_build_spawn_shell_cmd_omits_effort_level_when_none():
+    argv = _spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=None)
+    assert not any("CLAUDE_CODE_EFFORT_LEVEL" in arg for arg in argv)
+
+
 # ---------------------------------------------------------------------------
 # cmd_spawn — integration with subprocess mocked
 # ---------------------------------------------------------------------------
@@ -389,6 +412,7 @@ def _make_spawn_args(
     ns.model = model
     ns.max_budget = max_budget
     ns.session_id = session_id
+    ns.effort = None
     return ns
 
 
