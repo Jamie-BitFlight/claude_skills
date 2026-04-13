@@ -525,17 +525,28 @@ class InMemoryTaskProvider:
         return {"appended": True, "task_id": task.id}
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
-        """Stub — finalize_plan not yet implemented on InMemoryTaskProvider.
+        """Finalize a drafting plan, transitioning its state to 'ready'.
 
-        See TaskBackend.finalize_plan and #1770 for the ADR.
+        Clears the drafting marker set during create_plan when tasks_yaml was
+        empty. After finalize, sam_plan status and sam_plan ready return normal
+        progress data instead of a drafting marker.
+
+        Single-writer contract: callers must serialize writes to the same plan.
+        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
 
         Args:
-            plan_id: Plan identifier.
+            plan_id: Backend-assigned plan identifier.
+
+        Returns:
+            Dict with ``finalized`` (True) and ``state`` ('ready').
 
         Raises:
-            NotImplementedError: Always — see #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id is not known.
         """
-        raise NotImplementedError("InMemoryTaskProvider.finalize_plan not yet implemented — see #1770")
+        if plan_id not in self._plans:
+            raise PlanNotFoundError(plan_id)
+        self._plans[plan_id]["state"] = "ready"
+        return {"finalized": True, "state": "ready"}
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.
