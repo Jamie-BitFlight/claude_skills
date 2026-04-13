@@ -381,9 +381,28 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
     """Append a single task to an existing plan.
 
+    Parses ``config.task_yaml`` via ruamel round-trip YAML and delegates to
+    ``backend.append_task``.  The server is the YAML-parse boundary; the
+    backend receives a plain dict.
+
     See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
+
+    Args:
+        plan: Plan address (e.g., ``P1`` or slug).
+        config: AppendTaskConfig carrying the single-task YAML string.
+        plan_dir: Plan directory path passed through to ``_get_backend``.
+
+    Returns:
+        Result dict from ``backend.append_task`` — shape: ``{"appended": True, "task_id": ...}``.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskValidationError: When the task definition fails model validation.
     """
-    raise NotImplementedError("sam_plan action='append_task' not yet implemented — see #1770")
+    yaml_parser: Any = YAML()
+    task_dict: dict[str, Any] = yaml_parser.load(config.task_yaml)
+    backend = _get_backend(plan_dir)
+    return backend.append_task(plan, task_dict)
 
 
 def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
