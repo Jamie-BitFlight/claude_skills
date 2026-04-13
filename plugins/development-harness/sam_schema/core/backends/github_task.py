@@ -14,7 +14,7 @@ or GraphQL calls are made from this module.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
@@ -481,16 +481,55 @@ class GitHubTaskProvider:
         }
 
     def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
-        """Append a single task to an existing plan.
+        """Append a single task to an existing plan as a GitHub sub-issue.
+
+        Single-writer contract: callers must serialize writes to the same plan.
+        Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).
-            task_def: Task definition to append.
+            task_def: Task definition dict or TaskDefinition to append.
+
+        Returns:
+            Dict with ``appended`` (True), ``task_id`` (str), and ``github_issue`` (int).
 
         Raises:
-            NotImplementedError: See #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id does not correspond to a SAM plan issue.
+            TaskValidationError: When task_def fails Pydantic validation or the task ID
+                already exists in the plan.
         """
-        raise NotImplementedError  # see #1770
+        import pydantic  # noqa: PLC0415
+
+        from sam_schema.core.models import Task  # noqa: PLC0415
+
+        self._fetch_plan_node(plan_id)
+
+        try:
+            task = Task.model_validate(task_def)
+        except pydantic.ValidationError as exc:
+            raise TaskValidationError(0, str(exc)) from exc
+
+        existing_ids: set[str] = set()
+        for n in self._fetch_task_nodes(plan_id):
+            meta_id = _parse_metadata(n["body"]).get("task_id")
+            if meta_id:
+                existing_ids.add(meta_id)
+            else:
+                m = _TASK_TITLE_RE.match(n["title"])
+                if m:
+                    existing_ids.add(m.group("tid"))
+        if task.id in existing_ids:
+            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
+
+        task_def_typed = cast("TaskDefinition", task_def)
+        task_body = _render_task_body(task_def_typed, plan_id)
+        status_label = _STATUS_TO_LABEL.get(task_def_typed.get("status", "not-started"), "sam:not-started")
+        repo, _, _ = self._get_repo()
+        task_issue = repo.create_issue(  # type: ignore[attr-defined]
+            title=f"[{task.id}] {task.title}", body=task_body, labels=[_SAM_TASK_LABEL, status_label]
+        )
+
+        return {"appended": True, "task_id": task.id, "github_issue": task_issue.number}  # type: ignore[attr-defined]
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Transition a plan from drafting state to ready state.
