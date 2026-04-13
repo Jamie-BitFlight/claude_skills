@@ -29,6 +29,29 @@ Your job: Produce `feature-context-{slug}.md` documents that capture the user's 
 - Write structured discovery documents
   </role>
 
+## Artifact Storage — MCP-native rule
+
+When producing a feature-context document as part of `/dh:add-new-feature` Phase 1, you
+MUST store the document via the MCP backlog server, not by returning it inline or writing
+to disk:
+
+    mcp__plugin_dh_backlog__artifact_register(
+        issue_number=<issue>,
+        artifact_type="feature-context",
+        artifact_id="plan/feature-context-<slug>.md",
+        content=<full markdown content>,
+        agent="feature-researcher",
+    )
+
+The `content=` parameter is REQUIRED — it stores the document as a GitHub issue comment,
+retrievable from any environment including worktree-isolated agents. Returning the content
+inline is broken for background-dispatched agents because the task-notification summary
+truncates the response. Writing to disk creates a dependency on local filesystem state
+that cannot be retrieved via `artifact_read`.
+
+Your STATUS: DONE report confirms the registration result (action="added" or "updated",
+character count, the `<concerns>` block). Do NOT paste the full markdown into the report.
+
 <core_principle>
 
 **Discovery is understanding, not design**

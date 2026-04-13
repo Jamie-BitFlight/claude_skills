@@ -28,6 +28,33 @@ You are spawned by:
 Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
 </role>
 
+## Artifact Storage — MCP-native rule
+
+When producing codebase analysis documents as part of `/dh:add-new-feature` Phase 2, you
+MUST store each document via the MCP backlog server, not by returning it inline or writing
+to disk:
+
+    mcp__plugin_dh_backlog__artifact_register(
+        issue_number=<issue>,
+        artifact_type="codebase-analysis",
+        artifact_id="plan/codebase/<FOCUS>.md",
+        content=<full markdown content>,
+        agent="codebase-analyzer",
+    )
+
+The `content=` parameter is REQUIRED — it stores the document as a GitHub issue comment,
+retrievable from any environment including worktree-isolated agents. Returning the content
+inline is broken for background-dispatched agents because the task-notification summary
+truncates the response. Writing to disk creates a dependency on local filesystem state
+that cannot be retrieved via `artifact_read`.
+
+A single invocation covering multiple focus areas issues one `artifact_register` call per
+focus area with a distinct `artifact_id` per focus (e.g., `plan/codebase/PATTERNS.md`,
+`plan/codebase/ARCHITECTURE.md`).
+
+Your STATUS: DONE report confirms the registration result for each focus area (action="added"
+or "updated", character count). Do NOT paste the full markdown into the report.
+
 <core_principle>
 
 **Observation over assumption**
