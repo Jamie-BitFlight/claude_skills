@@ -21,68 +21,11 @@ if TYPE_CHECKING:
 
 __all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData"]
 
-
-class TaskDefinitionDict(TypedDict):
-    """Internal backend-contract type for creating tasks in a plan.
-
-    Passed as elements of the ``tasks`` list in
-    :meth:`~sam_schema.core.task_backend.TaskBackend.create_plan`.
-
-    This is the *backend-contract* TypedDict used between the query layer and
-    backend implementations.  It is distinct from
-    ``sam_schema.core.action_models.TaskDefinition``, which is the
-    *MCP-boundary* Pydantic model.  The server layer converts the Pydantic model
-    to this dict via ``TaskDefinition.model_dump(by_alias=False, exclude_none=True)``.
-
-    Required fields define the minimum viable task; all other fields
-    are optional and default to empty/None in the backend implementation.
-    """
-
-    # Required fields
-    id: str
-    title: str
-    status: str
-
-    # Optional structural fields
-    agent: NotRequired[str | None]
-    dependencies: NotRequired[list[str]]
-    blocked_by: NotRequired[list[str]]
-    parallelize_with: NotRequired[list[str]]
-    priority: NotRequired[int]
-    complexity: NotRequired[str]
-    skills: NotRequired[list[str]]
-
-    # Timestamp fields (ISO 8601 strings)
-    created: NotRequired[str | None]
-    started: NotRequired[str | None]
-    completed: NotRequired[str | None]
-    last_activity: NotRequired[str | None]
-
-    # Markdown content fields
-    body: NotRequired[str]
-    description: NotRequired[str]
-    objective: NotRequired[str]
-    requirements: NotRequired[str]
-    constraints: NotRequired[str]
-    expected_outputs: NotRequired[str]
-    acceptance_criteria: NotRequired[str]
-    verification_steps: NotRequired[str]
-    context_notes: NotRequired[str]
-    handoff: NotRequired[str]
-
-    # Analytical metadata
-    issue_classification: NotRequired[str | None]
-    analysis_method: NotRequired[str]
-    divergence_notes: NotRequired[int]
-    accuracy_risk: NotRequired[str]
-    reason: NotRequired[str]
-
-    # Bookend metadata
-    is_bookend: NotRequired[bool]
-    bookend_type: NotRequired[str | None]
-
-    # GitHub integration
-    github_issue: NotRequired[int | None]
+# TaskDefinitionDict was removed in the RC1 refactor (PR #1773).
+# Backends now accept Task instances or plain dicts directly via append_task.
+# This backwards-compat alias allows existing TYPE_CHECKING imports to resolve
+# without errors during the migration period.
+TaskDefinitionDict = dict  # backwards-compat alias; use Task or dict[str, Any] instead
 
 
 class TaskData(TypedDict):

@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from sam_schema.core.models import Task
 
 __all__ = [
     "ActiveTaskActionConfig",
@@ -51,123 +53,28 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-class TaskDefinition(BaseModel):
-    """Typed input model for defining a task at the MCP boundary.
+class TaskDefinition(Task):
+    """MCP-input projection of Task.
 
-    This is the **MCP-input boundary model** — it carries the fields a caller
-    sets when authoring a new task.  It is distinct from two other types with
-    similar names:
+    Inherits all field definitions, alias conventions, and validators from
+    ``sam_schema.core.models.Task``.  The ``extra='ignore'`` config allows
+    callers to submit unknown fields without raising a validation error —
+    unknown fields are silently discarded at the MCP boundary.
 
-    - ``sam_schema.core.models.Task`` — the *persisted entity* model that
-      includes all runtime fields (``created``, ``started``, ``completed``,
-      ``last_activity``, ``body``, ``description``, ``github_issue``, etc.).
-    - ``sam_schema.core.task_backend_types.TaskDefinition`` — the *backend
-      contract* TypedDict used internally between the query layer and backend
-      implementations.
+    Runtime-only fields (``created``, ``started``, ``completed``,
+    ``last_activity``, ``github_issue``) are inherited but default to ``None``;
+    callers should omit them when authoring a new task.
 
-    By using a typed ``BaseModel`` at the MCP boundary, Pydantic handles field
-    validation and alias normalization (kebab-case → snake_case) automatically,
-    eliminating the need for alias-normalization helpers downstream.
+    The ID regex, status enum, priority/complexity enums, and dependency
+    validators are all inherited automatically from ``Task``.
 
-    Alias conventions mirror ``Task``: ``populate_by_name=True``,
-    ``AliasChoices("kebab-case", "snake_case")`` for multi-word fields, and
-    ``serialization_alias="kebab-case"`` for round-trip fidelity.
+    ``status`` is given a default of ``"not-started"`` at the MCP boundary so
+    callers may omit it when submitting a new task.
     """
 
-    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True, extra="ignore")
 
-    # Required fields
-    id: str = Field(..., description="Task identifier (e.g. 'T1').")
-    title: str = Field(..., min_length=1, max_length=200, description="Human-readable task title.")
     status: str = Field(default="not-started", description="Task status. Defaults to 'not-started'.")
-
-    # Optional structural fields
-    agent: str | None = Field(default=None, description="Agent or specialist responsible for this task.")
-    dependencies: list[str] = Field(default_factory=list, description="List of task IDs this task depends on.")
-    priority: int = Field(default=3, ge=1, le=5, description="Priority (1=highest, 5=lowest). Default: 3 (MEDIUM).")
-    complexity: str = Field(
-        default="medium", pattern=r"^(low|medium|high)$", description="Complexity estimate: 'low', 'medium', or 'high'."
-    )
-    skills: list[str] = Field(default_factory=list, description="Skill tags required to complete this task.")
-    blocked_by: list[str] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("blocked-by", "blocked_by"),
-        serialization_alias="blocked-by",
-        description="Task IDs that are blocking this task.",
-    )
-    parallelize_with: list[str] = Field(
-        default_factory=list,
-        validation_alias=AliasChoices("parallelize-with", "parallelize_with"),
-        serialization_alias="parallelize-with",
-        description="Task IDs that can safely run in parallel with this task.",
-    )
-
-    # Markdown content fields (authoring inputs — no runtime timestamps)
-    body: str = Field(default="", description="Raw markdown body for the task.")
-    description: str = Field(default="", description="Short prose description of the task.")
-    objective: str = Field(default="", description="One-paragraph objective statement.")
-    requirements: str = Field(default="", description="Functional requirements for this task.")
-    constraints: str = Field(default="", description="Constraints and limitations.")
-    expected_outputs: str = Field(
-        default="",
-        validation_alias=AliasChoices("expected-outputs", "expected_outputs"),
-        serialization_alias="expected-outputs",
-        description="Deliverables and success artifacts.",
-    )
-    acceptance_criteria: str = Field(
-        default="",
-        validation_alias=AliasChoices("acceptance-criteria", "acceptance_criteria"),
-        serialization_alias="acceptance-criteria",
-        description="Acceptance criteria for this task.",
-    )
-    verification_steps: str = Field(
-        default="",
-        validation_alias=AliasChoices("verification-steps", "verification_steps"),
-        serialization_alias="verification-steps",
-        description="Steps to verify the task is complete.",
-    )
-    context_notes: str = Field(
-        default="",
-        validation_alias=AliasChoices("context-notes", "context_notes"),
-        serialization_alias="context-notes",
-        description="Additional context notes.",
-    )
-    handoff: str = Field(default="", description="Handoff notes for the next task or agent.")
-    reason: str = Field(default="", description="Reason for this task's inclusion in the plan.")
-
-    # Analytical metadata
-    issue_classification: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("issue-classification", "issue_classification"),
-        serialization_alias="issue-classification",
-        description="Root-cause classification: procedural, defect, recurring-pattern, etc.",
-    )
-    scenario_target: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("scenario-target", "scenario_target"),
-        serialization_alias="scenario-target",
-        description="Target scenario for this task.",
-    )
-    analysis_method: str = Field(
-        default="none",
-        validation_alias=AliasChoices("analysis-method", "analysis_method"),
-        serialization_alias="analysis-method",
-        description="Analysis method applied: none, 5-whys, 6-sigma, design-framing.",
-    )
-
-    # Bookend metadata
-    is_bookend: bool = Field(
-        default=False,
-        validation_alias=AliasChoices("is-bookend", "is_bookend"),
-        serialization_alias="is-bookend",
-        description="True when this task is a bookend (T0 baseline or TN verification).",
-    )
-    bookend_type: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("bookend-type", "bookend_type"),
-        serialization_alias="bookend-type",
-        description="Bookend type: 't0-baseline' or 'tn-verification'.",
-    )
 
 
 # ---------------------------------------------------------------------------

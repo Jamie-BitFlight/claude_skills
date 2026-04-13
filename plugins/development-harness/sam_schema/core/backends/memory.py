@@ -30,11 +30,12 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
-from sam_schema.core.models import PlanState
+from sam_schema.core.models import PlanState, Task
 from sam_schema.core.query import _new_plan_id
 
 if TYPE_CHECKING:
-    from sam_schema.core.models import Task
+    from collections.abc import Sequence
+
     from sam_schema.core.task_backend_types import (
         DocumentData,
         DocumentHandle,
@@ -198,7 +199,7 @@ class InMemoryTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinitionDict],
+        tasks: Sequence[Task],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -209,7 +210,7 @@ class InMemoryTaskProvider:
         Args:
             slug: Human-readable identifier slug for the plan.
             goal: One-sentence goal statement.
-            tasks: Ordered list of task definitions.
+            tasks: Ordered list of validated Task models.
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number. When provided, the plan_id
                 is ``P{issue}``; otherwise an auto-incremented ID is used.
@@ -228,12 +229,12 @@ class InMemoryTaskProvider:
             raise PlanExistsError(plan_id)
 
         task_data_list: list[TaskData] = []
-        for idx, task_def in enumerate(tasks):
-            if not task_def.get("id"):
+        for idx, task in enumerate(tasks):
+            if not task.id:
                 raise TaskValidationError(idx, "Task 'id' is required")
-            if not task_def.get("title"):
+            if not task.title:
                 raise TaskValidationError(idx, "Task 'title' is required")
-            task_data_list.append(_task_def_to_task_data(task_def))
+            task_data_list.append(_task_def_to_task_data(cast("TaskDefinitionDict", task.model_dump(by_alias=False))))
 
         plan_data: PlanData = {
             "plan_id": plan_id,
@@ -482,45 +483,34 @@ class InMemoryTaskProvider:
             new_context = f"{existing}{separator}{heading}\n\n{content}"
         task["context_notes"] = new_context  # type: ignore[typeddict-item]
 
-    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
-        """Append a single task definition to an existing plan.
+    def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
+        """Append a single validated Task to an existing plan.
 
-        Validates the task definition via the Task Pydantic model, checks for
-        duplicate task IDs, and appends the new task to the plan's task list.
+        The task has already been validated at the MCP boundary (TaskDefinition →
+        Task). This method only checks for duplicate task IDs and persists.
 
         Single-writer contract: callers must serialize writes to the same plan.
         Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
 
         Args:
             plan_id: Backend-assigned plan identifier.
-            task_def: Single-task definition dict. Must contain at minimum ``id``
-                and ``title``. Validated via ``Task.model_validate`` before appending.
+            task: Validated Task model to append.
 
         Returns:
             Dict with ``appended`` (True) and ``task_id`` (the appended task's ID).
 
         Raises:
             PlanNotFoundError: When plan_id is not known.
-            TaskValidationError: When task_def fails Pydantic validation or contains
-                a task ID already present in the plan.
+            TaskValidationError: When the task ID already exists in the plan.
         """
-        import pydantic  # noqa: PLC0415
-
-        from sam_schema.core.models import Task  # noqa: PLC0415
-
         if plan_id not in self._plans:
             raise PlanNotFoundError(plan_id)
-
-        try:
-            task = Task.model_validate(task_def)
-        except pydantic.ValidationError as exc:
-            raise TaskValidationError(0, str(exc)) from exc
 
         existing_ids = {t["id"] for t in self._plans[plan_id]["tasks"]}
         if task.id in existing_ids:
             raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
 
-        task_data = _task_def_to_task_data(cast("TaskDefinitionDict", task_def))
+        task_data = _task_def_to_task_data(cast("TaskDefinitionDict", task.model_dump(by_alias=False)))
         self._plans[plan_id]["tasks"].append(task_data)
 
         return {"appended": True, "task_id": task.id}

@@ -14,22 +14,17 @@ or GraphQL calls are made from this module.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
-from sam_schema.core.models import PlanState
-from sam_schema.core.task_backend_types import (
-    DocumentData,
-    DocumentHandle,
-    PlanData,
-    PlanSummary,
-    TaskData,
-    TaskDefinitionDict,
-)
+from sam_schema.core.models import PlanState, Task
+from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from backlog_core.backend_protocol import BacklogBackend, IssueNode, LabelNode
     from github.Repository import Repository
 
@@ -83,19 +78,21 @@ def _status_from_labels(labels: list[LabelNode]) -> str:
     return "not-started"
 
 
-def _render_metadata_section(task_def: TaskDefinitionDict, plan_id: str) -> str:
+def _render_metadata_section(task: Task, plan_id: str) -> str:
     """Render the ``<!-- sam-task-metadata:begin/end -->`` table block."""
+    # Use model_dump to get Python-native values (enum members, not raw strings)
+    td = task.model_dump(mode="python", by_alias=False)
     rows: list[tuple[str, str]] = [
-        ("task_id", task_def["id"]),
+        ("task_id", td["id"]),
         ("plan_id", plan_id),
-        ("agent", task_def.get("agent") or ""),
-        ("priority", str(task_def.get("priority", 0))),
-        ("complexity", task_def.get("complexity", "")),
-        ("dependencies", ",".join(task_def.get("dependencies", []))),
-        ("skills", ",".join(task_def.get("skills", []))),
-        ("created", task_def.get("created") or _now_iso()),
-        ("started", task_def.get("started") or ""),
-        ("completed", task_def.get("completed") or ""),
+        ("agent", td.get("agent") or ""),
+        ("priority", str(td.get("priority", 0))),
+        ("complexity", str(td.get("complexity", ""))),
+        ("dependencies", ",".join(td.get("dependencies") or [])),
+        ("skills", ",".join(td.get("skills") or [])),
+        ("created", str(td.get("created") or _now_iso())),
+        ("started", str(td.get("started") or "")),
+        ("completed", str(td.get("completed") or "")),
     ]
     lines = [_METADATA_BEGIN, "| Field | Value |", "|-------|-------|"]
     lines.extend(f"| {k} | {v} |" for k, v in rows)
@@ -131,15 +128,15 @@ def _render_plan_body(slug: str, goal: str, context: str | None, ac: str | None)
     return "\n\n".join(parts)
 
 
-def _render_task_body(task_def: TaskDefinitionDict, plan_id: str) -> str:
+def _render_task_body(task: Task, plan_id: str) -> str:
     """Render the full sub-issue body for a task."""
-    parts = [_render_metadata_section(task_def, plan_id)]
-    if body := task_def.get("body"):
-        parts.append(body)
-    if ac := task_def.get("acceptance_criteria"):
-        parts.append(f"## Acceptance Criteria\n\n{ac}")
-    if vs := task_def.get("verification_steps"):
-        parts.append(f"## Verification Steps\n\n{vs}")
+    parts = [_render_metadata_section(task, plan_id)]
+    if task.body:
+        parts.append(task.body)
+    if task.acceptance_criteria:
+        parts.append(f"## Acceptance Criteria\n\n{task.acceptance_criteria}")
+    if task.verification_steps:
+        parts.append(f"## Verification Steps\n\n{task.verification_steps}")
     return "\n\n".join(parts)
 
 
@@ -276,15 +273,15 @@ class GitHubTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinitionDict],
+        tasks: Sequence[Task],
         *,
         context: str | None = None,
         issue: int | None = None,
         acceptance_criteria: str | None = None,
     ) -> PlanData:
         """Create a plan as a parent GitHub Issue with task sub-issues."""
-        for i, task_def in enumerate(tasks):
-            if not task_def.get("id") or not task_def.get("title"):
+        for i, task in enumerate(tasks):
+            if not task.id or not task.title:
                 raise TaskValidationError(i, "Task must have 'id' and 'title' fields")
 
         repo, _, _ = self._get_repo()
@@ -297,24 +294,24 @@ class GitHubTaskProvider:
         plan_id = str(parent_issue.number)  # type: ignore[attr-defined]
 
         task_data_list: list[TaskData] = []
-        for task_def in tasks:
-            task_body = _render_task_body(task_def, plan_id)
-            status_label = _STATUS_TO_LABEL.get(task_def.get("status", "not-started"), "sam:not-started")
+        for task in tasks:
+            task_body = _render_task_body(task, plan_id)
+            status_label = _STATUS_TO_LABEL.get(str(task.status), "sam:not-started")
             task_issue = repo.create_issue(  # type: ignore[attr-defined]
-                title=f"[{task_def['id']}] {task_def['title']}", body=task_body, labels=[_SAM_TASK_LABEL, status_label]
+                title=f"[{task.id}] {task.title}", body=task_body, labels=[_SAM_TASK_LABEL, status_label]
             )
             task_data_list.append(
                 TaskData(
-                    id=task_def["id"],
-                    title=task_def["title"],
-                    status=task_def.get("status", "not-started"),
-                    agent=task_def.get("agent") or None,
-                    dependencies=task_def.get("dependencies", []),
-                    blocked_by=task_def.get("blocked_by", []),
-                    parallelize_with=task_def.get("parallelize_with", []),
-                    priority=task_def.get("priority", 0),
-                    complexity=task_def.get("complexity", ""),
-                    skills=task_def.get("skills", []),
+                    id=task.id,
+                    title=task.title,
+                    status=str(task.status),
+                    agent=task.agent or None,
+                    dependencies=task.dependencies or [],
+                    blocked_by=task.blocked_by or [],
+                    parallelize_with=task.parallelize_with or [],
+                    priority=int(task.priority),
+                    complexity=str(task.complexity),
+                    skills=task.skills or [],
                     created=_now_iso(),
                     started=None,
                     completed=None,
@@ -486,34 +483,29 @@ class GitHubTaskProvider:
             "has_cycles": _has_cycles(tasks),
         }
 
-    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
-        """Append a single task to an existing plan as a GitHub sub-issue.
+    def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
+        """Append a single validated Task to an existing plan as a GitHub sub-issue.
+
+        The task has already been validated at the MCP boundary. This method
+        checks for duplicate IDs and creates the sub-issue on GitHub.
+        Body and label inputs are rendered from ``task.model_dump(mode="python")``
+        so all enum coercions are applied before rendering — no raw dict access.
 
         Single-writer contract: callers must serialize writes to the same plan.
         Behavior under concurrent writes to the same plan is undefined. See ADR-1770-1.
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).
-            task_def: Task definition dict or TaskDefinitionDict to append.
+            task: Validated Task model to append.
 
         Returns:
             Dict with ``appended`` (True), ``task_id`` (str), and ``github_issue`` (int).
 
         Raises:
             PlanNotFoundError: When plan_id does not correspond to a SAM plan issue.
-            TaskValidationError: When task_def fails Pydantic validation or the task ID
-                already exists in the plan.
+            TaskValidationError: When the task ID already exists in the plan.
         """
-        import pydantic  # noqa: PLC0415
-
-        from sam_schema.core.models import Task  # noqa: PLC0415
-
         self._fetch_plan_node(plan_id)
-
-        try:
-            task = Task.model_validate(task_def)
-        except pydantic.ValidationError as exc:
-            raise TaskValidationError(0, str(exc)) from exc
 
         existing_ids: set[str] = set()
         for n in self._fetch_task_nodes(plan_id):
@@ -527,9 +519,9 @@ class GitHubTaskProvider:
         if task.id in existing_ids:
             raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
 
-        task_def_typed = cast("TaskDefinitionDict", task_def)
-        task_body = _render_task_body(task_def_typed, plan_id)
-        status_label = _STATUS_TO_LABEL.get(task_def_typed.get("status", "not-started"), "sam:not-started")
+        task_body = _render_task_body(task, plan_id)
+        status_val = str(task.status)
+        status_label = _STATUS_TO_LABEL.get(status_val, "sam:not-started")
         repo, _, _ = self._get_repo()
         task_issue = repo.create_issue(  # type: ignore[attr-defined]
             title=f"[{task.id}] {task.title}", body=task_body, labels=[_SAM_TASK_LABEL, status_label]

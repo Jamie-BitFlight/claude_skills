@@ -22,15 +22,10 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from sam_schema.core.models import Task
-    from sam_schema.core.task_backend_types import (
-        DocumentData,
-        DocumentHandle,
-        PlanData,
-        PlanSummary,
-        TaskData,
-        TaskDefinitionDict,
-    )
+    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
 
 __all__ = ["TaskBackend"]
 
@@ -57,7 +52,7 @@ class TaskBackend(Protocol):
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinitionDict],
+        tasks: Sequence[Task],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -68,7 +63,7 @@ class TaskBackend(Protocol):
         Args:
             slug: Human-readable identifier slug for the plan.
             goal: One-sentence goal statement for the plan.
-            tasks: Ordered list of task definitions to create.
+            tasks: Ordered sequence of validated Task models to create.
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number to associate with this plan.
             acceptance_criteria: Optional plan-level acceptance criteria markdown.
@@ -234,24 +229,26 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
+    def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single task to an existing plan.
 
         **Concurrency — single-writer assumption**: ``TaskBackend.append_task`` is NOT
         required to be atomic under concurrent writers. Callers MUST serialize writes to
         the same plan. Behavior under concurrent writes is undefined — backends are not
-        required to detect, reject, or recover from it. See #1770 / ADR-1770-1.
+        required to detect, reject, or recover from it. See ADR-1770-1.
 
         Args:
             plan_id: Plan identifier returned by create_plan.
-            task_def: Single-task dict matching one element of the tasks_yaml list.
+            task: Validated Task model to append. The caller (server layer) is
+                responsible for validation via Pydantic before calling this method.
+                Backends use ``task.model_dump()`` for format-specific serialization.
 
         Returns:
-            Dict with append result (e.g. appended=True, task_id=...).
+            Dict with append result: ``{"appended": True, "task_id": task.id}``.
 
         Raises:
             PlanNotFoundError: If plan_id does not exist.
-            TaskValidationError: If task_def is malformed or duplicates an existing task ID.
+            TaskValidationError: If the task ID duplicates an existing task in the plan.
         """
         ...
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from sam_schema.core.action_models import TaskDefinition
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.backends.memory import InMemoryTaskProvider
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
@@ -24,8 +25,6 @@ from sam_schema.core.task_backend import TaskBackend
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from sam_schema.core.task_backend_types import TaskDefinitionDict
 
 
 # ---------------------------------------------------------------------------
@@ -44,13 +43,16 @@ def _make_task_def(
     skills: list[str] | None = None,
     body: str = "",
     description: str = "",
-) -> TaskDefinitionDict:
-    """Construct a minimal TaskDefinitionDict for test data.
+) -> TaskDefinition:
+    """Construct a minimal TaskDefinition for test data.
+
+    Uses model_validate to accept raw test values (int priority, str complexity)
+    without triggering ty type errors on enum fields.
 
     All parameters have sensible defaults so callers only need to supply
     the fields relevant to the test under execution.
     """
-    td: TaskDefinitionDict = {
+    return TaskDefinition.model_validate({
         "id": task_id,
         "title": title,
         "status": status,
@@ -58,14 +60,10 @@ def _make_task_def(
         "complexity": complexity,
         "body": body,
         "description": description,
-    }
-    if dependencies is not None:
-        td["dependencies"] = dependencies
-    if agent is not None:
-        td["agent"] = agent
-    if skills is not None:
-        td["skills"] = skills
-    return td
+        "dependencies": dependencies or [],
+        "agent": agent,
+        "skills": skills or [],
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +497,7 @@ class TestTaskBackendConformance:
         created = backend.create_plan("my-slug", "Do the thing", [])
         plan_id = created["plan_id"]
 
-        task_def: TaskDefinitionDict = _make_task_def("T01", "First appended task")
+        task_def = _make_task_def("T01", "First appended task")
 
         # Act
         backend.append_task(plan_id, task_def)

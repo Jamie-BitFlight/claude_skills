@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from sam_schema.core import query
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
@@ -27,14 +27,9 @@ from sam_schema.core.models import Plan, PlanState, Task, TaskStatus
 from sam_schema.readers.detect import FormatDetectionError
 
 if TYPE_CHECKING:
-    from sam_schema.core.task_backend_types import (
-        DocumentData,
-        DocumentHandle,
-        PlanData,
-        PlanSummary,
-        TaskData,
-        TaskDefinitionDict,
-    )
+    from collections.abc import Sequence
+
+    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
 
 __all__ = ["LocalYamlTaskProvider"]
 
@@ -225,7 +220,7 @@ class LocalYamlTaskProvider:
         self,
         slug: str,
         goal: str,
-        tasks: list[TaskDefinitionDict],
+        tasks: Sequence[Task],
         *,
         context: str | None = None,
         issue: int | None = None,
@@ -241,7 +236,7 @@ class LocalYamlTaskProvider:
         Args:
             slug: Human-readable identifier slug for the plan.
             goal: One-sentence goal statement.
-            tasks: Ordered list of task definitions.
+            tasks: Ordered list of validated Task models.
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number.
             acceptance_criteria: Accepted but not written by this backend.
@@ -254,7 +249,7 @@ class LocalYamlTaskProvider:
             PlanExistsError: When a plan with the resolved plan_id already exists.
             TaskValidationError: When any task definition fails validation.
         """
-        task_dicts: list[dict[str, Any]] = [cast("dict[str, Any]", t) for t in tasks]
+        task_dicts: list[dict[str, Any]] = [t.model_dump(by_alias=False, exclude_none=True) for t in tasks]
         try:
             plan = query.create_plan(
                 slug=slug, goal=goal, tasks=task_dicts, plan_dir=self._plan_dir, context=context, issue=issue
@@ -543,12 +538,12 @@ class LocalYamlTaskProvider:
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
 
-    def append_task(self, plan_id: str, task_def: TaskDefinitionDict | dict[str, Any]) -> dict[str, Any]:
-        """Append a single task to an existing plan.
+    def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
+        """Append a single validated Task to an existing plan.
 
-        Resolves the plan path, loads the current plan via ruamel round-trip YAML,
-        validates the task definition, checks for duplicate IDs, appends the task,
-        and writes back using write_plan with force_single=True.
+        The task has already been validated at the MCP boundary. This method
+        checks for duplicate IDs, appends the task, and writes back using
+        write_plan with force_single=True.
 
         **Single-writer assumption (ADR-1770-1)**: This method is NOT safe under
         concurrent writers. Callers must serialize writes to the same plan. Behavior
@@ -556,32 +551,24 @@ class LocalYamlTaskProvider:
 
         Args:
             plan_id: Plan identifier.
-            task_def: Single-task definition dict or TaskDefinitionDict TypedDict.
+            task: Validated Task model to append.
 
         Returns:
             ``{"appended": True, "task_id": task.id}``
 
         Raises:
             PlanNotFoundError: When plan_id cannot be resolved to a file.
-            TaskValidationError: When task_def fails Pydantic validation or the
-                task ID already exists in the plan.
+            TaskValidationError: When the task ID already exists in the plan.
         """
-        import pydantic  # noqa: PLC0415
-
         from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
 
         path = self._resolve_path(plan_id)
         result = query.load_plan(path)
         plan = result.plan
 
-        try:
-            task = Task.model_validate(task_def)
-        except pydantic.ValidationError as exc:
-            raise TaskValidationError(0, str(exc)) from exc
-
         existing_ids = [t.id for t in plan.tasks]
         if task.id in existing_ids:
-            raise TaskValidationError(0, f"Duplicate task ID: {task.id!r} already exists in plan {plan_id!r}")
+            raise TaskValidationError(0, f"Task ID {task.id!r} already exists in plan {plan_id!r}")
 
         new_tasks = [*plan.tasks, task]
         updated_plan = plan.model_copy(update={"tasks": new_tasks})

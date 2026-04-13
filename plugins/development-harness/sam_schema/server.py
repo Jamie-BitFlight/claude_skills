@@ -48,7 +48,6 @@ from sam_schema.core.task_config import TaskConfig, create_task_backend, get_tas
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
-    from sam_schema.core.task_backend_types import TaskDefinitionDict
 
 _log = logging.getLogger(__name__)
 _artifact_registry = _ArtifactRegistry()
@@ -277,12 +276,9 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
         when an issue number is present, or just ``plan_id`` otherwise.
         It is not stored in the Plan model.
     """
-    task_defs = cast(
-        "list[TaskDefinitionDict]", [t.model_dump(by_alias=False, exclude_none=True) for t in config.tasks]
-    )
     backend = _get_backend(plan_dir)
     plan_data = backend.create_plan(
-        slug=config.slug, goal=config.goal, tasks=task_defs, context=config.context, issue=config.issue
+        slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
     )
     plan_id_str = plan_data["plan_id"]
     plan_ref: str | None = (
@@ -402,9 +398,8 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
     """
-    task_dict: dict[str, Any] = config.task.model_dump(by_alias=False, exclude_none=True)
     backend = _get_backend(plan_dir)
-    return backend.append_task(plan, task_dict)
+    return backend.append_task(plan, config.task)
 
 
 def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
