@@ -404,8 +404,13 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
     """
+    import collections.abc  # noqa: PLC0415
+
     yaml_parser: Any = YAML()
-    task_dict: dict[str, Any] = yaml_parser.load(config.task_yaml)
+    parsed: Any = yaml_parser.load(config.task_yaml)
+    if not isinstance(parsed, collections.abc.Mapping):
+        raise TypeError("task_yaml must parse to a YAML mapping with task fields")
+    task_dict: dict[str, Any] = dict(parsed)
     backend = _get_backend(plan_dir)
     return backend.append_task(plan, task_dict)
 

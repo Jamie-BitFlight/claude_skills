@@ -269,6 +269,13 @@ class LocalYamlTaskProvider:
                 raise TaskValidationError(int(m.group(1)), m.group(2)) from exc
             raise TaskValidationError(0, msg) from exc
 
+        if not tasks:
+            from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
+
+            plan = plan.model_copy(update={"state": "drafting"})
+            if plan.source_path is not None:
+                write_plan(plan, plan.source_path, force_single=True)
+
         plan_id = _plan_id_from_path(plan.source_path) if plan.source_path else slug
         return _plan_to_plan_data(plan, plan_id)
 

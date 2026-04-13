@@ -287,10 +287,11 @@ class GitHubTaskProvider:
                 raise TaskValidationError(i, "Task must have 'id' and 'title' fields")
 
         repo, _, _ = self._get_repo()
+        plan_body = _render_plan_body(slug, goal, context, acceptance_criteria)
+        if not tasks:
+            plan_body = f"{plan_body}\n{_DRAFTING_MARKER}"
         parent_issue = repo.create_issue(  # type: ignore[attr-defined]
-            title=f"SAM Plan: {slug}",
-            body=_render_plan_body(slug, goal, context, acceptance_criteria),
-            labels=[_SAM_PLAN_LABEL],
+            title=f"SAM Plan: {slug}", body=plan_body, labels=[_SAM_PLAN_LABEL]
         )
         plan_id = str(parent_issue.number)  # type: ignore[attr-defined]
 
@@ -341,7 +342,7 @@ class GitHubTaskProvider:
         node = self._fetch_plan_node(plan_id)
         slug, goal = self._extract_plan_meta(node)
         tasks = [_node_to_task_data(n) for n in self._fetch_task_nodes(plan_id)]
-        return PlanData(
+        plan_data = PlanData(
             plan_id=plan_id,
             feature=slug,
             version="1",
@@ -353,6 +354,9 @@ class GitHubTaskProvider:
             tasks=tasks,
             source_path=None,
         )
+        if _DRAFTING_MARKER in (node.get("body") or ""):
+            plan_data["state"] = "drafting"
+        return plan_data
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """List all SAM plan issues, optionally filtered by search substring."""
