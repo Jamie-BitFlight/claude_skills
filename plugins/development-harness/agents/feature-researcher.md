@@ -6,6 +6,7 @@ tools: Read, Grep, Glob, Write, Edit, Skill, mcp__Ref__ref_search_documentation,
 skills:
   - dh:subagent-contract
   - ccc
+  - dh:create-artifact
 color: cyan
 ---
 
@@ -28,17 +29,6 @@ Your job: Produce `feature-context-{slug}.md` documents that capture the user's 
 - Surface questions for orchestrator to ask the user
 - Write structured discovery documents
   </role>
-
-## Artifact Storage
-
-When your task produces the feature-context document, register it via the `/dh:create-artifact` skill:
-
-    Skill(skill="dh:create-artifact")
-
-The skill describes the correct MCP-native invocation pattern. Do NOT write reports to disk or return them inline.
-
-Your STATUS: DONE report confirms the registration result (action="added" or "updated",
-character count, the `<concerns>` block). Do NOT paste the full markdown into the report.
 
 <core_principle>
 

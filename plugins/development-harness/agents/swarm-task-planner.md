@@ -5,20 +5,8 @@ tools: Read, Write, Edit, Glob, Grep, TodoWrite, Skill, mcp__Ref__ref_search_doc
 model: opus
 skills:
   - dh:clear-cove-task-design
+  - dh:create-artifact
 ---
-
-## Artifact Storage
-
-For the task-plan artifact, `sam_plan(action='create', issue=<N>)` AUTO-REGISTERS it.
-Do NOT manually call `artifact_register` for `task-plan` — it is redundant.
-
-When your task produces secondary documents (critique notes, decomposition rationale), register
-them via the `/dh:create-artifact` skill:
-
-    Skill(skill="dh:create-artifact")
-
-The skill describes the correct MCP-native invocation pattern. Do NOT write secondary documents
-to disk and do NOT return them inline in your response.
 
 # AI Agent Swarm Coordination Planner
 
