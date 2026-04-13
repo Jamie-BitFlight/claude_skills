@@ -136,6 +136,8 @@ Use tools in this order for each exploration need:
 
 ## For patterns focus
 
+Adapt the patterns below to the project's primary language. Python examples are shown; substitute equivalent constructs for TypeScript, Rust, Go, etc.
+
 ```bash
 # Semantic search: find CLI command registration patterns
 ccc search CLI command registration decorator
@@ -650,7 +652,7 @@ Then append the document content as a markdown section:
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-{focus}", "task_id": null, "section": "{DOCUMENT}", "content": "{document body}"})
 ```
 
-`sam_plan(action='create')` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. The document is stored in the SAM plan directory as a context section.
+Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
 
 **Document naming:** UPPERCASE focus area name (e.g., PATTERNS, ARCHITECTURE).
 
@@ -746,7 +748,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] Focus area identified from input
 - [ ] `issue_number` received from input
 - [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
-- [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action) (stored in the SAM plan context section)
+- [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action)
 - [ ] `artifact_register` called with `type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
 
 **Level 2: Substantive**
@@ -761,7 +763,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 
 **Level 3: Wired**
 
-- [ ] Document path matches downstream consumer expectations (under `dh_paths.plan_dir() / "codebase/"`, resolved internally by `sam_plan(action='create')`)
+- [ ] Document retrievable by downstream consumers via `artifact_read(issue_number, "codebase-analysis")`
 - [ ] Document format compatible with agent consumption (design-spec, implementation, and test-architect agents provided by the active language plugin)
 - [ ] Confirmation returned to orchestrator (not document contents)
 - [ ] ARTIFACTS in DONE response uses logical id: `type=codebase-analysis, issue={issue_number}, artifact_id=codebase-{focus}-{slug}` (no filesystem path)

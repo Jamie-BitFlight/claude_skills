@@ -220,7 +220,7 @@ When the plan contains `acceptance-criteria-structured` entries, `swarm-task-pla
 - **T0** has `priority: 1` and `dependencies: []`, so it is the first ready task and dispatches before any implementation task.
 - **TN** has `dependencies: [all non-bookend task IDs]`, so it becomes ready only after all implementation tasks complete and dispatches last.
 
-T0 runs agent `t0-baseline-capture`. TN runs agent `tn-verification-gate`. Both agents write YAML result files to `~/.dh/projects/{project-slug}/plan/T0-baseline-{slug}.yaml` and `~/.dh/projects/{project-slug}/plan/TN-verification-{slug}.yaml` (resolved via `dh_paths.plan_dir()`). These files are read by `/complete-implementation` in its pre-Phase 1 check.
+T0 runs agent `t0-baseline-capture`. TN runs agent `tn-verification-gate`. Both agents register their results as artifacts via `artifact_register` (types `T0-baseline` and `TN-verification`). These artifacts are read by `/complete-implementation` in its pre-Phase 1 check via `artifact_read`.
 
 ### Bookend Artifact Registration
 

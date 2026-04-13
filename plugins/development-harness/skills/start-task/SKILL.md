@@ -71,7 +71,7 @@ $ARGUMENTS
 
    Use the returned content as context for implementation instead of reading filesystem paths directly. This is especially important for worktree-isolated agents that cannot access uncommitted plan files from the root worktree.
 
-   **Fallback**: If `artifact_list` returns an empty manifest (no `artifacts` entries) or an error, fall back to filesystem path conventions (`dh_paths.plan_dir() / "architect-{slug}.md"` and `dh_paths.plan_dir() / "feature-context-{slug}.md"`). This ensures backward compatibility with issues that predate the artifact manifest system.
+   **Fallback**: If `artifact_list` returns an empty manifest (no `artifacts` entries) or an error, try `artifact_read` with types `architect` and `feature-context` directly. These artifact types are registered by the agents that produce them.
 
 2. Select the task:
    - If `--task` provided, use that ID

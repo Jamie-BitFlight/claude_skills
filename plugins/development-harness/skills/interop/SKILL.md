@@ -122,41 +122,30 @@ plan file path as a note in the prompt (e.g., "Plan file for context: {plan-file
 `work-backlog-item` skill does not accept a second positional argument, so the path is passed
 as contextual prose in the delegation prompt, not as an arg.
 
-This step runs: groom → RT-ICA → SAM planning and produces `~/.dh/projects/{project-slug}/plan/tasks-N-slug.md` (resolved via `dh_paths.plan_dir()`).
+This step runs: groom → RT-ICA → SAM planning and produces a SAM task plan. The plan address is returned in the `/work-backlog-item` output.
 
-Wait for `/work-backlog-item` to complete. The task file path it produces is required for Steps
+Wait for `/work-backlog-item` to complete. The plan address it produces is required for Steps
 5 and 6.
 
 ---
 
-## Step 5 — Capture the task file path
+## Step 5 — Capture the plan address
 
-After `/work-backlog-item` completes, identify the task file it produced. Plan files are stored under `~/.dh/projects/{slug}/plan/` (resolved via `dh_paths.plan_dir()`). Use Glob with the resolved path:
+After `/work-backlog-item` completes, identify the plan address it produced. The plan address is included in the `/work-backlog-item` output (e.g., `Pc7d8e9f0` or `tasks-N-slug`).
 
-```python
-from dh_paths import plan_dir
-plan_root = plan_dir()
-# Find the specific plan file:
-Glob(pattern=str(plan_root / "tasks-N-*.md"))
-```
-
-Where `N` is the backlog item number from Step 3. If the item number is unknown or the glob
-returns no results, broaden to:
-
-```python
-Glob(pattern=str(plan_dir() / "tasks-*.md"))
-```
-
-Compare results against any task file paths mentioned in the `/work-backlog-item` output. Select
-the file whose slug matches the backlog item title.
-
-If no matching file exists after the Glob check, abort:
+If the plan address is not stated in the output, use `sam_list` via MCP to find the plan whose slug matches the backlog item title:
 
 ```text
-ERROR: /work-backlog-item did not produce a task file. Cannot write back-references.
+mcp__plugin_dh_sam__sam_plan(config={"action": "list"})
 ```
 
-Record the exact filename (e.g., `tasks-3-oauth-token-refresh.md`) for use in Steps 6 and 7.
+If no matching plan exists, abort:
+
+```text
+ERROR: /work-backlog-item did not produce a task plan. Cannot write back-references.
+```
+
+Record the plan address for use in Steps 6 and 7.
 
 ---
 
@@ -173,13 +162,13 @@ flowchart TD
     Insert --> Done
 ```
 
-The exact text to write (substituting the real task filename and full state path):
+The exact text to write (substituting the real plan address):
 
 ```markdown
-**SAM tasks:** ~/.dh/projects/{project-slug}/plan/tasks-N-slug.md
+**SAM tasks:** {plan-address}
 ```
 
-Plan files live outside the repository under `~/.dh/projects/{project-slug}/plan/` (resolved via `dh_paths.plan_dir()`). Use the absolute path — relative paths from `docs/superpowers/plans/` cannot reach state files outside the repo.
+Where `{plan-address}` is the plan identifier returned in Step 5 (e.g., `Pc7d8e9f0` or `tasks-N-slug`). The address is resolved by MCP tools — do not construct filesystem paths.
 
 Use the Edit tool to make this change. Do not rewrite the file.
 
@@ -196,17 +185,17 @@ flowchart TD
     ForEach([For each Chunk N captured]) --> HasTask{Does chunk number N<br>have a corresponding SAM task T{N}?}
     HasTask -->|No — chunk count exceeds task count| Skip[Skip this chunk — no annotation]
     HasTask -->|Yes| CheckExisting{Does the line immediately<br>following this heading already<br>contain a SAM annotation comment?}
-    CheckExisting -->|Yes — re-run scenario| ReplaceAnnotation["Replace existing annotation in-place<br><!-- SAM: T{N} in ~/.dh/projects/{project-slug}/plan/tasks-N-slug.md -->"]
-    CheckExisting -->|No| InsertAnnotation["Insert on the line immediately<br>after the ## Chunk N: heading<br><!-- SAM: T{N} in ~/.dh/projects/{project-slug}/plan/tasks-N-slug.md -->"]
+    CheckExisting -->|Yes — re-run scenario| ReplaceAnnotation["Replace existing annotation in-place<br><!-- SAM: T{N} in {plan-address} -->"]
+    CheckExisting -->|No| InsertAnnotation["Insert on the line immediately<br>after the ## Chunk N: heading<br><!-- SAM: T{N} in {plan-address} -->"]
     ReplaceAnnotation --> Next([Next chunk])
     InsertAnnotation --> Next
     Skip --> Next
 ```
 
-Annotation format — substitute the real chunk number and task filename:
+Annotation format — substitute the real chunk number and plan address from Step 5:
 
 ```markdown
-<!-- SAM: T3 in ~/.dh/projects/{project-slug}/plan/tasks-N-slug.md -->
+<!-- SAM: T3 in {plan-address} -->
 ```
 
 The task number `T{N}` matches the chunk number `N` by position. Chunk 1 → T1, chunk 2 → T2.

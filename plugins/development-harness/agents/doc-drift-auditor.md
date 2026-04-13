@@ -173,7 +173,7 @@ artifact_register(
 )
 ```
 
-where `{slug}` is computed from the project root by `dh_paths.compute_slug()`. Do not write to `~/.dh/` via the `Write` tool.
+Do not write to `~/.dh/` via the `Write` tool — use `artifact_register` with `content=` to store artifacts.
 
 Then return:
 

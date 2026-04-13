@@ -367,7 +367,7 @@ skills: []
 T0 runs before any implementation work. It captures the current pass/fail state of every structured acceptance criterion so TN can detect regressions after implementation.
 
 ## Objective
-Run all structured acceptance criteria commands and record baseline results in `dh_paths.plan_dir() / "T0-baseline-{slug}.yaml"`.
+Run all structured acceptance criteria commands and record baseline results via `artifact_register`.
 
 ## Inputs
 - Plan file: the task file containing `acceptance-criteria-structured` entries
@@ -375,17 +375,17 @@ Run all structured acceptance criteria commands and record baseline results in `
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Record exit code, stdout, stderr, and timestamp per criterion
-3. Write results to `dh_paths.plan_dir() / "T0-baseline-{slug}.yaml"` (one entry per criterion)
+3. Register results via `artifact_register(issue_number, type="T0-baseline", content=..., status="complete", agent="t0-baseline-capture")`
 
 ## Expected Outputs
-- `~/.dh/projects/{project-slug}/plan/T0-baseline-{slug}.yaml`
+- T0-baseline artifact registered and retrievable via `artifact_read(issue_number, "T0-baseline")`
 
 ## Acceptance Criteria
-1. `~/.dh/projects/{project-slug}/plan/T0-baseline-{slug}.yaml` exists
-2. File contains one entry per structured criterion with exit code, stdout, stderr, timestamp
+1. `artifact_read(issue_number, "T0-baseline")` returns content
+2. Content contains one entry per structured criterion with exit code, stdout, stderr, timestamp
 
 ## Verification Steps
-1. Read `dh_paths.plan_dir() / "T0-baseline-{slug}.yaml"` and confirm `criteria_count` matches plan
+1. Call `artifact_read(issue_number, "T0-baseline")` and confirm `criteria_count` matches plan
 ```
 
 ### TN Task Template
@@ -408,27 +408,27 @@ skills: []
 TN runs after all implementation tasks complete. It re-runs every structured acceptance criterion and compares results against the T0 baseline to detect regressions.
 
 ## Objective
-Re-run acceptance criteria and compare against T0 baseline; write verdict to `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"`.
+Re-run acceptance criteria and compare against T0 baseline; register verdict via `artifact_register`.
 
 ## Inputs
 - Plan file: the task file containing `acceptance-criteria-structured` entries
-- T0 baseline: `dh_paths.plan_dir() / "T0-baseline-{slug}.yaml"`
+- T0 baseline: retrieved via `artifact_read(issue_number, "T0-baseline")`
 
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Compare exit code against T0 baseline using the 4-cell status matrix
-3. Write per-criterion verdict and overall verdict to `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"`
+3. Assemble per-criterion verdict and overall verdict in memory; register via `artifact_register(issue_number, type="TN-verification", content=...)`
 4. Overall verdict is PASS only when no criterion has status `regressed`
 
 ## Expected Outputs
-- `~/.dh/projects/{project-slug}/plan/TN-verification-{slug}.yaml`
+- TN-verification artifact registered on the issue via `artifact_register`
 
 ## Acceptance Criteria
-1. `~/.dh/projects/{project-slug}/plan/TN-verification-{slug}.yaml` exists with overall `verdict: PASS`
+1. TN-verification artifact registered with overall `verdict: PASS`
 2. No criterion has status `regressed`
 
 ## Verification Steps
-1. Read `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"` and confirm `verdict` is `PASS`
+1. Read TN-verification artifact via `artifact_read(issue_number, "TN-verification")` and confirm `verdict` is `PASS`
 ```
 
 ### Dependency Rule

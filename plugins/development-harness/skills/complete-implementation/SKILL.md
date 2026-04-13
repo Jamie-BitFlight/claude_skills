@@ -260,13 +260,13 @@ Before invoking Phase 1, check for a TN verification report produced by `tn-veri
 
 Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the `P{id}-` prefix and `.yaml` suffix).
 
-Read the TN-verification artifact via `artifact_read(issue_number={N}, artifact_type="TN-verification")`. Fallback: if no artifact is registered, read `dh_paths.plan_dir() / "TN-verification-{slug}.yaml"`.
+Read the TN-verification artifact via `artifact_read(issue_number={N}, artifact_type="TN-verification")`.
 
 The file contains a list of per-criterion `BookendVerification` records — one per `acceptance-criteria-structured` entry. There is no top-level `verdict` field. Aggregate the verdict by scanning all records: the overall result is FAIL if any record has `status: regressed`; otherwise PASS.
 
 ```mermaid
 flowchart TD
-    Read["artifact_read(issue_number, 'TN-verification')<br>Fallback: dh_paths.plan_dir() / TN-verification-{slug}.yaml"] --> Exists{Artifact exists?}
+    Read["artifact_read(issue_number, 'TN-verification')"] --> Exists{Artifact exists?}
     Exists -->|No| Proceed["No structured criteria — proceed to Phase 1"]
     Exists -->|Yes| Scan["Scan all per-criterion records<br>for status: regressed"]
     Scan --> AnyRegressed{Any criterion<br>has status: regressed?}

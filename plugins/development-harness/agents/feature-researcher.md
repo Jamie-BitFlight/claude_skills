@@ -275,7 +275,7 @@ Then append the document content as a markdown section using:
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "{slug}", "task_id": null, "section": "Feature Context", "content": "{document body}"})
 ```
 
-`sam_plan(action='create')` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path.
+Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
 
 Use the output format template below.
 
