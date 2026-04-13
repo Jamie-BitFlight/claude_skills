@@ -550,12 +550,12 @@ class TestTaskBackendConformance:
     def test_append_task_duplicate_task_id_raises(self, backend: TaskBackend) -> None:
         """append_task raises an error when a duplicate task ID is appended.
 
-        AC #6: each backend must raise an appropriate error (TaskValidationError
-        or ValueError) when a task with an already-existing ID is appended.
+        AC #6: each backend must raise TaskValidationError when a task with an
+        already-existing ID is appended.
 
         Arrange: create a plan with T01; append T01 again.
         Act: second append_task call with the same task ID.
-        Assert: TaskValidationError (or ValueError) is raised.
+        Assert: TaskValidationError is raised.
         """
         from sam_schema.core.exceptions import TaskValidationError
 

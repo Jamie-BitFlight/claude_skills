@@ -870,7 +870,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
     AC #2: sam_plan(action='append_task', plan=P, task=<TaskDefinition>) must append
     a single task and return a success acknowledgment.
 
-    Arrange: create a plan with empty tasks_yaml; inject mock backend.
+    Arrange: create a plan with empty tasks list; inject mock backend.
     Act: call sam_plan with action=append_task.
     Assert: backend.append_task was called exactly once with the plan_id and a
             parsed task definition.

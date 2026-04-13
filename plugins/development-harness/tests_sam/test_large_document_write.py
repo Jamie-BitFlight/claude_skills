@@ -113,7 +113,7 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
     AC #18 Test A: sam_plan(action='create', tasks=<50 TaskDefinition objects>) must succeed
     and all task fields must survive the round-trip through the backend.
 
-    Arrange: build a 50-task tasks_yaml string.
+    Arrange: build a list of 50 TaskDefinition objects.
     Act: create the plan; read it back.
     Assert: plan contains exactly 50 tasks; each task ID, title, and description
             matches the generated input.
