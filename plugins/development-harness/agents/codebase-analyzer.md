@@ -28,25 +28,13 @@ You are spawned by:
 Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
 </role>
 
-## Artifact Storage — MCP-native rule
+## Artifact Storage
 
-When producing codebase analysis documents as part of `/dh:add-new-feature` Phase 2, you
-MUST store each document via the MCP backlog server, not by returning it inline or writing
-to disk:
+When your task produces codebase analysis documents, register each one via the `/dh:create-artifact` skill:
 
-    mcp__plugin_dh_backlog__artifact_register(
-        issue_number=<issue>,
-        artifact_type="codebase-analysis",
-        artifact_id="plan/codebase/<FOCUS>.md",
-        content=<full markdown content>,
-        agent="codebase-analyzer",
-    )
+    Skill(skill="dh:create-artifact")
 
-The `content=` parameter is REQUIRED — it stores the document as a GitHub issue comment,
-retrievable from any environment including worktree-isolated agents. Returning the content
-inline is broken for background-dispatched agents because the task-notification summary
-truncates the response. Writing to disk creates a dependency on local filesystem state
-that cannot be retrieved via `artifact_read`.
+The skill describes the correct MCP-native invocation pattern. Do NOT write reports to disk or return them inline.
 
 A single invocation covering multiple focus areas issues one `artifact_register` call per
 focus area with a distinct `artifact_id` per focus (e.g., `plan/codebase/PATTERNS.md`,
@@ -708,20 +696,14 @@ Do not use `Write` or `Edit` for codebase analysis documents -- all content goes
 
 ## Step 4: Register Artifact
 
-After `sam_plan(action='create')` + `sam_plan(action='update')` complete, register the artifact so it is discoverable via `artifact_list`:
+After `sam_plan(action='create')` + `sam_plan(action='update')` complete, register the artifact
+so it is discoverable via `artifact_list`. Load the `/dh:create-artifact` skill for the correct
+invocation pattern:
 
-```text
-mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
-  type="codebase-analysis",
-  artifact_id="codebase-{focus}-{slug}",
-  content=None,
-  status="complete",
-  agent="codebase-analyzer"
-)
-```
+    Skill(skill="dh:create-artifact")
 
-The `content` parameter is `None` here — the document is stored in SAM. Registration makes it discoverable via `artifact_list` without duplicating content.
+Use `artifact_type="codebase-analysis"`, `artifact_id="plan/codebase/{FOCUS}.md"`, and pass
+`content=` with the full document text so it is retrievable from worktree-isolated environments.
 
 ## Step 5: Return Confirmation
 

@@ -112,30 +112,22 @@ artifact_read(issue_number={issue}, artifact_type="research") before starting
 discovery — they contain prior investigation findings that should be incorporated.
 Produce feature-context-{slug}.md content with WHAT/WHY analysis — problem space, desired
 outcome, stakeholders, risks, open questions.
-
-MCP-NATIVE ARTIFACT STORAGE — REQUIRED:
-As your FINAL step, call `mcp__plugin_dh_backlog__artifact_register` directly with the
-markdown content:
-
-    mcp__plugin_dh_backlog__artifact_register(
-        issue_number={issue},
-        artifact_type="feature-context",
-        artifact_id="plan/feature-context-{slug}.md",
-        content="<your full markdown content>",
-        agent="feature-researcher",
-    )
-
-The `content=` parameter stores the document as a GitHub issue comment, retrievable by
-downstream agents via `artifact_read(issue_number={issue}, artifact_type="feature-context")`.
-Do NOT write the file to disk. Do NOT return the markdown content inline in your response.
-Your STATUS: DONE report should confirm the artifact was registered (character count,
-action="added" or "updated" from the return value) and include your <concerns> block.
 Do NOT prescribe HOW to build it.
 If the feature involves replacing or migrating a local module to an external tool,
 you MUST perform a Replacement Coverage Analysis: enumerate all capabilities of the
 local module, enumerate the replacement's capabilities, and produce a coverage matrix
 (COVERED/PARTIAL/MISSING for each capability). Include the matrix in the feature-context
 document. Surface any PARTIAL or MISSING capabilities as questions.
+
+Before storing your output, load the artifact storage skill:
+
+    Skill(skill="dh:create-artifact")
+
+Then register your deliverable with:
+    artifact_type="feature-context"
+    artifact_id="plan/feature-context-{slug}.md"
+    issue_number={issue}
+    agent="feature-researcher"
 ```
 
 After the agent completes, verify the artifact was registered:
@@ -183,26 +175,18 @@ Produce {focus_area}.md content documenting what exists today — patterns,
 conventions, constraints.
 Do NOT prescribe changes.
 
-MCP-NATIVE ARTIFACT STORAGE — REQUIRED:
-As your FINAL step, call `mcp__plugin_dh_backlog__artifact_register` directly with the
-markdown content:
+Before storing your output, load the artifact storage skill:
 
-    mcp__plugin_dh_backlog__artifact_register(
-        issue_number={issue},
-        artifact_type="codebase-analysis",
-        artifact_id="plan/codebase/{FOCUS}.md",
-        content="<your full markdown content>",
-        agent="codebase-analyzer",
-    )
+    Skill(skill="dh:create-artifact")
 
-The `content=` parameter stores the document as a GitHub issue comment, retrievable by
-downstream agents via `artifact_read(issue_number={issue}, artifact_type="codebase-analysis")`.
-Do NOT write the file to disk. Do NOT return the markdown content inline in your response.
-A single invocation covering multiple focus areas issues one `artifact_register` call per
-focus area with a distinct `artifact_id` per focus (e.g., `plan/codebase/PATTERNS.md`,
-`plan/codebase/ARCHITECTURE.md`).
-Your STATUS: DONE report should confirm each artifact was registered (character count,
-action="added" or "updated" from the return value) and include your <concerns> block.
+Then register each document with:
+    artifact_type="codebase-analysis"
+    artifact_id="plan/codebase/PATTERNS.md"  (use the actual focus-area filename, e.g. PATTERNS.md, ARCHITECTURE.md)
+    issue_number={issue}
+    agent="codebase-analyzer"
+
+A single invocation covering multiple focus areas issues one artifact_register call per
+focus area with a distinct artifact_id per focus.
 ```
 
 After the agent completes, verify the artifact was registered:
@@ -363,23 +347,15 @@ findings that should inform the architecture.
 Produce architect-{slug}.md content with interfaces, contracts, data models, module boundaries.
 Do NOT implement — define WHAT to build, not the code.
 
-MCP-NATIVE ARTIFACT STORAGE — REQUIRED:
-As your FINAL step, call `mcp__plugin_dh_backlog__artifact_register` directly with the
-markdown content:
+Before storing your output, load the artifact storage skill:
 
-    mcp__plugin_dh_backlog__artifact_register(
-        issue_number={issue},
-        artifact_type="architect",
-        artifact_id="plan/architect-{slug}.md",
-        content="<your full markdown content>",
-        agent="python-cli-design-spec",
-    )
+    Skill(skill="dh:create-artifact")
 
-The `content=` parameter stores the document as a GitHub issue comment, retrievable by
-downstream agents via `artifact_read(issue_number={issue}, artifact_type="architect")`.
-Do NOT write the file to disk. Do NOT return the markdown content inline in your response.
-Your STATUS: DONE report should confirm the artifact was registered (character count,
-action="added" or "updated" from the return value) and include your <concerns> block.
+Then register your deliverable with:
+    artifact_type="architect"
+    artifact_id="plan/architect-{slug}.md"
+    issue_number={issue}
+    agent="python-cli-design-spec"
 ```
 
 After the agent completes, verify the artifact was registered:
