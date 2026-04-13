@@ -21,6 +21,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sam_schema.core.models import Task
 
+# ---------------------------------------------------------------------------
+# Shared base — eliminates 17x repeated model_config boilerplate
+# ---------------------------------------------------------------------------
+
+
+class _ActionConfigBase(BaseModel):
+    """Shared base for all MCP action-config models.
+
+    Sets ``populate_by_name=True`` once so every subclass inherits it without
+    repeating the ``model_config = ConfigDict(populate_by_name=True)`` line.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 __all__ = [
     "ActiveTaskActionConfig",
     "AppendTaskConfig",
@@ -82,26 +97,20 @@ class TaskDefinition(Task):
 # ---------------------------------------------------------------------------
 
 
-class ReadTaskConfig(BaseModel):
+class ReadTaskConfig(_ActionConfigBase):
     """Read a task and return a TaskAssignment (plan context + task fields)."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["read"] = "read"
 
 
-class ClaimTaskConfig(BaseModel):
+class ClaimTaskConfig(_ActionConfigBase):
     """Claim a task (transition from not-started to in-progress)."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["claim"] = "claim"
 
 
-class StateTaskConfig(BaseModel):
+class StateTaskConfig(_ActionConfigBase):
     """Update a task's status field."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["state"] = "state"
     status: str = Field(
@@ -114,13 +123,11 @@ class StateTaskConfig(BaseModel):
     )
 
 
-class UpdateTaskConfig(BaseModel):
+class UpdateTaskConfig(_ActionConfigBase):
     """Update task fields or append a markdown section to the task body.
 
     All three sub-operations are non-exclusive and may be combined in one call.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["update"] = "update"
     set_fields_json: str | None = Field(
@@ -153,23 +160,19 @@ TaskActionConfig = Annotated[
 # ---------------------------------------------------------------------------
 
 
-class ReadPlanConfig(BaseModel):
+class ReadPlanConfig(_ActionConfigBase):
     """Read a plan and return its Plan fields."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["read"] = "read"
 
 
-class CreatePlanConfig(BaseModel):
+class CreatePlanConfig(_ActionConfigBase):
     """Create a new plan from a typed list of task definitions.
 
     Pass ``tasks=[]`` to create a plan in drafting state for incremental
     building via ``append_task``.  Pass a non-empty list to create a ready
     plan in a single call (monolithic path).
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["create"] = "create"
     slug: str = Field(
@@ -204,10 +207,8 @@ class CreatePlanConfig(BaseModel):
     )
 
 
-class ListPlansConfig(BaseModel):
+class ListPlansConfig(_ActionConfigBase):
     """List all plans with optional search and auto-pagination."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["list"] = "list"
     search: str | None = Field(
@@ -226,18 +227,14 @@ class ListPlansConfig(BaseModel):
     )
 
 
-class StatusPlanConfig(BaseModel):
+class StatusPlanConfig(_ActionConfigBase):
     """Get plan-level progress summary."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["status"] = "status"
 
 
-class ReadyPlanConfig(BaseModel):
+class ReadyPlanConfig(_ActionConfigBase):
     """List tasks ready for dispatch (status=not-started, all dependencies terminal)."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["ready"] = "ready"
     full: bool = Field(
@@ -251,13 +248,11 @@ class ReadyPlanConfig(BaseModel):
     )
 
 
-class UpdatePlanConfig(BaseModel):
+class UpdatePlanConfig(_ActionConfigBase):
     """Update plan-level fields.
 
     Applies field patches and/or sets the plan context field.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["update"] = "update"
     context: str | None = Field(
@@ -274,7 +269,7 @@ class UpdatePlanConfig(BaseModel):
     )
 
 
-class AppendTaskConfig(BaseModel):
+class AppendTaskConfig(_ActionConfigBase):
     """Append a single task to an existing plan.
 
     Enables incremental plan building — callers emit one task at a time rather than
@@ -291,8 +286,6 @@ class AppendTaskConfig(BaseModel):
     architectural decision record.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
-
     action: Literal["append_task"] = "append_task"
     task: TaskDefinition = Field(
         ...,
@@ -306,7 +299,7 @@ class AppendTaskConfig(BaseModel):
     )
 
 
-class FinalizePlanConfig(BaseModel):
+class FinalizePlanConfig(_ActionConfigBase):
     """Transition a plan out of ``drafting`` state into executable state.
 
     Plans created with an empty ``tasks`` list (the incremental build pattern)
@@ -318,8 +311,6 @@ class FinalizePlanConfig(BaseModel):
 
     See #1770 for the architectural decision record.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["finalize"] = "finalize"
 
@@ -342,18 +333,14 @@ PlanActionConfig = Annotated[
 # ---------------------------------------------------------------------------
 
 
-class GetActiveTaskConfig(BaseModel):
+class GetActiveTaskConfig(_ActionConfigBase):
     """Retrieve the active task context for a session."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["get"] = "get"
 
 
-class SetActiveTaskConfig(BaseModel):
+class SetActiveTaskConfig(_ActionConfigBase):
     """Store a task address as the active task for a session."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["set"] = "set"
     plan: str = Field(..., description="Plan address to register as the active task's plan (e.g., 'P1').")
@@ -367,14 +354,12 @@ class SetActiveTaskConfig(BaseModel):
     )
 
 
-class UpdateActiveTaskConfig(BaseModel):
+class UpdateActiveTaskConfig(_ActionConfigBase):
     """Update fields on the currently active task without repeating the address.
 
     Delegates to the same backend write path as sam_task(action='update').
     Raises if no active task has been set for this session.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["update"] = "update"
     set_fields_json: str | None = Field(
@@ -392,10 +377,8 @@ class UpdateActiveTaskConfig(BaseModel):
     )
 
 
-class ClearActiveTaskConfig(BaseModel):
+class ClearActiveTaskConfig(_ActionConfigBase):
     """Clear the active task context for a session."""
-
-    model_config = ConfigDict(populate_by_name=True)
 
     action: Literal["clear"] = "clear"
 
