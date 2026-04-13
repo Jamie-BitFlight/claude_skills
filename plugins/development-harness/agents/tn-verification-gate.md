@@ -39,13 +39,13 @@ The `issue_number` and plan path are provided in your task delegation prompt. Th
 Retrieve T0 baseline and read plan file:
 
 ```bash
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, type="T0-baseline")
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, type="task-plan")
+mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="T0-baseline")
+mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="task-plan")
 ```
 
 Parse the content returned by `artifact_read` as YAML to extract the T0 results.
 
-If `artifact_read` returns an error or empty result for type `T0-baseline`, return STATUS: BLOCKED with: "T0 baseline not found — `artifact_read(issue_number={issue_number}, type='T0-baseline')` returned no content. T0 agent must run first."
+If `artifact_read` returns an error or empty result for type `T0-baseline`, return STATUS: BLOCKED with: "T0 baseline not found — `artifact_read(issue_number={issue_number}, artifact_type='T0-baseline')` returned no content. T0 agent must run first."
 
 ## Step 2: Re-Run Each Check Command
 

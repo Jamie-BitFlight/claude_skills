@@ -51,7 +51,7 @@ mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","context":"
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":"{...}"})
     -- Patch plan-level fields
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"append_task","task_yaml":"<single-task YAML string>"})
-    -- Append a single task to a drafting plan (plan must be in state="drafting")
+    -- Append a single task to a plan in state="drafting"; backends do not enforce the drafting precondition
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"finalize"})
     -- Finalize a drafting plan: clear state="drafting" → state="ready", making tasks dispatchable
 ```

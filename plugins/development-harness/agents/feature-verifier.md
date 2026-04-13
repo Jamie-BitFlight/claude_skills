@@ -81,8 +81,8 @@ Read the architecture spec and task file to understand:
 - What did the tasks claim to deliver (artifacts)?
 
 ```bash
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, type="architect")
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, type="task-plan")
+mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="architect")
+mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="task-plan")
 ```
 
 ## Step 2: Establish Must-Haves

@@ -749,7 +749,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] `issue_number` received from input
 - [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
 - [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action)
-- [ ] `artifact_register` called with `type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
+- [ ] `artifact_register` called with `artifact_type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
 
 **Level 2: Substantive**
 

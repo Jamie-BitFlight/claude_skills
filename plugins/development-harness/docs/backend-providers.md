@@ -170,14 +170,20 @@ All protocol methods are synchronous. The MCP layer wraps calls in `asyncio.to_t
 - **Incremental append**: `append_task`, `finalize_plan`
 - **Documents**: `store_document`, `read_document`
 
-`append_task` adds a single validated task to a plan that is in `state="drafting"`. The method
-validates the task via `Task.model_validate()` before writing. **Single-writer assumption**:
-`append_task` is NOT required to be atomic under concurrent writers. Callers must serialize
-writes to the same plan. Behavior under concurrent `append_task` calls for the same plan is
-**undefined** — backends are not required to detect, reject, or recover from concurrent appends.
+`append_task` adds a single validated task to a plan. The method validates the task via
+`Task.model_validate()` before writing. Current backends do not enforce a `state="drafting"`
+precondition — callers must not assume `append_task` will reject appends based solely on plan
+state. **Single-writer assumption**: `append_task` is NOT required to be atomic under concurrent
+writers. Callers must serialize writes to the same plan. Behavior under concurrent `append_task`
+calls for the same plan is **undefined** — backends are not required to detect, reject, or
+recover from concurrent appends.
 
-`finalize_plan` transitions a plan from `state="drafting"` to `state="ready"`, making its tasks
-visible to `get_ready_tasks` and `get_plan_status`. Both methods return `dict[str, Any]`.
+`finalize_plan` sets a plan's state to `state="ready"` for backends that implement the drafting
+workflow. Creating a plan with an empty task list enters `state="drafting"`; `finalize_plan`
+transitions it to `state="ready"`, making its tasks visible to `get_ready_tasks` and
+`get_plan_status`. Callers should treat readiness and task visibility as backend-defined
+behavior rather than assuming tasks become visible only after finalization. Both methods return
+`dict[str, Any]`.
 
 ### Available Backends
 

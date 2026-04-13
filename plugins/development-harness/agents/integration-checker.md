@@ -75,7 +75,7 @@ For each module in the feature, extract what it provides and what it should cons
 **From task file, extract:**
 
 ```bash
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, type="task-plan")
+mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="task-plan")
 ```
 
 **Build provides/consumes map:**

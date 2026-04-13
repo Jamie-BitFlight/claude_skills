@@ -375,7 +375,7 @@ Run all structured acceptance criteria commands and record baseline results via 
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Record exit code, stdout, stderr, and timestamp per criterion
-3. Register results via `artifact_register(issue_number, type="T0-baseline", content=..., status="complete", agent="t0-baseline-capture")`
+3. Register results via `artifact_register(issue_number, artifact_type="T0-baseline", content=..., status="complete", agent="t0-baseline-capture")`
 
 ## Expected Outputs
 - T0-baseline artifact registered and retrievable via `artifact_read(issue_number, "T0-baseline")`
@@ -417,7 +417,7 @@ Re-run acceptance criteria and compare against T0 baseline; register verdict via
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Compare exit code against T0 baseline using the 4-cell status matrix
-3. Assemble per-criterion verdict and overall verdict in memory; register via `artifact_register(issue_number, type="TN-verification", content=...)`
+3. Assemble per-criterion verdict and overall verdict in memory; register via `artifact_register(issue_number, artifact_type="TN-verification", content=...)`
 4. Overall verdict is PASS only when no criterion has status `regressed`
 
 ## Expected Outputs
