@@ -245,6 +245,7 @@ class InMemoryTaskProvider:
             "issue": str(issue) if issue is not None else None,
             "tasks": task_data_list,
             "source_path": None,
+            "state": "drafting" if not tasks else "ready",
         }
         self._plans[plan_id] = copy.deepcopy(plan_data)
         return copy.deepcopy(plan_data)
