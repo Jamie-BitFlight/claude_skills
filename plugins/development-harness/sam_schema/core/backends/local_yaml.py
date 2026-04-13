@@ -166,6 +166,7 @@ def _plan_to_plan_data(plan: Plan, plan_id: str) -> PlanData:
         data["codebase_patterns"] = plan.codebase_patterns
     if plan.backend_ref is not None:
         data["backend_ref"] = plan.backend_ref
+    data["state"] = plan.state
     return data
 
 
