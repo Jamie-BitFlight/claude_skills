@@ -119,7 +119,6 @@ def memory_backend() -> Generator[InMemoryTaskProvider, None, None]:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_status_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='status') returns a drafting marker while plan is mid-append.
 
@@ -144,7 +143,6 @@ def test_status_returns_drafting_marker_on_mid_append_plan(memory_backend: InMem
     assert _is_drafting(status), f"Expected drafting marker in status response for a mid-append plan, got: {status!r}"
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_ready_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='ready') returns a drafting marker while plan is mid-append.
 
@@ -175,7 +173,6 @@ def test_ready_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemo
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='read') returns tasks plus drafting marker on a drafting plan.
 
@@ -213,7 +210,6 @@ def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backen
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='status') returns normal task data after finalize clears drafting.
 
@@ -240,7 +236,6 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
     assert status.get("total_tasks") == 1
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='ready') returns ready tasks after finalize clears drafting.
 

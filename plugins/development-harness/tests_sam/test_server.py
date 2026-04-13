@@ -952,7 +952,6 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
@@ -984,7 +983,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         "source_path": None,
         "state": "drafting",
     }
-    mock_backend.append_task.return_value = None
+    mock_backend.append_task.return_value = {"appended": True, "task_id": "T1"}
     mock_backend.create_plan.return_value = {
         "plan_id": "P1",
         "feature": "test-plan",
@@ -1024,7 +1023,6 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         reset_task_config()
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
     """sam_plan action=append_task returns a success acknowledgment dict.
 
@@ -1069,7 +1067,6 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
         reset_task_config()
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
     """sam_plan action=append_task raises PlanNotFoundError when plan does not exist.
 
@@ -1100,7 +1097,6 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
         reset_task_config()
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
     """sam_plan action=append_task raises an error when duplicate task ID is appended.
 
@@ -1145,7 +1141,6 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> None:
     """sam_plan action=finalize calls backend.finalize_plan (or update_plan_fields).
 
@@ -1161,8 +1156,8 @@ def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> No
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     mock_backend = MagicMock()
-    mock_backend.finalize_plan.return_value = None
-    mock_backend.update_plan_fields.return_value = None
+    mock_backend.finalize_plan.return_value = {"finalized": True, "state": "ready"}
+    mock_backend.update_plan_fields.return_value = {"updated": True}
     set_task_config(TaskConfig(backend=mock_backend))
 
     try:

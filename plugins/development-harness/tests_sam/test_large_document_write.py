@@ -172,7 +172,6 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMemoryTaskProvider) -> None:
     """50 sequential append_task calls produce plan with identical content to monolithic create.
 
@@ -233,7 +232,6 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: InMemoryTaskProvider) -> None:
     """Create with 5 tasks then append 45 more: total 50 tasks in correct order.
 
