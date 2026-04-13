@@ -14,7 +14,7 @@ or GraphQL calls are made from this module.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
@@ -480,7 +480,7 @@ class GitHubTaskProvider:
             "has_cycles": _has_cycles(tasks),
         }
 
-    def append_task(self, plan_id: str, task_def: TaskDefinition) -> None:
+    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
         """Append a single task to an existing plan.
 
         Args:
@@ -492,7 +492,7 @@ class GitHubTaskProvider:
         """
         raise NotImplementedError  # see #1770
 
-    def finalize_plan(self, plan_id: str) -> None:
+    def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Transition a plan from drafting state to ready state.
 
         Args:
