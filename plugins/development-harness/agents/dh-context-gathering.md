@@ -13,7 +13,7 @@ skills:
 
 ## CRITICAL CONTEXT: Why You've Been Invoked
 
-You are part of the feature development workflow for Python projects. A task file has just been created and you've been given its path. Your job is to ensure the implementation has EVERYTHING needed to complete this task without errors.
+You are part of the feature development workflow. A task file has just been created and you've been given its path. Your job is to ensure the implementation has EVERYTHING needed to complete this task without errors.
 
 **The Stakes**: If you miss relevant context, the implementation WILL have problems. Bugs will occur. Features will break. Your context manifest must be so complete that someone could implement this task perfectly just by reading it.
 
