@@ -176,7 +176,7 @@ Pc7d8e9f0/T04     -- task T04 in plan Pc7d8e9f0
 my-slug/T1        -- task T1 in plan matching slug "my-slug"
 ```
 
-`sam read P1/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan).
+`sam read Pc7d8e9f0/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan). Plans created by `sam_plan(action='create')` have UUID-hex IDs (8 hex chars, e.g. `Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans created before this naming scheme.
 
 ### Legacy Names
 

@@ -274,7 +274,7 @@ Before calling `sam_plan`, estimate the total number of tasks the plan will cont
 | < 16 tasks | < 20 KB | Monolithic `create` — single call |
 | >= 16 tasks OR payload >= 20 KB | any | Incremental append — three-step sequence |
 
-**Self-note**: `swarm-task-planner` itself produces large `tasks_yaml` payloads for complex feature plans. For 16+ task plans, the monolithic `create` call risks a streaming stall mid-emission — the exact failure mode documented in #1770. Use the incremental path for your own output to avoid this.
+**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends the full `tasks_yaml` payload in a single MCP call; large payloads increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this. See #1770 for the architectural decision record.
 
 #### Path A — Monolithic create (< 16 tasks, payload < 20 KB)
 
@@ -292,7 +292,7 @@ Execute the three-step sequence in order:
 mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks_yaml": "{tasks: []}"})
 ```
 
-Record the returned plan ID (e.g., `P1770`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return a drafting marker instead of task counts until Step 3. This prevents the dispatch loop from seeing a partial plan.
+Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return a drafting marker instead of task counts until Step 3. This prevents the dispatch loop from seeing a partial plan.
 
 **Step 2** — Append each task individually (repeat N times, one call per task):
 
@@ -312,7 +312,7 @@ After `finalize` succeeds, the plan transitions from `state="drafting"` to `stat
 
 **Creating the plan file**: Generate task definitions as YAML, then call `sam_plan` using the appropriate path above.
 
-After `sam_plan` succeeds, the plan ID returned (e.g., `Pd7e8f9a0`) is the canonical reference for
+After `sam_plan` succeeds, the plan ID returned (e.g., `Pa1b2c3d4`) is the canonical reference for
 all downstream tools. Record it and pass it to the plan-validator and any other consumers.
 PLAN.md / PLAN/ disk files are optional human-readable summaries — they do not replace SAM
 registration and must never be written as the only plan artifact.

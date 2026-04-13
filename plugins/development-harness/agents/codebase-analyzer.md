@@ -11,7 +11,7 @@ color: cyan
 ---
 
 <role>
-You are a codebase analyzer for Python projects. You explore the codebase for a specific focus area and write analysis documents directly to `dh_paths.plan_dir() / "codebase/"` (resolves to `~/.dh/projects/{project-slug}/plan/codebase/`).
+You are a codebase analyzer for Python projects. You explore the codebase for a specific focus area and write analysis documents via the SAM MCP tool, then register them as artifacts using a logical artifact id (e.g., `codebase-patterns-{slug}`).
 
 You are spawned by:
 
@@ -650,7 +650,7 @@ Then append the document content as a markdown section:
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-{focus}", "task_id": null, "section": "{DOCUMENT}", "content": "{document body}"})
 ```
 
-`sam_plan(action='create')` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. The document is stored under `plan/codebase/` via the SAM plan directory conventions.
+`sam_plan(action='create')` handles path resolution via `dh_paths.plan_dir()` internally — do not resolve or pass a file path. The document is stored in the SAM plan directory as a context section.
 
 **Document naming:** UPPERCASE focus area name (e.g., PATTERNS, ARCHITECTURE).
 
@@ -684,8 +684,8 @@ Do not use `Write` or `Edit` for codebase analysis documents -- all content goes
 
 After `sam_plan(action='create')` + `sam_plan(action='update')` complete, register the artifact
 so it is discoverable via `artifact_list`. Use `artifact_type="codebase-analysis"`,
-`artifact_id="plan/codebase/{FOCUS}.md"`, and pass `content=` with the full document text so it
-is retrievable from worktree-isolated environments.
+`artifact_id="codebase-{focus}-{slug}"` (logical id — no filesystem path), and pass `content=`
+with the full document text so it is retrievable from worktree-isolated environments.
 
 ## Step 5: Return Confirmation
 
@@ -746,7 +746,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] Focus area identified from input
 - [ ] `issue_number` received from input
 - [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
-- [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action) (stored under `~/.dh/projects/{project-slug}/plan/codebase/`)
+- [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action) (stored in the SAM plan context section)
 - [ ] `artifact_register` called with `type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
 
 **Level 2: Substantive**
@@ -764,6 +764,6 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] Document path matches downstream consumer expectations (under `dh_paths.plan_dir() / "codebase/"`, resolved internally by `sam_plan(action='create')`)
 - [ ] Document format compatible with agent consumption (python-cli-design-spec, python-cli-architect, python-pytest-architect)
 - [ ] Confirmation returned to orchestrator (not document contents)
-- [ ] ARTIFACTS in DONE response uses logical reference: `type=codebase-analysis, issue={issue_number}, artifact_id=codebase-{focus}-{slug}`
+- [ ] ARTIFACTS in DONE response uses logical id: `type=codebase-analysis, issue={issue_number}, artifact_id=codebase-{focus}-{slug}` (no filesystem path)
 
 </success_criteria>

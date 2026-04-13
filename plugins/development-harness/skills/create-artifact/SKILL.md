@@ -57,9 +57,14 @@ One of the recognized type strings:
 
 Logical identifier for the artifact. Two valid formats:
 
-- **Repo-relative path** for file artifacts: `plan/feature-context-{slug}.md`,
-  `plan/architect-{slug}.md`, `plan/codebase/PATTERNS.md`
-- **Logical id** for content-only artifacts: `T0-baseline-{slug}`, `TN-verification-{slug}`
+- **Repo-relative path** for file artifacts that exist on disk in the root worktree:
+  `plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`
+- **Logical id** for artifacts that do NOT write a repo file: `codebase-patterns-{slug}`,
+  `codebase-architecture-{slug}`, `T0-baseline-{slug}`, `TN-verification-{slug}`
+
+Use a logical id (not a path) when the agent stores content via `content=` without writing
+a file to disk. Using a path that doesn't exist on disk causes a warning when `content=None`
+and is misleading to artifact consumers.
 
 Do NOT use `~/.dh/...` paths — these are MCP-server internals, not stable agent interfaces.
 
@@ -86,13 +91,13 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-### codebase-analysis (one call per focus area)
+### codebase-analysis (one call per focus area, logical id — no filesystem path)
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
     issue_number=1770,
     artifact_type="codebase-analysis",
-    artifact_id="plan/codebase/PATTERNS.md",
+    artifact_id="codebase-patterns-my-feature",  # logical id: codebase-{focus}-{slug}
     content=patterns_markdown,
     agent="codebase-analyzer",
 )
@@ -100,7 +105,7 @@ mcp__plugin_dh_backlog__artifact_register(
 mcp__plugin_dh_backlog__artifact_register(
     issue_number=1770,
     artifact_type="codebase-analysis",
-    artifact_id="plan/codebase/ARCHITECTURE.md",
+    artifact_id="codebase-architecture-my-feature",  # logical id: codebase-{focus}-{slug}
     content=architecture_markdown,
     agent="codebase-analyzer",
 )

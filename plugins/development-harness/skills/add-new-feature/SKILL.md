@@ -119,11 +119,7 @@ local module, enumerate the replacement's capabilities, and produce a coverage m
 (COVERED/PARTIAL/MISSING for each capability). Include the matrix in the feature-context
 document. Surface any PARTIAL or MISSING capabilities as questions.
 
-Before storing your output, load the artifact storage skill:
-
-    Skill(skill="dh:create-artifact")
-
-Then register your deliverable with:
+Register your deliverable with:
     artifact_type="feature-context"
     artifact_id="plan/feature-context-{slug}.md"
     issue_number={issue}
@@ -175,13 +171,9 @@ Produce {focus_area}.md content documenting what exists today — patterns,
 conventions, constraints.
 Do NOT prescribe changes.
 
-Before storing your output, load the artifact storage skill:
-
-    Skill(skill="dh:create-artifact")
-
-Then register each document with:
+Register each document with:
     artifact_type="codebase-analysis"
-    artifact_id="plan/codebase/PATTERNS.md"  (use the actual focus-area filename, e.g. PATTERNS.md, ARCHITECTURE.md)
+    artifact_id="codebase-{focus}-{slug}"  (logical id — use lowercase focus area, e.g. codebase-patterns-{slug})
     issue_number={issue}
     agent="codebase-analyzer"
 
@@ -347,11 +339,7 @@ findings that should inform the architecture.
 Produce architect-{slug}.md content with interfaces, contracts, data models, module boundaries.
 Do NOT implement — define WHAT to build, not the code.
 
-Before storing your output, load the artifact storage skill:
-
-    Skill(skill="dh:create-artifact")
-
-Then register your deliverable with:
+Register your deliverable with:
     artifact_type="architect"
     artifact_id="plan/architect-{slug}.md"
     issue_number={issue}
