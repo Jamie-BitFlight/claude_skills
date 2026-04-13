@@ -58,6 +58,10 @@ _PLAN_DIR_SENTINEL = "plan"
 # Single-agent scenarios do not require explicit session isolation.
 _DEFAULT_SESSION_ID = "_default"
 
+# Returned by _sam_plan_status and _sam_plan_ready when the plan is in drafting state.
+# Defined once here to ensure both handlers return an identical shape.
+_DRAFTING_MARKER_RESPONSE: dict[str, object] = {"drafting": True, "state": PlanState.DRAFTING}
+
 # Stem parsing thresholds used in _build_task_assignment.
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
 _STEM_MIN_PARTS_FOR_SLUG: int = 3
@@ -317,25 +321,33 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
 
 
 def _sam_plan_status(plan: str, plan_dir: str) -> dict:
-    """Return plan-level progress summary."""
+    """Return plan-level progress summary.
+
+    Uses a single backend call — ``get_plan_status`` now includes ``state``
+    so no separate ``read_plan`` is needed for the drafting check.
+    """
     backend = _get_backend(plan_dir)
-    plan_data = backend.read_plan(plan)
-    if plan_data.get("state") == PlanState.DRAFTING:
-        return {"drafting": True, "state": PlanState.DRAFTING}
-    return dict(backend.get_plan_status(plan))
+    status = backend.get_plan_status(plan)
+    if status.get("state") == PlanState.DRAFTING:
+        return dict(_DRAFTING_MARKER_RESPONSE)
+    return dict(status)
 
 
 def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     """List tasks ready for dispatch.
 
+    Calls ``get_plan_status`` first for the drafting check (single backend call),
+    then ``get_ready_tasks`` only when the plan is not in drafting state.
+
     Returns:
         Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue`` keys.
     """
     backend = _get_backend(plan_dir)
-    plan_data = backend.read_plan(plan)
-    if plan_data.get("state") == PlanState.DRAFTING:
-        return {"drafting": True, "state": PlanState.DRAFTING}
+    status = backend.get_plan_status(plan)
+    if status.get("state") == PlanState.DRAFTING:
+        return dict(_DRAFTING_MARKER_RESPONSE)
     tasks_data = backend.get_ready_tasks(plan)
+    plan_data = backend.read_plan(plan)  # needed for plan_data["issue"]
     if config.full:
         ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
     else:
@@ -354,7 +366,7 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     return {
         "ready_tasks": ready_tasks,
         "count": len(tasks_data),
-        "feature": plan_data["feature"],
+        "feature": cast("str", status["feature"]),
         "issue": plan_data["issue"],
     }
 

@@ -649,6 +649,7 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
+            result = query.load_plan(path)
             status = query.get_plan_status(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
@@ -660,6 +661,7 @@ class LocalYamlTaskProvider:
             "blocked_tasks": list(status.blocked_tasks),
             "completion_pct": status.completion_pct,
             "has_cycles": status.has_cycles,
+            "state": result.plan.state,
         }
 
     # ------------------------------------------------------------------

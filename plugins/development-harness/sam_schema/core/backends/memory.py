@@ -611,6 +611,7 @@ class InMemoryTaskProvider:
             "blocked_tasks": blocked_tasks,
             "completion_pct": completion_pct,
             "has_cycles": _has_cycle(tasks),
+            "state": plan.get("state", PlanState.READY),
         }
 
     # ------------------------------------------------------------------

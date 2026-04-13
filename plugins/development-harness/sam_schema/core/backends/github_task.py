@@ -464,6 +464,8 @@ class GitHubTaskProvider:
         """Return a summary dict of task status counts for a plan."""
         node = self._fetch_plan_node(plan_id)
         slug, _ = self._extract_plan_meta(node)
+        # Derive plan state from drafting marker in the issue body.
+        state = PlanState.DRAFTING if _DRAFTING_MARKER in (node.get("body") or "") else PlanState.READY
         tasks = [_node_to_task_data(n) for n in self._fetch_task_nodes(plan_id)]
         by_id: dict[str, TaskData] = {t["id"]: t for t in tasks}
         by_status: dict[str, int] = {}
@@ -486,6 +488,7 @@ class GitHubTaskProvider:
             "blocked_tasks": blocked,
             "completion_pct": pct,
             "has_cycles": _has_cycles(tasks),
+            "state": state,
         }
 
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
