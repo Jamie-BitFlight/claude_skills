@@ -326,6 +326,9 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
 def _sam_plan_status(plan: str, plan_dir: str) -> dict:
     """Return plan-level progress summary."""
     backend = _get_backend(plan_dir)
+    plan_data = backend.read_plan(plan)
+    if plan_data.get("state") == "drafting":
+        return {"drafting": True, "state": "drafting"}
     return dict(backend.get_plan_status(plan))
 
 
@@ -337,6 +340,8 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     """
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
+    if plan_data.get("state") == "drafting":
+        return {"drafting": True, "state": "drafting"}
     tasks_data = backend.get_ready_tasks(plan)
     if config.full:
         ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
