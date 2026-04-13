@@ -537,18 +537,50 @@ class LocalYamlTaskProvider:
             raise PlanNotFoundError(plan_id) from exc
 
     def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
-        """Stub — append_task not yet implemented on LocalYamlTaskProvider.
+        """Append a single task to an existing plan.
 
-        See TaskBackend.append_task for the single-writer contract and #1770 for the ADR.
+        Resolves the plan path, loads the current plan via ruamel round-trip YAML,
+        validates the task definition, checks for duplicate IDs, appends the task,
+        and writes back using write_plan with force_single=True.
+
+        **Single-writer assumption (ADR-1770-1)**: This method is NOT safe under
+        concurrent writers. Callers must serialize writes to the same plan. Behavior
+        under concurrent ``append_task`` calls for the same plan is **undefined**.
 
         Args:
             plan_id: Plan identifier.
-            task_def: Single-task definition dict.
+            task_def: Single-task definition dict or TaskDefinition TypedDict.
+
+        Returns:
+            ``{"appended": True, "task_id": task.id}``
 
         Raises:
-            NotImplementedError: Always — see #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id cannot be resolved to a file.
+            TaskValidationError: When task_def fails Pydantic validation or the
+                task ID already exists in the plan.
         """
-        raise NotImplementedError("LocalYamlTaskProvider.append_task not yet implemented — see #1770")
+        import pydantic  # noqa: PLC0415
+
+        from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
+
+        path = self._resolve_path(plan_id)
+        result = query.load_plan(path)
+        plan = result.plan
+
+        try:
+            task = Task.model_validate(task_def)
+        except pydantic.ValidationError as exc:
+            raise TaskValidationError(0, str(exc)) from exc
+
+        existing_ids = [t.id for t in plan.tasks]
+        if task.id in existing_ids:
+            raise TaskValidationError(0, f"Duplicate task ID: {task.id!r} already exists in plan {plan_id!r}")
+
+        new_tasks = [*plan.tasks, task]
+        updated_plan = plan.model_copy(update={"tasks": new_tasks})
+        write_plan(updated_plan, path, force_single=True)
+
+        return {"appended": True, "task_id": task.id}
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Stub — finalize_plan not yet implemented on LocalYamlTaskProvider.
