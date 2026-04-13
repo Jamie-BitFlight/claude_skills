@@ -237,9 +237,10 @@ class TaskBackend(Protocol):
     def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
         """Append a single task to an existing plan.
 
-        Single-writer contract: callers MUST NOT invoke append_task concurrently on
-        the same plan_id. Backends are NOT required to provide atomicity under
-        concurrent writers. See #1770.
+        **Concurrency — single-writer assumption**: ``TaskBackend.append_task`` is NOT
+        required to be atomic under concurrent writers. Callers MUST serialize writes to
+        the same plan. Behavior under concurrent writes is undefined — backends are not
+        required to detect, reject, or recover from it. See #1770 / ADR-1770-1.
 
         Args:
             plan_id: Plan identifier returned by create_plan.
@@ -257,8 +258,14 @@ class TaskBackend(Protocol):
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Transition a plan from drafting state to ready state.
 
-        After finalize, the plan is available for execution via
-        sam_plan(action='ready') and /dh:implement-feature. See #1770.
+        **Concurrency — single-writer assumption**: ``TaskBackend.finalize_plan`` is NOT
+        required to be atomic under concurrent writers. Callers MUST serialize writes to
+        the same plan. Behavior under concurrent writes is undefined — backends are not
+        required to detect, reject, or recover from it. See #1770 / ADR-1770-1.
+
+        After finalize, the plan transitions from ``state="drafting"`` to
+        ``state="ready"`` and becomes available for execution via
+        ``sam_plan(action='ready')`` and ``/dh:implement-feature``. See #1770.
 
         Args:
             plan_id: Plan identifier.
