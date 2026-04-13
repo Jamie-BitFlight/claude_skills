@@ -480,6 +480,29 @@ class GitHubTaskProvider:
             "has_cycles": _has_cycles(tasks),
         }
 
+    def append_task(self, plan_id: str, task_def: TaskDefinition) -> None:
+        """Append a single task to an existing plan.
+
+        Args:
+            plan_id: Plan identifier (GitHub issue number string).
+            task_def: Task definition to append.
+
+        Raises:
+            NotImplementedError: See #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError  # see #1770
+
+    def finalize_plan(self, plan_id: str) -> None:
+        """Transition a plan from drafting state to ready state.
+
+        Args:
+            plan_id: Plan identifier (GitHub issue number string).
+
+        Raises:
+            NotImplementedError: See #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError  # see #1770
+
     def store_document(
         self, plan_id: str, task_id: str | None, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"
     ) -> DocumentHandle:

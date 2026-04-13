@@ -485,6 +485,7 @@ class TestTaskBackendConformance:
     # tests must pass for ALL parametrized variants.
     # ------------------------------------------------------------------
 
+    @pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
     def test_append_task_adds_task_to_plan(self, backend: TaskBackend) -> None:
         """append_task adds a single task to a plan with empty task list.
 
@@ -510,6 +511,7 @@ class TestTaskBackendConformance:
         assert plan["tasks"][0]["id"] == "T01"
         assert plan["tasks"][0]["title"] == "First appended task"
 
+    @pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
     def test_append_task_preserves_existing_tasks(self, backend: TaskBackend) -> None:
         """append_task adds a task without disturbing existing tasks.
 
@@ -533,6 +535,7 @@ class TestTaskBackendConformance:
         assert plan["tasks"][0]["id"] == "T01"
         assert plan["tasks"][1]["id"] == "T02"
 
+    @pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
     def test_append_task_plan_not_found_raises(self, backend: TaskBackend) -> None:
         """append_task raises PlanNotFoundError when plan_id does not exist.
 
@@ -549,6 +552,7 @@ class TestTaskBackendConformance:
         with pytest.raises(PlanNotFoundError):
             backend.append_task("P99999", _make_task_def("T01", "Task"))
 
+    @pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
     def test_append_task_duplicate_task_id_raises(self, backend: TaskBackend) -> None:
         """append_task raises an error when a duplicate task ID is appended.
 
@@ -569,6 +573,7 @@ class TestTaskBackendConformance:
         with pytest.raises((TaskValidationError, ValueError)):
             backend.append_task(plan_id, _make_task_def("T01", "Duplicate"))
 
+    @pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
     def test_append_multiple_tasks_preserves_order(self, backend: TaskBackend) -> None:
         """N sequential append_task calls preserve insertion order.
 

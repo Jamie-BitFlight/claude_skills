@@ -259,8 +259,10 @@ class AppendTaskConfig(BaseModel):
             "YAML string for a single task. Same schema as one element of the "
             "top-level ``tasks`` list accepted by CreatePlanConfig.tasks_yaml. "
             "Required fields per Task model: id (str, e.g. 'T1'), title (str), "
-            "status ('not-started'), agent (str), dependencies (list of task IDs), "
-            "priority (int 1-5), complexity ('low', 'medium', or 'high')."
+            "and status (any valid TaskStatus value). Optional fields include "
+            "agent (str), dependencies (list of task IDs), priority (int 1-5), "
+            "and complexity ('low', 'medium', or 'high'); omitted optional fields "
+            "use their model defaults."
         ),
     )
 

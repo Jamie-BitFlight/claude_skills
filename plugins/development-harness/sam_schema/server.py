@@ -117,7 +117,7 @@ mcp: FastMCP = FastMCP(
         "set config.action to: read | claim | state | update. "
         "Use sam_plan to read a plan, create a plan, list all plans, get progress status, "
         "or list ready-to-dispatch tasks — "
-        "set config.action to: read | create | list | status | ready | update. "
+        "set config.action to: read | create | list | status | ready | update | append_task | finalize. "
         "Use sam_active_task to park and retrieve the task currently being worked on "
         "within an agent session — "
         "set config.action to: get | set | update | clear."
@@ -402,7 +402,9 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
 def sam_plan(
     config: Annotated[
         PlanActionConfig,
-        Field(description="Action config. Set 'action' to: read | create | list | status | ready | update"),
+        Field(
+            description="Action config. Set 'action' to: read | create | list | status | ready | update | append_task | finalize"
+        ),
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
     plan: Annotated[
@@ -410,7 +412,7 @@ def sam_plan(
         Field(
             description=(
                 "Plan address (e.g., 'P1' or slug). "
-                "Required for: read, status, ready, update. "
+                "Required for: read, status, ready, update, append_task, finalize. "
                 "Not used for: list, create."
             )
         ),
@@ -426,6 +428,8 @@ def sam_plan(
     - ``status``: Return plan-level progress summary (task counts, completion %).
     - ``ready``: List tasks ready for dispatch (not-started, all deps resolved).
     - ``update``: Set plan-level context and/or patch plan fields.
+    - ``append_task``: Append a single task to an existing plan (incremental build; see #1770).
+    - ``finalize``: Transition a plan from drafting state to ready state (see #1770).
 
     Actions that do not use ``plan``:
 
@@ -435,7 +439,7 @@ def sam_plan(
     Args:
         config: Discriminated union config. The ``action`` field selects the operation.
         plan_dir: Path to the directory containing plan files.
-        plan: Plan address component. Required for read, status, ready, update actions.
+        plan: Plan address component. Required for read, status, ready, update, append_task, finalize actions.
 
     Returns:
         Response dict whose shape depends on the action (see individual action docs).

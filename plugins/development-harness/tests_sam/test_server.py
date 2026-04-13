@@ -952,6 +952,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
@@ -1023,6 +1024,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         reset_task_config()
 
 
+@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
     """sam_plan action=append_task returns a success acknowledgment dict.
 
@@ -1067,6 +1069,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
         reset_task_config()
 
 
+@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
     """sam_plan action=append_task raises PlanNotFoundError when plan does not exist.
 
@@ -1097,6 +1100,7 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
         reset_task_config()
 
 
+@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
     """sam_plan action=append_task raises an error when duplicate task ID is appended.
 
@@ -1141,6 +1145,7 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.xfail(strict=True, reason="red-phase — awaits #1770 green implementation")
 def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> None:
     """sam_plan action=finalize calls backend.finalize_plan (or update_plan_fields).
 

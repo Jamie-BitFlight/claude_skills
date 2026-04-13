@@ -12,7 +12,7 @@ All types follow the pattern established in backlog_core/backend_protocol.py:
 
 from __future__ import annotations
 
-from typing import NotRequired
+from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -157,6 +157,9 @@ class PlanData(TypedDict):
     issue: str | None
     tasks: list[TaskData]
     source_path: str | None
+
+    # Drafting state (see #1770)
+    state: NotRequired[Literal["drafting", "ready"]]
 
     # Optional reference fields
     architecture: NotRequired[str | None]
