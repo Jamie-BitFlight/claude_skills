@@ -409,8 +409,12 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     """Transition a plan from drafting state to ready state.
 
     See FinalizePlanConfig and #1770 for the ADR.
+
+    Returns:
+        Result dict from ``backend.finalize_plan`` — shape: ``{"finalized": True, "state": "ready"}``.
     """
-    raise NotImplementedError("sam_plan action='finalize' not yet implemented — see #1770")
+    backend = _get_backend(plan_dir)
+    return backend.finalize_plan(plan)
 
 
 @mcp.tool(
