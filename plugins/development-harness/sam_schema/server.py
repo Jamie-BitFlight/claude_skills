@@ -30,6 +30,7 @@ from ruamel.yaml import YAML
 
 from sam_schema.core.action_models import (
     ActiveTaskActionConfig,
+    AppendTaskConfig,
     CreatePlanConfig,
     ListPlansConfig,
     PlanActionConfig,
@@ -256,7 +257,7 @@ def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_
 
 
 # Actions that require the ``plan`` parameter to be supplied.
-_SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update"})
+_SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update", "append_task", "finalize"})
 
 
 def _sam_plan_read(plan: str, plan_dir: str) -> dict:
@@ -377,6 +378,22 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
     return {"updated": True, "address": plan}
 
 
+def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
+    """Append a single task to an existing plan.
+
+    See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
+    """
+    raise NotImplementedError("sam_plan action='append_task' not yet implemented — see #1770")
+
+
+def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
+    """Transition a plan from drafting state to ready state.
+
+    See FinalizePlanConfig and #1770 for the ADR.
+    """
+    raise NotImplementedError("sam_plan action='finalize' not yet implemented — see #1770")
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="SAM Plan Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -445,6 +462,10 @@ def sam_plan(
             return _sam_plan_ready(cast("str", plan), cast("ReadyPlanConfig", config), plan_dir)
         case "update":
             return _sam_plan_update(cast("str", plan), cast("UpdatePlanConfig", config), plan_dir)
+        case "append_task":
+            return _sam_plan_append_task(cast("str", plan), cast("AppendTaskConfig", config), plan_dir)
+        case "finalize":
+            return _sam_plan_finalize(cast("str", plan), plan_dir)
         case _:  # pragma: no cover
             raise ValueError(f"sam_plan: unhandled action '{config.action}'")
 

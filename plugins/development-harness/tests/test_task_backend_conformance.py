@@ -14,7 +14,7 @@ Coverage targets:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
@@ -371,7 +371,7 @@ class TestTaskBackendConformance:
 
         # Assert
         assert status["total_tasks"] == 3
-        by_status = status["by_status"]
+        by_status = cast("dict[str, int]", status["by_status"])
         assert isinstance(by_status, dict)
         assert by_status.get("complete") == 1
         assert by_status.get("not-started") == 2
@@ -474,3 +474,121 @@ class TestTaskBackendConformance:
     def test_isinstance_check(self, backend: TaskBackend) -> None:
         """Backend instance should satisfy the runtime-checkable TaskBackend Protocol."""
         assert isinstance(backend, TaskBackend)
+
+    # ------------------------------------------------------------------
+    # append_task — #1770 RED-PHASE conformance case
+    # ------------------------------------------------------------------
+    # These tests FAIL in the red phase with:
+    #   AttributeError: object has no attribute 'append_task'
+    # or NotImplementedError if the Protocol stub is added without implementation.
+    # The green phase implements append_task on all three backends and these
+    # tests must pass for ALL parametrized variants.
+    # ------------------------------------------------------------------
+
+    def test_append_task_adds_task_to_plan(self, backend: TaskBackend) -> None:
+        """append_task adds a single task to a plan with empty task list.
+
+        AC #2/#5: TaskBackend.append_task must append a single task to the plan
+        and make it visible on the subsequent read_plan call.
+
+        Arrange: create a plan with zero tasks.
+        Act: call backend.append_task with a TaskDefinition for T01.
+        Assert: read_plan returns a plan with exactly one task; task fields match.
+        """
+        # Arrange
+        created = backend.create_plan("my-slug", "Do the thing", [])
+        plan_id = created["plan_id"]
+
+        task_def: TaskDefinition = _make_task_def("T01", "First appended task")
+
+        # Act
+        backend.append_task(plan_id, task_def)
+
+        # Assert
+        plan = backend.read_plan(plan_id)
+        assert len(plan["tasks"]) == 1
+        assert plan["tasks"][0]["id"] == "T01"
+        assert plan["tasks"][0]["title"] == "First appended task"
+
+    def test_append_task_preserves_existing_tasks(self, backend: TaskBackend) -> None:
+        """append_task adds a task without disturbing existing tasks.
+
+        AC #3/#5: appending to a plan with existing tasks must not overwrite or
+        reorder the existing task list.
+
+        Arrange: create a plan with one task (T01); append a second task (T02).
+        Act: call backend.append_task(plan_id, T02_def).
+        Assert: read_plan returns two tasks in insertion order: T01 then T02.
+        """
+        # Arrange
+        created = backend.create_plan("two-task-plan", "Two tasks", [_make_task_def("T01", "Original task")])
+        plan_id = created["plan_id"]
+
+        # Act
+        backend.append_task(plan_id, _make_task_def("T02", "Appended task"))
+
+        # Assert
+        plan = backend.read_plan(plan_id)
+        assert len(plan["tasks"]) == 2
+        assert plan["tasks"][0]["id"] == "T01"
+        assert plan["tasks"][1]["id"] == "T02"
+
+    def test_append_task_plan_not_found_raises(self, backend: TaskBackend) -> None:
+        """append_task raises PlanNotFoundError when plan_id does not exist.
+
+        AC #6: each backend must raise PlanNotFoundError (not a silent no-op)
+        when append_task is called for an unknown plan_id.
+
+        Arrange: backend has no plans.
+        Act: call backend.append_task with plan_id 'P99999'.
+        Assert: PlanNotFoundError is raised containing 'P99999'.
+        """
+        # Arrange — backend starts empty; no plans exist
+
+        # Act / Assert
+        with pytest.raises(PlanNotFoundError):
+            backend.append_task("P99999", _make_task_def("T01", "Task"))
+
+    def test_append_task_duplicate_task_id_raises(self, backend: TaskBackend) -> None:
+        """append_task raises an error when a duplicate task ID is appended.
+
+        AC #6: each backend must raise an appropriate error (TaskValidationError
+        or ValueError) when a task with an already-existing ID is appended.
+
+        Arrange: create a plan with T01; append T01 again.
+        Act: second append_task call with the same task ID.
+        Assert: TaskValidationError (or ValueError) is raised.
+        """
+        from sam_schema.core.exceptions import TaskValidationError
+
+        # Arrange
+        created = backend.create_plan("dup-plan", "Goal", [_make_task_def("T01", "Original")])
+        plan_id = created["plan_id"]
+
+        # Act / Assert — appending a duplicate ID must be rejected
+        with pytest.raises((TaskValidationError, ValueError)):
+            backend.append_task(plan_id, _make_task_def("T01", "Duplicate"))
+
+    def test_append_multiple_tasks_preserves_order(self, backend: TaskBackend) -> None:
+        """N sequential append_task calls preserve insertion order.
+
+        AC #3: after N sequential append_task calls, read_plan must return tasks
+        in the same order they were appended.
+
+        Arrange: create empty plan; append T01..T05 sequentially.
+        Act: read plan.
+        Assert: tasks are ordered T01, T02, T03, T04, T05.
+        """
+        # Arrange
+        created = backend.create_plan("ordered-plan", "Order test", [])
+        plan_id = created["plan_id"]
+
+        # Act
+        for i in range(1, 6):
+            backend.append_task(plan_id, _make_task_def(f"T{i:02d}", f"Task {i}"))
+
+        # Assert
+        plan = backend.read_plan(plan_id)
+        assert len(plan["tasks"]) == 5
+        task_ids = [t["id"] for t in plan["tasks"]]
+        assert task_ids == ["T01", "T02", "T03", "T04", "T05"], f"Expected ordered IDs T01..T05, got: {task_ids}"

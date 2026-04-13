@@ -21,9 +21,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ActiveTaskActionConfig",
+    "AppendTaskConfig",
     "ClaimTaskConfig",
     "ClearActiveTaskConfig",
     "CreatePlanConfig",
+    "FinalizePlanConfig",
     # Active-task action models
     "GetActiveTaskConfig",
     "ListPlansConfig",
@@ -235,9 +237,62 @@ class UpdatePlanConfig(BaseModel):
     )
 
 
+class AppendTaskConfig(BaseModel):
+    """Append a single task to an existing plan.
+
+    Enables incremental plan building — callers emit one task at a time rather than
+    submitting the full ``tasks_yaml`` payload in a single ``create`` call. Plans
+    created with an empty ``tasks_yaml`` enter a ``drafting`` state; ``append_task``
+    keeps them in ``drafting`` until ``finalize`` is invoked.
+
+    Single-writer contract: implementations assume a single writer per plan. Backends
+    are NOT required to be atomic under concurrent writers. See #1770 for the
+    architectural decision record.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    action: Literal["append_task"] = "append_task"
+    task_yaml: str = Field(
+        ...,
+        description=(
+            "YAML string for a single task. Same schema as one element of the "
+            "top-level ``tasks`` list accepted by CreatePlanConfig.tasks_yaml. "
+            "Required fields per Task model: id (str, e.g. 'T1'), title (str), "
+            "status ('not-started'), agent (str), dependencies (list of task IDs), "
+            "priority (int 1-5), complexity ('low', 'medium', or 'high')."
+        ),
+    )
+
+
+class FinalizePlanConfig(BaseModel):
+    """Transition a plan out of ``drafting`` state into executable state.
+
+    Plans created with an empty ``tasks_yaml`` (the incremental build pattern)
+    start in ``drafting``. ``sam_plan(action='read')`` returns the tasks and a
+    ``drafting`` marker; ``status`` and ``ready`` return a ``drafting`` marker
+    instead of dispatchable task data. ``finalize`` clears ``drafting`` after
+    plan review completes (no-more-changes), making the plan available for
+    execution by ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
+
+    See #1770 for the architectural decision record.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    action: Literal["finalize"] = "finalize"
+
+
 # Discriminated union for sam_plan — discriminator is the ``action`` field.
 PlanActionConfig = Annotated[
-    ReadPlanConfig | CreatePlanConfig | ListPlansConfig | StatusPlanConfig | ReadyPlanConfig | UpdatePlanConfig,
+    ReadPlanConfig
+    | CreatePlanConfig
+    | ListPlansConfig
+    | StatusPlanConfig
+    | ReadyPlanConfig
+    | UpdatePlanConfig
+    | AppendTaskConfig
+    | FinalizePlanConfig,
     Field(discriminator="action"),
 ]
 

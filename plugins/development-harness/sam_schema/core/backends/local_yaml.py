@@ -535,6 +535,33 @@ class LocalYamlTaskProvider:
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
 
+    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+        """Stub — append_task not yet implemented on LocalYamlTaskProvider.
+
+        See TaskBackend.append_task for the single-writer contract and #1770 for the ADR.
+
+        Args:
+            plan_id: Plan identifier.
+            task_def: Single-task definition dict.
+
+        Raises:
+            NotImplementedError: Always — see #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError("LocalYamlTaskProvider.append_task not yet implemented — see #1770")
+
+    def finalize_plan(self, plan_id: str) -> dict[str, Any]:
+        """Stub — finalize_plan not yet implemented on LocalYamlTaskProvider.
+
+        See TaskBackend.finalize_plan and #1770 for the ADR.
+
+        Args:
+            plan_id: Plan identifier.
+
+        Raises:
+            NotImplementedError: Always — see #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError("LocalYamlTaskProvider.finalize_plan not yet implemented — see #1770")
+
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.
 

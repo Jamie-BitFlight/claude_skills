@@ -17,7 +17,7 @@ Dependency direction (must remain acyclic):
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Protocol, runtime_checkable
 
@@ -231,6 +231,43 @@ class TaskBackend(Protocol):
         Raises:
             PlanNotFoundError: When plan_id does not resolve to a known plan.
             TaskNotFoundError: When task_id does not exist within the plan.
+        """
+        ...
+
+    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+        """Append a single task to an existing plan.
+
+        Single-writer contract: callers MUST NOT invoke append_task concurrently on
+        the same plan_id. Backends are NOT required to provide atomicity under
+        concurrent writers. See #1770.
+
+        Args:
+            plan_id: Plan identifier returned by create_plan.
+            task_def: Single-task dict matching one element of the tasks_yaml list.
+
+        Returns:
+            Dict with append result (e.g. appended=True, task_id=...).
+
+        Raises:
+            PlanNotFoundError: If plan_id does not exist.
+            TaskValidationError: If task_def is malformed or duplicates an existing task ID.
+        """
+        ...
+
+    def finalize_plan(self, plan_id: str) -> dict[str, Any]:
+        """Transition a plan from drafting state to ready state.
+
+        After finalize, the plan is available for execution via
+        sam_plan(action='ready') and /dh:implement-feature. See #1770.
+
+        Args:
+            plan_id: Plan identifier.
+
+        Returns:
+            Dict with finalized=True and the new state.
+
+        Raises:
+            PlanNotFoundError: If plan_id does not exist.
         """
         ...
 

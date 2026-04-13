@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -271,6 +271,7 @@ class Plan(BaseModel):
     feature: str
     version: str = "1.0"
     description: str = ""
+    state: Literal["drafting", "ready"] = "ready"
 
     # Plan-level context fields (multiline markdown)
     goal: str | None = None

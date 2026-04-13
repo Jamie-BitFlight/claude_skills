@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import copy
 import uuid
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
@@ -479,6 +479,33 @@ class InMemoryTaskProvider:
             separator = "\n" if existing else ""
             new_context = f"{existing}{separator}{heading}\n\n{content}"
         task["context_notes"] = new_context  # type: ignore[typeddict-item]
+
+    def append_task(self, plan_id: str, task_def: TaskDefinition | dict[str, Any]) -> dict[str, Any]:
+        """Stub — append_task not yet implemented on InMemoryTaskProvider.
+
+        See TaskBackend.append_task for the single-writer contract and #1770 for the ADR.
+
+        Args:
+            plan_id: Plan identifier.
+            task_def: Single-task definition dict.
+
+        Raises:
+            NotImplementedError: Always — see #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError("InMemoryTaskProvider.append_task not yet implemented — see #1770")
+
+    def finalize_plan(self, plan_id: str) -> dict[str, Any]:
+        """Stub — finalize_plan not yet implemented on InMemoryTaskProvider.
+
+        See TaskBackend.finalize_plan and #1770 for the ADR.
+
+        Args:
+            plan_id: Plan identifier.
+
+        Raises:
+            NotImplementedError: Always — see #1770 for the green-phase implementation.
+        """
+        raise NotImplementedError("InMemoryTaskProvider.finalize_plan not yet implemented — see #1770")
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.

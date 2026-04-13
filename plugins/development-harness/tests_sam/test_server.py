@@ -938,3 +938,237 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
     # Assert — plan_ref includes issue number and UUID plan_id
     assert "error" not in result
     assert re.match(r"^#42,P[0-9a-f]{8}$", result["plan_ref"]), f"Expected '#42,P<hex8>', got: {result['plan_ref']!r}"
+
+
+# ---------------------------------------------------------------------------
+# sam_plan — append_task action (#1770 RED-PHASE tests)
+# ---------------------------------------------------------------------------
+# These tests target the new append_task routing added by #1770.
+# They are expected to FAIL in the red phase with:
+#   - Pydantic discriminator error for unknown action 'append_task', OR
+#   - ValueError: sam_plan: unhandled action 'append_task'
+# The green phase will add AppendTaskConfig to action_models.py and wire
+# the server.py match block.
+# ---------------------------------------------------------------------------
+
+
+def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
+    """sam_plan action=append_task calls backend.append_task for the given plan.
+
+    AC #2: sam_plan(action='append_task', plan=P, task_yaml=...) must append
+    a single task and return a success acknowledgment.
+
+    Arrange: create a plan with empty tasks_yaml; inject mock backend.
+    Act: call sam_plan with action=append_task.
+    Assert: backend.append_task was called exactly once with the plan_id and a
+            parsed task definition.
+    """
+    from unittest.mock import MagicMock
+
+    from sam_schema.core.action_models import AppendTaskConfig
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+    # Arrange
+    mock_backend = MagicMock()
+    mock_backend.read_plan.return_value = {
+        "plan_id": "P1",
+        "feature": "test-plan",
+        "version": "1",
+        "description": "",
+        "goal": "Test goal",
+        "context": "",
+        "acceptance_criteria": "",
+        "issue": None,
+        "tasks": [],
+        "source_path": None,
+        "state": "drafting",
+    }
+    mock_backend.append_task.return_value = None
+    mock_backend.create_plan.return_value = {
+        "plan_id": "P1",
+        "feature": "test-plan",
+        "version": "1",
+        "description": "",
+        "goal": "Test goal",
+        "context": "",
+        "acceptance_criteria": "",
+        "issue": None,
+        "tasks": [],
+        "source_path": str(tmp_path / "P1-test-plan.yaml"),
+        "state": "drafting",
+    }
+    set_task_config(TaskConfig(backend=mock_backend))
+
+    try:
+        task_yaml = (
+            "id: T1\n"
+            "title: First task\n"
+            "status: not-started\n"
+            "agent: test-agent\n"
+            "dependencies: []\n"
+            "priority: 2\n"
+            "complexity: low\n"
+        )
+
+        # Act
+        result = sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan="P1")
+
+        # Assert — backend.append_task called once
+        assert "error" not in result, f"append_task returned error: {result}"
+        mock_backend.append_task.assert_called_once()
+        call_args = mock_backend.append_task.call_args
+        plan_id_arg = call_args.args[0] if call_args.args else call_args.kwargs.get("plan_id")
+        assert plan_id_arg == "P1"
+    finally:
+        reset_task_config()
+
+
+def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
+    """sam_plan action=append_task returns a success acknowledgment dict.
+
+    AC #2: the response must not be an error dict; it must contain a truthy
+    success indicator (e.g. 'appended': True or 'task_id': 'T1').
+
+    Arrange: create plan via InMemoryTaskProvider; append one task.
+    Act: call sam_plan(action='append_task', plan=P, task_yaml=...).
+    Assert: result contains 'appended': True or 'task_id': 'T1' and no 'error' key.
+    """
+    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig
+    from sam_schema.core.backends.memory import InMemoryTaskProvider
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+    backend = InMemoryTaskProvider()
+    set_task_config(TaskConfig(backend=backend))
+
+    try:
+        create_result = sam_plan(
+            config=CreatePlanConfig(slug="append-test", goal="Append goal", tasks_yaml="tasks: []")
+        )
+        plan_id = create_result["plan_id"]
+
+        task_yaml = (
+            "id: T1\n"
+            "title: First task\n"
+            "status: not-started\n"
+            "agent: test-agent\n"
+            "dependencies: []\n"
+            "priority: 2\n"
+            "complexity: low\n"
+        )
+
+        # Act
+        result = sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+
+        # Assert
+        assert "error" not in result, f"Expected success but got error: {result}"
+        success = result.get("appended") is True or result.get("task_id") is not None
+        assert success, f"Expected success indicator in append_task response, got: {result!r}"
+    finally:
+        reset_task_config()
+
+
+def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
+    """sam_plan action=append_task raises PlanNotFoundError when plan does not exist.
+
+    AC #6: backend must raise PlanNotFoundError for unknown plan_id.
+    FastMCP converts this to a ToolError (isError=true) at the MCP transport.
+
+    Arrange: inject fresh InMemoryTaskProvider (no plans).
+    Act: call sam_plan(action='append_task', plan='P99999').
+    Assert: PlanNotFoundError or ToolError is raised containing 'P99999'.
+    """
+    from sam_schema.core.action_models import AppendTaskConfig
+    from sam_schema.core.backends.memory import InMemoryTaskProvider
+    from sam_schema.core.exceptions import PlanNotFoundError
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+    backend = InMemoryTaskProvider()
+    set_task_config(TaskConfig(backend=backend))
+
+    try:
+        task_yaml = (
+            "id: T1\ntitle: Task\nstatus: not-started\nagent: a\ndependencies: []\npriority: 2\ncomplexity: low\n"
+        )
+
+        # Act / Assert
+        with pytest.raises(PlanNotFoundError, match="P99999"):
+            sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan="P99999")
+    finally:
+        reset_task_config()
+
+
+def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
+    """sam_plan action=append_task raises an error when duplicate task ID is appended.
+
+    AC #6: backend must raise an error (TaskValidationError or ValueError) when
+    a task with an ID that already exists in the plan is appended.
+
+    Arrange: create a plan with T1; append T1 a second time.
+    Act: second append_task call.
+    Assert: an exception is raised (TaskValidationError or ValueError or similar).
+    """
+    from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig
+    from sam_schema.core.backends.memory import InMemoryTaskProvider
+    from sam_schema.core.exceptions import TaskValidationError
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+    backend = InMemoryTaskProvider()
+    set_task_config(TaskConfig(backend=backend))
+
+    try:
+        create_result = sam_plan(config=CreatePlanConfig(slug="dup-task", goal="Goal", tasks_yaml="tasks: []"))
+        plan_id = create_result["plan_id"]
+
+        task_yaml = (
+            "id: T1\ntitle: Task\nstatus: not-started\nagent: a\ndependencies: []\npriority: 2\ncomplexity: low\n"
+        )
+
+        # First append succeeds
+        sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+
+        # Act / Assert — second append with same ID must raise
+        with pytest.raises((TaskValidationError, ValueError)):
+            sam_plan(config=AppendTaskConfig(task_yaml=task_yaml), plan=plan_id)
+    finally:
+        reset_task_config()
+
+
+# ---------------------------------------------------------------------------
+# sam_plan — finalize action (#1770 RED-PHASE tests)
+# ---------------------------------------------------------------------------
+# These tests target the new finalize routing.
+# They FAIL in the red phase with Pydantic discriminator error or ValueError.
+# ---------------------------------------------------------------------------
+
+
+def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> None:
+    """sam_plan action=finalize calls backend.finalize_plan (or update_plan_fields).
+
+    AC #14: finalize must clear the drafting state via a dedicated backend call.
+
+    Arrange: inject mock backend.
+    Act: call sam_plan(action='finalize', plan='P1').
+    Assert: backend.finalize_plan (or update_plan_fields with state='ready') called once.
+    """
+    from unittest.mock import MagicMock
+
+    from sam_schema.core.action_models import FinalizePlanConfig
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+    mock_backend = MagicMock()
+    mock_backend.finalize_plan.return_value = None
+    mock_backend.update_plan_fields.return_value = None
+    set_task_config(TaskConfig(backend=mock_backend))
+
+    try:
+        # Act
+        result = sam_plan(config=FinalizePlanConfig(), plan="P1")
+
+        # Assert — either finalize_plan OR update_plan_fields called to transition state
+        assert "error" not in result, f"Expected success, got: {result!r}"
+        state_transitioned = mock_backend.finalize_plan.called or mock_backend.update_plan_fields.called
+        assert state_transitioned, (
+            "Expected either backend.finalize_plan or backend.update_plan_fields to be called to clear drafting state"
+        )
+    finally:
+        reset_task_config()
