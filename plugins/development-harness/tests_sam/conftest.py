@@ -10,10 +10,16 @@ Fixture design follows AAA pattern with full type annotations and pytest-mock
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from sam_schema.core.action_models import TaskDefinition
+from sam_schema.core.backends.memory import InMemoryTaskProvider
 from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
+from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # ---------------------------------------------------------------------------
 # Path constants
@@ -72,6 +78,26 @@ def make_task_def(
         "priority": 1,
         "complexity": "low",
     })
+
+
+# ---------------------------------------------------------------------------
+# Backend fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def memory_backend() -> Generator[InMemoryTaskProvider, None, None]:
+    """Inject a fresh InMemoryTaskProvider via set_task_config.
+
+    Calls reset_task_config() in teardown to prevent cross-test contamination.
+
+    Yields:
+        Configured InMemoryTaskProvider instance.
+    """
+    backend = InMemoryTaskProvider()
+    set_task_config(TaskConfig(backend=backend))
+    yield backend
+    reset_task_config()
 
 
 # ---------------------------------------------------------------------------

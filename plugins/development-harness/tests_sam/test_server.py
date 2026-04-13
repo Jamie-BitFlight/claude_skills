@@ -860,14 +860,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# sam_plan — append_task action (#1770 RED-PHASE tests)
-# ---------------------------------------------------------------------------
-# These tests target the new append_task routing added by #1770.
-# They are expected to FAIL in the red phase with:
-#   - Pydantic discriminator error for unknown action 'append_task', OR
-#   - ValueError: sam_plan: unhandled action 'append_task'
-# The green phase will add AppendTaskConfig to action_models.py and wire
-# the server.py match block.
+# sam_plan — append_task action (#1770)
 # ---------------------------------------------------------------------------
 
 
@@ -1015,12 +1008,11 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
 def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
     """sam_plan action=append_task raises an error when duplicate task ID is appended.
 
-    AC #6: backend must raise an error (TaskValidationError or ValueError) when
-    a task with an ID that already exists in the plan is appended.
+    AC #6: backend raises TaskValidationError when a duplicate task ID is appended.
 
     Arrange: create a plan with T1; append T1 a second time.
     Act: second append_task call.
-    Assert: an exception is raised (TaskValidationError or ValueError or similar).
+    Assert: TaskValidationError is raised.
     """
     from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig
     from sam_schema.core.backends.memory import InMemoryTaskProvider
@@ -1039,18 +1031,15 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
         # First append succeeds
         sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
 
-        # Act / Assert — second append with same ID must raise
-        with pytest.raises((TaskValidationError, ValueError)):
+        # Act / Assert — second append with same ID must raise TaskValidationError
+        with pytest.raises(TaskValidationError):
             sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
     finally:
         reset_task_config()
 
 
 # ---------------------------------------------------------------------------
-# sam_plan — finalize action (#1770 RED-PHASE tests)
-# ---------------------------------------------------------------------------
-# These tests target the new finalize routing.
-# They FAIL in the red phase with Pydantic discriminator error or ValueError.
+# sam_plan — finalize action (#1770)
 # ---------------------------------------------------------------------------
 
 

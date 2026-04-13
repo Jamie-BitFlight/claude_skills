@@ -59,45 +59,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-from sam_schema.core.backends.memory import InMemoryTaskProvider
-from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
-from sam_schema.server import sam_plan
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+from sam_schema.server import sam_plan
+
+if TYPE_CHECKING:
+    from sam_schema.core.backends.memory import InMemoryTaskProvider
 
 _MINIMAL_TASK = TaskDefinition(
     id="T1", title="First task", status="not-started", agent="test-agent", dependencies=[], priority=2, complexity="low"
 )
 
 _DRAFTING_PLAN_CONFIG = CreatePlanConfig(slug="test-plan", goal="Test goal", tasks=[])
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def memory_backend() -> Generator[InMemoryTaskProvider, None, None]:
-    """Inject a fresh InMemoryTaskProvider via set_task_config.
-
-    Calls reset_task_config() in teardown to prevent cross-test contamination.
-
-    Yields:
-        Configured InMemoryTaskProvider instance.
-    """
-    backend = InMemoryTaskProvider()
-    set_task_config(TaskConfig(backend=backend))
-    yield backend
-    reset_task_config()
 
 
 # ---------------------------------------------------------------------------
