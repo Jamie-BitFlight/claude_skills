@@ -67,6 +67,107 @@ Same methodology (goal-backward), different timing, different subject matter.
 
 </critical_rules>
 
+<drafting_state_handling>
+
+## Drafting State Handling
+
+Plans created with `tasks_yaml='{tasks: []}'` enter `state="drafting"`. This is an explicit
+intermediate state cleared only by `sam_plan(action='finalize')`. A drafting plan is a valid
+work-in-progress artifact — NOT a malformed or incomplete final plan.
+
+### Decision Table: Drafting vs Ready Validation Modes
+
+| Condition | Plan state | Drafting marker in response | Validation mode | Full dispatchability checks |
+|---|---|---|---|---|
+| Plan under construction | `drafting` | Present | Structural only | Deferred |
+| Plan ready for dispatch | `ready` (or absent) | Absent | Full | Applied |
+| Malformed: finalized but marker still present | `ready` (or absent) | Present | Flag as malformed | N/A — flag error |
+| Malformed: drafting but no marker | `drafting` | Absent | Structural only | Deferred |
+
+### Flowchart: Validation Mode Selection
+
+```text
+Read plan via sam_plan(action='read')
+        |
+        v
+Is state == "drafting"?
+  YES --> Apply Structural-Only checks (see below)
+          Return: STATUS=DRAFTING (not READY/BLOCKED)
+  NO  --> Is drafting marker present in response?
+            YES --> Flag: MALFORMED (non-drafting plan contains drafting marker)
+                    Return: STATUS=BLOCKED with STRUCTURE gap
+            NO  --> Apply Full Dispatchability checks (all dimensions)
+                    Return: STATUS=READY or STATUS=BLOCKED
+```
+
+### Structural-Only Checks (Drafting Plans)
+
+When `state="drafting"`, run ONLY these checks — defer the rest until `finalize` is called:
+
+**Apply:**
+
+- Dimension 3 (Dependency Correctness) on tasks present so far — partial DAG is valid; missing downstream deps are expected
+- Dimension 4 (Agent Capability Match) on tasks present so far
+- Dimension 9 (Architectural Boundary Compliance) on tasks present so far
+
+**Defer until finalized:**
+
+- Dimension 1 (Requirement Coverage) — plan may not yet have all tasks
+- Dimension 2 (Task Completeness) — tasks may still be incomplete stubs
+- Dimension 5 (Input/Output Validity) — downstream outputs may not exist yet
+- Dimension 6 (Artifact Wiring) — connections form as tasks are appended
+- Dimension 7 (Testability) — acceptance criteria may be placeholders
+- Dimension 8 (Scope Sanity) — phase structure incomplete
+- Dimension 10 (Impact Radius Coverage) — plan not yet fully built
+
+### Output: Drafting Status Signal
+
+When a drafting plan passes structural checks:
+
+```text
+STATUS: DRAFTING
+SUMMARY: Plan is in drafting state — structural checks passed on {N} tasks.
+         Full dispatchability checks deferred until sam_plan(action='finalize') is called.
+STRUCTURAL_CHECKS:
+  - Dependency correctness: pass (partial DAG valid)
+  - Agent capability match: pass
+  - Boundary compliance: pass
+DEFERRED_CHECKS:
+  - Requirement coverage, task completeness, input/output validity,
+    artifact wiring, testability, scope sanity, impact radius coverage
+NEXT_STEP: Continue appending tasks. Call finalize when plan construction is complete.
+```
+
+When a drafting plan has structural issues:
+
+```text
+STATUS: BLOCKED
+SUMMARY: Drafting plan has {N} structural issue(s) in current tasks.
+BLOCKERS:
+  1. [dependency] Task {ID}: circular dependency detected even in partial DAG
+     Fix: remove the cycle before appending more tasks
+```
+
+### Malformed Plan Detection
+
+A plan is malformed when `state` is `ready` (or absent) BUT the `sam_plan(action='read')` response
+contains a drafting marker (`{drafting: True}` or `{state: "drafting"}` embedded in the
+plan data).
+
+This indicates `finalize` was never called or the state field was corrupted. Report as:
+
+```text
+STATUS: BLOCKED
+SUMMARY: Plan state is inconsistent — non-drafting plan still contains drafting marker.
+BLOCKERS:
+  1. [STRUCTURE] Plan: state field is absent or 'ready' but drafting marker is present in data.
+     Fix: Call sam_plan(action='finalize') to clear the drafting marker, then re-validate.
+```
+
+SOURCE: Architectural Decision 2 — Drafting State (plan-context artifact #1770, 2026-04-13)
+
+</drafting_state_handling>
+
 <validation_dimensions>
 
 ## Dimension 1: Requirement Coverage
