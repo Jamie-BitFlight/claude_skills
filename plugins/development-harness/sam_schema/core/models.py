@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -102,6 +102,13 @@ class BookendType(StrEnum):
 
     T0_BASELINE = "t0-baseline"
     TN_VERIFICATION = "tn-verification"
+
+
+class PlanState(StrEnum):
+    """Lifecycle state for a SAM plan."""
+
+    DRAFTING = "drafting"
+    READY = "ready"
 
 
 class Task(BaseModel):
@@ -271,7 +278,7 @@ class Plan(BaseModel):
     feature: str
     version: str = "1.0"
     description: str = ""
-    state: Literal["drafting", "ready"] = "ready"
+    state: PlanState = PlanState.READY
 
     # Plan-level context fields (multiline markdown)
     goal: str | None = None

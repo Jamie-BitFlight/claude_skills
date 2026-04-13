@@ -30,6 +30,7 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
+from sam_schema.core.models import PlanState
 from sam_schema.core.query import _new_plan_id
 
 if TYPE_CHECKING:
@@ -245,7 +246,7 @@ class InMemoryTaskProvider:
             "issue": str(issue) if issue is not None else None,
             "tasks": task_data_list,
             "source_path": None,
-            "state": "drafting" if not tasks else "ready",
+            "state": PlanState.DRAFTING if not tasks else PlanState.READY,
         }
         self._plans[plan_id] = copy.deepcopy(plan_data)
         return copy.deepcopy(plan_data)
@@ -545,8 +546,8 @@ class InMemoryTaskProvider:
         """
         if plan_id not in self._plans:
             raise PlanNotFoundError(plan_id)
-        self._plans[plan_id]["state"] = "ready"
-        return {"finalized": True, "state": "ready"}
+        self._plans[plan_id]["state"] = PlanState.READY
+        return {"finalized": True, "state": PlanState.READY}
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.

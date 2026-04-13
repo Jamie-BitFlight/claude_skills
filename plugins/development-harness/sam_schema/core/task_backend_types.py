@@ -12,11 +12,14 @@ All types follow the pattern established in backlog_core/backend_protocol.py:
 
 from __future__ import annotations
 
-from typing import Literal, NotRequired
+from typing import TYPE_CHECKING, NotRequired
 
 from typing_extensions import TypedDict
 
-__all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData", "TaskDefinitionDict"]
+if TYPE_CHECKING:
+    from sam_schema.core.models import PlanState
+
+__all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData"]
 
 
 class TaskDefinitionDict(TypedDict):
@@ -165,7 +168,7 @@ class PlanData(TypedDict):
     source_path: str | None
 
     # Drafting state (see #1770)
-    state: NotRequired[Literal["drafting", "ready"]]
+    state: NotRequired[PlanState]
 
     # Optional reference fields
     architecture: NotRequired[str | None]

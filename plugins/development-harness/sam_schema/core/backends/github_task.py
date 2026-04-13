@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 from sam_schema.core.backends._utils import _now_iso
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
+from sam_schema.core.models import PlanState
 from sam_schema.core.task_backend_types import (
     DocumentData,
     DocumentHandle,
@@ -355,7 +356,7 @@ class GitHubTaskProvider:
             source_path=None,
         )
         if _DRAFTING_MARKER in (node.get("body") or ""):
-            plan_data["state"] = "drafting"
+            plan_data["state"] = PlanState.DRAFTING
         return plan_data
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
@@ -559,7 +560,7 @@ class GitHubTaskProvider:
         new_body = re.sub(r"\n?" + re.escape(_DRAFTING_MARKER), "", body)
         repo, _, _ = self._get_repo()
         self._issue_backend._update_issue_graphql(repo, node["id"], body=new_body)  # type: ignore[arg-type]
-        return {"finalized": True, "state": "ready"}
+        return {"finalized": True, "state": PlanState.READY}
 
     def store_document(
         self, plan_id: str, task_id: str | None, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"

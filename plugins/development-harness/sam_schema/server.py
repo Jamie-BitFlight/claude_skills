@@ -43,7 +43,7 @@ from sam_schema.core.action_models import (
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.exceptions import PlanNotFoundError, SamError, TaskNotFoundError
-from sam_schema.core.models import Plan, Task, TaskAssignment
+from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
@@ -324,8 +324,8 @@ def _sam_plan_status(plan: str, plan_dir: str) -> dict:
     """Return plan-level progress summary."""
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
-    if plan_data.get("state") == "drafting":
-        return {"drafting": True, "state": "drafting"}
+    if plan_data.get("state") == PlanState.DRAFTING:
+        return {"drafting": True, "state": PlanState.DRAFTING}
     return dict(backend.get_plan_status(plan))
 
 
@@ -337,8 +337,8 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     """
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
-    if plan_data.get("state") == "drafting":
-        return {"drafting": True, "state": "drafting"}
+    if plan_data.get("state") == PlanState.DRAFTING:
+        return {"drafting": True, "state": PlanState.DRAFTING}
     tasks_data = backend.get_ready_tasks(plan)
     if config.full:
         ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]

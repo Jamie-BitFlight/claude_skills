@@ -23,7 +23,7 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
-from sam_schema.core.models import Plan, Task, TaskStatus
+from sam_schema.core.models import Plan, PlanState, Task, TaskStatus
 from sam_schema.readers.detect import FormatDetectionError
 
 if TYPE_CHECKING:
@@ -272,7 +272,7 @@ class LocalYamlTaskProvider:
         if not tasks:
             from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
 
-            plan = plan.model_copy(update={"state": "drafting"})
+            plan = plan.model_copy(update={"state": PlanState.DRAFTING})
             if plan.source_path is not None:
                 write_plan(plan, plan.source_path, force_single=True)
 
@@ -614,10 +614,10 @@ class LocalYamlTaskProvider:
         result = query.load_plan(path)
         plan = result.plan
 
-        updated_plan = plan.model_copy(update={"state": "ready"})
+        updated_plan = plan.model_copy(update={"state": PlanState.READY})
         write_plan(updated_plan, path, force_single=True)
 
-        return {"finalized": True, "state": "ready"}
+        return {"finalized": True, "state": PlanState.READY}
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.
