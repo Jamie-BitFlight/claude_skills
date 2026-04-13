@@ -583,17 +583,34 @@ class LocalYamlTaskProvider:
         return {"appended": True, "task_id": task.id}
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
-        """Stub — finalize_plan not yet implemented on LocalYamlTaskProvider.
+        """Finalize a drafting plan by setting its state to ready.
 
-        See TaskBackend.finalize_plan and #1770 for the ADR.
+        Resolves the plan path, loads the current plan, sets ``state="ready"``,
+        and writes back using ``write_plan`` with ``force_single=True``.
+
+        **Single-writer assumption (ADR-1770-1)**: This method is NOT safe under
+        concurrent writers. Callers must serialize writes to the same plan. Behavior
+        under concurrent ``finalize_plan`` calls for the same plan is **undefined**.
 
         Args:
             plan_id: Plan identifier.
 
+        Returns:
+            ``{"finalized": True, "state": "ready"}``
+
         Raises:
-            NotImplementedError: Always — see #1770 for the green-phase implementation.
+            PlanNotFoundError: When plan_id cannot be resolved to a file.
         """
-        raise NotImplementedError("LocalYamlTaskProvider.finalize_plan not yet implemented — see #1770")
+        from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
+
+        path = self._resolve_path(plan_id)
+        result = query.load_plan(path)
+        plan = result.plan
+
+        updated_plan = plan.model_copy(update={"state": "ready"})
+        write_plan(updated_plan, path, force_single=True)
+
+        return {"finalized": True, "state": "ready"}
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return all tasks that are ready for dispatch.
