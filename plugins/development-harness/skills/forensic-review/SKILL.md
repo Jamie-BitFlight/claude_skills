@@ -1,6 +1,6 @@
 ---
 name: forensic-review
-description: SAM Stage 6 — Independent verification of execution results by a separate reviewer agent. Used when validating task completion against plan; performs fact-checking and returns COMPLETE or NEEDS_WORK with specific findings.
+description: Use when SAM Stage 5 Execution has completed and task results need independent verification against acceptance criteria. Dispatches a separate reviewer agent to fact-check implementation outputs and returns COMPLETE or NEEDS_WORK with specific findings and remediation tasks.
 user-invocable: false
 ---
 

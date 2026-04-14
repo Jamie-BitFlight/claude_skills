@@ -1,6 +1,6 @@
 ---
 name: work-milestone
-description: "Execute a groomed milestone with parallel kage-bunshin sessions in isolated worktrees. Use when running a milestone after /groom-milestone has produced a dispatch plan. Reads dispatch plan, creates integration branch, spawns one kage-bunshin (independent claude -p process) per wave item in its own worktree — each session is a full orchestrator with Agent tool and TeamCreate. Sequentially merges worktree branches, relays wave discoveries to subsequent waves, then lands integration branch to main. Args: {milestone-number}."
+description: "Executes a groomed milestone with parallel kage-bunshin sessions in isolated worktrees. Use when a milestone has been groomed and /groom-milestone has produced a dispatch plan. Reads the dispatch plan, creates an integration branch, spawns one kage-bunshin (independent claude -p process) per wave item in its own worktree — each session is a full orchestrator with Agent tool and TeamCreate. Sequentially merges worktree branches, relays wave discoveries to subsequent waves, then lands the integration branch to main. Takes a milestone number as argument."
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---

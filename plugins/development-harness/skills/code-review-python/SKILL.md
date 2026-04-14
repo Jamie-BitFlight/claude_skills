@@ -1,6 +1,6 @@
 ---
 name: code-review-python
-description: Python-specific code review patterns for the dh code-reviewer agent. Covers uv, ruff, ty, pytest, typing, and Python 3.11+ idioms. Loaded automatically when reviewing Python code.
+description: Provides Python-specific code review rules for the dh code-reviewer agent. Activates on pyproject.toml or *.py file detection — enforces uv, ruff, ty, pytest, type annotation, error handling, and Python 3.11+ idioms including pathlib, match statements, and modern union syntax.
 user-invocable: false
 ---
 

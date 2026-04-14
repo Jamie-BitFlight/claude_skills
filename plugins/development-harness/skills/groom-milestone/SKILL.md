@@ -1,6 +1,6 @@
 ---
 name: groom-milestone
-description: "Groom a GitHub milestone for parallel execution. Batch-grooms ungroomed items, assesses scope gaps, analyzes cross-item dependencies (Impact Radius overlap), builds conflict groups, assigns items to execution waves, and persists the dispatch plan via dispatch_create_plan MCP tool. Calls dispatch_wave_start MCP tool per wave to register state. Use when preparing a milestone for /work-milestone execution. Args: {milestone-number}. Requires milestone to have items assigned via /group-items-to-milestone."
+description: "Grooms a GitHub milestone for parallel execution — batch-grooms ungroomed items, assesses scope gaps, analyzes cross-item dependencies via Impact Radius overlap, builds conflict groups, assigns items to execution waves, and persists the dispatch plan via dispatch_create_plan MCP tool. Calls dispatch_wave_start per wave to register state. Use when preparing a milestone for /work-milestone execution. Pass the milestone number as the first argument. Requires milestone items assigned via /group-items-to-milestone."
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---

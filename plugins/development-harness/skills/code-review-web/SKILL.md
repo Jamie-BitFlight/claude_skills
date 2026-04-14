@@ -1,6 +1,6 @@
 ---
 name: code-review-web
-description: Web frontend code review patterns. Covers accessibility, DOM safety, performance, CSS, and framework-agnostic quality indicators. Loaded automatically when reviewing frontend code.
+description: Use when reviewing web frontend code — HTML, CSS, JSX, or browser-targeted JavaScript. Enforces accessibility (WCAG AA, aria labels, focus management), XSS prevention (innerHTML, dangerouslySetInnerHTML), performance (layout thrash, CLS, lazy loading), CSS design tokens, form labeling, and event listener cleanup. Loaded by dh:code-reviewer on *.html, *.css, *.jsx detection.
 user-invocable: false
 ---
 

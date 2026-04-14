@@ -1,6 +1,6 @@
 ---
 name: setup-skill-discovery
-description: 'Creates or regenerates .dh/skill_discovery.yaml. Scans repo to infer tech stack, inventories installed skills via npx skills list, loads candidate skill content before suggesting, and writes a config-driven skill injection file. Run /dh:setup-skill-discovery to create or update the project skill discovery config.'
+description: "Use when creating or updating the project skill discovery config — generates or regenerates .dh/skill_discovery.yaml by scanning the repo to infer tech stack, inventorying installed skills via npx skills list, loading candidate skill content before suggesting, and writing a config-driven skill injection file. Triggers on /dh:setup-skill-discovery invocations and programmatic --auto calls from add-new-feature Phase 3."
 argument-hint: "[--auto]"
 user-invocable: true
 model: sonnet

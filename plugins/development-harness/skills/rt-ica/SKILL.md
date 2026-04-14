@@ -1,6 +1,6 @@
 ---
 name: rt-ica
-description: Reverse Thinking - Information Completeness Assessment. Mandatory pre-planning checkpoint that blocks planning until prerequisites are verified. Use when receiving specs, PRDs, tickets, RFCs, architecture designs, or any multi-step engineering task. Integrates with CoVe-style planning pipelines. Invoke BEFORE creating plans, delegating to agents, or defining acceptance criteria.
+description: Use before creating plans, delegating to agents, or defining acceptance criteria — performs Reverse Thinking Information Completeness Assessment (RT-ICA) to surface missing prerequisites and block planning until all required inputs are verified. Activates on specs, PRDs, tickets, RFCs, architecture designs, and multi-step engineering tasks. Integrates with CoVe-style planning pipelines.
 user-invocable: true
 context: fork
 ---

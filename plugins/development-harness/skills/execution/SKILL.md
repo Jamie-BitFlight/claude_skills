@@ -1,6 +1,6 @@
 ---
 name: execution
-description: SAM Stage 5 — Stateless execution of a single task in a fresh agent session. The task file IS the complete prompt containing all context needed. Used when dispatching a task to an agent; produces the EXECUTION artifact with implementation results and verification output.
+description: Executes SAM Stage 5 — dispatches a single ARTIFACT:TASK file to a fresh stateless agent session, runs quality gates, and produces an ARTIFACT:EXECUTION with implementation results and verification output. Use when Stage 4 Task Decomposition is complete and tasks are ready for execution, when re-executing a task after Stage 6 returns NEEDS_WORK, or when dispatching a task to a language-appropriate specialist agent via the development harness pipeline.
 user-invocable: false
 ---
 

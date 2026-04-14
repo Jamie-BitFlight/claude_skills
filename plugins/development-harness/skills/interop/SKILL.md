@@ -1,6 +1,6 @@
 ---
 name: interop
-description: Use this skill when routing a Superpowers plan file through the /work-backlog-item pipeline — creates a SAM task file and writes back-references into the original plan
+description: Routes a Superpowers plan file through the /work-backlog-item pipeline and writes SAM task back-references and chunk annotations into the original plan. Use when given a path to a Superpowers plan file via $ARGUMENTS and needing to create a linked backlog item plus SAM task file.
 ---
 
 # /dh:interop — Superpowers Plan Interop Adapter

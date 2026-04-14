@@ -1,6 +1,6 @@
 ---
 name: code-review-llm
-description: LLM integration and machine learning code review patterns. Covers prompt engineering, model selection, context management, token economics, evaluation, and safety. Loaded automatically when reviewing AI/ML code.
+description: Use when reviewing AI/ML code or LLM integration — activates on prompt templates, model selection logic, token budget concerns, or evaluation harness code. Enforces prompt hygiene, model tier matching, context window management, token economics, structured output validation, temperature settings, retry logic, streaming error handling, and PII/safety rules.
 user-invocable: false
 ---
 

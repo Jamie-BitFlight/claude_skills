@@ -1,6 +1,6 @@
 ---
 name: code-review-claude-skills
-description: Claude Code skill and agent review patterns. Covers SKILL.md structure, frontmatter validity, token budget, description quality, and agent contract compliance. Loaded automatically when reviewing Claude skills or agent definitions.
+description: Loaded automatically when reviewing Claude skills or agent definitions — covers SKILL.md structure, frontmatter validity, token budget, description quality, and agent contract compliance.
 user-invocable: false
 ---
 

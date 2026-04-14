@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: Use when an agent needs to pick up a specific SAM task, set it in progress, implement its acceptance criteria, and signal completion. Activates when executing tasks from a SAM task file — updates status to IN PROGRESS with a Started timestamp, writes active-task context for hooks, and supports --complete to mark tasks done. Triggers on task execution within the implement-feature loop.
+description: Use when executing a SAM task — claims the task via MCP to set it IN PROGRESS, writes active-task context for hooks, loads task-level skills, implements against acceptance criteria, and marks complete via --complete flag. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan file.
 argument-hint: <task-file-path> [--task <task-id>] [--complete <task-id>]
 user-invocable: true
 hooks:

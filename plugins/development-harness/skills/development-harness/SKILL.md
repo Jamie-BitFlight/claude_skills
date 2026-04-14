@@ -1,6 +1,6 @@
 ---
 name: development-harness
-description: Development Harness plugin overview and skill router — use when unsure which dh skill to invoke. Routes by intent — capture, groom, plan, execute, single task, quality gates, or milestone. Activates on 'which skill', 'where do I start', 'development workflow', or direct /dh invocation.
+description: Routes to the correct dh skill entry point by intent. Use when unsure which development-harness skill to invoke, starting a development workflow, or invoking /dh directly. Covers capture, groom, plan, execute, single task, quality gates, and milestone routing.
 model: opus
 context: fork
 user-invocable: true

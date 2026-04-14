@@ -1,6 +1,6 @@
 ---
 name: code-review-nodejs
-description: Node.js-specific code review patterns. Covers async patterns, streams, security, process management, and dependency hygiene. Loaded automatically when reviewing Node.js server code.
+description: Applies Node.js-specific code review patterns for async I/O, streams, security, process management, and dependency hygiene. Use when reviewing Node.js server code, route handlers, middleware, or any JavaScript file alongside package.json without TypeScript. Triggers on sync I/O in request paths, missing stream backpressure, process.exit misuse, eval/exec injection risks, wildcard version ranges, missing lockfiles, EventEmitter cleanup gaps, and unvalidated environment variables at startup.
 user-invocable: false
 ---
 

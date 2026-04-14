@@ -1,6 +1,6 @@
 ---
 name: discovery
-description: SAM Stage 1 — Structured requirements gathering through discussion with user. Produces the DISCOVERY artifact containing feature requirements, NFRs, goals, anti-goals, references, and resolved questions. Use when starting a new feature or gathering requirements.
+description: Use when starting a new feature, gathering requirements for an unfamiliar domain, refining a vague idea into actionable scope, or when a user request is ambiguous or underspecified. Conducts SAM Stage 1 discovery — structured requirements gathering through user discussion, asking WHO/WHAT/WHEN/WHY and never HOW. Produces the ARTIFACT:DISCOVERY document containing feature requirements, NFRs, goals, anti-goals, references, and resolved questions. Supports backlog item self-initialization via a #N argument.
 model: sonnet
 user-invocable: true
 ---

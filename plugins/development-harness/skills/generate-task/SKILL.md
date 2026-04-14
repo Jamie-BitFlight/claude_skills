@@ -1,6 +1,6 @@
 ---
 name: generate-task
-description: Generate a single worker task prompt using the existing CLEAR + selective CoVe task design standard and the task structure requirements used by swarm-task-planner. Use when you need to create or rewrite one TASK/ file or one task block for a plan.
+description: Generates one worker task prompt conforming to the CLEAR + selective CoVe task design standard and swarm-task-planner structure. Use when creating or rewriting a single TASK file or task block inside a plan — providing a title and brief description as input.
 argument-hint: '[task title and brief description]'
 user-invocable: true
 disable-model-invocation: false

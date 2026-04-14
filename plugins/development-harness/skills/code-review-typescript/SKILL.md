@@ -1,6 +1,6 @@
 ---
 name: code-review-typescript
-description: TypeScript-specific code review patterns. Covers strict mode, ESM, type safety, branded types, and common anti-patterns. Loaded automatically when reviewing TypeScript code.
+description: Provides TypeScript-specific code review patterns covering strict mode, ESM, type safety, branded types, discriminated unions, async patterns, runtime safety, and common anti-patterns. Activates on detection of tsconfig.json, *.ts, or *.tsx files during code review — loaded automatically by dh:code-reviewer.
 user-invocable: false
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: context-integration
-description: SAM Stage 3 — Ground the design plan in actual codebase reality. Performs scope analysis, conflict detection, and resource mapping. Used when the PLAN artifact needs contextualization with concrete file references, integration points, and resolved conflicts.
+description: Use when the PLAN artifact from SAM Stage 2 needs contextualization against actual codebase state — grounds the design plan in reality by performing scope analysis (NEW/MODIFY/COMPLETE classification), conflict detection between plan assumptions and codebase patterns, and resource mapping to concrete file paths and integration points. Produces an updated ARTIFACT:PLAN registered via MCP with a Contextualization section appended.
 user-invocable: false
 ---
 

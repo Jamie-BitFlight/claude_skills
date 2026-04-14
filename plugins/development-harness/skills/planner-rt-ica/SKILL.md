@@ -1,6 +1,6 @@
 ---
 name: planner-rt-ica
-description: Identify required inputs, dependencies, and uncertainty during planning. Use when generating plans or task graphs under incomplete information. Does not block plan generation; instead localizes gaps and creates unblock dependencies.
+description: Runs information completeness pre-pass before task decomposition and plan generation. Use when grooming backlog items, generating plans, decomposing tasks under uncertainty, or working in brownfield and refactor scenarios. Localizes missing inputs to affected tasks only — does not block plan generation. Produces completeness summary (APPROVED-FOR-PLANNING, APPROVED-WITH-GAPS, or BLOCKED-FOR-PLANNING), missing input report with dependency mapping, required unblock actions, and planning annotations for downstream tasks. Non-blocking sister to dh:rt-ica — use dh:rt-ica at the S2 implementation gate where missing inputs must halt execution.
 argument-hint: '[optional-scope-or-task-id]'
 user-invocable: false
 disable-model-invocation: false

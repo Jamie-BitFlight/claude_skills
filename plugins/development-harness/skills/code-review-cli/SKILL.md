@@ -1,6 +1,6 @@
 ---
 name: code-review-cli
-description: CLI application code review patterns. Covers UX, argument parsing, exit codes, terminal output, and non-interactive operation. Loaded automatically when reviewing CLI tools.
+description: Reviews CLI application code for correctness and quality. Use when reviewing tools that use argparse, click, typer, commander.js, or similar argument parsers — covers exit codes, help flags, stdin/stdout/stderr separation, non-interactive operation, signal handling, argument validation, ANSI color safety, and dry-run support for destructive operations.
 user-invocable: false
 ---
 

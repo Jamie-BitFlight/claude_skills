@@ -2,7 +2,7 @@
 name: complete-implementation
 argument-hint: <task-file-path-or-issue-number>
 user-invocable: true
-description: "Holistic completion workflow after a feature's tasks are marked COMPLETE: code review, feature verification, integration check, documentation drift audit/update, and context refinement. Creates follow-up task files when issues are found."
+description: "Use when all tasks for a feature are marked COMPLETE — runs holistic quality gates including code review, feature verification, integration check, documentation drift audit and update, and context refinement. Creates follow-up task files when issues are found."
 compatibility: Python 3.11+
 metadata:
   version: 2.0.0

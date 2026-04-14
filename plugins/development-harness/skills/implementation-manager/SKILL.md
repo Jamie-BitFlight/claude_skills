@@ -1,6 +1,6 @@
 ---
 name: implementation-manager
-description: Query and manage feature implementation task status. Provides CLI tools to list features, check task status, find ready tasks, and validate task files. Used by /execution orchestrator to track progress. Automatically updates task timestamps via hooks on /start-task.
+description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, claiming tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing task files or configuring hook profiles.
 user-invocable: false
 disable-model-invocation: false
 ---

@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Single interface for backlog items and GitHub Issues. GitHub Issues are the source of truth. All backlog CRUD goes through MCP tools (mcp__plugin_dh_backlog__*) — no direct file edits. Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items and GitHub issues.
+description: Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items and GitHub Issues — single interface for all backlog CRUD via MCP tools (mcp__plugin_dh_backlog__*). GitHub Issues are the source of truth; direct file edits are bypassed in favour of MCP tool calls.
 ---
 
 # Backlog
