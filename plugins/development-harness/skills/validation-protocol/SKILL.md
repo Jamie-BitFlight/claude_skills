@@ -1,6 +1,6 @@
 ---
 name: validation-protocol
-description: Scientific validation protocol for verifying fixes work through observation, not assumption. Use when claiming a bug fix, code change, or implementation is complete. Enforces create-broken-state — define-success-criteria — apply-fix — verify-outcome workflow. Success equals observing intended behavior, not absence of errors.
+description: Scientific validation protocol for verifying fixes work through observation, not assumption. Use when claiming a bug fix, code change, refactoring, or implementation is complete — enforces reproduce-broken-state then define-success-criteria then apply-fix then verify-outcome. Success means observing intended behavior, not absence of errors.
 ---
 
 # Fix Validation Protocol
