@@ -3387,16 +3387,21 @@ def groom_item(
     if mark_groomed and "error" not in result:
         fresh_items = parse_backlog()
         fresh_item = find_item(fresh_items, selector)
-        if fresh_item and fresh_item.file_path:
-            update_item_metadata(Path(fresh_item.file_path), {"metadata": {"status": "groomed"}}, output=out)
-            result["mark_groomed_applied"] = True
-            out.info("  Status: groomed (local)")
-        if fresh_item and fresh_item.issue:
-            try:
-                apply_status_groomed(fresh_item, repo, output=out)
-            except GithubException as e:
-                out.warn(f"  GitHub label update failed: {e}")
-                result["mark_groomed_label_error"] = str(e)
+        if not fresh_item:
+            out.warn(f"  mark_groomed requested but item '{selector}' not found after re-parse — status not advanced")
+            result["mark_groomed_skipped"] = True
+            result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
+        else:
+            if fresh_item.file_path:
+                update_item_metadata(Path(fresh_item.file_path), {"metadata": {"status": "groomed"}}, output=out)
+                result["mark_groomed_applied"] = True
+                out.info("  Status: groomed (local)")
+            if fresh_item.issue:
+                try:
+                    apply_status_groomed(fresh_item, repo, output=out)
+                except GithubException as e:
+                    out.warn(f"  GitHub label update failed: {e}")
+                    result["mark_groomed_label_error"] = str(e)
     return result
 
 
