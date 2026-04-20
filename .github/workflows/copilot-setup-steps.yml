@@ -25,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
       # ---------------------------------------------------------------
-      # Python toolchain: uv + Python 3.11 + all project dependencies
+      # Python toolchain: uv + Python 3.12 + all project dependencies
       # Matches CI job: typecheck-python, validate-frontmatter, etc.
       # ---------------------------------------------------------------
       - uses: ./.github/actions/setup-python
