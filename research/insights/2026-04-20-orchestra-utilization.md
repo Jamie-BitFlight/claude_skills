@@ -5,7 +5,7 @@
 **Integration surfaces found**: Yes (CLI commands, state files, configuration)
 **Proposals written**: 0
 **Skipped**: 3
-**Assessment**: No suitable local integration opportunities
+**Assessment**: Integration surfaces identified, but no suitable local integration proposals
 
 ---
 
@@ -92,7 +92,7 @@ Three local systems already solve this same problem with mature, production-grad
 - Message-based communication
 
 **Differs from Orchestra**:
-- Lower-level primitives (facade to TeamCreate/SendMessage, not a orchestration framework)
+- Lower-level primitives (facade to TeamCreate/SendMessage, not an orchestration framework)
 - No DAG decomposition
 - No token budgeting
 - No dashboard or visualization
@@ -156,7 +156,7 @@ These are **pattern adoptions**, not integrations. If the decision is made to st
 
 ## Assessment Summary
 
-**STATUS**: No utilization surface identified for local integration.
+**STATUS**: Integration surfaces identified, but no suitable local integration opportunities.
 
 **REASON**: Orchestra and local orchestration systems (dispatch, development-harness) solve the same problem with competing approaches. Integration would require architectural replacement decisions, not incremental enhancements.
 

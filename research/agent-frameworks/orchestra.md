@@ -154,7 +154,7 @@ Before creating worktrees, Orchestra prompts to stash uncommitted changes, preve
 
 ### Core Components
 
-The system is modularized into six primary skill files (source: SKILL.md component reference):
+The system is modularized into seven primary skill files (source: SKILL.md component reference):
 
 1. **State Manager** (`state-manager.md`)
    - Initializes `.orchestra/` directory structure

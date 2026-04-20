@@ -3,9 +3,11 @@
 **Research entry**: ./research/agent-frameworks/orchestra.md
 **Generated**: 2026-04-20
 **Patterns assessed**: 8
-**Backlog items created**: 6 (issues: #1855, #1856, #1857, #1858, #1859, #1860)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 1
+**Research-derived backlog issues created**: 6 (issues: #1855, #1856, #1857, #1858, #1859, #1860)
+**Patterns deferred (low confidence)**: 1
+**Patterns skipped (already covered or tracked)**: 1
+
+_Note: these counters summarize outcomes from this Orchestra improvement-pattern review. "Research-derived backlog issues" refers to GitHub issues opened from this research pass, not to formal proposal counts used in separate utilization-assessment documents._
 
 ---
 

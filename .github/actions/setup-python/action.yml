@@ -1,5 +1,5 @@
 name: Setup Python
-description: Checkout repo and set up uv + Python 3.12 with caching
+description: Checkout repo and set up uv + Python 3.11 with caching
 
 runs:
   using: composite
@@ -12,7 +12,7 @@ runs:
     - name: Setup uv
       uses: astral-sh/setup-uv@v7
       with:
-        python-version: "3.12"
+        python-version: "3.11"
         enable-cache: true
         cache-dependency-glob: "**/uv.lock"
         cache-python: true

@@ -2,7 +2,7 @@
 name = "experiment-registry"
 version = "0.1.0"
 description = "MCP server for controlled experiment protocol — manages experiment lifecycle, registry, and state"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=3.0.0",
     "pydantic>=2.0",
