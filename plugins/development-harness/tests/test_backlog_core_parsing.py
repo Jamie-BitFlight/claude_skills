@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from backlog_core.models import BacklogItem, ViewItemResult
+from backlog_core.models import AmbiguousSelectorError, BacklogItem, ViewItemResult
 from backlog_core.parsing import (
     _MdPost,
     _parse_frontmatter,
@@ -516,6 +516,38 @@ class TestFindItem:
 
         assert result is not None
         assert result.issue == "#30"
+
+    def test_find_item_ambiguous_title_raises_error(self) -> None:
+        """When a substring matches multiple items, AmbiguousSelectorError is raised.
+
+        Callers must not silently receive whichever item happened to sort first.
+        """
+        items = [
+            BacklogItem(title="Auth token refresh", issue="#1", file_path="/tmp/p1-auth1.md"),
+            BacklogItem(title="Auth session expiry", issue="#2", file_path="/tmp/p1-auth2.md"),
+            BacklogItem(title="Unrelated feature", issue="#3", file_path="/tmp/p1-other.md"),
+        ]
+
+        with pytest.raises(AmbiguousSelectorError) as exc_info:
+            find_item(items, "auth")
+
+        err = exc_info.value
+        assert err.selector == "auth"
+        assert len(err.matches) == 2
+        assert any("#1" in m for m in err.matches)
+        assert any("#2" in m for m in err.matches)
+
+    def test_find_item_ambiguous_error_message_lists_candidates(self) -> None:
+        items = [
+            BacklogItem(title="Backlog sync alpha", issue="#10", file_path="/tmp/p1-a.md"),
+            BacklogItem(title="Backlog sync beta", issue="#11", file_path="/tmp/p1-b.md"),
+        ]
+
+        with pytest.raises(AmbiguousSelectorError) as exc_info:
+            find_item(items, "backlog sync")
+
+        assert "#10" in str(exc_info.value)
+        assert "#11" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ from .models import (
     ROLE_MAP,
     SECTION_HEADING_ALIAS,
     SKIP_STATUS,
+    AmbiguousSelectorError,
     BacklogItem,
     Entry,
     GroomedData,
@@ -45,6 +46,7 @@ from .models import (
 # Public API
 # ---------------------------------------------------------------------------
 __all__ = [
+    "AmbiguousSelectorError",
     "build_body_extra_only",
     "build_issue_body",
     "build_issue_body_from_file",
@@ -470,7 +472,12 @@ def find_item(items: list[BacklogItem], selector: str) -> BacklogItem | None:
     # Title substring match (case-insensitive)
     selector_lower = selector.lower()
     matches = [it for it in items if selector_lower in it.title.lower()]
-    return matches[0] if len(matches) == 1 else (matches[0] if matches else None)
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        titles = [f"{it.issue or '?'} {it.title}" for it in matches]
+        raise AmbiguousSelectorError(selector, titles)
+    return None
 
 
 def find_fuzzy_duplicates(
