@@ -498,6 +498,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [gitagent.md](./agent-frameworks/gitagent.md)                         | GitAgent v0.1.7 — framework-agnostic, git-native AI agent standard; define agents as git repos with AGENT.yaml spec (system prompts, tool schemas, compliance policies); exporters for Claude Code, OpenAI, LangChain, CrewAI, AutoGen; "Clone a repo, get an agent" (MIT) | 2026-03-29   |
 | [Trellis.md](./agent-frameworks/Trellis.md)                           | Multi-platform AI coding framework supporting 12 platforms with spec injection, task management, and parallel execution via worktrees | 2026-04-06   |
 | [arxitect.md](./agent-frameworks/arxitect.md)                         | Arxitect — Claude Code plugin enforcing software design principles via 3 specialized architecture reviewers (API Design, OO Design, Clean Architecture) and an implement-review-feedback loop; works with Claude Code, Cursor, Codex, Gemini CLI (v1.1.1, MIT) | 2026-04-08   |
+| [orchestra.md](./agent-frameworks/orchestra.md)                       | Orchestra — context-optimized Claude Code plugin for DAG-based task orchestration; decomposes complex tasks into focused sub-agents with configurable token budgets, wave-based parallelism, git worktree isolation, and resumable state (v1.0.0, MIT) | 2026-04-20   |
 
 **Key Topics**:
 
