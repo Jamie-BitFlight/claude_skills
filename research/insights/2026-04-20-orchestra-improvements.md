@@ -3,7 +3,7 @@
 **Research entry**: ./research/agent-frameworks/orchestra.md
 **Generated**: 2026-04-20
 **Patterns assessed**: 8
-**Backlog items created**: 6 (issues pending — see per-proposal `Backlog` fields below)
+**Backlog items created**: 6 (issues: #1855, #1856, #1857, #1858, #1859, #1860)
 **Deferred (low confidence)**: 1
 **Skipped (already covered or tracked)**: 1
 
@@ -15,7 +15,7 @@
 **Local system**: plugins/development-harness/sam_schema/core/models.py (Task model, lines 114–223)
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Pending creation
+**Backlog**: #1855 created
 
 ### Current state
 
@@ -37,7 +37,7 @@ Run: `uv run fastmcp call --command "uv run --script plugins/development-harness
 **Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py; plugins/development-harness/skills/implement-feature/SKILL.md (Agent Health Check section)
 **Confidence**: High
 **Impact**: High
-**Backlog**: Pending creation
+**Backlog**: #1856 created
 
 ### Current state
 
@@ -59,7 +59,7 @@ Run: `uv run fastmcp call --command "uv run --script plugins/development-harness
 **Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py (SubagentStop handler); plugins/development-harness/agents/task-worker.md (Step 5 — Mark Complete)
 **Confidence**: High
 **Impact**: High
-**Backlog**: Pending creation
+**Backlog**: #1857 created
 
 ### Current state
 
@@ -81,7 +81,7 @@ Run: against a plan with `ac-gate: true` and a task whose worker wrote a passing
 **Local system**: plugins/development-harness/skills/implement-feature/SKILL.md; plugins/development-harness/agents/task-worker.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Pending creation
+**Backlog**: #1858 created
 
 ### Current state
 
@@ -103,7 +103,7 @@ Run: from a repo with `.claude/CLAUDE.md` mentioning `ruamel.yaml`, `uv run plug
 **Local system**: plugins/development-harness/skills/implement-feature/SKILL.md (Progress Loop)
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Pending creation
+**Backlog**: #1859 created
 
 ### Current state
 
@@ -125,7 +125,7 @@ Run: `uv run fastmcp call --command "uv run --script plugins/development-harness
 **Local system**: plugins/development-harness/skills/work-milestone/SKILL.md (Entry Conditions + Step 3); plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Pending creation
+**Backlog**: #1860 created
 
 ### Current state
 
