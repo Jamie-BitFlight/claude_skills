@@ -514,6 +514,32 @@ class ItemNotFoundError(BacklogError):
         super().__init__(f"No item found for: {selector}")
 
 
+_AMBIGUOUS_TITLE_PREVIEW_LIMIT = 10
+
+
+class AmbiguousSelectorError(BacklogError):
+    """Raised when a title substring selector matches multiple backlog items.
+
+    The caller must use a more specific selector (e.g. ``#N`` issue number).
+    """
+
+    def __init__(self, selector: str, matches: list[BacklogItem]) -> None:
+        """Initialize with the ambiguous selector and the items it matched."""
+        self.selector = selector
+        self.matches = matches
+        preview = matches[:_AMBIGUOUS_TITLE_PREVIEW_LIMIT]
+        titles = ", ".join(f'"{it.title}" ({it.issue or "no issue"})' for it in preview)
+        suffix = (
+            f" (showing first {_AMBIGUOUS_TITLE_PREVIEW_LIMIT} of {len(matches)})"
+            if len(matches) > _AMBIGUOUS_TITLE_PREVIEW_LIMIT
+            else ""
+        )
+        super().__init__(
+            f"Ambiguous selector {selector!r} matches {len(matches)} items{suffix}: {titles}. "
+            "Use an issue number (#N) or a more specific title substring."
+        )
+
+
 class DuplicateItemError(BacklogError):
     """Raised when a fuzzy duplicate is detected during item creation."""
 

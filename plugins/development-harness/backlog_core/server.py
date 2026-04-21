@@ -4232,9 +4232,7 @@ async def _poll_until_done(
                     item_cost = float(rj.get("cost", 0)) or None
                 except (ValueError, KeyError, TypeError):
                     pass
-                await asyncio.to_thread(
-                    mgr.set_item_complete, milestone, wave_num, issue_num, content[:4096], item_cost
-                )
+                await asyncio.to_thread(mgr.set_item_complete, milestone, wave_num, issue_num, content, item_cost)
                 return True, item_cost
 
         pid_alive = True
@@ -4303,7 +4301,7 @@ async def _run_spawn_item(
                 pid = int(spawn_data.get("pid", -1))
                 result_file = str(spawn_data.get("result_file", ""))
             except (ValueError, KeyError):
-                error_msg = f"spawn.py non-JSON output: {stdout_text[:200]}"
+                error_msg = f"spawn.py non-JSON output: {stdout_text}"
                 await asyncio.to_thread(mgr.set_item_failed, milestone, wave_num, issue_num, error_msg)
                 counters.failed += 1
                 counters.total_done += 1
