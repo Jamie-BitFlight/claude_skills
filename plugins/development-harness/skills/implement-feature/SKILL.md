@@ -38,6 +38,14 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="<feature_input/>
 mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="P{N}")
 ```
 
+After receiving the status response, extract and store the autonomy mode:
+
+`autonomy_mode = status["autonomy"]`
+
+This value governs gate behavior throughout the remainder of the Progress Loop for this plan.
+Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default),
+so no gate fires and the loop behaves identically to the previous behavior.
+
 2. If tasks remain, query ready tasks **once** and store the result as the current batch:
 
 If parent story issue number is known, prefer the MCP tool:
@@ -61,7 +69,17 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="P{N}")
 > Only call `sam_plan(action='ready')` again when the previous batch is fully dispatched and you need the
 > next batch of ready tasks.
 
-3. For each ready task (or batch of ready tasks):
+3. Dispatch based on `autonomy_mode`:
+
+If `autonomy_mode == "per_task"`:
+
+Process tasks from the ready list one at a time:
+
+- Dispatch task N via a single `Agent` call (not `TeamCreate`).
+- Complete steps 4, 4a, 4b for task N.
+- Present the per-task gate (after step 4b, described below) before dispatching task N+1.
+
+Else (`autonomy_mode` is `"full_auto"` or `"checkpoint"`):
 
 When multiple tasks are simultaneously ready (non-zero `count` with 2+ tasks in the ready list), dispatch them in parallel using `TeamCreate`:
 
@@ -201,9 +219,52 @@ This terminates the teammate immediately rather than leaving it idle. Idle teamm
 
 **Skip when**: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
 
+**Per-task Confirmation Gate** (active when `autonomy_mode == "per_task"` only):
+
+After task N completes (steps 4 through 4b finished), before dispatching task N+1:
+
+1. Display a compact task result summary:
+   - Task ID and title
+   - Completion status (complete / error)
+   - Any concerns raised (from the concerns block check in step 4)
+
+2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
+   examples include "Ready to dispatch the next task? (yes/no)" or a numbered menu
+   of options. The prompt must make clear which task will be dispatched next (task ID and title).
+
+3. Await explicit user confirmation before proceeding.
+   - If confirmed: dispatch the next task from the stored batch (or query the next batch if the batch is exhausted).
+   - If declined or cancelled: stop the Progress Loop. Report the current plan state via
+     `mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="P{N}")` and exit.
+
+Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
+
 5. After all tasks in the current batch complete, call `mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="P{N}")` to
    check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
    tasks. Do NOT call `sam_plan(action='ready')` again until the previous batch is fully dispatched.
+
+**5a. Wave-Completion Confirmation Gate** (active when `autonomy_mode == "checkpoint"` only):
+
+After all tasks in the current batch complete and `sam_plan(action='status')` confirms that
+tasks remain (step 5 result: tasks remaining > 0):
+
+1. Display a compact wave-completion summary:
+   - Number of tasks completed in this wave
+   - Current plan completion percentage (from `status["completion_pct"]`)
+   - Number of tasks remaining
+   - Next ready tasks (from `status["ready_tasks"]` list — task IDs only)
+
+2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
+   examples include "Wave complete. Proceed with the next wave? (yes/no)".
+
+3. Await explicit user confirmation before calling `sam_plan(action='ready')` again.
+   - If confirmed: proceed to step 2 to fetch the next batch.
+   - If declined or cancelled: stop the Progress Loop. Report the current plan state
+     and exit. The plan remains in its current state and can be resumed later.
+
+Skip this gate when `autonomy_mode` is `"full_auto"` or `"per_task"`.
+
+Note: under `"per_task"`, per-task gates already fire for each task; no additional wave gate is needed.
 
 > **Hook behavior on SubagentStop**: When a sub-agent finishes, `task_status_hook.py` marks
 > the task complete in the local task file. After marking the task complete locally, the hook
