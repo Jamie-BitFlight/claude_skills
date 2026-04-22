@@ -321,16 +321,21 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
 
 
 def _sam_plan_status(plan: str, plan_dir: str) -> dict:
-    """Return plan-level progress summary.
+    """Return plan-level progress summary including autonomy mode.
 
-    Uses a single backend call — ``get_plan_status`` now includes ``state``
-    so no separate ``read_plan`` is needed for the drafting check.
+    Calls ``get_plan_status`` for computed metrics and ``read_plan`` to
+    surface the ``autonomy`` field, which lives on the Plan model and is
+    not part of ``PlanStatus``.  Follows the same pattern as
+    ``_sam_plan_ready``.
     """
     backend = _get_backend(plan_dir)
     status = backend.get_plan_status(plan)
     if status.get("state") == PlanState.DRAFTING:
         return dict(_DRAFTING_MARKER_RESPONSE)
-    return dict(status)
+    plan_data = backend.read_plan(plan)
+    result = dict(status)
+    result["autonomy"] = plan_data.get("autonomy", "full_auto")
+    return result
 
 
 def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
