@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
@@ -316,6 +316,14 @@ class Plan(BaseModel):
     # None means use the active TaskConfig backend (local by default).
     backend_ref: str | None = Field(
         default=None, validation_alias=AliasChoices("backend-ref", "backend_ref"), serialization_alias="backend-ref"
+    )
+
+    # Autonomy mode — controls how the implement-feature progress loop gates dispatch.
+    # full_auto: fully automatic, no pause points (default, backward-compatible).
+    # checkpoint: pause after each dependency wave for human confirmation.
+    # per_task: pause before each individual task dispatch for human confirmation.
+    autonomy: Literal["full_auto", "checkpoint", "per_task"] = Field(
+        default="full_auto", validation_alias=AliasChoices("autonomy"), serialization_alias="autonomy"
     )
 
     @field_validator("issue", mode="before")
