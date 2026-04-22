@@ -7,19 +7,26 @@ if [ -z "$BRANCH_NAME" ]; then
     exit 2
 fi
 
+if ! command -v uv >/dev/null 2>&1; then
+    echo "error: uv is required but not found in PATH" >&2
+    exit 2
+fi
+
 if [ -z "$(git status --porcelain)" ]; then
     exit 0
 fi
 
 printf "Stash uncommitted changes? [y/N] "
-read -r REPLY
+if ! read -r REPLY; then
+    REPLY="N"
+fi
 if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
     echo "Aborting: working tree is dirty. Please stash or commit your changes, then re-run."
     exit 1
 fi
 
 git stash push -u -m "dh-auto-stash: pre-run ${BRANCH_NAME}" >/dev/null
-STASH_REF="stash@{0}"
+STASH_REF="$(git rev-parse --verify 'stash@{0}')"
 
 DH_STATE_HOME="${DH_STATE_HOME:-$HOME/.dh}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -27,11 +34,6 @@ REPO_SLUG="${REPO_ROOT//\//-}"
 REPO_SLUG="${REPO_SLUG//\\/-}"
 AUTO_STASH_FILE="${DH_STATE_HOME}/projects/${REPO_SLUG}/context/auto-stashes.json"
 mkdir -p "$(dirname "${AUTO_STASH_FILE}")"
-
-if ! command -v uv >/dev/null 2>&1; then
-    echo "error: uv is required but not found in PATH" >&2
-    exit 2
-fi
 
 uv run python - "$AUTO_STASH_FILE" "$BRANCH_NAME" "$STASH_REF" <<'PY'
 from __future__ import annotations

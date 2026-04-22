@@ -95,8 +95,6 @@ flowchart TD
     Complete --> Done(["Exit: milestone complete"])
 ```
 
-## Step 3b: Fetch All Items Once (Before Any Wave)
-
 ## Step 3a: Prepare Clean Worktree Source State
 
 Before Step 5 creates any worktree, run:
@@ -112,6 +110,8 @@ Behavior:
 - If dirty, prompt exactly: `Stash uncommitted changes? [y/N]`.
 - On `y`, stash with message `dh-auto-stash: pre-run {integration-branch}` and record the stash ref in `~/.dh/projects/{slug}/context/auto-stashes.json` keyed by integration branch name.
 - On `N` (or Enter), halt the run with a clear instruction to stash or commit manually before re-invoking `/work-milestone`.
+
+## Step 3b: Fetch All Items Once (Before Any Wave)
 
 Before entering the wave dispatch loop, call `backlog_view` **once per issue** listed across all waves in the dispatch plan. Store each result in context keyed by issue number.
 
