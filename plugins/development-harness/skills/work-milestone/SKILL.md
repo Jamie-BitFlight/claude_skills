@@ -15,7 +15,7 @@ Execute a groomed milestone. Reads the dispatch plan produced by `/groom-milesto
 - Dispatch plan exists: `plan/milestone-{N}-dispatch.yaml`
 - All items in dispatch plan are groomed (`groomed: true`)
 - Backlog MCP and SAM MCP responding
-- Clean git state on main
+- Clean git state on main (if dirty, run `plugins/development-harness/scripts/prepare_clean_worktree.sh {integration-branch}` and accept/reject the stash prompt)
 
 Run `/groom-milestone {N}` first if the dispatch plan is missing or stale.
 
@@ -32,7 +32,7 @@ flowchart TD
     Validate -->|"Plan valid"| CreateBranch
     Regroom --> LoadPlan
 
-    CreateBranch["Step 3: Create Integration Branch<br>github_branches create<br>milestone/{N}-{slug} from main.<br>Switch to integration branch locally."]
+    CreateBranch["Step 3: Create Integration Branch<br>github_branches create<br>milestone/{N}-{slug} from main.<br>Switch to integration branch locally.<br>Run prepare_clean_worktree.sh before any worktree add."]
 
     CreateBranch --> FetchItems["Step 3b: Fetch All Items Once<br>Call backlog_view once per issue in the dispatch plan.<br>Store results in context keyed by issue number.<br>DO NOT call backlog_view again for any issue<br>already fetched this session."]
 
@@ -90,12 +90,28 @@ flowchart TD
 
     FinalResult -->|"Pass"| MergeMain["Step 9: Merge to Main<br>git switch main<br>git merge --no-ff milestone/{N}-{slug}<br>git push origin main"]
 
-    MergeMain --> Complete["Step 10: Complete Milestone<br>/complete-milestone {N}.<br>Delete integration branch."]
+    MergeMain --> Complete["Step 10: Complete Milestone<br>/complete-milestone {N}.<br>Delete integration branch.<br>Print pending auto-stash reminder(s)."]
 
     Complete --> Done(["Exit: milestone complete"])
 ```
 
 ## Step 3b: Fetch All Items Once (Before Any Wave)
+
+## Step 3a: Prepare Clean Worktree Source State
+
+Before Step 5 creates any worktree, run:
+
+```bash
+PREP="plugins/development-harness/scripts/prepare_clean_worktree.sh"
+"$PREP" "${INTEGRATION_BRANCH}"
+```
+
+Behavior:
+
+- If `git status --porcelain` is clean, continue silently.
+- If dirty, prompt exactly: `Stash uncommitted changes? [y/N]`.
+- On `y`, stash with message `dh-auto-stash: pre-run {integration-branch}` and record the stash ref in `~/.dh/projects/{slug}/context/auto-stashes.json` keyed by integration branch name.
+- On `N` (or Enter), halt the run with a clear instruction to stash or commit manually before re-invoking `/work-milestone`.
 
 Before entering the wave dispatch loop, call `backlog_view` **once per issue** listed across all waves in the dispatch plan. Store each result in context keyed by issue number.
 
@@ -184,6 +200,14 @@ done
 The `--model` flag on the kage-bunshin controls the spawned session's orchestrator model only. Sub-agents spawned inside that session use their own model per their agent frontmatter definition.
 
 Recommended: `--model sonnet` for spawned sessions (configurable via `dispatch_spawn` `model` parameter). Haiku viability as orchestrator is an open experiment. Use `--effort` to tune reasoning depth independently of model selection.
+
+## Step 10 Reminder: Pending Auto-Stashes
+
+After milestone completion, check `~/.dh/projects/{slug}/context/auto-stashes.json`. If there is a stash ref for the integration branch, print:
+
+```text
+Auto-stash ref {ref} pending; run 'git stash pop {ref}' to restore.
+```
 
 ## Agent Result Handling
 
