@@ -147,6 +147,29 @@ Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"ready"})`
 }
 ```
 
+### 2.1a sam_plan status output (PlanStatus + autonomy)
+
+Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"status"})`. CLI fallback: `uv run sam status P{N} --format json`.
+
+```json
+{
+  "feature": "string (plan slug)",
+  "total_tasks": 6,
+  "by_status": {
+    "not-started": 3,
+    "in-progress": 1,
+    "complete": 2
+  },
+  "ready_tasks": ["T03"],
+  "blocked_tasks": [],
+  "completion_pct": 33.3,
+  "has_cycles": false,
+  "autonomy": "full_auto"
+}
+```
+
+`autonomy` is surfaced from the `Plan` model (default `"full_auto"`). The `/implement-feature` Progress Loop reads this field to determine whether to dispatch all tasks without pausing (`full_auto`), pause after each dependency wave (`checkpoint`), or dispatch one task at a time with confirmation (`per_task`).
+
 ### 2.2 TaskAssignment (sam_task read P{N}/T{M})
 
 Output of `mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"read"})`. CLI fallback: `uv run sam read P{N}/T{M} --format json`.

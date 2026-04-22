@@ -201,6 +201,7 @@ acceptance_criteria:
 issue: 719                    # GitHub issue number (optional)
 feature: "My Feature Name"
 status: in-progress           # not-started | in-progress | complete
+autonomy: full_auto           # full_auto (default) | checkpoint | per_task
 created: "2026-03-15T00:00:00Z"
 tasks:
   - id: T01
@@ -208,6 +209,12 @@ tasks:
     status: not-started
     ...
 ```
+
+`autonomy` controls dispatch gating in the `/implement-feature` Progress Loop:
+
+- `full_auto` (default): dispatch all tasks without pausing — backward-compatible behaviour
+- `checkpoint`: pause for user confirmation after each dependency wave of tasks completes
+- `per_task`: dispatch one task at a time via a single `Agent` call and pause for user confirmation before the next
 
 For the complete field specification:
 
