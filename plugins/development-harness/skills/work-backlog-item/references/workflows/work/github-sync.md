@@ -1,6 +1,6 @@
 # Issue Sync (Steps 2.2–2.4)
 
-> **Backend abstraction**: Use MCP tools for all issue operations — the backlog MCP server handles backend-specific details. Do not call `gh` CLI or any platform API directly.
+> **Backend provider abstraction**: Use MCP tools for all issue operations — the backlog MCP server handles backend provider details (GitHub, GitLab, Linear, etc.). Do not call any provider CLI or API directly.
 
 ## Step 2.2: Issue Link Check
 
