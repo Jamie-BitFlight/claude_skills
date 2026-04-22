@@ -24,8 +24,14 @@ STASH_REF="stash@{0}"
 DH_STATE_HOME="${DH_STATE_HOME:-$HOME/.dh}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 REPO_SLUG="${REPO_ROOT//\//-}"
+REPO_SLUG="${REPO_SLUG//\\/-}"
 AUTO_STASH_FILE="${DH_STATE_HOME}/projects/${REPO_SLUG}/context/auto-stashes.json"
 mkdir -p "$(dirname "${AUTO_STASH_FILE}")"
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "error: uv is required but not found in PATH" >&2
+    exit 2
+fi
 
 uv run python - "$AUTO_STASH_FILE" "$BRANCH_NAME" "$STASH_REF" <<'PY'
 from __future__ import annotations

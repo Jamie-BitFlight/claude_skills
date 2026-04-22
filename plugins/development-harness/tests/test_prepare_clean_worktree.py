@@ -27,6 +27,10 @@ def _script_path() -> Path:
     return Path(__file__).resolve().parents[1] / "scripts" / "prepare_clean_worktree.sh"
 
 
+def _repo_slug(path: Path) -> str:
+    return str(path).replace("/", "-").replace("\\", "-")
+
+
 def test_prepare_clean_worktree_no_prompt_when_clean(tmp_path: Path) -> None:
     repo = _init_git_repo(tmp_path)
     state_home = tmp_path / "state"
@@ -76,11 +80,13 @@ def test_prepare_clean_worktree_stashes_and_records_ref(tmp_path: Path) -> None:
     assert "Stash uncommitted changes? [y/N]" in result.stdout
     assert "Auto-stash created: stash@{0}" in result.stdout
 
-    stash_list = _run(["git", "stash", "list", "--format=%gd %s"], cwd=repo).stdout
-    assert "stash@{0}" in stash_list
-    assert f"dh-auto-stash: pre-run {branch_name}" in stash_list
+    stash_lines = _run(["git", "stash", "list", "--format=%gd %s"], cwd=repo).stdout.splitlines()
+    assert stash_lines
+    stash_first = stash_lines[0]
+    assert "stash@{0}" in stash_first
+    assert f"dh-auto-stash: pre-run {branch_name}" in stash_first
 
-    slug = str(repo).replace("/", "-")
+    slug = _repo_slug(repo)
     record_file = state_home / "projects" / slug / "context" / "auto-stashes.json"
     assert record_file.exists()
 
