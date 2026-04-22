@@ -35,13 +35,24 @@ const DIAGNOSTIC_PATTERNS = [
 ];
 
 /**
+ * Remove single-quoted and double-quoted string content from a shell command.
+ * Prevents pattern matches inside quoted arguments (e.g., --name 'run ruff check').
+ * @param {string} str
+ * @returns {string}
+ */
+function stripQuotedStrings(str) {
+  return str.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ');
+}
+
+/**
  * @param {string} command
  * @returns {string|null} matched pattern description, or null if no match
  */
 function matchesDiagnosticCommand(command) {
   if (!command) return null;
+  const stripped = stripQuotedStrings(command);
   for (const pattern of DIAGNOSTIC_PATTERNS) {
-    const match = command.match(pattern);
+    const match = stripped.match(pattern);
     if (match) return match[0];
   }
   return null;

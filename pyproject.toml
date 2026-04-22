@@ -230,7 +230,8 @@ unfixable = ["F401"]
 # TC001/TC002 would move these to TYPE_CHECKING, making them unavailable at runtime.
 # TC001/TC002 — action model types must be present at runtime for discriminated union dispatch (from __future__ import annotations bypasses this)
 # PLR0911 — match-case action dispatch in sam_plan/sam_task produces one return per case; guard-clause refactoring would obscure intent
-"**/sam_schema/server.py" = ["TC001", "TC002", "PLR0911"]
+# C901/PLR0912 — discriminated union dispatch with per-arm isinstance type-narrowing guards is intentional; complexity metrics do not apply to inherently branching dispatch patterns
+"**/sam_schema/server.py" = ["TC001", "TC002", "PLR0911", "C901", "PLR0912"]
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — protocol surface includes _-prefixed methods that delegate to _-prefixed gh_client functions by design
 "**/backlog_core/backends/github_backend.py" = ["PLR0904", "SLF001"]
