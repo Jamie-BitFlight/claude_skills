@@ -1598,10 +1598,11 @@ def _build_compact_manifest(
     full_chars = len(_json.dumps(full_response))
     plan_match = _re.search(r"^[Pp]lan:\s*(\S+)", result.body, _re.MULTILINE)
     plan_path: str | None = plan_match.group(1) if plan_match else None
-    issue_number: int | None = None
-    num_match = _re.search(r"(\d+)", result.issue)
-    if num_match:
-        issue_number = int(num_match.group(1))
+    issue_number: int | None = result.number
+    if issue_number is None:
+        num_match = _re.search(r"(\d+)", result.issue)
+        if num_match:
+            issue_number = int(num_match.group(1))
     status: str = "closed" if result.state == "closed" else "open"
     compact: dict[str, object] = {
         "issue_number": issue_number,

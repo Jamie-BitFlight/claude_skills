@@ -1,8 +1,8 @@
-# GitHub Issue Sync (Steps 2.2–2.4)
+# Issue Sync (Steps 2.2–2.4)
 
-> **Repository**: OWNER/REPO is discovered via `discover_repo()` from `backlog_core.models`. Use MCP tools for all GitHub operations — no `gh` CLI required.
+> **Backend abstraction**: Use MCP tools for all issue operations — the backlog MCP server handles backend-specific details. Do not call `gh` CLI or any platform API directly.
 
-## Step 2.2: GitHub Issue Sync
+## Step 2.2: Issue Link Check
 
 After extracting item fields, check for an existing linked issue:
 
@@ -15,24 +15,24 @@ After extracting item fields, check for an existing linked issue:
 
    Report the issue state. If open, proceed. If closed, warn the user before re-opening planning.
 
-3. If not found AND priority is P0 or P1: offer to create a GitHub Issue:
+3. If not found AND priority is P0 or P1: offer to create a linked issue:
 
    ```text
-   This P1 item has no linked GitHub issue. Create one? (yes/no)
+   This P1 item has no linked issue. Create one? (yes/no)
    ```
 
    If yes, proceed to Step 2.3.
-   If no, skip GitHub sync; the backlog item remains without a linked issue.
+   If no, skip issue sync; the backlog item remains without a linked issue.
 
-4. If not found AND priority is P2 or Ideas: do not prompt; skip GitHub sync silently.
+4. If not found AND priority is P2 or Ideas: do not prompt; skip issue sync silently.
 
-## Step 2.3: Create GitHub Issue
+## Step 2.3: Create Linked Issue
 
 Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"`.
 
-The tool creates the issue automatically when the item lacks one and records the `issue: '#N'` link in the backend. Check the returned dict for an `error` key.
+The tool creates the linked issue automatically when the item lacks one and records the `issue: '#N'` link in the backend. Check the returned dict for an `error` key.
 
-## Step 2.4: Set In-Progress Label
+## Step 2.4: Set In-Progress
 
 Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"` and `status="in-progress"`. Check the returned dict for an `error` key.
 

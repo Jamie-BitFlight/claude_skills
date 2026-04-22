@@ -1,24 +1,24 @@
 # Work: Validate (Phase 2)
 
-Verify item state, sync with GitHub, and run discovery gate.
+Verify item state, sync issue link, and run discovery gate.
 
 ## Step 2.1: Already Implemented Check
 
-Before planning, verify the feature/fix hasn't already been implemented (stale open issue). Load [already-implemented.md](./already-implemented.md) for git commands, resolve calls, and behavior when <mode/> is `auto`.
+Before planning, verify the feature/fix hasn't already been implemented (stale open item). Load [already-implemented.md](./already-implemented.md) for git commands, resolve calls, and behavior when <mode/> is `auto`.
 
-## Step 2.2: GitHub Issue Sync
+## Step 2.2: Issue Link Check
 
 After Step 1.4, check for `**Issue**: #N` in the matched item. Load [github-sync.md](./github-sync.md) for MCP tool calls, yes/no branching, and issue creation.
 
 **Note:** On the Issue-first path (Step 1.2), the `backlog_view` response already contains issue state — carry it forward without re-fetching.
 
-## Step 2.3: Create GitHub Issue
+## Step 2.3: Create Linked Issue
 
-Load [github-sync.md](./github-sync.md#step-23-create-github-issue).
+Load [github-sync.md](./github-sync.md#step-23-create-linked-issue).
 
-## Step 2.4: Set In-Progress Label
+## Step 2.4: Set In-Progress
 
-Load [github-sync.md](./github-sync.md#step-24-set-in-progress-label).
+Load [github-sync.md](./github-sync.md#step-24-set-in-progress).
 
 **Two-part step:** (a) Always run `mcp__plugin_dh_backlog__backlog_update` with `status="in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
 
@@ -28,7 +28,7 @@ Before grooming or planning, check whether a structured discovery artifact exist
 
 ```mermaid
 flowchart TD
-    InProgress([Step 2.4 complete — label set]) --> HasIssue{"Item has GitHub<br>Issue number?"}
+    InProgress([Step 2.4 complete — status set]) --> HasIssue{"Item has linked<br>issue number?"}
     HasIssue -->|"No"| SkipGate["Skip discovery gate<br>Proceed to Step 3.1"]
     HasIssue -->|"Yes — issue #{N}"| TypeCheck{"Labels include<br>'type:fix' or 'type:bug'?"}
     TypeCheck -->|"Yes — fix/bug type"| SkipGate
