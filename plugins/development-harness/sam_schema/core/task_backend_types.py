@@ -119,6 +119,9 @@ class PlanData(TypedDict):
     codebase_patterns: NotRequired[str | None]
     backend_ref: NotRequired[str | None]
 
+    # Autonomy mode for the implement-feature dispatch loop
+    autonomy: NotRequired[str]
+
 
 class PlanSummary(TypedDict):
     """Lightweight plan metadata for list operations.

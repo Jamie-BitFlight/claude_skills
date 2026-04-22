@@ -718,3 +718,109 @@ async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
         plan_ref = item["plan_ref"]
         assert plan_ref is not None
         assert re.match(r"^P[0-9a-f\d]+", plan_ref), f"Expected P-format plan_ref, got: {plan_ref!r}"
+
+
+# ---------------------------------------------------------------------------
+# Plan.autonomy — MCP status surface and model validation tests
+# ---------------------------------------------------------------------------
+
+
+async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
+    """sam_plan status includes autonomy key with the value stored in the plan.
+
+    Tests: autonomy field surfaces through sam_plan status via MCP protocol.
+    How: Write a plan with autonomy='checkpoint'; call sam_plan status; assert autonomy='checkpoint'.
+    Why: Orchestrators read autonomy from status to gate dispatch mode selection.
+    """
+    # Arrange — write a plan with explicit autonomy='checkpoint'
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    tasks = [make_task("T1", status=TaskStatus.NOT_STARTED)]
+    plan = Plan(
+        feature="autonomy-test", version="1.0", goal="Test autonomy surfacing", tasks=tasks, autonomy="checkpoint"
+    )
+    write_plan(plan, p_dir / "tasks-1-autonomy-test.yaml", force_single=True)
+
+    # Act
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_plan", {"config": {"action": "status"}, "plan": "P1", "plan_dir": str(p_dir)}
+        )
+
+    # Assert
+    data = result.data
+    assert isinstance(data, dict)
+    assert "error" not in data
+    assert "autonomy" in data
+    assert data["autonomy"] == "checkpoint"
+
+
+async def test_sam_plan_status_autonomy_defaults_to_full_auto(plan_dir: Path) -> None:
+    """sam_plan status returns autonomy='full_auto' when plan has no autonomy field.
+
+    Tests: backward compatibility — plans created without autonomy get 'full_auto' default.
+    How: Use the default plan_dir fixture (Plan constructed without autonomy argument);
+         call sam_plan status; assert autonomy='full_auto'.
+    Why: Existing plans written before the autonomy field was introduced must not break.
+    """
+    # Arrange — plan_dir fixture writes a plan without explicit autonomy (uses default)
+
+    # Act
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_plan", {"config": {"action": "status"}, "plan": "P1", "plan_dir": str(plan_dir)}
+        )
+
+    # Assert
+    data = result.data
+    assert isinstance(data, dict)
+    assert "error" not in data
+    assert "autonomy" in data
+    assert data["autonomy"] == "full_auto"
+
+
+def test_plan_model_validate_without_autonomy_defaults_to_full_auto() -> None:
+    """Plan.model_validate without autonomy field defaults to 'full_auto'.
+
+    Tests: Pydantic default applies when autonomy key is absent from input dict.
+    How: Call Plan.model_validate with a minimal dict lacking the autonomy key.
+    Why: Backward-compatible default ensures existing YAML plans deserialize cleanly.
+    """
+    from pydantic import ValidationError
+
+    # Arrange — minimal dict without autonomy key
+    raw: dict = {"feature": "test", "tasks": []}
+
+    # Act
+    try:
+        plan = Plan.model_validate(raw)
+    except ValidationError as exc:
+        raise AssertionError(f"Plan.model_validate raised ValidationError unexpectedly: {exc}") from exc
+
+    # Assert
+    assert plan.autonomy == "full_auto"
+
+
+@pytest.mark.parametrize("autonomy_value", ["full_auto", "checkpoint", "per_task"])
+def test_plan_model_validate_accepts_all_three_autonomy_values(autonomy_value: str) -> None:
+    """Plan.model_validate accepts all three valid autonomy values without error.
+
+    Tests: Literal['full_auto', 'checkpoint', 'per_task'] validation accepts all members.
+    How: Parametrize over the three values; validate each; assert stored correctly.
+    Why: Ensures the Literal type admits the complete closed set.
+    """
+    from pydantic import ValidationError
+
+    # Arrange
+    raw: dict = {"feature": "test", "tasks": [], "autonomy": autonomy_value}
+
+    # Act
+    try:
+        plan = Plan.model_validate(raw)
+    except ValidationError as exc:
+        raise AssertionError(
+            f"Plan.model_validate raised ValidationError for autonomy={autonomy_value!r}: {exc}"
+        ) from exc
+
+    # Assert
+    assert plan.autonomy == autonomy_value

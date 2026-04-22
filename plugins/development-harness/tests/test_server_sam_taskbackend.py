@@ -265,6 +265,46 @@ async def test_sam_status_routes_through_backend_get_plan_status(backend_mock: M
     backend_mock.get_plan_status.assert_called_once_with("P1")
 
 
+async def test_sam_status_merges_autonomy_from_read_plan(backend_mock: MagicMock) -> None:
+    """sam_plan action=status merges autonomy field from backend.read_plan into the response.
+
+    Arrange: configure backend.read_plan to return _PLAN_DATA with autonomy='per_task'.
+    Act: call sam_plan with action=status, plan='P1'.
+    Assert: result['autonomy'] == 'per_task'; backend.read_plan called once with 'P1'.
+    """
+    # Arrange — override read_plan to return a plan dict with explicit autonomy
+    backend_mock.read_plan.return_value = {**_PLAN_DATA, "autonomy": "per_task"}
+
+    # Act
+    result = await _call("sam_plan", {"config": {"action": "status"}, "plan": "P1"})
+
+    # Assert — autonomy value surfaced from read_plan merge
+    assert "autonomy" in result, f"Expected 'autonomy' key in status result, got keys: {sorted(result.keys())}"
+    assert result["autonomy"] == "per_task"
+    backend_mock.read_plan.assert_called_once_with("P1")
+
+
+async def test_sam_status_autonomy_fallback_when_absent_in_read_plan(backend_mock: MagicMock) -> None:
+    """sam_plan action=status returns autonomy='full_auto' when read_plan dict lacks the key.
+
+    Arrange: backend.read_plan returns _PLAN_DATA which does NOT contain 'autonomy'.
+    Act: call sam_plan with action=status, plan='P1'.
+    Assert: result['autonomy'] == 'full_auto' (the .get() fallback path).
+    """
+    # Arrange — _PLAN_DATA has no 'autonomy' key; verify the baseline assumption
+    assert "autonomy" not in _PLAN_DATA, (
+        "_PLAN_DATA must not contain 'autonomy' for this test to exercise the fallback path. "
+        "Remove 'autonomy' from _PLAN_DATA or update this test."
+    )
+
+    # Act (backend_mock.read_plan already returns _PLAN_DATA by default from fixture)
+    result = await _call("sam_plan", {"config": {"action": "status"}, "plan": "P1"})
+
+    # Assert — fallback to 'full_auto' when key is absent
+    assert "autonomy" in result, f"Expected 'autonomy' key in status result, got keys: {sorted(result.keys())}"
+    assert result["autonomy"] == "full_auto"
+
+
 async def test_sam_list_routes_through_backend_list_plans(backend_mock: MagicMock) -> None:
     """sam_plan action=list calls backend.list_plans.
 

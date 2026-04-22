@@ -404,6 +404,7 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
         architecture=_coerce_str(plan_meta.get("architecture")),
         feature_context=_coerce_str(plan_meta.get("feature-context") or plan_meta.get("feature_context")),
         codebase_patterns=_coerce_str(plan_meta.get("codebase-patterns") or plan_meta.get("codebase_patterns")),
+        autonomy=plan_meta.get("autonomy", "full_auto"),
         tasks=tasks,
         source_path=source_path,
         source_format=source_format.value,
