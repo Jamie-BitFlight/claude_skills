@@ -656,7 +656,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Task as _Task
+    from sam_schema.core.models import Complexity, Priority, Task as _Task
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
     from sam_schema.server import sam_plan
 
@@ -664,7 +664,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task One", status="not-started", agent="a", priority=2, complexity="low"
+        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))

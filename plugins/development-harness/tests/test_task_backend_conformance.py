@@ -26,6 +26,8 @@ from sam_schema.core.task_backend import TaskBackend
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from sam_schema.core.task_backend_types import DocumentHandle
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -423,11 +425,19 @@ class TestTaskBackendConformance:
         handle = backend.store_document(
             plan_id=plan_id, task_id=None, stage="context", doc_type="notes", title="Notes", content="content"
         )
-        bad_handle = {**handle, "content_ref": "nonexistent://fake-ref"}
+        bad_handle: DocumentHandle = {
+            "content_ref": "nonexistent://fake-ref",
+            "owner_type": handle["owner_type"],
+            "owner_id": handle["owner_id"],
+            "stage": handle["stage"],
+            "doc_type": handle["doc_type"],
+            "title": handle["title"],
+            "fmt": handle["fmt"],
+        }
 
         # Act / Assert
         with pytest.raises(DocumentNotFoundError):
-            backend.read_document(bad_handle)  # type: ignore[arg-type]
+            backend.read_document(bad_handle)
 
     # ------------------------------------------------------------------
     # plan_id durability

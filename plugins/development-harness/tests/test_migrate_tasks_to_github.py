@@ -183,13 +183,6 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
         # Provide a mock repo so the live-mode path doesn't fail on import.
         mock_gh.return_value = MagicMock()
 
-        # We don't enter the live path because all tasks are skipped.
-        # But we need the import to succeed — monkeypatch the module namespace.
-        import migrate_tasks_to_github as mod
-
-        mod.create_task_issue = mock_create  # type: ignore[attr-defined]
-        mod.get_github = mock_gh  # type: ignore[attr-defined]
-
         # Act: invoke without dry-run; the task should still be skipped
         result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480", "--dry-run"])
 
@@ -301,8 +294,6 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
         orig_bc = mod._BACKLOG_CORE
         mod._BACKLOG_CORE = MagicMock()
         mod._BACKLOG_CORE.exists.return_value = True
-        mod.create_task_issue = _side_effect  # type: ignore[attr-defined]
-        mod.get_github = mock_gh  # type: ignore[attr-defined]
 
         try:
             runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"], catch_exceptions=False)
