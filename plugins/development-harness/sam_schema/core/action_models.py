@@ -15,7 +15,7 @@ collisions and silent shadowing.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -130,12 +130,12 @@ class UpdateTaskConfig(_ActionConfigBase):
     """
 
     action: Literal["update"] = "update"
-    set_fields_json: str | None = Field(
+    set_fields_json: dict[str, Any] | None = Field(
         default=None,
         description=(
-            'JSON object {"field": "value", ...} of task fields to patch. '
+            "Field=value pairs to patch on the task. "
             "Fields are validated through the Task Pydantic model before writing. "
-            'Example: \'{"priority": 1, "agent": "python-cli-architect"}\''
+            'Example: {"priority": 1, "agent": "python-cli-architect"}'
         ),
     )
     append_section: str | None = Field(
@@ -259,12 +259,12 @@ class UpdatePlanConfig(_ActionConfigBase):
         default=None,
         description=('Set the plan-level context field. Shorthand equivalent to set_fields_json={"context": "..."}.'),
     )
-    set_fields_json: str | None = Field(
+    set_fields_json: dict[str, Any] | None = Field(
         default=None,
         description=(
-            'JSON object {"field": "value", ...} of plan-level fields to set. '
+            "Field=value pairs of plan-level fields to set. "
             "Applied via backend.update_plan_fields. "
-            'Example: \'{"goal": "New goal statement", "issue": 42}\''
+            'Example: {"goal": "New goal statement", "issue": 42}'
         ),
     )
 
@@ -366,11 +366,10 @@ class UpdateActiveTaskConfig(_ActionConfigBase):
     """
 
     action: Literal["update"] = "update"
-    set_fields_json: str | None = Field(
+    set_fields_json: dict[str, Any] | None = Field(
         default=None,
         description=(
-            'JSON object {"field": "value", ...} of task fields to patch. '
-            "Applied to the task stored by the most recent set action."
+            "Field=value pairs of task fields to patch. Applied to the task stored by the most recent set action."
         ),
     )
     append_section: str | None = Field(

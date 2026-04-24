@@ -381,7 +381,7 @@ async def test_sam_update_task_fields_routes_through_backend_update_task(backend
     # Act
     await _call(
         "sam_task",
-        {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": '{"agent": "new-agent"}'}},
+        {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": {"agent": "new-agent"}}},
     )
 
     # Assert
@@ -610,12 +610,10 @@ async def test_sam_update_set_fields_json_list_value_passes_list_to_backend(back
     """
     # Arrange
     backend_mock.update_task.return_value = None
-    fields_json = '{"dependencies": ["T01", "T02", "T03"]}'
+    fields = {"dependencies": ["T01", "T02", "T03"]}
 
     # Act
-    await _call(
-        "sam_task", {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": fields_json}}
-    )
+    await _call("sam_task", {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": fields}})
 
     # Assert: update_task called, update_task_fields NOT called
     backend_mock.update_task.assert_called_once()
@@ -715,12 +713,10 @@ async def test_sam_update_set_fields_json_writes_via_update_task(backend_mock: M
     """
     # Arrange
     backend_mock.update_task.return_value = None
-    fields_json = '{"dependencies": ["T01", "T02"]}'
+    fields = {"dependencies": ["T01", "T02"]}
 
     # Act
-    await _call(
-        "sam_task", {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": fields_json}}
-    )
+    await _call("sam_task", {"plan": "P1", "task": "T1", "config": {"action": "update", "set_fields_json": fields}})
 
     # Assert: update_task called, update_task_fields NOT called
     backend_mock.update_task.assert_called_once()

@@ -698,3 +698,48 @@ async def test_artifact_read_returns_error_for_invalid_type() -> None:
 
     # Assert
     assert "error" in result
+
+
+async def test_artifact_read_multi_entry_returns_most_recent_and_warns() -> None:
+    """When multiple entries of the same type exist, artifact_read returns the most recent.
+
+    Tests: artifact_read MCP tool — multi-entry selection + warning.
+    How: Mock registry with two entries; older has earlier created_at, newer has later created_at.
+    Why: Silent first-entry selection is a data-loss bug in multi-agent scenarios (#1482).
+    """
+    # Arrange: two research entries — newer registered second with a later timestamp
+    older_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-old.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-01-01T10:00:00Z",
+    )
+    newer_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-new.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-06-01T10:00:00Z",
+    )
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[older_entry, newer_entry])
+    mock_provider = MagicMock()
+    mock_provider.get_manifest.return_value = mock_manifest
+    mock_provider.read_artifact_content_from_remote.return_value = "# Newer content"
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        patch("backlog_core.server._artifact_registry") as mock_registry,
+    ):
+        # Registry returns insertion-order list (older first)
+        mock_registry.get_by_type.return_value = [older_entry, newer_entry]
+        # Act
+        result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "research"})
+
+    # Assert: most recent returned
+    assert result.get("error") is None
+    assert result["path"] == "plan/r-new.md"
+    assert result["content"] == "# Newer content"
+    # Assert: warning lists the skipped older entry
+    warnings = result.get("warnings", [])
+    assert len(warnings) == 1
+    assert "plan/r-old.md" in warnings[0]
+    assert "2" in warnings[0]  # "Multiple … found (2)"

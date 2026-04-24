@@ -2612,8 +2612,16 @@ async def artifact_read(
             _require_artifact_entries(
                 entries, f"No artifacts of type '{artifact_type}' found for issue #{issue_number}"
             )
-            # Use the first (most recent) entry.
-            entry = entries[0]
+            # Sort by created_at desc so the most recently registered entry comes first.
+            # Entries without a timestamp fall back to insertion order (empty string sorts first).
+            entries_sorted = sorted(entries, key=lambda e: e.created_at or "", reverse=True)
+            entry = entries_sorted[0]
+            if len(entries_sorted) > 1:
+                skipped = [e.artifact_id for e in entries_sorted[1:]]
+                out.warnings.append(
+                    f"Multiple {artifact_type!r} artifacts found ({len(entries_sorted)}); "
+                    f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
+                )
 
             # 1. Try GitHub comment storage first.
             github_content = provider.read_artifact_content_from_remote(issue_number, artifact_type, entry.artifact_id)
