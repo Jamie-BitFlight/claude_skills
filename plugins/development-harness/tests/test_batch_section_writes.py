@@ -92,6 +92,11 @@ def _isolate_backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         ),
     )
 
+    # Prevent any operation that calls try_get_github from reaching the live
+    # API and creating real GitHub issues.  Tests that need GitHub-touching
+    # behaviour mock _write_groomed_to_github or try_get_github individually.
+    monkeypatch.setattr(ops, "try_get_github", lambda repo="": None)
+
 
 # ---------------------------------------------------------------------------
 # _handle_batch_groomed: Phase 1 — local writes
