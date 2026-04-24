@@ -256,6 +256,23 @@ class TestResolveExtendsChain:
         with pytest.raises(CircularExtendsError):
             resolve_extends_chain(a_dir / "language-manifest.yaml", search_paths=[("test", tmp_path / "manifests")])
 
+    def test_resolve_extends_chain_when_parent_not_found_then_raises(self, tmp_path: Path) -> None:
+        child_dir = tmp_path / "manifests" / "child"
+        child_dir.mkdir(parents=True)
+        child_file = child_dir / "language-manifest.yaml"
+        child_file.write_text(
+            dedent("""\
+            name: child
+            extends: missing-plugin:nonexistent
+            language: python
+            version: "1.0"
+            project_detection:
+              markers: [pyproject.toml]
+        """)
+        )
+        with pytest.raises(FileNotFoundError):
+            resolve_extends_chain(child_file, search_paths=[("other-plugin", tmp_path / "manifests")])
+
     def test_two_level_chain(self, tmp_path: Path) -> None:
         gp_dir = tmp_path / "manifests" / "gp"
         p_dir = tmp_path / "manifests" / "parent"
