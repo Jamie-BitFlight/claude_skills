@@ -1,6 +1,6 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.2.25",
+  "version": "0.2.26",
   "description": "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
   "author": {
     "name": "Jamie-BitFlight"
