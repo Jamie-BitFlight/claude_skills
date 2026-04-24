@@ -847,3 +847,62 @@ class TestSubprocessTimeoutContract:
         # Assert
         _, kwargs = mock_run.call_args
         assert kwargs["timeout"] == pytest.approx(5.0)
+
+
+# ---------------------------------------------------------------------------
+# {files} template variable pass-through
+# ---------------------------------------------------------------------------
+
+
+class TestFilesTemplateVariable:
+    """{files} placeholder in commands is NOT substituted by run_quality_gates.
+
+    The function is a pass-through executor: callers must expand {files}
+    before invoking run_quality_gates. This class documents and enforces
+    that contract.
+    """
+
+    def test_files_template_passed_verbatim_to_subprocess(self, mocker: MockerFixture) -> None:
+        """{files} appears literally in the subprocess.run call args.
+
+        Tests: that run_quality_gates does not substitute {files} before
+               passing the tokenised command to subprocess.run.
+        How: Patch shutil.which; patch subprocess.run; call with a command
+             containing {files}; inspect the positional args received by
+             subprocess.run.
+        Why: Callers pre-expand {files} with the actual file list. If
+             run_quality_gates substituted it too, a double-expansion bug
+             would silently corrupt commands.
+        """
+        # Arrange
+        mocker.patch("dispatch_schema.gates.shutil.which", return_value="/usr/bin/ruff")
+        mock_run = mocker.patch(
+            "dispatch_schema.gates.subprocess.run", return_value=_make_completed_process(returncode=0)
+        )
+
+        # Act
+        run_quality_gates(["ruff check {files}"])
+
+        # Assert: {files} was forwarded as a literal token
+        call_args, _ = mock_run.call_args
+        assert "{files}" in call_args[0]
+
+    def test_files_template_result_recorded_in_command_field(self, mocker: MockerFixture) -> None:
+        """CommandResult.command preserves the original {files} command string.
+
+        Tests: CommandResult.command field when input contains {files}.
+        How: Call with 'ruff check {files}'; assert result.results[0].command
+             equals the original string unchanged.
+        Why: The command field is the caller-visible record of what was run.
+             If it were modified, callers could not correlate results back to
+             their original pre-expanded command template.
+        """
+        # Arrange
+        mocker.patch("dispatch_schema.gates.shutil.which", return_value="/usr/bin/ruff")
+        mocker.patch("dispatch_schema.gates.subprocess.run", return_value=_make_completed_process(returncode=0))
+
+        # Act
+        result = run_quality_gates(["ruff check {files}"])
+
+        # Assert
+        assert result.results[0].command == "ruff check {files}"
