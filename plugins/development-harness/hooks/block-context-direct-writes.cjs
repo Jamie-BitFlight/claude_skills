@@ -88,7 +88,7 @@ function isBlockedWrite(command) {
 const BLOCK_REASON =
   'Direct writes to active-task context files are prohibited. ' +
   'Use the sam_active_task MCP tool instead: ' +
-  'mcp__plugin_dh_sam__sam_active_task({"action": "write", ...})';
+  'mcp__plugin_dh_sam__sam_active_task({"action": "set", "plan": "P{N}", "task": "T{M}"}).';
 
 let input = '';
 process.stdin.setEncoding('utf8');
