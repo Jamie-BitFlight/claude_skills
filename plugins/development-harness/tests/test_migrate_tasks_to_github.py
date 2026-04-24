@@ -183,13 +183,6 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
         # Provide a mock repo so the live-mode path doesn't fail on import.
         mock_gh.return_value = MagicMock()
 
-        # We don't enter the live path because all tasks are skipped.
-        # But we need the import to succeed — monkeypatch the module namespace.
-        import migrate_tasks_to_github as mod
-
-        mod.create_task_issue = mock_create  # type: ignore[attr-defined]
-        mod.get_github = mock_gh  # type: ignore[attr-defined]
-
         # Act: invoke without dry-run; the task should still be skipped
         result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480", "--dry-run"])
 
@@ -286,8 +279,11 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
             raise RuntimeError(msg)
         return success_issue
 
+    fake_bc = tmp_path / "bc"
+    fake_bc.mkdir()
+
     with (
-        patch("migrate_tasks_to_github._BACKLOG_CORE", tmp_path / "bc"),
+        patch("migrate_tasks_to_github._BACKLOG_CORE", fake_bc),
         patch("migrate_tasks_to_github.SamTask") as mock_sam_cls,
         patch("migrate_tasks_to_github.get_github") as mock_gh,
         patch("migrate_tasks_to_github.create_task_issue", side_effect=_side_effect),
@@ -295,21 +291,9 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
         mock_gh.return_value = MagicMock()
         mock_sam_cls.side_effect = lambda **kw: MagicMock(task_id=kw["task_id"])
 
-        # Patch _BACKLOG_CORE.exists() to return True so we proceed.
-        import migrate_tasks_to_github as mod
+        result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"])
 
-        orig_bc = mod._BACKLOG_CORE
-        mod._BACKLOG_CORE = MagicMock()
-        mod._BACKLOG_CORE.exists.return_value = True
-        mod.create_task_issue = _side_effect  # type: ignore[attr-defined]
-        mod.get_github = mock_gh  # type: ignore[attr-defined]
-
-        try:
-            runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"], catch_exceptions=False)
-        except SystemExit:
-            pass
-        finally:
-            mod._BACKLOG_CORE = orig_bc
+    assert result.exit_code == 0, result.output
 
     # The second task's github_issue field should be written (issue 482).
     updated_content = task_file.read_text()
