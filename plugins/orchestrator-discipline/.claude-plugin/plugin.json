@@ -1,7 +1,7 @@
 {
   "name": "orchestrator-discipline",
   "description": "Enforces orchestrator context window discipline via PreToolUse hooks and rules. Prevents the orchestrator from reading source files it will not edit, running diagnostic commands that should be delegated, and bypassing delegation with 'small change' rationalizations. Install to structurally prevent investigation escalation anti-patterns.",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
