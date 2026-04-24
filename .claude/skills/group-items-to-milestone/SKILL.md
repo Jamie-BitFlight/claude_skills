@@ -110,7 +110,7 @@ Assigned {count} items:
 
 Per-item files updated with {created_count} new issue numbers.
 
-Next step: /start-milestone {number}
+Next step: /dh:groom-milestone {number}
 ```
 
 ## Error Handling

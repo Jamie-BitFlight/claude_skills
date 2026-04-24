@@ -662,7 +662,7 @@ def sam_active_task(
         case "set":
             set_config = cast("SetActiveTaskConfig", config)
             active = ctx_backend.set_active_task(
-                resolved_session, set_config.plan, set_config.task, set_config.plan_dir
+                resolved_session, set_config.plan, set_config.task, set_config.plan_dir, set_config.parent_issue_number
             )
             return {"active_task": active.model_dump(mode="json")}
 

@@ -352,6 +352,10 @@ class SetActiveTaskConfig(_ActionConfigBase):
             "Stored alongside plan/task so retrieval uses the same backend."
         ),
     )
+    parent_issue_number: int | None = Field(
+        default=None,
+        description="Optional GitHub issue number for the parent story. Used by the SubagentStop hook to create sub-issues.",
+    )
 
 
 class UpdateActiveTaskConfig(_ActionConfigBase):
