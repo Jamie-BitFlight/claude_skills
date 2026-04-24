@@ -106,6 +106,7 @@ Milestone created.
 
 Next steps:
   Assign items:  /group-items-to-milestone {number}
+  Groom for execution: /dh:groom-milestone {number}
   Start work:    /start-milestone {number}
 ```
 
