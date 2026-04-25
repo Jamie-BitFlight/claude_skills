@@ -105,6 +105,7 @@ research/
 ├── embedded-ui-libraries/              # Embedded graphics libraries for microcontrollers and MCUs
 │   └── lvgl.md                         # LVGL - Light and Versatile Graphics Library (22.8K+ stars)
 ├── developer-tools/                   # Developer productivity and workflow tools
+│   ├── abtop.md                       # Real-time TUI monitor for Claude Code and Codex agent sessions with live token, context window, and rate limit tracking (v0.3.7, 1.2K stars)
 │   ├── biome.md                       # Rust-based web toolchain: formatter + linter + import organizer, 97% Prettier compat, ~35× faster (23.8K stars)
 │   ├── byobu.md                       # Enhanced terminal multiplexer wrapper for tmux/screen — F-key layer, 40+ status plugins, XDG config (1.5K stars)
 │   ├── animejs.md                     # Lightweight JavaScript animation engine (66K+ stars)
