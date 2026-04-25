@@ -394,7 +394,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
                 if not all(isinstance(item, str) for item in v):
                     raise ValueError(f"Field {k!r} list values must all be strings")
                 validated[k] = [str(item) for item in v]
-            elif isinstance(v, (str, int)):
+            elif isinstance(v, str) or (isinstance(v, int) and not isinstance(v, bool)):
                 validated[k] = v
             else:
                 raise TypeError(f"Field {k!r} value must be str, int, or list[str], got {type(v).__name__!r}")
