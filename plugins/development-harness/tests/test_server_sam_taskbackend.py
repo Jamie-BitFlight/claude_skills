@@ -685,3 +685,39 @@ async def test_sam_update_set_fields_json_writes_via_update_task(backend_mock: M
     # Assert: update_task called, update_task_fields NOT called
     backend_mock.update_task.assert_called_once()
     backend_mock.update_task_fields.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# sam_active_task: set→get round-trip with parent_issue_number
+# ---------------------------------------------------------------------------
+
+
+async def test_sam_active_task_set_get_round_trip_persists_parent_issue_number(backend_mock: MagicMock) -> None:
+    """sam_active_task set→get round-trip persists parent_issue_number.
+
+    SetActiveTaskConfig gained parent_issue_number to thread it into the
+    context backend so the SubagentStop hook can link sub-issues.  Verify
+    that a value set via action='set' is returned by action='get'.
+
+    Arrange: inject in-memory context backend; inject mock task backend.
+    Act 1: sam_active_task(action='set', plan='P1', task='T1', parent_issue_number=42).
+    Act 2: sam_active_task(action='get').
+    Assert: get response includes parent_issue_number=42.
+    """
+    from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
+    from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
+
+    ctx_backend = InMemoryContextBackend()
+    set_context_config(ContextConfig(backend=ctx_backend))
+    try:
+        # Act 1 — set with parent_issue_number
+        await _call(
+            "sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T1", "parent_issue_number": 42}}
+        )
+
+        # Act 2 — get and verify round-trip
+        result = await _call("sam_active_task", {"config": {"action": "get"}})
+        active_task = result.get("active_task") or {}
+        assert active_task.get("parent_issue_number") == 42
+    finally:
+        reset_context_config()

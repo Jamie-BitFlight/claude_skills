@@ -354,7 +354,7 @@ class SetActiveTaskConfig(_ActionConfigBase):
     )
     parent_issue_number: int | None = Field(
         default=None,
-        description="Optional GitHub issue number for the parent story. Used by the SubagentStop hook to create sub-issues.",
+        description="Optional GitHub issue number for the parent story. Used by the SubagentStop hook for GitHub sync and issue linking.",
     )
 
 
