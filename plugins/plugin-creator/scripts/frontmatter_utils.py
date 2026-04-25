@@ -25,8 +25,15 @@ from ruamel.yaml import YAML
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ruamel.yaml.nodes import ScalarNode
+    from ruamel.yaml.representer import RoundTripRepresenter
+
 # Recursive type for YAML/JSON-serializable frontmatter values. More specific than Any.
 FrontmatterValue: TypeAlias = dict[str, "FrontmatterValue"] | list["FrontmatterValue"] | str | int | float | bool | None
+
+
+def _represent_none(dumper: RoundTripRepresenter, _data: None) -> ScalarNode:
+    return dumper.represent_scalar("tag:yaml.org,2002:null", "null")
 
 
 class RuamelYAMLHandler(YAMLHandler):
@@ -47,6 +54,9 @@ class RuamelYAMLHandler(YAMLHandler):
         # Without this, descriptions longer than ~80 chars become multi-line
         # block scalars which break downstream validators expecting single-line strings.
         self._yaml.width = 2147483647
+        # ruamel.yaml round-trip mode emits None as an empty scalar (mcp:) by default.
+        # Represent None as the explicit 'null' keyword so mcp: null survives round-trips.
+        self._yaml.representer.add_representer(type(None), _represent_none)
 
     @property
     def yaml(self) -> YAML:
