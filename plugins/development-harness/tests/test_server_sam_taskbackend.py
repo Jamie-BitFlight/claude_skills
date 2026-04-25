@@ -708,6 +708,7 @@ async def test_sam_plan_update_set_fields_json_invalid_enum_raises_tool_error(ba
         await _call(
             "sam_plan", {"config": {"action": "update", "set_fields_json": '{"state": "invalid-value"}'}, "plan": "P1"}
         )
+    backend_mock.update_plan_fields.assert_not_called()
 
 
 async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock: MagicMock) -> None:
@@ -721,4 +722,4 @@ async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock
         "sam_plan", {"config": {"action": "update", "set_fields_json": '{"goal": "new goal"}'}, "plan": "P1"}
     )
     assert result.get("updated") is True
-    backend_mock.update_plan_fields.assert_called_once()
+    backend_mock.update_plan_fields.assert_called_once_with("P1", context=None, set_fields={"goal": "new goal"})
