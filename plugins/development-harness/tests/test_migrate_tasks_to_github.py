@@ -183,7 +183,7 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
         # Provide a mock repo so the live-mode path doesn't fail on import.
         mock_gh.return_value = MagicMock()
 
-        # Act: invoke without dry-run; the task should still be skipped
+        # Act: invoke in dry-run mode; the already-migrated task should still be skipped
         result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480", "--dry-run"])
 
     # Assert
@@ -287,6 +287,7 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
         patch("migrate_tasks_to_github.SamTask") as mock_sam_cls,
         patch("migrate_tasks_to_github.get_github") as mock_gh,
         patch("migrate_tasks_to_github.create_task_issue", side_effect=_side_effect),
+        patch("migrate_tasks_to_github._write_cache"),
     ):
         mock_gh.return_value = MagicMock()
         mock_sam_cls.side_effect = lambda **kw: MagicMock(task_id=kw["task_id"])
