@@ -183,7 +183,7 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
         # Provide a mock repo so the live-mode path doesn't fail on import.
         mock_gh.return_value = MagicMock()
 
-        # Act: invoke without dry-run; the task should still be skipped
+        # Act: invoke with --dry-run; the task should still be skipped
         result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480", "--dry-run"])
 
     # Assert

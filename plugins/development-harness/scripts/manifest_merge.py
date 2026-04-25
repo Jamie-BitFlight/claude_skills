@@ -103,7 +103,7 @@ def _resolve_extends_ref(ref: str, child_path: Path, search_paths: list[tuple[st
         candidate = search_path / manifest_name / "language-manifest.yaml"
         if candidate.exists():
             return candidate
-    path_strs = [str(p) for _, p in search_paths]
+    path_strs = [f"{name}:{p}" for name, p in search_paths]
     msg = f"Cannot resolve extends reference '{ref}' in search paths: {path_strs}"
     raise FileNotFoundError(msg)
 
