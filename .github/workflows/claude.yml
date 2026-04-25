@@ -30,6 +30,9 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Ensure Claude install directory exists
+        run: mkdir -p ~/.local/bin
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
