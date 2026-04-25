@@ -2613,7 +2613,8 @@ async def artifact_read(
                 entries, f"No artifacts of type '{artifact_type}' found for issue #{issue_number}"
             )
             # Sort by created_at desc so the most recently registered entry comes first.
-            # Entries without a timestamp fall back to insertion order (empty string sorts first).
+            # Entries without a timestamp sort last (empty string is smallest; stable sort
+            # preserves insertion order among multiple undated entries).
             entries_sorted = sorted(entries, key=lambda e: e.created_at or "", reverse=True)
             entry = entries_sorted[0]
             if len(entries_sorted) > 1:
