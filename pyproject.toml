@@ -25,6 +25,7 @@ dev = [
     "httpx>=0.28.1",
     "hvplot>=0.12.2",
     "hypothesis>=6.0.0",
+    "marko>=2.2.2",
     "matplotlib>=3.10.8",
     "mcp[cli]>=1.26.0",
     "pandas>=3.0.0",

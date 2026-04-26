@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["typer>=0.21.0"]
+# dependencies = ["marko>=2.0.0", "typer>=0.21.0"]
 # ///
 """Validate research entries against the research-curator quality standard."""
 
