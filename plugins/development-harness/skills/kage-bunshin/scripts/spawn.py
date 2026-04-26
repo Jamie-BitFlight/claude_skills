@@ -155,6 +155,23 @@ def _repo_dir_name(repo_root: Path) -> str:
     return repo_root.name
 
 
+def _jsonl_dir_for_project() -> Path:
+    """Derive the JSONL project directory from the current git repository slug.
+
+    Returns the directory containing .jsonl session files created by claude.
+    Falls back to ~/.claude/projects/ if git is unavailable.
+
+    Returns:
+        Path to the directory containing .jsonl session files.
+    """
+    try:
+        repo_root = _git_repo_root()
+        slug = str(repo_root).replace("/", "-")
+        return Path.home() / ".claude" / "projects" / slug
+    except SystemExit:
+        return Path.home() / ".claude" / "projects"
+
+
 def _session_state_dir() -> Path:
     """Return (and create) the kage-bunshin state directory for the current repo.
 
@@ -591,6 +608,84 @@ _CLAUDE_INIT_WAIT_SECONDS = 3.0
 """Seconds to wait for claude's interactive REPL to initialise before sending the prompt."""
 
 
+def _find_init_event_session_id(jsonl_path: Path) -> str | None:
+    """Read the first init event's session_id from a JSONL file.
+
+    Args:
+        jsonl_path: Path to the .jsonl session file.
+
+    Returns:
+        Session ID string if found, None if file is unreadable or has no init event.
+    """
+    try:
+        with jsonl_path.open(encoding="utf-8") as f:
+            for line in f:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    event = json.loads(text)
+                    if event.get("type") == "system" and event.get("subtype") == "init":
+                        return event.get("session_id")
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return None
+
+
+def _extract_session_id_from_jsonl(jsonl_path: Path, timeout_seconds: float = 5.0) -> str | None:
+    """Extract session_id from the first type=system,subtype=init event in a JSONL file.
+
+    Polls the file for up to timeout_seconds waiting for the initial event.
+    Returns None if the file doesn't exist, is empty, or has no init event.
+
+    Args:
+        jsonl_path: Path to the .jsonl session file.
+        timeout_seconds: Maximum time to wait for the file to contain init event.
+
+    Returns:
+        Session ID string if found, None otherwise.
+    """
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if not jsonl_path.exists():
+            time.sleep(0.1)
+            continue
+
+        session_id = _find_init_event_session_id(jsonl_path)
+        if session_id is not None:
+            return session_id
+
+        time.sleep(0.1)
+    return None
+
+
+def _build_spawn_record(entry_data: dict[str, Any]) -> dict[str, Any]:
+    """Build the JSON record to print from cmd_spawn output.
+
+    Extracts and formats spawn metadata for external consumers.
+    Includes all provided fields except internal state keys.
+
+    Args:
+        entry_data: Complete spawn entry data dict containing at minimum:
+            name, tmux_session, model, spawned_at.
+
+    Returns:
+        Dict suitable for json.dumps() with external-facing fields.
+    """
+    record = {
+        "name": entry_data["name"],
+        "tmux_session": entry_data["tmux_session"],
+        "model": entry_data["model"],
+        "spawned_at": entry_data["spawned_at"],
+        "worktree": entry_data.get("worktree", True),
+    }
+    if entry_data.get("session_id"):
+        record["session_id"] = entry_data["session_id"]
+    return record
+
+
 def cmd_spawn(args: argparse.Namespace) -> None:
     """Spawn a new claude session in interactive REPL mode via --worktree and --tmux.
 
@@ -618,9 +713,7 @@ def cmd_spawn(args: argparse.Namespace) -> None:
         print(limit_message, file=sys.stderr)
         sys.exit(1)
 
-    repo_root = _git_repo_root()
-    repo_dir = _repo_dir_name(repo_root)
-    registry = _load_registry(state_dir, args.session_id)
+    repo_dir = _repo_dir_name(_git_repo_root())
 
     name: str = args.name or _slugify(args.prompt[0])
     if not name:
@@ -628,6 +721,7 @@ def cmd_spawn(args: argparse.Namespace) -> None:
 
     claude_tmux_session = _claude_tmux_session_name(repo_dir, name)
 
+    registry = _load_registry(state_dir, args.session_id)
     if name in registry:
         if _tmux_alive(claude_tmux_session):
             _die(f"session '{name}' already exists and is alive. Kill it first.")
@@ -669,6 +763,10 @@ def cmd_spawn(args: argparse.Namespace) -> None:
     # Send the initial prompt as keyboard input to the running REPL.
     _tmux_run_in_session(claude_tmux_session, args.prompt[0])
 
+    # Extract session_id from the JSONL file created by claude.
+    jsonl_path = _jsonl_dir_for_project() / f"{args.session_id}.jsonl"
+    session_id = _extract_session_id_from_jsonl(jsonl_path)
+
     spawned_at = datetime.now(UTC).isoformat()
     entry: dict[str, Any] = {
         "name": name,
@@ -678,16 +776,11 @@ def cmd_spawn(args: argparse.Namespace) -> None:
         "tmux_session": claude_tmux_session,
         "repo_dir": repo_dir,
     }
+    if session_id:
+        entry["session_id"] = session_id
     _write_entry(state_dir, args.session_id, name, entry)
 
-    record: dict[str, Any] = {
-        "name": name,
-        "tmux_session": claude_tmux_session,
-        "model": args.model,
-        "spawned_at": spawned_at,
-        "worktree": True,
-    }
-    print(json.dumps(record))
+    print(json.dumps(_build_spawn_record(entry)))
 
 
 # ---------------------------------------------------------------------------

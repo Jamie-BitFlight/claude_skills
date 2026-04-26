@@ -77,6 +77,7 @@ class DispatchStateManager:
                 title        TEXT NOT NULL DEFAULT '',
                 status       TEXT NOT NULL DEFAULT 'pending',
                 pid          INTEGER,
+                session_id   TEXT,
                 started_at   TEXT,
                 completed_at TEXT,
                 result       TEXT,
@@ -255,6 +256,26 @@ class DispatchStateManager:
             WHERE milestone = ? AND wave_num = ?
             """,
             (_now_iso(), milestone, wave_num),
+        )
+        self._conn.commit()
+
+    def set_item_session_id(self, milestone: int, wave_num: int, issue: int, session_id: str | None) -> None:
+        """Record the Claude Code session UUID for a spawned item.
+
+        Args:
+            milestone: GitHub milestone number.
+            wave_num: Wave number (1-based).
+            issue: GitHub issue number of the item.
+            session_id: UUID extracted from JSONL type=system,subtype=init event, or None.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            UPDATE items
+            SET session_id = ?
+            WHERE milestone = ? AND wave_num = ? AND issue = ?
+            """,
+            (session_id, milestone, wave_num, issue),
         )
         self._conn.commit()
 

@@ -1429,6 +1429,8 @@ class DispatchItemRecord(BaseModel):
     status: str = "pending"
     """pending | in-progress | complete | failed | skipped"""
     pid: int | None = None
+    session_id: str | None = None
+    """Claude Code session UUID for this spawned item, extracted from JSONL."""
     started_at: str = ""
     """ISO 8601 timestamp when item entered in-progress state."""
     completed_at: str = ""
@@ -1463,6 +1465,8 @@ class DispatchSpawnResult(BaseModel):
     error_file: str
     model: str = "sonnet"
     lock_file: str | None = None
+    session_id: str | None = None
+    """Claude Code session UUID extracted from JSONL type=system,subtype=init event."""
 
 
 class DispatchWaveSummary(BaseModel):

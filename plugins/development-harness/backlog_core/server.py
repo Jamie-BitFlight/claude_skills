@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import collections
 import contextlib
 import dataclasses
 import json as _json
@@ -48,6 +49,7 @@ from .models import (
     RegisterResult,
     init as _init_models,
 )
+from .transcript_reader import read_session_transcript_usage as _read_session_transcript_usage
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -4114,37 +4116,62 @@ async def dispatch_wave_status(
         }
 
     items = wave.items
-    pending = sum(1 for i in items if i.status == "pending")
-    in_progress = sum(1 for i in items if i.status == "in-progress")
-    complete = sum(1 for i in items if i.status == "complete")
-    failed = sum(1 for i in items if i.status == "failed")
-    skipped = sum(1 for i in items if i.status == "skipped")
+    status_counts = collections.Counter(i.status for i in items)
 
     elapsed: float | None = None
     if wave.started_at:
-        try:
-            started = _datetime.fromisoformat(wave.started_at)
-            ended = _datetime.fromisoformat(wave.completed_at) if wave.completed_at else _datetime.now(UTC)
-            elapsed = (ended - started).total_seconds()
-        except ValueError:
-            pass
+        with contextlib.suppress(ValueError):
+            start = _datetime.fromisoformat(wave.started_at)
+            end = _datetime.fromisoformat(wave.completed_at) if wave.completed_at else _datetime.now(UTC)
+            elapsed = (end - start).total_seconds()
+
+    # Accumulate usage from all completed items.
+    accumulated_usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "estimated_cost_usd": 0.0,
+        "events_with_usage": 0,
+    }
+
+    try:
+        jsonl_dir = Path.home() / ".claude" / "projects" / _dh_paths.compute_slug(_dh_paths.infer_project_root())
+        for item in items:
+            if item.status == "complete" and item.session_id:
+                usage = _read_session_transcript_usage(jsonl_dir / f"{item.session_id}.jsonl")
+                accumulated_usage["input_tokens"] += usage.get("input_tokens", 0)
+                accumulated_usage["output_tokens"] += usage.get("output_tokens", 0)
+                accumulated_usage["cache_read_tokens"] += usage.get("cache_read_tokens", 0)
+                accumulated_usage["cache_creation_tokens"] += usage.get("cache_creation_tokens", 0)
+                accumulated_usage["estimated_cost_usd"] += usage.get("estimated_cost_usd", 0.0)
+                accumulated_usage["events_with_usage"] += usage.get("event_count", 0)
+    except (OSError, ValueError):
+        # If we can't read usage, continue without it — it's not critical to the response.
+        pass
 
     summary = _DispatchWaveSummary(
         milestone=milestone,
         wave_num=wave_num,
         status=wave.status,
         total_items=len(items),
-        pending=pending,
-        in_progress=in_progress,
-        complete=complete,
-        failed=failed,
-        skipped=skipped,
+        pending=status_counts.get("pending", 0),
+        in_progress=status_counts.get("in-progress", 0),
+        complete=status_counts.get("complete", 0),
+        failed=status_counts.get("failed", 0),
+        skipped=status_counts.get("skipped", 0),
         started_at=wave.started_at,
         completed_at=wave.completed_at,
         elapsed_seconds=elapsed,
         items=items,
     )
-    return {**summary.model_dump(), "messages": [], "warnings": warnings, "errors": []}
+    return {
+        **summary.model_dump(),
+        "messages": [],
+        "warnings": warnings,
+        "errors": [],
+        "accumulated_usage": accumulated_usage,
+    }
 
 
 @dataclasses.dataclass
@@ -4301,6 +4328,7 @@ async def _run_spawn_item(
                 spawn_data = _json.loads(stdout_text)
                 pid = int(spawn_data.get("pid", -1))
                 result_file = str(spawn_data.get("result_file", ""))
+                session_id = spawn_data.get("session_id")
             except (ValueError, KeyError):
                 error_msg = f"spawn.py non-JSON output: {stdout_text}"
                 await asyncio.to_thread(mgr.set_item_failed, milestone, wave_num, issue_num, error_msg)
@@ -4312,6 +4340,9 @@ async def _run_spawn_item(
 
             if pid > 0:
                 await asyncio.to_thread(mgr.set_item_in_progress, milestone, wave_num, issue_num, pid)
+
+            if session_id:
+                await asyncio.to_thread(mgr.set_item_session_id, milestone, wave_num, issue_num, session_id)
 
             succeeded, _ = await _poll_until_done(mgr, milestone, wave_num, issue_num, pid, result_file)
             if succeeded:
