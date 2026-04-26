@@ -343,11 +343,7 @@ async def test_sam_task_update_set_fields_patches_task(client: Client, task_back
     # Act
     result = await client.call_tool(
         "sam_task",
-        {
-            "plan": plan_id,
-            "task": "T01",
-            "config": {"action": "update", "set_fields_json": '{"title": "Updated title"}'},
-        },
+        {"plan": plan_id, "task": "T01", "config": {"action": "update", "set_fields_json": {"title": "Updated title"}}},
     )
 
     # Assert
@@ -390,11 +386,11 @@ async def test_sam_task_update_append_section_stores_content(
 async def test_sam_task_update_invalid_json_raises_tool_error(
     client: Client, task_backend: InMemoryTaskProvider
 ) -> None:
-    """sam_task action=update raises ToolError when set_fields_json is not valid JSON.
+    """sam_task action=update raises ToolError when set_fields_json is the wrong type.
 
-    Tests: sam_task update input validation for malformed JSON.
-    How: Pass 'not-json' as set_fields_json.
-    Why: json.loads raises ValueError which FastMCP wraps as ToolError.
+    Tests: sam_task update input validation for wrong-type value.
+    How: Pass a string instead of a dict for set_fields_json.
+    Why: Pydantic rejects non-dict values; FastMCP wraps ValidationError as ToolError.
     """
     # Arrange
     plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
@@ -912,9 +908,7 @@ async def test_sam_active_task_update_without_active_raises_tool_error(client: C
     """
     # Act / Assert
     with pytest.raises(ToolError, match="no active task set"):
-        await client.call_tool(
-            "sam_active_task", {"config": {"action": "update", "set_fields_json": '{"priority": 1}'}}
-        )
+        await client.call_tool("sam_active_task", {"config": {"action": "update", "set_fields_json": {"priority": 1}}})
 
 
 async def test_sam_active_task_update_patches_task_via_active_context(
@@ -935,8 +929,7 @@ async def test_sam_active_task_update_patches_task_via_active_context(
 
     # Act
     result = await client.call_tool(
-        "sam_active_task",
-        {"config": {"action": "update", "set_fields_json": '{"title": "Updated via active context"}'}},
+        "sam_active_task", {"config": {"action": "update", "set_fields_json": {"title": "Updated via active context"}}}
     )
 
     # Assert
