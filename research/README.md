@@ -1459,6 +1459,18 @@ Embedded and in-process database clients for Python, focused on analytical and O
 
 ---
 
+### 32. Learning Resources
+
+**Location**: [./learning-resources/](./learning-resources/)
+
+Comprehensive collections of algorithm implementations, code examples, and educational reference materials for learning computational fundamentals.
+
+| File | Description | Last Verified |
+|------|-------------|--------------|
+| [TheAlgorithms-Python.md](./learning-resources/TheAlgorithms-Python.md) | The Algorithms/Python — 1,381+ implementations of 40+ algorithm categories with type hints, doctests, and educational focus. Stars: 220.2K. Active maintenance with 930+ open issues. | 2026-04-26 |
+
+---
+
 ## Planned Categories
 
 The following categories are planned for future research:
