@@ -7,14 +7,19 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import re
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 import typer
+
+if TYPE_CHECKING:
+    import types
 
 
 class Issue(TypedDict):
@@ -365,12 +370,89 @@ def collect_files(path: Path) -> list[Path]:
     return [f for f in files if f.name != "README.md"]
 
 
+def _load_backlink_lib() -> types.ModuleType:
+    """Load backlink_lib from the same directory as this script using importlib.util.
+
+    Both scripts are PEP 723 siblings in the same directory; importlib is needed
+    because neither is an installed package. Module must be registered in sys.modules
+    before exec_module so that @dataclass can resolve its module namespace.
+
+    Returns:
+        The loaded backlink_lib module with all public functions accessible.
+    """
+    lib_path = Path(__file__).parent / "backlink_lib.py"
+    spec = importlib.util.spec_from_file_location("backlink_lib", lib_path)
+    if spec is None or spec.loader is None:
+        msg = f"Cannot load backlink_lib from {lib_path}"
+        raise ImportError(msg)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["backlink_lib"] = module
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path, vault_path: Path) -> bool:
+    """Attempt to append a missing backlink row to target pointing at source.
+
+    Reads the source and target entry files, locates the forward cross-reference row
+    in source that cites target, transforms the relationship description, and appends
+    the reciprocal row to target. Writes the modified target file on success.
+
+    Args:
+        bl: Loaded backlink_lib module.
+        source: Absolute path to the entry that has a forward reference to target.
+        target: Absolute path to the entry that is missing the reciprocal backlink.
+        vault_path: Absolute path to the vault root (for computing relative paths).
+
+    Returns:
+        True if a new backlink row was appended and target was written; False if the
+        row already exists (idempotent) or if source has no parseable forward row.
+    """
+    source_md = source.read_text(encoding="utf-8")
+    source_rows: list[object] = bl.parse_cross_references_table(source_md)
+
+    forward_row: object | None = None
+    for row in source_rows:
+        row_link: str = getattr(row, "link_path", "")
+        if bl.resolve_link_path(source, row_link) == target:
+            forward_row = row
+            break
+
+    target_md = target.read_text(encoding="utf-8")
+    source_category: str = bl.category_of(source, vault_path)
+    # os.path.relpath supports walking above the start directory on all Python 3.11+
+    backlink_str = os.path.relpath(source, target.parent).replace("\\", "/")
+    if not backlink_str.startswith("..") and "/" in backlink_str:
+        backlink_str = "./" + backlink_str
+
+    CrossRefRow = bl.CrossRefRow  # type: ignore[attr-defined]
+
+    if forward_row is not None:
+        source_name: str = getattr(forward_row, "entry_name", source.stem)
+        forward_rel: str = getattr(forward_row, "relationship", "")
+        backlink_relationship = bl.transform_to_backlink_description(
+            forward_rel, source_name, source_category, bl.category_of(target, vault_path)
+        )
+    else:
+        source_name = source.stem
+        backlink_relationship = f"referenced by {source_name} ({source_category})"
+
+    backlink_row = CrossRefRow(
+        entry_name=source_name, link_path=backlink_str, category=source_category, relationship=backlink_relationship
+    )
+
+    new_md, modified = bl.append_backlink_row(target_md, backlink_row)
+    if modified:
+        target.write_text(new_md, encoding="utf-8")
+    return modified
+
+
 _PATH_ARG = typer.Argument(Path("./research/"), help="File or directory to validate")
 _JSON_OPT = typer.Option(False, "--json", help="Output machine-readable JSON")
 _VERBOSE_OPT = typer.Option(False, "--verbose", help="Show per-file detail")
 
 
-@app.command()
+@app.command(name="validate")
 def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = _VERBOSE_OPT) -> None:
     """Validate research entries against quality standards."""
     research_root = path if path.is_dir() else path.parent
@@ -425,6 +507,50 @@ def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = 
                     print(f"  {severity_label}: {issue['message']}")
 
     if total_errors > 0:
+        sys.exit(1)
+    sys.exit(0)
+
+
+@app.command(name="check-backlinks")
+def check_backlinks(
+    vault_path: Annotated[Path, typer.Argument(help="Root directory of the research vault")],
+    fix: Annotated[bool, typer.Option("--fix", help="Auto-append missing backlink rows")] = False,
+) -> None:
+    """Scan the vault for asymmetric cross-references and optionally repair them."""
+    bl = _load_backlink_lib()
+
+    graph: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
+    asymmetric: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph)
+    count = len(asymmetric)
+
+    print(f"asymmetric_cross_references: {count}")
+    for source, target in asymmetric:
+        source_rel = source.relative_to(vault_path)
+        target_rel = target.relative_to(vault_path)
+        print(f"  {source_rel} -> {target_rel}")
+
+    if fix and count > 0:
+        repaired = 0
+        for source, target in asymmetric:
+            try:
+                if _repair_one_asymmetric_pair(bl, source, target, vault_path):
+                    repaired += 1
+            except (OSError, ValueError):
+                # Log to stderr and continue — do not abort the entire fix pass
+                typer.echo(
+                    f"warning: could not repair {source.relative_to(vault_path)} -> {target.relative_to(vault_path)}",
+                    err=True,
+                )
+
+        print(f"backlinks_repaired: {repaired}")
+        # After fix, re-check asymmetries to set exit code correctly
+        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
+        remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph_after)
+        if remaining:
+            sys.exit(1)
+        sys.exit(0)
+
+    if count > 0:
         sys.exit(1)
     sys.exit(0)
 
