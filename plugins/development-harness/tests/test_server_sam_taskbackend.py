@@ -799,4 +799,3 @@ async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock
     )
     assert result.get("updated") is True
     backend_mock.update_plan_fields.assert_called_once_with("P1", context=None, set_fields={"goal": "new goal"})
-
