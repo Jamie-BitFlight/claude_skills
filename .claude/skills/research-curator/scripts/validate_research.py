@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marko>=2.0.0", "typer>=0.21.0"]
+# dependencies = ["marko>=2.2.2", "typer>=0.21.0"]
 # ///
 """Validate research entries against the research-curator quality standard."""
 
@@ -422,7 +422,7 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
     source_category: str = bl.category_of(source, vault_path)
     # os.path.relpath supports walking above the start directory on all Python 3.11+
     backlink_str = os.path.relpath(source, target.parent).replace("\\", "/")
-    if not backlink_str.startswith("..") and "/" in backlink_str:
+    if not backlink_str.startswith(".."):
         backlink_str = "./" + backlink_str
 
     CrossRefRow = bl.CrossRefRow  # type: ignore[attr-defined]
@@ -452,7 +452,7 @@ _JSON_OPT = typer.Option(False, "--json", help="Output machine-readable JSON")
 _VERBOSE_OPT = typer.Option(False, "--verbose", help="Show per-file detail")
 
 
-@app.command(name="validate")
+@app.command()
 def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = _VERBOSE_OPT) -> None:
     """Validate research entries against quality standards."""
     research_root = path if path.is_dir() else path.parent

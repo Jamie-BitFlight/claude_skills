@@ -57,13 +57,13 @@ Use the helper module [backlink_lib.py](./../skills/research-curator/scripts/bac
 for all markdown parsing, path resolution, and relationship-description transforms. Do not
 reimplement these in the agent prompt.
 
-Invoke it via `uv run --script` or import its functions in a small Python driver step:
+Invoke it via the validator's check-backlinks subcommand or import its functions in a small Python driver step:
 
 ```bash
-uv run --script .claude/skills/research-curator/scripts/backlink_lib.py
+uv run --script .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
 ```
 
-Or write a small inline driver that imports and calls the public API functions:
+Or write a small inline driver that imports and calls the public API functions directly:
 
 - `parse_cross_references_table(entry_markdown)` — returns list of `CrossRefRow`
 - `resolve_link_path(source_entry_path, link)` — resolves relative link to absolute path

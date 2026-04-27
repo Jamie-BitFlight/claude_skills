@@ -215,7 +215,12 @@ def _find_table_insert_index(lines_stripped: list[str], heading_idx: int) -> int
                 past_header = True
             last_table_row_idx = i
             table_end_idx = i + 1
-        elif stripped in {"", "---"} or stripped.startswith("## "):
+        elif stripped.startswith("## "):
+            table_end_idx = i
+            break
+        elif stripped in {"", "---"} and last_table_row_idx is not None:
+            # Only stop on blank lines / separators once we have seen at least one table row.
+            # A blank line between the heading and the table header must not end the scan.
             table_end_idx = i
             break
 
@@ -410,9 +415,9 @@ def backlink_exists(target_entry_markdown: str, source_entry_path_link: str) -> 
         normalised source_entry_path_link.
     """
     rows = parse_cross_references_table(target_entry_markdown)
-    normalised_source = source_entry_path_link.lstrip("./")
+    normalised_source = source_entry_path_link.removeprefix("./")
     for row in rows:
-        normalised_existing = row.link_path.lstrip("./")
+        normalised_existing = row.link_path.removeprefix("./")
         if normalised_existing == normalised_source:
             return True
     return False
