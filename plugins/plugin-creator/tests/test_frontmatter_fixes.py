@@ -92,11 +92,15 @@ class TestMcpBlockPreservation:
 
         # Serialized output preserves the mcp key.
         assert "mcp:" in result
+        # Both parsed metadata objects MUST contain the mcp key explicitly
+        # (.get() would return None for a missing key, which would silently pass).
+        assert "mcp" in post.metadata
+        assert "mcp" in reloaded.metadata
         # Round-trip preserves None on the original parsed metadata.
-        assert post.metadata.get("mcp") is None
+        assert post.metadata["mcp"] is None
         # Re-loading the dumped output also returns None (not a dict — the
         # emitter must not have produced a block-mapping).
-        assert reloaded.metadata.get("mcp") is None
+        assert reloaded.metadata["mcp"] is None
 
     def test_description_with_colon_still_detected_after_mcp_null(self) -> None:
         """Non-mcp fields after mcp: null are loaded correctly (no state bleed).
