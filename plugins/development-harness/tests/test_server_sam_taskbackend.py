@@ -265,6 +265,46 @@ async def test_sam_status_routes_through_backend_get_plan_status(backend_mock: M
     backend_mock.get_plan_status.assert_called_once_with("P1")
 
 
+async def test_sam_status_merges_autonomy_from_read_plan(backend_mock: MagicMock) -> None:
+    """sam_plan action=status merges autonomy field from backend.read_plan into the response.
+
+    Arrange: configure backend.read_plan to return _PLAN_DATA with autonomy='per_task'.
+    Act: call sam_plan with action=status, plan='P1'.
+    Assert: result['autonomy'] == 'per_task'; backend.read_plan called once with 'P1'.
+    """
+    # Arrange — override read_plan to return a plan dict with explicit autonomy
+    backend_mock.read_plan.return_value = {**_PLAN_DATA, "autonomy": "per_task"}
+
+    # Act
+    result = await _call("sam_plan", {"config": {"action": "status"}, "plan": "P1"})
+
+    # Assert — autonomy value surfaced from read_plan merge
+    assert "autonomy" in result, f"Expected 'autonomy' key in status result, got keys: {sorted(result.keys())}"
+    assert result["autonomy"] == "per_task"
+    backend_mock.read_plan.assert_called_once_with("P1")
+
+
+async def test_sam_status_autonomy_fallback_when_absent_in_read_plan(backend_mock: MagicMock) -> None:
+    """sam_plan action=status returns autonomy='full_auto' when read_plan dict lacks the key.
+
+    Arrange: backend.read_plan returns _PLAN_DATA which does NOT contain 'autonomy'.
+    Act: call sam_plan with action=status, plan='P1'.
+    Assert: result['autonomy'] == 'full_auto' (the .get() fallback path).
+    """
+    # Arrange — _PLAN_DATA has no 'autonomy' key; verify the baseline assumption
+    assert "autonomy" not in _PLAN_DATA, (
+        "_PLAN_DATA must not contain 'autonomy' for this test to exercise the fallback path. "
+        "Remove 'autonomy' from _PLAN_DATA or update this test."
+    )
+
+    # Act (backend_mock.read_plan already returns _PLAN_DATA by default from fixture)
+    result = await _call("sam_plan", {"config": {"action": "status"}, "plan": "P1"})
+
+    # Assert — fallback to 'full_auto' when key is absent
+    assert "autonomy" in result, f"Expected 'autonomy' key in status result, got keys: {sorted(result.keys())}"
+    assert result["autonomy"] == "full_auto"
+
+
 async def test_sam_list_routes_through_backend_list_plans(backend_mock: MagicMock) -> None:
     """sam_plan action=list calls backend.list_plans.
 
@@ -616,7 +656,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Task as _Task
+    from sam_schema.core.models import Complexity, Priority, Task as _Task
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
     from sam_schema.server import sam_plan
 
@@ -624,7 +664,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task One", status="not-started", agent="a", priority=2, complexity="low"
+        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))
@@ -688,6 +728,42 @@ async def test_sam_update_set_fields_json_writes_via_update_task(backend_mock: M
 
 
 # ---------------------------------------------------------------------------
+# sam_active_task: set→get round-trip with parent_issue_number
+# ---------------------------------------------------------------------------
+
+
+async def test_sam_active_task_set_get_round_trip_persists_parent_issue_number(backend_mock: MagicMock) -> None:
+    """sam_active_task set→get round-trip persists parent_issue_number.
+
+    SetActiveTaskConfig gained parent_issue_number to thread it into the
+    context backend so the SubagentStop hook can link sub-issues.  Verify
+    that a value set via action='set' is returned by action='get'.
+
+    Arrange: inject in-memory context backend; inject mock task backend.
+    Act 1: sam_active_task(action='set', plan='P1', task='T1', parent_issue_number=42).
+    Act 2: sam_active_task(action='get').
+    Assert: get response includes parent_issue_number=42.
+    """
+    from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
+    from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
+
+    ctx_backend = InMemoryContextBackend()
+    set_context_config(ContextConfig(backend=ctx_backend))
+    try:
+        # Act 1 — set with parent_issue_number
+        await _call(
+            "sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T1", "parent_issue_number": 42}}
+        )
+
+        # Act 2 — get and verify round-trip
+        result = await _call("sam_active_task", {"config": {"action": "get"}})
+        active_task = result.get("active_task") or {}
+        assert active_task.get("parent_issue_number") == 42
+    finally:
+        reset_context_config()
+
+
+# ---------------------------------------------------------------------------
 # Plan-level set_fields_json validation (fix #1512)
 # ---------------------------------------------------------------------------
 
@@ -723,3 +799,4 @@ async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock
     )
     assert result.get("updated") is True
     backend_mock.update_plan_fields.assert_called_once_with("P1", context=None, set_fields={"goal": "new goal"})
+
