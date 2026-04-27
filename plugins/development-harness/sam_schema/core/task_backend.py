@@ -212,16 +212,34 @@ class TaskBackend(Protocol):
         ...
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
-        """Append markdown content to a named section of a task body.
+        """Append markdown content under a named heading in the task record.
 
-        If the section does not exist, it is created. If it already exists,
-        the content is appended below the existing section content.
+        ``section_name`` is used as the markdown heading text (``## {section_name}``).
+        It is **not** routed as a YAML field name — callers may pass any string
+        (e.g. ``"Findings"``, ``"Work Log"``) and the content will be preserved
+        without error.  The specific storage field (e.g. ``context_notes`` or
+        ``body``) is an implementation detail of each backend; callers must not
+        assume a particular field.  Content is always retrievable via
+        :meth:`read_task` regardless of the field used.
+
+        .. note::
+            The ``LocalYamlTaskProvider`` and ``InMemoryTaskProvider`` accumulate
+            all sections in ``context_notes``.  The ``GitHubTaskProvider`` appends
+            to the task ``body`` field.  A future Protocol revision may define a
+            canonical target field; until then, use :meth:`read_task` to retrieve
+            content rather than inspecting a specific field directly.
+
+        If a heading with ``section_name`` already exists in the storage field,
+        the new content is appended below it.  If no such heading exists, the
+        heading is created followed by the content.
 
         Args:
             plan_id: Backend-assigned plan identifier.
             task_id: Task identifier within the plan.
-            section_name: Markdown heading name for the section (without ``##``).
-            content: Markdown content to append to the section.
+            section_name: Heading label for the section (without ``##``). Any
+                string is accepted; the value is used as markdown heading text
+                only, not as a YAML field name.
+            content: Markdown content to append under the section heading.
 
         Raises:
             PlanNotFoundError: When plan_id does not resolve to a known plan.
