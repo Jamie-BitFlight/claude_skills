@@ -229,9 +229,14 @@ class TaskBackend(Protocol):
             canonical target field; until then, use :meth:`read_task` to retrieve
             content rather than inspecting a specific field directly.
 
-        If a heading with ``section_name`` already exists in the storage field,
-        the new content is appended below it.  If no such heading exists, the
-        heading is created followed by the content.
+        Append semantics: if a heading matching ``section_name`` already exists
+        anywhere in the storage field, only ``content`` is appended to the end
+        of the field (the heading is not re-emitted, and content is NOT inserted
+        immediately under the matched heading — it lands at the end of the field
+        regardless of any later headings).  If no such heading exists, the
+        heading is appended followed by ``content``, both at the end of the
+        field.  This matches the current ``LocalYamlTaskProvider``,
+        ``InMemoryTaskProvider``, and ``GitHubTaskProvider`` implementations.
 
         Args:
             plan_id: Backend-assigned plan identifier.
