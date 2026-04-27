@@ -279,28 +279,22 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
             raise RuntimeError(msg)
         return success_issue
 
+    fake_bc = tmp_path / "bc"
+    fake_bc.mkdir()
+
     with (
-        patch("migrate_tasks_to_github._BACKLOG_CORE", tmp_path / "bc"),
+        patch("migrate_tasks_to_github._BACKLOG_CORE", fake_bc),
         patch("migrate_tasks_to_github.SamTask") as mock_sam_cls,
         patch("migrate_tasks_to_github.get_github") as mock_gh,
         patch("migrate_tasks_to_github.create_task_issue", side_effect=_side_effect),
+        patch("migrate_tasks_to_github._write_cache"),
     ):
         mock_gh.return_value = MagicMock()
         mock_sam_cls.side_effect = lambda **kw: MagicMock(task_id=kw["task_id"])
 
-        # Patch _BACKLOG_CORE.exists() to return True so we proceed.
-        import migrate_tasks_to_github as mod
+        result = runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"])
 
-        orig_bc = mod._BACKLOG_CORE
-        mod._BACKLOG_CORE = MagicMock()
-        mod._BACKLOG_CORE.exists.return_value = True
-
-        try:
-            runner.invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"], catch_exceptions=False)
-        except SystemExit:
-            pass
-        finally:
-            mod._BACKLOG_CORE = orig_bc
+    assert result.exit_code == 0, result.output
 
     # The second task's github_issue field should be written (issue 482).
     updated_content = task_file.read_text()
