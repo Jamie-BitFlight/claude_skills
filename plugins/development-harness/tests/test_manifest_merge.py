@@ -270,8 +270,11 @@ class TestResolveExtendsChain:
               markers: [pyproject.toml]
         """)
         )
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(FileNotFoundError) as exc_info:
             resolve_extends_chain(child_file, search_paths=[("other-plugin", tmp_path / "manifests")])
+        message = str(exc_info.value)
+        assert "missing-plugin:nonexistent" in message
+        assert "other-plugin" in message
 
     def test_two_level_chain(self, tmp_path: Path) -> None:
         gp_dir = tmp_path / "manifests" / "gp"
