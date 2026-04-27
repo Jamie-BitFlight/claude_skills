@@ -68,7 +68,7 @@ flowchart TD
 - Skipping the restart means the next wave doesn't benefit from the previous wave's output
 - Not every wave boundary needs a restart — only where new capabilities must be active
 
-**Record in description** — append the wave plan to the milestone description so `/group-items-to-milestone` and `/groom-milestone` can reference it:
+**Record in description** — append the wave plan to the milestone description so `/group-items-to-milestone` and `/dh:groom-milestone` can reference it:
 
 ```text
 Wave 0 (Foundation): #N1, #N2

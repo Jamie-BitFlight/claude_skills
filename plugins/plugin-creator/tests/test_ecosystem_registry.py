@@ -198,13 +198,13 @@ class TestGetEcosystemForKey:
 class TestGetEcosystemOwnedAgentKeys:
     """Tests for get_ecosystem_owned_agent_keys() public function.
 
-    Scope: Verifies return type is frozenset (immutable) and that the function
-    is symmetric with get_ecosystem_owned_skill_keys() — same contract, different
-    field. Current registry has no agent keys so the set is empty; tests verify
-    shape and immutability, not membership.
+    Scope: Verifies return type is frozenset (immutable), current-registry state
+    (empty set, disjoint from skill keys), and symmetry with
+    get_ecosystem_owned_skill_keys() — same contract, different field.
 
     Strategy: Black-box tests against the public API; immutability via attribute
-    access attempt; future membership tests belong here when agent keys are added.
+    access attempt; current-registry expectations documented as tests that will
+    fail when an ecosystem adds its first agent key.
     """
 
     def test_returns_frozenset(self) -> None:
