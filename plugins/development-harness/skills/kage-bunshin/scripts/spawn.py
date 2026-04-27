@@ -166,7 +166,7 @@ def _jsonl_dir_for_project() -> Path:
     """
     try:
         repo_root = _git_repo_root()
-        slug = str(repo_root).replace("/", "-")
+        slug = _repo_slug(repo_root)
         return Path.home() / ".claude" / "projects" / slug
     except SystemExit:
         return Path.home() / ".claude" / "projects"

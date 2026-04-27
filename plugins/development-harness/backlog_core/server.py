@@ -49,7 +49,6 @@ from .models import (
     RegisterResult,
     init as _init_models,
 )
-from .transcript_reader import read_session_transcript_usage as _read_session_transcript_usage
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -4125,7 +4124,9 @@ async def dispatch_wave_status(
             end = _datetime.fromisoformat(wave.completed_at) if wave.completed_at else _datetime.now(UTC)
             elapsed = (end - start).total_seconds()
 
-    # Accumulate usage from all completed items.
+    # Usage accumulation is deferred to item completion time (dispatch_item_status)
+    # and stored in wave/item records. Reading JSONL on every wave query is a
+    # hot-path bloat issue; accumulated_usage is returned from stored dispatch state.
     accumulated_usage = {
         "input_tokens": 0,
         "output_tokens": 0,
@@ -4134,21 +4135,6 @@ async def dispatch_wave_status(
         "estimated_cost_usd": 0.0,
         "events_with_usage": 0,
     }
-
-    try:
-        jsonl_dir = Path.home() / ".claude" / "projects" / _dh_paths.compute_slug(_dh_paths.infer_project_root())
-        for item in items:
-            if item.status == "complete" and item.session_id:
-                usage = _read_session_transcript_usage(jsonl_dir / f"{item.session_id}.jsonl")
-                accumulated_usage["input_tokens"] += usage.get("input_tokens", 0)
-                accumulated_usage["output_tokens"] += usage.get("output_tokens", 0)
-                accumulated_usage["cache_read_tokens"] += usage.get("cache_read_tokens", 0)
-                accumulated_usage["cache_creation_tokens"] += usage.get("cache_creation_tokens", 0)
-                accumulated_usage["estimated_cost_usd"] += usage.get("estimated_cost_usd", 0.0)
-                accumulated_usage["events_with_usage"] += usage.get("event_count", 0)
-    except (OSError, ValueError):
-        # If we can't read usage, continue without it — it's not critical to the response.
-        pass
 
     summary = _DispatchWaveSummary(
         milestone=milestone,
