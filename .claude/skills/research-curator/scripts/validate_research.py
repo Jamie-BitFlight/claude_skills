@@ -518,6 +518,7 @@ def check_backlinks(
 ) -> None:
     """Scan the vault for asymmetric cross-references and optionally repair them."""
     bl = _load_backlink_lib()
+    vault_path = vault_path.resolve()
 
     graph: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
     asymmetric: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph)
