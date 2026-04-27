@@ -413,7 +413,8 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
     if config.set_fields_json is not None:
         raw_fields: Any = json.loads(config.set_fields_json)
         if not isinstance(raw_fields, dict):
-            raise ToolError("set_fields_json must be a JSON object")
+            msg = "set_fields_json must be a JSON object"
+            raise ToolError(msg)
         validated = _validated_plan_patch(backend, plan, raw_fields)
         plan_fields = {k: v for k, v in validated.model_dump().items() if k in raw_fields}
     backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
@@ -512,10 +513,11 @@ def sam_plan(
         ToolError: When ``plan`` is None for an action that requires it.
     """
     if config.action in _SAM_PLAN_REQUIRED_ACTIONS and plan is None:
-        raise ToolError(
+        msg = (
             f"sam_plan: action='{config.action}' requires the 'plan' parameter "
             f"(e.g., plan='P1'). Actions that do not need 'plan': list, create."
         )
+        raise ToolError(msg)
 
     match config.action:
         case "read":
@@ -535,7 +537,8 @@ def sam_plan(
         case "finalize":
             return _sam_plan_finalize(cast("str", plan), plan_dir)
         case _:  # pragma: no cover
-            raise ValueError(f"sam_plan: unhandled action '{config.action}'")
+            msg = f"sam_plan: unhandled action '{config.action}'"
+            raise ValueError(msg)
 
 
 @mcp.tool(
@@ -620,7 +623,8 @@ def sam_task(
             if update_config.set_fields_json is not None:
                 raw_fields: Any = json.loads(update_config.set_fields_json)
                 if not isinstance(raw_fields, dict):
-                    raise ToolError("set_fields_json must be a JSON object")
+                    msg = "set_fields_json must be a JSON object"
+                    raise ToolError(msg)
                 validated_task = _validated_task_patch(backend, plan_id, task, raw_fields)
                 backend.update_task(plan_id, validated_task)
             if update_config.append_section is not None:
@@ -630,7 +634,8 @@ def sam_task(
             return {"updated": True, "address": f"{plan}/{task}"}
 
         case _:  # pragma: no cover
-            raise ValueError(f"sam_task: unhandled action '{config.action}'")
+            msg = f"sam_task: unhandled action '{config.action}'"
+            raise ValueError(msg)
 
 
 @mcp.tool(
@@ -701,10 +706,11 @@ def sam_active_task(
         case "update":
             active = ctx_backend.get_active_task(resolved_session)
             if active is None:
-                raise ToolError(
+                msg = (
                     "sam_active_task: no active task set for this session. "
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
+                raise ToolError(msg)
             update_config = cast("UpdateActiveTaskConfig", config)
             # ActiveTaskContext stores task_file_path and task_id.
             # Derive plan_id and plan_dir from the path rather than storing them separately.
@@ -715,7 +721,8 @@ def sam_active_task(
             if update_config.set_fields_json is not None:
                 raw_fields: Any = json.loads(update_config.set_fields_json)
                 if not isinstance(raw_fields, dict):
-                    raise ToolError("set_fields_json must be a JSON object")
+                    msg = "set_fields_json must be a JSON object"
+                    raise ToolError(msg)
                 validated_task = _validated_task_patch(task_backend, active_plan_id, active_task_id, raw_fields)
                 task_backend.update_task(active_plan_id, validated_task)
             if update_config.append_section is not None:
@@ -729,4 +736,5 @@ def sam_active_task(
             return {"cleared": removed}
 
         case _:  # pragma: no cover
-            raise ValueError(f"sam_active_task: unhandled action '{config.action}'")
+            msg = f"sam_active_task: unhandled action '{config.action}'"
+            raise ValueError(msg)
