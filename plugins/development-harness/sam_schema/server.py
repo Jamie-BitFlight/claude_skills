@@ -258,6 +258,32 @@ def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_
     return Task.model_validate({**current.model_dump(), **raw_fields})
 
 
+def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
+    """Validate raw JSON patch fields through the Pydantic Plan model.
+
+    Reads the current plan, merges *raw_fields* into its data, then passes the
+    merged dict through ``Plan.model_validate`` so field validators run (e.g.
+    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
+    fully-validated Plan model so callers use normalized field values, not the
+    raw input.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan_id: Backend-assigned plan identifier.
+        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
+
+    Returns:
+        Fully-validated Plan model with the patched fields applied.
+
+    Raises:
+        PlanNotFoundError: When plan_id cannot be resolved by the backend.
+        pydantic.ValidationError: When a field value fails Plan model validation.
+    """
+    plan_data = backend.read_plan(plan_id)
+    current = Plan.model_validate(plan_data)
+    return Plan.model_validate({**current.model_dump(), **raw_fields})
+
+
 # Actions that require the ``plan`` parameter to be supplied.
 _SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update", "append_task", "finalize"})
 
@@ -383,12 +409,13 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
         Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
     """
     backend = _get_backend(plan_dir)
-    plan_fields: dict[str, str | int | list[str]] | None = None
+    plan_fields: dict[str, Any] | None = None
     if config.set_fields_json is not None:
         raw_fields: Any = json.loads(config.set_fields_json)
         if not isinstance(raw_fields, dict):
-            raise ValueError("set_fields_json must be a JSON object")
-        plan_fields = cast("dict[str, str | int | list[str]]", raw_fields)
+            raise ToolError("set_fields_json must be a JSON object")
+        validated = _validated_plan_patch(backend, plan, raw_fields)
+        plan_fields = {k: v for k, v in validated.model_dump().items() if k in raw_fields}
     backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
     return {"updated": True, "address": plan}
 
