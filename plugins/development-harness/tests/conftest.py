@@ -4,10 +4,6 @@ Adds the plugin root to sys.path so ``from backlog_core.parsing import ...``
 resolves correctly regardless of pytest invocation directory.
 
 Shared fixtures for scenario integration tests:
-- ``_block_github_io``: autouse fixture that sets BACKLOG_BACKEND=memory for
-  every test, blocking all real GitHub I/O by routing through the in-memory
-  backend. Tests that explicitly need GitHub must opt-out via their own
-  monkeypatch or fixture override.
 - ``backlog_dir``: Redirects backlog state to tmp_path via DH_STATE_HOME for
   test isolation (uses dh_paths.backlog_dir() path conventions)
 - ``mock_github``: Patches all gh_client.py functions at operations.py boundary
@@ -25,8 +21,6 @@ import backlog_core.models as _bc_models
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-
     from backlog_core.models import GroomedData, Section
 
 # Ensure backlog_core package is importable when running tests from repo root.
@@ -41,36 +35,6 @@ if str(_plugin_dir) not in sys.path:
 _scripts_dir = _plugin_dir / "scripts"
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
-
-
-# ---------------------------------------------------------------------------
-# Autouse: block GitHub I/O for every test in this suite
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def _block_github_io(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
-    """Route all backend operations through the in-memory backend for every test.
-
-    Sets BACKLOG_BACKEND=memory so that backend_protocol.get_config() returns
-    an InMemoryBackend instance instead of the GitHub backend.  The memory
-    backend's try_get_github() always returns None, blocking all real GitHub
-    I/O without requiring per-test patching.
-
-    Clears the backend_protocol singleton cache before each test so that the
-    env var is re-read on first use, and resets it after each test so that
-    later tests are not affected by residual state.
-
-    Tests that deliberately exercise GitHub codepaths must patch
-    ``backlog_core.operations.try_get_github`` explicitly within the test body
-    using ``mocker.patch``.
-    """
-    from backlog_core.backend_protocol import reset_config
-
-    monkeypatch.setenv("BACKLOG_BACKEND", "memory")
-    reset_config()
-    yield
-    reset_config()
 
 
 # ---------------------------------------------------------------------------
@@ -146,24 +110,6 @@ def mock_github(monkeypatch):
         "issue_to_local_fields": IssueLocalFields(
             title="Test", body="body", priority="P1", item_type="Feature", status="open"
         ),
-        # Backend-delegated GraphQL helpers — prevent InMemoryBackend from
-        # raising RuntimeError/KeyError when tests set BACKLOG_BACKEND=memory.
-        "_fetch_issue_graphql": {
-            "id": "I_mock",
-            "number": 0,
-            "title": "Mock Issue",
-            "state": "OPEN",
-            "body": "",
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-01T00:00:00Z",
-            "labels": [],
-            "assignees": [],
-            "milestone": None,
-        },
-        "_update_issue_graphql": None,
-        "_add_comment_graphql": "C_mock",
-        "_fetch_milestones_graphql": [],
-        "sync_issues_graphql": [],
     }
     for name, default in defaults.items():
         mock = MagicMock(return_value=default)
