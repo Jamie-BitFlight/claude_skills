@@ -15,7 +15,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import backlog_core.models as _backlog_models
 import tiktoken
@@ -518,12 +518,13 @@ def sam_plan(
         raise ToolError(msg)
 
     # The earlier _SAM_PLAN_REQUIRED_ACTIONS guard has already raised ToolError
-    # when plan is None for any action that requires it; assertions below are
-    # for the type checker only (the runtime check has already happened).
+    # when plan is None for any action that requires it. The casts below narrow
+    # the type for the static checker only — the runtime check has already
+    # happened. (This is post-validated narrowing, not the previously-removed
+    # cast-as-type-pun pattern that hid real type issues.)
     match config.action:
         case "read":
-            assert plan is not None
-            return _sam_plan_read(plan, plan_dir)
+            return _sam_plan_read(cast("str", plan), plan_dir)
         case "create":
             if not isinstance(config, CreatePlanConfig):
                 raise TypeError(f"Expected CreatePlanConfig, got {type(config).__name__}")
@@ -533,26 +534,21 @@ def sam_plan(
                 raise TypeError(f"Expected ListPlansConfig, got {type(config).__name__}")
             return _sam_plan_list(config, plan_dir)
         case "status":
-            assert plan is not None
-            return _sam_plan_status(plan, plan_dir)
+            return _sam_plan_status(cast("str", plan), plan_dir)
         case "ready":
-            assert plan is not None
             if not isinstance(config, ReadyPlanConfig):
                 raise TypeError(f"Expected ReadyPlanConfig, got {type(config).__name__}")
-            return _sam_plan_ready(plan, config, plan_dir)
+            return _sam_plan_ready(cast("str", plan), config, plan_dir)
         case "update":
-            assert plan is not None
             if not isinstance(config, UpdatePlanConfig):
                 raise TypeError(f"Expected UpdatePlanConfig, got {type(config).__name__}")
-            return _sam_plan_update(plan, config, plan_dir)
+            return _sam_plan_update(cast("str", plan), config, plan_dir)
         case "append_task":
-            assert plan is not None
             if not isinstance(config, AppendTaskConfig):
                 raise TypeError(f"Expected AppendTaskConfig, got {type(config).__name__}")
-            return _sam_plan_append_task(plan, config, plan_dir)
+            return _sam_plan_append_task(cast("str", plan), config, plan_dir)
         case "finalize":
-            assert plan is not None
-            return _sam_plan_finalize(plan, plan_dir)
+            return _sam_plan_finalize(cast("str", plan), plan_dir)
         case _:  # pragma: no cover
             msg = f"sam_plan: unhandled action '{config.action}'"
             raise ValueError(msg)
