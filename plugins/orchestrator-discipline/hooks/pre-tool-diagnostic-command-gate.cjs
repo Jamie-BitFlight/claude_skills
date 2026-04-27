@@ -35,13 +35,36 @@ const DIAGNOSTIC_PATTERNS = [
 ];
 
 /**
+ * Prepare a shell command string for diagnostic pattern matching.
+ *
+ * Unquotes -c payloads so diagnostic commands run via shell wrappers
+ * (e.g. `bash -c "ruff check src"`) still trigger warnings.
+ * Strips all other quoted strings to prevent false positives from
+ * string arguments (e.g. `spawn --name x 'run ruff check on foo'`).
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function stripQuotedStrings(str) {
+  // Preserve -c payloads for shell wrappers, including combined flags like
+  // -lc (login + command), -ic (interactive + command), -eoc, etc. Match any
+  // `-` followed by zero or more alphabetic characters ending in `c`.
+  return str
+    .replace(/-[a-zA-Z]*c\s+'([^']*)'/g, '-c $1')
+    .replace(/-[a-zA-Z]*c\s+"([^"]*)"/g, '-c $1')
+    .replace(/'[^']*'/g, ' ')
+    .replace(/"[^"]*"/g, ' ');
+}
+
+/**
  * @param {string} command
  * @returns {string|null} matched pattern description, or null if no match
  */
 function matchesDiagnosticCommand(command) {
   if (!command) return null;
+  const stripped = stripQuotedStrings(command);
   for (const pattern of DIAGNOSTIC_PATTERNS) {
-    const match = command.match(pattern);
+    const match = stripped.match(pattern);
     if (match) return match[0];
   }
   return null;
