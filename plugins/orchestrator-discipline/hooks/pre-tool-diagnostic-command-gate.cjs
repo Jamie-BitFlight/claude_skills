@@ -46,9 +46,12 @@ const DIAGNOSTIC_PATTERNS = [
  * @returns {string}
  */
 function stripQuotedStrings(str) {
+  // Preserve -c payloads for shell wrappers, including combined flags like
+  // -lc (login + command), -ic (interactive + command), -eoc, etc. Match any
+  // `-` followed by zero or more alphabetic characters ending in `c`.
   return str
-    .replace(/-c\s+'([^']*)'/g, '-c $1')
-    .replace(/-c\s+"([^"]*)"/g, '-c $1')
+    .replace(/-[a-zA-Z]*c\s+'([^']*)'/g, '-c $1')
+    .replace(/-[a-zA-Z]*c\s+"([^"]*)"/g, '-c $1')
     .replace(/'[^']*'/g, ' ')
     .replace(/"[^"]*"/g, ' ');
 }
