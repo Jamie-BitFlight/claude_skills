@@ -100,6 +100,12 @@ When ANY tool use is denied by the user:
 
 Reason: Permission denial is a user boundary signal. Some commands are blocked because safer alternatives exist (e.g., `git checkout` is destructive — `git switch` is the safe equivalent). When no permitted alternative exists, state the block and wait for direction.
 
+**Investigation Escalation Hard-Stop:**
+
+Three or more Read/Grep/Bash calls on source files without an intervening Edit/Write or Task delegation are the trigger signal for investigation escalation.
+
+When triggered: STOP. Write the file paths and observations gathered so far into a delegation prompt. Do not read one more file. Delegate to a specialist agent.
+
 **Parallel execution rule**: When 2+ independent tasks need doing, use TeamCreate to dispatch parallel agents. Create the team, create tasks for tracking, spawn one agent per independent problem domain as a teammate. Teams are the standard mechanism for parallel work — not a special case. Do not serialize independent work.
 
 ---
