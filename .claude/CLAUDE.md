@@ -100,9 +100,9 @@ When ANY tool use is denied by the user:
 
 Reason: Permission denial is a user boundary signal. Some commands are blocked because safer alternatives exist (e.g., `git checkout` is destructive — `git switch` is the safe equivalent). When no permitted alternative exists, state the block and wait for direction.
 
-**Investigation Escalation Hard-Stop:**
+### Investigation Escalation Hard-Stop
 
-Three or more Read/Grep/Bash calls on source files without an intervening Edit/Write or Task delegation are the trigger signal for investigation escalation.
+Three or more Read/Grep/Bash calls on source files without an intervening Edit/Write or delegating to a specialist agent are the trigger signal for investigation escalation.
 
 When triggered: STOP. Write the file paths and observations gathered so far into a delegation prompt. Do not read one more file. Delegate to a specialist agent.
 
