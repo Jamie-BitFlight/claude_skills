@@ -42,7 +42,12 @@ class TestMcpBlockPreservation:
         assert "transport: stdio" in result
 
     def test_mcp_block_with_nested_colons_not_mangled(self) -> None:
-        """mcp: block values containing colons are not incorrectly requoted."""
+        """mcp: block values containing colons are not incorrectly requoted.
+
+        Includes scalar values with embedded ``": "`` (the YAML key separator
+        when unquoted) to exercise the regression path that would mangle
+        colons inside values during the round-trip.
+        """
         from frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = (
@@ -52,9 +57,10 @@ class TestMcpBlockPreservation:
             "tools: Read\n"
             "mcp:\n"
             "  server: ./scripts/mcp_server.py\n"
+            '  notes: "URL: https://example.com/docs"\n'
             "  tools:\n"
             "    - name: do_thing\n"
-            "      description: Performs the thing\n"
+            '      description: "Performs the thing: with colon in value"\n'
             "---\n\n"
             "# Body\n"
         )
@@ -63,20 +69,32 @@ class TestMcpBlockPreservation:
 
         assert "mcp:" in result
         assert "name: do_thing" in result
-        assert "description: Performs the thing" in result
+        # Embedded ": " in scalar values must survive the round-trip.
+        assert "Performs the thing: with colon in value" in result
+        assert "URL: https://example.com/docs" in result
 
     def test_mcp_null_scalar_preserved(self) -> None:
-        """mcp: null scalar survives a round-trip without becoming a block."""
+        """mcp: null scalar survives a round-trip without becoming a block.
+
+        Asserts both that the serialized output retains the scalar form
+        ``mcp: null`` (not a block ``mcp:\n`` followed by indented children)
+        and that re-loading the dumped output round-trips ``None`` back into
+        metadata.
+        """
         from frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = "---\nname: test-skill\ndescription: A skill without mcp\ntools: Read\nmcp: null\n---\n\n# Body\n"
         post = loads_frontmatter(text)
         result = dump_frontmatter(post)
+        reloaded = loads_frontmatter(result)
 
-        assert "mcp:" in result
-        # After round-trip, mcp should remain null/None (not become a block)
-        mcp_value = post.metadata.get("mcp")
-        assert mcp_value is None
+        # Serialized output preserves the scalar form, not the block form.
+        assert "mcp: null" in result
+        assert "mcp:\n" not in result
+        # Round-trip preserves None on the original parsed metadata.
+        assert post.metadata.get("mcp") is None
+        # Re-loading the dumped output also returns None.
+        assert reloaded.metadata.get("mcp") is None
 
     def test_description_with_colon_still_detected_after_mcp_null(self) -> None:
         """Non-mcp fields after mcp: null are loaded correctly (no state bleed).
