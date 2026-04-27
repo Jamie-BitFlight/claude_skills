@@ -95,10 +95,10 @@ No graceful degradation. `blocked` is an explicit terminal state, not a fallback
 
 After calling `backlog_groom(mark_groomed=True)`, inspect the response for `mark_groomed_skipped`:
 
-- `mark_groomed_skipped` absent or `False` → status advanced normally, grooming complete
-- `mark_groomed_skipped: True` → re-lookup of the item by selector failed after content was written; status was NOT advanced
+- `mark_groomed_skipped` absent or `false` → status advanced normally, grooming complete
+- `mark_groomed_skipped: true` → re-lookup of the item by selector failed after content was written; status was NOT advanced
 
-When `mark_groomed_skipped` is `True`:
+When `mark_groomed_skipped` is `true`:
 1. Check `mark_groomed_skip_reason` in the response for the failing selector
 2. Retry once: `backlog_groom(selector='{item_ref}', mark_groomed=True)` using the `#N` issue reference form (most reliable selector)
 3. If skip repeats: report to user — the item may have been renamed or removed during the grooming session
