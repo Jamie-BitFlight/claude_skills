@@ -517,10 +517,12 @@ def sam_plan(
         )
         raise ToolError(msg)
 
+    # The earlier _SAM_PLAN_REQUIRED_ACTIONS guard has already raised ToolError
+    # when plan is None for any action that requires it; assertions below are
+    # for the type checker only (the runtime check has already happened).
     match config.action:
         case "read":
-            if plan is None:
-                raise ToolError("sam_plan: 'read' requires the 'plan' parameter")
+            assert plan is not None
             return _sam_plan_read(plan, plan_dir)
         case "create":
             if not isinstance(config, CreatePlanConfig):
@@ -531,30 +533,25 @@ def sam_plan(
                 raise TypeError(f"Expected ListPlansConfig, got {type(config).__name__}")
             return _sam_plan_list(config, plan_dir)
         case "status":
-            if plan is None:
-                raise ToolError("sam_plan: 'status' requires the 'plan' parameter")
+            assert plan is not None
             return _sam_plan_status(plan, plan_dir)
         case "ready":
-            if plan is None:
-                raise ToolError("sam_plan: 'ready' requires the 'plan' parameter")
+            assert plan is not None
             if not isinstance(config, ReadyPlanConfig):
                 raise TypeError(f"Expected ReadyPlanConfig, got {type(config).__name__}")
             return _sam_plan_ready(plan, config, plan_dir)
         case "update":
-            if plan is None:
-                raise ToolError("sam_plan: 'update' requires the 'plan' parameter")
+            assert plan is not None
             if not isinstance(config, UpdatePlanConfig):
                 raise TypeError(f"Expected UpdatePlanConfig, got {type(config).__name__}")
             return _sam_plan_update(plan, config, plan_dir)
         case "append_task":
-            if plan is None:
-                raise ToolError("sam_plan: 'append_task' requires the 'plan' parameter")
+            assert plan is not None
             if not isinstance(config, AppendTaskConfig):
                 raise TypeError(f"Expected AppendTaskConfig, got {type(config).__name__}")
             return _sam_plan_append_task(plan, config, plan_dir)
         case "finalize":
-            if plan is None:
-                raise ToolError("sam_plan: 'finalize' requires the 'plan' parameter")
+            assert plan is not None
             return _sam_plan_finalize(plan, plan_dir)
         case _:  # pragma: no cover
             msg = f"sam_plan: unhandled action '{config.action}'"
