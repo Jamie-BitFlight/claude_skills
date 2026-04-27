@@ -128,7 +128,30 @@ process.stdin.on('end', () => {
 
   // Emit metadata-only: session count + registry path.
   // Full session details (tmux names, commands) are in the registry file.
-  const message = `${sessions.length} kage-bunshin session(s) still running. Registry: ${registryPath}`;
+  // Bound the message to MAX_MESSAGE_LEN — long deep-checkout repoRoots can
+  // otherwise push the message past the documented limit. Filename is kept
+  // intact; the directory portion is elided from the front when needed.
+  const MAX_MESSAGE_LEN = 200;
+  const ELLIPSIS = '\u2026';
+  const prefix = `${sessions.length} kage-bunshin session(s) still running. Registry: `;
+  const pathBudget = MAX_MESSAGE_LEN - prefix.length;
+  let displayPath = registryPath;
+  if (displayPath.length > pathBudget) {
+    if (pathBudget <= ELLIPSIS.length) {
+      displayPath = ELLIPSIS;
+    } else {
+      const filename = path.basename(displayPath);
+      const sep = path.sep;
+      const room = pathBudget - filename.length - ELLIPSIS.length - sep.length;
+      if (room <= 0) {
+        displayPath = ELLIPSIS + filename.slice(-(pathBudget - ELLIPSIS.length));
+      } else {
+        const dir = path.dirname(displayPath);
+        displayPath = ELLIPSIS + dir.slice(-room) + sep + filename;
+      }
+    }
+  }
+  const message = prefix + displayPath;
 
   const output = {
     systemMessage: message,
