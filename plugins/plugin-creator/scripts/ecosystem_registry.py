@@ -71,20 +71,24 @@ _REGISTRY: dict[str, EcosystemSpec] = {
     )
 }
 
-_ECOSYSTEM_OWNED_SKILL_KEYS: frozenset[str] = frozenset().union(
-    *(spec.skill_frontmatter_keys for spec in _REGISTRY.values())
+_ECOSYSTEM_OWNED_KEYS: frozenset[str] = frozenset().union(
+    *(spec.skill_frontmatter_keys | spec.agent_frontmatter_keys for spec in _REGISTRY.values())
 )
 
 
 def get_ecosystem_owned_skill_keys() -> frozenset[str]:
-    """Return the union of all skill_frontmatter_keys across every registered ecosystem.
+    """Return the union of all ecosystem-owned frontmatter keys across every registered ecosystem.
+
+    Covers both ``skill_frontmatter_keys`` and ``agent_frontmatter_keys`` from all
+    registered ecosystems, matching the behaviour of :func:`get_ecosystem_for_key`.
 
     Returns:
         Immutable frozenset of top-level YAML key names owned by any registered
-        ecosystem in their ``skill_frontmatter_keys``.  Callers can safely check
-        ``key in get_ecosystem_owned_skill_keys()`` without risk of accidental mutation.
+        ecosystem in either ``skill_frontmatter_keys`` or ``agent_frontmatter_keys``.
+        Callers can safely check ``key in get_ecosystem_owned_skill_keys()`` without
+        risk of accidental mutation.
     """
-    return _ECOSYSTEM_OWNED_SKILL_KEYS
+    return _ECOSYSTEM_OWNED_KEYS
 
 
 def get_ecosystem_for_key(key: str) -> str | None:
