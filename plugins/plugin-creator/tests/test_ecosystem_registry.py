@@ -199,27 +199,31 @@ class TestGetEcosystemForKey:
 
 
 class TestEcosystemOwnedKeysIncludesAgentKeys:
-    """Verify the guard-set computation unions agent_frontmatter_keys.
+    """Verify get_ecosystem_owned_skill_keys() unions agent_frontmatter_keys.
 
-    Tests: _ECOSYSTEM_OWNED_KEYS / get_ecosystem_owned_skill_keys() includes
-           keys from agent_frontmatter_keys, matching get_ecosystem_for_key().
-    Strategy: Patch _REGISTRY and _ECOSYSTEM_OWNED_KEYS together with a synthetic
-              spec that has non-empty agent_frontmatter_keys, then check membership.
+    Tests: get_ecosystem_owned_skill_keys() includes keys from agent_frontmatter_keys,
+           matching get_ecosystem_for_key().
+    Strategy: Patch _REGISTRY with a synthetic spec that has non-empty
+              agent_frontmatter_keys, then assert against the public API.
+              Because get_ecosystem_owned_skill_keys() computes from _REGISTRY on
+              each call, patching _REGISTRY is sufficient to exercise the real
+              production code path.
     """
 
     def test_agent_key_present_in_guard_set(self) -> None:
         """get_ecosystem_owned_skill_keys() includes agent_frontmatter_keys entries.
 
-        Tests: The guard-set unions both field types
-        How: Patch _REGISTRY to include a spec with agent_frontmatter_keys;
-             recompute the guard set using the same expression used at module load;
-             verify the agent key appears in the result.
-        Why: The module-level _ECOSYSTEM_OWNED_KEYS is computed once at import time
-             from the real _REGISTRY.  We verify the computation formula is correct by
-             reproducing it with a synthetic registry that has a non-empty
-             agent_frontmatter_keys — the real registry has none.
+        Tests: The guard-set unions both field types via the public API
+        How: Patch _REGISTRY to include a spec with non-empty agent_frontmatter_keys;
+             call get_ecosystem_owned_skill_keys() under the patch;
+             verify both the skill key and the agent key appear in the result.
+        Why: The real registry has agent_frontmatter_keys=frozenset() for all specs,
+             so the agent-keys branch is dead against the live data.  A regression
+             removing that branch would not be caught without this test.
+             Asserting against get_ecosystem_owned_skill_keys() (not a local copy)
+             ensures the production guard-set code is the thing being exercised.
         """
-        # Arrange: synthetic registry with agent-only key
+        # Arrange: synthetic registry with both skill and agent keys
         mock_registry = {
             "testsuite": EcosystemSpec(
                 display_name="TestSuite",
@@ -231,12 +235,11 @@ class TestEcosystemOwnedKeysIncludesAgentKeys:
             )
         }
 
-        # Reproduce the module-level computation with the mock registry
-        computed: frozenset[str] = frozenset().union(
-            *(spec.skill_frontmatter_keys | spec.agent_frontmatter_keys for spec in mock_registry.values())
-        )
+        with patch.object(ecosystem_registry, "_REGISTRY", mock_registry):
+            # Act: call the real public API under the patched registry
+            result = get_ecosystem_owned_skill_keys()
 
-        # Assert: both keys appear
-        assert "skill-key" in computed
-        assert "agent-key" in computed
-        assert isinstance(computed, frozenset)
+        # Assert: both field types appear in the returned frozenset
+        assert "skill-key" in result
+        assert "agent-key" in result
+        assert isinstance(result, frozenset)
