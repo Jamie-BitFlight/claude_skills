@@ -728,7 +728,8 @@ def sam_active_task(
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
                 raise ToolError(msg)
-            update_config = cast("UpdateActiveTaskConfig", config)
+            if not isinstance(config, UpdateActiveTaskConfig):
+                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
             # ActiveTaskContext stores task_file_path and task_id.
             # Derive plan_id and plan_dir from the path rather than storing them separately.
             active_plan_dir = str(Path(active.task_file_path).parent)
