@@ -34,11 +34,11 @@ mattpocock/skills addresses this gap by encoding **specific engineering practice
 
 ## Key Statistics
 
-- **23,883 stars** (as of 2026-04-27)
-- **1,936 forks** (as of 2026-04-27)
+- **43,829 stars** (as of 2026-04-29)
+- **3,467 forks** (as of 2026-04-29)
 - **Repository created**: 2026-02-03
-- **Last updated**: 2026-04-27 (very recent — active maintenance)
-- **21 distinct skills** in organized directories
+- **Last updated**: 2026-04-29 (very recent — active maintenance)
+- **22 distinct skills** in organized directories (4 deprecated)
 - **60,000+ subscribers** to associated newsletter (mentioned in README)
 
 ---
@@ -54,11 +54,12 @@ mattpocock/skills addresses this gap by encoding **specific engineering practice
    - `to-issues`: Breaks plans into independently-grabbable GitHub issues using vertical slices.
    - `request-refactor-plan`: Creates detailed refactor plans with commit-sized steps via user interview, files as GitHub issue.
 
-2. **Development** (6 skills)
+2. **Development** (7 skills; 1 deprecated)
    - `tdd`: Test-driven development with explicit red-green-refactor loops. Core teaching: **vertical slices via tracer bullets, not horizontal slicing**. One test → one implementation → repeat. Prevents writing all tests first (imagined behavior) then all code. Includes embedded references: tests.md, mocking.md, refactoring.md, interface-design.md, deep-modules.md.
-   - `triage-issue`: Investigates bugs by exploring codebase, identifies root cause, files GitHub issue with TDD-based fix plan.
+   - `triage`: Investigates bugs by exploring codebase, identifies root cause, files GitHub issue with TDD-based fix plan. Replaces deprecated `triage-issue`.
+   - `diagnose`: New skill (2026-04-29) — systematic diagnostic approach for understanding root causes in codebases.
    - `improve-codebase-architecture`: Finds deepening opportunities—refactors that turn shallow modules (interface complexity ≈ implementation complexity) into deep ones (small interface hiding significant complexity). Uses domain-aware language from CONTEXT.md and decisions from docs/adr/ to avoid re-litigating settled choices. Teaches deletion test: would removing this module concentrate complexity or just move it?
-   - `qa`: Quality assurance skill (specific content not examined in depth).
+   - `grill-with-docs`: New skill (2026-04-29) — leverages domain context (CONTEXT.md and ADR formats) to ask domain-aware questions about architectural decisions.
    - `migrate-to-shoehorn`: Automates migration from TypeScript `as` type assertions to @total-typescript/shoehorn library.
    - `scaffold-exercises`: Creates exercise directory structures with sections, problems, solutions, and explainers (used for teaching/knowledge capture).
 
@@ -317,13 +318,13 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Anthropic Agent Skills Repository](./anthropics-skills.md) | skill-generation-tools | Official skill specification and template reference; foundation for SKILL.md format mattpocock/skills follows |
-| [Claude Code Skills Library by Alireza Rezvani](./claude-code-skills-alirezarezvani.md) | skill-generation-tools | 170 modular skills with identical architecture (SKILL.md + references + CLI tools); shared emphasis on encoding expertise as reusable instruction bundles |
-| [Everything Claude Code](./everything-claude-code.md) | skill-generation-tools | Comprehensive skill harness (65+ skills, 16 agents) implementing mattpocock patterns at scale with hook-based automation and persistent memory |
-| [SkillKit — Universal Package Manager for AI Agent Skills](./skillkit.md) | skill-generation-tools | Skill format auto-translation and package discovery; complements mattpocock/skills distribution model with cross-platform support for 32 agents |
-| [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | Enforcement layer using hooks and checklist-driven verification similar to mattpocock/skills workflow discipline; model routing strategy complements skill-based approach |
-| [mcpskills-cli](./mcpskills-cli.md) | skill-generation-tools | MCP-to-skill converter using Streamable HTTP discovery; extends mattpocock approach to integrate external tool ecosystems |
-| [Skill Seekers](./skill-seekers.md) | skill-generation-tools | Documentation-to-skill automation; alternative generation path to mattpocock's manual curation model |
+| [Anthropic Agent Skills Repository](./anthropics-skills.md) | skill-generation-tools | Official skill specification and SKILL.md format foundation that mattpocock/skills implements; shared frontmatter schema |
+| [Claude Code Skills Library by Alireza Rezvani](./claude-code-skills-alirezarezvani.md) | skill-generation-tools | 170 modular skills across 9 domains with identical architecture (SKILL.md + references); shares vertical-slice and deep-module philosophy |
+| [Everything Claude Code](./everything-claude-code.md) | skill-generation-tools | 65+ skills and 16 agents implementing mattpocock patterns at organizational scale with hook-based automation and persistent memory |
+| [SkillKit — Universal Package Manager](./skillkit.md) | skill-generation-tools | Cross-platform skill format translation and discovery; extends mattpocock distribution model with 32 agent support |
+| [Skill Seekers](./skill-seekers.md) | skill-generation-tools | Documentation-to-skill automation; alternative generation path to mattpocock's manual curation model; both target skill standardization |
+| [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | Enforcement layer using checklist-driven verification similar to mattpocock's workflow discipline; model routing strategy complements skill-based approach |
+| [mcpskills-cli](./mcpskills-cli.md) | skill-generation-tools | MCP-to-skill converter; extends mattpocock's skill ecosystem to integrate external tool ecosystems via Streamable HTTP discovery |
 | [oh-my-opencode](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | Production-scale orchestration (37.5K stars) implementing multi-agent patterns that mattpocock skills coordinate; hash-anchored editing complements skill-based workflows |
 
 ---
@@ -332,9 +333,9 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 
 **Entry Created**: 2026-04-27 (v1.0.0)
 
-**Last Verified**: 2026-04-27
+**Last Verified**: 2026-04-29 (v1.1.0 — re-researched)
 
-**Next Review Due**: 2026-07-27 (90 days)
+**Next Review Due**: 2026-07-29 (90 days)
 
 ### Confidence Assessment
 
@@ -350,7 +351,14 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 
 ### Changes Since Last Review
 
-N/A — this is the initial entry created 2026-04-27.
+**Verified 2026-04-29** — substantial growth in 2 days:
+
+1. **Star count**: 23,883 → 43,829 (+20,146 stars, +82% increase)
+2. **Fork count**: 1,936 → 3,467 (+1,531 forks, +79% increase)
+3. **New skills added**: `diagnose` and `grill-with-docs` (engineering category)
+4. **Skill status changes**: `triage-issue` renamed to `triage`; 4 skills now marked deprecated (design-an-interface, qa, request-refactor-plan, ubiquitous-language)
+5. **Repository updates**: Out-of-scope clarification added (2026-04-29 commit: "Add out-of-scope note: issue trackers must be mainstream")
+6. **Maintenance status**: Actively maintained with recent commits addressing out-of-scope documentation
 
 ### Data Drift Monitoring
 

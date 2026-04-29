@@ -1,6 +1,6 @@
 # OpenSpec MCP (openspec-mcp)
 
-**Research Date**: 2026-03-02
+**Research Date**: 2026-04-29
 **Source URL**: <https://github.com/iflow-mcp/lumiaqian-openspec-mcp>
 **Upstream Repository**: <https://github.com/Lumiaqian/openspec-mcp>
 **npm Package**: <https://www.npmjs.com/package/openspec-mcp>
@@ -36,16 +36,15 @@ upstream repository.
 
 | Metric | Value | Date Gathered |
 |--------|-------|---------------|
-| GitHub Stars (upstream Lumiaqian/openspec-mcp) | 10 | 2026-03-02 |
-| GitHub Stars (iflow-mcp fork) | 0 | 2026-03-02 |
-| Forks (upstream) | 1 | 2026-03-02 |
-| Contributors (upstream) | 1 (Lumiaqian) | 2026-03-02 |
-| npm Weekly Downloads | 58 | 2026-03-01 |
-| npm Total Versions | 15 | 2026-03-02 |
-| Latest Release | v0.4.2 (2026-01-12) | 2026-03-02 |
-| npm Unpacked Size | 1.12 MB (179 files) | 2026-03-02 |
+| GitHub Stars (upstream Lumiaqian/openspec-mcp) | 20 | 2026-04-29 |
+| GitHub Forks (upstream) | 3 | 2026-04-29 |
+| GitHub Open Issues | 0 | 2026-04-29 |
+| npm Weekly Downloads | 61 | 2026-04-29 |
+| npm Total Versions | 15 | 2026-04-29 |
+| Latest Release | v0.4.2 (2026-01-12) | 2026-04-29 |
+| Days Since Latest Release | 107 days | 2026-04-29 |
 
-SOURCE: [GitHub API - upstream repo](https://api.github.com/repos/Lumiaqian/openspec-mcp) (accessed 2026-03-02), [npm registry](https://www.npmjs.com/package/openspec-mcp) (accessed 2026-03-02)
+SOURCE: [GitHub API - upstream repo](https://api.github.com/repos/Lumiaqian/openspec-mcp) (accessed 2026-04-29), [npm registry downloads](https://api.npmjs.org/downloads/point/last-week/openspec-mcp) (accessed 2026-04-29)
 
 ---
 
@@ -116,13 +115,17 @@ Local filesystem (OpenSpec project directory)
 
 Key dependencies (from package.json v0.4.2):
 
-- `@modelcontextprotocol/sdk` v1.13.3 -- MCP server SDK
-- `fastify` -- HTTP server for dashboard
-- `chokidar` -- filesystem watcher for real-time updates
-- `zod` -- schema validation for MCP tool parameters
-- `gray-matter` -- YAML frontmatter parsing for proposal files
+- `@modelcontextprotocol/sdk` ^1.13.3 -- MCP server SDK
+- `@fastify/cors` ^9.0.0 -- CORS handling for Fastify
+- `@fastify/static` ^7.0.0 -- Static file serving
+- `@fastify/websocket` ^8.2.0 -- WebSocket support for real-time updates
+- `fastify` ^4.24.0 -- HTTP server for dashboard and API
+- `chokidar` ^3.5.3 -- filesystem watcher for real-time updates
+- `commander` ^12.0.0 -- CLI argument parsing
+- `zod` ^3.22.0 -- schema validation for MCP tool parameters
+- `gray-matter` ^4.0.3 -- YAML frontmatter parsing for proposal files
 
-SOURCE: [GitHub repo file tree](https://github.com/Lumiaqian/openspec-mcp/tree/main/src) (accessed 2026-03-02), [package.json](https://raw.githubusercontent.com/Lumiaqian/openspec-mcp/main/package.json) (accessed 2026-03-02)
+SOURCE: [GitHub repo file tree](https://github.com/Lumiaqian/openspec-mcp/tree/main/src) (accessed 2026-04-29), [package.json](https://raw.githubusercontent.com/Lumiaqian/openspec-mcp/main/package.json) (accessed 2026-04-29)
 
 ---
 
@@ -199,12 +202,13 @@ SOURCE: [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main
 
 ## References
 
-- [iflow-mcp/lumiaqian-openspec-mcp (fork)](https://github.com/iflow-mcp/lumiaqian-openspec-mcp) (accessed 2026-03-02)
-- [Lumiaqian/openspec-mcp (upstream)](https://github.com/Lumiaqian/openspec-mcp) (accessed 2026-03-02)
-- [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main/README.md) (accessed 2026-03-02)
-- [npm package: openspec-mcp](https://www.npmjs.com/package/openspec-mcp) (accessed 2026-03-02)
-- [GitHub API repo metadata](https://api.github.com/repos/Lumiaqian/openspec-mcp) (accessed 2026-03-02)
-- [GitHub releases v0.4.2](https://github.com/Lumiaqian/openspec-mcp/releases/tag/v0.4.2) (accessed 2026-03-02)
+- [iflow-mcp/lumiaqian-openspec-mcp (fork)](https://github.com/iflow-mcp/lumiaqian-openspec-mcp) (accessed 2026-04-29)
+- [Lumiaqian/openspec-mcp (upstream)](https://github.com/Lumiaqian/openspec-mcp) (accessed 2026-04-29)
+- [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main/README.md) (accessed 2026-04-29)
+- [npm package: openspec-mcp](https://www.npmjs.com/package/openspec-mcp) (accessed 2026-04-29)
+- [GitHub API repo metadata](https://api.github.com/repos/Lumiaqian/openspec-mcp) (accessed 2026-04-29)
+- [GitHub releases v0.4.2](https://github.com/Lumiaqian/openspec-mcp/releases/tag/v0.4.2) (accessed 2026-04-29)
+- [npm downloads API](https://api.npmjs.org/downloads/point/last-week/openspec-mcp) (accessed 2026-04-29)
 
 ---
 
@@ -212,6 +216,26 @@ SOURCE: [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main
 
 | Field | Value |
 |-------|-------|
-| Last Verified | 2026-03-02 |
+| Last Verified | 2026-04-29 |
 | Version at Verification | v0.4.2 |
-| Next Review Recommended | 2026-06-02 |
+| Days Since Last Release | 107 days (latest: 2026-01-12) |
+| Confidence: Statistics | high |
+| Confidence: Features | high |
+| Confidence: Architecture | high |
+| Confidence: Usage Examples | high |
+| Confidence: Limitations | medium |
+| Next Review Recommended | 2026-07-29 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Spec Workflow MCP](./spec-workflow-mcp.md) | mcp-ecosystem | alternative spec-driven workflow tool with Requirements→Design→Tasks gates and approval state machine |
+| [Saga MCP](./saga-mcp.md) | mcp-ecosystem | shares hierarchical task tracking (Projects>Epics>Tasks) and immutable activity log audit trail |
+| [GitNexus](./gitnexus.md) | mcp-ecosystem | provides code intelligence context that complements OpenSpec's spec management via graph-based impact analysis |
+| [CodeGraphContext](./codegraphcontext.md) | mcp-ecosystem | MCP server with repository-to-graph tools for cross-service dependency analysis alongside spec changes |
+| [Ultra MCP](./ultra-mcp.md) | mcp-ecosystem | provides multi-provider routing and unified dashboard model for aggregating tools across services |
+| [SourceSync.ai MCP](./sourcesyncai-mcp.md) | mcp-ecosystem | shares multi-source document aggregation pattern for knowledge base ingestion and cross-service sync |
+| [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | 16-agent framework implementing spec-driven orchestration and approval workflows alongside code execution |
