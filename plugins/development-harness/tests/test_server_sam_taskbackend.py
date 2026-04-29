@@ -791,7 +791,7 @@ async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock
     Assert: backend.update_plan_fields is called; no ToolError raised.
     """
     result = await _call(
-        "sam_plan", {"config": {"action": "update", "set_fields_json": '{"goal": "new goal"}'}, "plan": "P1"}
+        "sam_plan", {"config": {"action": "update", "set_fields_json": {"goal": "new goal"}}, "plan": "P1"}
     )
     assert result.get("updated") is True
     backend_mock.update_plan_fields.assert_called_once_with("P1", context=None, set_fields={"goal": "new goal"})

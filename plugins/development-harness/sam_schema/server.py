@@ -723,6 +723,7 @@ def sam_active_task(
                 raise ToolError(msg)
             if not isinstance(config, UpdateActiveTaskConfig):
                 raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
+            update_config = config
             # ActiveTaskContext stores task_file_path and task_id.
             # Derive plan_id and plan_dir from the path rather than storing them separately.
             active_plan_dir = str(Path(active.task_file_path).parent)
@@ -734,9 +735,9 @@ def sam_active_task(
                     task_backend, active_plan_id, active_task_id, update_config.set_fields_json
                 )
                 task_backend.update_task(active_plan_id, validated_task)
-            if config.append_section is not None:
+            if update_config.append_section is not None:
                 task_backend.append_task_section(
-                    active_plan_id, active_task_id, config.append_section, config.section_content or ""
+                    active_plan_id, active_task_id, update_config.append_section, update_config.section_content or ""
                 )
             return {"updated": True, "address": f"{active_plan_id}/{active_task_id}"}
 
