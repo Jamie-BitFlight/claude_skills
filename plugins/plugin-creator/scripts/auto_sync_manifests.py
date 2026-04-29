@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Automatically sync plugin.json and marketplace.json based on git changes.
 
-This script has two modes:
+This script has three modes:
 
 1. **Pre-commit mode** (default): Detects CRUD operations on plugins and their
    components during pre-commit, then updates manifests and bumps versions.
@@ -9,6 +9,11 @@ This script has two modes:
 2. **Reconcile mode** (``--reconcile``): Full directory scan that compares
    filesystem state against plugin.json and marketplace.json entries.  Adds
    missing components, removes stale references, and reports drift.
+
+3. **Sync-marketplace mode** (``--sync-marketplace``): Post-merge CI mode.
+   Reconciles the marketplace.json plugin list against disk, then bumps
+   the marketplace version. Called by CI after push to main so that
+   marketplace.json version bumps do not appear in PR branches.
 
 CRUD Detection (pre-commit mode):
 - Plugin created: New plugins/ directory with .claude-plugin/plugin.json
@@ -1443,23 +1448,22 @@ def _precommit_sync() -> int:
             marketplace_changes["modified"].append((plugin_name, new_version))
             _report_plugin_update(plugin_name, new_version, changes)
 
-    # Update marketplace.json
-    if marketplace_changes["added"] or marketplace_changes["deleted"] or marketplace_changes["modified"]:
-        marketplace_updated = update_marketplace_json(marketplace_changes)
-
-        if marketplace_updated:
-            _git_stage_file(".claude-plugin/marketplace.json")
-
-            with Path(".claude-plugin/marketplace.json").open(encoding="utf-8") as f:
-                data = json.load(f)
-                new_version = data["metadata"]["version"]
-
-            print(f"Updated marketplace -> {new_version}")
-
-            if marketplace_changes["added"]:
-                print(f"   - Added plugins: {', '.join(marketplace_changes['added'])}")
-            if marketplace_changes["deleted"]:
-                print(f"   - Removed plugins: {', '.join(marketplace_changes['deleted'])}")
+    # Structural sync only — version bump happens in CI post-merge
+    # (avoids marketplace.json conflicts across concurrent PRs)
+    if marketplace_changes["added"] or marketplace_changes["deleted"]:
+        marketplace_path = Path(".claude-plugin/marketplace.json")
+        if marketplace_path.exists():
+            with marketplace_path.open(encoding="utf-8") as f:
+                mdata: dict[str, Any] = json.load(f)
+            if _update_marketplace_plugins(mdata, marketplace_changes):
+                _write_json_lf(marketplace_path, _format_json(mdata))
+                _git_stage_file(".claude-plugin/marketplace.json")
+                marketplace_updated = True
+                if marketplace_changes["added"]:
+                    print(f"Added plugins to marketplace: {', '.join(sorted(marketplace_changes['added']))}")
+                if marketplace_changes["deleted"]:
+                    print(f"Removed plugins from marketplace: {', '.join(sorted(marketplace_changes['deleted']))}")
+                print("Note: marketplace version bump deferred to CI post-merge")
 
     if not plugins_updated and not marketplace_updated:
         print("Info: No manifest updates needed")
@@ -1467,8 +1471,59 @@ def _precommit_sync() -> int:
     return 0
 
 
+def _sync_marketplace_mode() -> int:
+    """Post-merge marketplace sync mode.
+
+    Called by CI after push to main. Reconciles the plugin list structure,
+    then bumps the marketplace version to reflect changes that landed in
+    the merge commit.
+
+    Returns:
+        Exit code (0 for success, 1 on error)
+    """
+    marketplace_path = Path(".claude-plugin/marketplace.json")
+    plugins_root = Path("plugins")
+
+    if not marketplace_path.exists():
+        sys.stderr.write("Error: marketplace.json not found\n")
+        return 1
+
+    if not plugins_root.is_dir():
+        sys.stderr.write("Error: plugins/ directory not found\n")
+        return 1
+
+    # Read version before reconcile
+    with marketplace_path.open(encoding="utf-8") as f:
+        pre_data: dict[str, Any] = json.load(f)
+    pre_meta = cast("dict[str, str]", pre_data.get("metadata", {}))
+    version_before = pre_meta.get("version", "0.0.0")
+
+    # Reconcile plugin list structure (handles add/remove + their version bumps)
+    _reconcile_marketplace(plugins_root, dry_run=False)
+
+    # Re-read after reconcile
+    with marketplace_path.open(encoding="utf-8") as f:
+        post_data: dict[str, Any] = json.load(f)
+    post_meta = cast("dict[str, str]", post_data.get("metadata", {}))
+    version_after = post_meta.get("version", "0.0.0")
+
+    # If reconcile didn't bump (no plugin added/removed), do a patch bump
+    # to reflect that plugin content changed (this mode only runs when it did)
+    if _parse_version_tuple(version_after) == _parse_version_tuple(version_before):
+        new_version = bump_version(version_after, "patch")
+        post_meta["version"] = new_version
+        post_data["metadata"] = post_meta
+        _write_json_lf(marketplace_path, _format_json(post_data))
+        print(f"Updated marketplace -> {new_version}")
+    else:
+        print(f"Updated marketplace -> {version_after} (structural changes)")
+
+    _git_stage_file(".claude-plugin/marketplace.json")
+    return 0
+
+
 def main() -> int:
-    """Main entry point — dispatches to pre-commit or reconcile mode.
+    """Main entry point — dispatches to pre-commit, reconcile, or sync-marketplace mode.
 
     Returns:
         Exit code (0 for success)
@@ -1480,7 +1535,15 @@ def main() -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="Report drift without modifying files (requires --reconcile)"
     )
+    parser.add_argument(
+        "--sync-marketplace",
+        action="store_true",
+        help="Post-merge mode: reconcile marketplace.json structure and bump version (for CI use)",
+    )
     args = parser.parse_args()
+
+    if args.sync_marketplace:
+        return _sync_marketplace_mode()
 
     if args.reconcile:
         return reconcile(dry_run=args.dry_run)

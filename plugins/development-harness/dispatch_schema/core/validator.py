@@ -9,10 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from backlog_core.operations import MIN_CONFLICT_GROUP_SIZE
+
 if TYPE_CHECKING:
     from dispatch_schema.core.models import DispatchPlan
-
-_MIN_CONFLICT_GROUP_SIZE = 2
 
 
 @dataclass(frozen=True)
@@ -215,7 +215,7 @@ def _check_conflict_group_wave_placement(plan: DispatchPlan) -> list[str]:
             wave_to_issues.setdefault(wave_idx, []).append(issue_num)
 
         for wave_idx, issues_in_wave in wave_to_issues.items():
-            if len(issues_in_wave) < _MIN_CONFLICT_GROUP_SIZE:
+            if len(issues_in_wave) < MIN_CONFLICT_GROUP_SIZE:
                 continue
             actual_wave = plan.waves[wave_idx]
             if not actual_wave.parallel:

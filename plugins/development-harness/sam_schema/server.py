@@ -258,6 +258,32 @@ def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_
     return Task.model_validate({**current.model_dump(), **raw_fields})
 
 
+def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
+    """Validate raw JSON patch fields through the Pydantic Plan model.
+
+    Reads the current plan, merges *raw_fields* into its data, then passes the
+    merged dict through ``Plan.model_validate`` so field validators run (e.g.
+    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
+    fully-validated Plan model so callers use normalized field values, not the
+    raw input.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan_id: Backend-assigned plan identifier.
+        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
+
+    Returns:
+        Fully-validated Plan model with the patched fields applied.
+
+    Raises:
+        PlanNotFoundError: When plan_id cannot be resolved by the backend.
+        pydantic.ValidationError: When a field value fails Plan model validation.
+    """
+    plan_data = backend.read_plan(plan_id)
+    current = Plan.model_validate(plan_data)
+    return Plan.model_validate({**current.model_dump(), **raw_fields})
+
+
 # Actions that require the ``plan`` parameter to be supplied.
 _SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update", "append_task", "finalize"})
 
@@ -368,12 +394,10 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
             }
             for t in tasks_data
         ]
-    return {
-        "ready_tasks": ready_tasks,
-        "count": len(tasks_data),
-        "feature": cast("str", status["feature"]),
-        "issue": plan_data["issue"],
-    }
+    feature = status["feature"]
+    if not isinstance(feature, str):
+        raise TypeError(f"get_plan_status must return str for 'feature', got {type(feature).__name__}")
+    return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
@@ -383,12 +407,14 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
         Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
     """
     backend = _get_backend(plan_dir)
-    plan_fields: dict[str, str | int | list[str]] | None = None
+    plan_fields: dict[str, Any] | None = None
     if config.set_fields_json is not None:
         raw_fields: Any = json.loads(config.set_fields_json)
         if not isinstance(raw_fields, dict):
-            raise ValueError("set_fields_json must be a JSON object")
-        plan_fields = cast("dict[str, str | int | list[str]]", raw_fields)
+            msg = "set_fields_json must be a JSON object"
+            raise ToolError(msg)
+        validated = _validated_plan_patch(backend, plan, raw_fields)
+        plan_fields = {k: v for k, v in validated.model_dump().items() if k in raw_fields}
     backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
     return {"updated": True, "address": plan}
 
@@ -485,30 +511,47 @@ def sam_plan(
         ToolError: When ``plan`` is None for an action that requires it.
     """
     if config.action in _SAM_PLAN_REQUIRED_ACTIONS and plan is None:
-        raise ToolError(
+        msg = (
             f"sam_plan: action='{config.action}' requires the 'plan' parameter "
             f"(e.g., plan='P1'). Actions that do not need 'plan': list, create."
         )
+        raise ToolError(msg)
 
+    # The earlier _SAM_PLAN_REQUIRED_ACTIONS guard has already raised ToolError
+    # when plan is None for any action that requires it. The casts below narrow
+    # the type for the static checker only — the runtime check has already
+    # happened. (This is post-validated narrowing, not the previously-removed
+    # cast-as-type-pun pattern that hid real type issues.)
     match config.action:
         case "read":
             return _sam_plan_read(cast("str", plan), plan_dir)
         case "create":
-            return _sam_plan_create(cast("CreatePlanConfig", config), plan_dir)
+            if not isinstance(config, CreatePlanConfig):
+                raise TypeError(f"Expected CreatePlanConfig, got {type(config).__name__}")
+            return _sam_plan_create(config, plan_dir)
         case "list":
-            return _sam_plan_list(cast("ListPlansConfig", config), plan_dir)
+            if not isinstance(config, ListPlansConfig):
+                raise TypeError(f"Expected ListPlansConfig, got {type(config).__name__}")
+            return _sam_plan_list(config, plan_dir)
         case "status":
             return _sam_plan_status(cast("str", plan), plan_dir)
         case "ready":
-            return _sam_plan_ready(cast("str", plan), cast("ReadyPlanConfig", config), plan_dir)
+            if not isinstance(config, ReadyPlanConfig):
+                raise TypeError(f"Expected ReadyPlanConfig, got {type(config).__name__}")
+            return _sam_plan_ready(cast("str", plan), config, plan_dir)
         case "update":
-            return _sam_plan_update(cast("str", plan), cast("UpdatePlanConfig", config), plan_dir)
+            if not isinstance(config, UpdatePlanConfig):
+                raise TypeError(f"Expected UpdatePlanConfig, got {type(config).__name__}")
+            return _sam_plan_update(cast("str", plan), config, plan_dir)
         case "append_task":
-            return _sam_plan_append_task(cast("str", plan), cast("AppendTaskConfig", config), plan_dir)
+            if not isinstance(config, AppendTaskConfig):
+                raise TypeError(f"Expected AppendTaskConfig, got {type(config).__name__}")
+            return _sam_plan_append_task(cast("str", plan), config, plan_dir)
         case "finalize":
             return _sam_plan_finalize(cast("str", plan), plan_dir)
         case _:  # pragma: no cover
-            raise ValueError(f"sam_plan: unhandled action '{config.action}'")
+            msg = f"sam_plan: unhandled action '{config.action}'"
+            raise ValueError(msg)
 
 
 @mcp.tool(
@@ -584,16 +627,20 @@ def sam_task(
             return {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
 
         case "state":
-            state_config = cast("StateTaskConfig", config)
-            backend.update_task_status(plan_id, task, state_config.status)
-            return {"id": task, "status": state_config.status}
+            if not isinstance(config, StateTaskConfig):
+                raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
+            backend.update_task_status(plan_id, task, config.status)
+            return {"id": task, "status": config.status}
 
         case "update":
-            update_config = cast("UpdateTaskConfig", config)
+            if not isinstance(config, UpdateTaskConfig):
+                raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
+            update_config = config
             if update_config.set_fields_json is not None:
                 raw_fields: Any = json.loads(update_config.set_fields_json)
                 if not isinstance(raw_fields, dict):
-                    raise ToolError("set_fields_json must be a JSON object")
+                    msg = "set_fields_json must be a JSON object"
+                    raise ToolError(msg)
                 validated_task = _validated_task_patch(backend, plan_id, task, raw_fields)
                 backend.update_task(plan_id, validated_task)
             if update_config.append_section is not None:
@@ -603,7 +650,8 @@ def sam_task(
             return {"updated": True, "address": f"{plan}/{task}"}
 
         case _:  # pragma: no cover
-            raise ValueError(f"sam_task: unhandled action '{config.action}'")
+            msg = f"sam_task: unhandled action '{config.action}'"
+            raise ValueError(msg)
 
 
 @mcp.tool(
@@ -665,35 +713,39 @@ def sam_active_task(
             return {"active_task": active.model_dump(mode="json")}
 
         case "set":
-            set_config = cast("SetActiveTaskConfig", config)
+            if not isinstance(config, SetActiveTaskConfig):
+                raise TypeError(f"Expected SetActiveTaskConfig, got {type(config).__name__}")
             active = ctx_backend.set_active_task(
-                resolved_session, set_config.plan, set_config.task, set_config.plan_dir, set_config.parent_issue_number
+                resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
             )
             return {"active_task": active.model_dump(mode="json")}
 
         case "update":
             active = ctx_backend.get_active_task(resolved_session)
             if active is None:
-                raise ToolError(
+                msg = (
                     "sam_active_task: no active task set for this session. "
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
-            update_config = cast("UpdateActiveTaskConfig", config)
+                raise ToolError(msg)
+            if not isinstance(config, UpdateActiveTaskConfig):
+                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
             # ActiveTaskContext stores task_file_path and task_id.
             # Derive plan_id and plan_dir from the path rather than storing them separately.
             active_plan_dir = str(Path(active.task_file_path).parent)
             active_plan_id = Path(active.task_file_path).stem.split("-")[0]
             active_task_id = active.task_id
             task_backend = _get_backend(active_plan_dir)
-            if update_config.set_fields_json is not None:
-                raw_fields: Any = json.loads(update_config.set_fields_json)
+            if config.set_fields_json is not None:
+                raw_fields: Any = json.loads(config.set_fields_json)
                 if not isinstance(raw_fields, dict):
-                    raise ToolError("set_fields_json must be a JSON object")
+                    msg = "set_fields_json must be a JSON object"
+                    raise ToolError(msg)
                 validated_task = _validated_task_patch(task_backend, active_plan_id, active_task_id, raw_fields)
                 task_backend.update_task(active_plan_id, validated_task)
-            if update_config.append_section is not None:
+            if config.append_section is not None:
                 task_backend.append_task_section(
-                    active_plan_id, active_task_id, update_config.append_section, update_config.section_content or ""
+                    active_plan_id, active_task_id, config.append_section, config.section_content or ""
                 )
             return {"updated": True, "address": f"{active_plan_id}/{active_task_id}"}
 
@@ -702,4 +754,5 @@ def sam_active_task(
             return {"cleared": removed}
 
         case _:  # pragma: no cover
-            raise ValueError(f"sam_active_task: unhandled action '{config.action}'")
+            msg = f"sam_active_task: unhandled action '{config.action}'"
+            raise ValueError(msg)

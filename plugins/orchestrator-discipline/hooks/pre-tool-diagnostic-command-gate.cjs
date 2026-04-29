@@ -35,13 +35,58 @@ const DIAGNOSTIC_PATTERNS = [
 ];
 
 /**
+ * Detect whether a command starts with a known shell wrapper (sh, bash, zsh,
+ * etc.), optionally preceded by `env VAR=val ...` or a path prefix.
+ *
+ * @param {string} str
+ * @returns {boolean}
+ */
+function isKnownShellInvocation(str) {
+  return /^\s*(?:env\s+(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*)?(?:\S+\/)?(?:bash|sh|zsh|ksh|dash|fish|ash)\b/.test(
+    str,
+  );
+}
+
+/**
+ * Prepare a shell command string for diagnostic pattern matching.
+ *
+ * For known shell-wrapper invocations (e.g. `bash -c "ruff check src"`,
+ * `bash -lc "ruff check src"`), unquote `-c`/`-lc`/`-ic`/etc. payloads so
+ * the inner command is still scanned. For non-shell tools (e.g.
+ * `grep -c 'ruff check'`), do NOT preserve the `-c` payload — quoted args
+ * are descriptive and should be stripped to avoid false positives.
+ *
+ * Strips all other quoted strings to prevent false positives from
+ * string arguments (e.g. `spawn --name x 'run ruff check on foo'`).
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function stripQuotedStrings(str) {
+  let normalized = str;
+
+  if (isKnownShellInvocation(str)) {
+    // Preserve -c payloads only for known shell wrappers, including combined
+    // flags like -lc (login + command), -ic (interactive + command), -eoc,
+    // etc. Match any `-` followed by zero or more alphabetic characters
+    // ending in `c`.
+    normalized = normalized
+      .replace(/-[a-zA-Z]*c\s+'([^']*)'/g, '-c $1')
+      .replace(/-[a-zA-Z]*c\s+"([^"]*)"/g, '-c $1');
+  }
+
+  return normalized.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ');
+}
+
+/**
  * @param {string} command
  * @returns {string|null} matched pattern description, or null if no match
  */
 function matchesDiagnosticCommand(command) {
   if (!command) return null;
+  const stripped = stripQuotedStrings(command);
   for (const pattern of DIAGNOSTIC_PATTERNS) {
-    const match = command.match(pattern);
+    const match = stripped.match(pattern);
     if (match) return match[0];
   }
   return null;

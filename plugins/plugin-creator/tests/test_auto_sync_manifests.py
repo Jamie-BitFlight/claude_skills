@@ -1581,3 +1581,203 @@ class TestFindStaleItemsScripts:
 
         assert "./skills" in stale
         assert "./skills/my-skill" not in stale
+
+
+# ============================================================================
+# Area 8: _precommit_sync structural marketplace updates (no version bump)
+# ============================================================================
+
+
+class TestPrecommitSyncMarketplaceStructural:
+    """Verify _precommit_sync updates plugin list structure without bumping version.
+
+    With the post-merge CI model, version bumping is deferred; _precommit_sync
+    must only apply add/delete structural changes (no version increment).
+    """
+
+    def test_precommit_sync_adds_plugin_to_list_without_version_bump(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Verify new plugin is written to marketplace list but version unchanged.
+
+        Tests: _precommit_sync structural-only write path for added plugin
+        How: Stage a new plugin.json (added), mock git status, run _precommit_sync,
+             assert plugin list updated and version unchanged.
+        Why: Confirms the pre-commit hook no longer bumps marketplace version —
+             only the CI post-merge mode does that.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        # Create the new plugin's plugin.json on disk
+        _make_plugin_json(tmp_path, "new-plugin", {"name": "new-plugin", "version": "0.1.0"})
+        _make_marketplace_json(
+            tmp_path,
+            {"metadata": {"version": "2.3.0"}, "plugins": [{"name": "existing", "source": "./plugins/existing"}]},
+        )
+
+        # Mock git status to report new plugin's plugin.json as added
+        staged_status = {"added": ["plugins/new-plugin/.claude-plugin/plugin.json"], "deleted": [], "modified": []}
+        monkeypatch.setattr(auto_sync, "get_git_status", lambda: staged_status)
+        monkeypatch.setattr(auto_sync, "_git_stage_file", lambda _fp: None)
+
+        # Act
+        exit_code = auto_sync._precommit_sync()
+
+        # Assert exit ok
+        assert exit_code == 0
+
+        marketplace_json = tmp_path / ".claude-plugin" / "marketplace.json"
+        data = json.loads(marketplace_json.read_text(encoding="utf-8"))
+
+        # Version must NOT have changed
+        assert data["metadata"]["version"] == "2.3.0"
+
+        # New plugin must be in the list
+        names = {p["name"] for p in data["plugins"]}
+        assert "new-plugin" in names
+        assert "existing" in names
+
+    def test_precommit_sync_modify_only_leaves_marketplace_untouched(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Verify modify-only changes leave marketplace.json completely unmodified.
+
+        Tests: _precommit_sync skips marketplace for modify-only operations
+        How: Stage a modified skill file (not add/delete plugin), run _precommit_sync,
+             assert marketplace.json byte-for-byte unchanged.
+        Why: Confirm marketplace.json is not touched at all for non-structural changes.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        _make_plugin_json(tmp_path, "alpha", {"name": "alpha", "version": "1.0.0"})
+        marketplace_json = _make_marketplace_json(
+            tmp_path, {"metadata": {"version": "3.0.0"}, "plugins": [{"name": "alpha", "source": "./plugins/alpha"}]}
+        )
+        original_content = marketplace_json.read_text(encoding="utf-8")
+
+        # Only a modified skill — no plugin add/delete
+        staged_status = {"added": [], "deleted": [], "modified": ["plugins/alpha/skills/my-skill/SKILL.md"]}
+        monkeypatch.setattr(auto_sync, "get_git_status", lambda: staged_status)
+        monkeypatch.setattr(auto_sync, "_git_stage_file", lambda _fp: None)
+        monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: {"name": "alpha", "version": "0.9.9"})
+
+        # Act
+        exit_code = auto_sync._precommit_sync()
+
+        # Assert
+        assert exit_code == 0
+        assert marketplace_json.read_text(encoding="utf-8") == original_content
+
+
+# ============================================================================
+# Area 9: _sync_marketplace_mode — post-merge CI marketplace sync
+# ============================================================================
+
+
+def _make_plugin_on_disk(base: Path, plugin_dir_name: str, plugin_name: str | None = None) -> Path:
+    """Create a minimal plugin on disk with plugin.json.
+
+    Args:
+        base: Root directory (monkeypatched cwd).
+        plugin_dir_name: Directory name under plugins/.
+        plugin_name: Value for the "name" field; defaults to plugin_dir_name.
+
+    Returns:
+        Path to the .claude-plugin/ directory.
+    """
+    name = plugin_name or plugin_dir_name
+    plugin_dir = base / "plugins" / plugin_dir_name / ".claude-plugin"
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+    (plugin_dir / "plugin.json").write_text(
+        json.dumps({"name": name, "version": "1.0.0"}, indent=2) + "\n", encoding="utf-8"
+    )
+    return plugin_dir
+
+
+class TestSyncMarketplaceMode:
+    """Tests for _sync_marketplace_mode — post-merge CI path."""
+
+    def test_sync_marketplace_mode_bumps_patch_when_no_structural_changes(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        """Verify patch bump when reconcile finds no structural changes.
+
+        Tests: _sync_marketplace_mode patch-bump path
+        How: One plugin on disk, marketplace already lists that plugin at 1.0.0;
+             reconcile finds no missing/stale, so _sync_marketplace_mode does a patch bump.
+        Why: Post-merge CI needs to reflect that plugin content changed even when
+             no plugins were added or removed.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _make_plugin_on_disk(tmp_path, "alpha")
+        _make_marketplace_json(
+            tmp_path, {"metadata": {"version": "1.0.0"}, "plugins": [{"name": "alpha", "source": "./plugins/alpha"}]}
+        )
+
+        # Suppress git add calls
+        monkeypatch.setattr(auto_sync, "_git_stage_file", lambda _fp: None)
+
+        # Act
+        exit_code = auto_sync._sync_marketplace_mode()
+
+        # Assert
+        assert exit_code == 0
+        marketplace_json = tmp_path / ".claude-plugin" / "marketplace.json"
+        data = json.loads(marketplace_json.read_text(encoding="utf-8"))
+        assert data["metadata"]["version"] == "1.0.1"
+
+    def test_sync_marketplace_mode_delegates_to_reconcile_for_structural_changes(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        """Verify reconcile path fires when marketplace is out of sync with disk.
+
+        Tests: _sync_marketplace_mode when reconcile detects a missing plugin
+        How: Two plugins on disk, marketplace lists only one; _sync_marketplace_mode
+             delegates to _reconcile_marketplace which adds the missing plugin and
+             bumps the minor version.
+        Why: Structural changes (plugin added/removed) must update the plugin list
+             and bump version accordingly.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _make_plugin_on_disk(tmp_path, "alpha")
+        _make_plugin_on_disk(tmp_path, "beta")
+        _make_marketplace_json(
+            tmp_path, {"metadata": {"version": "1.0.0"}, "plugins": [{"name": "alpha", "source": "./plugins/alpha"}]}
+        )
+
+        monkeypatch.setattr(auto_sync, "_git_stage_file", lambda _fp: None)
+
+        # Act
+        exit_code = auto_sync._sync_marketplace_mode()
+
+        # Assert
+        assert exit_code == 0
+        marketplace_json = tmp_path / ".claude-plugin" / "marketplace.json"
+        data = json.loads(marketplace_json.read_text(encoding="utf-8"))
+
+        # Reconcile bumped minor version because a plugin was added
+        _major, minor, _patch = map(int, data["metadata"]["version"].split("."))
+        assert minor >= 1, f"Expected minor bump, got {data['metadata']['version']}"
+
+        # beta is now in the plugin list
+        names = {p["name"] for p in data["plugins"]}
+        assert "beta" in names
+        assert "alpha" in names
+
+    def test_sync_marketplace_mode_returns_1_when_marketplace_missing(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Verify exit code 1 when marketplace.json does not exist.
+
+        Tests: _sync_marketplace_mode error path — missing marketplace.json
+        How: Create a plugins/ dir but no .claude-plugin/marketplace.json
+        Why: The function must fail fast with a clear error rather than creating
+             or silently skipping marketplace.json.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "plugins").mkdir()
+
+        # Act
+        exit_code = auto_sync._sync_marketplace_mode()
+
+        # Assert
+        assert exit_code == 1

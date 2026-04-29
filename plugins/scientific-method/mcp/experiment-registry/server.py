@@ -1,3 +1,11 @@
+#!/usr/bin/env -S uv --quiet run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "fastmcp>=3.0.0",
+#   "pydantic>=2.0",
+# ]
+# ///
 """Experiment Registry MCP Server.
 
 Manages controlled experiment lifecycle: creation, stepping, validation, and completion.
@@ -7,8 +15,11 @@ State persists to .claude/experiments/{id}/state.json.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Annotated, Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError

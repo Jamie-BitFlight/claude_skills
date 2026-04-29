@@ -761,3 +761,41 @@ async def test_sam_active_task_set_get_round_trip_persists_parent_issue_number(b
         assert active_task.get("parent_issue_number") == 42
     finally:
         reset_context_config()
+
+
+# ---------------------------------------------------------------------------
+# Plan-level set_fields_json validation (fix #1512)
+# ---------------------------------------------------------------------------
+
+
+async def test_sam_plan_update_set_fields_json_invalid_enum_raises_tool_error(backend_mock: MagicMock) -> None:
+    """sam_plan action=update with set_fields_json validates fields through Plan model.
+
+    Plan-level set_fields_json must route through Plan.model_validate, not cast().
+    Passing an invalid enum value for `state` must raise ToolError, not silently
+    accept the invalid value.
+
+    Arrange: inject mock backend.
+    Act: call sam_plan with action=update, plan='P1', set_fields_json containing
+         an invalid PlanState enum value.
+    Assert: ToolError is raised (pydantic.ValidationError propagates as ToolError).
+    """
+    with pytest.raises(ToolError):
+        await _call(
+            "sam_plan", {"config": {"action": "update", "set_fields_json": '{"state": "invalid-value"}'}, "plan": "P1"}
+        )
+    backend_mock.update_plan_fields.assert_not_called()
+
+
+async def test_sam_plan_update_set_fields_json_valid_value_succeeds(backend_mock: MagicMock) -> None:
+    """sam_plan action=update with valid set_fields_json passes validation and calls backend.
+
+    Arrange: inject mock backend.
+    Act: call sam_plan with action=update, plan='P1', set_fields_json with a valid goal string.
+    Assert: backend.update_plan_fields is called; no ToolError raised.
+    """
+    result = await _call(
+        "sam_plan", {"config": {"action": "update", "set_fields_json": '{"goal": "new goal"}'}, "plan": "P1"}
+    )
+    assert result.get("updated") is True
+    backend_mock.update_plan_fields.assert_called_once_with("P1", context=None, set_fields={"goal": "new goal"})

@@ -1,7 +1,7 @@
 {
   "name": "python-engineering",
   "description": "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI, web, data/science, and constrained environments.",
-  "version": "9.22.5",
+  "version": "9.22.6",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

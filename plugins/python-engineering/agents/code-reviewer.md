@@ -9,7 +9,6 @@ skills:
   - python-engineering:python3-testing
   - dh:validation-protocol
   - holistic-linting:holistic-linting
-  - python-engineering:shebangpython
   - python-engineering:stinkysnake
   - python-engineering:modernpython
 ---
@@ -115,24 +114,18 @@ Look for:
 
 ### Step 6: Execute Automated Analysis
 
-For Python files, run automated quality checks. The shebangpython, stinkysnake, and modernpython
+For Python files, run automated quality checks. The stinkysnake and modernpython
 rules are preloaded in your context via the `skills:` frontmatter — apply them directly without
 invoking the Skill tool, which would terminate your flow prematurely.
 
 1. Create `.claude/smells/` directory: `mkdir -p .claude/smells`
-2. For each Python file, apply shebangpython validation rules inline:
-   - Read the file and check shebang presence and type
-   - Apply the four shebang selection rules to determine the correct shebang
-   - Check PEP 723 metadata against actual external imports
-   - Check execute bit status
-   - Record verdict (CORRECT / INCORRECT) — do not produce output yet
-3. For each Python file, apply stinkysnake rules inline:
+2. For each Python file, apply stinkysnake rules inline:
    - Identify code smells using the stinkysnake criteria in your context
    - Write findings to `.claude/smells/{base_filename}.smells.{timestamp}.md`
-4. For each Python file, apply modernpython rules inline:
+3. For each Python file, apply modernpython rules inline:
    - Identify modernization opportunities using the modernpython criteria in your context
    - Write findings to `.claude/smells/{base_filename}.modernization.{timestamp}.md`
-5. Consolidate these findings to inform the follow-up tasks in the next step.
+4. Consolidate these findings to inform the follow-up tasks in the next step.
 
 ### Step 7: Create Follow-up Tasks
 

@@ -5,13 +5,16 @@ Tests the public API of ecosystem_registry.py:
 - get_ecosystem_owned_agent_keys() return value and type
 - get_ecosystem_for_key() for owned, standard, and unknown keys, including agent branch
 - Immutability guarantee of returned frozensets
+- agent_frontmatter_keys coverage in both get_ecosystem_for_key() and the guard set
 """
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
-import ecosystem_registry as _reg
+import ecosystem_registry
 from ecosystem_registry import (
     EcosystemSpec,
     get_ecosystem_for_key,
@@ -166,33 +169,39 @@ class TestGetEcosystemForKey:
         # Assert
         assert result is None, f"Expected None for key {unknown_key!r}, got {result!r}"
 
-    def test_agent_frontmatter_key_returns_ecosystem(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """get_ecosystem_for_key() checks agent_frontmatter_keys, not only skill_frontmatter_keys.
+    def test_agent_frontmatter_key_returns_ecosystem(self) -> None:
+        """get_ecosystem_for_key returns the ecosystem for an agent_frontmatter_key.
 
-        Tests: The agent_frontmatter_keys branch in get_ecosystem_for_key()
-        How: Monkeypatch _REGISTRY with a test ecosystem declaring an agent-only key;
-             call get_ecosystem_for_key() and assert it returns the ecosystem name.
-        Why: No current registered ecosystem has agent_frontmatter_keys, so this branch
-             is only reachable via injection. Without this test the branch is uncovered
-             and a regression (e.g. dropping the agent_frontmatter_keys check) would go
-             undetected.
+        Tests: agent_frontmatter_keys branch in get_ecosystem_for_key()
+        How: Patch _REGISTRY with a spec containing a non-empty agent_frontmatter_keys;
+             verify the key resolves to the ecosystem name.
+        Why: The implementation checks both skill_frontmatter_keys and
+             agent_frontmatter_keys; this test exercises the second branch which is
+             dead code in the real registry (all agent_frontmatter_keys are empty).
+             Without this test, a regression removing the agent branch is invisible.
         """
-        # Arrange — inject a registry entry with an agent-only key
-        test_spec = EcosystemSpec(
-            display_name="TestEco",
-            source_url="https://example.com",
-            verified_date="2026-01-01",
-            skill_frontmatter_keys=frozenset(),
-            agent_frontmatter_keys=frozenset({"agent-only-key"}),
-            notes="",
-        )
-        monkeypatch.setattr(_reg, "_REGISTRY", {"testeco": test_spec})
+        # Arrange
+        mock_registry = {
+            "testsuite": EcosystemSpec(
+                display_name="TestSuite",
+                source_url="https://example.com/testsuite",
+                verified_date="2026-04-28",
+                skill_frontmatter_keys=frozenset({"suite-skill-key"}),
+                agent_frontmatter_keys=frozenset({"suite-agent-key"}),
+                notes="Synthetic spec used only by this test.",
+            )
+        }
 
-        # Act
-        result = get_ecosystem_for_key("agent-only-key")
+        with patch.object(ecosystem_registry, "_REGISTRY", mock_registry):
+            # Act
+            result_skill = get_ecosystem_for_key("suite-skill-key")
+            result_agent = get_ecosystem_for_key("suite-agent-key")
+            result_unknown = get_ecosystem_for_key("not-registered")
 
         # Assert
-        assert result == "testeco"
+        assert result_skill == "testsuite"
+        assert result_agent == "testsuite"
+        assert result_unknown is None
 
 
 class TestGetEcosystemOwnedAgentKeys:
@@ -264,3 +273,50 @@ class TestGetEcosystemOwnedAgentKeys:
 
         # Assert
         assert "mcp" not in owned
+
+
+class TestEcosystemOwnedKeysIncludesAgentKeys:
+    """Verify get_ecosystem_owned_skill_keys() unions agent_frontmatter_keys.
+
+    Tests: get_ecosystem_owned_skill_keys() includes keys from agent_frontmatter_keys,
+           matching get_ecosystem_for_key().
+    Strategy: Patch _REGISTRY with a synthetic spec that has non-empty
+              agent_frontmatter_keys, then assert against the public API.
+              Because get_ecosystem_owned_skill_keys() computes from _REGISTRY on
+              each call, patching _REGISTRY is sufficient to exercise the real
+              production code path.
+    """
+
+    def test_agent_key_present_in_guard_set(self) -> None:
+        """get_ecosystem_owned_skill_keys() includes agent_frontmatter_keys entries.
+
+        Tests: The guard-set unions both field types via the public API
+        How: Patch _REGISTRY to include a spec with non-empty agent_frontmatter_keys;
+             call get_ecosystem_owned_skill_keys() under the patch;
+             verify both the skill key and the agent key appear in the result.
+        Why: The real registry has agent_frontmatter_keys=frozenset() for all specs,
+             so the agent-keys branch is dead against the live data.  A regression
+             removing that branch would not be caught without this test.
+             Asserting against get_ecosystem_owned_skill_keys() (not a local copy)
+             ensures the production guard-set code is the thing being exercised.
+        """
+        # Arrange: synthetic registry with both skill and agent keys
+        mock_registry = {
+            "testsuite": EcosystemSpec(
+                display_name="TestSuite",
+                source_url="https://example.com/testsuite",
+                verified_date="2026-04-28",
+                skill_frontmatter_keys=frozenset({"skill-key"}),
+                agent_frontmatter_keys=frozenset({"agent-key"}),
+                notes="Synthetic spec.",
+            )
+        }
+
+        with patch.object(ecosystem_registry, "_REGISTRY", mock_registry):
+            # Act: call the real public API under the patched registry
+            result = get_ecosystem_owned_skill_keys()
+
+        # Assert: both field types appear in the returned frozenset
+        assert "skill-key" in result
+        assert "agent-key" in result
+        assert isinstance(result, frozenset)

@@ -85,6 +85,13 @@ def live_items(tmp_path_factory, monkeypatch_class):
         "backlog_dir": bd,
         "issues": [],  # track created issue numbers for cleanup
         "title_prefix": f"[MCP-TEST-{test_id}]",
+        # Populated by test_l1_add_with_real_issue on success.
+        # Pre-initialised to None so dependent tests can pytest.skip instead of KeyError.
+        "item_title": None,
+        "item_issue_num": None,
+        "item_filepath": None,
+        # Set to True only when L1 fully completes. Downstream guards check this sentinel.
+        "l1_ok": False,
     }
 
     yield ctx
@@ -174,9 +181,12 @@ class TestLiveLifecycle:
         live_items["item_title"] = result["title"]
         live_items["item_filepath"] = result["file_path"]
         live_items["item_issue_num"] = result["issue_num"]
+        live_items["l1_ok"] = True
 
     async def test_l2_list_includes_created_item(self, live_items):
         """L2: backlog_list returns the item created in L1."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call("backlog_list", {})
 
         assert isinstance(result["items"], list)
@@ -186,6 +196,8 @@ class TestLiveLifecycle:
 
     async def test_l3_view_by_issue_number(self, live_items):
         """L3: backlog_view by issue number returns full item data."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         issue_num = live_items["item_issue_num"]
         result = await _call("backlog_view", {"selector": f"#{issue_num}", "summary": False})
 
@@ -198,6 +210,8 @@ class TestLiveLifecycle:
 
     async def test_l4_update_attach_plan(self, live_items):
         """L4: backlog_update attaches a plan path to the item."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call("backlog_update", {"selector": live_items["item_title"], "plan": "plan/live-test-plan.md"})
 
         assert result["title"] == live_items["item_title"]
@@ -205,6 +219,8 @@ class TestLiveLifecycle:
 
     async def test_l5_update_set_status_in_progress(self, live_items):
         """L5: backlog_update sets status to in-progress via GitHub label."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call("backlog_update", {"selector": live_items["item_title"], "status": "in-progress"})
 
         assert result["title"] == live_items["item_title"]
@@ -212,6 +228,8 @@ class TestLiveLifecycle:
 
     async def test_l6_groom_write_full_content(self, live_items):
         """L6: backlog_groom writes full groomed content to item and syncs to GitHub."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call(
             "backlog_groom",
             {
@@ -226,6 +244,8 @@ class TestLiveLifecycle:
 
     async def test_l7_groom_incremental_section(self, live_items):
         """L7: backlog_groom updates a specific section incrementally."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call(
             "backlog_groom",
             {"selector": live_items["item_title"], "section": "Dependencies", "content": "No external dependencies."},
@@ -249,6 +269,8 @@ class TestLiveLifecycle:
 
     async def test_l10_close_full_lifecycle_end(self, live_items):
         """L10: backlog_close with reason closes the item."""
+        if not live_items["l1_ok"]:
+            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
         result = await _call("backlog_close", {"selector": live_items["item_title"], "reason": "wontfix"})
 
         assert result["closed"] is True

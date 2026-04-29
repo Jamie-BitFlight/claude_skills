@@ -274,6 +274,8 @@ The flag works with both single-section writes and the batch `sections` paramete
 
 **Error handling**: If the GitHub label transition fails, the local frontmatter update still applies and a warning is recorded in the result. Content writes are not affected.
 
+**Re-lookup failure**: After content is written, `groom_item` re-parses the backlog to locate the item by selector before advancing status. If this re-lookup returns `None` (e.g., selector ambiguity after a title change during content write), the status advance is skipped. The response contains `mark_groomed_skipped: true` and a human-readable `mark_groomed_skip_reason` that includes the selector and indicates the item was not found in the re-parsed backlog. A warning is also emitted. The caller must check for `mark_groomed_skipped` in the result dict and re-run the `backlog_groom` call if the status advance is required.
+
 **When to use**: Pass `mark_groomed=True` on the final `backlog_groom` call when all required sections have been written and the item is approved for planning. Using the `sections` parameter to write all sections in a single call combined with `mark_groomed=True` is the recommended pattern — it writes all content and advances the status atomically.
 
 **Failure paths**:

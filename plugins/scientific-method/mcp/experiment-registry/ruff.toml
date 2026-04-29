@@ -1,0 +1,5 @@
+# Inherit ruff configuration from the repo root.
+# Without this file, ruff may stop config resolution at this directory
+# when given explicit file paths (prek --all-files), using defaults instead
+# of the root pyproject.toml rules.
+extend = "../../../../pyproject.toml"

@@ -201,7 +201,7 @@ Mandatory pre-planning checkpoint (Reverse Thinking — Information Completeness
 
 Reference for configuring Claude Code persistent memory: `CLAUDE.md` files, auto memory, `.claude/rules/` directories, memory hierarchy, and best practices for each scope level.
 
-#### `/permissions`
+#### `/review-permissions`
 
 Reference for configuring Claude Code permissions: tool approval rules, permission modes, managed policies, and sandboxing. Covers allow/deny/ask policies for Bash, Read, Edit, WebFetch, MCP, and Agent tools.
 

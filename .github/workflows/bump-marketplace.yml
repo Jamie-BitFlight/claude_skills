@@ -1,0 +1,54 @@
+name: Bump Marketplace Version
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugins/**'
+
+# Only one run at a time — sequential bumps, not concurrent
+concurrency:
+  group: bump-marketplace
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  bump:
+    name: Sync marketplace.json version
+    runs-on: ubuntu-latest
+    # Skip commits from this action to avoid infinite loop
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+          cache-python: true
+
+      - name: Sync marketplace version
+        run: |
+          uv run -q --no-sync \
+            plugins/plugin-creator/scripts/auto_sync_manifests.py \
+            --sync-marketplace
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet .claude-plugin/marketplace.json; then
+            echo "No marketplace changes to commit"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .claude-plugin/marketplace.json
+            git commit -m "chore: bump marketplace version [skip ci]"
+            git push
+          fi

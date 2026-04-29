@@ -3387,16 +3387,21 @@ def groom_item(
     if mark_groomed and "error" not in result:
         fresh_items = parse_backlog()
         fresh_item = find_item(fresh_items, selector)
-        if fresh_item and fresh_item.file_path:
-            update_item_metadata(Path(fresh_item.file_path), {"metadata": {"status": "groomed"}}, output=out)
-            result["mark_groomed_applied"] = True
-            out.info("  Status: groomed (local)")
-        if fresh_item and fresh_item.issue:
-            try:
-                apply_status_groomed(fresh_item, repo, output=out)
-            except GithubException as e:
-                out.warn(f"  GitHub label update failed: {e}")
-                result["mark_groomed_label_error"] = str(e)
+        if not fresh_item:
+            out.warn(f"  mark_groomed requested but item '{selector}' not found after re-parse — status not advanced")
+            result["mark_groomed_skipped"] = True
+            result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
+        else:
+            if fresh_item.file_path:
+                update_item_metadata(Path(fresh_item.file_path), {"metadata": {"status": "groomed"}}, output=out)
+                result["mark_groomed_applied"] = True
+                out.info("  Status: groomed (local)")
+            if fresh_item.issue:
+                try:
+                    apply_status_groomed(fresh_item, repo, output=out)
+                except GithubException as e:
+                    out.warn(f"  GitHub label update failed: {e}")
+                    result["mark_groomed_label_error"] = str(e)
     return result
 
 
@@ -4933,7 +4938,7 @@ def create_project(
 # Impact Radius conflict analysis (pure — no GitHub calls)
 # ---------------------------------------------------------------------------
 
-_MIN_CONFLICT_GROUP_SIZE = 2
+MIN_CONFLICT_GROUP_SIZE = 2
 
 
 class _UnionFind:
@@ -5045,7 +5050,7 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
     group_id = 1
     for root in sorted(components):
         members = components[root]
-        if len(members) < _MIN_CONFLICT_GROUP_SIZE:
+        if len(members) < MIN_CONFLICT_GROUP_SIZE:
             continue
         member_titles = sorted(titles[i] for i in members)
         shared = group_shared.get(root, set())
@@ -5104,6 +5109,6 @@ def analyze_impact_radius_conflicts(items: list[ImpactRadiusItem]) -> list[Confl
         conflicts are found.
     """
     titles, path_sets = _collect_items_with_paths(items)
-    if len(titles) < _MIN_CONFLICT_GROUP_SIZE:
+    if len(titles) < MIN_CONFLICT_GROUP_SIZE:
         return []
     return _build_conflict_groups(titles, path_sets)

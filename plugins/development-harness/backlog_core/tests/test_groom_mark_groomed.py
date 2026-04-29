@@ -102,3 +102,57 @@ def test_groom_item_mark_groomed_with_content_calls_update_item(mocker: MockerFi
     assert call_kwargs.get("groomed") is True
     assert call_kwargs.get("groomed_content") == "## Groomed\n\nSome content"
     assert isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# Fix 3 — mark_groomed emits warning and sets skip signal when re-lookup returns None
+# ---------------------------------------------------------------------------
+
+
+def test_groom_item_mark_groomed_skipped_when_item_not_found_after_reparse(mocker: MockerFixture) -> None:
+    """mark_groomed=True emits warning and sets mark_groomed_skipped when re-lookup returns None.
+
+    Before this fix, groom_item silently dropped the mark_groomed operation when
+    find_item returned None after the post-write re-parse. No warning was emitted
+    and no result key indicated the skip — a violation of the silent-failure-prevention rule.
+
+    Fix 3: when fresh_item is None, emit out.warn() and set result["mark_groomed_skipped"]=True.
+    """
+    # Arrange — first find_item call (initial lookup) returns item, second (re-lookup) returns None
+    fake_item = MagicMock(spec=BacklogItem)
+    fake_item.file_path = None
+    fake_item.issue = None
+
+    find_item_call_count = {"n": 0}
+
+    def find_item_side_effect(items: object, selector: object) -> BacklogItem | None:
+        find_item_call_count["n"] += 1
+        return fake_item if find_item_call_count["n"] == 1 else None
+
+    mocker.patch("backlog_core.operations.parse_backlog", return_value=[fake_item])
+    mocker.patch("backlog_core.operations.find_item", side_effect=find_item_side_effect)
+    mocker.patch("backlog_core.operations.update_item", return_value={"updated": True})
+    mock_update_metadata = mocker.patch("backlog_core.operations.update_item_metadata")
+    mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
+
+    out = MagicMock()
+
+    # Act
+    result = groom_item(
+        selector="vanishing-item", section="Description", content="Groomed content.", output=out, mark_groomed=True
+    )
+
+    # Assert — skip is explicit, not silent
+    assert result.get("mark_groomed_skipped") is True
+    skip_reason = result.get("mark_groomed_skip_reason")
+    assert isinstance(skip_reason, str)
+    assert "vanishing-item" in skip_reason
+    assert result.get("mark_groomed_applied") is not True
+    # Warning must be emitted — not silent
+    out.warn.assert_called()
+    warn_msg = out.warn.call_args_list[0][0][0]
+    assert "mark_groomed" in warn_msg
+    assert "not found" in warn_msg
+    # Metadata and GitHub label paths must NOT be reached
+    mock_update_metadata.assert_not_called()
+    mock_apply.assert_not_called()

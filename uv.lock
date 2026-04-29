@@ -10,13 +10,6 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
-[manifest]
-members = [
-    "backlog-core",
-    "claude-skills",
-    "experiment-registry",
-]
-
 [[package]]
 name = "aiofile"
 version = "3.9.0"
@@ -240,55 +233,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/28/10/b325d58ffe86815b399334a101e63bc6fa4e1953921cb23703b48a0a0220/authlib-1.6.11.tar.gz", hash = "sha256:64db35b9b01aeccb4715a6c9a6613a06f2bd7be2ab9d2eb89edd1dfc7580a38f", size = 165359, upload-time = "2026-04-16T07:22:50.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/57/2f/55fca558f925a51db046e5b929deb317ddb05afed74b22d89f4eca578980/authlib-1.6.11-py2.py3-none-any.whl", hash = "sha256:c8687a9a26451c51a34a06fa17bb97cb15bba46a6a626755e2d7f50da8bff3e3", size = 244469, upload-time = "2026-04-16T07:22:48.413Z" },
-]
-
-[[package]]
-name = "backlog-core"
-version = "0.1.0"
-source = { editable = "plugins/development-harness" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "fastmcp" },
-    { name = "gitpython" },
-    { name = "pydantic" },
-    { name = "pygithub" },
-    { name = "pygments" },
-    { name = "requests" },
-    { name = "ruamel-yaml" },
-    { name = "tiktoken" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "fastmcp", extra = ["tasks"] },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=46.0.6" },
-    { name = "fastmcp", specifier = ">=3.2.0" },
-    { name = "gitpython", specifier = ">=3.1.0" },
-    { name = "pydantic", specifier = ">=2.12.3" },
-    { name = "pygithub", specifier = ">=2.8.1" },
-    { name = "pygments", specifier = ">=2.20.0" },
-    { name = "requests", specifier = ">=2.33.0" },
-    { name = "ruamel-yaml", specifier = ">=0.18.0" },
-    { name = "tiktoken", specifier = ">=0.12.0" },
-    { name = "typer", specifier = ">=0.21.2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "fastmcp", extras = ["tasks"], specifier = ">=3.0.2" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=0.26.0" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
 ]
 
 [[package]]
@@ -631,7 +575,6 @@ name = "claude-skills"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "backlog-core" },
     { name = "fastmcp", extra = ["tasks"] },
     { name = "marko" },
     { name = "pygithub" },
@@ -686,7 +629,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "backlog-core", editable = "plugins/development-harness" },
     { name = "fastmcp", extras = ["tasks"], specifier = ">=3.0.2" },
     { name = "marko", specifier = ">=2.2.2" },
     { name = "pygithub", specifier = ">=2.8.1" },
@@ -1265,35 +1207,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/89/780e11f9588d9e7128a3f87788354c7946a9cbb1401ad38a48c4db9a4f07/execnet-2.1.2.tar.gz", hash = "sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd", size = 166622, upload-time = "2025-11-12T09:56:37.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/84/02fc1827e8cdded4aa65baef11296a9bbe595c474f0d6d758af082d849fd/execnet-2.1.2-py3-none-any.whl", hash = "sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec", size = 40708, upload-time = "2025-11-12T09:56:36.333Z" },
-]
-
-[[package]]
-name = "experiment-registry"
-version = "0.1.0"
-source = { editable = "plugins/scientific-method/mcp/experiment-registry" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "pydantic" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp", specifier = ">=3.0.0" },
-    { name = "pydantic", specifier = ">=2.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
 ]
 
 [[package]]
