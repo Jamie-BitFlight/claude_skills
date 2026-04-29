@@ -18,6 +18,7 @@ def _init_git_repo(tmp_path: Path) -> Path:
     _run(["git", "init"], cwd=repo)
     _run(["git", "config", "user.email", "test@example.com"], cwd=repo)
     _run(["git", "config", "user.name", "Test User"], cwd=repo)
+    _run(["git", "config", "commit.gpgsign", "false"], cwd=repo)
     _run(["git", "checkout", "-b", "main"], cwd=repo)
     (repo / "tracked.txt").write_text("initial\n", encoding="utf-8")
     _run(["git", "add", "tracked.txt"], cwd=repo)
