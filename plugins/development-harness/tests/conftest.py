@@ -17,15 +17,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
-import backlog_core.models as _bc_models
-import pytest
-
-if TYPE_CHECKING:
-    from backlog_core.models import GroomedData, Section
-
 # Ensure backlog_core package is importable when running tests from repo root.
 # The package lives at plugins/development-harness/ (not installed as editable
 # from root), so we add its parent directory to sys.path explicitly.
+# Must run before any backlog_core imports below.
 _plugin_dir = Path(__file__).parent.parent
 if str(_plugin_dir) not in sys.path:
     sys.path.insert(0, str(_plugin_dir))
@@ -35,6 +30,12 @@ if str(_plugin_dir) not in sys.path:
 _scripts_dir = _plugin_dir / "scripts"
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
+
+import backlog_core.models as _bc_models
+import pytest
+
+if TYPE_CHECKING:
+    from backlog_core.models import GroomedData, Section
 
 
 # ---------------------------------------------------------------------------
