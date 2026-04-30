@@ -1,7 +1,7 @@
 {
   "name": "plugin-creator",
   "description": "Complete plugin development toolkit for creating, refactoring, and validating Claude Code plugins and agents. Use when creating new plugins/skills/agents, refactoring existing plugins/skills, validating frontmatter, or restructuring plugin components. Includes specialized agents for assessment, planning, execution, and validation workflows.",
-  "version": "10.1.1",
+  "version": "10.1.2",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

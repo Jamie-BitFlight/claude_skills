@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from ecosystem_registry import get_ecosystem_for_key, get_ecosystem_owned_skill_keys
+import ecosystem_registry
+from ecosystem_registry import EcosystemSpec, get_ecosystem_for_key, get_ecosystem_owned_skill_keys
 
 
 class TestGetEcosystemOwnedKeys:
@@ -158,3 +159,82 @@ class TestGetEcosystemForKey:
 
         # Assert
         assert result is None, f"Expected None for key {unknown_key!r}, got {result!r}"
+
+    def test_finds_key_in_agent_frontmatter_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """get_ecosystem_for_key() returns ecosystem name for agent_frontmatter_keys.
+
+        Tests: agent_frontmatter_keys branch of get_ecosystem_for_key()
+        How: Monkeypatch _REGISTRY with a test ecosystem whose agent_frontmatter_keys
+             contains 'agent_test_key'; call function; assert ecosystem name returned
+        Why: This branch (checking spec.agent_frontmatter_keys) had no test coverage.
+             Future ecosystems with agent-specific keys must be discoverable via this
+             function, and the branch must not regress silently.
+        """
+        # Arrange — register a test ecosystem with an agent-only key
+        test_spec = EcosystemSpec(
+            display_name="TestEco",
+            source_url="https://test.example.com",
+            verified_date="2026-01-01",
+            skill_frontmatter_keys=frozenset(),
+            agent_frontmatter_keys=frozenset({"agent_test_key"}),
+            notes="Test-only ecosystem for branch coverage",
+        )
+        monkeypatch.setitem(ecosystem_registry._REGISTRY, "testeco", test_spec)
+
+        # Act
+        result = get_ecosystem_for_key("agent_test_key")
+
+        # Assert
+        assert result == "testeco"
+
+
+class TestOwnedKeysUnionBothFieldTypes:
+    """Regression tests verifying _ECOSYSTEM_OWNED_SKILL_KEYS unions both key types.
+
+    Before fix: frozenset().union(*(spec.skill_frontmatter_keys ...)) omitted agent keys.
+    After fix: frozenset().union(*(skill_keys | agent_keys ...)) includes both.
+    """
+
+    def test_owned_keys_includes_agent_frontmatter_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """get_ecosystem_owned_skill_keys() returns keys from agent_frontmatter_keys.
+
+        Tests: _ECOSYSTEM_OWNED_SKILL_KEYS unions both skill and agent key types
+        How: Patch _REGISTRY with a test ecosystem that has agent_frontmatter_keys;
+             assert the old (buggy) pattern omits the agent key; assert the new
+             (fixed) pattern includes it; patch the module constant and verify
+             the public function returns it.
+        Why: Before fix, the generator expression referenced only skill_frontmatter_keys,
+             silently excluding agent_frontmatter_keys from the guard set.
+        """
+        # Arrange — register a test ecosystem with both skill and agent keys
+        test_spec = EcosystemSpec(
+            display_name="TestEco",
+            source_url="https://test.example.com",
+            verified_date="2026-01-01",
+            skill_frontmatter_keys=frozenset({"skill_test_key"}),
+            agent_frontmatter_keys=frozenset({"agent_test_key"}),
+            notes="Test-only ecosystem for regression coverage",
+        )
+        monkeypatch.setitem(ecosystem_registry._REGISTRY, "testeco", test_spec)
+
+        # Verify the OLD (buggy) pattern omits agent keys
+        old_pattern = frozenset().union(
+            *(spec.skill_frontmatter_keys for spec in ecosystem_registry._REGISTRY.values())
+        )
+        assert "agent_test_key" not in old_pattern, "Old pattern should omit agent keys (documents the bug)"
+
+        # Verify the NEW (fixed) pattern includes agent keys
+        new_pattern = frozenset().union(
+            *(
+                spec.skill_frontmatter_keys | spec.agent_frontmatter_keys
+                for spec in ecosystem_registry._REGISTRY.values()
+            )
+        )
+        assert "agent_test_key" in new_pattern, "New pattern must include agent_frontmatter_keys"
+        assert "skill_test_key" in new_pattern, "New pattern must still include skill_frontmatter_keys"
+
+        # Verify the public function returns the fixed pattern
+        monkeypatch.setattr(ecosystem_registry, "_ECOSYSTEM_OWNED_SKILL_KEYS", new_pattern)
+        owned = get_ecosystem_owned_skill_keys()
+        assert "agent_test_key" in owned
+        assert "skill_test_key" in owned
