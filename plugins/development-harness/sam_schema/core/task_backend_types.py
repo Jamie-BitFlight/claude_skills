@@ -19,7 +19,15 @@ from typing_extensions import TypedDict
 if TYPE_CHECKING:
     from sam_schema.core.models import PlanState
 
-__all__ = ["DocumentData", "DocumentHandle", "PlanData", "PlanSummary", "TaskData"]
+__all__ = [
+    "DocumentData",
+    "DocumentHandle",
+    "PlanData",
+    "PlanFieldsUpdate",
+    "PlanSummary",
+    "TaskData",
+    "TaskFieldsUpdate",
+]
 
 # TaskDefinitionDict was removed in the RC1 refactor (PR #1773).
 # Backends now accept Task instances or plain dicts directly via append_task.
@@ -121,6 +129,72 @@ class PlanData(TypedDict):
 
     # Autonomy mode for the implement-feature dispatch loop
     autonomy: NotRequired[str]
+
+
+class PlanFieldsUpdate(TypedDict, total=False):
+    """Mutable subset of PlanData fields for targeted plan updates.
+
+    Passed to :meth:`~sam_schema.core.task_backend.TaskBackend.update_plan_fields`
+    via ``set_fields``. All fields are optional; only provided fields are written.
+    The structural ``tasks`` field is excluded — use ``append_task`` for task
+    mutation. The ``plan_id`` is immutable and excluded.
+    """
+
+    feature: str
+    version: str
+    description: str
+    goal: str
+    context: str
+    acceptance_criteria: str
+    issue: str | None
+    source_path: str | None
+    state: PlanState
+    architecture: str | None
+    feature_context: str | None
+    codebase_patterns: str | None
+    backend_ref: str | None
+    autonomy: str
+
+
+class TaskFieldsUpdate(TypedDict, total=False):
+    """Mutable subset of TaskData fields for targeted task updates.
+
+    Passed to :meth:`~sam_schema.core.task_backend.TaskBackend.update_task_fields`
+    via ``fields``. All fields are optional; only provided fields are written.
+    """
+
+    id: str
+    title: str
+    status: str
+    agent: str | None
+    dependencies: list[str]
+    blocked_by: list[str]
+    parallelize_with: list[str]
+    priority: int
+    complexity: str
+    skills: list[str]
+    created: str | None
+    started: str | None
+    completed: str | None
+    last_activity: str | None
+    body: str
+    description: str
+    objective: str
+    requirements: str
+    constraints: str
+    expected_outputs: str
+    acceptance_criteria: str
+    verification_steps: str
+    context_notes: str
+    handoff: str
+    issue_classification: str | None
+    analysis_method: str
+    divergence_notes: int
+    accuracy_risk: str
+    reason: str
+    is_bookend: bool
+    bookend_type: str | None
+    github_issue: int | None
 
 
 class PlanSummary(TypedDict):

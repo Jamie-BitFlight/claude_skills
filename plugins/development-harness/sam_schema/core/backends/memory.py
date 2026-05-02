@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import copy
 import uuid
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
+
+from pydantic import TypeAdapter
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
 from sam_schema.core.dependencies import TERMINAL_STATUSES as _TERMINAL_STATUSES
@@ -36,16 +38,20 @@ from sam_schema.core.query import _new_plan_id
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from sam_schema.core.task_backend_types import (
-        DocumentData,
-        DocumentHandle,
-        PlanData,
-        PlanSummary,
-        TaskData,
-        TaskDefinitionDict,
-    )
+    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
 
 __all__ = ["InMemoryTaskProvider"]
+
+# Pydantic TypeAdapters for validating and narrowing set_fields dicts to the
+# strongly-typed PlanFieldsUpdate / TaskFieldsUpdate TypedDicts required by
+# TypedDict.update().  Created at module load; safe to reuse across calls.
+from sam_schema.core.task_backend_types import (
+    PlanFieldsUpdate as _PlanFieldsUpdate,
+    TaskFieldsUpdate as _TaskFieldsUpdate,
+)
+
+_PLAN_UPDATE_TA: TypeAdapter[_PlanFieldsUpdate] = TypeAdapter(_PlanFieldsUpdate)
+_TASK_UPDATE_TA: TypeAdapter[_TaskFieldsUpdate] = TypeAdapter(_TaskFieldsUpdate)
 
 # All valid TaskStatus values.
 _VALID_STATUSES: frozenset[str] = frozenset({
@@ -58,13 +64,13 @@ _VALID_STATUSES: frozenset[str] = frozenset({
 })
 
 
-def _task_def_to_task_data(task_def: TaskDefinitionDict) -> TaskData:
-    """Convert a TaskDefinitionDict input TypedDict to a TaskData output TypedDict.
+def _task_def_to_task_data(task_def: dict[str, Any]) -> TaskData:
+    """Convert a raw task definition dict to a TaskData TypedDict.
 
     Applies defaults for all optional fields absent from the input.
 
     Args:
-        task_def: Input task definition from create_plan.
+        task_def: Input task definition dict from create_plan or append_task.
 
     Returns:
         TaskData dict with all required fields set and optional fields
@@ -99,27 +105,27 @@ def _task_def_to_task_data(task_def: TaskDefinitionDict) -> TaskData:
         "context_notes",
         "handoff",
     ):
-        val = task_def.get(opt_field, "")  # type: ignore[literal-required]
+        val = task_def.get(opt_field, "")
         if val:
             data[opt_field] = val  # type: ignore[literal-required]
 
     # Analytical metadata.
-    data["analysis_method"] = task_def.get("analysis_method", "none")  # type: ignore[typeddict-item]
-    data["divergence_notes"] = task_def.get("divergence_notes", 0)  # type: ignore[typeddict-item]
-    data["accuracy_risk"] = task_def.get("accuracy_risk", "low")  # type: ignore[typeddict-item]
+    data["analysis_method"] = task_def.get("analysis_method", "none")
+    data["divergence_notes"] = task_def.get("divergence_notes", 0)
+    data["accuracy_risk"] = task_def.get("accuracy_risk", "low")
     reason = task_def.get("reason", "")
     if reason:
-        data["reason"] = reason  # type: ignore[typeddict-item]
+        data["reason"] = reason
 
     # Bookend fields.
     if task_def.get("is_bookend"):
-        data["is_bookend"] = cast("bool", task_def["is_bookend"])  # type: ignore[typeddict-item]
+        data["is_bookend"] = task_def["is_bookend"]
     if task_def.get("bookend_type") is not None:
-        data["bookend_type"] = cast("str | None", task_def["bookend_type"])  # type: ignore[typeddict-item]
+        data["bookend_type"] = task_def["bookend_type"]
     if task_def.get("issue_classification") is not None:
-        data["issue_classification"] = cast("str | None", task_def["issue_classification"])  # type: ignore[typeddict-item]
+        data["issue_classification"] = task_def["issue_classification"]
     if task_def.get("github_issue") is not None:
-        data["github_issue"] = cast("int | None", task_def["github_issue"])  # type: ignore[typeddict-item]
+        data["github_issue"] = task_def["github_issue"]
 
     return data
 
@@ -234,7 +240,7 @@ class InMemoryTaskProvider:
                 raise TaskValidationError(idx, "Task 'id' is required")
             if not task.title:
                 raise TaskValidationError(idx, "Task 'title' is required")
-            task_data_list.append(_task_def_to_task_data(cast("TaskDefinitionDict", task.model_dump(by_alias=False))))
+            task_data_list.append(_task_def_to_task_data(task.model_dump(by_alias=False)))
 
         plan_data: PlanData = {
             "plan_id": plan_id,
@@ -323,8 +329,7 @@ class InMemoryTaskProvider:
         if context is not None:
             plan["context"] = context
         if set_fields:
-            for key, value in set_fields.items():
-                cast("dict[str, object]", plan)[key] = value
+            plan.update(_PLAN_UPDATE_TA.validate_python(set_fields))
 
     # ------------------------------------------------------------------
     # Task access
@@ -427,8 +432,7 @@ class InMemoryTaskProvider:
             TaskNotFoundError: When task_id is not in the plan.
         """
         task = self._find_task(plan_id, task_id)
-        for key, value in fields.items():
-            cast("dict[str, object]", task)[key] = value
+        task.update(_TASK_UPDATE_TA.validate_python(fields))
 
     def update_task(self, plan_id: str, task: Task) -> None:
         """Replace the stored task with the provided Task model.
@@ -506,7 +510,7 @@ class InMemoryTaskProvider:
         existing_ids = {t["id"] for t in self._plans[plan_id]["tasks"]}
         validate_appended_task(task, existing_ids, plan_id)
 
-        task_data = _task_def_to_task_data(cast("TaskDefinitionDict", task.model_dump(by_alias=False)))
+        task_data = _task_def_to_task_data(task.model_dump(by_alias=False))
         self._plans[plan_id]["tasks"].append(task_data)
 
         return {"appended": True, "task_id": task.id}

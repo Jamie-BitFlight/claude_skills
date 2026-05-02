@@ -17,7 +17,7 @@ The manifest format has a global frontmatter block containing:
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.models import TASK_ID_PATTERN
 from sam_schema.readers._yaml_utils import coerce_to_plain, load_yaml, parse_prose_fields, split_outside_fences
@@ -125,7 +125,7 @@ def _parse_skills_value(raw: str) -> list[str]:
     return [p for p in parts if p]
 
 
-def _extract_bold_fields(prose: str) -> dict[str, object]:  # noqa: PLR0912
+def _extract_bold_fields(prose: str) -> dict[str, str | list[str] | int]:  # noqa: PLR0912
     """Extract ``**FieldName**: value`` patterns from task prose text.
 
     Parses lines matching the bold-field pattern and maps display names to
@@ -147,7 +147,7 @@ def _extract_bold_fields(prose: str) -> dict[str, object]:  # noqa: PLR0912
         Dict mapping canonical YAML key names to normalized values.
         Only recognized field names are included.
     """
-    result: dict[str, object] = {}
+    result: dict[str, str | list[str] | int] = {}
     for match in _BOLD_FIELD_RE.finditer(prose):
         field_display = match.group(1).strip()
         raw_value = match.group(2).strip()
@@ -407,7 +407,7 @@ def _resolve_task_id_from_dict(task_dict: dict) -> str | None:
     return "T1"
 
 
-def _merge_prose_fields(task_dict: dict, prose: str) -> None:
+def _merge_prose_fields(task_dict: dict[str, Any], prose: str) -> None:
     """Merge bold-field values and description from prose into ``task_dict`` in place.
 
     Calls ``_extract_bold_fields`` to parse ``**FieldName**: value`` lines from
@@ -484,11 +484,11 @@ def _build_task_dict(  # noqa: C901, PLR0912
             # Split on first colon only; ID is the part before, title is after
             colon_idx = entry.find(":")
             if colon_idx > 0:
-                task_id = entry[:colon_idx].strip()
+                str_id = entry[:colon_idx].strip()
                 title = entry[colon_idx + 1 :].strip()
-                if task_id and title:
-                    task_dict: dict = {"task": task_id, "title": title}
-                    prose = prose_by_task.get(task_id, "")
+                if str_id and title:
+                    task_dict: dict[str, Any] = {"task": str_id, "title": title}
+                    prose = prose_by_task.get(str_id, "")
                     if prose:
                         _merge_prose_fields(task_dict, prose)
                     task_dict.setdefault("status", "not-started")
@@ -517,7 +517,7 @@ def _build_task_dict(  # noqa: C901, PLR0912
     if not parsed:
         return None
     task_id, title = parsed
-    task_dict: dict = {"task": task_id, "title": title}
+    task_dict = {"task": task_id, "title": title}
     # Merge body YAML block fields (provides full structured metadata + prose content).
     # Body blocks may contain per-task status, timestamps, and other fields that
     # override the simple-mapping defaults.
