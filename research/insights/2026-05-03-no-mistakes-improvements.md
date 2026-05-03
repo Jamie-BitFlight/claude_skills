@@ -3,7 +3,7 @@
 **Research entry**: ./research/developer-tools/no-mistakes.md
 **Generated**: 2026-05-03
 **Patterns assessed**: 8
-**Backlog items created**: TBD (filled in below after creation)
+**Backlog items created**: 5 (issues: #2104, #2105, #2106, #2107, #2108)
 **Deferred (low confidence)**: 2
 **Skipped (already covered or out of scope)**: 1
 
@@ -15,7 +15,7 @@
 **Local system**: plugins/development-harness/skills/complete-implementation/SKILL.md
 **Confidence**: High
 **Impact**: High
-**Backlog**: #{TBD}
+**Backlog**: #2104 created
 
 ### Current state
 
@@ -37,7 +37,7 @@ Run: `/complete-implementation #N` against a feature branch with uncommitted cha
 **Local system**: plugins/development-harness/skills/complete-implementation/SKILL.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #{TBD}
+**Backlog**: #2105 created
 
 ### Current state
 
@@ -59,7 +59,7 @@ Create `.dh/quality-gates.yaml` with 3 gates (e.g., omit T2 and T3). Run `/compl
 **Local system**: plugins/development-harness/skills/complete-implementation/SKILL.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #{TBD}
+**Backlog**: #2106 created
 
 ### Current state
 
@@ -81,7 +81,7 @@ Run `/complete-implementation #N` on a plan with `autonomy: checkpoint` and a de
 **Local system**: plugins/development-harness/skills/complete-implementation/SKILL.md (and a new follow-on skill if needed)
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #{TBD}
+**Backlog**: #2107 created
 
 ### Current state
 
@@ -103,7 +103,7 @@ After `/complete-implementation #N` push with autonomy=full_auto: a background p
 **Local system**: plugins/development-harness/skills/complete-implementation/SKILL.md (new sibling skill)
 **Confidence**: High
 **Impact**: Low
-**Backlog**: #{TBD}
+**Backlog**: #2108 created
 
 ### Current state
 
