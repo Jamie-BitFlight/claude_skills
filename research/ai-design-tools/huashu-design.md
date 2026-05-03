@@ -355,17 +355,3 @@ Outputs radar chart visualization + Keep / Fix / Quick Wins punch list (stated i
 **Next review recommended**: 2026-08-03 (3 months). Monitor for: new release versions, changes to Core Asset Protocol rules, new design vocabulary additions, commercial licensing policy updates.
 
 **Status**: Complete entry. All claims trace to primary sources. No inferred content. All statistics exact as documented.
-
----
-
-## Cross-References
-
-| Entry | Category | Relationship |
-|-------|----------|--------------|
-| [UI UX Pro Max Skill](./ui-ux-pro-max-skill.md) | ai-design-tools | complementary design system injection: Pro Max provides pattern libraries while Huashu enables skill-based natural language generation |
-| [Google Stitch](./google-stitch.md) | ai-design-tools | competitive AI design-to-code tool: Stitch generates UI from text/images; both collapse design-to-code pipeline |
-| [Omma (omma.build)](./omma-build.md) | ai-design-tools | parallel multi-agent design generation: Omma's code+3D+image+data agents mirror Huashu's multi-format output architecture |
-| [OpenPencil](./open-pencil.md) | ai-design-tools | open-source alternative with AI tools: native .fig support complements Huashu's single-file HTML exports |
-| [Interface Design](./interface-design.md) | ai-design-tools | Claude Code plugin for persistent design system decisions across sessions: pairs with Huashu for stateful design workflows |
-| [Hedra](./hedra.md) | ai-design-tools | AI-powered media creation for visual assets: complements Huashu's motion design with character animation and voice synthesis |
-| [Jimeng AI (即梦AI)](./jimeng.md) | ai-design-tools | multimodal video/image generation with cinematic control: overlapping motion design use case for launch videos and animations |
