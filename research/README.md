@@ -297,6 +297,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------ |
 | [browsermcp-mcp.md](./mcp-ecosystem/browsermcp-mcp.md)   | Browser MCP - Chrome browser automation via extension bridge, preserving auth sessions and real fingerprint (5.8K stars) | 2026-02-20   |
 | [docs-mcp-server.md](./mcp-ecosystem/docs-mcp-server.md) | Grounded Docs - local documentation index with semantic search, open-source Context7 alternative         | 2026-01-26   |
+| [homebutler.md](./mcp-ecosystem/homebutler.md)           | HomeButler - single Go binary MCP server for homelab management: container status, port mapping, service logs, app deployment; integrates with Claude, Cursor, Claude Code (135 stars, v0.18.1) | 2026-05-03   |
 | [mcpjam.md](./mcp-ecosystem/mcpjam.md)                   | Local inspector for MCP servers, ChatGPT apps, MCP Apps with LLM playground, OAuth debugger, E2E testing | 2026-01-26   |
 | [mimir-mcp.md](./mcp-ecosystem/mimir-mcp.md)             | Git-backed AI memory system with 7 MCP tools, graph associations, and version-controlled persistence     | 2026-02-04   |
 | [narsil-mcp.md](./mcp-ecosystem/narsil-mcp.md)           | Rust MCP server with 90 tools for code intelligence, security scanning, call graphs                      | 2026-01-26   |
