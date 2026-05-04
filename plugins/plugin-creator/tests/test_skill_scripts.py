@@ -20,6 +20,8 @@ from ruamel.yaml import YAML
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 _yaml = YAML(typ="safe")
 
 
@@ -274,19 +276,17 @@ class TestPackageSkillPackager:
         result = package_skill(tmp_path / "does-not-exist")
         assert result is None
 
-    def test_default_output_dir_uses_cwd(self, tmp_path: Path, monkeypatch: object) -> None:
+    def test_default_output_dir_uses_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """When output_dir is omitted, .skill file is placed in cwd.
 
         Tests: Default output-directory logic in package_skill().
         How: chdir to tmp_path, package a skill without output_dir, assert file in cwd.
         Why: Verifies the cwd fallback path works; a regression would confuse users.
         """
-        import os
-
         from package_skill import package_skill
 
         skill_dir = _make_minimal_valid_skill(tmp_path / "source", "cwd-skill")
-        os.chdir(tmp_path)
+        monkeypatch.chdir(tmp_path)
 
         result = package_skill(skill_dir)  # no output_dir
         assert result is not None
@@ -423,9 +423,9 @@ class TestQuickValidateBrokenFixtures:
 
         Tests: Length cap in _validate_name().
         """
-        from quick_validate import validate_skill
+        from quick_validate import MAX_NAME_LENGTH, validate_skill
 
-        long_name = "a" * 65  # MAX_NAME_LENGTH = 64
+        long_name = "a" * (MAX_NAME_LENGTH + 1)
         skill_dir = tmp_path / "long-name"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
@@ -434,7 +434,7 @@ class TestQuickValidateBrokenFixtures:
 
         valid, message = validate_skill(skill_dir)
         assert not valid
-        assert "long" in message.lower() or "64" in message or "maximum" in message.lower()
+        assert "long" in message.lower() or str(MAX_NAME_LENGTH) in message or "maximum" in message.lower()
 
     def test_name_with_consecutive_hyphens_fails(self, tmp_path: Path) -> None:
         """Name with consecutive hyphens is rejected.
