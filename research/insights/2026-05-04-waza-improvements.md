@@ -3,7 +3,7 @@
 **Research entry**: ./research/skill-generation-tools/waza.md
 **Generated**: 2026-05-04
 **Patterns assessed**: 6
-**Backlog items created**: 3 (issues recorded in each proposal)
+**Backlog items created**: 3 (issues: #2124, #2125, #2126)
 **Deferred (low confidence)**: 1
 **Skipped (already covered or tracked)**: 2
 
@@ -15,7 +15,7 @@
 **Local system**: `/home/user/claude_skills/.claude-plugin/marketplace.json` (30 plugin entries) and `plugins/*/` directories; current validator is `uvx skilllint@latest` which checks individual skill structure but does not cross-reference marketplace entries against actual plugin directories.
 **Confidence**: High
 **Impact**: High
-**Backlog**: #1965 created
+**Backlog**: #2124 created
 
 ### Current state
 
@@ -37,7 +37,7 @@ Run: `uv run scripts/verify_marketplace_consistency.py` — exit code 0 with no 
 **Local system**: `/home/user/claude_skills/plugins/plugin-creator/skills/skill-creator/SKILL.md` (Step 5 frontmatter guidance) and `/home/user/claude_skills/plugins/plugin-creator/skills/write-frontmatter-description/`.
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #1966 created
+**Backlog**: #2125 created
 
 ### Current state
 
@@ -129,7 +129,7 @@ Read `plugins/plugin-creator/skills/skill-creator/references/workflows.md` — s
 **Local system**: `/home/user/claude_skills/scripts/` (9 maintenance scripts including `check_symlinks.py`, `repair_symlinks.py`, `process-research-integration.py`) and `plugins/plugin-creator/scripts/` (init_skill, package_skill, etc.). Pre-commit hooks via `.pre-commit-config.yaml` and `prek` runner. CI workflows at `.github/workflows/`.
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #1967 created
+**Backlog**: #2126 created
 
 ### Current state
 
