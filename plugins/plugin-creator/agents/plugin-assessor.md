@@ -45,7 +45,7 @@ Execute in order. Report discovery summary before proceeding to Phase 2.
 
 ## Ecosystem Field Rule
 
-When a SKILL.md contains frontmatter keys outside the Claude Code standard set, cross-reference against `ecosystem_registry.get_ecosystem_owned_keys()` (see `skills/skill-creator/references/agent-plugin-ecosystem.md`). Ecosystem-owned fields (e.g., `mcp:` belongs to OpenCode) are VALID — report as informational, not an error. Unknown fields get a WARNING.
+When a SKILL.md contains frontmatter keys outside the Claude Code standard set, treat `mcp:` as an OpenCode ecosystem-owned field — it is VALID, report as informational, not an error. Any other unrecognized top-level key gets a WARNING.
 
 ## Assessment Rules
 

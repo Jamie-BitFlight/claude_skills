@@ -68,9 +68,9 @@ Concrete artifacts, files, or deliverables produced by this task. Be specific ab
 - Documentation updated: path/to/docs.md
 
 Example:
-- File created: plugins/plugin-creator/scripts/plugin_validator.py
-- Models: ValidationResult, ValidationIssue, ComplexityMetrics
-- Constants: ERROR_CODE_BASE_URL, token thresholds
+- File created: plugins/plugin-creator/scripts/ecosystem_registry.py
+- Models: EcosystemSpec, _REGISTRY
+- Constants: get_ecosystem_owned_skill_keys, get_ecosystem_for_key
 
 ## Acceptance Criteria
 
@@ -107,13 +107,13 @@ Example:
 
 ```bash
 # Type checking
-uv run ty check plugins/plugin-creator/scripts/plugin_validator.py
+uv run ty check plugins/plugin-creator/scripts/ecosystem_registry.py
 
 # Unit test data models
 uv run pytest tests/test_data_models.py -v
 
-# Verify error code count
-grep -c "ERROR_" plugins/plugin-creator/scripts/plugin_validator.py
+# Verify function count
+grep -c "def get_" plugins/plugin-creator/scripts/ecosystem_registry.py
 ```
 
 ## Can Parallelize With
@@ -136,7 +136,7 @@ Report to orchestrator:
 - Recommendations for follow-up tasks or improvements
 
 Example:
-- Data model file: plugins/plugin-creator/scripts/plugin_validator.py
+- Data model file: plugins/plugin-creator/scripts/ecosystem_registry.py
 - Error codes implemented: 23 (matches architecture catalog)
 - Type checking: passed (ty or project mypy command)
 - Unit tests: passed (100% coverage on data models)

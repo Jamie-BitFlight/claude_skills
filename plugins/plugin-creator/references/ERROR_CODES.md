@@ -261,7 +261,7 @@ description: Use when: analyzing logs  # Colon causes parse error
 
 **Fix**: Quote the description value or avoid colons.
 
-**Ecosystem exemption**: Sub-keys of ecosystem-owned top-level frontmatter fields are exempt from FM009 rewriting. For example, lines nested under `mcp:` (owned by OpenCode) are not rewritten even if they contain colons. See `ecosystem_registry.py` for the authoritative list of ecosystem-owned keys.
+**Ecosystem exemption**: Sub-keys of ecosystem-owned top-level frontmatter fields are exempt from FM009 rewriting. For example, lines nested under `mcp:` (owned by OpenCode) are not rewritten even if they contain colons. The currently known ecosystem-owned key is `mcp:` (OpenCode).
 
 **Auto-fix result**:
 

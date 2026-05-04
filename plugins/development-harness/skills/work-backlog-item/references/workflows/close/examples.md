@@ -12,7 +12,7 @@ Checklist: 12/12 tasks complete
 Spawning acceptance criteria verification agent...
 
 Verdict: PASS
-Evidence: Sub-issues 1-4 implemented in plugins/plugin-creator/scripts/plugin_validator.py
+Evidence: Sub-issues 1-4 implemented in plugins/plugin-creator/scripts/auto_sync_manifests.py
           commit 4a2f1b3 — "fix(validator): report unique files, add hook validation"
 
 Summarize what was done:

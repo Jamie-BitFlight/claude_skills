@@ -102,7 +102,6 @@ flowchart TD
 |--------|---------|
 | `create_plugin.py` | Interactive plugin scaffolding — creates `.claude-plugin/`, `plugin.json` |
 | `plugin_validator.py` | Removed — replaced by `uvx skilllint@latest check` |
-| `ecosystem_registry.py` | stdlib-only module declaring frontmatter key ownership per ecosystem; used by FM009 auto-fix to skip ecosystem-owned blocks |
 | `auto_sync_manifests.py` | Pre-commit hook — syncs plugin.json component arrays, bumps semver |
 | `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |

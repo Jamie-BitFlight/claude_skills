@@ -177,7 +177,7 @@ Original problem statement from backlog.
 ### Impact
 
 - Blocks: manifest-sync job, pre-commit hooks
-- Bottleneck: Every PR runs plugin_validator
+- Bottleneck: Every PR runs `uvx skilllint@latest check`
 
 ### Benefits
 

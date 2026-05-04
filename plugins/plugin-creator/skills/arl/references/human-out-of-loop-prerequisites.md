@@ -76,7 +76,7 @@ All documents identify these recurring human decision points:
 **2. Schema Validation**
 
 - **SAM Framework:** Artifact templates enforce structure
-- **Plugin-Creator:** Frontmatter schema validation catches structural errors before execution (plugin_validator.py)
+- **Plugin-Creator:** Frontmatter schema validation catches structural errors before execution (uvx skilllint@latest check)
 - **Autonomous Refinement Research:** "Every acceptance criterion in the task file gets a pass/fail."
 
 **Success Factor:** Predefined schemas allow automated verification. Human review only needed when schema is ambiguous or incomplete.

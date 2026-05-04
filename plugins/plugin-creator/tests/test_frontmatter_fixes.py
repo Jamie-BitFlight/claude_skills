@@ -118,10 +118,3 @@ class TestMcpBlockPreservation:
         assert post.metadata.get("description") == "A useful skill"
         assert post.metadata.get("mcp") is None
         assert post.metadata.get("tools") == "Read"
-
-    def test_mcp_field_identity_via_ecosystem_registry(self) -> None:
-        """ecosystem_registry registers mcp as an ecosystem-owned skill key."""
-        from ecosystem_registry import get_ecosystem_owned_skill_keys
-
-        owned = get_ecosystem_owned_skill_keys()
-        assert "mcp" in owned

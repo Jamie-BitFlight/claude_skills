@@ -49,13 +49,10 @@ Do NOT strip, flag, or rewrite frontmatter fields that are unrecognized by the C
 schema if those fields belong to a known ecosystem. Unknown fields are preservation targets,
 not validation failures.
 
-The authoritative list of known ecosystem fields is maintained in:
+The currently known ecosystem-owned fields are:
+- `mcp:` — owned by OpenCode
 
-```text
-plugins/plugin-creator/scripts/ecosystem_registry.py
-```
-
-Consult that file before treating any unfamiliar frontmatter key as an error.
+When encountering an unrecognized top-level frontmatter key, flag it as UNKNOWN rather than stripping it. Report it to the user — do not silently discard it.
 
 ### OpenCode — `mcp:` Field
 
@@ -89,13 +86,3 @@ mcp:
 The `mcp:` block above is owned by OpenCode. It is preserved verbatim regardless of whether
 its sub-keys match any Claude Code schema.
 
-### Adding New Ecosystems
-
-When a new ecosystem field is encountered that is not yet in `ecosystem_registry.py`:
-
-1. Check `ecosystem_registry.py` first — it may already be registered
-2. If absent, flag the field as UNKNOWN rather than stripping it
-3. Report the unknown field to the user so it can be added to the registry
-4. Do not silently discard it
-
-**SOURCE:** T4 of `plan/tasks-1-multi-ecosystem-plugin-creator.md`; ecosystem registry at `plugins/plugin-creator/scripts/ecosystem_registry.py`

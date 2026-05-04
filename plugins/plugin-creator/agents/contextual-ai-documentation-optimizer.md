@@ -178,7 +178,7 @@ Glob("references/*", "/path/to/plugins/my-skill/")
 
 When optimizing SKILL.md or agent frontmatter, the in-scope fields are `description` and `name` only.
 
-**Ecosystem-owned key pass-through:** Treat `mcp:` and any other key in `ecosystem_registry.get_ecosystem_owned_keys()` as opaque pass-through content. Do not rewrite, normalize, reorder, or remove these fields. Copy them verbatim into the output. They belong to other runtime ecosystems (e.g., `mcp:` belongs to OpenCode) and are not subject to Claude Code schema validation.
+**Ecosystem-owned key pass-through:** Treat `mcp:` as an OpenCode ecosystem-owned field — copy it verbatim into the output. Do not rewrite, normalize, reorder, or remove it. It is not subject to Claude Code schema validation.
 
 ## Cross-Skill References
 

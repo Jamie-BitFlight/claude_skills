@@ -1,6 +1,6 @@
 {
   "name": "agentskill-kaizen",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "description": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling opportunities, and user frustration signals for continuous improvement",
   "author": {
     "name": "Jamie Nelson",
