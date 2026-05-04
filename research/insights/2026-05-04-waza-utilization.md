@@ -19,7 +19,7 @@
 
 ### Why this caller
 
-The `analyze-test-failures` skill in development-harness guides agents through debugging test failures, but it is context-limited to test execution output within a single codebase. Waza's `/hunt` skill ("bugs, crashes, regressions, test failures, unexpected behavior") is a generalized debugging entrypoint that enforces the same discipline (`find root cause before applying fix`) across all failure types — not just tests. The skill's documented design rule ("Focuses on reproducible failures and confirmed root causes") matches our error-handling philosophy in [code-review-python](./plugins/development-harness/skills/code-review-python/SKILL.md) (lines 56-60: "Exception messages must include context to diagnose without reading the source").
+The `analyze-test-failures` skill in development-harness guides agents through debugging test failures, but it is context-limited to test execution output within a single codebase. Waza's `/hunt` skill ("bugs, crashes, regressions, test failures, unexpected behavior") is a generalized debugging entrypoint that enforces the same discipline (`find root cause before applying fix`) across all failure types — not just tests. The skill's documented design rule ("Focuses on reproducible failures and confirmed root causes") matches our error-handling philosophy in `plugins/development-harness/skills/code-review-python/SKILL.md` (lines 56-60: "Exception messages must include context to diagnose without reading the source").
 
 Reading `./plugins/development-harness/skills/analyze-test-failures/SKILL.md`, the current flow is: gather output → propose hypothesis → instrument/isolate → validate. Waza's `/hunt` enforces structured reproduction before hypothesis, making it more rigorous. Integration would allow callers to route general-purpose debugging to `/hunt` when the failure is not test-specific (server crashes, integration bugs, unexpected behavior).
 
@@ -83,7 +83,7 @@ When reviewing a change for release/publication/push:
 ## Utilization 3: `refresh-research` → Waza `/learn` skill
 
 **Research entry**: ./research/skill-generation-tools/waza.md
-**Caller**: ./claude_skills/.claude/skills/refresh-research/SKILL.md (and research-curator agent)
+**Caller**: `.claude/skills/refresh-research/SKILL.md` (and research-curator agent)
 **Integration mechanism**: CLI skill invocation (`/learn`)
 **Replaces or adds**: Extends research workflow with structured six-phase methodology and self-review gate
 **Setup cost**: Low (install via `npx skills add tw93/Waza -a claude-code -g -y`)
@@ -95,7 +95,7 @@ The `refresh-research` skill (and the `research-curator` agent at `.claude/agent
 
 Waza's `/learn` provides structured phases for *conducting* research (phases: collect sources, digest findings, outline structure, fill in sections, refine prose, then self-review before publication). Our current research workflow (via `research-curator`) manages the *orchestration* (waves, freshness tracking, backlink detection) but does not prescribe internal research phases. Integration would allow callers to use `/learn` for individual research topics, then feed the output into our backlog/insight pipeline.
 
-Reading `./claude_skills/.claude/skills/refresh-research/SKILL.md` and `./claude_skills/.claude/agents/research-curator.md`, the current research lifecycle is: identify topic → spawn agent to research → write entry → auto-extract insights. Waza's `/learn` adds rigor to the middle phase (the actual research conduct) with explicit phases and self-review gate.
+Reading `.claude/skills/refresh-research/SKILL.md` and `.claude/agents/research-curator.md`, the current research lifecycle is: identify topic → spawn agent to research → write entry → auto-extract insights. Waza's `/learn` adds rigor to the middle phase (the actual research conduct) with explicit phases and self-review gate.
 
 ### Integration sketch
 

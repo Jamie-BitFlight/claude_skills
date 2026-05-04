@@ -83,7 +83,7 @@ Add a script + pre-commit hook. Adding a fake skill reference like `/dh:nonexist
 **Local system**: This repo's CLAUDE.md (`/home/user/claude_skills/.claude/CLAUDE.md`) defines "Response style: Concise, precise, direct answer only" but no per-skill output marker convention exists.
 **Confidence**: High
 **Impact**: Low
-**Backlog**: Deferred — impact too narrow to justify a backlog item: per-skill output markers are a Waza branding choice; this repo's convention is "concise direct answer only" which is functionally equivalent for the AI consumer. Adopting an emoji marker would conflict with `/home/user/claude_skills/.claude/CLAUDE.md` rule "For clear communication with the user the assistant MUST avoid using emojis."
+**Backlog**: Deferred — impact too narrow to justify a backlog item: per-skill output markers are a Waza branding choice; this repo's convention is "concise direct answer only" which is functionally equivalent for the AI consumer. Adopting an emoji marker would conflict with `.claude/CLAUDE.md` rule "Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked." (Tone and style section).
 
 ### Current state
 
