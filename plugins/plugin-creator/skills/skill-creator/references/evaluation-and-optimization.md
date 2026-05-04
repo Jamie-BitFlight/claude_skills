@@ -92,15 +92,21 @@ For each test case, launch TWO parallel runs:
 
 Use `--output-format stream-json` and `--verbose` to capture full transcripts. Run all test cases in parallel using the Agent tool.
 
-Save outputs inside a `run-1/` subdirectory within each config directory:
+Save outputs inside a `run-1/` subdirectory within each config directory. Use underscores in config directory names — the viewer and `aggregate_benchmark.py` use these names verbatim:
 
 ```text
 iteration-1/
   eval-0/
-    with-skill/
-      run-1/transcript.json
-    without-skill/
-      run-1/transcript.json
+    with_skill/
+      run-1/
+        transcript.json
+        timing.json
+        outputs/
+    without_skill/
+      run-1/
+        transcript.json
+        timing.json
+        outputs/
   eval-1/
     ...
 ```
@@ -137,14 +143,14 @@ Record execution time and token usage for each run. Save to the eval directory a
 
 ### Step 8d: Grade, aggregate, and launch the viewer
 
-1. For each completed eval config, spawn one **grader agent** per config (with-skill and without-skill) with subagent_type="plugin-creator:grader":
+1. For each completed eval config, spawn one **grader agent** per config (`with_skill` and `without_skill`) with subagent_type="plugin-creator:grader":
 
    ```text
    Task is grading eval results with subagent_type="plugin-creator:grader"
    Context to include in the prompt: evals/evals.json (assertions),
-     transcript_path: iteration-N/eval-M/with-skill/run-1/transcript.json,
-     outputs_dir: iteration-N/eval-M/with-skill/run-1/
-   Output: iteration-N/eval-M/with-skill/run-1/grading.json
+     transcript_path: iteration-N/eval-M/with_skill/run-1/transcript.json,
+     outputs_dir: iteration-N/eval-M/with_skill/run-1/outputs/
+   Output: iteration-N/eval-M/with_skill/run-1/grading.json
    ```
 
    Spawn a second grader for the baseline:
@@ -152,9 +158,9 @@ Record execution time and token usage for each run. Save to the eval directory a
    ```text
    Task is grading eval results with subagent_type="plugin-creator:grader"
    Context to include in the prompt: evals/evals.json (assertions),
-     transcript_path: iteration-N/eval-M/without-skill/run-1/transcript.json,
-     outputs_dir: iteration-N/eval-M/without-skill/run-1/
-   Output: iteration-N/eval-M/without-skill/run-1/grading.json
+     transcript_path: iteration-N/eval-M/without_skill/run-1/transcript.json,
+     outputs_dir: iteration-N/eval-M/without_skill/run-1/outputs/
+   Output: iteration-N/eval-M/without_skill/run-1/grading.json
    ```
 
 2. Aggregate all grading results using the benchmark script:
