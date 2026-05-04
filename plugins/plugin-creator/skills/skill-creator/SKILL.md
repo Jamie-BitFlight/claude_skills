@@ -536,8 +536,8 @@ After creating the skill, test it with real prompts, grade results with the A/B 
 **Read `references/evaluation-and-optimization.md`** for the complete workflow covering:
 
 - **Step 7** — Define test cases (`evals/evals.json`)
-- **Step 8** — Run A/B evaluation (parallel with-skill vs baseline runs, grading via `agents/grader.md`, viewer via `eval-viewer/generate_review.py`)
-- **Step 9** — Improve the skill (failure mode taxonomy, iteration loop, blind comparison via `agents/comparator.md` and `agents/analyzer.md`)
+- **Step 8** — Run A/B evaluation (parallel with-skill vs baseline runs, grading via `@plugin-creator:grader`, viewer via `eval-viewer/generate_review.py`)
+- **Step 9** — Improve the skill (failure mode taxonomy, iteration loop, blind comparison via `@plugin-creator:comparator` and `@plugin-creator:analyzer`)
 - **Step 10** — Description optimization (automated trigger tuning via `scripts/run_loop.py` with train/test split)
 
 Load [schemas.md](./references/schemas.md) for evals.json and grading.json formats.
@@ -546,7 +546,9 @@ Load [schemas.md](./references/schemas.md) for evals.json and grading.json forma
 
 | Directory | Contents |
 |-----------|----------|
-| `agents/` | `agents/grader.md` (assertion grading), `agents/comparator.md` (blind A/B), `agents/analyzer.md` (post-hoc analysis) |
+| `@plugin-creator:grader` | Assertion grading — evaluates eval outputs against expectations |
+| `@plugin-creator:comparator` | Blind A/B comparison — evaluates two skill versions without knowing which is which |
+| `@plugin-creator:analyzer` | Post-hoc analysis — explains why the winning version won and generates improvement suggestions |
 | `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns) |
 | `eval-viewer/` | `viewer.html` (interactive eval viewer), `generate_review.py` (HTML generator) |
 | `assets/` | `eval_review.html` (trigger eval review template) |

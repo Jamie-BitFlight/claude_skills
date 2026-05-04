@@ -135,11 +135,11 @@ Record execution time and token usage for each run. Save to the eval directory a
 
 ### Step 8d: Grade, aggregate, and launch the viewer
 
-1. For each completed eval, spawn the **grader agent** (read `agents/grader.md`):
+1. For each completed eval, spawn the **grader agent** with subagent_type="plugin-creator:grader":
 
    ```text
-   Task is grading eval results with subagent_type="general-purpose"
-   Context to include in the prompt: agents/grader.md, evals/evals.json (assertions),
+   Task is grading eval results with subagent_type="plugin-creator:grader"
+   Context to include in the prompt: evals/evals.json (assertions),
      iteration-N/eval-M/with-skill/transcript.json, iteration-N/eval-M/without-skill/transcript.json
    Output: iteration-N/eval-M/grading.json
    ```
@@ -256,9 +256,9 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 ## Advanced: Blind Comparison
 
-For significant skill changes, use blind A/B comparison to avoid confirmation bias. Spawn the **comparator agent** (read `agents/comparator.md`) with outputs from both versions. The comparator doesn't know which version is "old" or "new" — it evaluates purely on quality.
+For significant skill changes, use blind A/B comparison to avoid confirmation bias. Spawn the **comparator agent** (`@plugin-creator:comparator`) with outputs from both versions. The comparator doesn't know which version is "old" or "new" — it evaluates purely on quality.
 
-Then spawn the **analyzer agent** (read `agents/analyzer.md`) to understand WHY the winner won, producing actionable improvement suggestions.
+Then spawn the **analyzer agent** (`@plugin-creator:analyzer`) to understand WHY the winner won, producing actionable improvement suggestions.
 
 ## Step 10: Description Optimization
 
@@ -330,11 +330,11 @@ Review the `best_description` from the optimization output. Update the SKILL.md 
 
 ## Reference Files
 
-The `agents/` directory contains instructions for specialized subagents. Read them when you need to spawn the relevant subagent.
+These plugin agents are available for the eval workflow:
 
-- `../agents/grader.md` — How to evaluate assertions against outputs
-- `../agents/comparator.md` — How to do blind A/B comparison between two outputs
-- `../agents/analyzer.md` — How to analyze why one version beat another
+- `@plugin-creator:grader` — Evaluates assertions against outputs
+- `@plugin-creator:comparator` — Blind A/B comparison between two outputs
+- `@plugin-creator:analyzer` — Analyzes why one version beat another
 
 The `references/` directory has additional documentation:
 
