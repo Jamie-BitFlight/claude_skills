@@ -85,7 +85,7 @@ Keep the bar high. The goal is to flag things the eval author would say "good ca
 
 ### Step 7: Write Grading Results
 
-Save results to `{outputs_dir}/../grading.json` (sibling to outputs_dir).
+Save results to `{outputs_dir}/grading.json` (inside outputs_dir, alongside the transcript).
 
 ## Grading Criteria
 
@@ -106,7 +106,7 @@ Save results to `{outputs_dir}/../grading.json` (sibling to outputs_dir).
 ### Step 8: Read Executor Metrics and Timing
 
 1. If `{outputs_dir}/metrics.json` exists, read it and include in grading output
-2. If `{outputs_dir}/../timing.json` exists, read it and include timing data
+2. If `{outputs_dir}/timing.json` exists, read it and include timing data
 
 ## Output Format
 
