@@ -20,7 +20,7 @@ Consult `references/python3-standards.md` for the full standards document.
 - No `Any`, broad `object`, or unchecked `cast()` in internal code
 - Code smells are design signals to investigate, not noise to suppress
 - Expand acronyms in public names: `greatest_common_divisor()` not `gcd()`; domain
-  acronyms (URL, API, SQL, HTTP, JSON, XML) are exempt; see python3-standards.md §1.5
+  acronyms (URL, API, SQL, HTTP, JSON, XML) are exempt; see `references/python3-standards.md` §1.5
 
 ### Type Coverage
 
