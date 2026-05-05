@@ -27,7 +27,7 @@ status: "published"
 
 **1. Read** — read the complete entry file before extracting any field. Values appear in the body; reading first is required, not optional.
 
-**2. Skip check** — if the file already has all of `title`, `category`, `resource_url`, `date_created`, `date_last_reviewed`, `status` present and non-empty: stop, report SKIPPED, do not write.
+**2. Skip check** — if the file already has all of `title`, `subtitle`, `category`, `resource_url`, `date_created`, `date_last_reviewed`, `status` present and non-empty: stop, report SKIPPED, do not write.
 
 **3. Extract** — apply the extraction table. Required fields are `title` and `resource_url`; all others have defined fallbacks.
 

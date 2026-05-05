@@ -885,6 +885,54 @@ def _parse_date_field(raw: Any) -> date:
     return _parse_research_date(str(raw))
 
 
+def _from_research_curator_meta(top: Any, path: Path) -> KBEntry:
+    """Parse a KBEntry from canonical research-curator frontmatter schema.
+
+    Handles entries written by the research-curator skill's frontmatter
+    generation procedure: title/subtitle/category/resource_url/github_url/
+    date_created/date_last_reviewed/status at the top level.
+
+    Field mapping to KBEntry:
+        title           -> name  (topic defaults to file stem)
+        subtitle        -> description
+        resource_url    -> source_url
+        date_created    -> verified
+        date_last_reviewed -> next_review
+        github_url      -> github
+
+    Args:
+        top: Full parsed frontmatter metadata dict.
+        path: File path for error reporting.
+
+    Returns:
+        KBEntry populated from research-curator format.
+
+    Raises:
+        FrontmatterValidationError: If required fields are missing.
+        ParseError: If date fields cannot be parsed.
+    """
+    required = [f for f in ("title", "resource_url", "date_created", "date_last_reviewed") if f not in top]
+    if required:
+        raise FrontmatterValidationError(path=path, missing_fields=required, invalid_fields=[])
+
+    category = str(top.get("category") or path.parent.name)
+    github_raw = top.get("github_url")
+
+    return KBEntry(
+        topic=path.stem,
+        name=str(top["title"]),
+        description=str(top.get("subtitle") or ""),
+        category=category,
+        source_url=str(top["resource_url"]),
+        verified=_parse_date_field(top["date_created"]),
+        next_review=_parse_date_field(top["date_last_reviewed"]),
+        github=str(github_raw) if github_raw is not None else None,
+        file_path=path,
+        body="",
+        has_frontmatter=True,
+    )
+
+
 def _from_skill_spec_meta(top: Any, path: Path) -> KBEntry:
     """Parse a KBEntry from new skill-spec frontmatter (metadata sub-mapping).
 
@@ -985,10 +1033,13 @@ def _from_flat_meta(meta: Any, path: Path) -> KBEntry:
 def parse_frontmatter_entry(text: str, path: Path) -> KBEntry:
     """Parse an entry in YAML frontmatter format.
 
-    Handles both formats:
-    - New skill-spec format: top-level ``name``, ``description``, ``license``; KB
+    Handles three formats:
+    - Skill-spec format: top-level ``name``, ``description``, ``license``; KB
       fields inside a ``metadata`` mapping.
-    - Old flat format: all KB fields at top level (topic, name, category, …).
+    - Research-curator format: top-level ``title``, ``resource_url``,
+      ``date_created``, ``date_last_reviewed`` (produced by the research-curator
+      skill's frontmatter generation procedure).
+    - Flat format: all KB fields at top level (topic, name, category, …).
 
     Args:
         text: Raw file content.
@@ -1007,7 +1058,12 @@ def parse_frontmatter_entry(text: str, path: Path) -> KBEntry:
         raise ParseError(path=path, detail=f"YAML parse error: {exc}") from exc
 
     top = post.metadata
-    entry = _from_skill_spec_meta(top, path) if isinstance(top.get("metadata"), dict) else _from_flat_meta(top, path)
+    if isinstance(top.get("metadata"), dict):
+        entry = _from_skill_spec_meta(top, path)
+    elif "title" in top and "resource_url" in top:
+        entry = _from_research_curator_meta(top, path)
+    else:
+        entry = _from_flat_meta(top, path)
     entry.body = post.content
     return entry
 

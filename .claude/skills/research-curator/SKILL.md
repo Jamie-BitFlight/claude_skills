@@ -270,7 +270,9 @@ flowchart TD
 
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
-5. Apply Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md) to refresh `date_last_reviewed` and normalize to canonical schema
+5. **Update frontmatter** — two cases based on entry state after the agent completes:
+   - **Already canonical** (all of `title`, `subtitle`, `category`, `resource_url`, `date_created`, `date_last_reviewed`, `status` present): update only `date_last_reviewed` to today's date directly in the existing frontmatter; do not invoke the full Generation Procedure
+   - **Not yet canonical**: apply the full Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md)
 6. Update README with refreshed date
 7. Concurrently spawn three analysis agents:
 
