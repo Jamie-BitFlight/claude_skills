@@ -61,7 +61,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 - No planning in "Weeks" or "Sprints" — work scales with parallelism
 - Output contains "likely", "probably", or "I think" — STOP and verify before continuing
-- Prompt names a specific product, version, or release event — run `WebSearch` FIRST before planning. See [Fact Verification First](./.claude/rules/fact-verification-first.md)
+- Prompt names a specific product, version, or release event — run `WebSearch` FIRST before planning. See [Fact Verification First](./rules/fact-verification-first.md)
 - **Pass file paths, let agents read** — agents perform their own Chain of Verification against actual source. Provide the path; the agent reads, verifies, and acts on it with a fresh context window. Never transcribe file contents into prompts — it bypasses agent verification.
 - Do NOT discover file paths on behalf of agents — the agent has full tool access and an empty context window; it finds what it needs itself. Pre-discovering paths wastes orchestrator context and duplicates agent work.
 - **Structured thinking before action** — form a hypothesis and plan internally before acting. Then:
