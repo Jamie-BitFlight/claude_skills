@@ -52,21 +52,6 @@ mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action": "claim
 
 If the response contains `"claimed": false` — stop. The task is already claimed by another worker. Return STATUS: BLOCKED with this as the reason.
 
-## Step 3a — Register as Active Worker
-
-Immediately after claiming, register yourself so the SubagentStop hook can resolve which task you own.
-
-```text
-mcp__plugin_dh_sam__sam_active_task(
-    config={"action": "set", "plan": "P{id}", "task": "T{M}"},
-    session_id="${CLAUDE_SESSION_ID}"
-)
-```
-
-If `sam_active_task(set)` fails, log the error to stderr and continue — this registration is
-best-effort. The SubagentStop hook has a prompt-extraction fallback when registration is absent,
-but registration is the most reliable path.
-
 ## Step 4 — Execute
 
 Work against the acceptance criteria. Use the verification steps to confirm progress.
