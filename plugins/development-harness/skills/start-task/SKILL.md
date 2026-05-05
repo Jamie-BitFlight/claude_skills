@@ -111,7 +111,7 @@ $ARGUMENTS
    ```text
    mcp__plugin_dh_sam__sam_active_task(
        config={"action": "set", "plan": "P{N}", "task": "T{M}", "parent_issue_number": N},
-       session_id="{{session_id}}"
+       session_id="${CLAUDE_SESSION_ID}"
    )
    ```
 

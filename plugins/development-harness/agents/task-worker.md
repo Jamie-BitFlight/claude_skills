@@ -59,7 +59,7 @@ Immediately after claiming, register yourself so the SubagentStop hook can resol
 ```text
 mcp__plugin_dh_sam__sam_active_task(
     config={"action": "set", "plan": "P{id}", "task": "T{M}"},
-    session_id="{{session_id}}"
+    session_id="${CLAUDE_SESSION_ID}"
 )
 ```
 
