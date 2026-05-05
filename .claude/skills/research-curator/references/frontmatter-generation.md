@@ -11,7 +11,7 @@
 ```yaml
 ---
 title: "{Official resource name}"
-subtitle: "{What it is — 5–10 words}"
+subtitle: "{Short byline contrasting with or expanding the title}"
 category: "{parent directory name}"
 resource_url: "{primary URL}"
 github_url: "{GitHub URL — omit field entirely if absent}"
@@ -34,7 +34,7 @@ status: "published"
 | Field | Where to find it |
 |---|---|
 | `title` | YAML `title:` or `name:` → else first `# Heading` |
-| `subtitle` | YAML `subtitle:` → else first sentence of `## Overview` (up to first period, max 100 chars) |
+| `subtitle` | YAML `subtitle:` → else write a short byline (5–10 words) that provides contrasting context to the title after reading the entry |
 | `category` | YAML `category:` or `metadata.category:` → else parent directory name |
 | `resource_url` | YAML `resource_url:` or `metadata.source_url:` → else `**Source URL**: <url>` in body |
 | `github_url` | YAML `github_url:` or `metadata.github:` (add `https://github.com/` if no scheme) → else `**GitHub Repository**: <url>` → **omit field entirely** if absent |
