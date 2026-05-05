@@ -111,6 +111,8 @@ Look for:
 - Missing docstrings
 - Undocumented CLI options
 - Missing type hints
+- Identifier naming violations: acronym-named public functions or methods (`gcd`, `lcm`,
+  `bfs`, `dfs`) that should be expanded (see python3-standards.md §1.5)
 
 ### Step 6: Execute Automated Analysis
 

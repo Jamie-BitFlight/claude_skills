@@ -45,6 +45,7 @@ Verify code follows shared Python patterns documented in this plugin. Consult `.
 - CLI Standards (Typer/Rich)
 - Service Integration Standards (Protocol classes)
 - Testing Standards (pytest-mock, 80% coverage)
+- Identifier Naming Standards (expand acronyms in public APIs; see §1.5)
 
 ## SOP (Code Review)
 
