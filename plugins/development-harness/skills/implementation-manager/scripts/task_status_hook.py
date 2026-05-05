@@ -669,6 +669,7 @@ def _extract_prompt_from_transcript(transcript_path: Path) -> str | None:
         missing, unreadable, or no user text content appears in the first 50 lines.
     """
     if not transcript_path.exists():
+        print(f"[hook] transcript not found: {transcript_path}", file=sys.stderr)
         return None
 
     try:
@@ -919,7 +920,7 @@ def _cascade_failed_task(
     """
     try:
         _mark_downstream_skipped_in_plan(full_path, task_id)
-    except Exception as e:  # noqa: BLE001
+    except (OSError, ValueError, KeyError, FileNotFoundError) as e:
         print(f"[hook] SubagentStop: downstream skip failed for {task_id} — {e}", file=sys.stderr)
     _cleanup_active_task_context(sub_agent_session_id, context_file)
     sys.exit(0)

@@ -69,11 +69,12 @@
     ],
     "SubagentStop": [
       {
+        "matcher": "^task-worker$",
         "hooks": [
           {
             "type": "command",
             "command": "uv run --script \"${CLAUDE_PLUGIN_ROOT}/skills/implementation-manager/scripts/task_status_hook.py\"",
-            "timeout": 60
+            "timeout": 60000
           }
         ]
       }
