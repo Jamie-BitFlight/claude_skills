@@ -141,7 +141,19 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-7. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+7. **Spawn backlink-detector** -- after cross-referencer completes, spawn a sequential backlink pass:
+
+   ```text
+   Agent tool parameters:
+     agent: .claude/agents/research-backlink-detector.md
+     prompt: "Add backlinks for {file-path-from-agent-result}"
+   ```
+
+8. **Wait for backlink-detector and relay result**:
+
+   - **Backlinks**: relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added."
+
+9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -166,7 +178,7 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each). See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each), followed by a sequential `@research-backlink-detector` pass for each entry after cross-referencer completes. See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
 ### Duplicate Detection
 
@@ -232,10 +244,14 @@ flowchart TD
     RelayCheck2 --> UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
     UpdateDate --> SpawnAnalysis1["Concurrently spawn 3 agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all 3 agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    WaitAnalysis1 --> SpawnBacklinks1["Spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'"]
+    SpawnBacklinks1 --> WaitBacklinks1["Wait for backlink-detector<br>Relay BACKLINKS_ADDED count and ENTRIES_MODIFIED paths"]
+    WaitBacklinks1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn 3 agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> PostActions
+    WaitAnalysisN --> SpawnBacklinksN["For each updated entry: spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'"]
+    SpawnBacklinksN --> WaitBacklinksN["Wait for all backlink-detector agents<br>Report total BACKLINKS_ADDED count"]
+    WaitBacklinksN --> PostActions
 ```
 
 ### Single Entry Rerun
@@ -259,6 +275,14 @@ flowchart TD
    ```
 
 7. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
+
+8. Spawn backlink-detector after cross-referencer completes:
+
+   ```text
+   @research-backlink-detector — "Add backlinks for ./research/{category}/{name}.md"
+   ```
+
+9. Wait for backlink-detector; relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added."
 
 ### All Entries Rerun
 
@@ -478,5 +502,6 @@ YYYY-MM-DD
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
 - Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
 - Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
+- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- appends reciprocal backlink rows to all entries cited by the target entry; runs as a sequential post-pass after `@research-cross-referencer`
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).
