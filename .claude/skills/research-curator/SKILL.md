@@ -1,7 +1,7 @@
 ---
 name: research-curator
 description: 'Manage research entries in ./research/ — create, refresh, and validate. Use when asked to add a tool, "document this", "research this", "refresh this research", "validate research entries", or given a tool URL. Modes: default (single URL), --batch (multiple URLs in parallel), --rerun (refresh stale entries), --validate (structural check and auto-fix).'
-argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all] [--add-frontmatter category/name|all]'
+argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all] [--add-frontmatter category/name|all] [--alternatives N]'
 ---
 
 <mode_args>$ARGUMENTS</mode_args>
@@ -37,7 +37,7 @@ flowchart TD
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
     Q3 -->|"No — validate flag absent"| Q4{"Does <mode_args/> contain --add-frontmatter?"}
     Q4 -->|"Yes — add-frontmatter flag present"| Frontmatter(["Execute Frontmatter Mode"])
-    Q4 -->|"No — no flags matched"| VBD{"Vague Brief Detector<br>Triggers if input has no URL,<br>URL is homepage with no resource path,<br>input is generic category word,<br>or input is verb phrase not a noun"}
+    Q4 -->|"No — no flags matched"| VBD{"Vague Brief Detector<br/>Triggers if input has no URL,<br/>URL is homepage with no resource path,<br/>input is generic category word,<br/>or input is verb phrase not a noun"}
     VBD -->|"No — clear URL with named resource"| Default(["Execute Default Mode — single URL"])
     VBD -->|"Yes — vague brief detected"| Fallback(["Execute Fallback Mode — N direction cards"])
 ```
@@ -112,27 +112,29 @@ Trigger: Vague Brief Detector fires — `<mode_args/>` has no URL, a homepage UR
 
 1. **Parse** `--alternatives N` from `<mode_args/>` (default: 3 if flag absent)
 
-2. **Spawn N parallel agents** — each scoped to a different interpretation of the vague brief:
+2. **Spawn N parallel agents** — each assigned an explicit direction index from 1 to N, each scoped to a different interpretation:
 
    ```text
    Agent tool parameters:
      subagent_type: general-purpose
      run_in_background: true
      prompt: "Produce a direction card for the research brief '<mode_args/>'.
-               Your interpretation: [specific reading assigned to this agent]
+               This is Direction {index} of {N}. Your interpretation: [specific reading]
                Format exactly:
-               **Direction [N]: [Interpretation Name]**
+               **Direction {index}: [Interpretation Name]**
                Rationale: [2–3 sentences on why this reading fits '<mode_args/>']
                Research scope:
                - [concrete research item 1]
                - [concrete research item 2]
                - [concrete research item 3]
-               Keywords: [3–5 comma-separated terms]"
+               Keywords: [3–5 comma-separated terms]
+               Canonical URL: [single authoritative URL for this interpretation
+                               e.g. https://docs.python.org/3/ — use WebSearch if needed]"
    ```
 
    Differentiation rule: assign each agent a different dimension (tool domain, target audience, use-case level, technology layer). No two agents share the same dimension.
 
-3. **Wait** for all N agents and collect direction cards
+3. **Wait** for all N agents and collect direction cards (index, name, rationale, scope, keywords, canonical URL)
 
 4. **Present cards and wait for selection** via AskUserQuestion:
 
@@ -143,6 +145,7 @@ Trigger: Vague Brief Detector fires — `<mode_args/>` has no URL, a homepage UR
    Rationale: …
    Research scope: …
    Keywords: …
+   URL: [canonical URL]
 
    **Direction 2: [Name]**
    …
@@ -151,7 +154,8 @@ Trigger: Vague Brief Detector fires — `<mode_args/>` has no URL, a homepage UR
    ```
 
 5. **Route based on response**:
-   - User enters a number → route to Default Mode using the selected interpretation as the research target
+   - User enters a number → use the canonical URL from the selected card as `<mode_args/>` and route to Default Mode
+   - If the selected card has no canonical URL → ask user via AskUserQuestion: "What URL should we use for [selected direction]?" then route to Default Mode with that URL
    - User describes a new direction → treat as a clear brief and route to Default Mode
 
 ### Error Handling
