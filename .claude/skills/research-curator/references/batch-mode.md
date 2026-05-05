@@ -48,7 +48,8 @@ flowchart TD
     SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with successful entries only<br>(concurrent with analysis agents)"]
     UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
     Partial --> WaitAnalysis
-    WaitAnalysis --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added"]
+    WaitAnalysis --> BacklinkPass["For each successful entry in sequence (one at a time):<br>spawn @research-backlink-detector<br>'Add backlinks for {file-path}'<br>wait for completion before spawning next<br>(sequential to prevent write races on shared cited entries)"]
+    BacklinkPass --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added<br>Report total BACKLINKS_ADDED count<br>Relay non-empty SKIPPED lists verbatim"]
     NotifyUser --> PostActions(["Execute Post-Actions — lint, commit, push"])
 ```
 
@@ -57,6 +58,8 @@ flowchart TD
 **Sequential waves**: Wait for all agents in current wave to complete before spawning next wave. This prevents overwhelming MCP tool rate limits.
 
 **Analysis phase concurrency**: After all curator waves complete, analysis agents spawn concurrently per entry: up to 5 entries × 3 agents (insight-extractor + utilization-assessor + cross-referencer) = maximum 15 concurrent agents. This is distinct from the 5-agent curator wave limit.
+
+**Backlink phase serialization**: After all analysis agents complete, backlink-detector agents run **sequentially** — one entry at a time. Concurrent backlink passes on multiple entries that cite a shared target file would produce a write race (each agent reads a stale snapshot and the last writer drops the other's row). Sequential execution prevents this.
 
 ---
 
@@ -87,6 +90,8 @@ Files created: [list]
 README updated: Yes
 Utilization proposals written: N files
 Cross-references added: N entries updated
+Backlinks added: N rows across M entries
+Backlink skipped: [(path, reason), ...] (omitted when empty)
 ```
 
 ---

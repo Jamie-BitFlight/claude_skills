@@ -141,7 +141,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-7. **Spawn backlink-detector** -- after cross-referencer completes, spawn a sequential backlink pass:
+7. **Spawn backlink-detector** -- if cross-referencer returned `STATUS: complete`, spawn a sequential backlink pass (skip this step if cross-referencer returned `STATUS: failed`; failures of insight-extractor or utilization-assessor do not block this step):
 
    ```text
    Agent tool parameters:
@@ -152,6 +152,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 8. **Wait for backlink-detector and relay result**:
 
    - **Backlinks**: relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added."
+   - **Skipped**: if `SKIPPED` is non-empty, relay each `(path, reason)` pair verbatim so dangling links and conflicting descriptions are visible to the user.
 
 9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
@@ -246,11 +247,12 @@ flowchart TD
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all 3 agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
     WaitAnalysis1 --> SpawnBacklinks1["Spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'"]
     SpawnBacklinks1 --> WaitBacklinks1["Wait for backlink-detector<br>Relay BACKLINKS_ADDED count and ENTRIES_MODIFIED paths"]
-    WaitBacklinks1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    WaitBacklinks1 --> RelayBacklinks1["Relay BACKLINKS_ADDED count<br>Relay non-empty SKIPPED list verbatim"]
+    RelayBacklinks1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn 3 agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> SpawnBacklinksN["For each updated entry: spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'"]
-    SpawnBacklinksN --> WaitBacklinksN["Wait for all backlink-detector agents<br>Report total BACKLINKS_ADDED count"]
+    WaitAnalysisN --> SpawnBacklinksN["For each updated entry in sequence (one at a time):<br>spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'<br>wait for completion before spawning next<br>(sequential to prevent write races on shared cited entries)"]
+    SpawnBacklinksN --> WaitBacklinksN["After all backlink passes complete:<br>Report total BACKLINKS_ADDED count<br>Relay non-empty SKIPPED lists verbatim"]
     WaitBacklinksN --> PostActions
 ```
 
@@ -282,7 +284,7 @@ flowchart TD
    @research-backlink-detector — "Add backlinks for ./research/{category}/{name}.md"
    ```
 
-9. Wait for backlink-detector; relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added."
+9. Wait for backlink-detector; relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added." If `SKIPPED` is non-empty, relay each `(path, reason)` pair verbatim.
 
 ### All Entries Rerun
 
