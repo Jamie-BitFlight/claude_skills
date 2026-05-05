@@ -264,3 +264,11 @@ export const POST = copilotRuntimeNextJSAppRouterEndpoint({
 - GitHub stars milestone (30K, 35K)
 - New generative UI patterns or components
 - Breaking changes to `useCopilotAction` or `useCopilotReadable` API
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |

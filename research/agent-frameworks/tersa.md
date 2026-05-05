@@ -199,3 +199,11 @@ const { text } = await generateText({
 | Last Verified | 2026-03-06 |
 | Version at Verification | v2.0.0 |
 | Next Review Recommended | 2026-06-06 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |

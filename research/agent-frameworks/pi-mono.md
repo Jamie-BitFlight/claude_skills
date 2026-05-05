@@ -334,6 +334,7 @@ await agent.prompt("Hello!");
 | [Everything Claude Code](../everything-claude-code.md) | agent-frameworks | Comprehensive agent harness toolkit; parallel toolkit ecosystem approach to pi-mono for agent development and orchestration |
 | [Byobu](../../developer-tools/byobu.md) | developer-tools | terminal multiplexer wrapper with session persistence; complements pi-tui's differential rendering with terminal session management |
 | [surf-cli](../../developer-tools/surf-cli.md) | developer-tools | agent-agnostic Chrome control via CLI; extends pi-coding-agent and pi-web-ui with browser automation capability |
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | TypeScript agent runtime with unified LLM API and CLI framework; shares multi-interface patterns (TUI, web, Slack) with Cookbook examples (bidirectional) |
 
 ---
 

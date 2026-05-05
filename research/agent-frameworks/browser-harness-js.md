@@ -418,7 +418,7 @@ Beyond the above design constraints (which are intentional), no other limitation
 ## Cross-References
 
 | Entry | Category | Relationship |
-|-------|----------|──────────────|
+|-------|----------|--------------|
 | [PinchTab](../agent-infrastructure/pinchtab.md) | agent-infrastructure | alternative low-token browser control via a11y tree |
 | [Kernel](../agent-infrastructure/kernel-sh.md) | agent-infrastructure | browsers-as-a-service alternative with DevTools passthrough |
 | [Vibium](../agent-infrastructure/vibium.md) | agent-infrastructure | WebDriver BiDi browser control (complementary protocol) |
@@ -427,6 +427,7 @@ Beyond the above design constraints (which are intentional), no other limitation
 | [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | terminal UI with in-app browser for agent debugging |
 | [HappyCapy](../agent-infrastructure/happycapy.md) | agent-infrastructure | browser-based sandbox for agent execution |
 | [Browser MCP](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | MCP-based Chrome automation (protocol adapter pattern) |
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | provides full Chrome DevTools Protocol surface for agent interaction; complements Cookbook's CDP method for browser automation workflows (bidirectional) |
 
 ---
 
