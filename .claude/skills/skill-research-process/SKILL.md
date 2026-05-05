@@ -1,7 +1,7 @@
 ---
 name: skill-research-process
 description: Systematic process for building comprehensive Claude Code skills using parallel research agents. Triggers on "research for skill", "build skill from docs", "create comprehensive skill", or when needing to gather extensive documentation from official sources before skill creation.
-argument-hint: <tool-or-library-name>
+argument-hint: <tool-or-library-name> [--alternatives N]
 model: sonnet
 context: fork
 agent: general-purpose
@@ -27,6 +27,33 @@ Stage 3: Integrate → Update SKILL.md, validate structure
     ↓
 Gate 3: Final validation (links work, quality standards met)
 ```
+
+## Vague Brief Detector
+
+Before any other step, check whether the `<tool-or-library-name>` argument is specific enough to identify a single tool or library.
+
+**Vague if ANY condition matches:**
+
+- Input is a generic category word with no domain specificity (e.g., "AI", "tools", "design", "machine learning")
+- Input is a verb phrase instead of a noun (e.g., "do research on AI", "make a research thing")
+
+**Clear if:** Input names a specific tool, library, or resource (e.g., "httpx", "FastAPI", "uv", "Pydantic"). Missing version number alone is not a vague signal.
+
+**If vague — Fallback mode:**
+
+1. Parse `--alternatives N` from arguments (default: 3)
+2. Generate N direction cards inline — each card is a different interpretation of what the brief could mean. Each card contains:
+   - **Direction name** — interpretation label (e.g., "httpx as async HTTP client")
+   - **Rationale** — 2–3 sentences explaining why this reading fits the brief
+   - **Research scope** — 3–4 concrete topics this interpretation would investigate
+   - **Keywords** — 3–5 terms characterizing this direction
+3. Assign each card a different dimension: tool domain, target audience, use-case level, technology layer
+4. Present cards to the user and ask them to choose (numbered prompt — wait for response)
+5. Continue below using the selected direction as the `<tool-or-library-name>` target
+
+**If clear:** Proceed directly to Pre-Requisites below.
+
+---
 
 ## Pre-Requisites
 

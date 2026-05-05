@@ -37,7 +37,9 @@ flowchart TD
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
     Q3 -->|"No — validate flag absent"| Q4{"Does <mode_args/> contain --add-frontmatter?"}
     Q4 -->|"Yes — add-frontmatter flag present"| Frontmatter(["Execute Frontmatter Mode"])
-    Q4 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
+    Q4 -->|"No — no flags matched"| VBD{"Vague Brief Detector<br>Triggers if input has no URL,<br>URL is homepage with no resource path,<br>input is generic category word,<br>or input is verb phrase not a noun"}
+    VBD -->|"No — clear URL with named resource"| Default(["Execute Default Mode — single URL"])
+    VBD -->|"Yes — vague brief detected"| Fallback(["Execute Fallback Mode — N direction cards"])
 ```
 
 ---
@@ -97,6 +99,67 @@ Before reporting results to the user after any mode completes, verify:
 - [ ] "Inaccessible" has not been upgraded to "unavailable" or "nonexistent"
 - [ ] Structured sections (STATUS, ARTIFACTS, WARNINGS) are preserved
 - [ ] Agent observations are distinguished from agent conclusions
+
+---
+
+<fallback_mode>
+
+## Fallback Mode — Vague Brief
+
+Trigger: Vague Brief Detector fires — `<mode_args/>` has no URL, a homepage URL with no resource path, a generic category word (e.g., "AI", "tools", "design"), or a verb phrase (e.g., "research AI tools").
+
+### Workflow
+
+1. **Parse** `--alternatives N` from `<mode_args/>` (default: 3 if flag absent)
+
+2. **Spawn N parallel agents** — each scoped to a different interpretation of the vague brief:
+
+   ```text
+   Agent tool parameters:
+     subagent_type: general-purpose
+     run_in_background: true
+     prompt: "Produce a direction card for the research brief '<mode_args/>'.
+               Your interpretation: [specific reading assigned to this agent]
+               Format exactly:
+               **Direction [N]: [Interpretation Name]**
+               Rationale: [2–3 sentences on why this reading fits '<mode_args/>']
+               Research scope:
+               - [concrete research item 1]
+               - [concrete research item 2]
+               - [concrete research item 3]
+               Keywords: [3–5 comma-separated terms]"
+   ```
+
+   Differentiation rule: assign each agent a different dimension (tool domain, target audience, use-case level, technology layer). No two agents share the same dimension.
+
+3. **Wait** for all N agents and collect direction cards
+
+4. **Present cards and wait for selection** via AskUserQuestion:
+
+   ```text
+   Your brief "[brief]" could mean several different things. Here are [N] directions:
+
+   **Direction 1: [Name]**
+   Rationale: …
+   Research scope: …
+   Keywords: …
+
+   **Direction 2: [Name]**
+   …
+
+   Enter a number (1–[N]) to select a direction, or describe a different angle.
+   ```
+
+5. **Route based on response**:
+   - User enters a number → route to Default Mode using the selected interpretation as the research target
+   - User describes a new direction → treat as a clear brief and route to Default Mode
+
+### Error Handling
+
+- If a parallel agent fails, present the successful cards and note the missing one
+- If fewer than 2 cards are produced, ask the user to be more specific instead of presenting cards
+
+</fallback_mode>
 
 ---
 
