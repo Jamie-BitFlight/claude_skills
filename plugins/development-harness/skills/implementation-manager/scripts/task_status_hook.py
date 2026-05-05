@@ -697,7 +697,8 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     """Extract the sub-agent's session_id from the first parseable line of a JSONL transcript.
 
     The transcript file contains newline-delimited JSON objects. Each line may have
-    a top-level ``session_id`` field that identifies the sub-agent's own session.
+    a top-level ``sessionId`` field (camelCase, as written by Claude Code) that
+    identifies the sub-agent's own session.
     Reading only the first few lines avoids loading the entire (potentially large) file.
 
     Args:
@@ -725,7 +726,7 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
                     record: dict[str, Any] = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                session_id = record.get("session_id")
+                session_id = record.get("sessionId") or record.get("session_id")
                 if isinstance(session_id, str) and session_id:
                     return session_id
     except OSError as e:
