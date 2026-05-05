@@ -99,6 +99,7 @@ Consult `references/python3-standards.md` when applying shared rules for:
 - CLI Standards (Typer/Rich)
 - Service Integration Standards (Protocol classes)
 - Testing Standards (pytest-mock, 80% coverage)
+- Identifier Naming Standards (expand acronyms in public names; see §1.5)
 
 ### Python Development Process Graph
 
