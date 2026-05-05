@@ -1,7 +1,7 @@
 ---
 name: research-curator
 description: 'Manage research entries in ./research/ — create, refresh, and validate. Use when asked to add a tool, "document this", "research this", "refresh this research", "validate research entries", or given a tool URL. Modes: default (single URL), --batch (multiple URLs in parallel), --rerun (refresh stale entries), --validate (structural check and auto-fix).'
-argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all]'
+argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all] [--add-frontmatter category/name|all]'
 ---
 
 <mode_args>$ARGUMENTS</mode_args>
@@ -35,7 +35,9 @@ flowchart TD
     Q2Layer -->|"Yes — layer filter present"| RerunLayer(["Execute Rerun Mode with layer filter applied"])
     Q2Layer -->|"No — no layer filter"| Rerun(["Execute Rerun Mode"])
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
-    Q3 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
+    Q3 -->|"No — validate flag absent"| Q4{"Does <mode_args/> contain --add-frontmatter?"}
+    Q4 -->|"Yes — add-frontmatter flag present"| Frontmatter(["Execute Frontmatter Mode"])
+    Q4 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
 ```
 
 ---
@@ -117,7 +119,8 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 3. **Wait** for structured result (status, file path, category, key findings)
 4. **Apply relay rules** -- verify pre-relay checklist before proceeding
-5. **Spawn four tasks concurrently** -- if research status is not `failed`:
+5. **Generate frontmatter** -- if research status is not `failed`, apply the Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md) to the new entry file before any other post-creation steps
+6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
    ```text
    a. Agent tool parameters:
@@ -135,13 +138,13 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    d. Update ./research/README.md -- add new entry to category table
    ```
 
-6. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
+7. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-7. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+8. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -249,8 +252,9 @@ flowchart TD
 
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
-5. Update README with refreshed date
-6. Concurrently spawn three analysis agents:
+5. Apply Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md) to refresh `date_last_reviewed` and normalize to canonical schema
+6. Update README with refreshed date
+7. Concurrently spawn three analysis agents:
 
    ```text
    - @research-insight-extractor — "Extract improvements from ./research/{category}/{name}.md"
@@ -258,7 +262,7 @@ flowchart TD
    - @research-cross-referencer — "Add cross-references to ./research/{category}/{name}.md"
    ```
 
-7. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
+8. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
 
 ### All Entries Rerun
 
@@ -348,6 +352,44 @@ Validation complete:
 ```
 
 </validate_mode>
+
+---
+
+<frontmatter_mode>
+
+## Frontmatter Mode
+
+Trigger: `<mode_args/>` contains `--add-frontmatter`.
+
+Generates or upgrades YAML frontmatter on existing research entries to the canonical schema defined in [Frontmatter Generation](./references/frontmatter-generation.md). Use this to backfill entries created before frontmatter generation was part of the workflow, or to normalize entries that have partial or non-canonical frontmatter.
+
+### Target Parsing
+
+Extract the value after `--add-frontmatter`:
+
+- `category/name` — single entry at `./research/category/name.md`
+- `all` — every entry in `./research/` except `README.md` and `./research/insights/**`
+
+### Execution
+
+Follow the Standalone Backfill Procedure in [Frontmatter Generation](./references/frontmatter-generation.md).
+
+### Output
+
+```text
+Frontmatter update complete:
+  Entries processed: N
+  Updated: N (frontmatter added or upgraded to canonical)
+  Skipped: N (already canonical)
+  Failed: N
+
+Updated entries:
+  ./research/category/name.md
+```
+
+List any failures with the exact reason (field could not be extracted, file write error, etc.).
+
+</frontmatter_mode>
 
 ---
 
@@ -472,6 +514,7 @@ YYYY-MM-DD
 ## Reference Links
 
 - [Entry Template](./references/entry-template.md) -- standard format for all research entries
+- [Frontmatter Generation](./references/frontmatter-generation.md) -- canonical YAML schema, extraction rules for all entry formats, and backfill procedure for `--add-frontmatter` mode
 - [Validation Rules](./references/validation-rules.md) -- checks and severity mapping for `--validate` mode
 - [Batch Mode](./references/batch-mode.md) -- wave spawning workflow for `--batch` mode
 - Agent: `@research-curator` at `.claude/agents/research-curator.md` -- single-entry research executor
