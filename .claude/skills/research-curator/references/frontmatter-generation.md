@@ -11,7 +11,7 @@
 ```yaml
 ---
 title: "{Official resource name}"
-subtitle: "{Short byline contrasting with or expanding the title}"
+subtitle: "{What a reader finds inside — 5–10 words, written as a journal deck line}"
 category: "{parent directory name}"
 resource_url: "{primary URL}"
 github_url: "{GitHub URL — omit field entirely if absent}"
@@ -34,7 +34,7 @@ status: "published"
 | Field | Where to find it |
 |---|---|
 | `title` | YAML `title:` or `name:` → else first `# Heading` |
-| `subtitle` | YAML `subtitle:` → else write a short byline (5–10 words) that provides contrasting context to the title after reading the entry |
+| `subtitle` | YAML `subtitle:` → else after reading the full entry, write 5–10 words describing what a reader finds inside — the key capability, finding, or differentiator — as a journal editor would pitch the article |
 | `category` | YAML `category:` or `metadata.category:` → else parent directory name |
 | `resource_url` | YAML `resource_url:` or `metadata.source_url:` → else `**Source URL**: <url>` in body |
 | `github_url` | YAML `github_url:` or `metadata.github:` (add `https://github.com/` if no scheme) → else `**GitHub Repository**: <url>` → **omit field entirely** if absent |
