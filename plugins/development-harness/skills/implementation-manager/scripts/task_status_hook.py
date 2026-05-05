@@ -625,6 +625,74 @@ def sync_completion_to_github(task_file_path: Path, task_id: str, parent_issue_n
         print(f"[hook] GitHub sync failed: {e}", file=sys.stderr)
 
 
+def _extract_text_from_user_record(record: dict[str, Any]) -> str | None:
+    """Extract the first non-empty text block from a ``type: "user"`` JSONL record.
+
+    Args:
+        record: A parsed JSONL record from a sub-agent transcript.
+
+    Returns:
+        The first non-empty text string found in the record's content list,
+        or None if the record is not a user message or has no text content.
+    """
+    if record.get("type") != "user":
+        return None
+    message = record.get("message", {})
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content", [])
+    if not isinstance(content, list):
+        return None
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text = item.get("text", "")
+            if text:
+                return text
+    return None
+
+
+def _extract_prompt_from_transcript(transcript_path: Path) -> str | None:
+    """Extract the sub-agent's initial prompt from a JSONL transcript.
+
+    Scans the transcript for the first ``type: "user"`` record whose message
+    content contains a text block. This corresponds to the initial prompt passed
+    to the sub-agent by the orchestrator and may contain a
+    ``Skill(skill="start-task", args="...")`` invocation or ``/start-task`` pattern.
+
+    Reads at most 50 lines to avoid loading large transcripts.
+
+    Args:
+        transcript_path: Path to the sub-agent's JSONL transcript file.
+
+    Returns:
+        The text of the first user message if found, or None if the file is
+        missing, unreadable, or no user text content appears in the first 50 lines.
+    """
+    if not transcript_path.exists():
+        return None
+
+    try:
+        with transcript_path.open(encoding="utf-8") as fh:
+            for _ in range(50):
+                line = fh.readline()
+                if not line:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record: dict[str, Any] = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                text = _extract_text_from_user_record(record)
+                if text:
+                    return text
+    except OSError as e:
+        print(f"[hook] could not read transcript for prompt extraction {transcript_path}: {e}", file=sys.stderr)
+
+    return None
+
+
 def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     """Extract the sub-agent's session_id from the first parseable line of a JSONL transcript.
 
@@ -745,9 +813,14 @@ def _resolve_active_task_context(
 ) -> tuple[str | None, Path | None, str | None, int | None, Path | None] | None:
     """Resolve the active task context for the agent that just stopped.
 
-    Primary path: sam_active_task(action='get') via fastmcp CLI using the
-    sub-agent's session_id extracted from the transcript.
-    Fallback: filesystem context file via ``_resolve_context_file_from_transcript``.
+    Three-step resolution chain:
+    1. sam_active_task(action='get') via fastmcp CLI using the sub-agent's
+       session_id extracted from the transcript (primary path).
+    2. Filesystem context file via ``_resolve_context_file_from_transcript``
+       (fallback when agent did not call sam_active_task(set)).
+    3. Prompt extraction from the JSONL transcript via
+       ``_extract_prompt_from_transcript`` + ``extract_task_info_from_prompt``
+       (final fallback for agents dispatched without context registration).
 
     Args:
         hook_input: Parsed SubagentStop hook input from stdin.
@@ -766,14 +839,32 @@ def _resolve_active_task_context(
     parent_issue_number: int | None = None
     context_file: Path | None = None
 
+    # Step 1: MCP lookup via sam_active_task(get)
     if sub_agent_session_id:
         task_file_path, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
 
+    # Step 2: Filesystem context file written by /start-task
     if task_file_path is None or task_id is None:
         context_file = _resolve_context_file_from_transcript(hook_input)
-        if context_file is None:
-            return None
-        task_file_path, task_id, parent_issue_number = _read_context_file(context_file)
+        if context_file is not None:
+            task_file_path, task_id, parent_issue_number = _read_context_file(context_file)
+
+    # Step 3: Extract task reference from the agent's prompt in the JSONL transcript
+    if (task_file_path is None or task_id is None) and transcript_path_raw:
+        prompt_text = _extract_prompt_from_transcript(Path(transcript_path_raw))
+        if prompt_text:
+            extracted_path, extracted_id = extract_task_info_from_prompt(prompt_text)
+            if extracted_path is not None and extracted_id is not None:
+                print(
+                    f"[hook] SubagentStop: resolved task from prompt — {extracted_path} / {extracted_id}",
+                    file=sys.stderr,
+                )
+                task_file_path = extracted_path
+                task_id = extracted_id
+                # parent_issue_number remains None — not available from prompt alone
+
+    if task_file_path is None or task_id is None:
+        return None
 
     return sub_agent_session_id, task_file_path, task_id, parent_issue_number, context_file
 
