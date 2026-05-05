@@ -4,12 +4,14 @@
 /**
  * SubagentStop hook — validates summarizer sub-agent output quality.
  *
- * Fires on: SubagentStop (no matcher — matcher is silently ignored for SubagentStop)
- * Action: blocking (exit 2 + {"decision":"block",...} on stdout) when format requirements
- *         or fidelity rules are violated.
+ * Fires on: SubagentStop with matcher "^(file-summarizer|url-summarizer|image-summarizer)$"
+ *           in hooks.json (matched against agent_type field in the hook payload).
+ * Action: blocking (exit 2 + reason on stderr) when format requirements or fidelity
+ *         rules are violated. The redundant agent_type check below handles cases where
+ *         the hook fires without matcher filtering.
  *
- * Agent-type gate: exits 0 silently if agent_type is not a summarizer. This replaces
- * the prompt-type hook which could not be silenced on non-summarizer agents.
+ * Blocking protocol: exit 2 with reason written to stderr (JSON on stdout is ignored
+ *                    by Claude Code on exit 2).
  *
  * Test command:
  *   echo '{"hook_event_name":"SubagentStop","agent_type":"general-purpose","agent_transcript_path":"/tmp/test.jsonl"}' \
@@ -192,8 +194,11 @@ function validateJson(text) {
  */
 function validateTable(text) {
   const missing = [];
-  if (!/\|\s*Finding\s*\|.*\|\s*Detail\s*\||\|\s*Detail\s*\|.*\|\s*Finding\s*\|/i.test(text)) {
-    missing.push('markdown table with Finding, Detail, Source, Status columns');
+  // Check that all four required columns appear in the header row (order-independent).
+  const hasColumn = (col) => new RegExp(`\\|\\s*${col}\\s*\\|`, 'i').test(text);
+  const missingCols = ['Finding', 'Detail', 'Source', 'Status'].filter((c) => !hasColumn(c));
+  if (missingCols.length > 0) {
+    missing.push(`markdown table missing required columns: ${missingCols.join(', ')}`);
   }
   if (!/\|\s*(Not Found|Uncertain|None identified)/i.test(text)) {
     missing.push('at least one Not Found, Uncertain, or None identified row');
@@ -306,9 +311,7 @@ process.stdin.on('end', () => {
   if (fidelityViolations.length > 0)
     parts.push(`Fidelity violations: ${fidelityViolations.join('; ')}`);
 
-  process.stdout.write(
-    JSON.stringify({ decision: 'block', reason: `Format: ${formatId}. ${parts.join('. ')}.` }) +
-      '\n',
-  );
+  // Exit 2 with reason on stderr — Claude Code ignores JSON on stdout when exit code is 2.
+  process.stderr.write(`[summarizer-hook] BLOCKED. Format: ${formatId}. ${parts.join('. ')}.\n`);
   process.exit(2);
 });

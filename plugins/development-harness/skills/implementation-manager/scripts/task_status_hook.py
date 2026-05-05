@@ -684,6 +684,8 @@ def _extract_prompt_from_transcript(transcript_path: Path) -> str | None:
                     record: dict[str, Any] = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if not isinstance(record, dict):
+                    continue
                 text = _extract_text_from_user_record(record)
                 if text:
                     return text
@@ -725,6 +727,8 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
                 try:
                     record: dict[str, Any] = json.loads(line)
                 except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
                     continue
                 session_id = record.get("sessionId") or record.get("session_id")
                 if isinstance(session_id, str) and session_id:
