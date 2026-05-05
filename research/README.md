@@ -393,6 +393,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
 | [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
 | [graphify.md](./skill-generation-tools/graphify.md)           | graphify v3 — dual AST+LLM extraction pipeline, 19-language tree-sitter support, confidence-tagged edges (EXTRACTED/INFERRED/AMBIGUOUS), 71.5x token reduction on mixed corpora, multi-format export (HTML/JSON/Markdown/SVG/GraphML/Cypher/Obsidian), PreToolUse hook integration | 2026-04-08   |
+| [waza.md](./skill-generation-tools/waza.md)                   | Waza (技) — 8 engineering-habit skills (think, check, hunt, design, read, write, learn, health) for Claude Code; multi-mode architecture, runtime project context extraction, smoke-tested packaging (4,369 stars, MIT) | 2026-05-04   |
 
 **Key Topics**:
 
