@@ -1,6 +1,6 @@
 {
   "name": "summarizer",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "Faithful information summarization with fidelity preservation, structured output, and anti-hallucination methodology. Provides skills for file, URL, and image summarization; agents for autonomous summarization tasks; and hooks for validating agent output structure.",
   "author": {
     "name": "jamie-bitflight-skills",
