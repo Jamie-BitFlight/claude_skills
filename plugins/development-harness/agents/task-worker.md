@@ -56,13 +56,10 @@ If the response contains `"claimed": false` — stop. The task is already claime
 
 Immediately after claiming, register yourself so the SubagentStop hook can resolve which task you own.
 
-The `session_id` must be the value of `CLAUDE_CODE_SESSION_ID` — injected by the SessionStart
-hook. If it is not in context, resolve it first: `Bash("echo $CLAUDE_CODE_SESSION_ID")`.
-
 ```text
 mcp__plugin_dh_sam__sam_active_task(
     config={"action": "set", "plan": "P{id}", "task": "T{M}"},
-    session_id="<CLAUDE_CODE_SESSION_ID value>"
+    session_id="{{session_id}}"
 )
 ```
 

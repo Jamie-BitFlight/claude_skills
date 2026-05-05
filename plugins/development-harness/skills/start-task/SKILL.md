@@ -108,13 +108,10 @@ $ARGUMENTS
 
 4. Register the active-task context via the SAM MCP tool (required for hook-driven updates):
 
-   The `session_id` must be the value of `CLAUDE_CODE_SESSION_ID` — injected into your context
-   by the SessionStart hook. If it is not in context, resolve it first: `Bash("echo $CLAUDE_CODE_SESSION_ID")`.
-
    ```text
    mcp__plugin_dh_sam__sam_active_task(
        config={"action": "set", "plan": "P{N}", "task": "T{M}", "parent_issue_number": N},
-       session_id="<CLAUDE_CODE_SESSION_ID value>"
+       session_id="{{session_id}}"
    )
    ```
 
