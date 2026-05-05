@@ -14,6 +14,13 @@ _yaml = YAML(typ="safe")
 
 # Constants
 MAX_NAME_LENGTH = 64
+
+# Detects a bare YAML block-scalar indicator on the description line, e.g.
+#   description: >-
+#   description: |-
+# These are parsed by YAML as empty string (not ">-") so the string-equality
+# guard in _validate_description() cannot catch them — raw-text check is needed.
+_BARE_BLOCK_SCALAR_RE = re.compile(r"^description:\s*[|>][-+]?\s*$", re.MULTILINE)
 MAX_DESCRIPTION_LENGTH = 1024
 REQUIRED_ARGC = 2  # script name + skill-path
 
@@ -142,6 +149,29 @@ def _validate_description(frontmatter: dict) -> str | None:
     return None
 
 
+def _validate_description_raw(skill_path: Path) -> str | None:
+    """Check raw SKILL.md text for a bare block-scalar indicator on the description line.
+
+    YAML parses ``description: >-`` (with no block content) as an empty string,
+    so _validate_description() cannot detect it via the parsed dict. This function
+    reads the raw SKILL.md text and catches the pattern directly.
+
+    Args:
+        skill_path: Path to the skill directory
+
+    Returns:
+        Error message string if a bare block-scalar indicator is found, None otherwise
+    """
+    skill_md = skill_path / "SKILL.md"
+    content = skill_md.read_text(encoding="utf-8")
+    if _BARE_BLOCK_SCALAR_RE.search(content):
+        return (
+            "Description uses a bare YAML block scalar indicator (>-, |-) on its own line — "
+            "this is broken in Claude Code. Use a single-line string value instead."
+        )
+    return None
+
+
 def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     """Basic validation of a skill.
 
@@ -168,6 +198,10 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     desc_err = _validate_description(result)
     if desc_err:
         return False, desc_err
+
+    desc_raw_err = _validate_description_raw(skill_path)
+    if desc_raw_err:
+        return False, desc_raw_err
 
     return True, "Skill is valid!"
 

@@ -118,6 +118,7 @@ class TestInitSkillScaffolder:
 
         fm = _parse_frontmatter(result / "SKILL.md")
         assert fm.get("name") == "yaml-check-skill"
+        assert isinstance(fm.get("description"), str), "description must parse as a string, not a block-scalar artifact"
 
     def test_invalid_name_uppercase_is_rejected(self) -> None:
         """validate_skill_name rejects names containing uppercase letters.
@@ -209,7 +210,7 @@ class TestPackageSkillPackager:
 
         with zipfile.ZipFile(result) as zf:
             names = zf.namelist()
-        assert any("SKILL.md" in n for n in names), f"SKILL.md absent from archive entries: {names}"
+        assert "demo-skill/SKILL.md" in names, f"Expected 'demo-skill/SKILL.md' in archive entries: {names}"
 
     def test_zip_contains_all_source_files(self, tmp_path: Path) -> None:
         """All files in the skill directory are included in the .skill archive.
@@ -229,7 +230,9 @@ class TestPackageSkillPackager:
 
         with zipfile.ZipFile(result) as zf:
             names = zf.namelist()
-        assert any("guide.md" in n for n in names), f"guide.md absent from archive: {names}"
+        assert "full-skill/references/guide.md" in names, (
+            f"Expected 'full-skill/references/guide.md' in archive: {names}"
+        )
 
     def test_missing_skill_md_returns_none(self, tmp_path: Path) -> None:
         """package_skill returns None when SKILL.md is absent.
@@ -245,6 +248,10 @@ class TestPackageSkillPackager:
 
         result = package_skill(bad_dir)
         assert result is None
+        # No .skill artifact must be created when SKILL.md is absent
+        assert not list(tmp_path.rglob("*.skill")), (
+            "package_skill must not create any archive artifact when SKILL.md is missing"
+        )
 
     def test_validation_failure_blocks_packaging(self, tmp_path: Path) -> None:
         """package_skill returns None when quick_validate rejects the skill.
@@ -291,6 +298,34 @@ class TestPackageSkillPackager:
         result = package_skill(skill_dir)  # no output_dir
         assert result is not None
         assert result.parent == tmp_path
+
+    def test_scaffolder_output_can_be_packaged(self, tmp_path: Path) -> None:
+        """Skill directory produced by init_skill() can be packaged by package_skill().
+
+        Tests: End-to-end handoff from scaffolder to packager.
+        How: Call init_skill() to create a scaffold, then call package_skill() on the
+             result, verify the archive is created and contains SKILL.md.
+        Why: A regression where init_skill emits frontmatter that quick_validate rejects
+             (e.g. wrong template quoting, missing required field) would leave every
+             packager test green while packaging all scaffolded skills silently fails.
+        """
+        from init_skill import init_skill
+        from package_skill import package_skill
+
+        scaffold_root = tmp_path / "skills"
+        skill_dir = init_skill("scaffold-pack-skill", str(scaffold_root))
+        assert skill_dir is not None, "init_skill must succeed before packaging"
+
+        out_dir = tmp_path / "dist"
+        result = package_skill(skill_dir, out_dir)
+
+        assert result is not None, "package_skill must succeed on a freshly-scaffolded skill"
+        assert result.suffix == ".skill"
+        assert result.exists()
+
+        with zipfile.ZipFile(result) as zf:
+            names = zf.namelist()
+        assert "scaffold-pack-skill/SKILL.md" in names, f"SKILL.md not found at expected path in archive. Got: {names}"
 
 
 # ===========================================================================
@@ -400,23 +435,28 @@ class TestQuickValidateBrokenFixtures:
         assert any(kw in message.lower() for kw in ("angle bracket", "<", ">"))
 
     def test_yaml_multiline_indicator_description_fails(self, tmp_path: Path) -> None:
-        """Description that is only a YAML multiline block indicator is rejected.
+        """Description written as a bare YAML block-scalar indicator is rejected.
 
-        Tests: Broken multiline-indicator guard (>-, |-, etc. break Claude Code).
+        Tests: Raw-text guard for bare >- / |- indicators on the description line.
+        How: Write SKILL.md with ``description: >-`` (no quotes — the real developer
+             mistake). YAML parses this as an empty string, but the raw-text check in
+             quick_validate must detect the bare indicator and reject the skill.
+        Why: The parsed-value check (``description in {">-", ...}``) cannot catch the
+             bare form because YAML gives empty string, not the literal ">-" string.
+             A regex over the raw SKILL.md text is the only reliable detection method.
         """
         from quick_validate import validate_skill
 
         skill_dir = tmp_path / "multiline-indicator"
         skill_dir.mkdir()
-        # ruamel.yaml parses ">-" as a block-scalar; the resulting string is empty,
-        # so quick_validate must catch the raw indicator form.
+        # Write the ACTUAL developer mistake: bare block-scalar indicator, no quotes.
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: multiline-indicator\ndescription: '>-'\n---\n\n# Skill\n", encoding="utf-8"
+            "---\nname: multiline-indicator\ndescription: >-\n---\n\n# Skill\n", encoding="utf-8"
         )
 
         valid, message = validate_skill(skill_dir)
         assert not valid
-        assert any(kw in message.lower() for kw in ("multiline", "broken", ">-"))
+        assert any(kw in message.lower() for kw in ("block scalar", ">-", "broken", "indicator"))
 
     def test_name_too_long_fails(self, tmp_path: Path) -> None:
         """Name exceeding the maximum length is rejected.
