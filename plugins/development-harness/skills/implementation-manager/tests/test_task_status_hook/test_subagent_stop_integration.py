@@ -302,10 +302,10 @@ class TestSubagentStopFullPathWithGithubSync:
                 hook.handle_subagent_stop(hook_input)
         assert exit_info.value.code == 0
 
-        updated = task_file.read_text(encoding="utf-8")
-        assert "id: T2" in updated
-        assert "status: skipped" in updated
-        assert "id: T3" in updated
-        assert "status: skipped" in updated
-        assert "skipped: upstream T1 failed" in updated
+        read_result = hook.sam_load_plan(task_file)
+        by_id = {task.id: task for task in read_result.plan.tasks}
+        assert by_id["T2"].status == TaskStatus.SKIPPED
+        assert by_id["T3"].status == TaskStatus.SKIPPED
+        assert "skipped: upstream T1 failed" in by_id["T2"].reason
+        assert "skipped: upstream T1 failed" in by_id["T3"].reason
         assert not context_file.exists()

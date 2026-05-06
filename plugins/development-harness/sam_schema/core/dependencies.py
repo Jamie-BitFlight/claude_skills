@@ -95,7 +95,7 @@ class DependencyGraph:
         for task in self._tasks:
             if task.status != TaskStatus.NOT_STARTED:
                 continue
-            if self._all_deps_terminal(task):
+            if self._all_deps_successful(task):
                 ready.append(task)
 
         ready.sort(key=lambda t: (int(t.priority), _task_id_sort_key(t.id)))
@@ -217,13 +217,12 @@ class DependencyGraph:
                     continue
                 visited.add(dependent_id)
                 dep_task = self._by_id.get(dependent_id)
-                if dep_task is None:
-                    continue
-                if dep_task.status == TaskStatus.NOT_STARTED:
-                    dep_task.status = TaskStatus.SKIPPED
-                    dep_task.reason = f"skipped: upstream {failed_task_id} failed"
-                    skipped.append(dependent_id)
-                _dfs(dependent_id)
+                if dep_task is not None:
+                    if dep_task.status == TaskStatus.NOT_STARTED:
+                        dep_task.status = TaskStatus.SKIPPED
+                        dep_task.reason = f"skipped: upstream {failed_task_id} failed"
+                        skipped.append(dependent_id)
+                    _dfs(dependent_id)
 
         _dfs(failed_task_id)
         return skipped
@@ -232,7 +231,7 @@ class DependencyGraph:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _dep_is_terminal(self, dep_id: str) -> bool:
+    def _dep_is_successful(self, dep_id: str) -> bool:
         """Return True when *dep_id* exists and is in a successful status.
 
         Args:
@@ -249,7 +248,7 @@ class DependencyGraph:
             return False
         return dep_task.status in SUCCESSFUL_STATUSES
 
-    def _all_deps_terminal(self, task: Task) -> bool:
+    def _all_deps_successful(self, task: Task) -> bool:
         """Return True when all of *task*'s dependencies are in successful status.
 
         Args:
@@ -259,7 +258,7 @@ class DependencyGraph:
             ``True`` when every dependency ID resolves to a task in a successful
             status.  ``True`` for tasks with no dependencies.
         """
-        return all(self._dep_is_terminal(dep_id) for dep_id in task.dependencies)
+        return all(self._dep_is_successful(dep_id) for dep_id in task.dependencies)
 
     def _unsatisfied_deps(self, task: Task) -> list[str]:
         """Return dependency IDs that are not yet in a successful status.
@@ -271,7 +270,7 @@ class DependencyGraph:
             List of dependency IDs (may include IDs absent from the plan)
              that are not in a successful status.
         """
-        return [dep_id for dep_id in task.dependencies if not self._dep_is_terminal(dep_id)]
+        return [dep_id for dep_id in task.dependencies if not self._dep_is_successful(dep_id)]
 
 
 class BookendValidator:

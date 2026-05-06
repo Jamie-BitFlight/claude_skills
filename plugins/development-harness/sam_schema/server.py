@@ -628,16 +628,16 @@ def sam_task(
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
             backend.update_task_status(plan_id, task, config.status)
-            skipped: list[str] = []
             if config.status == str(TaskStatus.FAILED):
                 plan_data = backend.read_plan(plan_id)
                 tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
                 graph = DependencyGraph(tasks)
-                skipped = graph.mark_downstream_skipped(task)
+                skipped: list[str] = graph.mark_downstream_skipped(task)
                 for skipped_task_id in skipped:
                     backend.update_task_status(plan_id, skipped_task_id, str(TaskStatus.SKIPPED))
                     backend.update_task_fields(plan_id, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
-            return {"id": task, "status": config.status, "skipped_downstream": skipped}
+                return {"id": task, "status": config.status, "skipped_downstream": skipped}
+            return {"id": task, "status": config.status}
 
         case "update":
             if not isinstance(config, UpdateTaskConfig):

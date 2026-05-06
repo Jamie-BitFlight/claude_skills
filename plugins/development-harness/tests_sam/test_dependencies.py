@@ -811,9 +811,9 @@ def test_mark_downstream_skipped_transitive_chain() -> None:
     assert t2.status == TaskStatus.SKIPPED
     assert t3.status == TaskStatus.SKIPPED
     assert t2.reason is not None
-    assert "upstream T1 failed" in t2.reason
+    assert "skipped: upstream T1 failed" in t2.reason
     assert t3.reason is not None
-    assert "upstream T1 failed" in t3.reason
+    assert "skipped: upstream T1 failed" in t3.reason
 
 
 def test_mark_downstream_skipped_already_terminal_excluded() -> None:
@@ -852,9 +852,9 @@ def test_failed_status_downstream_skip_chain_leaves_no_ready_tasks() -> None:
     assert t2.status == TaskStatus.SKIPPED
     assert t3.status == TaskStatus.SKIPPED
     assert t2.reason is not None
-    assert "upstream T1 failed" in t2.reason
+    assert "skipped: upstream T1 failed" in t2.reason
     assert t3.reason is not None
-    assert "upstream T1 failed" in t3.reason
+    assert "skipped: upstream T1 failed" in t3.reason
     assert ready == []
 
 

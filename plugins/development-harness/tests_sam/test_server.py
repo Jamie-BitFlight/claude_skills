@@ -218,8 +218,8 @@ def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> No
     assert result["skipped_downstream"] == ["T2", "T3"]
     assert t2["task"]["status"] == "skipped"
     assert t3["task"]["status"] == "skipped"
-    assert "upstream T1 failed" in (t2["task"].get("reason") or "")
-    assert "upstream T1 failed" in (t3["task"].get("reason") or "")
+    assert "skipped: upstream T1 failed" in (t2["task"].get("reason") or "")
+    assert "skipped: upstream T1 failed" in (t3["task"].get("reason") or "")
     assert ready["count"] == 0
 
 
