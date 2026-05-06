@@ -4054,7 +4054,7 @@ def update_sam_task_status(
     return {"updated": updated, "issue_number": issue_number, "new_status": new_status, **out.to_dict()}
 
 
-_SAM_TERMINAL_STATUSES: frozenset[str] = frozenset({"complete", "closed", "done"})
+_SAM_SUCCESSFUL_STATUSES: frozenset[str] = frozenset({"complete", "deferred", "closed", "done"})
 
 
 def _extract_feature_slug(tasks: list[dict[str, object]]) -> str:
@@ -4076,7 +4076,7 @@ def _build_task_status_map(tasks: list[dict[str, object]]) -> dict[str, str]:
 
 
 def _is_sam_task_ready(task: dict[str, object], status_by_id: dict[str, str]) -> bool:
-    """Return True when a task is not-started and all feature-scoped deps are terminal."""
+    """Return True when a task is not-started and all feature-scoped deps are successful."""
     if str(task.get("status", "not-started")) != "not-started":
         return False
     deps_raw = task.get("dependencies", [])
@@ -4084,7 +4084,7 @@ def _is_sam_task_ready(task: dict[str, object], status_by_id: dict[str, str]) ->
         dep_str = str(dep).strip()
         if dep_str.startswith("#"):  # cross-feature ref — always satisfied
             continue
-        if status_by_id.get(dep_str, "not-started") not in _SAM_TERMINAL_STATUSES:
+        if status_by_id.get(dep_str, "not-started") not in _SAM_SUCCESSFUL_STATUSES:
             return False
     return True
 
@@ -4095,7 +4095,7 @@ def get_ready_sam_tasks(
     """Return SAM tasks that are ready to execute (not-started with all deps satisfied).
 
     A task is ready when its status is ``"not-started"`` and all dependencies
-    have a terminal status (``"complete"``). Cross-feature ``#N`` dependencies
+    have a successful status (``"complete"`` or ``"deferred"``). Cross-feature ``#N`` dependencies
     (GitHub issue references) are treated as always-satisfied.
 
     Args:

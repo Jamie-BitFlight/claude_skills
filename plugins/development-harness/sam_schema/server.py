@@ -42,8 +42,9 @@ from sam_schema.core.action_models import (
     UpdateTaskConfig,
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
+from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import PlanNotFoundError, SamError, TaskNotFoundError
-from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment
+from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
@@ -627,7 +628,16 @@ def sam_task(
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
             backend.update_task_status(plan_id, task, config.status)
-            return {"id": task, "status": config.status}
+            skipped: list[str] = []
+            if config.status == str(TaskStatus.FAILED):
+                plan_data = backend.read_plan(plan_id)
+                tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
+                graph = DependencyGraph(tasks)
+                skipped = graph.mark_downstream_skipped(task)
+                for skipped_task_id in skipped:
+                    backend.update_task_status(plan_id, skipped_task_id, str(TaskStatus.SKIPPED))
+                    backend.update_task_fields(plan_id, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
+            return {"id": task, "status": config.status, "skipped_downstream": skipped}
 
         case "update":
             if not isinstance(config, UpdateTaskConfig):

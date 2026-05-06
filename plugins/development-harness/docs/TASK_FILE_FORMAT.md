@@ -314,6 +314,7 @@ All content fields are stored as YAML multiline scalars. Default is an empty str
 | `blocked` | Cannot proceed — external dependency | Agent via `sam state` |
 | `deferred` | Postponed to a later session | Orchestrator |
 | `skipped` | Intentionally not executed | Orchestrator |
+| `failed` | Task execution failed; downstream dependents are auto-skipped | Agent or orchestrator via `sam state` |
 
 ### Priority Values
 

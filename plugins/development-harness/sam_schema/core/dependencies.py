@@ -13,7 +13,7 @@ from sam_schema.core.models import BookendType, Plan, Task, TaskStatus
 # Statuses that satisfy a dependency — a downstream task may proceed only when
 # its dependency is in one of these statuses.  FAILED is intentionally excluded:
 # a failed parent must NOT unblock its dependents (they should be auto-skipped).
-SUCCESSFUL_STATUSES: frozenset[str] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED, TaskStatus.SKIPPED})
+SUCCESSFUL_STATUSES: frozenset[str] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED})
 
 # Statuses that represent the end of a task's lifecycle (no further transitions
 # are expected).  Used for cycle detection and plan-completion checks.
@@ -80,8 +80,8 @@ class DependencyGraph:
         A task is ready when:
 
         1. Its status is ``not-started``.
-        2. All tasks listed in its ``dependencies`` are in a terminal status
-           (``complete``, ``deferred``, or ``skipped``).
+        2. All tasks listed in its ``dependencies`` are in a successful status
+           (``complete`` or ``deferred``).
 
         Tasks referencing dependency IDs that do not exist in the task list
         are treated as having an unsatisfied dependency and are therefore
@@ -162,7 +162,7 @@ class DependencyGraph:
         """Return tasks that are blocked by unsatisfied dependencies.
 
         A task is *blocked* when it is in ``not-started`` status and has at
-        least one dependency that is not in a terminal status.  Dependencies
+        least one dependency that is not in a successful status.  Dependencies
         that reference task IDs absent from the plan are also treated as
         unsatisfied and reported.
 
@@ -172,7 +172,7 @@ class DependencyGraph:
 
         Returns:
             List of ``(task, missing_dep_ids)`` tuples where ``missing_dep_ids``
-            are the IDs of dependencies not yet in a terminal status.
+             are the IDs of dependencies not yet in a successful status.
         """
         result: list[tuple[Task, list[str]]] = []
         for task in self._tasks:
@@ -184,24 +184,22 @@ class DependencyGraph:
         return result
 
     def mark_downstream_skipped(self, failed_task_id: str) -> list[str]:
-        """Return the IDs of all tasks that must be skipped because *failed_task_id* failed.
+        """Mark transitive downstream tasks as skipped after an upstream failure.
 
         Performs a forward DFS from *failed_task_id* through the dependency graph
-        (following edges in the direction "task → tasks that depend on it") and
-        collects all reachable tasks that are still in ``not-started`` status.
+        (following edges in the direction "task → tasks that depend on it").
+        Every reachable task still in ``not-started`` is transitioned in-memory to:
 
-        This method does NOT mutate any task — callers are responsible for writing
-        ``status = "skipped"`` and ``reason = "upstream {failed_task_id} failed"``
-        to each returned task ID via the backend.
+        - ``status = "skipped"``
+        - ``reason = "skipped: upstream {failed_task_id} failed"``
 
         Args:
             failed_task_id: ID of the task that has just transitioned to FAILED.
 
         Returns:
-            List of task IDs (in DFS discovery order) that should be marked
-            ``skipped`` because they depend transitively on the failed task.
+            List of task IDs (in DFS discovery order) newly marked ``skipped``.
             Empty list when the failed task has no downstream dependents, or all
-            downstream tasks are already in a terminal status.
+            downstream tasks were already non-actionable.
         """
         # Build reverse adjacency: task_id -> list of task_ids that depend on it.
         reverse: dict[str, list[str]] = {t.id: [] for t in self._tasks}
@@ -219,9 +217,13 @@ class DependencyGraph:
                     continue
                 visited.add(dependent_id)
                 dep_task = self._by_id.get(dependent_id)
-                if dep_task is not None and dep_task.status == TaskStatus.NOT_STARTED:
+                if dep_task is None:
+                    continue
+                if dep_task.status == TaskStatus.NOT_STARTED:
+                    dep_task.status = TaskStatus.SKIPPED
+                    dep_task.reason = f"skipped: upstream {failed_task_id} failed"
                     skipped.append(dependent_id)
-                    _dfs(dependent_id)
+                _dfs(dependent_id)
 
         _dfs(failed_task_id)
         return skipped
@@ -248,26 +250,26 @@ class DependencyGraph:
         return dep_task.status in SUCCESSFUL_STATUSES
 
     def _all_deps_terminal(self, task: Task) -> bool:
-        """Return True when all of *task*'s dependencies are in terminal status.
+        """Return True when all of *task*'s dependencies are in successful status.
 
         Args:
             task: The task whose dependencies are checked.
 
         Returns:
-            ``True`` when every dependency ID resolves to a task in a terminal
+            ``True`` when every dependency ID resolves to a task in a successful
             status.  ``True`` for tasks with no dependencies.
         """
         return all(self._dep_is_terminal(dep_id) for dep_id in task.dependencies)
 
     def _unsatisfied_deps(self, task: Task) -> list[str]:
-        """Return dependency IDs that are not yet in a terminal status.
+        """Return dependency IDs that are not yet in a successful status.
 
         Args:
             task: The task whose dependencies are examined.
 
         Returns:
             List of dependency IDs (may include IDs absent from the plan)
-            that are not in a terminal status.
+             that are not in a successful status.
         """
         return [dep_id for dep_id in task.dependencies if not self._dep_is_terminal(dep_id)]
 

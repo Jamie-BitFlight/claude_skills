@@ -17,7 +17,7 @@ import re
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
-from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _TERMINAL_STATUSES
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SUCCESSFUL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.models import PlanState, Task
 from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
@@ -170,10 +170,10 @@ def _node_to_task_data(node: IssueNode) -> TaskData:
 
 
 def _is_ready(task: TaskData, by_id: dict[str, TaskData]) -> bool:
-    """Return True when a task is not-started and all dependencies are terminal."""
+    """Return True when a task is not-started and all dependencies are successful."""
     if task["status"] != "not-started":
         return False
-    return all(by_id.get(dep, {}).get("status") in _TERMINAL_STATUSES for dep in task["dependencies"])  # type: ignore[union-attr]
+    return all(by_id.get(dep, {}).get("status") in _SUCCESSFUL_STATUSES for dep in task["dependencies"])  # type: ignore[union-attr]
 
 
 def _has_cycles(tasks: list[TaskData]) -> bool:
@@ -476,7 +476,7 @@ class GitHubTaskProvider:
         blocked: list[dict[str, list[str]]] = []
         for t in tasks:
             if t["status"] == "not-started" and not _is_ready(t, by_id) and t["dependencies"]:
-                unmet = [d for d in t["dependencies"] if by_id.get(d, {}).get("status") not in _TERMINAL_STATUSES]  # type: ignore[union-attr]
+                unmet = [d for d in t["dependencies"] if by_id.get(d, {}).get("status") not in _SUCCESSFUL_STATUSES]  # type: ignore[union-attr]
                 if unmet:
                     blocked.append({t["id"]: unmet})
         completed = by_status.get("complete", 0)

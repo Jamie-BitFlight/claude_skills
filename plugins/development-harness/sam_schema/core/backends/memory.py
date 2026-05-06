@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import TypeAdapter
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
-from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _TERMINAL_STATUSES
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SUCCESSFUL_STATUSES
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
     PlanExistsError,
@@ -543,7 +543,7 @@ class InMemoryTaskProvider:
         """Return all tasks that are ready for dispatch.
 
         A task is ready when its status is ``not-started`` and all dependency
-        tasks are in a terminal status (complete, deferred, or skipped).
+        tasks are in a successful status (complete or deferred).
         Dependencies referencing absent task IDs are treated as unsatisfied.
 
         Args:
@@ -564,7 +564,7 @@ class InMemoryTaskProvider:
         for task in tasks:
             if task["status"] != "not-started":
                 continue
-            if all(status_by_id.get(dep_id, "") in _TERMINAL_STATUSES for dep_id in task["dependencies"]):
+            if all(status_by_id.get(dep_id, "") in _SUCCESSFUL_STATUSES for dep_id in task["dependencies"]):
                 ready.append(copy.deepcopy(task))
 
         return ready
@@ -598,7 +598,7 @@ class InMemoryTaskProvider:
         for task in tasks:
             if task["status"] != "not-started":
                 continue
-            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in _TERMINAL_STATUSES]
+            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in _SUCCESSFUL_STATUSES]
             if unsatisfied:
                 blocked_tasks.append({task["id"]: unsatisfied})
             else:

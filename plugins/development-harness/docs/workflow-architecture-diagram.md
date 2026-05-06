@@ -184,7 +184,7 @@ Output of `mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"actio
   "task": {
     "task": "T04",
     "title": "string",
-    "status": "not-started|in-progress|complete|blocked|deferred|skipped",
+    "status": "not-started|in-progress|complete|blocked|deferred|skipped|failed",
     "agent": "string",
     "dependencies": ["T01"],
     "priority": 1,
@@ -309,13 +309,16 @@ flowchart TD
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
     IP -->|"task_status_hook.py SubagentStop<br>via sam state P{N}/T{M} complete"| CO[complete]
     IP -->|"agent or human operator<br>via sam state P{N}/T{M} blocked"| BL[blocked]
+    IP -->|"agent or orchestrator<br>via sam state P{N}/T{M} failed"| FA[failed]
     NS -->|"orchestrator<br>via sam state P{N}/T{M} deferred"| DE[deferred]
     NS -->|"orchestrator<br>via sam state P{N}/T{M} skipped"| SK[skipped]
+    NS -->|"orchestrator<br>via sam state P{N}/T{M} failed"| FA
     IP -->|"orchestrator<br>via sam state P{N}/T{M} deferred"| DE
     IP -->|"orchestrator<br>via sam state P{N}/T{M} skipped"| SK
+    FA -->|"auto-cascade<br>mark downstream tasks skipped"| SK
 ```
 
-Readiness rule: a task is ready when `status == not-started` AND all dependency task IDs have terminal status. Terminal statuses: `complete`, `blocked`, `skipped`. SKIPPED counts as terminal for dependency evaluation — when T5 is skipped, T6 becomes ready.
+Readiness rule: a task is ready when `status == not-started` AND all dependency task IDs have successful status. Successful statuses: `complete`, `deferred`. Terminal statuses for lifecycle/completion checks: `complete`, `deferred`, `skipped`, `failed`.
 
 ---
 

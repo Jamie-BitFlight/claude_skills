@@ -327,6 +327,7 @@ _KNOWN_TASK_FIELDS: frozenset[str] = frozenset({
     "scenario-target",
     "analysis-method",
     "divergence-notes",
+    "reason",
     # Markdown content
     "description",
     "objective",

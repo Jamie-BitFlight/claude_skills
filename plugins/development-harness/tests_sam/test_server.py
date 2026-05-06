@@ -185,10 +185,42 @@ def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str:
     How: Cycle through valid statuses on T2.
     Why: Agents use all status values during the task lifecycle.
     """
-    for status_str in ("in-progress", "blocked", "complete", "deferred", "skipped", "not-started"):
+    for status_str in ("in-progress", "blocked", "complete", "deferred", "skipped", "failed", "not-started"):
         result = sam_task(plan="P1", task="T2", config=StateTaskConfig(status=status_str), plan_dir=plan_dir_str)
         assert "error" not in result, f"Unexpected error for status '{status_str}': {result}"
         assert result["status"] == status_str
+
+
+def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> None:
+    """sam_task(state=failed) auto-skips transitive downstream dependencies."""
+    # Arrange
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    plan = Plan(
+        feature="failed-cascade",
+        version="1.0",
+        tasks=[
+            make_task("T1", status=TaskStatus.IN_PROGRESS),
+            make_task("T2", dependencies=["T1"]),
+            make_task("T3", dependencies=["T2"]),
+        ],
+    )
+    write_plan(plan, plan_dir / "tasks-1-failed-cascade.yaml", force_single=True)
+
+    # Act
+    result = sam_task(plan="P1", task="T1", config=StateTaskConfig(status="failed"), plan_dir=str(plan_dir))
+    t2 = sam_task(plan="P1", task="T2", config=ReadTaskConfig(), plan_dir=str(plan_dir))
+    t3 = sam_task(plan="P1", task="T3", config=ReadTaskConfig(), plan_dir=str(plan_dir))
+    ready = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=str(plan_dir))
+
+    # Assert
+    assert result["status"] == "failed"
+    assert result["skipped_downstream"] == ["T2", "T3"]
+    assert t2["task"]["status"] == "skipped"
+    assert t3["task"]["status"] == "skipped"
+    assert "upstream T1 failed" in (t2["task"].get("reason") or "")
+    assert "upstream T1 failed" in (t3["task"].get("reason") or "")
+    assert ready["count"] == 0
 
 
 def test_sam_state_invalid_status_returns_error_dict(plan_dir: Path, plan_dir_str: str) -> None:

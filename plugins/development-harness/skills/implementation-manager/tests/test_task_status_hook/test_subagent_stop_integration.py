@@ -31,6 +31,8 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from sam_schema.core.models import Plan, TaskStatus
+from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,6 +40,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+from tests_sam.conftest import make_task
 
 _TASK_YAML_IN_PROGRESS_WITH_GITHUB = """\
 ---
@@ -267,3 +271,41 @@ class TestSubagentStopFullPathWithGithubSync:
         # Assert: warning was written to stderr
         stderr = capsys.readouterr().err
         assert "GitHub" in stderr
+
+    def test_subagent_stop_failed_status_cascades_downstream_skip(self, tmp_path: Path) -> None:
+        """FAILED task on SubagentStop cascades skipped state to transitive downstream tasks."""
+        # Arrange
+        import task_status_hook as hook
+
+        plan = Plan(
+            feature="failed-cascade",
+            version="1.0",
+            tasks=[
+                make_task("T1", status=TaskStatus.FAILED),
+                make_task("T2", dependencies=["T1"]),
+                make_task("T3", dependencies=["T2"]),
+            ],
+        )
+        task_file = tmp_path / "tasks-1-failed-cascade.yaml"
+        write_plan(plan, task_file, force_single=True)
+
+        session_id = "integration-failed-cascade-session"
+        context_file = _write_context_file(tmp_path, session_id, task_file, task_id="T1")
+        hook_input = _build_hook_input(tmp_path, session_id, task_file)
+
+        with (
+            pytest.MonkeyPatch.context() as mp,
+            patch.object(hook, "_resolve_context_file_from_transcript", return_value=context_file),
+        ):
+            mp.setattr(hook, "_resolve_context_file_from_transcript", lambda _: context_file)
+            with pytest.raises(SystemExit) as exit_info:
+                hook.handle_subagent_stop(hook_input)
+        assert exit_info.value.code == 0
+
+        updated = task_file.read_text(encoding="utf-8")
+        assert "id: T2" in updated
+        assert "status: skipped" in updated
+        assert "id: T3" in updated
+        assert "status: skipped" in updated
+        assert "skipped: upstream T1 failed" in updated
+        assert not context_file.exists()

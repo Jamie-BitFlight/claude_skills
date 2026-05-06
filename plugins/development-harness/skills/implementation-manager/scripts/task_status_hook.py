@@ -931,7 +931,7 @@ def _mark_downstream_skipped_in_plan(plan_path: Path, failed_task_id: str) -> No
 
     Loads the plan, builds a DependencyGraph, calls mark_downstream_skipped
     to obtain the list of tasks that must be auto-skipped, then writes
-    status=skipped and reason="upstream {failed_task_id} failed" for each.
+    status=skipped and reason="skipped: upstream {failed_task_id} failed" for each.
 
     Args:
         plan_path: Absolute path to the plan YAML file.
@@ -944,7 +944,9 @@ def _mark_downstream_skipped_in_plan(plan_path: Path, failed_task_id: str) -> No
         sam_update_status(plan_path, dep_id, SamTaskStatus.SKIPPED)
         # reason field write is best-effort — status update already succeeded
         with contextlib.suppress(ValueError, KeyError, FileNotFoundError):
-            sam_update_plan_fields(plan_path, dep_id, set_fields={"reason": f"upstream {failed_task_id} failed"})
+            sam_update_plan_fields(
+                plan_path, dep_id, set_fields={"reason": f"skipped: upstream {failed_task_id} failed"}
+            )
 
 
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:

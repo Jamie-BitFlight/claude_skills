@@ -101,7 +101,7 @@ def test_get_ready_tasks_deferred_dep_satisfies_dependency() -> None:
     assert [t.id for t in ready] == ["T2"]
 
 
-def test_get_ready_tasks_skipped_dep_satisfies_dependency() -> None:
+def test_get_ready_tasks_skipped_dep_does_not_satisfy_dependency() -> None:
     # Arrange
     tasks = [make_task("T1", status=TaskStatus.SKIPPED), make_task("T2", dependencies=["T1"])]
     graph = DependencyGraph(tasks)
@@ -109,8 +109,8 @@ def test_get_ready_tasks_skipped_dep_satisfies_dependency() -> None:
     # Act
     ready = graph.get_ready_tasks()
 
-    # Assert
-    assert [t.id for t in ready] == ["T2"]
+    # Assert — skipped is terminal but not successful for dependency dispatch
+    assert ready == []
 
 
 def test_get_ready_tasks_in_progress_dep_does_not_satisfy() -> None:
@@ -808,6 +808,12 @@ def test_mark_downstream_skipped_transitive_chain() -> None:
     # Assert
     assert "T2" in to_skip
     assert "T3" in to_skip
+    assert t2.status == TaskStatus.SKIPPED
+    assert t3.status == TaskStatus.SKIPPED
+    assert t2.reason is not None
+    assert "upstream T1 failed" in t2.reason
+    assert t3.reason is not None
+    assert "upstream T1 failed" in t3.reason
 
 
 def test_mark_downstream_skipped_already_terminal_excluded() -> None:
@@ -827,6 +833,29 @@ def test_mark_downstream_skipped_already_terminal_excluded() -> None:
 
     # Assert
     assert "T2" not in to_skip
+
+
+def test_failed_status_downstream_skip_chain_leaves_no_ready_tasks() -> None:
+    """Failing T1 cascades skip state to T2/T3 and leaves no ready work."""
+    # Arrange
+    t1 = make_task("T1", status=TaskStatus.FAILED)
+    t2 = make_task("T2", dependencies=["T1"])
+    t3 = make_task("T3", dependencies=["T2"])
+    graph = DependencyGraph([t1, t2, t3])
+
+    # Act
+    skipped = graph.mark_downstream_skipped("T1")
+    ready = graph.get_ready_tasks()
+
+    # Assert
+    assert skipped == ["T2", "T3"]
+    assert t2.status == TaskStatus.SKIPPED
+    assert t3.status == TaskStatus.SKIPPED
+    assert t2.reason is not None
+    assert "upstream T1 failed" in t2.reason
+    assert t3.reason is not None
+    assert "upstream T1 failed" in t3.reason
+    assert ready == []
 
 
 def test_failed_is_terminal_status() -> None:
