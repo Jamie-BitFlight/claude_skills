@@ -67,3 +67,5 @@ After successful completion, verify PR visibility for the branch:
 REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')"
 gh pr list -R "$REPO_SLUG" --head <branch-name>
 ```
+
+Use the original input branch (`branch_name`), not `normalized_slug`, for `--head`.
