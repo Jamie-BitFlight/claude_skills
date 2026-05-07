@@ -24,6 +24,7 @@ If empty: stop and ask for `<branch-name>`.
    - Then replace any remaining `/`, `_`, and `-` with spaces (for example `feature/auth/login-fix` → `auth login fix`)
    - Trim whitespace
    - Store the result as `normalized_slug`
+   - Placeholder convention: values shown as `{normalized_slug}` are variable substitutions, not literal braces
 2. Strategy 1 (title match):
    - `mcp__plugin_dh_backlog__backlog_list(title="{normalized_slug}")`
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
