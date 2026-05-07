@@ -33,6 +33,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from sam_schema.core.models import Plan, TaskStatus
 from sam_schema.writers.yaml_writer import write_plan
+from tests_sam.conftest import make_task
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,8 +41,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-from tests_sam.conftest import make_task
 
 _TASK_YAML_IN_PROGRESS_WITH_GITHUB = """\
 ---
