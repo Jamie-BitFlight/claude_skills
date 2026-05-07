@@ -64,5 +64,6 @@ Skill(skill: "dh:complete-implementation", args: "{developer_supplied_target}")
 After successful completion, verify PR visibility for the branch:
 
 ```bash
-gh pr list -R Jamie-BitFlight/claude_skills --head <branch-name>
+REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\\.git)?#\\1#')"
+gh pr list -R "$REPO_SLUG" --head <branch-name>
 ```
