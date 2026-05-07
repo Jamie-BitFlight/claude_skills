@@ -66,7 +66,7 @@ If no backlog match is found, a match exists but has neither `issue` nor `plan`,
 COMPLETION BLOCKED — Branch cannot be resolved to a single backlog issue/plan.
 
 Required precondition:
-- Ensure branch-to-backlog mapping is decided at the start of /dh:work-backlog-item or /dh:implement-feature.
+- Ensure branch-to-backlog mapping is decided at workflow start (for example via `/dh:work-backlog-item --auto ...`) or at the start of `/dh:implement-feature`.
 - Ensure the matched backlog item has either an issue number or a linked plan.
 
 Then re-run:
