@@ -21,7 +21,7 @@ If empty: stop and ask for `<branch-name>`.
 
 1. Normalize `branch_name` into a lookup slug:
    - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing the prefix up to and including the first `/` character
-   - Replace `/`, `_`, and `-` with spaces
+   - Then replace any remaining `/`, `_`, and `-` with spaces (for example `feature/auth/login-fix` → `auth login fix`)
    - Trim whitespace
    - Store the result as `normalized_slug`
 2. Strategy 1 (title match):
@@ -35,7 +35,7 @@ If empty: stop and ask for `<branch-name>`.
 From `match`, resolve in this order:
 
 1. If `match.issue` exists (issue number field from backlog output) → `target = "#{match.issue}"`
-2. Else if `match.plan` exists and non-empty → `target = "{plan_path_or_plan_id}"`
+2. Else if `match.plan` exists and non-empty → `target = "{match.plan}"` (use the backlog item's plan field directly)
 3. Else no resolvable target
 
 ## Execute gate pipeline
@@ -64,6 +64,6 @@ Skill(skill: "dh:complete-implementation", args: "{developer_supplied_target}")
 After successful completion, verify PR visibility for the branch:
 
 ```bash
-REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\\.git)?#\\1#')"
+REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')"
 gh pr list -R "$REPO_SLUG" --head <branch-name>
 ```
