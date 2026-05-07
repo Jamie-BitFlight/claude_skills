@@ -471,13 +471,13 @@ class TestQGReadinessSequencing:
         assert ready[0].id == "T4"
 
     @pytest.mark.integration
-    def test_t6_becomes_ready_after_t5_skipped(self, tmp_path: Path) -> None:
-        """T6 becomes ready when T5 is marked SKIPPED (drift-free fast-path).
+    def test_t6_not_ready_after_t5_skipped(self, tmp_path: Path) -> None:
+        """T6 is not ready when T5 is marked SKIPPED.
 
-        Tests: SKIPPED status is terminal for dependency resolution
+        Tests: SKIPPED is terminal but does not satisfy dependency readiness
         How: Mark T1-T4 complete, mark T5 skipped, then query get_ready_tasks
-        Why: When no documentation drift is found, T5 is skipped — T6 must still
-             proceed to complete the quality gate sequence
+        Why: Readiness now gates on successful dependencies only
+             (complete/deferred), not skipped/failed
         """
         # Arrange
         plan_dir = tmp_path / "plan"
@@ -492,8 +492,7 @@ class TestQGReadinessSequencing:
         ready = get_ready_tasks(plan.source_path)
 
         # Assert
-        assert len(ready) == 1
-        assert ready[0].id == "T6"
+        assert ready == []
 
     @pytest.mark.integration
     def test_no_tasks_ready_when_all_complete(self, tmp_path: Path) -> None:
