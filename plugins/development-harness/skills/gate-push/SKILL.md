@@ -21,16 +21,16 @@ If empty: stop and ask for `<branch-name>`.
 
 1. Normalize `branch_name` into a lookup slug:
    - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing only the prefix up to and including the first `/` character
-   - Then replace any remaining `/`, `_`, and `-` with spaces (for example `feature/auth/login-fix` → `auth/login-fix` → `auth login fix`)
+   - Then replace any remaining `/`, `_`, and `-` with spaces (for example `feature/auth/login-fix` → `auth login fix`)
    - Trim whitespace
    - Store the result as `normalized_slug`
-   - Expected pattern is `type/slug` (e.g., `feature/foo-bar`); multi-segment branches still normalize using the same rule
+   - Expected pattern is `type/slug` (e.g., `feature/foo-bar`); multi-segment branches (`type/segment1/segment2`) are supported and normalize with the same replacement rule
 2. Strategy 1 (title match):
    - `mcp__plugin_dh_backlog__backlog_list(title="<normalized_slug>")`
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
    - `mcp__plugin_dh_backlog__backlog_list(topic="<normalized_slug>")`
 4. If exactly one item is returned, use it as `match`.
-5. If multiple items are returned, do not guess — prompt the developer for an explicit issue number or plan path and use fallback mode.
+5. If multiple items are returned, do not guess — prompt the developer for an explicit issue number or plan path and follow the No-match / unresolved fallback procedure below.
 
 ## Resolve complete-implementation input
 
