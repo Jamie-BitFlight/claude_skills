@@ -253,6 +253,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 - `/dh:implement-feature` - Execute tasks from a SAM task file via agent delegation loop
 - `/dh:start-task` - Start or complete a specific task inside a SAM task file
 - `/dh:complete-implementation` - Quality gates after all tasks are COMPLETE
+- `/dh:gate-push` - Resolve branch → backlog issue/plan, then run complete-implementation gates and push/PR
 
 **Workflow stages:**
 
