@@ -13,6 +13,7 @@ research/
 ├── README.md                          # This index file
 ├── agent-frameworks/                  # Agent SDKs and orchestration frameworks
 │   ├── ai-agents-frameworks.md        # 10-framework comparative benchmark study
+│   ├── claude-code-harness.md         # Go-native guardrails and 5-verb workflow for Claude Code (MIT, v4.7.0)
 │   ├── copilotkit.md                  # React-first agentic frontend framework with bi-directional state sync and AG-UI protocol (28.9K stars)
 │   ├── liteagents.md                  # Multi-tool AI development toolkit with 11 agents and session memory
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
