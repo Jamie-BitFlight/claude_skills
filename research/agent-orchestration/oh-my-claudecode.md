@@ -545,6 +545,7 @@ The ARCHITECTURE.md file covers overview and skill composition but does not deta
 | [everything-claude-code.md](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Comprehensive 16-agent harness with 65+ skills and hook-based automation; shares OMC's skill layering and execution parallelism patterns |
 | [claw-loop.md](../research-agent-patterns/claw-loop.md) | research-agent-patterns | Autonomous orchestration via tmux + cron with supervisor-worker pattern; foundational pattern for OMC's Ralph mode and persistent execution loops |
 | [ollama-subagents-web-search-claude-code.md](../research-agent-patterns/ollama-subagents-web-search-claude-code.md) | research-agent-patterns | Ollama native subagents for Claude Code with parallel task isolation; shares OMC's model-agnostic agent spawning and context isolation approach |
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
 
 ---
 

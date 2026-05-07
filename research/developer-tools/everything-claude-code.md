@@ -410,3 +410,11 @@ This repository is the closest peer project to `claude_skills` in the Claude Cod
 | Last Verified | 2026-03-06 |
 | Version at Verification | v1.8.0 |
 | Next Review Recommended | 2026-06-06 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |

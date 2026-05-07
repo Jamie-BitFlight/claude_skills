@@ -240,3 +240,11 @@ npm run build && npx next start -p 4000
 | Relevance | medium | Pattern analysis; not field-tested in Claude Code |
 
 **Session Summary**: Entry created 2026-04-03 from shallow clone of mission-control repo. All claims trace to README, CHANGELOG, or source code inspection. 10 sections complete with extracted passages documented.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |

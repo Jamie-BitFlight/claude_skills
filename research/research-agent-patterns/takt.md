@@ -428,6 +428,7 @@ movements:
 | [The Delegation](./the-delegation.md) | research-agent-patterns | overlapping orchestration model: spatial multi-agent coordination with PM orchestrator |
 | [Ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | production-scale multi-agent orchestration: 100+ specialized agents, 215+ MCP tools, fault-tolerant consensus |
 | [Solace Agent Mesh](../agent-frameworks/solace-agent-mesh.md) | agent-frameworks | event-driven agent delegation: scalable peer-to-peer agent collaboration via message-broker architecture |
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
 
 ---
 

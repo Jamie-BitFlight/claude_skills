@@ -300,3 +300,11 @@ bunx @every-env/compound-plugin install compound-engineering --to codex
 5. **Story Behind Compound Engineering**: <https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it> (accessed 2026-01-31)
 6. **Plugin README**: <https://github.com/EveryInc/compound-engineering-plugin/blob/main/plugins/compound-engineering/README.md> (accessed 2026-01-31)
 7. **CHANGELOG**: <https://github.com/EveryInc/compound-engineering-plugin/blob/main/plugins/compound-engineering/CHANGELOG.md> (accessed 2026-01-31)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |

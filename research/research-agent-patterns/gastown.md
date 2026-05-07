@@ -307,3 +307,11 @@ SOURCE: [gastown/README.md](https://github.com/steveyegge/gastown/blob/main/READ
 | Last Verified | 2026-03-01 |
 | Version at Verification | v0.9.0 |
 | Next Review Recommended | 2026-06-01 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |

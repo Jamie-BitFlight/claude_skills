@@ -610,3 +610,11 @@ If you cannot route safely, ask up to 3 clarifying questions and stop.
 5. **Related Article**: "Long-horizon agents: OpenCode + GPT-5.2 Codex Experiment" by Maxim Saplin, Dev.to (2026-01-22)
 6. **Related Article**: "OpenCode Agents: Another Path to Self-Healing Documentation Pipelines" by Rick Hightower, Medium (2025-09-17)
 7. **GitHub Issue**: "[feat] True Async/Background Sub-Agent Delegation #5887" - anomalyco/opencode (2025-12-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
