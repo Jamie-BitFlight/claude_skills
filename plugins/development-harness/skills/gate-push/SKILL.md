@@ -13,7 +13,11 @@ Run `/dh:gate-push <branch-name>` to resolve branch context into a `/dh:complete
 
 - `branch_name = $ARGUMENTS` (must be non-empty)
 
-If empty: stop with `ERROR: Missing required argument <branch-name>.`
+If empty: stop with:
+
+```text
+COMPLETION BLOCKED — Missing required argument <branch-name>.
+```
 
 ## Branch → backlog lookup algorithm
 
@@ -59,7 +63,7 @@ If no backlog match is found, a match exists but has neither `issue` nor `plan`,
 COMPLETION BLOCKED — Branch cannot be resolved to a single backlog issue/plan.
 
 Required precondition:
-- Ensure branch-to-backlog mapping is decided during the start of /dh:work-backlog-item or /dh:implement-feature.
+- Ensure branch-to-backlog mapping is decided at the start of /dh:work-backlog-item or /dh:implement-feature.
 - Ensure the matched backlog item has either an issue number or a linked plan.
 
 Then re-run:
