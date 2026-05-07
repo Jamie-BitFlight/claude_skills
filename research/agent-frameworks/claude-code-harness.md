@@ -127,8 +127,8 @@ Requires [Codex CLI](https://github.com/openai/codex) and API key configuration.
 
 2. **Guardrail Engine** (`go/internal/guardrail/`)
    - 13 rules (R01–R13) evaluating command patterns, file paths, secret patterns
-   - Stateless evaluation (no context-dependent logic)
-   - Paired with state manager for permission history tracking (PermissionRequest, PermissionDenied)
+   - Pattern-based rule evaluation; rules are stateless (evaluate inputs at call time)
+   - State-aware rules (e.g., R12 checks prior permission grants) query the state manager for session context
 
 3. **State Manager** (`go/internal/state/`)
    - Tracks session state: active worktrees, Plans.md hash, memory events, permission history
@@ -267,34 +267,34 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 
 ## References
 
-- **Repository**: <https://github.com/Chachamaru127/claude-code-harness> (accessed 2025-05-07)
-- **README.md**: Full feature list, workflow examples, 5-verb diagram, benchmarks (accessed 2025-05-07)
-- **License**: MIT (LICENSE.md, accessed 2025-05-07)
-- **IMPLEMENTATION_GUIDE.md**: Architecture overview, Go structure, skill mirrors, validation commands (accessed 2025-05-07)
-- **CLAUDE.md**: Development rules, feature utilization, permission boundaries (accessed 2025-05-07)
-- **go/go.mod**: Go 1.25.0 requirement, dependencies (sqlite3, toml, uuid, humanize, strftime) (accessed 2025-05-07)
-- **go/cmd/harness/**: Main entry point (651 lines), doctor (794 test lines), sync (316 + 374 test lines), validate (554 + 592 test lines) (accessed 2025-05-07)
-- **agents/ directory**: worker.md (14,711 chars), reviewer.md (6,365 chars), advisor.md (2,882 chars), scaffolder.md (2,757 chars) (accessed 2025-05-07)
-- **skills/ directory**: 20+ skill directories including harness-plan, harness-work, harness-review, harness-release, harness-setup, memory, breezing (accessed 2025-05-07)
-- **Plugin manifest**: `.claude-plugin/plugin.json` version 4.7.0 (accessed 2025-05-07)
+- **Repository**: <https://github.com/Chachamaru127/claude-code-harness> (accessed 2026-05-07)
+- **README.md**: Full feature list, workflow examples, 5-verb diagram, benchmarks (accessed 2026-05-07)
+- **License**: MIT (LICENSE.md, accessed 2026-05-07)
+- **IMPLEMENTATION_GUIDE.md**: Architecture overview, Go structure, skill mirrors, validation commands (accessed 2026-05-07)
+- **CLAUDE.md**: Development rules, feature utilization, permission boundaries (accessed 2026-05-07)
+- **go/go.mod**: Go 1.25.0 requirement, dependencies (sqlite3, toml, uuid, humanize, strftime) (accessed 2026-05-07)
+- **go/cmd/harness/**: Main entry point (651 lines), doctor (794 test lines), sync (316 + 374 test lines), validate (554 + 592 test lines) (accessed 2026-05-07)
+- **agents/ directory**: worker.md (14,711 chars), reviewer.md (6,365 chars), advisor.md (2,882 chars), scaffolder.md (2,757 chars) (accessed 2026-05-07)
+- **skills/ directory**: 20+ skill directories including harness-plan, harness-work, harness-review, harness-release, harness-setup, memory, breezing (accessed 2026-05-07)
+- **Plugin manifest**: `.claude-plugin/plugin.json` version 4.7.0 (accessed 2026-05-07)
 
 ## Freshness Tracking
 
 | Section | Confidence | Last Verified | Next Review |
 |---------|------------|---------------|-------------|
-| Overview & Problem | high | 2025-05-07 | 2025-08-07 |
-| Key Statistics | high | 2025-05-07 | 2025-08-07 |
-| Key Features | high | 2025-05-07 | 2025-08-07 |
-| Technical Architecture | high | 2025-05-07 | 2025-08-07 |
-| Installation & Usage | high | 2025-05-07 | 2025-08-07 |
-| Relevance to Claude Code | medium | 2025-05-07 | 2025-08-07 |
-| Limitations | medium | 2025-05-07 | 2025-08-07 |
+| Overview & Problem | high | 2026-05-07 | 2026-08-07 |
+| Key Statistics | high | 2026-05-07 | 2026-08-07 |
+| Key Features | high | 2026-05-07 | 2026-08-07 |
+| Technical Architecture | high | 2026-05-07 | 2026-08-07 |
+| Installation & Usage | high | 2026-05-07 | 2026-08-07 |
+| Relevance to Claude Code | medium | 2026-05-07 | 2026-08-07 |
+| Limitations | medium | 2026-05-07 | 2026-08-07 |
 
 **Overall Confidence**: High (full README read, implementation guide read, Go source structure examined, agent and skill files surveyed, plugin manifest inspected). Sources are current (latest clone as of session date) and detailed.
 
-**Data Freshness**: Version 4.7.0 released 2025-05-07 (latest commit: `d2f968c chore: mark v4.7.0 release complete`). Corresponds to Claude Code v2.1.99-2.1.110 + Opus 4.7 compatibility.
+**Data Freshness**: Version 4.7.0 released 2026-05-07 (latest commit: `d2f968c chore: mark v4.7.0 release complete`). Corresponds to Claude Code v2.1.99-2.1.110 + Opus 4.7 compatibility.
 
-**Next Review**: 2025-08-07 (3 months). Priority topics for re-check: v4.2+ guardrail regression test count (17 mentioned for R01–R13), harness-mem integration stability, Windows Breezing support rollout completion, Codex integration examples.
+**Next Review**: 2026-08-07 (3 months). Priority topics for re-check: v4.2+ guardrail regression test count (17 mentioned for R01–R13), harness-mem integration stability, Windows Breezing support rollout completion, Codex integration examples.
 
 ---
 
@@ -302,7 +302,7 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Everything Claude Code](../developer-tools/everything-claude-code.md) | agent-frameworks | Comprehensive alternative harness: 16 agents, 65+ skills, 40+ commands, hook-based automation |
+| [Everything Claude Code](../developer-tools/everything-claude-code.md) | developer-tools | Comprehensive alternative harness: 16 agents, 65+ skills, 40+ commands, hook-based automation |
 | [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | Multi-agent orchestration with 32 agents, natural language routing, Sisyphus persistent mode |
 | [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | Competing workflow plugin with Plan/Work/Review/Compound model, 27 agents |
 | [Gas Town](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager orchestrating 20-50+ Claude Code sessions via tmux |
