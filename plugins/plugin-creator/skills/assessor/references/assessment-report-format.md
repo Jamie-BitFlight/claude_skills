@@ -100,7 +100,7 @@ SUGGESTED LINK: [Display Text](./references/{filename}.md) — add under "## {Se
 
 ## 6. Citation Drift
 
-Only include this section when at least one `SOURCE:` URL is present in analyzed skill/agent files.
+Only include this section when at least one `SOURCE:` URL is present in analyzed skill/agent files. If omitted, renumber subsequent sections sequentially.
 
 ### Citation Status
 

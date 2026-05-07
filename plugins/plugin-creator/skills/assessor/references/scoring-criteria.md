@@ -34,7 +34,10 @@ Start from 100 and deduct for citation findings:
 Rules:
 - Apply deductions only when `SOURCE:` citations exist.
 - Reachable citation with phrase present has no deduction.
-- Floor score at 0.
+- Reachable citation with insufficient claim context (no sentence available; link title fallback used) has no deduction and should be reported in the Citation Drift section notes/findings as informational manual-review context.
+- Apply each cap per finding type independently, then sum all deductions (total deductions may exceed 100).
+- Final score formula: `max(0, 100 - total_deductions)`.
+- Use this 0–100 result as the Documentation Quality component score before weighting it at 10% in the overall plugin score.
 
 ## Overall Plugin Score (0–100)
 

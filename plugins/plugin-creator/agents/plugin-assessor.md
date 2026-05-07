@@ -29,9 +29,9 @@ Execute in order. Report discovery summary before proceeding to Phase 2.
 - Audit reference files: inventory all `.md` files, extract links from SKILL.md, classify each unlinked file (New Content / Duplicate / Notes / Examples / Outdated). READ orphaned files completely before classifying.
 - Validate all links resolve to existing files; check bidirectional linking
 - Run citation drift checks for `SOURCE:` references found in SKILL.md and skill reference files:
-  - Extract citation URLs via `SOURCE:\s+\[([^\]]+)\]\(([^)]+)\)` and keep `file:line` provenance.
-  - For each citation, capture a claim phrase from the nearest preceding sentence (fallback to link title if no sentence exists).
-  - Fetch each unique URL once using WebFetch with timeout `citation_timeout_seconds` (default: 15; max: 30). Do not hang on slow URLs.
+  - Extract citation URLs via regex pattern `SOURCE:\s+\[([^\]]+)\]\(([^)]+)\)` (canonical citation format; literal regex escapes); use capture group 2 as the URL and capture group 1 as the link title. If a `SOURCE:` line does not match this format, emit a WARNING for unparsable citation syntax with `file:line`.
+  - For each citation, capture the immediately preceding sentence as the claim phrase (split on `.`, `!`, `?`, or newline; search backward up to `citation_context_window_chars`, default: 300, max: 600). This is a heuristic: abbreviations/decimals (for example `Dr.`, `e.g.`, `v1.2.3`) may split imperfectly; if extracted phrase is empty or shorter than 20 characters, fallback to link title.
+  - Fetch each unique URL once using WebFetch with timeout `citation_timeout_seconds` (runtime setting; default: 15, max: 30). Do not hang on slow URLs.
   - Continue assessment after fetch failures. Record failures as `Unreachable Citation` findings with reason.
   - Severity mapping: 404/410 => CRITICAL (broken citation); timeout/DNS/5xx => WARNING (unreachable); URL reachable but claim phrase absent => RECOMMENDATION (drift suspected); phrase present => no finding.
 - If any skill exceeds 4000 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
