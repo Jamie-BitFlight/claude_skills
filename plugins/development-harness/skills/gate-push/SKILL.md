@@ -7,15 +7,13 @@ user-invocable: true
 
 # Gate Push
 
-Run `/dh:gate-push <branch-name>` to execute the same quality-gate pipeline as `/dh:complete-implementation`, then complete push + PR creation.
-
-This mirrors the `git push no-mistakes <branch>` intent from `research/developer-tools/no-mistakes.md`: one verb, full gate pipeline, automatic PR on success.
+Run `/dh:gate-push <branch-name>` to resolve branch context into a `/dh:complete-implementation` input and execute that quality-gate pipeline.
 
 ## Required input
 
 - `branch_name = $ARGUMENTS` (must be non-empty)
 
-If empty: stop and ask for `<branch-name>`.
+If empty: stop with `ERROR: Missing required argument <branch-name>.`
 
 ## Branch → backlog lookup algorithm
 
@@ -30,7 +28,7 @@ If empty: stop and ask for `<branch-name>`.
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
    - `mcp__plugin_dh_backlog__backlog_list(topic="<normalized_slug>")`
 4. If exactly one item is returned, use it as `match`.
-5. If multiple items are returned, do not guess — prompt the developer for an explicit issue number or plan path and follow the No-match / unresolved fallback procedure below.
+5. If multiple items are returned, stop and follow the No-match / unresolved fallback procedure below.
 
 ## Resolve complete-implementation input
 
@@ -52,13 +50,20 @@ Skill(skill: "dh:complete-implementation", args: "<target>")
 
 ## No-match / unresolved fallback
 
-If no backlog match is found, or a match exists but has neither `issue` nor `plan`:
+If no backlog match is found, a match exists but has neither `issue` nor `plan`, or multiple matches are found:
 
-1. Prompt the developer for an explicit issue number (`#N`) or plan path.
-2. Invoke:
+- Do not prompt mid-loop.
+- Stop with:
 
 ```text
-Skill(skill: "dh:complete-implementation", args: "<developer_supplied_target>")
+COMPLETION BLOCKED — Branch cannot be resolved to a single backlog issue/plan.
+
+Required precondition:
+- Ensure branch-to-backlog mapping is decided during the start of /dh:work-backlog-item or /dh:implement-feature.
+- Ensure the matched backlog item has either an issue number or a linked plan.
+
+Then re-run:
+/dh:gate-push <branch-name>
 ```
 
 ## Success check
