@@ -10,7 +10,7 @@
 | 3–4 | Vague, unclear when to use |
 | 0–2 | Missing or single word |
 
-Normalization for overall scoring: convert Description Quality to a 0–100 component by multiplying the 0–10 raw score by 10 before applying the 15% overall weight.
+Normalization for overall scoring: convert Description Quality to a 0–100 component by multiplying the 0–10 raw score by 10 before applying the 15% overall weight in the Overall Plugin Score calculation.
 
 ## Reference Organization (0–100)
 
@@ -27,8 +27,10 @@ Normalization for overall scoring: convert Description Quality to a 0–100 comp
 
 Start from 100 and deduct for citation findings:
 
-| Finding type | Deduction (each) | Cap |
-|--------------|------------------|-----|
+All deduction values below are positive magnitudes that are subtracted from 100 via `100 - total_deductions`.
+
+| Finding type | Deduction magnitude (each) | Max deduction magnitude (cap) |
+|--------------|----------------------------|-------------------------------|
 | Persistent broken citation (`SOURCE:` URL returns 404/410 after retry policy) | 20 | 60 |
 | Unreachable citation (timeout, DNS, 5xx, 401/403/429) | 10 | 30 |
 | Drift suspected (URL reachable but claim phrase absent) | 15 | 45 |
