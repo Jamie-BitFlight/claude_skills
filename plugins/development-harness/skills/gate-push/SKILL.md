@@ -20,7 +20,7 @@ If empty: stop and ask for `<branch-name>`.
 ## Branch → backlog lookup algorithm
 
 1. Normalize `branch_name` into a lookup slug:
-   - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing only the first path segment ending in `/`
+   - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing the prefix up to and including the first `/` character
    - Replace `/`, `_`, and `-` with spaces
    - Trim whitespace
    - Store the result as `normalized_slug`
