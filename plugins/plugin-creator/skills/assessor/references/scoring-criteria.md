@@ -21,6 +21,21 @@
 | 20 | Many orphans, structure unclear |
 | 0 | References exist but not integrated |
 
+## Documentation Quality (0–100)
+
+Start from 100 and deduct for citation findings:
+
+| Finding type | Deduction (each) | Cap |
+|--------------|------------------|-----|
+| Broken citation (`SOURCE:` URL returns 404/410) | -20 | -60 |
+| Unreachable citation (timeout, DNS, 5xx) | -10 | -30 |
+| Drift suspected (URL reachable but claim phrase absent) | -15 | -45 |
+
+Rules:
+- Apply deductions only when `SOURCE:` citations exist.
+- Reachable citation with phrase present has no deduction.
+- Floor score at 0.
+
 ## Overall Plugin Score (0–100)
 
 | Component | Weight | Criteria |
@@ -30,7 +45,7 @@
 | Frontmatter correctness | 20% | Valid YAML, required fields, correct types |
 | Description quality | 15% | Trigger keywords, clarity, actionability |
 | Reference organization | 15% | No orphans, proper linking, navigation |
-| Documentation quality | 10% | Examples, instructions, completeness |
+| Documentation quality | 10% | Examples, instructions, completeness, citation drift status |
 | Enhancement potential | 5% | Growth opportunities identified |
 
 ## Orphan Classification

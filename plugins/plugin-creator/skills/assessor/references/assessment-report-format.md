@@ -98,7 +98,20 @@ SUGGESTED LINK: [Display Text](./references/{filename}.md) — add under "## {Se
 #### Issues
 - [{severity}] {description}
 
-## 6. Cross-Reference Analysis
+## 6. Citation Drift
+
+Only include this section when at least one `SOURCE:` URL is present in analyzed skill/agent files.
+
+### Citation Status
+
+| URL | Referenced At | Fetch Status | Drift | Severity | Notes |
+|-----|---------------|--------------|-------|----------|-------|
+| {url} | skills/{name}/SKILL.md:{line} | Reachable / 404 / 410 / Timeout / DNS / 5xx | Yes / No / Unknown | CRITICAL / WARNING / RECOMMENDATION / — | {short reason} |
+
+### Findings
+- [{severity}] {finding text with file:line and URL}
+
+## 7. Cross-Reference Analysis
 
 ### Documentation Link Graph
 
@@ -117,12 +130,12 @@ SKILL.md
 | Orphaned files | N |
 | Missing back-links | N |
 
-## 7. Enhancement Opportunities
+## 8. Enhancement Opportunities
 
 ### High Priority
 1. **{Enhancement Name}** — Type: Script/Tool/MCP/Documentation/Structure — Benefit: {specific benefit} — Effort: Low/Medium/High
 
-## 8. Scoring Breakdown
+## 9. Scoring Breakdown
 
 | Component | Weight | Score | Weighted |
 |-----------|--------|-------|----------|
@@ -135,13 +148,13 @@ SKILL.md
 | Enhancement potential | 5% | X/100 | X |
 | **Total** | **100%** | — | **X/100** |
 
-## 9. Action Items
+## 10. Action Items
 
 ### Critical (Must Fix Before Release)
 - [ ] {action item with file:line reference}
 
 ### Recommended (Should Fix)
-- [ ] {action item}
+- [ ] {action item with file:line reference}
 
 ### Optional (Nice to Have)
 - [ ] {action item}
