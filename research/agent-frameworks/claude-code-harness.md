@@ -295,3 +295,18 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 **Data Freshness**: Version 4.7.0 released 2025-05-07 (latest commit: `d2f968c chore: mark v4.7.0 release complete`). Corresponds to Claude Code v2.1.99-2.1.110 + Opus 4.7 compatibility.
 
 **Next Review**: 2025-08-07 (3 months). Priority topics for re-check: v4.2+ guardrail regression test count (17 mentioned for R01–R13), harness-mem integration stability, Windows Breezing support rollout completion, Codex integration examples.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Everything Claude Code](../developer-tools/everything-claude-code.md) | agent-frameworks | Comprehensive alternative harness: 16 agents, 65+ skills, 40+ commands, hook-based automation |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | Multi-agent orchestration with 32 agents, natural language routing, Sisyphus persistent mode |
+| [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | Competing workflow plugin with Plan/Work/Review/Compound model, 27 agents |
+| [Gas Town](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager orchestrating 20-50+ Claude Code sessions via tmux |
+| [oh-my-opencode](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | Production-scale multi-agent orchestration with hash-anchored editing and demand-scoped MCP |
+| [Orchestrator Agent Creation Guide](../research-agent-patterns/orchestrator-agent-creation-guide.md) | research-agent-patterns | Multi-agent routing, chaining, and delegation patterns applicable to harness design |
+| [TAKT](../research-agent-patterns/takt.md) | research-agent-patterns | YAML-defined multi-agent workflows with state machines and AI judge routing |
+| [Mission Control](./mission-control.md) | agent-frameworks | 24/7 autonomous product engine: research → ideation → build → PR workflow automation |
