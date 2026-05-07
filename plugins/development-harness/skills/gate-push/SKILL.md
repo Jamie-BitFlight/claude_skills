@@ -17,6 +17,9 @@ If empty: stop with:
 
 ```text
 COMPLETION BLOCKED — Missing required argument <branch-name>.
+
+Then re-run:
+/dh:gate-push <branch-name>
 ```
 
 ## Branch → backlog lookup algorithm
@@ -32,7 +35,7 @@ COMPLETION BLOCKED — Missing required argument <branch-name>.
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
    - `mcp__plugin_dh_backlog__backlog_list(topic="<normalized_slug>")`
 4. If exactly one item is returned, use it as `match`.
-5. If multiple items are returned, stop and follow the No-match / unresolved fallback procedure below.
+5. If multiple items are returned, do not guess — stop and follow the No-match / unresolved fallback procedure below.
 
 ## Resolve complete-implementation input
 
