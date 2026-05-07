@@ -32,8 +32,9 @@ Execute in order. Report discovery summary before proceeding to Phase 2.
   - Extract citation URLs via regex pattern `SOURCE:\s+\[([^\]]+)\]\(([^)]+)\)` (canonical citation format; literal regex escapes); use capture group 2 as the URL and capture group 1 as the link title. If a `SOURCE:` line does not match this format, emit a WARNING for unparsable citation syntax with `file:line`.
   - For each citation, capture the immediately preceding sentence as the claim phrase (split on `.`, `!`, `?`, or newline; search backward up to `citation_context_window_chars`, default: 300, max: 600). This is a heuristic: abbreviations/decimals (for example `Dr.`, `e.g.`, `v1.2.3`) may split imperfectly; if extracted phrase is empty or shorter than 20 characters, fallback to link title.
   - Fetch each unique URL once using WebFetch with timeout `citation_timeout_seconds` (runtime setting; default: 15, max: 30). Do not hang on slow URLs.
-  - Continue assessment after fetch failures. Record failures as `Unreachable Citation` findings with reason.
-  - Severity mapping: 404/410 => CRITICAL (broken citation); timeout/DNS/5xx => WARNING (unreachable); URL reachable but claim phrase absent => RECOMMENDATION (drift suspected); phrase present => no finding.
+  - Continue assessment after fetch failures. Record failures as `Unreachable Citation` findings with reason, and treat network/access failures as potentially transient.
+  - Retry policy for non-success fetches (including 404/410): retry once after a 2-second delay; if still failing specifically with timeout/DNS/401/403/429 and the evaluator can use a second egress path (for example a configured VPN/proxy profile), retry from that path before final classification.
+  - Severity mapping: timeout/DNS/5xx/401/403/429 => WARNING (unreachable; possibly transient or access-gated); 404/410 that persist after retry policy => CRITICAL (persistently broken citation); 404/410 that succeed on retry => no finding; URL reachable but claim phrase absent => RECOMMENDATION (drift suspected); phrase present => no finding.
 - If any skill exceeds 4000 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
 
 **Phase 4 — Commands Analysis**: Validate frontmatter. Check argument documentation and example usage.

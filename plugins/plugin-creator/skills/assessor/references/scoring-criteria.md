@@ -27,13 +27,14 @@ Start from 100 and deduct for citation findings:
 
 | Finding type | Deduction (each) | Cap |
 |--------------|------------------|-----|
-| Broken citation (`SOURCE:` URL returns 404/410) | -20 | -60 |
-| Unreachable citation (timeout, DNS, 5xx) | -10 | -30 |
+| Persistent broken citation (`SOURCE:` URL returns 404/410 after retry policy) | -20 | -60 |
+| Unreachable citation (timeout, DNS, 5xx, 401/403/429) | -10 | -30 |
 | Drift suspected (URL reachable but claim phrase absent) | -15 | -45 |
 
 Rules:
 - Apply deductions only when `SOURCE:` citations exist.
 - Reachable citation with phrase present has no deduction.
+- Apply the assessor retry policy before classifying a citation as persistently broken.
 - Reachable citation with insufficient claim context (no sentence available; link title fallback used) has no deduction and should be reported in the Citation Drift section notes/findings as informational manual-review context.
 - Apply each cap per finding type independently, then sum all deductions (total deductions may exceed 100).
 - Final score formula: `max(0, 100 - total_deductions)`.
