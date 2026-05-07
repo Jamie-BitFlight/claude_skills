@@ -476,8 +476,8 @@ class TestQGReadinessSequencing:
 
         Tests: SKIPPED is terminal but does not satisfy dependency readiness
         How: Mark T1-T4 complete, mark T5 skipped, then query get_ready_tasks
-        Why: Readiness now gates on successful dependencies only
-             (complete/deferred), not skipped/failed
+        Why: Readiness now gates on successful dependencies only,
+             not skipped/failed
         """
         # Arrange
         plan_dir = tmp_path / "plan"
