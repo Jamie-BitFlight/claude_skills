@@ -28,7 +28,7 @@ The underlying problem is that Claude Code's raw capability—while powerful—l
 
 ## Key Statistics
 
-- **Version**: 4.7.0 (released 2025-05-07, as of clone date)
+- **Version**: 4.7.0 (released 2026-05-07, as of clone date)
 - **License**: MIT (full commercial use permitted)
 - **Repository stars**: Not extracted from source (README does not include badge link to live count)
 - **Go runtime**: Go 1.25.0 (source: `go/go.mod`)
@@ -36,7 +36,7 @@ The underlying problem is that Claude Code's raw capability—while powerful—l
 - **Claude Code requirement**: v2.1+ (v2.1.105+ recommended for PreCompact hook; v2.1.111+ for xhigh effort)
 - **Model recommendation**: Opus 4.7 for full v4.2 benefit (literal instruction following, vision 2576px, xhigh effort)
 - **Code metrics** (v4.2): 9,176 total lines across Go cmd/harness package (including tests)
-- **Agents**: 3 core sub-agents (worker 14,711 lines, reviewer 6,365 lines, advisor 2,882 lines, scaffolder 2,757 lines)
+- **Agents**: 4 sub-agents (worker 14,711 chars, reviewer 6,365 chars, advisor 2,882 chars, scaffolder 2,757 chars)
 - **Skills**: 20+ skill directories in primary `skills/` directory (harness-work, harness-plan, harness-review, harness-release, harness-setup, memory, breezing, etc.)
 
 ## Key Features
@@ -302,7 +302,7 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Everything Claude Code](../developer-tools/everything-claude-code.md) | developer-tools | Comprehensive alternative harness: 16 agents, 65+ skills, 40+ commands, hook-based automation |
+| [Everything Claude Code](./everything-claude-code.md) | agent-frameworks | Comprehensive alternative harness: 16 agents, 65+ skills, 40+ commands, hook-based automation |
 | [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | Multi-agent orchestration with 32 agents, natural language routing, Sisyphus persistent mode |
 | [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | Competing workflow plugin with Plan/Work/Review/Compound model, 27 agents |
 | [Gas Town](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager orchestrating 20-50+ Claude Code sessions via tmux |
