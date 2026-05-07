@@ -24,11 +24,13 @@ If empty: stop and ask for `<branch-name>`.
    - Then replace any remaining `/`, `_`, and `-` with spaces (for example `feature/auth/login-fix` → `auth/login-fix` → `auth login fix`)
    - Trim whitespace
    - Store the result as `normalized_slug`
+   - Expected pattern is `type/slug` (e.g., `feature/foo-bar`); multi-segment branches still normalize using the same rule
 2. Strategy 1 (title match):
    - `mcp__plugin_dh_backlog__backlog_list(title="<normalized_slug>")`
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
    - `mcp__plugin_dh_backlog__backlog_list(topic="<normalized_slug>")`
-4. Select the first returned backlog item as `match`.
+4. If exactly one item is returned, use it as `match`.
+5. If multiple items are returned, do not guess — prompt the developer for an explicit issue number or plan path and use fallback mode.
 
 ## Resolve complete-implementation input
 
@@ -65,6 +67,10 @@ After successful completion, verify PR visibility for the branch:
 
 ```bash
 REPO_SLUG="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')"
+if [ -z "$REPO_SLUG" ]; then
+  echo "Unable to resolve GitHub repo slug from origin remote."
+  exit 1
+fi
 gh pr list -R "$REPO_SLUG" --head <branch-name>
 ```
 
