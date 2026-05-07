@@ -20,20 +20,21 @@ If empty: stop and ask for `<branch-name>`.
 ## Branch → backlog lookup algorithm
 
 1. Normalize `branch_name` into a lookup slug:
-   - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing the first path segment ending in `/`
+   - Strip leading branch type prefix when present (`feature/`, `fix/`, `chore/`, etc.) by removing only the first path segment ending in `/`
    - Replace `/`, `_`, and `-` with spaces
    - Trim whitespace
+   - Store the result as `normalized_slug`
 2. Strategy 1 (title match):
-   - `mcp__plugin_dh_backlog__backlog_list(title="{derived_slug}")`
+   - `mcp__plugin_dh_backlog__backlog_list(title="{normalized_slug}")`
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
-   - `mcp__plugin_dh_backlog__backlog_list(topic="{derived_slug}")`
+   - `mcp__plugin_dh_backlog__backlog_list(topic="{normalized_slug}")`
 4. Select the first returned backlog item as `match`.
 
 ## Resolve complete-implementation input
 
 From `match`, resolve in this order:
 
-1. If `match.issue` exists → `target = "#{issue_number}"`
+1. If `match.issue` exists (issue number field from backlog output) → `target = "#{match.issue}"`
 2. Else if `match.plan` exists and non-empty → `target = "{plan_path_or_plan_id}"`
 3. Else no resolvable target
 
