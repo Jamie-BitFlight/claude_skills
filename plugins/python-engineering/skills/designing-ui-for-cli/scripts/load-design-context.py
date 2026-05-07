@@ -8,7 +8,7 @@ Searches case-insensitively for PRODUCT.md, DESIGN.TUI.md, and DESIGN.md in the
 following directories (first match per file wins):
 
     1. project root (cwd)
-    2. .claude/context/
+    2. context/
     3. docs/
 
 Emits a JSON document to stdout matching this shape:
@@ -43,7 +43,7 @@ from pathlib import Path
 PRODUCT_NAMES = ("PRODUCT.md",)
 DESIGN_TUI_NAMES = ("DESIGN.TUI.md",)
 DESIGN_NAMES = ("DESIGN.md",)
-SEARCH_DIRS = ("", ".claude/context", "docs")
+SEARCH_DIRS = ("", "context", "docs")
 PLACEHOLDER_MIN_CHARS = 200
 PLACEHOLDER_MARKER = "[TODO]"
 
