@@ -106,7 +106,7 @@ Only include this section when at least one `SOURCE:` URL is present in analyzed
 
 | URL | Referenced At | Fetch Status | Drift | Severity | Notes |
 |-----|---------------|--------------|-------|----------|-------|
-| {url} | skills/{name}/SKILL.md:{line} | Reachable / 404 / 410 / Timeout / DNS / 5xx | Yes / No / Unknown | CRITICAL / WARNING / RECOMMENDATION / — | {short reason} |
+| {url} | {relative_path}:{line} | Reachable / 404 / 410 / Timeout / DNS / 5xx | Yes / No / Unknown | CRITICAL / WARNING / RECOMMENDATION / — | {short reason} |
 
 ### Findings
 - [{severity}] {finding text with file:line and URL}

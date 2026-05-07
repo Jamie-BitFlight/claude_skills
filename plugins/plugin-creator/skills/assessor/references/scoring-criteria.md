@@ -10,6 +10,8 @@
 | 3–4 | Vague, unclear when to use |
 | 0–2 | Missing or single word |
 
+Normalization for overall scoring: convert Description Quality to a 0–100 component by multiplying the 0–10 raw score by 10 before applying the 15% overall weight.
+
 ## Reference Organization (0–100)
 
 | Score | Criteria |
@@ -27,17 +29,17 @@ Start from 100 and deduct for citation findings:
 
 | Finding type | Deduction (each) | Cap |
 |--------------|------------------|-----|
-| Persistent broken citation (`SOURCE:` URL returns 404/410 after retry policy) | -20 | -60 |
-| Unreachable citation (timeout, DNS, 5xx, 401/403/429) | -10 | -30 |
-| Drift suspected (URL reachable but claim phrase absent) | -15 | -45 |
+| Persistent broken citation (`SOURCE:` URL returns 404/410 after retry policy) | 20 | 60 |
+| Unreachable citation (timeout, DNS, 5xx, 401/403/429) | 10 | 30 |
+| Drift suspected (URL reachable but claim phrase absent) | 15 | 45 |
 
 Rules:
 - Apply deductions only when `SOURCE:` citations exist.
 - Reachable citation with phrase present has no deduction.
 - Apply the assessor retry policy before classifying a citation as persistently broken.
 - Reachable citation with insufficient claim context (no sentence available; link title fallback used) has no deduction and should be reported in the Citation Drift section notes/findings as informational manual-review context.
-- Apply each cap per finding type independently, then sum all deductions (total deductions may exceed 100).
-- Final score formula: `max(0, 100 - total_deductions)`.
+- Apply each cap per finding type independently, then sum all deduction magnitudes (total deductions may exceed 100).
+- Final score formula: `max(0, 100 - total_deductions)` where `total_deductions` is the summed deduction magnitude.
 - Use this 0–100 result as the Documentation Quality component score before weighting it at 10% in the overall plugin score.
 
 ## Overall Plugin Score (0–100)
@@ -49,7 +51,7 @@ Rules:
 | Frontmatter correctness | 20% | Valid YAML, required fields, correct types |
 | Description quality | 15% | Trigger keywords, clarity, actionability |
 | Reference organization | 15% | No orphans, proper linking, navigation |
-| Documentation quality | 10% | Examples, instructions, completeness, citation drift status |
+| Documentation quality | 10% | Citation reliability and evidence support quality |
 | Enhancement potential | 5% | Growth opportunities identified |
 
 ## Orphan Classification
