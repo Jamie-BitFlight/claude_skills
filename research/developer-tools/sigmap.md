@@ -273,7 +273,13 @@ Create `gen-context.config.json` in project root:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| (none yet) | (none) | (cross-references populated by research-cross-referencer) |
+| [Narsil-MCP](../mcp-ecosystem/narsil-mcp.md) | mcp-ecosystem | Rust MCP server with 90 code intelligence tools; complements SigMap's TF-IDF ranking with call graphs, taint analysis, and security scanning |
+| [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | Semantic code search MCP server achieving ~70% token savings; shares token optimization goal via embedding-based retrieval vs SigMap's deterministic ranking |
+| [GitNexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | Knowledge graph-based code intelligence MCP; alternative approach to SigMap's signature extraction for codebase context generation |
+| [CodeGraphContext](../mcp-ecosystem/codegraphcontext.md) | mcp-ecosystem | Graph database MCP server for code queries and impact analysis; complements SigMap's dependency tracking with semantic graph traversal |
+| [GrepAI](../developer-tools/grepai.md) | developer-tools | Semantic code search with call graph analysis; shares SigMap's goal of AI-friendly code retrieval with embedding-based approach vs TF-IDF |
+| [Repomix](../developer-tools/repomix.md) | developer-tools | Context compression tool using Tree-sitter that achieves ~70% reduction; parallel compression approach to SigMap's signature extraction strategy |
+| [Claude Mem](../context-management/claude-mem.md) | context-management | Persistent memory compression for Claude Code agents; shares SigMap's session context pattern (4-hour TTL) and token optimization focus |
 
 ---
 
