@@ -135,6 +135,7 @@ research/
 │   ├── pixel-agents.md                # VS Code extension rendering Claude Code terminals as pixel-art characters in a virtual office (3K+ stars)
 │   ├── psmux.md                       # Native Windows tmux replacement in Rust — 76 commands, .tmux.conf compat, ConPTY (269 stars)
 │   ├── shpool.md                      # Shell session pool daemon in Rust — raw PTY passthrough, VT100 reattach replay, autodaemon (1.7K stars)
+│   ├── sigmap.md                      # Zero-dependency AI context engine: signature extraction, TF-IDF ranking, 40–98% token reduction, 29 languages (v6.10.0)
 │   ├── repomix.md                     # Pack codebase into AI-friendly formats (21K+ stars)
 │   ├── tabz-browser-console-forwarder.md # Browser console to terminal forwarder for AI agent debugging (MIT)
 │   ├── traycer.md                     # Spec-driven AI development orchestrator (commercial SaaS)
