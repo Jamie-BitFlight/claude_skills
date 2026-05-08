@@ -322,3 +322,11 @@ The project documentation references large codebase and enterprise scenarios han
 - **High confidence** for identity, features, and installation: Full README read, pyproject.toml specifications verified, official documentation accessed
 - **High confidence** for architecture: Source code structure examined (`server.py`, core module organization) and MCP protocol documentation available
 - **Medium confidence** for limitations: SQLite issue on macOS documented; enterprise-scale limitations referenced but not detailed. Absence of documented limitations for other scenarios does not confirm absence of limitations
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |

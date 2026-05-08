@@ -320,3 +320,20 @@ TypeScript configuration also supported (`repomix.config.ts`) with `defineConfig
 8. **Anthropic XML Tags Guide**: <https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags>
 9. **Tree-sitter**: <https://github.com/tree-sitter/tree-sitter>
 10. **Secretlint**: <https://github.com/secretlint/secretlint>
+
+---
+
+## Freshness Tracking
+
+| Field | Value |
+|-------|-------|
+| Last Verified | 2026-05-08 |
+| Next Review Recommended | TBD |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |

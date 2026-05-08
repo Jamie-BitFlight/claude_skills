@@ -330,3 +330,20 @@ grepai update           # Download and install latest
 13. **GitHub API - Contributors** - `gh api repos/yoanbernabeu/grepai/contributors` (accessed 2026-02-13)
 14. **GitHub API - Release Downloads** - `gh api repos/yoanbernabeu/grepai/releases` (accessed 2026-02-13)
 15. **Reddit r/ollama** - <https://www.reddit.com/r/ollama/comments/1qiv7v8/> (accessed 2026-02-13)
+
+---
+
+## Freshness Tracking
+
+| Field | Value |
+|-------|-------|
+| Last Verified | 2026-05-08 |
+| Next Review Recommended | TBD |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | Semantic code search with call graph analysis; shares SigMap's goal of AI-friendly code retrieval with embedding-based approach vs TF-IDF (bidirectional) |

@@ -461,6 +461,7 @@ No limitations were documented in the official documentation or README beyond th
 | [GrepAI](../developer-tools/grepai.md) | developer-tools | Semantic code search and call graph analysis tool with MCP integration; complementary embedding-based approach to code understanding |
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase packaging and compression tool using Tree-sitter; generates agent skills and supports MCP server interface |
 | [CodeWiki (Google)](../ai-research-tools/codewiki-google.md) | ai-research-tools | AI-powered repository documentation system generating architecture diagrams and hyperlinked symbol navigation from code analysis |
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 
 ---
 

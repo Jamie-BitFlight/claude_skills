@@ -243,3 +243,20 @@ Settings are managed in `~/.claude-mem/settings.json`:
 8. **Configuration Guide**: <https://docs.claude-mem.ai/configuration> (accessed 2026-01-31)
 9. **Author Twitter/X**: <https://x.com/Claude_Memory>
 10. **Discord Community**: <https://discord.com/invite/J4wttp9vDu>
+
+---
+
+## Freshness Tracking
+
+| Field | Value |
+|-------|-------|
+| Last Verified | 2026-05-08 |
+| Next Review Recommended | TBD |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |

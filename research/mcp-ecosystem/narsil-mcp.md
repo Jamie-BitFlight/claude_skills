@@ -378,3 +378,20 @@ CLI flags > Environment vars > Project config (`.narsil.yaml`) > User config (`~
 7. **Claude Code Integration Playbook**: <https://github.com/postrv/narsil-mcp/blob/main/docs/playbooks/integrations/claude-code.md>
 8. **npm Package**: <https://www.npmjs.com/package/narsil-mcp>
 9. **Crates.io**: <https://crates.io/crates/narsil-mcp>
+
+---
+
+## Freshness Tracking
+
+| Field | Value |
+|-------|-------|
+| Last Verified | 2026-05-08 |
+| Next Review Recommended | TBD |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |

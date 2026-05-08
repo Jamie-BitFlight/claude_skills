@@ -515,6 +515,7 @@ Matching patterns prevent files and directories from being indexed.
 | [Kythe](../developer-tools/kythe.md) | developer-tools | Google's language-agnostic code intelligence ecosystem using graph-based semantic indexing; foundational approach to cross-language code analysis |
 | [GrepAI](../developer-tools/grepai.md) | developer-tools | Go-based MCP server for semantic code search and call graph analysis; shares Tree-sitter parsing and MCP integration patterns |
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase packaging tool using Tree-sitter for code extraction; shares language-agnostic parsing approach and generates agent skills |
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 
 ---
 
