@@ -3301,7 +3301,7 @@ def update_item(
         result["plan"] = plan
         _auto_register_plan_artifact(item, plan, repo, output=out)
 
-    if not item.issue and repo:
+    if not item.issue and not title:
         issue_num = _create_issue_and_update_item(item, repo, output=out)
         if issue_num:
             out.info(f"  Issue: #{issue_num}")
