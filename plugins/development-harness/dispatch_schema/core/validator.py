@@ -9,10 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-# Minimum number of members for a conflict group check to be meaningful.
-# Mirrors the same constant in backlog_core.operations — kept local to break
-# the circular import: backlog_core.operations → dispatch_schema → validator → backlog_core.
-MIN_CONFLICT_GROUP_SIZE = 2
+from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 
 if TYPE_CHECKING:
     from dispatch_schema.core.models import DispatchPlan
