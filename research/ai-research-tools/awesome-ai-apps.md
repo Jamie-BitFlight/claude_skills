@@ -359,23 +359,6 @@ The repository is manually maintained. While recently updated (2026-03-17), new 
    - Code style expectations (Black, Ruff formatters)
    - `.env.example` practices (no committed secrets)
 
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-17
-**Next Review**: 2026-06-17 (3 months)
-
-**Key Fields to Monitor**:
-- Star count (baseline: 9,278 as of 2026-03-17)
-- Active project count (baseline: 76 documented projects)
-- Primary framework adoption (Agno currently most common)
-- Course completion/test status (AWS Strands course fully documented)
-- Framework updates (AWS Strands, Agno, OpenAI SDK versions should be checked)
-- API key dependencies (track new providers or deprecations)
-
-**Change Log**: Initial entry — 2026-03-17
-
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
@@ -401,3 +384,20 @@ The repository is manually maintained. While recently updated (2026-03-17), new 
 | [accomplish.md](../coding-agents/accomplish.md) | coding-agents | Local-first AI desktop agent with MCP tools and 15 providers (implements Awesome AI Apps' multi-agent, multi-provider patterns) |
 | [cline.md](../coding-agents/cline.md) | coding-agents | Open-source autonomous coding agent with human-in-the-loop approvals (HITL pattern demonstrated in Awesome AI Apps' simple agents) |
 | [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
+
+---
+
+## Freshness Tracking
+
+**Last Reviewed**: 2026-03-17
+**Next Review**: 2026-06-17 (3 months)
+
+**Key Fields to Monitor**:
+- Star count (baseline: 9,278 as of 2026-03-17)
+- Active project count (baseline: 76 documented projects)
+- Primary framework adoption (Agno currently most common)
+- Course completion/test status (AWS Strands course fully documented)
+- Framework updates (AWS Strands, Agno, OpenAI SDK versions should be checked)
+- API key dependencies (track new providers or deprecations)
+
+**Change Log**: Initial entry — 2026-03-17

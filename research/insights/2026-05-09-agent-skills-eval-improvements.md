@@ -3,21 +3,9 @@
 **Research entry**: ./research/evaluation-testing/agent-skills-eval.md
 **Generated**: 2026-05-09
 **Patterns assessed**: 7
-**Backlog items created**: 3 (local-only — GitHub backend unavailable; will sync on next `backlog_pull`)
+**Backlog items created**: 3
 **Deferred (low confidence)**: 1
 **Skipped (already covered or tracked)**: 4
-
----
-
-## Backlog Creation Status
-
-The MCP backlog backend reported `GitHub repository unavailable — token set but connection failed` at the time of this run. The three High-confidence proposals below were nevertheless persisted as **local-only** backlog YAML files at `/root/.dh/projects/-home-user-claude_skills/backlog/`. They will sync to GitHub Issues on the next successful `backlog_pull` once GitHub becomes reachable.
-
-Local files created:
-
-- `p1-provider-abstraction-for-skill-evaluation-runner.yaml`
-- `p1-bounded-concurrency-worker-pool-for-parallel-skill-eval-runs.yaml`
-- `p1-deterministic-tool-call-assertions-in-evalsjson-schema.yaml`
 
 ---
 
