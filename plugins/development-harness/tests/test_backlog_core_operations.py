@@ -149,9 +149,14 @@ def _isolate_backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     # Prevent tests from creating real GitHub issues.
-    # Without this, add_item() hits the live API when GITHUB_TOKEN is set,
-    # creating orphan issues that are never cleaned up.
+    # Both try_get_github and get_github must be patched: _create_issue_and_update_item
+    # now calls try_get_github, but other code paths call get_github directly.
     monkeypatch.setattr(ops, "try_get_github", lambda repo="": None)
+    monkeypatch.setattr(
+        ops,
+        "get_github",
+        lambda repo="", timeout=15: (_ for _ in ()).throw(RuntimeError("get_github called in test — patch missing")),
+    )
 
 
 # ---------------------------------------------------------------------------

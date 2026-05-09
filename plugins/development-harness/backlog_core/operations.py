@@ -642,8 +642,10 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
         Issue number if created, None otherwise.
     """
     out = output or Output()
+    repository = try_get_github(repo)
+    if repository is None:
+        return None
     try:
-        repository = get_github(repo)
         issue_num = create_issue_for_item(repository, item, dry_run=False, output=out)
     except (GithubException, BacklogError) as e:
         out.warn(f"  WARNING: Issue creation failed: {e}")
