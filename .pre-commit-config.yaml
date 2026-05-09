@@ -104,6 +104,12 @@ repos:
       - id: markdownlint-cli2
         exclude: ^(plan/|\.claude/backlog/|\.claude/BACKLOG\.md)
 
+  # GitHub Actions structural validation (beyond YAML parsability)
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
   # Shell formatting
   - repo: https://github.com/pecigonzalo/pre-commit-shfmt
     rev: v2.2.0

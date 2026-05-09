@@ -182,7 +182,7 @@ jobs:
 
       - name: Run file hygiene hooks
         env:
-          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
+          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")

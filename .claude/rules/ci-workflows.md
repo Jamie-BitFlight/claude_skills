@@ -47,8 +47,8 @@ Before executing, review plan:
 Implement plan:
 
 1. Make changes to workflow YAML files
-2. Validate YAML syntax: `python3 -m yaml <file>` or equivalent
-3. Run `uv run prek run --files <file>` if applicable
+2. Validate workflow structure: `uv run prek run --files .github/workflows/<file>` (runs `actionlint` for schema validation and `check-yaml` for parsability)
+3. Run `uv run prek run --files <file>` for non-workflow files if applicable
 4. Commit with descriptive message explaining what changed and why
 
 **Gate**: Changes committed and pass local validation.
