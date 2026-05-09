@@ -326,6 +326,7 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 | [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | Enforcement layer using checklist-driven verification similar to mattpocock's workflow discipline; model routing strategy complements skill-based approach |
 | [mcpskills-cli](./mcpskills-cli.md) | skill-generation-tools | MCP-to-skill converter; extends mattpocock's skill ecosystem to integrate external tool ecosystems via Streamable HTTP discovery |
 | [oh-my-opencode](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | Production-scale orchestration (37.5K stars) implementing multi-agent patterns that mattpocock skills coordinate; hash-anchored editing complements skill-based workflows |
+| [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
 
 ---
 

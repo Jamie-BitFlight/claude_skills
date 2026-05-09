@@ -400,3 +400,4 @@ The repository is manually maintained. While recently updated (2026-03-17), new 
 | [piebald.md](../developer-tools/piebald.md) | developer-tools | Cross-platform agentic AI desktop client with parallel subagents (desktop implementation of agent patterns) |
 | [accomplish.md](../coding-agents/accomplish.md) | coding-agents | Local-first AI desktop agent with MCP tools and 15 providers (implements Awesome AI Apps' multi-agent, multi-provider patterns) |
 | [cline.md](../coding-agents/cline.md) | coding-agents | Open-source autonomous coding agent with human-in-the-loop approvals (HITL pattern demonstrated in Awesome AI Apps' simple agents) |
+| [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
