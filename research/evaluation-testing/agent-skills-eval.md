@@ -313,8 +313,15 @@ Source: README.md lines 217–232
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Agent Skills Open Standard](../skill-generation-tools/agentskills.io.md) | skill-generation-tools | Implements full agentskills.io spec for SKILL.md frontmatter, evals.json schema, iteration-N artifact layout |
-| [TypeScript Evaluation Frameworks](../evaluation-testing/typescript-eval-frameworks.md) | evaluation-testing | Peer tool for agent/prompt evaluation using TypeScript; shares judge-based grading patterns |
+| [Harness Engineering Discipline (Martin Fowler)](./harness-engineering-martin-fowler.md) | evaluation-testing | Shared foundational framework for constraining AI agents; agent-skills-eval operationalizes the harness-engineering principles via judge-graded assertions |
+| [OpenAI Codex Harness Engineering](./harness-engineering-openai.md) | evaluation-testing | Production A/B testing methodology for code agents; 3-layer harness architecture directly parallels agent-skills-eval's provider + grading separation |
+| [Anthropic Agent Skills](../skill-generation-tools/anthropics-skills.md) | skill-generation-tools | Official Agent Skills standard with 17 skills; primary evaluation target for agent-skills-eval's SKILL.md validation and evals.json discovery |
+| [Everything Claude Code](../skill-generation-tools/everything-claude-code.md) | skill-generation-tools | 65+ skills, 16 agents harness requiring empirical evaluation; uses agent-skills-eval pattern for impact measurement |
+| [AI Agents Frameworks](../agent-frameworks/ai-agents-frameworks.md) | agent-frameworks | 10-framework comparative benchmarking study; agent-skills-eval provides the evaluation infrastructure that enables cross-framework performance comparison |
+| [Codex App Server (JSON-RPC)](./codex-harness-openai.md) | evaluation-testing | Bidirectional harness protocol enabling agent evaluation; complements judge-graded output validation with structured event streaming |
+| [mattpocock/skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | 21 battle-tested specialized skills for Claude Code; exemplar use case for agent-skills-eval's empirical impact measurement |
+| [Superpowers Framework](../agent-frameworks/superpowers.md) | agent-frameworks | Agentic skills framework with TDD enforcement; shares goal-driven evaluation patterns and skill-to-capability mapping with agent-skills-eval |
+| [awesome-ai-apps](../ai-research-tools/awesome-ai-apps.md) | ai-research-tools | Curated 76 AI agent projects across 6 categories; agent-skills-eval enables comparative evaluation of these diverse implementations |
 
 ---
 
