@@ -396,6 +396,9 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
 | [graphify.md](./skill-generation-tools/graphify.md)           | graphify v3 — dual AST+LLM extraction pipeline, 19-language tree-sitter support, confidence-tagged edges (EXTRACTED/INFERRED/AMBIGUOUS), 71.5x token reduction on mixed corpora, multi-format export (HTML/JSON/Markdown/SVG/GraphML/Cypher/Obsidian), PreToolUse hook integration | 2026-04-08   |
 | [waza.md](./skill-generation-tools/waza.md)                   | Waza (技) — 8 engineering-habit skills (think, check, hunt, design, read, write, learn, health) for Claude Code; multi-mode architecture, runtime project context extraction, smoke-tested packaging (4,369 stars, MIT) | 2026-05-04   |
+| [composio-codebase-migrate.md](./skill-generation-tools/composio-codebase-migrate.md) | Composio Codebase Migrate — Codex skill for large-scale multi-file refactors batched into ~25-file PRs with Composio CLI issue tracking, checkpoint validation, and parallel reviewable batches | 2026-05-10   |
+| [awesome-codex-skills-issue-triage.md](./skill-generation-tools/awesome-codex-skills-issue-triage.md) | Awesome Codex Skills Issue Triage — Codex skill for bulk issue triage and deduplication across Linear and Jira via Composio CLI; supports relabeling, reassignment, and summary posting | 2026-05-10   |
+| [codebase-recon-skill.md](./skill-generation-tools/codebase-recon-skill.md) | Codebase Recon Skill — git history analysis across seven dimensions (health, risk, team structure, momentum) before reading any code; multi-agent compatible, agent-skills-spec compliant | 2026-05-10   |
 
 **Key Topics**:
 
@@ -772,6 +775,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [pretext.md](./developer-tools/pretext.md) | Pretext v0.0.3 — DOM-free multiline text measurement and layout library; canvas-based measurement, pure arithmetic line breaking, 100% browser accuracy (7,680/7,680 tests), CJK/Arabic/Thai/BiDi support, ~19ms prepare() for 500-text batch, 0.09ms/call layout() (8K stars) | 2026-03-29   |
 | [pyscript.md](./developer-tools/pyscript.md) | PyScript 2026.3.1 — open-source platform bringing Python to web browsers via WebAssembly; dual interpreters (Pyodide + MicroPython 170KB); Python-JavaScript FFI; pyscript.web Pythonic DOM API; worker-based execution via Donkey/Bridge API (18.7K stars, Apache-2.0) | 2026-04-12   |
 | [wrkflw.md](./developer-tools/wrkflw.md) | wrkflw v0.8.0 — Rust CLI for local GitHub Actions and GitLab CI workflow validation and execution; 4 runtimes (Docker, Podman, emulation, secure emulation), TUI with DAG view, diff-aware filtering, matrix builds, reusable workflows, multi-provider secrets (MIT) | 2026-04-25   |
+| [gh-skill.md](./developer-tools/gh-skill.md) | GitHub CLI (gh) Skill — agent-ready GitHub CLI installer with SHA256 binary verification, GITHUB_TOKEN auth, proxy-remote `-R` flag patterns, 50+ documented commands, and Python automation scripts for label/milestone/Projects V2 setup | 2026-05-10   |
 
 **Key Topics**:
 
@@ -932,6 +936,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [hyperagents.md](./coding-agents/hyperagents.md) | HyperAgents — Meta research framework for self-referential self-improving agents; MetaAgent iteratively modifies codebase, TaskAgent solves domains (Balrog, Genesis, IMO, Polyglot, Paper Review, Search Arena); Docker-containerized evaluation, LiteLLM multi-model support, evolutionary optimization loop (CC BY-NC-SA 4.0) | 2026-03-29   |
 | [trigger-dev-examples.md](./coding-agents/trigger-dev-examples.md) | Trigger.dev Examples — 29 TypeScript/Python example projects covering 5 AI agent patterns (prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer); Next.js/Remix integrations; real-time streaming via Socket.io; OpenAI/Anthropic/Mastra integrations (Apache-2.0) | 2026-04-11   |
 | [raincast.md](./coding-agents/raincast.md) | Raincast v0.1.0 — AI-powered native desktop app generator: describe an app in plain English, receive a compiled React + Tauri binary (macOS/Windows/Linux) with real UI, file system access, and system integration; live preview with hot reload during generation (MIT) | 2026-04-25   |
+| [brooks-lint.md](./coding-agents/brooks-lint.md) | brooks-lint — AI code reviews grounded in twelve classic software engineering books (The Pragmatic Programmer, Clean Code, SICP, etc.); surfaces book-backed insights mapped to changed code | 2026-05-10   |
 
 **Key Topics**:
 
