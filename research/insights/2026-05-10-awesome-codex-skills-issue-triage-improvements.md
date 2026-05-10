@@ -3,7 +3,7 @@
 **Research entry**: ./research/skill-generation-tools/awesome-codex-skills-issue-triage.md
 **Generated**: 2026-05-10
 **Patterns assessed**: 7
-**Backlog items created**: 1 (issues: TBD — see below)
+**Backlog items created**: 1 (issues: #2244)
 **Deferred (low confidence)**: 1
 **Skipped (already covered or tracked)**: 5
 
@@ -15,7 +15,7 @@
 **Local system**: `plugins/development-harness/backlog_core/operations.py` (calls `find_fuzzy_duplicates`), `plugins/development-harness/backlog_core/parsing.py:481` (`find_fuzzy_duplicates` definition), `plugins/development-harness/backlog_core/server.py` (MCP tool surface)
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Created (priority P1)
+**Backlog**: #2244 created (priority P1)
 
 ### Current state
 
