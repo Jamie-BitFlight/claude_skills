@@ -3,9 +3,9 @@
 **Research entry**: ./research/coding-agents/brooks-lint.md
 **Generated**: 2026-05-10
 **Patterns assessed**: 8
-**Backlog items created**: 5 (issues to be filled in below)
+**Backlog items created**: 6 (issues: #2248, #2250, #2251, #2252, #2253, #2254)
 **Deferred (low/medium confidence)**: 2
-**Skipped (already covered or tracked)**: 1
+**Skipped (already covered or tracked)**: 4
 
 ---
 
@@ -15,7 +15,7 @@
 **Local system**: plugins/development-harness/agents/code-reviewer.md
 **Confidence**: High
 **Impact**: High
-**Backlog**: #2418 created
+**Backlog**: #2248 created
 
 ### Current state
 
@@ -65,7 +65,7 @@ returns 4 distinct lines per finding. The agent prompt at `plugins/development-h
 **Local system**: plugins/development-harness/skills/code-review-{python,typescript,nodejs,web,cli,llm,claude-skills}/
 **Confidence**: High
 **Impact**: High
-**Backlog**: #2419 created
+**Backlog**: #2250 created
 
 ### Current state
 
@@ -113,7 +113,7 @@ The `agents/code-reviewer.md` Step 6 ("Apply Stack-Specific Rules") instruction 
 **Local system**: plugins/development-harness/skills/code-review-{python,typescript,nodejs,web,cli,llm,claude-skills}/, plugins/development-harness/agents/code-reviewer.md
 **Confidence**: High
 **Impact**: High
-**Backlog**: #2420 created
+**Backlog**: #2251 created
 
 ### Current state
 
@@ -154,7 +154,7 @@ exits 0. Running `uv run plugins/development-harness/scripts/run_code_review_eva
 **Local system**: plugins/development-harness/agents/code-reviewer.md Step 2
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #2421 created
+**Backlog**: #2252 created
 
 ### Current state
 
@@ -188,7 +188,7 @@ The agent's STATUS output includes a "Scope" line stating which fallback level w
 **Local system**: plugins/development-harness/agents/code-reviewer.md Step 7
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #2422 created
+**Backlog**: #2253 created
 
 ### Current state
 
@@ -267,7 +267,7 @@ To be defined.
 **Local system**: no local equivalent; closest is `plugins/development-harness/skills/forensic-review/` and `agents/codebase-analyzer.md`
 **Confidence**: High
 **Impact**: Low
-**Backlog**: #2423 created
+**Backlog**: #2254 created
 
 ### Current state
 
