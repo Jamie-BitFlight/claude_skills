@@ -2,7 +2,7 @@
 title: GitHub CLI (gh) Skill
 subtitle: Agent-ready GitHub CLI installer with SHA256 verification and proxy-remote command patterns
 category: developer-tools
-resource_url: https://github.com/Jamie-BitFlight/claude_skills/blob/master/.claude/skills/gh/SKILL.md
+resource_url: https://github.com/Jamie-BitFlight/claude_skills/blob/main/.claude/skills/gh/SKILL.md
 github_url: https://github.com/cli/cli
 date_created: "2026-05-10"
 date_last_reviewed: "2026-05-10"
@@ -12,7 +12,7 @@ status: published
 # GitHub CLI (gh) Skill — Installation and Agent Integration
 
 **Research Date**: 2026-05-10
-**Source URL**: <https://github.com/Jamie-BitFlight/claude_skills/blob/master/.claude/skills/gh/SKILL.md>
+**Source URL**: <https://github.com/Jamie-BitFlight/claude_skills/blob/main/.claude/skills/gh/SKILL.md>
 **GitHub Repository**: <https://github.com/cli/cli>
 **Version at Research**: 2.87.2 (released 2026-02-20)
 **License**: MIT (GitHub CLI project)
@@ -212,7 +212,7 @@ Source: SKILL.md line 224
 
 4. **SHA256 verification depends on release integrity**: The setup script verifies SHA256 checksums from the official GitHub Releases checksums file. If that file is unavailable or corrupted, installation will fail. — Source: setup_gh.py lines 34-35 (references checksum file download)
 
-5. **Authentication fallback is silent**: When `GITHUB_TOKEN` authentication fails (401/403 status), the script silently falls back to anonymous requests. This may result in lower rate limits (60 requests/hour for anonymous vs. 5,000 for authenticated) without explicit warning. — Source: setup_gh.py lines 53-54
+5. **Authentication fallback degrades rate limits**: When `GITHUB_TOKEN` authentication fails (401/403 status), the script prints an explicit warning (`:warning: Authenticated request failed (HTTP {code}), retrying anonymously`) and retries anonymously. This may result in lower rate limits (60 requests/hour for anonymous vs. 5,000 for authenticated). — Source: setup_gh.py lines 255-256
 
 6. **Label and Projects automation are idempotent**: `github_project_setup.py` creates labels and projects only if they don't exist. Re-running is safe but does not update existing labels/projects. — Implied by "automation script" terminology at line 166
 

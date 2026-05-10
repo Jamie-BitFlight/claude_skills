@@ -20,7 +20,7 @@ status: published
 
 Internal-comms is a modular Codex skill that provides standardized formats and workflows for writing internal company communications. It helps users compose professional internal messages in company-preferred formats by directing them to specific guideline templates matched to the communication type. The skill covers six primary communication categories: 3P updates (Progress/Plans/Problems), company newsletters, frequently asked question compilations, status reports, leadership updates, project updates, and incident reports.
 
-SOURCE: "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use" ([SKILL.md](./../../internal-comms/SKILL.md) line 3, accessed 2026-05-10).
+SOURCE: "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use" ([SKILL.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/SKILL.md) line 3, accessed 2026-05-10).
 
 ## Problem Addressed
 
@@ -46,7 +46,7 @@ Structure: Each section contains 1-3 sentences of data-driven content. Progress 
 
 Format: `[emoji] [Team Name] (Dates) / Progress: [content] / Plans: [content] / Problems: [content]`
 
-SOURCE: [3p-updates.md](./../../internal-comms/examples/3p-updates.md) lines 2-2, 6-9, 40-46 (accessed 2026-05-10).
+SOURCE: [3p-updates.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/3p-updates.md) lines 2-2, 6-9, 40-46 (accessed 2026-05-10).
 
 ### 2. **Company-Wide Newsletters**
 
@@ -59,7 +59,7 @@ Features:
 - Prioritizes announcements from leadership, major milestones, and external press recognition
 - Each bullet point kept to 1-2 sentences for scannability
 
-SOURCE: [company-newsletter.md](./../../internal-comms/examples/company-newsletter.md) lines 2-2, 21, 24-34 (accessed 2026-05-10).
+SOURCE: [company-newsletter.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/company-newsletter.md) lines 2-2, 21, 24-34 (accessed 2026-05-10).
 
 ### 3. **FAQ Compilation**
 
@@ -69,7 +69,7 @@ Format: Question-and-answer pairs where each question is 1 sentence and each ans
 
 Data sources: Slack threads with high response counts, company-wide emails, Google Drive documents, and Calendar event attendee lists. Answers grounded in official company communications when possible, with links to authoritative sources.
 
-SOURCE: [faq-answers.md](./../../internal-comms/examples/faq-answers.md) lines 2-5, 11-15, 25-30 (accessed 2026-05-10).
+SOURCE: [faq-answers.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/faq-answers.md) lines 2-5, 11-15, 25-30 (accessed 2026-05-10).
 
 ### 4. **General Communications**
 
@@ -77,7 +77,7 @@ SOURCE: [faq-answers.md](./../../internal-comms/examples/faq-answers.md) lines 2
 
 Provides a flexible workflow for non-standard internal communications (incident reports, ad-hoc announcements, directional memos) by gathering information about audience, purpose, tone, and formatting requirements before composing.
 
-SOURCE: [general-comms.md](./../../internal-comms/examples/general-comms.md) lines 1-4 (accessed 2026-05-10).
+SOURCE: [general-comms.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/general-comms.md) lines 1-4 (accessed 2026-05-10).
 
 ## Technical Architecture
 
@@ -108,7 +108,7 @@ The skill architecture supports addition of new communication types via new guid
 
 No code changes needed — users or contributors can add new `examples/{new-type}.md` files to support additional communication formats.
 
-SOURCE: [SKILL.md](./../../internal-comms/SKILL.md) lines 21-29 (accessed 2026-05-10).
+SOURCE: [SKILL.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/SKILL.md) lines 21-29 (accessed 2026-05-10).
 
 ## Installation & Usage
 
@@ -146,7 +146,7 @@ Problems: understaffed due to PTO, dependency on Design team for API specs.
 3. Formats content into strict structure: `[emoji] Platform (May 3-9) / Progress: ... / Plans: ... / Problems: ...`
 4. Outputs formatted update ready to paste into Slack or email
 
-SOURCE: [SKILL.md](./../../internal-comms/SKILL.md) lines 19-29; [3p-updates.md](./../../internal-comms/examples/3p-updates.md) lines 30-46 (accessed 2026-05-10).
+SOURCE: [SKILL.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/SKILL.md) lines 19-29; [3p-updates.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/3p-updates.md) lines 30-46 (accessed 2026-05-10).
 
 ## Relevance to Claude Code Development
 
@@ -174,7 +174,7 @@ Internal-comms is directly relevant for team coordination and status tracking wi
 
 4. **Context Window Constraints**: For large organizations with extensive weekly activity, summarizing 20-25 newsletter items within a tight context window may lose important details or require iterative refinement.
 
-SOURCE: [3p-updates.md](./../../internal-comms/examples/3p-updates.md) lines 40, 29-34 (accessed 2026-05-10). [company-newsletter.md](./../../internal-comms/examples/company-newsletter.md) lines 9-17 (accessed 2026-05-10).
+SOURCE: [3p-updates.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/3p-updates.md) lines 40, 29-34 (accessed 2026-05-10). [company-newsletter.md](https://github.com/ComposioHQ/awesome-codex-skills/blob/master/internal-comms/examples/company-newsletter.md) lines 9-17 (accessed 2026-05-10).
 
 ## References
 
