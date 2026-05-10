@@ -392,6 +392,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [softaworks-agent-toolkit.md](./skill-generation-tools/softaworks-agent-toolkit.md) | Softaworks Agent Toolkit - 43 skills, 6 agents, 7 slash commands for Claude Code with multi-platform support (621 stars) | 2026-02-20   |
 | [mattpocock-skills.md](./skill-generation-tools/mattpocock-skills.md) | mattpocock/skills - 21 specialized skills encoding engineering disciplines (TDD, interface design, architectural refactoring, pre-commit setup) for Claude Code; battle-tested patterns for planning, development, tooling, and knowledge management (23.9K stars, MIT) | 2026-04-27   |
 | [obsidian-skills.md](./skill-generation-tools/obsidian-skills.md)     | Obsidian Skills - 5 modular Agent Skills for Obsidian (markdown, bases, JSON Canvas, CLI, defuddle) by Steph Ango (13.3K stars) | 2026-03-12   |
+| [paperjsx.md](./skill-generation-tools/paperjsx.md)                   | PaperJSX Document Generation Library - Node.js library generating PPTX, DOCX, XLSX, PDF documents from declarative JSON schemas; 4 format-specific npm packages, 8 PPTX slide types, 5 themes per format, local-only execution (no API keys) | 2026-05-10   |
 | [vercel-labs-skills.md](./skill-generation-tools/vercel-labs-skills.md) | Vercel Labs Skills - universal CLI for installing skills to 40+ AI coding agents with symlink-first design (6.3K stars) | 2026-02-20   |
 | [claude-scientific-skills.md](./skill-generation-tools/claude-scientific-skills.md) | Claude Scientific Skills - 170+ skills across 15 scientific domains (bioinformatics, cheminformatics, ML, physics, materials science); 250+ accessible databases; agentskills.io compliance for Cursor, Claude Code, Codex, Gemini CLI | 2026-03-16   |
 | [graphify.md](./skill-generation-tools/graphify.md)           | graphify v3 — dual AST+LLM extraction pipeline, 19-language tree-sitter support, confidence-tagged edges (EXTRACTED/INFERRED/AMBIGUOUS), 71.5x token reduction on mixed corpora, multi-format export (HTML/JSON/Markdown/SVG/GraphML/Cypher/Obsidian), PreToolUse hook integration | 2026-04-08   |
@@ -399,6 +400,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [composio-codebase-migrate.md](./skill-generation-tools/composio-codebase-migrate.md) | Composio Codebase Migrate — Codex skill for large-scale multi-file refactors batched into ~25-file PRs with Composio CLI issue tracking, checkpoint validation, and parallel reviewable batches | 2026-05-10   |
 | [awesome-codex-skills-issue-triage.md](./skill-generation-tools/awesome-codex-skills-issue-triage.md) | Awesome Codex Skills Issue Triage — Codex skill for bulk issue triage and deduplication across Linear and Jira via Composio CLI; supports relabeling, reassignment, and summary posting | 2026-05-10   |
 | [codebase-recon-skill.md](./skill-generation-tools/codebase-recon-skill.md) | Codebase Recon Skill — git history analysis across seven dimensions (health, risk, team structure, momentum) before reading any code; multi-agent compatible, agent-skills-spec compliant | 2026-05-10   |
+| [agent-skills.md](./skill-generation-tools/agent-skills.md) | Agent Skills (Addy Osmani) — 37K-star production-grade skills library for AI coding agents; structured workflows following Google software engineering culture with senior engineer practices (MIT, v1.0.0) | 2026-05-10   |
 
 **Key Topics**:
 
@@ -1010,6 +1012,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 | [artifact-manifest-backend-providers.md](./task-management/artifact-manifest-backend-providers.md) | Cross-platform comparison of structured metadata capabilities (GitHub, Linear, GitLab, Supabase) for ArtifactBackend provider implementations | 2026-03-22   |
 | [xyops.md](./task-management/xyops.md)                                                             | xyOps - distributed job orchestration and fleet management platform with visual workflow editor, real-time monitoring, alerting, and remote satellite agent system | 2026-03-26   |
 | [beads.md](./task-management/beads.md) | Beads (bd) — Dolt-powered version-controlled issue tracker for distributed AI workflows: hash-based collision-free IDs, dependency DAG with 4 relationship types, semantic compaction for context window recovery, offline-first with S3/GCS/DoltHub sync (19,673 stars, v0.62.0) | 2026-03-25   |
+| [internal-comms-skill.md](./task-management/internal-comms-skill.md) | Internal-Comms Skill — Codex skill for six internal communication formats (3P updates, newsletters, FAQ, status reports, leadership updates, incident reports) via Composio CLI (Apache-2.0) | 2026-05-10   |
 
 **Key Topics**:
 
@@ -1380,6 +1383,7 @@ Automated content generation tools that produce changelogs, release notes, blog 
 | -------- | ----------- | ------------ |
 | [notra.md](./ai-writing-tools/notra.md) | Notra - SaaS tool that auto-generates publish-ready changelogs, blog posts, and social updates by monitoring GitHub, Linear, and Slack activity; drafts content matching configured brand voice (proprietary SaaS) | 2026-03-04 |
 | [stop-slop.md](./ai-writing-tools/stop-slop.md) | Stop Slop — editorial skill removing AI-generated writing patterns via 8 core rules + 60+ phrase catalog + structural anti-patterns + 5-dimensional scoring rubric; framework for prose clarity and authenticity (MIT) | 2026-04-03 |
+| [unslop.md](./ai-writing-tools/unslop.md) | unslop v0.6.2 — AI output humanization system removing AI-isms with byte-exact preservation of code, tables, and URLs; deterministic regex + optional LLM refinement; Claude Code, Cursor, Codex, Gemini CLI plugin (MIT) | 2026-05-10 |
 
 **Key Topics**:
 
