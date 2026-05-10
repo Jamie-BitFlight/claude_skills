@@ -3,7 +3,7 @@
 **Research entry**: ./research/skill-generation-tools/codebase-recon-skill.md
 **Generated**: 2026-05-10
 **Patterns assessed**: 5
-**Backlog items created**: 2 (issues filled in below after creation)
+**Backlog items created**: 2 (issues: #2246, #2249)
 **Deferred (low confidence)**: 1
 **Skipped (already covered or tracked)**: 2
 
@@ -15,7 +15,7 @@
 **Local system**: ./.claude/skills/linear-walkthrough/SKILL.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #2295 created
+**Backlog**: #2246 created
 
 ### Current state
 
@@ -47,7 +47,7 @@ After the change, running `/linear-walkthrough` on a target directory produces `
 **Local system**: ./.claude/skills/ (no existing skill performs git-history risk analysis)
 **Confidence**: High
 **Impact**: High
-**Backlog**: #2296 created
+**Backlog**: #2249 created
 
 ### Current state
 
