@@ -5,15 +5,18 @@
  * SubagentStop hook — detects completed scientific investigations and notifies
  * the user that the retrospective-analyst agent is available.
  *
- * Fires on: SubagentStop (no matcher — fires on all agents, fast grep only)
- * Action: non-blocking — emits systemMessage when status: resolved-verified
- *         is found in section 14 of the Unified Investigation Template output.
+ * Fires on: SubagentStop (no matcher — fires on all agents)
+ * Action: non-blocking — emits systemMessage when "status: resolved-verified"
+ *         is found anywhere in the subagent's final response text.
+ *
+ * Detection uses data.last_assistant_message (direct payload field) to avoid
+ * disk I/O. Falls back to JSONL transcript parsing only if that field is absent.
  *
  * Replaces the former "prompt" type hook, which made an LLM call on every
- * SubagentStop. This script does a text search on the transcript instead.
+ * SubagentStop. This script does a plain text search instead.
  *
  * Test:
- *   echo '{"hook_event_name":"SubagentStop","agent_type":"general-purpose","agent_transcript_path":"/tmp/test.jsonl"}' \
+ *   echo '{"hook_event_name":"SubagentStop","agent_type":"general-purpose","last_assistant_message":"status: resolved-verified"}' \
  *     | node ./plugins/scientific-method/hooks/notify-investigation-complete.cjs
  */
 
@@ -24,6 +27,7 @@ const NOTIFICATION =
 
 /**
  * Extract the text content from the last assistant message in a JSONL transcript.
+ * Used as a fallback when last_assistant_message is absent from the payload.
  * @param {string} transcriptPath
  * @returns {string} Combined text content, or empty string on any error.
  */
@@ -71,28 +75,28 @@ process.stdin.on('end', () => {
   try {
     data = JSON.parse(input || '{}');
   } catch {
-    process.stdout.write(JSON.stringify({}));
     process.exit(0);
   }
 
-  const transcriptPath = data.agent_transcript_path || '';
-  if (!transcriptPath) {
-    process.stdout.write(JSON.stringify({}));
-    process.exit(0);
-  }
+  // Primary: use last_assistant_message from the payload (no disk I/O)
+  let text = typeof data.last_assistant_message === 'string' ? data.last_assistant_message : '';
 
-  const text = extractLastAssistantText(transcriptPath);
+  // Fallback: parse JSONL transcript if payload field is absent
   if (!text) {
-    process.stdout.write(JSON.stringify({}));
-    process.exit(0);
+    const transcriptPath = data.agent_transcript_path || '';
+    if (!transcriptPath) {
+      process.exit(0);
+    }
+    text = extractLastAssistantText(transcriptPath);
+    if (!text) {
+      process.exit(0);
+    }
   }
 
   // Look for status: resolved-verified anywhere in the output
   if (/status:\s*resolved-verified/i.test(text)) {
     process.stdout.write(JSON.stringify({ systemMessage: NOTIFICATION }));
-    process.exit(0);
   }
 
-  process.stdout.write(JSON.stringify({}));
   process.exit(0);
 });
