@@ -3,7 +3,7 @@
 **Research entry**: ./research/developer-tools/gh-skill.md
 **Generated**: 2026-05-10
 **Patterns assessed**: 7
-**Backlog items created**: 2 (issues: pending creation below)
+**Backlog items created**: 2 (issues: #2245, #2247)
 **Deferred (low confidence)**: 0
 **Skipped (already covered or tracked)**: 5
 
@@ -15,7 +15,7 @@
 **Local system**: `./.claude/skills/gh/scripts/setup_gh.py` and `./.claude/skills/gh/SKILL.md`
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: pending — will be created after this file is written
+**Backlog**: #2245 created
 
 ### Current state
 
@@ -52,7 +52,7 @@ Run: `./.claude/skills/gh/scripts/setup_gh.py --detect-repo` from the repo root.
 **Local system**: `./.claude/skills/gh/scripts/setup_gh.py`
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: pending — will be created after this file is written
+**Backlog**: #2247 created
 
 ### Current state
 
