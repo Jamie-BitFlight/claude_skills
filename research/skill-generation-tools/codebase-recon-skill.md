@@ -250,3 +250,17 @@ SOURCE: Absence of documented limitations in README.md and SKILL.md files. Above
 - **medium**: Limitations inferred from design constraints rather than explicitly documented
 
 **Staleness Risk**: Version 1.0.0 is very recent (2026-04-26). Next review recommended in 3 months to check for bug fixes, new features, or calibration adjustments to the Phase 1 thresholds.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [GitNexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | graph-based code intelligence MCP server with repository queries and impact analysis; complements Codebase Recon's git-history findings with live code graph navigation |
+| [CodeGraphContext](../mcp-ecosystem/codegraphcontext.md) | mcp-ecosystem | repository-to-graph tool with Tree-Sitter AST parsing and caller/callee analysis; extends Codebase Recon's hotspot identification with code-level dependencies and dead code detection |
+| [grepai](../developer-tools/grepai.md) | developer-tools | semantic code search and call graph analysis for AI agents; provides deep code-level intelligence to interpret the developers identified by Codebase Recon's bus factor analysis |
+| [graphify](./graphify.md) | skill-generation-tools | AST+LLM extraction pipeline for code structure visualization; transforms Codebase Recon's metadata findings into navigable code architecture diagrams and knowledge graphs |
+| [agent-skills](./agent-skills.md) | skill-generation-tools | production-grade skills library by Addy Osmani with structured workflows; demonstrates canonical skill packaging pattern (Agent Skills Spec) that Codebase Recon follows for multi-agent distribution |
+| [everything-claude-code](./everything-claude-code.md) | skill-generation-tools | comprehensive agent harness with 65+ skills including codebase analysis workflows; shows how Codebase Recon insights integrate into larger multi-agent orchestration systems |
+| [Kythe](../developer-tools/kythe.md) | developer-tools | Google's language-agnostic code intelligence platform; alternative to git-based analysis offering static semantic indexing of hotspots, contributors, and risk areas |

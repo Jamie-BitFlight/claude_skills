@@ -282,3 +282,15 @@ composio run --file scripts/migrate-batch.ts -- --batch 3
 - Full Composio CLI reference link (docs.composio.dev) referenced in source but not independently accessed
 - Integration with Claude Code is speculative; skill is designed for Codex ecosystem
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Awesome Codex Skills — Issue Triage](./awesome-codex-skills-issue-triage.md) | skill-generation-tools | Composio CLI orchestration: both use Composio CLI for multi-tool automation and bulk operations |
+| [Codebase Recon Skill](./codebase-recon-skill.md) | skill-generation-tools | Pre-migration codebase analysis via git history across multiple dimensions before executing large-scale changes |
+| [Agent Skills](./agent-skills.md) | skill-generation-tools | CI/CD and quality gate patterns; deprecation and migration workflows for large refactors |
+| [GitHub CLI (gh)](../developer-tools/github-cli.md) | developer-tools | PR creation and CI polling: github-cli is alternative to Composio for GitHub operations |
+| [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase understanding before operations: pre-migration understanding of file structure and impact |
+| [Vercel Labs Skills](./vercel-labs-skills.md) | skill-generation-tools | Multi-agent skill distribution pattern for large-scale tooling coordination |
+| [mattpocock/skills](./mattpocock-skills.md) | skill-generation-tools | Architectural refactoring skill and pre-commit validation patterns for safe large-scale changes |
+

@@ -356,3 +356,15 @@ Confidence in documented limitations: **high** (explicitly stated in SKILL.md). 
 - **Medium**: Limitations section relies on three explicitly documented constraints; undocumented limitations are inferred but not verified against Composio source. Relevance section applies architectural findings to Claude Code context — not verified in Claude Code documentation.
 
 **Next review date**: 2026-08-10 (3 months from verification date 2026-05-10). This allows time to detect changes in Composio CLI API, new Linear/Jira endpoints, or updates to the awesome-codex-skills repository.
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Composio Codebase Migrate](./composio-codebase-migrate.md) | skill-generation-tools | sibling Composio-based Codex skill; codebase-migrate handles large-scale refactors, issue-triage handles bulk backlog management |
+| [codex-skills](./codex-skills.md) | skill-generation-tools | 19-skill Codex catalog of which issue-triage is an Awesome Codex Skills example |
+| [Codebase Recon Skill](./codebase-recon-skill.md) | skill-generation-tools | sibling production-grade Codex skill; both exemplify structured skill implementation with multi-agent compatibility |
+| [Agent Skills (Addy Osmani)](./agent-skills.md) | skill-generation-tools | production-grade skills library providing skill authoring patterns and standards that issue-triage exemplifies |
+| [jira.js](../developer-tools/jirajs.md) | developer-tools | TypeScript Jira API client; issue-triage skill wraps this API via Composio for bulk triage operations |
+| [GitHub CLI (gh)](../developer-tools/github-cli.md) | developer-tools | CLI-based issue/PR management; issue-triage extends to Linear/Jira what gh handles for GitHub |
+| [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | large-scale skill ecosystem and CLI integration patterns; issue-triage demonstrates specialized skill design for issue tracking workflows |

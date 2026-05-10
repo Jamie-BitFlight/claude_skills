@@ -455,12 +455,29 @@ Source: README.md, CLAUDE.md, AGENTS.md, plugin.json (accessed 2026-05-10).
 
 ---
 
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Maverick](./maverick.md) | coding-agents | Enforcement chain for multi-stage code review with best-practice → verify → CI → agent review progression |
+| [Cline](./cline.md) | coding-agents | Human-in-the-loop approval gates for autonomous code agent output |
+| [OpenHands](./openhands.md) | coding-agents | Cloud-based platform generating code that requires quality review and assessment |
+| [Hound](../code-auditing/hound.md) | code-auditing | Autonomous code auditor using knowledge graphs and pattern analysis for structural decay detection |
+| [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Comprehensive system with 65+ skills, 16 agents, and AgentShield security scanner for code quality |
+| [Narsil-MCP](../mcp-ecosystem/narsil-mcp.md) | mcp-ecosystem | Code intelligence infrastructure with 90 tools for symbol analysis and architectural pattern detection |
+| [Rope](../code-auditing/rope.md) | code-auditing | AST-based refactoring library enabling automated fixes for decay patterns identified in code reviews |
+
+---
+
 ## Freshness Tracking
 
 - **Last Content Update**: 2026-04-29 (CHANGELOG.md v1.2.2 — aggressive token reduction pass)
 - **Last Commit**: 2026-05-01 (verified via git log)
 - **Latest Release**: v1.2.2 (2026-04-29)
 - **Access Date**: 2026-05-10
+- **Cross-References Added**: 2026-05-10
 
 ### Confidence Summary
 
