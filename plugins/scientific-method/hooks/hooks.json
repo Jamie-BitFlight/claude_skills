@@ -4,9 +4,9 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "You are validating the output of a scientific investigation sub-agent that uses the scientific-method plugin.\n\nInspect the agent's output for the investigation status.\n\nStep 1: Find the status line.\n- Look for 'status: resolved-verified' in section 14 of the Unified Investigation Template output.\n- Also check for a line matching 'status:' followed by one of: resolved-verified, mitigated, unresolved, unknown.\n\nStep 2: If status is 'resolved-verified':\n- Notify the user with this exact message: 'Investigation complete (resolved-verified). The retrospective-analyst agent can produce a mermaid timeline and structured retrospective from this investigation. Invoke it with the full investigation output as input.'\n- Then return {\"ok\": true}.\n\nStep 3: If status is anything other than 'resolved-verified' (mitigated, unresolved, unknown):\n- Do not notify. Return {\"ok\": true}.\n\nStep 4: If no status line is found in the output:\n- The agent did not complete a full investigation cycle. Return {\"ok\": true} silently.\n\nDo not block or fail any agent output. This hook is informational only.",
-            "timeout": 15
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/notify-investigation-complete.cjs\"",
+            "timeout": 10
           }
         ]
       }
