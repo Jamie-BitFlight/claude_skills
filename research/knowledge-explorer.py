@@ -59,7 +59,7 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 # ---------------------------------------------------------------------------
 
 KB_ROOT: Path = Path(__file__).parent.resolve()
-_SCRIPT_PATH: Path = Path(__file__).resolve()
+_KNOWLEDGE_EXPLORER_SCRIPT_PATH: Path = Path(__file__).resolve()
 _LEVENSHTEIN_MAX_DISTANCE: int = 2
 _MAX_SUGGESTIONS: int = 3
 _MIN_GITHUB_PATH_PARTS: int = 2
@@ -477,7 +477,8 @@ def _normalize_readme_description(value: str, max_len: int = _README_DESC_MAX_LE
         max_len: Maximum allowed output length.
 
     Returns:
-        Normalized and length-capped markdown-safe description text.
+        Normalized and length-capped markdown-safe description text with ``|``
+        escaped for markdown table cells.
     """
     normalized = re.sub(r"\s+", " ", value).strip().replace("|", "\\|")
     if len(normalized) <= max_len:
@@ -499,7 +500,7 @@ def _readme_paths_from_text(text: str) -> set[str]:
 
 def _discover_research_markdown_paths(kb_root: Path) -> set[str]:
     """Return all research markdown paths relative to kb_root."""
-    excluded = {kb_root / "README.md", _SCRIPT_PATH}
+    excluded = {(kb_root / "README.md").resolve(), _KNOWLEDGE_EXPLORER_SCRIPT_PATH}
     return {str(path.relative_to(kb_root)).replace("\\", "/") for path in kb_root.rglob("*.md") if path not in excluded}
 
 

@@ -495,7 +495,7 @@ List any failures with the exact reason (field could not be extracted, file writ
 Shared by all modes. Execute after any mode completes successfully.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables
-2. **README Reconcile** -- run full index reconciliation to backfill any missing links before lint:
+2. **README Reconcile** -- run full index reconciliation before lint to ensure every `research/**/*.md` entry is indexed in `./research/README.md`:
 
    ```bash
    uv run ./research/knowledge-explorer.py sync-readme
