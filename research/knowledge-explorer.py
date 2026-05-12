@@ -619,6 +619,35 @@ def _group_paths_by_category(paths: list[str]) -> dict[str, list[str]]:
     return grouped
 
 
+def _format_category_title(category: str) -> str:
+    """Format category slug into an acronym-aware section title.
+
+    Args:
+        category: Category directory name or ``"(root)"``.
+
+    Returns:
+        Human-readable README section title.
+    """
+    if category == "(root)":
+        return "Root Research Entries"
+
+    acronym_words = {
+        "ai": "AI",
+        "ui": "UI",
+        "ux": "UX",
+        "llm": "LLM",
+        "mcp": "MCP",
+        "api": "API",
+        "sdk": "SDK",
+        "cli": "CLI",
+        "qa": "QA",
+        "ci": "CI",
+        "cd": "CD",
+    }
+    parts = category.split("-")
+    return " ".join(acronym_words.get(part.lower(), part.capitalize()) for part in parts)
+
+
 def _append_category_section(lines: list[str], category: str, rows: list[str]) -> None:
     """Append a new README section and table block for a category.
 
@@ -627,7 +656,7 @@ def _append_category_section(lines: list[str], category: str, rows: list[str]) -
         category: Category directory name or ``"(root)"``.
         rows: Prebuilt markdown table rows for the category.
     """
-    title = "Root Research Entries" if category == "(root)" else category.replace("-", " ").title()
+    title = _format_category_title(category)
     location = "./" if category == "(root)" else f"./{category}/"
     block = [
         "\n",
