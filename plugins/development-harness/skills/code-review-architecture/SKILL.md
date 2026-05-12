@@ -229,7 +229,7 @@ For each `hook-config` node (`hooks.json`, `.claude/settings.json`) discovered i
 For each `pep723-script` node (Python file whose first line matches `#!/usr/bin/env.*--script`), extract its inline `# /// script` metadata block:
 
 ```bash
-grep -n "# ///" <file>
+grep -n "^# /// script$" <file>
 ```
 
 Read all lines between the `# /// script` marker and the closing `# ///`. Extract each quoted package name from `dependencies = [...]`. Record these as `ext-pkg` nodes connected to the script with `depends-on` edges. Render them as light-grey hexagon nodes (`{{pkg-name}}` in Mermaid) — they convey runtime requirements without polluting the coupling analysis.
@@ -239,7 +239,7 @@ Read all lines between the `# /// script` marker and the closing `# ///`. Extrac
 Search all in-scope files for `uv run` invocations that reference a local `.py` path:
 
 ```bash
-grep -rn "uv run[^|&;&\n]*\.py" <scope-root> \
+grep -rn "uv run[^|&;\n]*\.py" <scope-root> \
   --include="*.py" --include="*.cjs" --include="*.mjs" --include="*.md"
 ```
 
