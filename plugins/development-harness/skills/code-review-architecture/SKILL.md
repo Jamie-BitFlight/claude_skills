@@ -35,7 +35,7 @@ Before falling back to Glob, check whether a richer indexing skill is available 
 | Tool | Probe command | What it provides |
 |---|---|---|
 | `ccc` (CocoIndex Code) | `ccc search --limit 1 module imports` | Semantic index of modules, paths, and relationships already built from the codebase |
-| `graphify` (or equivalent AST graph skill) | Activate skill `graphify` / `codebase-graph` | Pre-computed AST-level dependency graph |
+| `graphify` (global CLI, PyPI: `graphifyy`) | `which graphify` | AST knowledge graph via tree-sitter — local extraction, no API calls for code; outputs `graphify-out/graph.json` + `GRAPH_REPORT.md` |
 
 **If `ccc` is available and initialized:**
 
@@ -55,11 +55,32 @@ Before falling back to Glob, check whether a richer indexing skill is available 
 
 4. Merge all discovered file paths into the candidate module list and proceed to Step 1b for any gaps.
 
-**If `graphify` (or equivalent AST / knowledge-graph skill) is available:**
+**If `graphify` is available (globally installed via `uv tool install graphifyy` / `pipx install graphifyy`):**
 
-1. Activate the skill and request the full module-dependency graph for the current project.
-2. Use the returned graph edges directly to populate Steps 2–3; skip Grep-based import parsing for any edges already covered by the graph.
-3. Supplement with Glob (Step 1b) only for languages or directories not covered by the graph output.
+1. Probe availability: `which graphify` (or `graphify --version`). If not found, skip this branch.
+
+2. Check whether `graphify-out/graph.json` already exists in the project root.
+   - If it **does**, use it directly (it may have been committed to the repo for team use). Treat it as fresh unless it is older than 24 hours or the working tree has uncommitted source file changes, in which case run step 3.
+   - If it **does not**, continue to step 3.
+
+3. Build the graph (AST extraction is local — no API calls required for code files):
+
+   ```bash
+   graphify . --no-viz
+   ```
+
+   `--no-viz` skips the HTML output and produces only `graphify-out/graph.json` and `graphify-out/GRAPH_REPORT.md`.
+
+4. Query the graph to enumerate modules and their dependency edges:
+
+   ```bash
+   graphify query "list all source code files and their import dependencies"
+   graphify query "show circular imports and highly coupled modules"
+   ```
+
+   Also read `graphify-out/GRAPH_REPORT.md` — it summarizes **god nodes** (most-connected modules), **surprising connections**, and confidence-tagged relationships (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`).
+
+5. Use the graphify output to directly populate the module list (Step 1b candidate set), the import edges (Step 2), and the coupling/cycle pre-analysis (Steps 3–4). Only fall back to Grep for intra-project import parsing on nodes where graphify reported `AMBIGUOUS` confidence.
 
 **1b. Glob-based fallback (always run if 1a produced < 20 modules or no tool was available)**
 
