@@ -28,6 +28,41 @@ Do NOT invoke for:
 
 ### Step 1: Discover Source Modules
 
+**1a. Probe for AST / knowledge-graph tools**
+
+Before falling back to Glob, check whether a richer indexing skill is available in the current session. Try each probe in order and stop at the first success:
+
+| Tool | Probe command | What it provides |
+|---|---|---|
+| `ccc` (CocoIndex Code) | `ccc search --limit 1 module imports` | Semantic index of modules, paths, and relationships already built from the codebase |
+| `graphify` (or equivalent AST graph skill) | Activate skill `graphify` / `codebase-graph` | Pre-computed AST-level dependency graph |
+
+**If `ccc` is available and initialized:**
+
+1. Run a broad semantic search to enumerate the primary source modules:
+
+   ```bash
+   ccc search --limit 50 "module definition class function"
+   ccc search --limit 50 "import dependency package"
+   ```
+
+2. Collect the returned file paths — these form the initial module set. Deduplicate and normalize to relative paths from the project root.
+3. For each module file returned, also check its immediate file-level neighbors with a targeted search:
+
+   ```bash
+   ccc search --path '<module_dir>/*' --limit 20 "imports dependencies"
+   ```
+
+4. Merge all discovered file paths into the candidate module list and proceed to Step 1b for any gaps.
+
+**If `graphify` (or equivalent AST / knowledge-graph skill) is available:**
+
+1. Activate the skill and request the full module-dependency graph for the current project.
+2. Use the returned graph edges directly to populate Steps 2–3; skip Grep-based import parsing for any edges already covered by the graph.
+3. Supplement with Glob (Step 1b) only for languages or directories not covered by the graph output.
+
+**1b. Glob-based fallback (always run if 1a produced < 20 modules or no tool was available)**
+
 Use `Glob` to enumerate source files. Exclude generated code, vendor trees, and build artifacts:
 
 | Language | Include patterns | Exclude |
@@ -38,7 +73,7 @@ Use `Glob` to enumerate source files. Exclude generated code, vendor trees, and 
 | Rust | `**/*.rs` | `**/target/**` |
 | Java / Kotlin | `**/*.java`, `**/*.kt` | `**/build/**`, `**/target/**` |
 
-Limit analysis to at most **200 modules**. If more exist, restrict to the top-level source directories and note the exclusion in the report.
+**Merge** Glob results with any paths already discovered in Step 1a, deduplicate, then limit the combined set to at most **200 modules**. If more exist, restrict to the top-level source directories and note the exclusion in the report.
 
 ### Step 2: Parse Import Relationships
 
