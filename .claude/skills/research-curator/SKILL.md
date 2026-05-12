@@ -495,20 +495,26 @@ List any failures with the exact reason (field could not be extracted, file writ
 Shared by all modes. Execute after any mode completes successfully.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables
-2. **Lint** -- run formatting checks on all modified files:
+2. **README Reconcile** -- run full index reconciliation to backfill any missing links before lint:
+
+   ```bash
+   uv run ./research/knowledge-explorer.py sync-readme
+   ```
+
+3. **Lint** -- run formatting checks on all modified files:
 
    ```bash
    uv run prek run --files ./research/README.md [new-or-modified-files]
    ```
 
-3. **Commit** -- stage and commit all research and insight changes:
+4. **Commit** -- stage and commit all research and insight changes:
 
    ```bash
    git add ./research/
    git commit -m "docs(research): [action] [resource names]"
    ```
 
-4. **Push** -- push to current branch:
+5. **Push** -- push to current branch:
 
    ```bash
    git push -u origin HEAD

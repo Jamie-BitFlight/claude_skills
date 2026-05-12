@@ -64,34 +64,46 @@ _MAX_SUGGESTIONS: int = 3
 _MIN_GITHUB_PATH_PARTS: int = 2
 _DEFAULT_REVIEW_DAYS: int = 90
 _NAME_MAX_LEN: int = 64
+_README_DESC_MAX_LEN: int = 220
 
 VALID_CATEGORIES: frozenset[str] = frozenset({
     "agent-frameworks",
     "agent-infrastructure",
+    "agent-orchestration",
     "ai-design-tools",
     "ai-observability",
     "ai-research-tools",
     "ai-writing-tools",
     "api-frameworks",
     "async-libraries",
+    "claude-code-plugins",
     "code-auditing",
     "coding-agents",
     "context-management",
+    "customer-support-platforms",
     "data-infrastructure",
+    "database-libraries",
     "developer-tooling",
     "developer-tools",
     "documentation-tools",
+    "embedded-ui-libraries",
     "evaluation-testing",
+    "insights",
     "installer-tools",
+    "learning-resources",
     "llm-infrastructure",
     "low-code-platforms",
     "mcp-ecosystem",
     "ml-infrastructure",
+    "paas-platforms",
+    "prompt-engineering",
     "python-runtimes",
     "research-agent-patterns",
     "rust-python-bindings",
+    "serialization-libraries",
     "skill-generation-tools",
     "task-management",
+    "utilization",
 })
 
 console = Console()
@@ -192,6 +204,16 @@ class ReadmeUpdateError(KBError):
     def __str__(self) -> str:
         """Return string representation."""
         return f"README update error: {self.detail}"
+
+
+@dataclass
+class ReadmeSyncResult:
+    """Result summary from README reconciliation."""
+
+    missing_links: list[str]
+    stale_links: list[str]
+    added_rows: int
+    created_sections: list[str]
 
 
 # ---------------------------------------------------------------------------
@@ -427,8 +449,262 @@ def _build_readme_row(entry: KBEntry) -> str:
         Markdown table row string.
     """
     today_iso = datetime.now(tz=UTC).date().isoformat()
-    summary = _extract_first_paragraph(entry.body) or entry.name
+    summary = _normalize_readme_description(_extract_first_paragraph(entry.body) or entry.name)
     return f"| [{entry.topic}.md](./{entry.category}/{entry.topic}.md) | {summary} | {today_iso} |"
+
+
+def _normalize_readme_description(value: str, max_len: int = _README_DESC_MAX_LEN) -> str:
+    """Normalize README row description text for markdown table safety.
+
+    Args:
+        value: Raw description text.
+        max_len: Maximum allowed output length.
+
+    Returns:
+        Normalized and length-capped markdown-safe description text.
+    """
+    normalized = re.sub(r"\s+", " ", value).strip().replace("|", r"\|")
+    if len(normalized) <= max_len:
+        return normalized
+    return normalized[: max_len - 3].rstrip() + "..."
+
+
+def _readme_paths_from_text(text: str) -> set[str]:
+    """Extract markdown link targets from README table links.
+
+    Args:
+        text: Full README markdown content.
+
+    Returns:
+        Set of relative markdown paths referenced by README links.
+    """
+    return set(re.findall(r"\]\(\./([^)]+\.md)\)", text))
+
+
+def _discover_research_markdown_paths(kb_root: Path) -> set[str]:
+    """Return all research markdown paths relative to kb_root."""
+    excluded = {kb_root / "README.md", kb_root / "knowledge-explorer.py"}
+    return {str(path.relative_to(kb_root)).replace("\\", "/") for path in kb_root.rglob("*.md") if path not in excluded}
+
+
+def _extract_readme_row_metadata(path: Path) -> tuple[str, str]:
+    """Extract description and date for README table row generation.
+
+    Args:
+        path: Absolute path to a markdown research file.
+
+    Returns:
+        Tuple of ``(description, yyyy-mm-dd)`` suitable for README tables.
+    """
+    text = path.read_text(encoding="utf-8")
+    body = text
+    frontmatter_meta: dict[str, Any] = {}
+
+    if text.startswith("---\n"):
+        with contextlib.suppress(Exception):
+            post = frontmatter.loads(text, handler=_handler)
+            frontmatter_meta = cast("dict[str, Any]", post.metadata)
+            body = post.content
+
+    nested_meta = frontmatter_meta.get("metadata")
+    nested = cast("dict[str, Any]", nested_meta) if isinstance(nested_meta, dict) else {}
+
+    desc = (
+        cast("str | None", frontmatter_meta.get("subtitle"))
+        or cast("str | None", frontmatter_meta.get("description"))
+        or cast("str | None", frontmatter_meta.get("title"))
+        or cast("str | None", frontmatter_meta.get("name"))
+        or _extract_first_paragraph(body)
+        or path.stem.replace("-", " ")
+    )
+    normalized_desc = _normalize_readme_description(desc)
+
+    date_candidates: list[str] = []
+    for key in ("date_last_reviewed", "last_reviewed", "date_created", "verified"):
+        value = frontmatter_meta.get(key)
+        if isinstance(value, str):
+            date_candidates.append(value)
+    nested_verified = nested.get("verified")
+    if isinstance(nested_verified, str):
+        date_candidates.append(nested_verified)
+
+    for value in date_candidates:
+        match = re.search(r"\d{4}-\d{2}-\d{2}", value)
+        if match:
+            return normalized_desc, match.group(0)
+
+    body_date_match = re.search(r"\*\*(?:Research Date|Last Verified)\*\*:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", body)
+    if body_date_match:
+        return normalized_desc, body_date_match.group(1)
+
+    freshness_match = re.search(r"\|\s*Last Verified\s*\|\s*([0-9]{4}-[0-9]{2}-[0-9]{2})\s*\|", body)
+    if freshness_match:
+        return normalized_desc, freshness_match.group(1)
+
+    return normalized_desc, datetime.now(tz=UTC).date().isoformat()
+
+
+def _find_location_section_index(lines: list[str], category: str) -> int | None:
+    """Return index of the Location line for a README category section.
+
+    Args:
+        lines: README lines with newlines preserved.
+        category: Category directory name or ``"(root)"``.
+
+    Returns:
+        Line index for the matching ``**Location**`` line, else ``None``.
+    """
+    targets = ("(./)",) if category == "(root)" else (f"(./{category}/)",)
+    for idx, line in enumerate(lines):
+        if line.startswith("**Location**:") and any(target in line for target in targets):
+            return idx
+    return None
+
+
+def _find_table_insert_index(lines: list[str], location_idx: int) -> int | None:
+    """Find insertion point at end of a category table.
+
+    Args:
+        lines: README lines with newlines preserved.
+        location_idx: Line index of the category ``**Location**`` marker.
+
+    Returns:
+        Line index where new table rows should be inserted, or ``None`` when
+        no table header exists for the section.
+    """
+    table_idx = None
+    for idx in range(location_idx + 1, len(lines)):
+        if lines[idx].startswith(("### ", "## ")):
+            break
+        if lines[idx].startswith("| Document |"):
+            table_idx = idx
+            break
+    if table_idx is None:
+        return None
+
+    insert_idx = table_idx + 2
+    while insert_idx < len(lines) and lines[insert_idx].startswith("| "):
+        insert_idx += 1
+    return insert_idx
+
+
+def _build_readme_row_from_relpath(kb_root: Path, rel_path: str) -> str:
+    """Build a README table row for a research markdown relative path.
+
+    Args:
+        kb_root: Root ``research/`` directory.
+        rel_path: Markdown path relative to ``kb_root``.
+
+    Returns:
+        Markdown table row with link, description, and date.
+    """
+    desc, updated = _extract_readme_row_metadata(kb_root / rel_path)
+    file_name = Path(rel_path).name
+    return f"| [{file_name}](./{rel_path}) | {desc} | {updated} |\n"
+
+
+def _group_paths_by_category(paths: list[str]) -> dict[str, list[str]]:
+    """Group relative markdown paths by category key.
+
+    Args:
+        paths: Relative markdown paths from ``research/``.
+
+    Returns:
+        Mapping of category name (or ``"(root)"``) to relative paths.
+    """
+    grouped: dict[str, list[str]] = {}
+    for rel_path in paths:
+        category = rel_path.split("/", 1)[0] if "/" in rel_path else "(root)"
+        grouped.setdefault(category, []).append(rel_path)
+    return grouped
+
+
+def _append_category_section(lines: list[str], category: str, rows: list[str]) -> None:
+    """Append a new README section and table block for a category.
+
+    Args:
+        lines: README lines with newlines preserved.
+        category: Category directory name or ``"(root)"``.
+        rows: Prebuilt markdown table rows for the category.
+    """
+    title = "Root Research Entries" if category == "(root)" else category.replace("-", " ").title()
+    location = "./" if category == "(root)" else f"./{category}/"
+    block = [
+        "\n",
+        f"### {title}\n",
+        "\n",
+        f"**Location**: [{location}]({location})\n",
+        "\n",
+        "| Document | Description | Last Updated |\n",
+        "|---|---|---|\n",
+        *rows,
+    ]
+    planned_idx = next((idx for idx, line in enumerate(lines) if line.startswith("## Planned")), len(lines))
+    lines[planned_idx:planned_idx] = block
+
+
+def _insert_missing_rows(kb_root: Path, lines: list[str], grouped_paths: dict[str, list[str]]) -> tuple[int, list[str]]:
+    """Insert missing README rows by category and return mutation summary.
+
+    Args:
+        kb_root: Root ``research/`` directory.
+        lines: README lines with newlines preserved.
+        grouped_paths: Missing file paths grouped by category.
+
+    Returns:
+        Tuple of ``(added_row_count, created_sections)``.
+    """
+    added_rows = 0
+    created_sections: list[str] = []
+    for category in sorted(grouped_paths):
+        rows = [_build_readme_row_from_relpath(kb_root, rel_path) for rel_path in grouped_paths[category]]
+        location_idx = _find_location_section_index(lines, category)
+        if location_idx is not None:
+            insert_idx = _find_table_insert_index(lines, location_idx)
+            if insert_idx is None:
+                continue
+            lines[insert_idx:insert_idx] = rows
+            added_rows += len(rows)
+            continue
+
+        _append_category_section(lines, category, rows)
+        added_rows += len(rows)
+        created_sections.append(category)
+    return added_rows, created_sections
+
+
+def reconcile_readme_index(kb_root: Path, write: bool = True) -> ReadmeSyncResult:
+    """Reconcile README links against all markdown files in ``research/``.
+
+    Args:
+        kb_root: Root ``research/`` directory.
+        write: When ``True``, writes missing rows into README. When ``False``,
+            performs a read-only drift check.
+
+    Returns:
+        Summary containing missing links, stale links, and write mutations.
+    """
+    readme_path = kb_root / "README.md"
+    if not readme_path.exists():
+        raise ReadmeUpdateError(detail="README.md not found")
+
+    text = readme_path.read_text(encoding="utf-8")
+    linked_paths = _readme_paths_from_text(text)
+    discovered_paths = _discover_research_markdown_paths(kb_root)
+
+    missing = sorted(discovered_paths - linked_paths)
+    stale = sorted(linked_paths - discovered_paths)
+    if not missing or not write:
+        return ReadmeSyncResult(missing_links=missing, stale_links=stale, added_rows=0, created_sections=[])
+
+    grouped = _group_paths_by_category(missing)
+    lines = text.splitlines(keepends=True)
+    added_rows, created_sections = _insert_missing_rows(kb_root, lines, grouped)
+
+    readme_path.write_text("".join(lines), encoding="utf-8")
+    return ReadmeSyncResult(
+        missing_links=missing, stale_links=stale, added_rows=added_rows, created_sections=created_sections
+    )
 
 
 def _update_existing_section(text: str, new_row: str, entry: KBEntry, section_start: int) -> str:
@@ -1532,6 +1808,42 @@ def list_kb(
     measurement = Measurement.get(temp_con, temp_con.options, tree)
     tree_width = int(measurement.maximum)
     console.print(tree, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True, width=max(tree_width, 80))
+
+
+# ---------------------------------------------------------------------------
+# sync-readme command
+# ---------------------------------------------------------------------------
+
+
+@app.command("sync-readme")
+def sync_readme(
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check", help="Report missing/stale README links without writing. Exits non-zero when drift is found."
+        ),
+    ] = False,
+) -> None:
+    """Reconcile README index links with markdown files under research/."""
+    result = reconcile_readme_index(KB_ROOT, write=not check)
+    has_drift = bool(result.missing_links or result.stale_links)
+
+    if result.added_rows:
+        console.print(f"[green]Added {result.added_rows} missing README row(s).[/green]")
+    if result.created_sections:
+        console.print(f"[green]Created sections:[/green] {', '.join(result.created_sections)}")
+    if result.stale_links:
+        console.print("[yellow]Stale README links (no matching file):[/yellow]")
+        for stale in result.stale_links:
+            console.print(f"  - {stale}")
+    if check and has_drift:
+        if result.missing_links:
+            console.print("[yellow]Missing README links:[/yellow]")
+            for missing in result.missing_links:
+                console.print(f"  - {missing}")
+        raise typer.Exit(code=1)
+    if not has_drift:
+        console.print("[green]README index is in sync.[/green]")
 
 
 # ---------------------------------------------------------------------------
