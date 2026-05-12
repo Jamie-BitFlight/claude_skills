@@ -1,6 +1,6 @@
 ---
 name: code-review-architecture
-description: Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Builds a module-dependency graph from import/include/require relationships across Python, TypeScript, JavaScript, Go, Rust, and Java. Emits a Mermaid flowchart with severity color-coding (red = circular dep / critical, yellow = high-coupling / warning, green = clean). When the graph exceeds 40 nodes, applies recursive semantic partitioning to produce linked parent/child diagrams instead of truncating. Registers each diagram as a codebase-analysis artifact.
+description: Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Auto-detects scope (git diff → PR diff → full project). Reads project config (pyproject.toml, tsconfig.json, go.mod, Cargo.toml) to establish the intra-project module namespace before parsing imports. Builds a module-dependency graph across Python, TypeScript, JavaScript, Go, Rust, and Java. Detects cycles via graphify output or an executable Python script. Checks Conway's Law alignment against CODEOWNERS and directory structure. Emits Mermaid flowcharts with severity color-coding (red = circular dep, yellow = high-coupling, green = clean, blue = Conway violation). Applies recursive semantic partitioning for graphs > 40 nodes. Registers each diagram as a codebase-analysis artifact.
 user-invocable: true
 ---
 
@@ -25,6 +25,19 @@ Do NOT invoke for:
 ## SOP (Architecture Audit)
 
 <workflow>
+
+### Step 0: Determine Scope
+
+Auto-detect the analysis scope before touching any source files. Use the **first** of the following that yields a non-empty file set:
+
+1. `git diff --cached --name-only` — files staged for commit
+2. `git diff --name-only` — unstaged working-tree changes
+3. `git diff main...HEAD --name-only` (or `master...HEAD`) — PR-level changes; try both base branch names
+4. **Entire project tree** — fall back when none of the above yields files (e.g., no git history or clean working tree)
+
+Record the detected scope explicitly. It will appear at the top of every output report (e.g., `**Scope:** Full project tree — 360 Python files` or `**Scope:** PR diff — 12 files across 3 modules`).
+
+When scope is a diff subset (cases 1–3), still build the full dependency graph (Steps 1–4) but **highlight** only nodes that appear in the diff set. Do not silently discard the broader graph — cross-boundary edges from diff nodes to stable nodes are the most important coupling signals.
 
 ### Step 1: Discover Source Modules
 
@@ -96,6 +109,44 @@ Use `Glob` to enumerate source files. Exclude generated code, vendor trees, and 
 
 **Merge** Glob results with any paths already discovered in Step 1a, deduplicate, then limit the combined set to at most **200 modules**. If more exist, restrict to the top-level source directories and note the exclusion in the report.
 
+### Step 1c: Language Detection and Module Namespace Establishment
+
+Before running any import parsing, determine which languages are actually present and read the project's own config files to establish the **intra-project module namespace**. This is mandatory — without it, Step 2 cannot reliably distinguish a project's own modules from third-party packages.
+
+**1c-i. Detect languages**
+
+Tally file counts from the Step 1b glob results:
+
+| Language present if… | Min files |
+|---|---|
+| Python | ≥ 1 `.py` file outside `**/test_*.py` |
+| TypeScript / JS | ≥ 1 `.ts`, `.tsx`, `.js`, `.mjs`, or `.cjs` file outside `**/node_modules/**` |
+| Go | ≥ 1 `.go` file outside `**/vendor/**` |
+| Rust | ≥ 1 `.rs` file outside `**/target/**` |
+| Java / Kotlin | ≥ 1 `.java` or `.kt` file outside `**/build/**` |
+
+Record detected languages. A project may have multiple.
+
+**1c-ii. Read project config per detected language**
+
+For each detected language, read the relevant config file(s) to establish the module namespace. This determines which import paths are "owned by this project" vs. third-party.
+
+| Language | Config file | What to extract |
+|---|---|---|
+| Python | `pyproject.toml` (`[project] name`), or `setup.py` (`name=`) | Package root name (e.g., `claude_skills`). All `import {name}.*` and `from {name}.*` are intra-project. Also note any `packages = find:` / `find_packages()` roots. |
+| TypeScript / JS | `tsconfig.json` (`compilerOptions.baseUrl`, `compilerOptions.paths`) | Path alias prefixes (e.g., `@/` → `src/`). All aliased imports and relative imports (`./`, `../`) are intra-project. |
+| Go | `go.mod` (first `module` directive) | Module path (e.g., `github.com/org/repo`). All imports beginning with this prefix are intra-project. |
+| Rust | `Cargo.toml` (`[workspace] members`) | Workspace crate names. All `use {crate}::` for listed crate names are intra-project. |
+| Java / Kotlin | `pom.xml` (`<groupId>`), or `build.gradle` (`group =`) | Group ID prefix (e.g., `com.example`). All imports beginning with this prefix are intra-project. |
+
+If no config file exists for a detected language, use the top-level source directory name as the package root prefix (e.g., if source files live in `src/`, treat `src/` as the root).
+
+Record the namespace map: `{ language → [intra-project prefixes] }`. Step 2 uses this map to filter imports.
+
+**Example for this repository** (claude_skills):
+- Python: `pyproject.toml` → `name = "claude_skills"` + source roots: `plugins/`, `scripts/`, `tests/`. Intra-project imports include `from backlog_core`, `from sam_schema`, `from dispatch_schema`, `from plugins.*`.
+- JavaScript/TypeScript: `package.json` → `name = "claude_skills"`. Check `tsconfig.json` for path aliases. Relative imports (`./`, `../`) are always intra-project.
+
 ### Step 2: Parse Import Relationships
 
 For each module, use `Grep` to extract import/include/require statements:
@@ -114,16 +165,86 @@ Normalize identifiers to short PascalCase labels for graph readability (e.g., `s
 
 ### Step 3: Detect Circular Dependencies
 
-Perform DFS cycle detection over the dependency adjacency list:
+**Do not attempt to trace cycles mentally across the full module graph.** Use one of the following executable methods, in priority order:
 
-1. Build `{module → [imported modules]}`.
-2. For each unvisited node run DFS, tracking the recursion stack.
-3. A back-edge (target is already in the recursion stack) marks a cycle — record every module in it as **critical**.
+**3a-i. Prefer graphify output (when available from Step 1a)**
 
-Also compute in-degree + out-degree for each node:
+If `graphify` was run and produced `graphify-out/GRAPH_REPORT.md`, read that file. It explicitly lists circular imports and confidence-tagged (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`) dependency relationships. Use it as the authoritative cycle list. Only fall back to 3a-ii if graphify output is absent or the report contains only `AMBIGUOUS` entries for the modules in question.
 
-- Degree ≥ 10 → **high-coupling** (warning) unless also critical.
+**3a-ii. Run a cycle-detection script**
+
+Write the following script to `/tmp/cycle_detect.py` and execute it with `python3 /tmp/cycle_detect.py <project_root>`. It reads the adjacency list built in Step 2 (passed via stdin as JSON or reconstructed from the module set) and prints all cycles found.
+
+```python
+#!/usr/bin/env python3
+"""Cycle detection for architecture audit. Reads adjacency JSON from stdin."""
+import json, sys
+from collections import defaultdict
+
+data = json.loads(sys.stdin.read())  # {module: [dep, dep, ...]}
+graph = {k: set(v) for k, v in data.items()}
+
+visited, in_stack, cycles = set(), set(), []
+
+def dfs(node, path):
+    if node in in_stack:
+        idx = path.index(node)
+        cycles.append(path[idx:] + [node])
+        return
+    if node in visited:
+        return
+    visited.add(node)
+    in_stack.add(node)
+    path.append(node)
+    for neighbor in graph.get(node, []):
+        if neighbor in graph:
+            dfs(neighbor, path)
+    path.pop()
+    in_stack.discard(node)
+
+for m in graph:
+    if m not in visited:
+        dfs(m, [])
+
+print(json.dumps({"cycles": cycles, "count": len(cycles)}))
+```
+
+To run: serialize the filtered adjacency map from Step 2 to JSON, pipe it into the script, and parse the output. Every module that appears in any cycle is classified **critical**.
+
+**3a-iii. Coupling metrics**
+
+After cycle classification, compute in-degree + out-degree for each node from the filtered adjacency map built in Step 2:
+
+- Degree ≥ 10 → **high-coupling** (warning) unless already critical.
 - All others → **clean**.
+
+### Step 3b: Conway's Law Alignment Check
+
+Conway's Law states that a system's module structure mirrors the communication structure of the team that built it. Check whether module cluster boundaries align with the project's stated team/ownership structure.
+
+**3b-i. Find team/ownership signals**
+
+Look for the following, in order:
+
+1. `CODEOWNERS` (`.github/CODEOWNERS` or `CODEOWNERS` at root) — each path pattern and its owning team
+2. Top-level directory names under `src/`, `packages/`, `plugins/`, or `lib/` — each directory is treated as a domain boundary
+3. Package naming conventions (e.g., `@org/auth-*`, `com.example.auth.*`) — shared prefix segments indicate intended domains
+
+**3b-ii. Compare cluster boundaries to ownership boundaries**
+
+For each cluster identified in Step 5b, check whether all modules in the cluster fall under the same CODEOWNERS pattern or top-level directory.
+
+A **Conway violation** occurs when:
+- A single cluster contains modules from two or more distinct CODEOWNERS paths (different teams own different parts of what the graph treats as one cohesive unit)
+- OR a single team's modules are split across two or more clusters (what belongs together architecturally is fragmented in the graph)
+
+**3b-iii. Record Conway findings**
+
+Each violation is a finding of class **Conway**. Add it to the Findings section (see Output Format). Conway findings do not affect the red/yellow/green node coloring (which is reserved for circular deps and coupling) but must appear in the Findings section separately.
+
+**Example for this repository** (claude_skills):
+- Top-level domain boundaries: `plugins/development-harness/`, `plugins/plugin-creator/`, `scripts/`, `tests/`
+- Each `plugins/{name}/` directory is an intended domain. If the graph clusters `backlog_core` and `sam_schema` into separate clusters, that is a Conway violation because both live under `plugins/development-harness/` and are owned together.
 
 ### Step 4: Color-Code Nodes
 
@@ -290,7 +411,7 @@ If `issue_number` is not available, output all reports inline (parent first, the
 ````markdown
 # Architecture Audit — Module Dependency Graph
 
-**Scope:** {language} — {N} modules analyzed
+**Scope:** {detected-scope} — {language} — {N} modules analyzed
 
 ---
 
@@ -318,6 +439,14 @@ flowchart TD
 |---|---|---|---|
 | `ServiceFacade` | 8 | 5 | 13 |
 
+### 🔵 Conway's Law Violations
+
+| Violation | Modules | Expected Owner | Actual Owners |
+|---|---|---|---|
+| Cross-boundary coupling | `auth/users.py`, `billing/users.py` | Single team | `@team-auth`, `@team-billing` |
+
+> Omit this section entirely if no Conway violations were found (Step 3b).
+
 ### 🟢 Clean Modules
 
 {N} modules with no circular dependencies and total degree < 10.
@@ -326,9 +455,11 @@ flowchart TD
 
 ## Summary
 
+**Detected scope:** {detected-scope}
 **Total modules analyzed:** {N}
 **Circular dependency participants:** {count} — Critical
 **High-coupling modules:** {count} — Warning
+**Conway violations:** {count} — (omit line if 0)
 **Clean modules:** {count}
 
 {One paragraph describing overall architecture health and the most important findings.}
@@ -341,7 +472,7 @@ The parent report is the entry point. Each over-budget cluster is collapsed to a
 ````markdown
 # Architecture Audit — Module Dependency Graph
 
-**Scope:** {language} — {N} modules analyzed ({C} clusters — see child diagrams for detail)
+**Scope:** {detected-scope} — {language} — {N} modules analyzed ({C} clusters — see child diagrams for detail)
 
 ---
 
@@ -368,16 +499,18 @@ flowchart TD
 
 ## Findings
 
-{Same Findings sections as single-diagram report — report findings across ALL nodes, not only those visible in the parent diagram.}
+{Same Findings sections as single-diagram report — report findings across ALL nodes, not only those visible in the parent diagram. Include 🔴 Circular Dependencies, 🟡 High-Coupling Modules, 🔵 Conway's Law Violations (if any), and 🟢 Clean Modules.}
 
 ---
 
 ## Summary
 
+**Detected scope:** {detected-scope}
 **Total modules analyzed:** {N}
 **Diagrams produced:** {1 parent + C children}
 **Circular dependency participants:** {count} — Critical
 **High-coupling modules:** {count} — Warning
+**Conway violations:** {count} — (omit line if 0)
 **Clean modules:** {count}
 
 {One paragraph describing overall architecture health, partitioning rationale, and the most important findings.}
@@ -410,13 +543,13 @@ flowchart TD
 
 ## Findings
 
-{Findings scoped to this cluster only.}
+{Findings scoped to this cluster only — 🔴 Circular Dependencies, 🟡 High-Coupling Modules, 🔵 Conway Violations (if any within or spanning this cluster's boundary), 🟢 Clean Modules.}
 
 ---
 
 ## Summary
 
-{One paragraph describing the health of this cluster and any cross-boundary concerns.}
+{One paragraph describing the health of this cluster and any cross-boundary concerns, including whether the cluster boundary aligns with team ownership (Step 3b).}
 ````
 
 ## Color Legend
@@ -426,3 +559,4 @@ flowchart TD
 | 🔴 Red (`#FF4444`) | Circular dependency — breaks build tooling, causes runtime errors, prevents safe refactoring | Break the cycle by extracting shared types to a common module or applying dependency inversion |
 | 🟡 Yellow (`#FFD700`) | High coupling (degree ≥ 10) — high change-propagation risk | Extract a façade or split responsibilities across smaller modules |
 | 🟢 Green (`#44BB44`) | Clean — no circular dependency, low coupling | No action required |
+| 🔵 Conway violation | Cluster boundary misaligns with team/ownership boundary | Align module groupings with team boundaries, or restructure CODEOWNERS to match the actual dependency clusters |
