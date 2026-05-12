@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -252,7 +252,7 @@ def _checksums_cache_path(asset_name: str) -> Path:
     return _cache_dir() / f"{CHECKSUMS_CACHE_PREFIX}{digest}.json"
 
 
-def _read_cache_json(path: Path, *, ttl_seconds: int) -> dict[str, object] | None:
+def _read_cache_json(path: Path, *, ttl_seconds: int) -> dict[str, Any] | None:
     """Read cached JSON if present and within TTL.
 
     Args:
@@ -272,10 +272,9 @@ def _read_cache_json(path: Path, *, ttl_seconds: int) -> dict[str, object] | Non
             return loaded
     except (OSError, json.JSONDecodeError):
         return None
-    return None
 
 
-def _write_cache_json(path: Path, payload: dict[str, object]) -> None:
+def _write_cache_json(path: Path, payload: dict[str, Any]) -> None:
     """Write JSON cache payload atomically."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +306,7 @@ def _release_assets_from_cache(assets_raw: object) -> list[ReleaseAsset] | None:
     for raw_obj in assets_raw:
         if not isinstance(raw_obj, dict):
             continue
-        typed_raw = cast("dict[str, object]", raw_obj)
+        typed_raw = cast("dict[str, Any]", raw_obj)
         name = typed_raw.get("name")
         url = typed_raw.get("url")
         size = typed_raw.get("size")
@@ -389,7 +388,7 @@ def fetch_latest_release(
     ]
 
     if use_cache:
-        cache_payload: dict[str, object] = {
+        cache_payload: dict[str, Any] = {
             "tag_name": tag_name,
             "assets": [{"name": asset.name, "url": asset.url, "size": asset.size} for asset in assets],
         }
