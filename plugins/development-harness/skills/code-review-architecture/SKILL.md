@@ -1,6 +1,6 @@
 ---
 name: code-review-architecture
-description: Architecture audit skill that builds a module-dependency graph from import/include/require relationships, detects circular dependencies, and emits a Mermaid flowchart with severity color-coding (red = circular dep / critical, yellow = high-coupling / warning, green = clean). Registers the graph as a codebase-analysis artifact. Invoked when a task asks for architecture review, dependency graph visualization, or circular dependency detection. Works across Python, TypeScript, JavaScript, Go, Rust, and Java.
+description: Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Builds a module-dependency graph from import/include/require relationships across Python, TypeScript, JavaScript, Go, Rust, and Java. Emits a Mermaid flowchart with severity color-coding (red = circular dep / critical, yellow = high-coupling / warning, green = clean) and registers it as a codebase-analysis artifact.
 user-invocable: true
 ---
 
