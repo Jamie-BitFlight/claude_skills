@@ -1532,7 +1532,7 @@ Comprehensive collections of algorithm implementations, code examples, and educa
 
 | Document | Description | Last Updated |
 |---|---|---|
-| [artifact-manifest-github-fields.md](./artifact-manifest-github-fields.md) | GitHub Projects V2 supports the following custom field types: | 2026-05-12 |
+| [artifact-manifest-github-fields.md](./artifact-manifest-github-fields.md) | GitHub Projects V2 custom fields include text, number, single-select, iteration, date, and user metadata types for structured issue tracking. | 2026-05-12 |
 | [artifact-manifest-gitlab-api-deep.md](./artifact-manifest-gitlab-api-deep.md) | GitLab shipped custom fields as a generally available (GA) feature in version 18.0 (after introduction in 17.11 with a feature flag). The feature is fully documented for **user-facing configuration** (creating fields, managing them at the group level, setting values in the UI). However: | 2026-05-12 |
 | [artifact-manifest-gitlab-custom-fields.md](./artifact-manifest-gitlab-custom-fields.md) | GitLab offers limited but growing structured metadata capabilities for issues. Custom fields (Premium/Ultimate tier) support four basic types (text, number, single-select, multi-select) with strict limits. API support for custom fields remains incomplete—GraphQL support is partial, and REST API access is minimal. Epics | 2026-05-12 |
 | [artifact-manifest-jira-asana-monday-patterns.md](./artifact-manifest-jira-asana-monday-patterns.md) | All three platforms support linking artifacts to work items, but use fundamentally different mental models: | 2026-05-12 |
@@ -1554,7 +1554,7 @@ Comprehensive collections of algorithm implementations, code examples, and educa
 
 | Document | Description | Last Updated |
 |---|---|---|
-| [lvgl.md](./embedded-ui-libraries/lvgl.md) | LVGL is a free, open-source embedded graphics library written in C that provides everything needed to create rich graphical UIs on microcontrollers and microprocessors. It runs on any MCU, MPU, OS, or display type with minimal hardware requirements (64 kB Flash, 16 kB RAM minimum), making it the most widely adopted emb | 2026-03-05 |
+| [lvgl.md](./embedded-ui-libraries/lvgl.md) | LVGL is an open-source C graphics library for building embedded GUIs on MCUs/MPUs with broad display and OS portability and low hardware requirements. | 2026-03-05 |
 
 ### Insights
 

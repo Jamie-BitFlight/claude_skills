@@ -463,7 +463,7 @@ def _normalize_readme_description(value: str, max_len: int = _README_DESC_MAX_LE
     Returns:
         Normalized and length-capped markdown-safe description text.
     """
-    normalized = re.sub(r"\s+", " ", value).strip().replace("|", r"\|")
+    normalized = re.sub(r"\s+", " ", value).strip().replace("|", "\\|")
     if len(normalized) <= max_len:
         return normalized
     return normalized[: max_len - 3].rstrip() + "..."
@@ -694,7 +694,7 @@ def reconcile_readme_index(kb_root: Path, write: bool = True) -> ReadmeSyncResul
 
     missing = sorted(discovered_paths - linked_paths)
     stale = sorted(linked_paths - discovered_paths)
-    if not missing or not write:
+    if not write or not missing:
         return ReadmeSyncResult(missing_links=missing, stale_links=stale, added_rows=0, created_sections=[])
 
     grouped = _group_paths_by_category(missing)
