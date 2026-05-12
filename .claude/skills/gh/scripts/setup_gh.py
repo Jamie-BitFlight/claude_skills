@@ -17,6 +17,7 @@ falling back to anonymous requests on authentication failure.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import platform
 import shutil
@@ -25,12 +26,13 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import zipfile
 from dataclasses import dataclass
 from enum import StrEnum
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -52,6 +54,10 @@ DOWNLOAD_CHUNK_SIZE = 8192
 HTTP_OK = 200
 HTTP_UNAUTHORIZED = 401
 HTTP_FORBIDDEN = 403
+DEFAULT_CACHE_TTL_SECONDS = 6 * 60 * 60
+CACHE_DIR_NAME = "gh-skill"
+LATEST_RELEASE_CACHE_FILE = "latest-release.json"
+CHECKSUMS_CACHE_PREFIX = "checksums-"
 
 ARCH_MAP: dict[str, str] = {
     "x86_64": "amd64",
@@ -227,7 +233,105 @@ def _is_auth_failure(status_code: int) -> bool:
     return status_code in {HTTP_UNAUTHORIZED, HTTP_FORBIDDEN}
 
 
-def fetch_latest_release(timeout: float = 30.0) -> tuple[str, list[ReleaseAsset]]:
+def _cache_dir() -> Path:
+    """Return the cache directory for setup_gh metadata."""
+    xdg_cache_home = os.environ.get("XDG_CACHE_HOME", "")
+    if xdg_cache_home:
+        return Path(xdg_cache_home) / CACHE_DIR_NAME
+    return Path.home() / ".cache" / CACHE_DIR_NAME
+
+
+def _latest_release_cache_path() -> Path:
+    """Return the cache file path for latest release metadata."""
+    return _cache_dir() / LATEST_RELEASE_CACHE_FILE
+
+
+def _checksums_cache_path(asset_name: str) -> Path:
+    """Return the cache file path for checksums content."""
+    digest = hashlib.sha256(asset_name.encode("utf-8")).hexdigest()[:16]
+    return _cache_dir() / f"{CHECKSUMS_CACHE_PREFIX}{digest}.json"
+
+
+def _read_cache_json(path: Path, *, ttl_seconds: int) -> dict[str, object] | None:
+    """Read cached JSON if present and within TTL.
+
+    Args:
+        path: Cache file path to read.
+        ttl_seconds: Maximum cache age in seconds.
+
+    Returns:
+        Parsed JSON dict when fresh and valid; otherwise None.
+    """
+    try:
+        age_seconds = time.time() - path.stat().st_mtime
+        if age_seconds > ttl_seconds:
+            return None
+        with path.open(encoding="utf-8") as f:
+            loaded = json.load(f)
+        if isinstance(loaded, dict):
+            return loaded
+    except (OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def _write_cache_json(path: Path, payload: dict[str, object]) -> None:
+    """Write JSON cache payload atomically."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", delete=False
+        ) as tmp:
+            json.dump(payload, tmp)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+            tmp_path = Path(tmp.name)
+        Path(tmp_path).replace(path)
+    except OSError:
+        return
+
+
+def _release_assets_from_cache(assets_raw: object) -> list[ReleaseAsset] | None:
+    """Build typed release assets list from cached JSON value.
+
+    Args:
+        assets_raw: Parsed JSON value for the cached release assets.
+
+    Returns:
+        Parsed release assets, or None if the JSON shape is invalid.
+    """
+    if not isinstance(assets_raw, list):
+        return None
+
+    assets: list[ReleaseAsset] = []
+    for raw_obj in assets_raw:
+        if not isinstance(raw_obj, dict):
+            continue
+        typed_raw = cast("dict[str, object]", raw_obj)
+        name = typed_raw.get("name")
+        url = typed_raw.get("url")
+        size = typed_raw.get("size")
+        if isinstance(name, str) and isinstance(url, str) and isinstance(size, int):
+            assets.append(ReleaseAsset(name=name, url=url, size=size))
+    return assets
+
+
+def _cached_latest_release(*, cache_path: Path, cache_ttl_seconds: int) -> tuple[str, list[ReleaseAsset]] | None:
+    """Return cached latest release payload when available and valid."""
+    cached = _read_cache_json(cache_path, ttl_seconds=cache_ttl_seconds)
+    if not cached:
+        return None
+
+    tag_name = cached.get("tag_name")
+    assets = _release_assets_from_cache(cached.get("assets"))
+    if isinstance(tag_name, str) and assets is not None:
+        return tag_name, assets
+    return None
+
+
+def fetch_latest_release(
+    timeout: float = 30.0, *, use_cache: bool = True, cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS
+) -> tuple[str, list[ReleaseAsset]]:
     """Fetch the latest gh release metadata from GitHub.
 
     Uses GITHUB_TOKEN if available. Falls back to anonymous requests
@@ -235,6 +339,8 @@ def fetch_latest_release(timeout: float = 30.0) -> tuple[str, list[ReleaseAsset]
 
     Args:
         timeout: HTTP request timeout in seconds.
+        use_cache: Whether to read/write local release metadata cache.
+        cache_ttl_seconds: Maximum cache age before forcing a refresh.
 
     Returns:
         Tuple of (version_tag, list_of_assets).
@@ -243,6 +349,12 @@ def fetch_latest_release(timeout: float = 30.0) -> tuple[str, list[ReleaseAsset]
         GitHubAPIError: On non-200 responses or missing fields.
         httpx.HTTPError: On network-level failures.
     """
+    cache_path = _latest_release_cache_path()
+    if use_cache:
+        cached_release = _cached_latest_release(cache_path=cache_path, cache_ttl_seconds=cache_ttl_seconds)
+        if cached_release is not None:
+            return cached_release
+
     token = os.environ.get("GITHUB_TOKEN", "")
     use_auth = bool(token)
 
@@ -275,6 +387,13 @@ def fetch_latest_release(timeout: float = 30.0) -> tuple[str, list[ReleaseAsset]
         ReleaseAsset(name=raw.get("name", ""), url=raw.get("browser_download_url", ""), size=raw.get("size", 0))
         for raw in data.get("assets", [])
     ]
+
+    if use_cache:
+        cache_payload: dict[str, object] = {
+            "tag_name": tag_name,
+            "assets": [{"name": asset.name, "url": asset.url, "size": asset.size} for asset in assets],
+        }
+        _write_cache_json(cache_path, cache_payload)
 
     return tag_name, assets
 
@@ -317,12 +436,20 @@ def find_checksums_asset(assets: list[ReleaseAsset]) -> ReleaseAsset | None:
 # ---------------------------------------------------------------------------
 # Checksum handling
 # ---------------------------------------------------------------------------
-def fetch_checksums(checksums_asset: ReleaseAsset, timeout: float = 30.0) -> dict[str, str]:
+def fetch_checksums(
+    checksums_asset: ReleaseAsset,
+    timeout: float = 30.0,
+    *,
+    use_cache: bool = True,
+    cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS,
+) -> dict[str, str]:
     """Download and parse the checksums file.
 
     Args:
         checksums_asset: The checksums.txt release asset.
         timeout: HTTP request timeout in seconds.
+        use_cache: Whether to read/write local checksums cache.
+        cache_ttl_seconds: Maximum cache age before forcing a refresh.
 
     Returns:
         Dict mapping filename to SHA256 hex digest.
@@ -330,6 +457,14 @@ def fetch_checksums(checksums_asset: ReleaseAsset, timeout: float = 30.0) -> dic
     Raises:
         httpx.HTTPError: On network-level failures.
     """
+    cache_path = _checksums_cache_path(checksums_asset.name)
+    if use_cache:
+        cached = _read_cache_json(cache_path, ttl_seconds=cache_ttl_seconds)
+        if cached:
+            checksums_raw = cached.get("checksums")
+            if isinstance(checksums_raw, dict):
+                return {k: v for k, v in checksums_raw.items() if isinstance(k, str) and isinstance(v, str)}
+
     token = os.environ.get("GITHUB_TOKEN", "")
     use_auth = bool(token)
 
@@ -350,6 +485,9 @@ def fetch_checksums(checksums_asset: ReleaseAsset, timeout: float = 30.0) -> dic
         if len(parts) == 2:  # noqa: PLR2004
             sha256_hex, filename = parts
             checksums[filename] = sha256_hex
+
+    if use_cache:
+        _write_cache_json(cache_path, {"checksums": checksums})
 
     return checksums
 
@@ -561,12 +699,16 @@ def suggest_path_update(install_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 # Orchestration helpers
 # ---------------------------------------------------------------------------
-def resolve_release(os_key: str, arch: str) -> tuple[str, ReleaseAsset, str | None]:
+def resolve_release(
+    os_key: str, arch: str, *, use_cache: bool = True, cache_ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS
+) -> tuple[str, ReleaseAsset, str | None]:
     """Fetch the latest release and locate the matching asset.
 
     Args:
         os_key: Operating system key.
         arch: Architecture key.
+        use_cache: Whether to use local cached release metadata/checksums.
+        cache_ttl_seconds: Maximum cache age before forcing a refresh.
 
     Returns:
         Tuple of (latest_version, asset, expected_sha256_or_None).
@@ -577,7 +719,7 @@ def resolve_release(os_key: str, arch: str) -> tuple[str, ReleaseAsset, str | No
     console.print(":globe_with_meridians: Fetching latest gh release...")
 
     try:
-        tag, assets = fetch_latest_release()
+        tag, assets = fetch_latest_release(use_cache=use_cache, cache_ttl_seconds=cache_ttl_seconds)
     except (GitHubAPIError, httpx.HTTPError) as exc:
         error_console.print(f":cross_mark: Failed to fetch release info: {exc}")
         raise typer.Exit(code=1) from exc
@@ -595,7 +737,7 @@ def resolve_release(os_key: str, arch: str) -> tuple[str, ReleaseAsset, str | No
     checksums_asset = find_checksums_asset(assets)
     if checksums_asset is not None:
         try:
-            checksums = fetch_checksums(checksums_asset)
+            checksums = fetch_checksums(checksums_asset, use_cache=use_cache, cache_ttl_seconds=cache_ttl_seconds)
             expected_sha256 = checksums.get(asset.name)
             if expected_sha256:
                 console.print(":lock: SHA256 checksum available for verification")
@@ -679,6 +821,13 @@ def download_and_install(
 def main(
     force: Annotated[bool, typer.Option("--force", help="Reinstall even if already at latest version")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would happen without installing")] = False,
+    no_cache: Annotated[bool, typer.Option("--no-cache", help="Disable local release metadata cache")] = False,
+    cache_ttl_seconds: Annotated[
+        int,
+        typer.Option(
+            "--cache-ttl-seconds", min=1, help="Cache TTL for release metadata/checksums in seconds (default: 21600)"
+        ),
+    ] = DEFAULT_CACHE_TTL_SECONDS,
     bin_dir: Annotated[
         Path | None, typer.Option("--bin-dir", help="Override install directory (default: auto-detect from PATH)")
     ] = None,
@@ -696,6 +845,8 @@ def main(
     Args:
         force: Reinstall even if the installed version matches the latest.
         dry_run: Print planned actions without performing them.
+        no_cache: Disable local release metadata cache reads/writes.
+        cache_ttl_seconds: Cache freshness TTL in seconds.
         bin_dir: Override the default install directory.
     """
     # 1. Check if gh is already installed
@@ -725,7 +876,9 @@ def main(
     console.print(f":file_folder: Install directory: [cyan]{install_dir}[/cyan]")
 
     # 4. Fetch latest release and find matching asset
-    latest_version, asset, expected_sha256 = resolve_release(os_key, arch)
+    latest_version, asset, expected_sha256 = resolve_release(
+        os_key, arch, use_cache=not no_cache, cache_ttl_seconds=cache_ttl_seconds
+    )
 
     # 5. Check if update is needed
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
