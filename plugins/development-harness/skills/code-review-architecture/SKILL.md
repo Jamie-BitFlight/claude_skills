@@ -1,9 +1,8 @@
 ---
 name: code-review-architecture
-description: Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Auto-detects scope (git diff → PR diff → full project). Reads project config (pyproject.toml, tsconfig.json, go.mod, Cargo.toml) to establish the intra-project module namespace before parsing imports. Builds a module-dependency graph across Python, TypeScript, JavaScript, Go, Rust, and Java. Detects cycles via graphify output or an executable Python script. Checks Conway's Law alignment against CODEOWNERS and directory structure. Emits Mermaid flowcharts with severity color-coding (red = circular dep, yellow = high-coupling, green = clean, blue = Conway violation). Applies recursive semantic partitioning for graphs > 40 nodes. Registers each diagram as a codebase-analysis artifact.
+description: "Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Auto-detects scope (git diff → PR diff → full project). Reads project config (pyproject.toml, tsconfig.json, go.mod, Cargo.toml) to establish the intra-project module namespace before parsing imports. Builds a module-dependency graph across Python, TypeScript, JavaScript, Go, Rust, and Java. Detects cycles via graphify output or an executable Python script. Checks Conway's Law alignment against CODEOWNERS and directory structure. For Claude plugin repos, also traces cross-language chains: hook configs → hook scripts, SKILL.md/agent docs → node/uv-run scripts, PEP 723 inline deps, and MCP tool calls. Emits Mermaid flowcharts with severity color-coding (red = circular dep, yellow = high-coupling, green = clean, blue = Conway violation). Applies recursive semantic partitioning for graphs > 40 nodes. Registers each diagram as a codebase-analysis artifact."
 user-invocable: true
 ---
-
 # Architecture Audit — Module Dependency Graph
 
 Generates a Mermaid module-dependency graph with severity color-coding from import/include analysis of the project source. Registers the result as a `codebase-analysis` artifact.
@@ -107,6 +106,19 @@ Use `Glob` to enumerate source files. Exclude generated code, vendor trees, and 
 | Rust | `**/*.rs` | `**/target/**` |
 | Java / Kotlin | `**/*.java`, `**/*.kt` | `**/build/**`, `**/target/**` |
 
+**1b-ii. Claude plugin artifact discovery**
+
+If any `plugin.json` files are found in the project (probe: `glob **/.claude-plugin/plugin.json` or `glob **/plugins/*/plugin.json`), this is a Claude plugin repository. Also discover the following as first-class graph nodes — they form the cross-language runtime invocation chain:
+
+| Artifact | Glob patterns | Node type |
+|---|---|---|
+| Hook event configs | `**/hooks.json`, `**/.claude/settings.json` | `hook-config` |
+| Hook scripts (CJS/MJS) | `**/hooks/*.cjs`, `**/hooks/*.mjs` | `hook-script` |
+| Skill / agent / command docs | `**/skills/**/SKILL.md`, `**/agents/*.md`, `**/commands/*.md` | `skill-doc` |
+| PEP 723 standalone scripts | `**/scripts/*.py` whose first line matches `#!/usr/bin/env.*--script` | `pep723-script` |
+
+If no `plugin.json` is found, skip this sub-step entirely.
+
 **Merge** Glob results with any paths already discovered in Step 1a, deduplicate, then limit the combined set to at most **200 modules**. If more exist, restrict to the top-level source directories and note the exclusion in the report.
 
 ### Step 1c: Language Detection and Module Namespace Establishment
@@ -162,6 +174,86 @@ For each module, use `Grep` to extract import/include/require statements:
 Map each import to its source module. Only record **intra-project** imports — ignore stdlib and third-party packages. A dependency exists when module A imports module B and B is in the discovered module set.
 
 Normalize identifiers to short PascalCase labels for graph readability (e.g., `src/api/handler.ts` → `ApiHandler`, `auth/users.py` → `AuthUsers`).
+
+### Step 2b: Extract Cross-Language Invocations from Skill/Agent/Command Docs
+
+*Skip this step if no `plugin.json` was found in Step 1b-ii.*
+
+For each `skill-doc` node (SKILL.md, agent `.md`, command `.md`) discovered in Step 1b-ii, use `Grep` to find shell invocations that cross language boundaries. Scan both inline backtick code spans and fenced code block lines.
+
+| Grep pattern (applied per file) | Edge type | Example match in this repo |
+|---|---|---|
+| `` `node\s+["']?\$\{[^}]+\}[^`\s'"]+`` or `` `node\s+[^\s`'"]+`` | `invokes` | `` `node "${CLAUDE_SKILL_DIR}/scripts/parser/parse.mjs" "$ARGUMENTS"` `` |
+| `` `uv run\s+(?:--\S+\s+)*[^\s`'"]+\.py`` | `spawns` | `` `uv run plugins/dh/scripts/migrate.py` `` |
+| `` `python3?\s+[^\s`'"]+\.py`` | `spawns` | `` `python3 /tmp/cycle_detect.py` `` |
+
+Also scan YAML frontmatter `command:` fields with pattern `^command:\s*(.+)$`.
+
+For each match, record an edge:
+
+- **Source:** the Markdown file path (normalized relative to project root)
+- **Target:** the resolved script path — strip `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PLUGIN_ROOT}` placeholders, resolving them against the Markdown file's own directory
+- **Edge label:** `invokes` (Node.js target) or `spawns` (Python target via `uv run` or `python3`)
+
+Node ID convention for Markdown files: last two path segments joined in PascalCase — e.g., `work-backlog-item/SKILL.md` → `WorkBacklogItemSkill`, `agents/architect.md` → `AgentsArchitect`.
+
+### Step 2c: Extract Hook Event → Script Edges from Hook Configs
+
+*Skip this step if no `plugin.json` was found in Step 1b-ii.*
+
+For each `hook-config` node (`hooks.json`, `.claude/settings.json`) discovered in Step 1b-ii, read the file as JSON and walk the hook event structure:
+
+1. For each top-level event key (`SessionStart`, `PreToolUse`, `PostToolUse`, `TaskCompleted`, `Stop`, `SubagentStart`, `SubagentStop`, etc.), collect every `"command"` string from all nested `"hooks"` arrays.
+2. Extract the script path from each command string:
+   - Pattern `node\s+"?\$\{CLAUDE_PLUGIN_ROOT\}([^"]+\.(cjs|mjs))"?` → `hook-script` node; resolve against the `hooks.json` directory
+   - Pattern `uv run\s+([^\s]+\.py)` → `pep723-script` node
+3. Record an edge:
+   - **Source:** virtual node `{PluginDirName}Hook:{EventName}` (e.g., `DevelopmentHarnessHookSessionStart`)
+   - **Target:** resolved script path
+   - **Edge label:** `fires`
+
+**Example** (from `plugins/development-harness/hooks/hooks.json`):
+
+```json
+"SessionStart": [{"hooks": [{"command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-session-id.cjs\""}]}]
+```
+
+→ Edge: `DevelopmentHarnessHookSessionStart` **--fires→** `hooks/session-start-session-id.cjs`
+
+### Step 2d: Extract PEP 723 Inline Dependencies and `uv run` Spawn Edges
+
+*Skip this step if no `plugin.json` was found in Step 1b-ii.*
+
+**PEP 723 inline dependency blocks**
+
+For each `pep723-script` node (Python file whose first line matches `#!/usr/bin/env.*--script`), extract its inline `# /// script` metadata block:
+
+```bash
+grep -n "# ///" <file>
+```
+
+Read all lines between the `# /// script` marker and the closing `# ///`. Extract each quoted package name from `dependencies = [...]`. Record these as `ext-pkg` nodes connected to the script with `depends-on` edges. Render them as light-grey hexagon nodes (`{{pkg-name}}` in Mermaid) — they convey runtime requirements without polluting the coupling analysis.
+
+**`uv run <path>` spawn edges across all source files**
+
+Search all in-scope files for `uv run` invocations that reference a local `.py` path:
+
+```bash
+grep -rn "uv run[^|&;&\n]*\.py" <scope-root> \
+  --include="*.py" --include="*.cjs" --include="*.mjs" --include="*.md"
+```
+
+For each match where the referenced path resolves to a file in the project tree, record an edge:
+
+- **Source:** the file containing the invocation
+- **Target:** the resolved `.py` path
+- **Edge label:** `spawns`
+
+This connects, for example, a `.cjs` hook that calls `uv run scripts/foo.py` directly to the Python script in the graph.
+
+**MCP tool call references**
+
+In Markdown files (`skill-doc` nodes), scan for `mcp__<server>__<tool>` patterns (e.g., `mcp__plugin_dh_backlog__artifact_register`). Record each distinct tool name as an `mcp-call` node (Mermaid hexagon shape: `{{mcp__server__tool}}`) with a `calls` edge from the containing Markdown file. Group all calls to the same MCP server under one server node to avoid node explosion.
 
 ### Step 3: Detect Circular Dependencies
 
@@ -560,3 +652,5 @@ flowchart TD
 | 🟡 Yellow (`#FFD700`) | High coupling (degree ≥ 10) — high change-propagation risk | Extract a façade or split responsibilities across smaller modules |
 | 🟢 Green (`#44BB44`) | Clean — no circular dependency, low coupling | No action required |
 | 🔵 Conway violation | Cluster boundary misaligns with team/ownership boundary | Align module groupings with team boundaries, or restructure CODEOWNERS to match the actual dependency clusters |
+| 🟤 Brown dashed edge | Cross-language invocation (`invokes`, `fires`, `spawns`) — e.g., SKILL.md → parse.mjs, hooks.json → session-start.cjs, hook → uv run script | Verify the target script exists; ensure input/output contract is documented |
+| ⬜ Light grey hexagon | External PEP 723 package dependency (`ext-pkg`) or MCP tool call (`mcp-call`) | No action unless the package has known vulnerabilities or the MCP tool is undocumented |
