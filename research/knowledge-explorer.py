@@ -59,12 +59,26 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 # ---------------------------------------------------------------------------
 
 KB_ROOT: Path = Path(__file__).parent.resolve()
+_SCRIPT_PATH: Path = Path(__file__).resolve()
 _LEVENSHTEIN_MAX_DISTANCE: int = 2
 _MAX_SUGGESTIONS: int = 3
 _MIN_GITHUB_PATH_PARTS: int = 2
 _DEFAULT_REVIEW_DAYS: int = 90
 _NAME_MAX_LEN: int = 64
 _README_DESC_MAX_LEN: int = 220
+_CATEGORY_ACRONYMS: dict[str, str] = {
+    "ai": "AI",
+    "ui": "UI",
+    "ux": "UX",
+    "llm": "LLM",
+    "mcp": "MCP",
+    "api": "API",
+    "sdk": "SDK",
+    "cli": "CLI",
+    "qa": "QA",
+    "ci": "CI",
+    "cd": "CD",
+}
 
 VALID_CATEGORIES: frozenset[str] = frozenset({
     "agent-frameworks",
@@ -449,7 +463,9 @@ def _build_readme_row(entry: KBEntry) -> str:
         Markdown table row string.
     """
     today_iso = datetime.now(tz=UTC).date().isoformat()
-    summary = _normalize_readme_description(_extract_first_paragraph(entry.body) or entry.name)
+    first_paragraph = _extract_first_paragraph(entry.body)
+    summary_source = entry.name if first_paragraph is None else first_paragraph
+    summary = _normalize_readme_description(summary_source)
     return f"| [{entry.topic}.md](./{entry.category}/{entry.topic}.md) | {summary} | {today_iso} |"
 
 
@@ -483,7 +499,7 @@ def _readme_paths_from_text(text: str) -> set[str]:
 
 def _discover_research_markdown_paths(kb_root: Path) -> set[str]:
     """Return all research markdown paths relative to kb_root."""
-    excluded = {kb_root / "README.md", kb_root / "knowledge-explorer.py"}
+    excluded = {kb_root / "README.md", _SCRIPT_PATH}
     return {str(path.relative_to(kb_root)).replace("\\", "/") for path in kb_root.rglob("*.md") if path not in excluded}
 
 
@@ -631,21 +647,8 @@ def _format_category_title(category: str) -> str:
     if category == "(root)":
         return "Root Research Entries"
 
-    acronym_words = {
-        "ai": "AI",
-        "ui": "UI",
-        "ux": "UX",
-        "llm": "LLM",
-        "mcp": "MCP",
-        "api": "API",
-        "sdk": "SDK",
-        "cli": "CLI",
-        "qa": "QA",
-        "ci": "CI",
-        "cd": "CD",
-    }
     parts = category.split("-")
-    return " ".join(acronym_words.get(part.lower(), part.capitalize()) for part in parts)
+    return " ".join(_CATEGORY_ACRONYMS.get(part.lower(), part.capitalize()) for part in parts)
 
 
 def _append_category_section(lines: list[str], category: str, rows: list[str]) -> None:
@@ -1846,7 +1849,7 @@ def list_kb(
 
 @app.command("sync-readme")
 def sync_readme(
-    check: Annotated[
+    read_only: Annotated[
         bool,
         typer.Option(
             "--check", help="Report missing/stale README links without writing. Exits non-zero when drift is found."
@@ -1854,7 +1857,7 @@ def sync_readme(
     ] = False,
 ) -> None:
     """Reconcile README index links with markdown files under research/."""
-    result = reconcile_readme_index(KB_ROOT, write=not check)
+    result = reconcile_readme_index(KB_ROOT, write=not read_only)
     has_drift = bool(result.missing_links or result.stale_links)
 
     if result.added_rows:
@@ -1865,7 +1868,7 @@ def sync_readme(
         console.print("[yellow]Stale README links (no matching file):[/yellow]")
         for stale in result.stale_links:
             console.print(f"  - {stale}")
-    if check and has_drift:
+    if read_only and has_drift:
         if result.missing_links:
             console.print("[yellow]Missing README links:[/yellow]")
             for missing in result.missing_links:
