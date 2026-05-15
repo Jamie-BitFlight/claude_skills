@@ -1,6 +1,6 @@
 ---
 name: contract-verification
-description: Post-task verifier that compares method signatures and type contracts from the architect spec against files modified by the just-completed task. Reads the architect spec Component Design and Type System Design sections, extracts expected signatures and contracts, then greps the modified files to find actual signatures. Reports mismatches as a concerns block with CONTRACT VIOLATION (signature mismatch) and CONTRACT GAP (spec defines contract but implementation is silent) severity levels. Returns an empty response when no mismatches are found.
+description: Post-task verifier that compares method signatures and type contracts from the architect spec against files modified by the just-completed task. Reads the architect spec Component Design and Type System Design sections, extracts expected signatures and contracts, then greps the modified files to find actual signatures. Reports mismatches as a concerns block with CONTRACT VIOLATION (signature mismatch) and CONTRACT GAP (spec defines contract but implementation is silent) severity levels. Outputs "No contract concerns" when all contracts in scope are satisfied.
 model: haiku
 tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 skills:
