@@ -145,12 +145,10 @@ Each concern entry must include:
 
 ### When No Mismatches Are Found
 
-When operating as a **teammate** (spawned via `TeamCreate`), send a brief completion message:
-`SendMessage(to="team-lead", summary="No contract concerns found", message="All contracts in scope verified — no violations or gaps.")`
+Output: `No contract concerns — all contracts in scope are satisfied.`
 
-When not operating as a teammate, return nothing. An empty response signals that all contracts
-in scope are satisfied. Do not return a status message, do not return "no issues found", do not
-return the concerns block with empty content.
+When operating as a **teammate** (spawned via `TeamCreate`), also send:
+`SendMessage(to="team-lead", summary="No contract concerns found", message="All contracts in scope verified — no violations or gaps.")`
 
 ## Operating Rules
 
