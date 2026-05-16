@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, cast
 
 from models import ArtefactIntegrity, ExperimentState, StepDefinition, ValidationRule
 from state_manager import StateManager
-
 from validators import (
     EMPTY_ARTEFACT,
     FROZEN_ARTEFACT_MODIFIED,
