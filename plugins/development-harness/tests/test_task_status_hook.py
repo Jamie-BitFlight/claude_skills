@@ -45,6 +45,7 @@ _spec.loader.exec_module(_hook_mod)  # type: ignore[union-attr]
 _call_sam_task_state = _hook_mod._call_sam_task_state
 _call_sam_task_update = _hook_mod._call_sam_task_update
 _extract_plan_addr_from_path = _hook_mod._extract_plan_addr_from_path
+extract_task_info_from_prompt = _hook_mod.extract_task_info_from_prompt
 handle_subagent_stop = _hook_mod.handle_subagent_stop
 handle_activity_update = _hook_mod.handle_activity_update
 HookProfile = _hook_mod.HookProfile
@@ -106,6 +107,141 @@ def test_extract_plan_addr_from_path_short_address() -> None:
 
     # Assert
     assert result == "P1a2b3c4"
+
+
+# ---------------------------------------------------------------------------
+# extract_task_info_from_prompt — plan address form
+# ---------------------------------------------------------------------------
+
+
+def test_extract_task_info_from_prompt_plan_address_skill_invocation() -> None:
+    """Skill(skill='start-task', args='Pdec8934d --task T01') → (Path('Pdec8934d'), 'T01')."""
+    # Arrange
+    prompt = """Fix a confirmed code bug.
+
+Skill(skill="start-task", args="Pdec8934d --task T01")
+
+Working directory: /home/user/claude_skills"""
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T01"
+    assert task_file is not None
+    assert task_file == Path("Pdec8934d")
+
+
+def test_extract_task_info_from_prompt_plan_address_different_task() -> None:
+    """Skill(skill='start-task', args='Pdec8934d --task T22') → (Path('Pdec8934d'), 'T22')."""
+    # Arrange
+    prompt = "Skill(skill='start-task', args='Pdec8934d --task T22')"
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T22"
+    assert task_file is not None
+    assert task_file == Path("Pdec8934d")
+
+
+def test_extract_task_info_from_prompt_slash_command_plan_address() -> None:
+    """/start-task Pdec8934d --task T01 (literal slash-command form with plan address)."""
+    # Arrange
+    prompt = "Run /start-task Pdec8934d --task T01 in the working directory."
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T01"
+    assert task_file is not None
+    assert task_file == Path("Pdec8934d")
+
+
+def test_extract_task_info_from_prompt_plan_address_longer_hex() -> None:
+    """Plan address with longer hex ID is matched correctly."""
+    # Arrange
+    prompt = 'Skill(skill="start-task", args="Pf4281187abcd --task T05")'
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T05"
+    assert task_file is not None
+    assert task_file == Path("Pf4281187abcd")
+
+
+# ---------------------------------------------------------------------------
+# extract_task_info_from_prompt — file path form (regression tests)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_task_info_from_prompt_file_path_md_skill_invocation() -> None:
+    """File path (.md) in Skill() args still parses correctly (regression)."""
+    # Arrange
+    prompt = 'Skill(skill="start-task", args="plan/Pf4281187-feature.md --task T1")'
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T1"
+    assert task_file is not None
+    assert str(task_file) == "plan/Pf4281187-feature.md"
+
+
+def test_extract_task_info_from_prompt_file_path_yaml_skill_invocation() -> None:
+    """File path (.yaml) in Skill() args still parses correctly (regression)."""
+    # Arrange
+    prompt = 'Skill(skill="start-task", args="plan/Pf4281187-feature.yaml --task T2")'
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T2"
+    assert task_file is not None
+    assert str(task_file) == "plan/Pf4281187-feature.yaml"
+
+
+def test_extract_task_info_from_prompt_slash_command_file_path() -> None:
+    """/start-task with .md file path parses correctly (regression)."""
+    # Arrange
+    prompt = "/start-task plan/Pf4281187-feature.md --task T3"
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T3"
+    assert task_file is not None
+    assert str(task_file) == "plan/Pf4281187-feature.md"
+
+
+def test_extract_task_info_from_prompt_returns_none_when_no_match() -> None:
+    """A prompt with no start-task invocation returns (None, None)."""
+    # Arrange
+    prompt = "This is a generic task description with no skill invocation."
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_file is None
+    assert task_id is None
+
+
+def test_extract_task_info_from_prompt_empty_returns_none() -> None:
+    """An empty prompt returns (None, None)."""
+    # Act
+    task_file, task_id = extract_task_info_from_prompt("")
+
+    # Assert
+    assert task_file is None
+    assert task_id is None
 
 
 # ---------------------------------------------------------------------------
