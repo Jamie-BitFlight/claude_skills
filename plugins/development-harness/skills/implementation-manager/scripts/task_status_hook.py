@@ -244,36 +244,46 @@ def extract_task_info_from_args(args: str) -> tuple[Path | None, str | None]:
 def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]:
     """Extract task file path and task ID from sub-agent prompt.
 
+    Accepts two arg forms for the plan argument:
+    - File path form: ``<path>.md`` or ``<path>.yaml``
+    - Plan address form: ``P[0-9a-f]+`` (e.g. ``Pdec8934d``)
+
     Args:
         prompt: The sub-agent's prompt string.
 
     Returns:
         Tuple of (task_file_path, task_id) or (None, None) if not extractable.
+        When the plan argument is a plan address (not a file path), task_file_path
+        is returned as ``Path(plan_address)`` so callers receive the address string
+        via ``task_file_path.name``.
     """
     if not prompt:
         return None, None
 
-    # Look for /start-task invocation pattern in the prompt
-    # Pattern 1: /start-task <path> --task <id>  (literal slash-command)
-    # Matches both .md and .yaml task file extensions.
-    match = re.search(rf"/start-task\s+([^\s]+\.(?:md|yaml))(?:\s+--task\s+({_TASK_ID_RE}))?", prompt)
+    # Plan argument pattern: file path (.md/.yaml) OR plan address (P<hex>).
+    # Named group ``plan`` captures whichever form is present.
+    PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
+
+    # Pattern 1: /start-task <plan-arg> --task <id>  (literal slash-command)
+    # Matches both file-path form and plan-address form.
+    match = re.search(rf"/start-task\s+{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt)
     if match:
-        task_file = Path(match.group(1))
-        task_id = match.group(2)
+        task_file = Path(match.group("plan"))
+        task_id = match.group("task_id")
         return task_file, task_id
 
-    # Pattern 2: Skill(skill="start-task", args="<path> --task <id>")
+    # Pattern 2: Skill(skill="start-task", args="<plan-arg> --task <id>")
     # The orchestrator invokes start-task via the Skill tool, not as a literal command.
-    # Matches both .md and .yaml task file extensions.
+    # Matches both file-path form and plan-address form.
     skill_match = re.search(
         rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
-        rf"([^\s\"']+\.(?:md|yaml))(?:\s+--task\s+({_TASK_ID_RE}))?"
+        rf"{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?"
         rf'["\']',
         prompt,
     )
     if skill_match:
-        task_file = Path(skill_match.group(1))
-        task_id = skill_match.group(2)
+        task_file = Path(skill_match.group("plan"))
+        task_id = skill_match.group("task_id")
         return task_file, task_id
 
     return None, None
