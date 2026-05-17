@@ -118,7 +118,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
     Resolution order when *name* is ``None``:
 
     1. ``TASKBACKEND`` environment variable.
-    2. ``[backend] name`` in ``taskbackend.toml`` (project root or ``~/.dh/``).
+    2. ``task.backend`` in ``.dh/config.yaml`` (project or user home dir, via DHConfig).
     3. Default: ``"local"``.
 
     Args:

@@ -302,3 +302,190 @@ class TestAppendTask:
 
         with pytest.raises(TaskValidationError):
             provider.append_task(plan_id, _task_def("T01", "Duplicate"))  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# TestSubprocessCallCounts — TDD tests for efficiency fixes (currently xfail)
+#
+# Tests A and B assert subprocess-count invariants that break under the current
+# N+1 and once-per-plan patterns.  They are marked xfail(strict=True) so that:
+#   - Today:       tests XFAIL (expected — current code is inefficient)
+#   - After fix:   tests XPASS, which strict=True converts to a test ERROR,
+#                  forcing the xfail marker to be removed when the fix lands.
+#
+# The PlanNotFoundError contract test (Test C, second assertion) is NOT marked
+# xfail because the current code already raises PlanNotFoundError correctly —
+# that test passes today and must keep passing after the fix.
+# ---------------------------------------------------------------------------
+
+
+class TestSubprocessCallCounts:
+    """Subprocess call-count assertions for the three efficiency fixes.
+
+    Uses _FakeBdRunner.json_calls and .text_calls to verify exact subprocess
+    counts instead of merely checking that results are correct.
+    """
+
+    # ------------------------------------------------------------------
+    # Test A — read_plan: N+1 bd show calls must become 1+constant
+    # ------------------------------------------------------------------
+
+    @pytest.mark.parametrize("task_count", [1, 3, 5])
+    def test_read_plan_batch_fetches_tasks(
+        self, plan_id_and_runner: tuple[str, _FakeBdRunner], task_count: int
+    ) -> None:
+        """read_plan must issue exactly 1 bd show (epic) + 1 bd list (children batch).
+
+        The current code issues 1 bd show for the epic plus N individual bd show
+        calls for each task — a classic N+1 pattern.  After Fix A the N individual
+        shows are replaced by a single bd list --parent <epic_id> call.
+
+        Parametrized over task_count to prove the O(1) invariant regardless of
+        how many tasks the plan contains.
+        """
+        plan_id, runner = plan_id_and_runner
+
+        # Arrange: add task_count tasks to the plan
+        epic_id = runner._memory[f"dh.plan-index.{plan_id}"]
+        for i in range(task_count):
+            make_task_record(runner, plan_id, f"T{i:02d}", title=f"Task {i}", parent_id=epic_id)
+
+        # Register a handler for bd list --parent so the batch call succeeds.
+        # We patch run_json to intercept "list" with "--parent" and return the
+        # child issues that are already in runner._issues with that parent.
+        original_run_json = runner.run_json
+
+        def _patched_run_json(argv: list[str]) -> object:  # type: ignore[override]
+            args = list(argv)
+            runner.json_calls.append(args)
+            if args[0] == "list" and "--parent" in args:
+                parent_idx = args.index("--parent")
+                parent_id = args[parent_idx + 1]
+                return [
+                    issue
+                    for issue in runner._issues.values()
+                    if isinstance(issue.get("metadata"), dict) and issue["metadata"].get("parent") == parent_id
+                ]
+            # Delegate everything else to the original (without double-appending)
+            runner.json_calls.pop()  # remove the one we just appended
+            return original_run_json(argv)
+
+        runner.run_json = _patched_run_json  # type: ignore[method-assign]
+        runner.json_calls.clear()
+
+        # Act
+        provider = BeadsTaskProvider(runner=runner)
+        provider.read_plan(plan_id)
+
+        # Assert: exactly 1 show (for the epic) and exactly 1 list (batch children)
+        show_calls = [c for c in runner.json_calls if c[0] == "show"]
+        list_calls = [c for c in runner.json_calls if c[0] == "list"]
+
+        assert len(show_calls) == 1, (
+            f"Expected exactly 1 bd show (for epic), got {len(show_calls)} "
+            f"with {task_count} tasks. Current code issues 1 + {task_count} shows."
+        )
+        assert len(list_calls) == 1, (
+            f"Expected exactly 1 bd list --parent (batch), got {len(list_calls)} with {task_count} tasks."
+        )
+        assert "--parent" in list_calls[0], "The bd list call must use --parent <epic_id>"
+
+    # ------------------------------------------------------------------
+    # Test B — list_plans: bd memories must be called exactly once
+    # ------------------------------------------------------------------
+
+    def test_list_plans_calls_bd_memories_once(self, fake_runner: _FakeBdRunner) -> None:
+        """list_plans must issue bd memories exactly once regardless of plan count.
+
+        The current code calls _task_index(plan_id) for each plan entry found in
+        the remember store.  Each _task_index call triggers _remember_list() which
+        issues bd memories --json.  With 3 plans this produces 4 memories calls
+        (1 outer + 3 per-plan).  After the fix, a single one-pass bucketing replaces
+        the repeated calls.
+        """
+        runner = fake_runner
+
+        # Arrange: 3 independent plans, each with 2 tasks
+        for plan_num in range(3):
+            plan_id = f"Plist{plan_num:04d}"
+            epic_id = runner._new_id()
+            runner._issues[epic_id] = runner._make_issue(
+                epic_id, f"plan-{plan_num}", issue_type="epic", description=f"goal {plan_num}"
+            )
+            runner._memory[f"dh.plan-index.{plan_id}"] = epic_id
+            for task_num in range(2):
+                make_task_record(runner, plan_id, f"T{task_num:02d}", title=f"Task {task_num}", parent_id=epic_id)
+
+        runner.json_calls.clear()
+
+        # Act
+        provider = BeadsTaskProvider(runner=runner)
+        provider.list_plans()
+
+        # Assert: bd memories --json called exactly once
+        memories_calls = [c for c in runner.json_calls if c == ["memories", "--json"]]
+        assert len(memories_calls) == 1, (
+            f"Expected bd memories to be called exactly once, got {len(memories_calls)}. "
+            "Current code calls it once per plan via _task_index."
+        )
+
+    # ------------------------------------------------------------------
+    # Test C — _bd_id_for_task: exactly 1 bd recall on the hot path
+    # ------------------------------------------------------------------
+
+    def test_bd_id_for_task_single_recall_on_hot_path(self, plan_id_and_runner: tuple[str, _FakeBdRunner]) -> None:
+        """_bd_id_for_task must issue exactly 1 bd recall when the task exists.
+
+        Current code:
+            1. _epic_id_for_plan → _remember_get → bd recall (plan key)
+            2. _remember_get → bd recall (task key)
+        Total: 2 recalls.
+
+        After Fix B (happy-path optimization):
+            1. _remember_get → bd recall (task key — hit on hot path)
+        Total: 1 recall.  Plan-existence check deferred to error path.
+        """
+        plan_id, runner = plan_id_and_runner
+        epic_id = runner._memory[f"dh.plan-index.{plan_id}"]
+        make_task_record(runner, plan_id, "T01", title="Hot path task", parent_id=epic_id)
+        runner.text_calls.clear()
+
+        # Act
+        provider = BeadsTaskProvider(runner=runner)
+        provider._bd_id_for_task(plan_id, "T01")
+
+        # Assert: exactly 1 bd recall on the hot path
+        recall_calls = [c for c in runner.text_calls if c[0] == "recall"]
+        assert len(recall_calls) == 1, (
+            f"Expected exactly 1 bd recall on hot path (task exists), got {len(recall_calls)}. "
+            "Current code issues 2 recalls (plan check + task check)."
+        )
+
+    def test_bd_id_for_task_raises_plan_not_found_for_unknown_plan(self, fake_runner: _FakeBdRunner) -> None:
+        """_bd_id_for_task must raise PlanNotFoundError when the plan does not exist.
+
+        This is a regression-protection test for the Fix B contract requirement:
+        the plan-existence check is deferred to the error path but must still fire
+        when the task key is absent and the plan also doesn't exist.
+
+        This test passes today and must keep passing after Fix B lands.
+        """
+        provider = BeadsTaskProvider(runner=fake_runner)
+        with pytest.raises(PlanNotFoundError):
+            provider._bd_id_for_task("Pnonexistent", "T01")
+
+    def test_bd_id_for_task_raises_task_not_found_when_plan_exists(
+        self, plan_id_and_runner: tuple[str, _FakeBdRunner]
+    ) -> None:
+        """_bd_id_for_task must raise TaskNotFoundError when plan exists but task absent.
+
+        Verifies that the error-path distinction between PlanNotFoundError and
+        TaskNotFoundError is preserved after Fix B.  The plan is registered so
+        the plan-existence check on the error path succeeds; but the task key
+        is absent, so TaskNotFoundError must be raised instead.
+        """
+        plan_id, runner = plan_id_and_runner
+
+        provider = BeadsTaskProvider(runner=runner)
+        with pytest.raises(TaskNotFoundError):
+            provider._bd_id_for_task(plan_id, "Tnonexistent")
