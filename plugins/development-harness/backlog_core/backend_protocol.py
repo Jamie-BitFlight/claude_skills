@@ -19,7 +19,7 @@ from __future__ import annotations
 import contextlib
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, runtime_checkable
 
 if TYPE_CHECKING:
     import types
@@ -1050,25 +1050,25 @@ def create_backend(name: str | None = None) -> BacklogBackend:
         # Deferred import: backends import TypedDicts from this module — circular at top level.
         from backlog_core.backends.github_backend import GitHubBackend  # noqa: PLC0415
 
-        return cast("BacklogBackend", GitHubBackend())
+        return GitHubBackend()
 
     if resolved == "memory":
         # Deferred import: backends import TypedDicts from this module — circular at top level.
         from backlog_core.backends.memory_backend import InMemoryBackend  # noqa: PLC0415
 
-        return cast("BacklogBackend", InMemoryBackend())
+        return InMemoryBackend()
 
     if resolved == "sqlite":
         # Deferred import: backends import TypedDicts from this module — circular at top level.
         from backlog_core.backends.sqlite_backend import SQLiteBackend  # noqa: PLC0415
 
-        return cast("BacklogBackend", SQLiteBackend())
+        return SQLiteBackend()
 
     if resolved == "beads":
         # Deferred import: BeadsBackend is added in T05/T06 — circular at top level.
         from backlog_core.backends.beads_backend import BeadsBackend  # noqa: PLC0415
 
-        return cast("BacklogBackend", BeadsBackend())
+        return BeadsBackend()
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
     raise ValueError(msg)
