@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from subprocess import CompletedProcess, SubprocessError, TimeoutExpired
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -115,9 +115,11 @@ def test_extract_plan_addr_from_path_short_address() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_extract_task_info_from_prompt_plan_address_skill_invocation() -> None:
-    """Skill(skill='start-task', args='Pdec8934d --task T01') → (Path('Pdec8934d'), 'T01')."""
+def test_extract_task_info_from_prompt_plan_address_skill_invocation(tmp_path: Path) -> None:
+    """Skill(skill='start-task', args='Pdec8934d --task T01') resolves plan address to real path."""
     # Arrange
+    resolved = tmp_path / "Pdec8934d-my-feature.yaml"
+    resolved.touch()
     prompt = """Fix a confirmed code bug.
 
 Skill(skill="start-task", args="Pdec8934d --task T01")
@@ -125,54 +127,77 @@ Skill(skill="start-task", args="Pdec8934d --task T01")
 Working directory: /home/user/claude_skills"""
 
     # Act
-    task_file, task_id = extract_task_info_from_prompt(prompt)
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved) as mock_resolve:
+        task_file, task_id = extract_task_info_from_prompt(prompt)
 
     # Assert
     assert task_id == "T01"
-    assert task_file is not None
-    assert task_file == Path("Pdec8934d")
+    assert task_file == resolved
+    mock_resolve.assert_called_once_with("Pdec8934d", ANY)
 
 
-def test_extract_task_info_from_prompt_plan_address_different_task() -> None:
-    """Skill(skill='start-task', args='Pdec8934d --task T22') → (Path('Pdec8934d'), 'T22')."""
+def test_extract_task_info_from_prompt_plan_address_different_task(tmp_path: Path) -> None:
+    """Skill(skill='start-task', args='Pdec8934d --task T22') resolves plan address."""
     # Arrange
+    resolved = tmp_path / "Pdec8934d-my-feature.yaml"
+    resolved.touch()
     prompt = "Skill(skill='start-task', args='Pdec8934d --task T22')"
 
     # Act
-    task_file, task_id = extract_task_info_from_prompt(prompt)
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved) as mock_resolve:
+        task_file, task_id = extract_task_info_from_prompt(prompt)
 
     # Assert
     assert task_id == "T22"
-    assert task_file is not None
-    assert task_file == Path("Pdec8934d")
+    assert task_file == resolved
+    mock_resolve.assert_called_once_with("Pdec8934d", ANY)
 
 
-def test_extract_task_info_from_prompt_slash_command_plan_address() -> None:
+def test_extract_task_info_from_prompt_slash_command_plan_address(tmp_path: Path) -> None:
     """/start-task Pdec8934d --task T01 (literal slash-command form with plan address)."""
     # Arrange
+    resolved = tmp_path / "Pdec8934d-my-feature.yaml"
+    resolved.touch()
     prompt = "Run /start-task Pdec8934d --task T01 in the working directory."
 
     # Act
-    task_file, task_id = extract_task_info_from_prompt(prompt)
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved) as mock_resolve:
+        task_file, task_id = extract_task_info_from_prompt(prompt)
 
     # Assert
     assert task_id == "T01"
-    assert task_file is not None
-    assert task_file == Path("Pdec8934d")
+    assert task_file == resolved
+    mock_resolve.assert_called_once_with("Pdec8934d", ANY)
 
 
-def test_extract_task_info_from_prompt_plan_address_longer_hex() -> None:
-    """Plan address with longer hex ID is matched correctly."""
+def test_extract_task_info_from_prompt_plan_address_longer_hex(tmp_path: Path) -> None:
+    """Plan address with longer hex ID is resolved to real path."""
     # Arrange
+    resolved = tmp_path / "Pf4281187abcd-slug.yaml"
+    resolved.touch()
     prompt = 'Skill(skill="start-task", args="Pf4281187abcd --task T05")'
 
     # Act
-    task_file, task_id = extract_task_info_from_prompt(prompt)
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved) as mock_resolve:
+        task_file, task_id = extract_task_info_from_prompt(prompt)
 
     # Assert
     assert task_id == "T05"
-    assert task_file is not None
-    assert task_file == Path("Pf4281187abcd")
+    assert task_file == resolved
+    mock_resolve.assert_called_once_with("Pf4281187abcd", ANY)
+
+
+def test_extract_task_info_from_prompt_plan_address_not_found() -> None:
+    """When plan address cannot be resolved, (None, None) is returned."""
+    from sam_schema.core.addressing import AddressingError
+
+    prompt = 'Skill(skill="start-task", args="Pdead0000 --task T01")'
+
+    with patch.object(_hook_mod, "resolve_plan_address", side_effect=AddressingError("Pdead0000", Path("/plan"))):
+        task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    assert task_file is None
+    assert task_id is None
 
 
 # ---------------------------------------------------------------------------
