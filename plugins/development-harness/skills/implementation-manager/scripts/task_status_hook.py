@@ -984,7 +984,10 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
 
     current_task = _call_sam_task_read(plan_addr, task_id)
     if current_task is None:
-        # MCP read failed — best-effort: clean up and exit silently.
+        print(
+            f"[hook] SubagentStop: could not read task {task_id} from plan {plan_addr} via MCP — skipping",
+            file=sys.stderr,
+        )
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
@@ -1040,7 +1043,12 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
         sys.exit(0)
 
     current_task = _call_sam_task_read(plan_addr, task_id)
-    if current_task is not None and current_task.status == SamTaskStatus.COMPLETE:
+    if current_task is None:
+        print(
+            f"[hook] PostToolUse: could not read task {task_id} from plan {plan_addr} via MCP — skipping",
+            file=sys.stderr,
+        )
+    elif current_task.status == SamTaskStatus.COMPLETE:
         return
 
     timestamp = get_iso_timestamp()

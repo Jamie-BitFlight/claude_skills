@@ -1093,3 +1093,82 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     assert not isinstance(plan_id, Path), "plan_id must NOT be a Path after refactor — filesystem abstraction removed"
     assert plan_id == "Pf4281187"
     assert task_id == "T1"
+
+
+# ---------------------------------------------------------------------------
+# handle_subagent_stop — stderr diagnostic when _call_sam_task_read returns None
+# ---------------------------------------------------------------------------
+
+
+def test_handle_subagent_stop_emits_stderr_when_mcp_read_returns_none(
+    mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """handle_subagent_stop prints a diagnostic to stderr when _call_sam_task_read returns None.
+
+    Verifies the silent failure case is now visible: before this fix the hook exited 0
+    without any message when the MCP read failed.
+    """
+    # Arrange
+    plan_id = "Pf4281187"
+    task_id = "T1"
+
+    hook_input: dict[str, Any] = {"cwd": "/workspace", "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    mocker.patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, task_id, None, None))
+    mocker.patch.object(_hook_mod, "_call_sam_task_read", create=True, return_value=None)
+    mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
+
+    # Act — exits 0 after printing the diagnostic
+    with pytest.raises(SystemExit) as exc_info:
+        handle_subagent_stop(hook_input)
+
+    # Assert — non-blocking exit
+    assert exc_info.value.code == 0
+
+    # Assert — diagnostic visible on stderr
+    captured = capsys.readouterr()
+    assert f"could not read task {task_id} from plan {plan_id} via MCP" in captured.err
+    assert "skipping" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# handle_activity_update — stderr diagnostic when _call_sam_task_read returns None
+# ---------------------------------------------------------------------------
+
+
+def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
+    mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """handle_activity_update prints a diagnostic to stderr when _call_sam_task_read returns None.
+
+    Verifies the silent failure case is now visible: before this fix the hook fell
+    through to the activity update without any indication the read had failed.
+    """
+    # Arrange — context file pointing to a plan with a valid plan address token
+    plan_file = tmp_path / "Pf4281187-feature.yaml"
+    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
+
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    import dh_paths
+
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    session_id = "sess-no-task"
+    context_file = context_dir / f"active-task-{session_id}.json"
+    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
+
+    mocker.patch.object(_hook_mod, "_call_sam_task_read", create=True, return_value=None)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+
+    # Act
+    handle_activity_update(hook_input)
+
+    # Assert — diagnostic visible on stderr
+    captured = capsys.readouterr()
+    assert "could not read task T1 from plan Pf4281187 via MCP" in captured.err
+    assert "skipping" in captured.err
+
+    # Assert — update still proceeds (best-effort activity tracking continues)
+    mock_update.assert_called_once()
