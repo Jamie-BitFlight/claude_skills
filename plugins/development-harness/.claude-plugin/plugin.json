@@ -7,6 +7,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "8.2.17",
 =======
   "version": "8.2.16",
@@ -26,6 +27,9 @@
 =======
   "version": "8.2.21",
 >>>>>>> a05d6c69 (fix(types): remove stale cast() suppressions from create_backend())
+=======
+  "version": "8.2.22",
+>>>>>>> 36308946 (fix(addressing): numeric plan ID comparison and slug multi-match behavior)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

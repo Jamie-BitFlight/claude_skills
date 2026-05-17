@@ -735,7 +735,7 @@ def test_issue_to_local_fields_maps_node_to_local_fields() -> None:
         "createdAt": "2026-01-01T00:00:00Z",
         "updatedAt": "2026-01-02T00:00:00Z",
         "labels": [{"id": "L1", "name": "bug"}],
-        "milestone": {"id": "M1", "number": 2, "title": "v1.0"},
+        "milestone": {"id": "M1", "number": 2, "title": "v1.0", "state": "OPEN", "dueOn": None},
         "assignees": [{"login": "alice"}],
     }
 
