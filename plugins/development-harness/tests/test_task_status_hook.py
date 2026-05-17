@@ -11,14 +11,18 @@ Covers:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess, SubprocessError, TimeoutExpired
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 # Ensure hook script is importable from repo root.
 _plugin_dir = Path(__file__).parent.parent
@@ -30,9 +34,6 @@ _repo_root = _plugin_dir.parent.parent
 _sam_packages = str(_repo_root / "packages")
 if _sam_packages not in sys.path:
     sys.path.insert(0, _sam_packages)
-
-# Import the module under test (not the shebang — import directly)
-import importlib.util
 
 _hook_path = _plugin_dir / "skills" / "implementation-manager" / "scripts" / "task_status_hook.py"
 _spec = importlib.util.spec_from_file_location("task_status_hook", _hook_path)
@@ -645,3 +646,252 @@ def test_handle_subagent_stop_exits_cleanly_when_state_fails(tmp_path: Path, mon
     assert exc_info.value.code == 0
     # Update should not be called if state failed
     mock_update.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _is_plan_address — predicate for bare plan address strings
+# ---------------------------------------------------------------------------
+
+
+def test_is_plan_address_standard_short_hex_returns_true() -> None:
+    """Pdec8934d is a valid plan address — 8 hex digits after P."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("Pdec8934d") is True  # type: ignore[attr-defined]
+
+
+def test_is_plan_address_seven_hex_digits_returns_true() -> None:
+    """P1a2b3c4 (7 hex digits) is a valid plan address."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("P1a2b3c4") is True  # type: ignore[attr-defined]
+
+
+def test_is_plan_address_longer_hex_returns_true() -> None:
+    """Pf4281187abcd (12 hex digits) is a valid plan address."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("Pf4281187abcd") is True  # type: ignore[attr-defined]
+
+
+def test_is_plan_address_file_path_form_returns_false() -> None:
+    """plan/P60d669b9.yaml contains a plan address but is a file path — must return False."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("plan/P60d669b9.yaml") is False  # type: ignore[attr-defined]
+
+
+def test_is_plan_address_bare_P_no_hex_digits_returns_false() -> None:
+    """'P' with no following hex digits is not a valid plan address."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("P") is False  # type: ignore[attr-defined]
+
+
+def test_is_plan_address_empty_string_returns_false() -> None:
+    """Empty string is not a valid plan address."""
+    # Arrange / Act / Assert
+    assert _hook_mod._is_plan_address("") is False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# handle_subagent_stop — plan-address path (currently broken: exits 0 at exists())
+# ---------------------------------------------------------------------------
+
+
+def test_handle_subagent_stop_plan_address_calls_sam_task_state_directly(tmp_path: Path, mocker: MockerFixture) -> None:
+    """When task_file_path is a bare plan address, _call_sam_task_state is called directly.
+
+    This test targets the CURRENTLY BROKEN path: handle_subagent_stop receives
+    Path("Pdec8934d") from _resolve_active_task_context, then constructs
+    full_path = cwd / Path("Pdec8934d"). That path does not exist on disk, so
+    the current code exits 0 before calling _call_sam_task_state.
+
+    After the fix, _is_plan_address("Pdec8934d") returns True and the code must
+    skip the exists() check and call _call_sam_task_state("Pdec8934d", "T01", "complete").
+    """
+    # Arrange — transcript with Skill() invocation using plan address
+    plan_address = "Pdec8934d"
+    task_id = "T01"
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    # _resolve_active_task_context returns the plan address as a bare Path
+    mocker.patch.object(
+        _hook_mod, "_resolve_active_task_context", return_value=(None, Path(plan_address), task_id, None, None)
+    )
+    mock_state = mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=True)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+    mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
+    # _fetch_task_for_stop_hook must NOT be called for plan-address path
+    mock_fetch = mocker.patch.object(_hook_mod, "_fetch_task_for_stop_hook")
+
+    # Act
+    handle_subagent_stop(hook_input)
+
+    # Assert — _call_sam_task_state called with plan address (not a file path)
+    mock_state.assert_called_once_with(plan_address, task_id, "complete")
+    # _call_sam_task_update called for timestamp
+    mock_update.assert_called_once()
+    update_args = mock_update.call_args[0]
+    assert update_args[0] == plan_address
+    assert update_args[1] == task_id
+    assert "completed" in update_args[2]
+    # _fetch_task_for_stop_hook must be skipped for plan-address path
+    mock_fetch.assert_not_called()
+
+
+def test_handle_subagent_stop_plan_address_state_fails_exits_zero(tmp_path: Path, mocker: MockerFixture) -> None:
+    """When plan-address path _call_sam_task_state returns False, hook exits 0 (best-effort).
+
+    After the fix, the hook should call cleanup and exit 0 — not exit 2 — when
+    the MCP state write fails. This mirrors existing behaviour for the file-path path.
+    """
+    # Arrange
+    plan_address = "Pdec8934d"
+    task_id = "T01"
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    mocker.patch.object(
+        _hook_mod, "_resolve_active_task_context", return_value=(None, Path(plan_address), task_id, None, None)
+    )
+    mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=False)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+    mock_cleanup = mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
+
+    # Act
+    with pytest.raises(SystemExit) as exc_info:
+        handle_subagent_stop(hook_input)
+
+    # Assert — exits 0 (not 2); update skipped on state failure; cleanup called
+    assert exc_info.value.code == 0
+    mock_update.assert_not_called()
+    mock_cleanup.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# handle_subagent_stop — file-path form regression
+# ---------------------------------------------------------------------------
+
+
+def test_handle_subagent_stop_file_path_calls_fetch_task_for_stop_hook(tmp_path: Path, mocker: MockerFixture) -> None:
+    """When task_file_path is a .yaml file path, _fetch_task_for_stop_hook IS called.
+
+    Regression test: ensures the file-path branch continues to work after the
+    plan-address short-circuit is added. _fetch_task_for_stop_hook must be called
+    (not skipped) for file-path forms.
+    """
+    # Arrange — plan file on disk
+    plan_file = tmp_path / "Pf4281187-feature.yaml"
+    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
+
+    from sam_schema.core.models import Task, TaskStatus
+
+    mock_task = MagicMock(spec=Task)
+    mock_task.status = TaskStatus.IN_PROGRESS
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    mocker.patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_file, "T1", None, None))
+    # _fetch_task_for_stop_hook should be called and return mock_task
+    mock_fetch = mocker.patch.object(_hook_mod, "_fetch_task_for_stop_hook", return_value=mock_task)
+    mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=True)
+    mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+    mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
+
+    # Act
+    handle_subagent_stop(hook_input)
+
+    # Assert — _fetch_task_for_stop_hook was called with the resolved file path
+    mock_fetch.assert_called_once()
+    fetch_args = mock_fetch.call_args[0]
+    assert fetch_args[0] == plan_file  # full_path
+    assert fetch_args[1] == "T1"  # task_id
+
+
+# ---------------------------------------------------------------------------
+# handle_subagent_stop — STRICT profile skipped on plan-address path
+# ---------------------------------------------------------------------------
+
+
+def test_handle_subagent_stop_strict_not_called_for_plan_address_path(mocker: MockerFixture) -> None:
+    """STRICT profile pre-completion checks are skipped when task_file_path is a bare plan address.
+
+    The plan-address branch (lines 1003-1005) returns early via
+    _complete_task_via_plan_address before reaching the STRICT profile check at
+    line 1025-1027. This ensures filesystem-free paths never attempt to open a
+    task file for validation.
+    """
+    # Arrange
+    plan_address = "Pdec8934d"
+    task_id = "T01"
+    hook_input: dict[str, Any] = {"cwd": "/tmp", "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    mocker.patch.object(
+        _hook_mod, "_resolve_active_task_context", return_value=(None, Path(plan_address), task_id, None, None)
+    )
+    mock_complete = mocker.patch.object(_hook_mod, "_complete_task_via_plan_address")
+    mock_strict = mocker.patch.object(_hook_mod, "run_strict_pre_completion_checks")
+
+    # Act
+    handle_subagent_stop(hook_input, profile=HookProfile.STRICT)
+
+    # Assert — plan-address branch taken; strict checks must not run
+    mock_complete.assert_called_once_with(plan_address, task_id, None, None)
+    mock_strict.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# handle_activity_update — plan-address guard exits 0 without MCP write
+# ---------------------------------------------------------------------------
+
+
+def test_handle_activity_update_exits_silently_when_context_contains_plan_address(mocker: MockerFixture) -> None:
+    """handle_activity_update exits 0 without calling _call_sam_task_update when context file
+    holds a bare plan address as task_file_path.
+
+    The defensive guard at lines 1076-1081 detects this form and exits cleanly.
+    This prevents a path-existence check against a non-filesystem address and
+    avoids triggering an MCP write with an invalid path.
+    """
+    # Arrange
+    hook_input: dict[str, Any] = {"cwd": "/tmp", "session_id": "sess-test", "hook_event_name": "PostToolUse"}
+    # read_task_context returns a bare plan address (the form stored in the context file)
+    mocker.patch.object(_hook_mod, "read_task_context", return_value=(Path("Pdec8934d"), "T01"))
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update")
+
+    # Act / Assert — exits 0 without calling MCP update
+    with pytest.raises(SystemExit) as exc_info:
+        handle_activity_update(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_update.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _complete_task_via_plan_address — calls update after successful state write
+# ---------------------------------------------------------------------------
+
+
+def test_complete_task_via_plan_address_calls_update_after_state_write(mocker: MockerFixture) -> None:
+    """_complete_task_via_plan_address calls _call_sam_task_update with completed timestamp
+    only after _call_sam_task_state returns True.
+
+    Verifies the MCP update carries the plan_addr, task_id, and a 'completed' key
+    so that callers of the plan-address completion path get the same timestamp
+    written as the file-path completion path.
+    """
+    # Arrange
+    plan_addr = "Pdec8934d"
+    task_id = "T01"
+
+    mock_state = mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=True)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+    mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
+
+    # Act
+    _hook_mod._complete_task_via_plan_address(plan_addr, task_id, None, None)
+
+    # Assert — state written first, then update with completed timestamp
+    mock_state.assert_called_once_with(plan_addr, task_id, "complete")
+    mock_update.assert_called_once()
+    update_args = mock_update.call_args[0]
+    assert update_args[0] == plan_addr
+    assert update_args[1] == task_id
+    assert "completed" in update_args[2]

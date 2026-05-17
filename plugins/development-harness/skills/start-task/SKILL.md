@@ -1,7 +1,7 @@
 ---
 name: start-task
 description: Use when executing a SAM task — claims the task via MCP to set it IN PROGRESS, writes active-task context for hooks, loads task-level skills, implements against acceptance criteria, and marks complete via --complete flag. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan file.
-argument-hint: <task-file-path> [--task <task-id>] [--complete <task-id>]
+argument-hint: <plan-address> [--task <task-id>] [--complete <task-id>]
 user-invocable: true
 hooks:
   PostToolUse:
@@ -25,7 +25,7 @@ $ARGUMENTS
 
 ## Parse Arguments
 
-- `task_file_path` (required): path to a `plan/tasks-*.md` file
+- `plan_address` (required): plan address in `P{hex}` form, e.g. `Pdec8934d`
 - `--task <id>` (optional): Task ID to start (defaults to first ready task)
 - `--complete <id>` (optional): Task ID to mark COMPLETE
 
@@ -111,7 +111,7 @@ $ARGUMENTS
    ```text
    mcp__plugin_dh_sam__sam_active_task(
        config={"action": "set", "plan": "P{N}", "task": "T{M}", "parent_issue_number": N},
-       session_id="${CLAUDE_SESSION_ID}"
+       session_id="${CLAUDE_CODE_SESSION_ID}"
    )
    ```
 
