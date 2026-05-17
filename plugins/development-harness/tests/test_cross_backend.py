@@ -33,7 +33,7 @@ Test layout:
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -100,7 +100,7 @@ def backend(request: pytest.FixtureRequest) -> BacklogBackend:
     # github — only reached when BACKLOG_CROSS_BACKEND_GITHUB is set
     from backlog_core.backends.github_backend import GitHubBackend
 
-    return cast("BacklogBackend", GitHubBackend())
+    return GitHubBackend()
 
 
 def _make_item(title: str = "Test Feature", description: str = "A test item") -> BacklogItem:

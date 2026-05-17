@@ -19,7 +19,7 @@ from __future__ import annotations
 import contextlib
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, cast, runtime_checkable
 
 if TYPE_CHECKING:
     import types
@@ -95,6 +95,8 @@ class MilestoneNode(TypedDict):
     id: str
     number: int
     title: str
+    dueOn: str | None
+    state: Literal["OPEN", "CLOSED"]
 
 
 class AssigneeNode(TypedDict):

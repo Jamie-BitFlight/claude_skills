@@ -16,13 +16,14 @@ import os
 import re
 import sys
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import dh_paths as _dh_paths
 from github import Auth, Github, GithubException
 from typing_extensions import TypedDict
 
 from . import models as _models
+from .backend_protocol import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .models import (
     TYPE_TO_LABEL,
     BackendAvailability,
@@ -111,44 +112,6 @@ def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-class LabelNode(TypedDict):
-    """Label node from GraphQL response."""
-
-    name: str
-    id: str
-
-
-class MilestoneNode(TypedDict):
-    """Minimal milestone reference embedded in issue responses."""
-
-    id: str
-    number: int
-    title: str
-    dueOn: str | None
-    state: Literal["OPEN", "CLOSED"]
-
-
-class AssigneeNode(TypedDict):
-    """Assignee node from GraphQL response."""
-
-    login: str
-
-
-class IssueNode(TypedDict):
-    """Single issue from GraphQL query. Maps to repository.issue or issues.nodes[]."""
-
-    id: str
-    number: int
-    title: str
-    state: str  # "OPEN" | "CLOSED"
-    body: str
-    createdAt: str
-    updatedAt: str
-    labels: list[LabelNode]  # flattened from labels.nodes
-    milestone: MilestoneNode | None
-    assignees: list[AssigneeNode]  # flattened from assignees.nodes
-
-
 class CreatedIssueNode(TypedDict):
     """Issue data returned from createIssue mutation."""
 
@@ -163,30 +126,6 @@ class CommentNode(TypedDict):
 
     id: str
     url: str
-
-
-class IssueCommentNode(TypedDict):
-    """Comment node returned from issue comments listing query."""
-
-    id: str
-    body: str
-    url: str
-    author: str
-    created_at: str
-    updated_at: str
-
-
-class MilestoneFullNode(TypedDict):
-    """Milestone from GraphQL query with issue counts."""
-
-    id: str
-    number: int
-    title: str
-    state: str  # "OPEN" | "CLOSED"
-    description: str
-    dueOn: str | None
-    openIssueCount: int  # derived from issues(states:[OPEN]).totalCount
-    closedIssueCount: int  # derived from issues(states:[CLOSED]).totalCount
 
 
 class SearchPRNode(TypedDict):

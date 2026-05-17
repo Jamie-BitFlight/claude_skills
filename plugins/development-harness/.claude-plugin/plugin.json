@@ -5,6 +5,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "8.2.17",
 =======
   "version": "8.2.16",
@@ -18,6 +19,9 @@
 =======
   "version": "8.2.19",
 >>>>>>> 0e407dea (refactor(tests): extract call_mcp_tool helper, fix dh_config YAML import)
+=======
+  "version": "8.2.20",
+>>>>>>> 498f0562 (fix(types): consolidate TypedDicts into backend_protocol, remove cast suppressions)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
