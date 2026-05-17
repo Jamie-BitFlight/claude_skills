@@ -40,7 +40,13 @@ from typing import TYPE_CHECKING, Any, Final
 
 import dh_paths
 from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
-from backlog_core.backends.beads_models import BeadsIssueRaw, BeadsStatus, parse_issue, parse_ready_list
+from backlog_core.backends.beads_models import (
+    BeadsIssueRaw,
+    BeadsStatus,
+    parse_issue,
+    parse_issue_list,
+    parse_ready_list,
+)
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
@@ -366,6 +372,11 @@ class BeadsTaskProvider:
     def _bd_id_for_task(self, plan_id: str, task_id: str) -> tuple[str, bool, str | None]:
         """Look up (bd_id, is_bookend, bookend_type) for a SAM task.
 
+        Uses a single bd recall on the hot path. The plan-existence check is
+        deferred to the error path to preserve PlanNotFoundError vs
+        TaskNotFoundError distinction without paying for two bd recall calls on
+        every successful lookup.
+
         Args:
             plan_id: SAM plan identifier.
             task_id: SAM task identifier.
@@ -377,17 +388,22 @@ class BeadsTaskProvider:
             PlanNotFoundError: When no epic is registered for plan_id.
             TaskNotFoundError: When task_id is not in the task index.
         """
-        self._epic_id_for_plan(plan_id)  # raises PlanNotFoundError if absent
+        # Hot path: 1 subprocess call. Fetch task key directly.
         raw = self._remember_get(f"{_TASK_IDX_PREFIX}{plan_id}.{task_id}")
-        if not raw:
-            raise TaskNotFoundError(plan_id, task_id)
-        try:
-            parsed = json.loads(raw)
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise TaskNotFoundError(plan_id, task_id) from exc
-        if not isinstance(parsed, dict) or "bd_id" not in parsed:
-            raise TaskNotFoundError(plan_id, task_id)
-        return parsed["bd_id"], bool(parsed.get("is_bookend", False)), parsed.get("bookend_type")
+        if raw:
+            try:
+                parsed = json.loads(raw)
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise TaskNotFoundError(plan_id, task_id) from exc
+            if not isinstance(parsed, dict) or "bd_id" not in parsed:
+                raise TaskNotFoundError(plan_id, task_id)
+            return parsed["bd_id"], bool(parsed.get("is_bookend", False)), parsed.get("bookend_type")
+
+        # Task key absent: distinguish missing-plan from missing-task (1 additional
+        # recall on the error path only). Contract: PlanNotFoundError when the plan
+        # does not exist; TaskNotFoundError when the plan exists but task is absent.
+        self._epic_id_for_plan(plan_id)  # raises PlanNotFoundError if plan absent
+        raise TaskNotFoundError(plan_id, task_id)
 
     def _create_task_issue(self, task: Task, epic_id: str) -> BeadsIssueRaw:
         """Create a child bd issue for a SAM task.
@@ -576,18 +592,59 @@ class BeadsTaskProvider:
 
         task_index = self._task_index(plan_id)
         task_data_list: list[TaskData] = []
+
+        # Batch fetch: replace N individual bd show calls with a single
+        # bd list --parent <epic_id>. Falls back to per-task shows when the
+        # --parent flag is unsupported or the response fails to parse.
+        children_by_bd_id: dict[str, BeadsIssueRaw] = {}
+        try:
+            raw_children = self._runner.run_json(["list", "--parent", epic_id])
+            children_by_bd_id = {issue.id: issue for issue in parse_issue_list(raw_children)}
+        except (BdInvocationError, ValidationError):
+            # bd list --parent unavailable or JSON invalid — fall back to per-task shows.
+            for task_id, meta in task_index.items():
+                bd_id = meta["bd_id"]
+                try:
+                    issue = parse_issue(self._runner.run_json(["show", bd_id]))
+                    td = _issue_to_task_data(issue, task_id, plan_id)
+                    if meta.get("is_bookend"):
+                        td["is_bookend"] = meta["is_bookend"]
+                    if meta.get("bookend_type") is not None:
+                        td["bookend_type"] = meta["bookend_type"]
+                    task_data_list.append(td)
+                except BdInvocationError:
+                    continue  # issue inaccessible; skip rather than fail whole plan
+            plan_data: PlanData = {
+                "plan_id": plan_id,
+                "feature": epic.title,
+                "version": "1.0.0",
+                "description": epic.description or "",
+                "goal": epic.description or "",
+                "context": "",
+                "acceptance_criteria": "",
+                "issue": None,
+                "tasks": task_data_list,
+                "source_path": None,
+                "state": PlanState.READY,
+                "backend_ref": epic_id,
+            }
+            return plan_data
+
+        # Happy path: join batch result against task index for task_id mapping
+        # and bookend metadata. Issues absent from the batch result are skipped —
+        # this matches the defensive posture of the original per-task show loop
+        # (bd issues deleted in bd but surviving in the remember index are dropped).
         for task_id, meta in task_index.items():
             bd_id = meta["bd_id"]
-            try:
-                issue = parse_issue(self._runner.run_json(["show", bd_id]))
-                td = _issue_to_task_data(issue, task_id, plan_id)
-                if meta.get("is_bookend"):
-                    td["is_bookend"] = meta["is_bookend"]
-                if meta.get("bookend_type") is not None:
-                    td["bookend_type"] = meta["bookend_type"]
-                task_data_list.append(td)
-            except BdInvocationError:
-                continue  # issue inaccessible; skip rather than fail whole plan
+            issue = children_by_bd_id.get(bd_id)
+            if issue is None:
+                continue  # issue deleted in bd but index entry survives; skip
+            td = _issue_to_task_data(issue, task_id, plan_id)
+            if meta.get("is_bookend"):
+                td["is_bookend"] = meta["is_bookend"]
+            if meta.get("bookend_type") is not None:
+                td["bookend_type"] = meta["bookend_type"]
+            task_data_list.append(td)
 
         plan_data: PlanData = {
             "plan_id": plan_id,
@@ -608,6 +665,9 @@ class BeadsTaskProvider:
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return plan summaries by scanning bd remember for plan index entries.
 
+        Calls bd memories exactly once and partitions entries in memory to count
+        tasks per plan without a separate bd recall per plan.
+
         Args:
             search: Optional substring filter on feature name or goal.
             offset: Number of results to skip (for pagination).
@@ -616,12 +676,31 @@ class BeadsTaskProvider:
         Returns:
             List of PlanSummary TypedDicts.
         """
+        # Single-pass bucketing: one bd memories call instead of 1 + M.
+        all_entries = self._remember_list()
+
+        # Partition entries into plan-index entries and task count by plan_id.
+        # Task key format: dh.task-index.{plan_id}.{task_id}
+        # Plan_id contains no dots (it is a nanoid-prefixed slug), so the first
+        # dot after the prefix unambiguously separates plan_id from task_id.
+        plan_entries: dict[str, str] = {}  # plan_id -> epic_id
+        task_counts: dict[str, int] = {}  # plan_id -> task count
+
+        for entry in all_entries:
+            if entry.key.startswith(_PLAN_IDX_PREFIX):
+                plan_id = entry.key[len(_PLAN_IDX_PREFIX) :]
+                plan_entries[plan_id] = entry.value.strip()
+            elif entry.key.startswith(_TASK_IDX_PREFIX):
+                # Extract plan_id from dh.task-index.{plan_id}.{task_id}
+                remainder = entry.key[len(_TASK_IDX_PREFIX) :]
+                dot_idx = remainder.find(".")
+                if dot_idx == -1:
+                    continue  # malformed key; skip
+                plan_id = remainder[:dot_idx]
+                task_counts[plan_id] = task_counts.get(plan_id, 0) + 1
+
         summaries: list[PlanSummary] = []
-        for entry in self._remember_list():
-            if not entry.key.startswith(_PLAN_IDX_PREFIX):
-                continue
-            plan_id = entry.key[len(_PLAN_IDX_PREFIX) :]
-            epic_id = entry.value.strip()
+        for plan_id, epic_id in plan_entries.items():
             if not epic_id:
                 continue
 
@@ -636,13 +715,12 @@ class BeadsTaskProvider:
             if search is not None and search.lower() not in f"{feature} {goal}".lower():
                 continue
 
-            task_index = self._task_index(plan_id)
             summary: PlanSummary = {
                 "plan_id": plan_id,
                 "feature": feature,
                 "goal": goal,
                 "description": goal,
-                "task_count": len(task_index),
+                "task_count": task_counts.get(plan_id, 0),
                 "source_path": None,
                 "backend_ref": epic_id,
             }

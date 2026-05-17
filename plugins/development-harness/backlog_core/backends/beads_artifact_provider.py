@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import cast
 
 from backlog_core.backends.bd_runner import BdRunner
-from backlog_core.backends.beads_models import parse_issue
+from backlog_core.backends.beads_models import BeadsIssueRaw, parse_issue
 from backlog_core.models import ArtifactManifest
 
 # dh_paths lives one level above backlog_core (at plugin root).
@@ -381,13 +381,7 @@ class BeadsArtifactProvider:
             bd_runner.BdInvocationError: When ``bd show`` fails.
             pydantic.ValidationError: When the stored manifest JSON is corrupt.
         """
-        raw = self._runner.run_json(["show", issue_id])
-        issue = parse_issue(raw)
-        if issue.metadata is None:
-            return ArtifactManifest(issue_number=0)
-        manifest = _extract_manifest_from_metadata(issue.metadata)
-        if manifest is None:
-            return ArtifactManifest(issue_number=0)
+        manifest, _ = self._fetch_issue_and_manifest(issue_id)
         return manifest
 
     def set_manifest_bd(self, issue_id: str, manifest: ArtifactManifest) -> None:
@@ -498,11 +492,12 @@ class BeadsArtifactProvider:
     def delete_entry_bd(self, issue_id: str, artifact_type: str, path: str) -> None:
         """Remove an artifact entry from the manifest and its content block from notes.
 
-        Reads the current manifest, removes the entry matching *artifact_type*
-        and *path*, persists the updated manifest, then strips the
-        corresponding sentinel block from the issue notes.  Both manifest and
-        notes are updated independently — a missing entry in one location does
-        not prevent cleanup in the other.
+        Reads the current manifest and notes in a single ``bd show`` call,
+        removes the manifest entry matching *artifact_type* and *path*, persists
+        the updated manifest if changed, then strips the corresponding sentinel
+        block from the issue notes.  Both manifest and notes are updated
+        independently — a missing entry in one location does not prevent cleanup
+        in the other.
 
         Args:
             issue_id: Beads issue ID string (e.g. ``"bd-a3f8"``).
@@ -513,8 +508,11 @@ class BeadsArtifactProvider:
             bd_runner.BdNotInstalledError: When ``bd`` is not on ``PATH``.
             bd_runner.BdInvocationError: When ``bd show`` or ``bd update`` fails.
         """
+        # Single fetch supplies both manifest and notes; set_manifest_bd only
+        # writes metadata (--set-metadata), so the cached notes remain valid.
+        manifest, issue = self._fetch_issue_and_manifest(issue_id)
+
         # Step 1: Update manifest (filter out matching entry).
-        manifest = self.get_manifest_bd(issue_id)
         updated_artifacts = [
             e for e in manifest.artifacts if not (e.artifact_type == artifact_type and e.artifact_id == path)
         ]
@@ -523,8 +521,6 @@ class BeadsArtifactProvider:
             self.set_manifest_bd(issue_id, updated_manifest)
 
         # Step 2: Strip content block from notes.
-        raw = self._runner.run_json(["show", issue_id])
-        issue = parse_issue(raw)
         current_notes = issue.notes or ""
         if not current_notes:
             return
@@ -543,6 +539,36 @@ class BeadsArtifactProvider:
     # -----------------------------------------------------------------------
     # Private helpers
     # -----------------------------------------------------------------------
+
+    def _fetch_issue_and_manifest(self, issue_id: str) -> tuple[ArtifactManifest, BeadsIssueRaw]:
+        """Fetch a beads issue and extract its artifact manifest in one call.
+
+        Issues a single ``bd show <issue_id> --json`` request and returns both
+        the parsed ``ArtifactManifest`` (empty when absent) and the raw
+        ``BeadsIssueRaw`` model.  Callers that need both manifest and notes
+        should use this helper to avoid redundant subprocess invocations.
+
+        Args:
+            issue_id: Beads issue ID string (e.g. ``"bd-a3f8"``).
+
+        Returns:
+            Tuple of ``(ArtifactManifest, BeadsIssueRaw)``.  The manifest is
+            an empty ``ArtifactManifest(issue_number=0)`` when no manifest
+            data is stored on the issue.
+
+        Raises:
+            bd_runner.BdNotInstalledError: When ``bd`` is not on ``PATH``.
+            bd_runner.BdInvocationError: When ``bd show`` fails.
+            pydantic.ValidationError: When the stored manifest JSON is corrupt.
+        """
+        raw = self._runner.run_json(["show", issue_id])
+        issue = parse_issue(raw)
+        if issue.metadata is None:
+            return ArtifactManifest(issue_number=0), issue
+        manifest = _extract_manifest_from_metadata(issue.metadata)
+        if manifest is None:
+            return ArtifactManifest(issue_number=0), issue
+        return manifest, issue
 
     @property
     def _runner(self) -> BdRunner:

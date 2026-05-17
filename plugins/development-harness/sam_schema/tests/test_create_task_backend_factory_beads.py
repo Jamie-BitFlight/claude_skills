@@ -3,8 +3,8 @@
 Verifies that:
 - TASKBACKEND=beads env var routes to BeadsTaskProvider
 - CONTEXTBACKEND=beads env var routes to BeadsContextBackend
-- A taskbackend.toml file with [backend] name = "beads" is respected
-- A contextbackend.toml file with [backend] name = "beads" is respected
+- .dh/config.yaml with task.backend = "beads" is respected (via DHConfig)
+- .dh/config.yaml with context.backend = "beads" is respected (via DHConfig)
 - Invalid backend names raise ValueError
 """
 
@@ -65,27 +65,26 @@ class TestCreateTaskBackendEnvVar:
 # ---------------------------------------------------------------------------
 
 
-class TestCreateTaskBackendToml:
-    def test_toml_file_beads_returns_beads_provider(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """taskbackend.toml with [backend] name = 'beads' must route to BeadsTaskProvider."""
-        # Write a taskbackend.toml in tmp_path
-        toml_file = tmp_path / "taskbackend.toml"
-        toml_file.write_text('[backend]\nname = "beads"\n', encoding="utf-8")
+class TestCreateTaskBackendConfig:
+    def test_config_yaml_task_backend_beads_returns_beads_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """.dh/config.yaml with task.backend = 'beads' must route to BeadsTaskProvider."""
+        import dh_config as _dh_config_mod
 
-        # Patch Path.home() to point to tmp_path so the factory finds the .dh/taskbackend.toml
         dh_dir = tmp_path / ".dh"
         dh_dir.mkdir()
-        (dh_dir / "taskbackend.toml").write_text('[backend]\nname = "beads"\n', encoding="utf-8")
+        (dh_dir / "config.yaml").write_text("task:\n  backend: beads\n", encoding="utf-8")
 
-        # Clear TASKBACKEND env var so TOML path is used
+        # Clear TASKBACKEND env var so config file path is used.
         monkeypatch.delenv("TASKBACKEND", raising=False)
 
-        # Monkeypatch Path.home to return tmp_path
+        # Null out _dh_paths so project-root config (which sets task.backend: local)
+        # is not found — only the user-home config (tmp_path/.dh/config.yaml) is searched.
+        monkeypatch.setattr(_dh_config_mod, "_dh_paths", None)
 
-        def _fake_home() -> Path:
-            return tmp_path
-
-        monkeypatch.setattr(Path, "home", staticmethod(_fake_home))
+        # Patch Path.home() so DHConfig finds the config at tmp_path/.dh/config.yaml.
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
 
         backend = create_task_backend()
         assert isinstance(backend, BeadsTaskProvider)

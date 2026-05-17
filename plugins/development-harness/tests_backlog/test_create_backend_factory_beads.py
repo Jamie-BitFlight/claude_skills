@@ -12,12 +12,12 @@ All tests isolate dh_paths via monkeypatch to avoid filesystem side-effects.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
 import backlog_core.backend_protocol as _bp
 import pytest
 from backlog_core.backend_protocol import BEADS_DIR, BEADS_OPT_IN_MARKER, create_backend, reset_config
 from backlog_core.backends.beads_backend import BeadsBackend
+from tests.helpers import make_dh_paths_mock
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,11 +28,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_dh_paths_mock(project_root: Path) -> MagicMock:
-    """Return a MagicMock that behaves like dh_paths with a fixed project root."""
-    mock = MagicMock()
-    mock.git_project_root.return_value = project_root
-    return mock
+_make_dh_paths_mock = make_dh_paths_mock
 
 
 # ---------------------------------------------------------------------------

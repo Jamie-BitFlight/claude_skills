@@ -277,32 +277,44 @@ def test_fetch_tasks_from_backend_float_raises_typeerror() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.unit
-def test_task_status_hook_pep723_metadata_is_valid_toml() -> None:
-    """task_status_hook.py PEP 723 inline metadata block is valid TOML."""
-    assert _HOOK_SCRIPT.exists(), f"Expected hook script at {_HOOK_SCRIPT}"
+def _extract_pep723_block(path: Path) -> str:
+    """Extract the TOML content from a PEP 723 '# /// script' block.
 
-    lines = _HOOK_SCRIPT.read_text(encoding="utf-8").splitlines()
+    Args:
+        path: Path to the script file containing the PEP 723 inline metadata block.
 
-    # Extract the "# /// script" ... "# ///" block
+    Returns:
+        The TOML source text inside the block, with leading '# ' prefixes stripped.
+        Returns an empty string if no block is found.
+
+    Why: Two PEP 723 metadata tests contain identical extraction loops — extracting
+    this to a module-level helper eliminates the duplication and gives the logic
+    a clear, named home.
+    """
     in_block = False
     block_lines: list[str] = []
-    for line in lines:
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.rstrip() == "# /// script":
             in_block = True
             continue
         if in_block:
             if line.rstrip() == "# ///":
                 break
-            # Strip the leading "# " prefix (PEP 723 format)
             if line.startswith("# "):
                 block_lines.append(line[2:])
             else:
                 block_lines.append(line)
+    return "\n".join(block_lines)
 
-    assert block_lines, "No PEP 723 script block found in task_status_hook.py"
 
-    toml_src = "\n".join(block_lines)
+@pytest.mark.unit
+def test_task_status_hook_pep723_metadata_is_valid_toml() -> None:
+    """task_status_hook.py PEP 723 inline metadata block is valid TOML."""
+    assert _HOOK_SCRIPT.exists(), f"Expected hook script at {_HOOK_SCRIPT}"
+
+    toml_src = _extract_pep723_block(_HOOK_SCRIPT)
+    assert toml_src, "No PEP 723 script block found in task_status_hook.py"
+
     metadata = tomllib.loads(toml_src)
 
     assert "requires-python" in metadata, "PEP 723 block must declare requires-python"
@@ -314,23 +326,7 @@ def test_task_status_hook_pep723_metadata_is_valid_toml() -> None:
 @pytest.mark.unit
 def test_task_status_hook_pep723_requires_python_311_or_newer() -> None:
     """task_status_hook.py requires Python 3.11 or newer per PEP 723 metadata."""
-    lines = _HOOK_SCRIPT.read_text(encoding="utf-8").splitlines()
-
-    in_block = False
-    block_lines: list[str] = []
-    for line in lines:
-        if line.rstrip() == "# /// script":
-            in_block = True
-            continue
-        if in_block:
-            if line.rstrip() == "# ///":
-                break
-            if line.startswith("# "):
-                block_lines.append(line[2:])
-            else:
-                block_lines.append(line)
-
-    metadata = tomllib.loads("\n".join(block_lines))
+    metadata = tomllib.loads(_extract_pep723_block(_HOOK_SCRIPT))
     requires = metadata.get("requires-python", "")
 
     # Must specify >=3.11 or stricter (>=3.12, ==3.11, etc.)

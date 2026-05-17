@@ -17,7 +17,7 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 from backlog_core.backends.bd_runner import BdRunner
-from backlog_core.backends.beads_models import parse_issue, parse_issue_list
+from backlog_core.backends.beads_models import parse_issue
 from backlog_core.models import DispatchItemRecord, DispatchWaveRecord
 from backlog_core.parsing import now_iso as _now_iso
 
@@ -520,6 +520,7 @@ class BeadsDispatchAdapter:
         """
         self._map_path = db_path.parent / _WAVE_MAP_FILENAME
         self._map: dict[str, str] = self._load_map()
+        self._runner: BdRunner = BdRunner()
 
     # ------------------------------------------------------------------
     # Sidecar helpers
@@ -587,8 +588,7 @@ class BeadsDispatchAdapter:
             pydantic.ValidationError: If the response does not match the
                 ``BeadsIssueRaw`` schema.
         """
-        runner = BdRunner()
-        data = runner.run_json(["create", "--type", "molecule", "--title", title])
+        data = self._runner.run_json(["create", "--type", "molecule", "--title", title])
         issue = parse_issue(data)
         beads_id: str = issue.id
         self._map[self._map_key(milestone, wave_num)] = beads_id
@@ -615,23 +615,22 @@ class BeadsDispatchAdapter:
         if wave_id is None:
             _log.debug("No molecule for wave %d:%d — skipping bond for %s", milestone, wave_num, beads_item_id)
             return
-        runner = BdRunner()
-        runner.run_text(["mol", "bond", wave_id, beads_item_id])
+        self._runner.run_text(["mol", "bond", wave_id, beads_item_id])
         _log.debug("Bonded %s to molecule %s", beads_item_id, wave_id)
 
     def check_stale_members(
         self, milestone: int, wave_num: int, state_manager: DispatchStateManager
     ) -> list[DispatchItemRecord]:
-        """Reconcile beads wave members against SQLite state.
+        """Check in-progress SQLite items for a specific wave for PID liveness.
 
-        Queries ``bd list --parent <molecule_id> --json`` to discover all
-        issues bonded to the wave's molecule, then checks in-progress SQLite
-        items for the same wave for PID liveness. Dead PIDs are marked failed
-        via the state manager.
+        Scopes PID liveness checks to the specific wave rather than scanning
+        all in-progress items globally (contrast with
+        ``DispatchStateManager.check_stale_pids()``). Dead PIDs are marked
+        failed via the state manager.
 
-        This method scopes PID liveness checks to the specific wave rather
-        than scanning all in-progress items globally (contrast with
-        ``DispatchStateManager.check_stale_pids()``).
+        Note: Beads membership is not queried here — PID state is stored only
+        in SQLite. The wave's molecule ID is checked solely to confirm this wave
+        is beads-tracked; if no molecule is recorded the method returns early.
 
         Args:
             milestone: GitHub milestone number.
@@ -641,21 +640,12 @@ class BeadsDispatchAdapter:
         Returns:
             List of ``DispatchItemRecord`` instances newly marked failed.
             Empty if no molecule is recorded for this wave or no stale PIDs.
-
-        Raises:
-            BdNotInstalledError: If the ``bd`` binary is not on PATH.
-            BdInvocationError: If ``bd list`` returns a non-zero exit code.
-            BdJsonDecodeError: If the JSON response cannot be decoded.
         """
         wave_id = self.get_wave_id(milestone, wave_num)
         if wave_id is None:
             return []
 
-        runner = BdRunner()
-        data = runner.run_json(["list", "--parent", wave_id])
-        # Validate the response as a list of beads issues (raises on bad JSON).
-        parse_issue_list(data)
-
+        # PID liveness is checked via SQLite only; beads carries no PID data.
         wave_items = state_manager.get_wave_items(milestone, wave_num)
         stale: list[DispatchItemRecord] = []
         for item in wave_items:

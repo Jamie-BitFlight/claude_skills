@@ -362,10 +362,10 @@ class TestDeleteEntryBd:
             "architect content\n"
             "<!-- /artifact-content:type=architect:id=plan/architect.md -->"
         )
-        mock_runner.run_json.side_effect = [
-            _raw_issue(metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes),
-            _raw_issue(notes=notes),
-        ]
+        # Single bd show call supplies both manifest and notes.
+        mock_runner.run_json.return_value = _raw_issue(
+            metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes
+        )
 
         provider.delete_entry_bd(_ISSUE_ID, "architect", "plan/architect.md")
 
@@ -382,10 +382,10 @@ class TestDeleteEntryBd:
         """When the entry is not in the manifest and no sentinel exists, run_text is never called."""
         manifest = ArtifactManifest(issue_number=0, artifacts=[])
         notes = "some notes without sentinel"
-        mock_runner.run_json.side_effect = [
-            _raw_issue(metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes),
-            _raw_issue(notes=notes),
-        ]
+        # Single bd show call supplies both manifest and notes.
+        mock_runner.run_json.return_value = _raw_issue(
+            metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes
+        )
 
         provider.delete_entry_bd(_ISSUE_ID, "architect", "plan/architect.md")
 
@@ -404,10 +404,10 @@ class TestDeleteEntryBd:
             "<!-- /artifact-content:type=architect:id=plan/architect.md -->\n\n"
             "postamble"
         )
-        mock_runner.run_json.side_effect = [
-            _raw_issue(metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes),
-            _raw_issue(notes=notes),
-        ]
+        # Single bd show call supplies both manifest and notes.
+        mock_runner.run_json.return_value = _raw_issue(
+            metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=notes
+        )
 
         provider.delete_entry_bd(_ISSUE_ID, "architect", "plan/architect.md")
 
@@ -421,10 +421,10 @@ class TestDeleteEntryBd:
         """When notes is empty after get, the notes update run_text is not called."""
         entry = _make_entry()
         manifest = ArtifactManifest(issue_number=0, artifacts=[entry])
-        mock_runner.run_json.side_effect = [
-            _raw_issue(metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}),
-            _raw_issue(notes=None),
-        ]
+        # Single bd show call supplies both manifest and notes (notes=None here).
+        mock_runner.run_json.return_value = _raw_issue(
+            metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=None
+        )
 
         provider.delete_entry_bd(_ISSUE_ID, "architect", "plan/architect.md")
 
@@ -507,14 +507,14 @@ class TestADR002TypeWidening:
     def test_delete_entry_with_str_delegates(self, provider: BeadsArtifactProvider, mock_runner: MagicMock) -> None:
         """delete_entry(str, ...) delegates to delete_entry_bd."""
         manifest = ArtifactManifest(issue_number=0, artifacts=[])
-        mock_runner.run_json.side_effect = [
-            _raw_issue(metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}),
-            _raw_issue(notes=None),
-        ]
+        # Single bd show call supplies both manifest and notes.
+        mock_runner.run_json.return_value = _raw_issue(
+            metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=None
+        )
 
         provider.delete_entry(_ISSUE_ID, "architect", "plan/architect.md")  # type: ignore[arg-type]
 
-        assert mock_runner.run_json.call_count >= 1
+        assert mock_runner.run_json.call_count == 1
 
     def test_delete_entry_with_int_raises_not_implemented(self, provider: BeadsArtifactProvider) -> None:
         """delete_entry(int, ...) raises NotImplementedError."""
