@@ -12,14 +12,14 @@ Why: T4 added --include-closed CLI flag and modified fetch functions. T5 added
 
 from __future__ import annotations
 
-import json
 from typing import cast
 from unittest.mock import patch
 
 from backlog_core.models import BacklogItem, IssueStatus
 from backlog_core.operations import _filter_closed_items, list_items
 from backlog_core.server import mcp
-from fastmcp.client import Client
+
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,10 +47,11 @@ def _make_mixed_items() -> list[BacklogItem]:
 
 
 async def _call_mcp(tool_name: str, params: dict | None = None) -> dict:
-    """Call a tool through the in-memory FastMCP transport and parse the result."""
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    """Call a tool through the in-memory FastMCP transport and parse the result.
+
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
+    """
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

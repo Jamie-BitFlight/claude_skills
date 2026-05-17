@@ -6,7 +6,6 @@ four warning-merge tests (one per artifact MCP tool).
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -17,7 +16,8 @@ from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_artifact_provider import BeadsArtifactProvider
 from backlog_core.models import BacklogError, GitHubUnavailableError
-from fastmcp.client import Client
+
+from tests.helpers import call_mcp_tool
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -77,10 +77,11 @@ def active_fallback(isolated_state: Path, monkeypatch: pytest.MonkeyPatch) -> Lo
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
-    """Invoke a backlog MCP tool in-process and return the parsed JSON response."""
-    async with Client(_server.mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    """Invoke a backlog MCP tool in-process and return the parsed JSON response.
+
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
+    """
+    return await call_mcp_tool(_server.mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

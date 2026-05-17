@@ -11,7 +11,6 @@ No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import uuid
@@ -20,7 +19,8 @@ import backlog_core.models as _bc_models
 import pytest
 from backlog_core.models import BacklogConfig
 from backlog_core.server import _SESSION_GATE_TOKEN, mcp
-from fastmcp.client import Client
+
+from tests.helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,11 @@ pytestmark = [pytest.mark.e2e, pytest.mark.skipif(not _HAS_TOKEN, reason="GITHUB
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
-    """Call MCP tool via in-memory transport and parse JSON response."""
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    """Call MCP tool via in-memory transport and parse JSON response.
+
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
+    """
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

@@ -40,6 +40,16 @@ with contextlib.suppress(ImportError):
 
 __all__ = ["DHConfig"]
 
+try:
+    from ruamel.yaml import YAML as _RuamelYAML
+    from ruamel.yaml.error import YAMLError as _YAMLError
+
+    _YAML: _RuamelYAML | None = _RuamelYAML(typ="safe")
+    _YAML_PARSE_ERRORS: tuple[type[Exception], ...] = (OSError, _YAMLError)
+except ImportError:
+    _YAML = None
+    _YAML_PARSE_ERRORS = (OSError,)
+
 # ---------------------------------------------------------------------------
 # Subsystem configuration constants
 # ---------------------------------------------------------------------------
@@ -67,12 +77,11 @@ def _load_yaml_config(path: Path) -> dict[str, object] | None:
     """
     if not path.is_file():
         return None
+    if _YAML is None:
+        return None
     try:
-        from ruamel.yaml import YAML  # noqa: PLC0415
-
-        yaml = YAML(typ="safe")
-        data = yaml.load(path.read_text(encoding="utf-8"))
-    except (OSError, Exception):  # noqa: BLE001 — ruamel raises various internal types
+        data = _YAML.load(path.read_text(encoding="utf-8"))
+    except _YAML_PARSE_ERRORS:
         return None
     else:
         if not isinstance(data, dict):

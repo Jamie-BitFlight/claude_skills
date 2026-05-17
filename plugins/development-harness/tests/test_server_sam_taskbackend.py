@@ -16,17 +16,17 @@ No @pytest.mark.asyncio decorators — asyncio_mode = "auto" is set in pyproject
 from __future__ import annotations
 
 import inspect
-import json
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
-from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from pytest_mock import MockerFixture  # noqa: F401 — available for future use
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 from sam_schema.server import mcp
+
+from tests.helpers import call_mcp_tool
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -40,16 +40,9 @@ if TYPE_CHECKING:
 async def _call(tool_name: str, params: dict | None = None) -> dict:
     """Call an MCP tool through the in-memory FastMCP transport.
 
-    Args:
-        tool_name: Registered MCP tool name (e.g. ``"sam_read"``).
-        params: Optional parameter dict to pass to the tool.
-
-    Returns:
-        Parsed JSON response dict from the tool.
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

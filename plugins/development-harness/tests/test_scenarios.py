@@ -10,14 +10,13 @@ No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 
 from __future__ import annotations
 
-import json
 from typing import ClassVar
 from unittest.mock import MagicMock
 
 from backlog_core.server import mcp
-from fastmcp.client import Client
 
 from tests.conftest import TEST_GATE_TOKEN as _SESSION_GATE_TOKEN
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -25,10 +24,11 @@ from tests.conftest import TEST_GATE_TOKEN as _SESSION_GATE_TOKEN
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
-    """Call MCP tool via in-memory transport and parse JSON response."""
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    """Call MCP tool via in-memory transport and parse JSON response.
+
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
+    """
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,6 @@ All GitHub API calls are mocked at the ``_graphql_request`` boundary
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -33,7 +32,6 @@ from backlog_core.artifact_provider import (
 )
 from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType
 from backlog_core.server import mcp
-from fastmcp.client import Client
 from graphql_factories import (
     make_issue_by_number_response,
     make_issue_comment_node,
@@ -41,6 +39,8 @@ from graphql_factories import (
     make_issue_node,
     make_update_issue_response,
 )
+
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -50,13 +50,9 @@ from graphql_factories import (
 async def _call(tool_name: str, params: dict | None = None) -> dict:
     """Call a tool through the in-memory FastMCP transport and parse the result.
 
-    Tests: FastMCP tool invocation via in-memory transport.
-    How: Opens a Client connected to the mcp server, calls tool, parses JSON.
-    Why: Ensures MCP tool wrappers behave correctly end-to-end without HTTP.
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 def _make_mock_repo() -> MagicMock:

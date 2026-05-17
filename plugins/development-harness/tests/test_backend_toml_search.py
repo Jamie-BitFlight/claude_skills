@@ -9,7 +9,6 @@ migration.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, cast
-from unittest.mock import MagicMock
 
 import backlog_core.backend_protocol as _bp
 import dh_config as _dh_config
@@ -17,6 +16,8 @@ import pytest
 import sam_schema.core.task_config as _tc
 from backlog_core.backend_protocol import BEADS_DIR, BEADS_OPT_IN_MARKER
 from ruamel.yaml import YAML
+
+from tests.helpers import make_dh_paths_mock
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -42,12 +43,7 @@ def _write_yaml_config_subsystem(path: Path, subsystem: str, backend_name: str) 
     _yaml.dump({subsystem: {"backend": backend_name}}, path.open("w", encoding="utf-8"))
 
 
-def _make_dh_paths_mock(project_root: Path, user_dh_root: Path | None = None) -> MagicMock:
-    mock = MagicMock()
-    mock.git_project_root.return_value = project_root
-    mock._dh_user_root.return_value = user_dh_root if user_dh_root is not None else project_root / "fakehome" / ".dh"
-    mock.project_dh_dir.return_value = project_root / ".dh"
-    return mock
+_make_dh_paths_mock = make_dh_paths_mock
 
 
 def _patch_dh_paths(
