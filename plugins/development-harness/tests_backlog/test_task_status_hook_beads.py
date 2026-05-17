@@ -108,7 +108,7 @@ def test_read_context_file_beads_id_no_valueerror(tmp_path: Path) -> None:
     assert parent == "bd-a3f8", "beads nanoid must be returned as-is (str), not int-cast"
     assert isinstance(parent, str), "type must be str, not int"
     assert task_id == "T1"
-    assert task_path == Path("/tmp/plan/P001-feature.yaml")
+    assert task_path == "/tmp/plan/P001-feature.yaml"
 
 
 @pytest.mark.unit

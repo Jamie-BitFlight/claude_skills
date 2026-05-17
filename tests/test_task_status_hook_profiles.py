@@ -26,8 +26,6 @@ from unittest.mock import MagicMock
 import pytest
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 # task_status_hook is on pythonpath via pyproject.toml:
@@ -477,148 +475,118 @@ class TestRunStrictPreCompletionChecks:
         task.acceptance_criteria = acceptance_criteria
         return task
 
-    def test_in_progress_with_criteria_returns_empty(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_in_progress_with_criteria_returns_empty(self) -> None:
         """IN_PROGRESS + non-empty criteria -> empty warnings list (all checks pass).
 
         Tests: run_strict_pre_completion_checks() happy path.
-        How: Mock sam_get_task to return IN_PROGRESS task with criteria.
+        How: Pass IN_PROGRESS task with criteria directly (no I/O mocking needed).
         Why: No warnings means strict mode adds no output when everything is correct.
         """
         task = self._make_task_mock(status="in-progress", acceptance_criteria="- [ ] Must pass")
-        mocker.patch("task_status_hook.sam_get_task", return_value=task)
-
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
-
-        result = run_strict_pre_completion_checks(plan_file, "T01", {})
+        result = run_strict_pre_completion_checks(task, "T01")
         assert result == []
 
-    def test_not_started_status_returns_warning(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_not_started_status_returns_warning(self) -> None:
         """NOT_STARTED status -> warning about unclaimed task.
 
         Tests: run_strict_pre_completion_checks() check #1 (status).
-        How: Mock sam_get_task to return NOT_STARTED task.
+        How: Pass NOT_STARTED task directly.
         Why: Task should be claimed before completion; strict mode flags this.
         """
         task = self._make_task_mock(status="not-started", acceptance_criteria="- [ ] Must pass")
-        mocker.patch("task_status_hook.sam_get_task", return_value=task)
-
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
-
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
+        warnings = run_strict_pre_completion_checks(task, "T01")
         assert len(warnings) >= 1
         assert any("not-started" in w or "claimed" in w for w in warnings)
 
-    def test_empty_acceptance_criteria_returns_warning(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_empty_acceptance_criteria_returns_warning(self) -> None:
         """Empty acceptance criteria -> warning about missing criteria.
 
         Tests: run_strict_pre_completion_checks() check #2 (acceptance criteria).
-        How: Mock sam_get_task to return IN_PROGRESS task with empty criteria.
+        How: Pass IN_PROGRESS task with empty criteria directly.
         Why: Tasks without acceptance criteria cannot be verified; strict mode flags this.
         """
         task = self._make_task_mock(status="in-progress", acceptance_criteria="")
-        mocker.patch("task_status_hook.sam_get_task", return_value=task)
-
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
-
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
+        warnings = run_strict_pre_completion_checks(task, "T01")
         assert len(warnings) >= 1
         assert any("acceptance" in w.lower() or "criteria" in w.lower() for w in warnings)
 
-    def test_whitespace_only_criteria_returns_warning(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_whitespace_only_criteria_returns_warning(self) -> None:
         """Whitespace-only acceptance criteria -> warning (treated as empty).
 
         Tests: run_strict_pre_completion_checks() whitespace-only criteria.
-        How: Mock sam_get_task to return task with whitespace-only criteria.
+        How: Pass task with whitespace-only criteria directly.
         Why: Whitespace is semantically empty; should trigger the same warning.
         """
         task = self._make_task_mock(status="in-progress", acceptance_criteria="   ")
-        mocker.patch("task_status_hook.sam_get_task", return_value=task)
-
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
-
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
+        warnings = run_strict_pre_completion_checks(task, "T01")
         assert len(warnings) >= 1
 
-    def test_both_checks_fail_returns_two_warnings(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_both_checks_fail_returns_two_warnings(self) -> None:
         """NOT_STARTED + empty criteria -> two warnings (both checks fail).
 
         Tests: run_strict_pre_completion_checks() dual failure.
-        How: Mock sam_get_task to return NOT_STARTED task with empty criteria.
+        How: Pass NOT_STARTED task with empty criteria directly.
         Why: Both checks are independent; both failures must be reported.
         """
         task = self._make_task_mock(status="not-started", acceptance_criteria="")
-        mocker.patch("task_status_hook.sam_get_task", return_value=task)
-
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
-
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
+        warnings = run_strict_pre_completion_checks(task, "T01")
         assert len(warnings) == 2
 
-    def test_key_error_returns_warning_no_exception(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """sam_get_task raises KeyError -> warning returned, no exception propagated.
+    def test_none_acceptance_criteria_treated_as_empty_returns_warning(self) -> None:
+        """acceptance_criteria=None (falsy) is treated as empty — triggers criteria warning.
 
-        Tests: run_strict_pre_completion_checks() KeyError handling.
-        How: Mock sam_get_task to raise KeyError (task not found in plan).
-        Why: Strict checks must never crash the hook; errors are observational only.
+        Tests: run_strict_pre_completion_checks() None criteria handling.
+        How: Set acceptance_criteria to None on mock task after construction.
+        Why: `or ""` fallback must treat None the same as empty string.
         """
-        mocker.patch("task_status_hook.sam_get_task", side_effect=KeyError("T99"))
+        task = self._make_task_mock(status="in-progress", acceptance_criteria="")
+        task.acceptance_criteria = None
+        result = run_strict_pre_completion_checks(task, "T01")
+        assert len(result) >= 1
+        assert any("criteria" in w.lower() or "acceptance" in w.lower() for w in result)
 
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
+    def test_task_id_included_in_status_warning(self) -> None:
+        """Status warning message includes the task_id for traceability.
 
-        warnings = run_strict_pre_completion_checks(plan_file, "T99", {})
-        assert len(warnings) == 1
-        assert "T99" in warnings[0]
-
-    def test_file_not_found_returns_warning_no_exception(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """sam_get_task raises FileNotFoundError -> warning returned, no exception.
-
-        Tests: run_strict_pre_completion_checks() FileNotFoundError handling.
-        How: Mock sam_get_task to raise FileNotFoundError.
-        Why: Missing plan file must not crash the hook.
+        Tests: run_strict_pre_completion_checks() status warning content.
+        How: Pass NOT_STARTED task with task_id='T42', check warning contains 'T42'.
+        Why: Warnings must be actionable — task_id identifies which task to investigate.
         """
-        mocker.patch("task_status_hook.sam_get_task", side_effect=FileNotFoundError("no file"))
+        task = self._make_task_mock(status="not-started", acceptance_criteria="- [ ] Must pass")
+        result = run_strict_pre_completion_checks(task, "T42")
+        assert len(result) == 1
+        assert "T42" in result[0]
 
-        plan_file = tmp_path / "P001-test.yaml"
+    def test_task_id_included_in_criteria_warning(self) -> None:
+        """Criteria warning message includes the task_id for traceability.
 
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
-        assert len(warnings) == 1
-        assert "T01" in warnings[0]
-
-    def test_value_error_returns_warning_no_exception(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """sam_get_task raises ValueError -> warning returned, no exception.
-
-        Tests: run_strict_pre_completion_checks() ValueError handling.
-        How: Mock sam_get_task to raise ValueError.
-        Why: Corrupt plan data must not crash the hook.
+        Tests: run_strict_pre_completion_checks() criteria warning content.
+        How: Pass in-progress task with empty criteria, task_id='T99'.
+        Why: Warnings must be actionable — task_id identifies which task to investigate.
         """
-        mocker.patch("task_status_hook.sam_get_task", side_effect=ValueError("bad yaml"))
+        task = self._make_task_mock(status="in-progress", acceptance_criteria="")
+        result = run_strict_pre_completion_checks(task, "T99")
+        assert len(result) == 1
+        assert "T99" in result[0]
 
-        plan_file = tmp_path / "P001-test.yaml"
-        plan_file.write_text("", encoding="utf-8")
+    def test_return_type_is_always_list_of_str(self) -> None:
+        """Function always returns list[str] regardless of status/criteria combination.
 
-        warnings = run_strict_pre_completion_checks(plan_file, "T01", {})
-        assert len(warnings) == 1
-
-    def test_returns_list_of_strings_never_raises(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """Function always returns list[str] and never raises an exception.
-
-        Tests: run_strict_pre_completion_checks() return type contract.
-        How: Mock sam_get_task to raise OSError (OS-level error).
-        Why: Strict checks must be fail-safe regardless of error type.
+        Tests: run_strict_pre_completion_checks() return type invariant.
+        How: Call with multiple status/criteria combinations, verify type each time.
+        Why: Callers iterate warnings as strings; type must be stable across all inputs.
         """
-        mocker.patch("task_status_hook.sam_get_task", side_effect=OSError("disk error"))
-
-        plan_file = tmp_path / "P001-test.yaml"
-
-        result = run_strict_pre_completion_checks(plan_file, "T01", {})
-        assert isinstance(result, list)
-        assert all(isinstance(w, str) for w in result)
+        cases = [
+            ("in-progress", "- [x] Works"),
+            ("not-started", ""),
+            ("in-progress", "   "),
+            ("not-started", "- [ ] Pending"),
+        ]
+        for status, criteria in cases:
+            task = self._make_task_mock(status=status, acceptance_criteria=criteria)
+            result = run_strict_pre_completion_checks(task, "T01")
+            assert isinstance(result, list)
+            assert all(isinstance(w, str) for w in result)
 
 
 # ---------------------------------------------------------------------------
