@@ -16,13 +16,13 @@ All imports are at module level.
 from __future__ import annotations
 
 import inspect
-import json
 from unittest.mock import patch
 
 import pytest
 from backlog_core.models import BacklogError
 from backlog_core.server import backlog_groom, mcp
-from fastmcp.client import Client
+
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Shared helper
@@ -32,16 +32,9 @@ from fastmcp.client import Client
 async def _call(tool_name: str, params: dict | None = None) -> dict:
     """Call a tool through the in-memory FastMCP transport and parse the result.
 
-    Args:
-        tool_name: The registered MCP tool name.
-        params: Optional dict of parameters to pass to the tool.
-
-    Returns:
-        Parsed JSON response dict from the tool.
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

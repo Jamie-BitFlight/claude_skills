@@ -13,7 +13,6 @@ asyncio_mode = "auto" is set globally in pyproject.toml — no @pytest.mark.asyn
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -22,8 +21,9 @@ import pytest
 from backlog_core.gh_client import probe_backend_status
 from backlog_core.models import BackendAvailability, BackendStatus, BacklogConfig
 from backlog_core.server import mcp
-from fastmcp.client import Client
 from github import GithubException
+
+from tests.helpers import call_mcp_tool
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,16 +36,9 @@ if TYPE_CHECKING:
 async def _call(tool_name: str, params: dict | None = None) -> dict:
     """Call an MCP tool through the in-memory transport and return parsed JSON.
 
-    Args:
-        tool_name: Registered MCP tool name.
-        params: Optional parameters dict.
-
-    Returns:
-        Parsed JSON response dict from the tool.
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------

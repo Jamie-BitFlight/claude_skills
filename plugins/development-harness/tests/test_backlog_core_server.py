@@ -23,6 +23,7 @@ from backlog_core.server import mcp
 from fastmcp.client import Client
 
 from tests.conftest import TEST_GATE_TOKEN
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -72,16 +73,9 @@ def _extract_log_messages(mock_log: AsyncMock, level: str | None = None) -> list
 async def _call(tool_name: str, params: dict | None = None) -> dict:
     """Call a tool through the in-memory FastMCP transport and parse the result.
 
-    Args:
-        tool_name: The registered MCP tool name.
-        params: Optional dict of parameters to pass to the tool.
-
-    Returns:
-        Parsed JSON response dict from the tool.
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +335,6 @@ async def test_backlog_list_pagination_last_page_has_more_false():
 
 async def test_backlog_list_autopagination_stays_within_token_budget():
     """backlog_list auto-pagination (limit=0) keeps response JSON under ~17600 chars."""
-    import json
 
     # 500 items with a realistic-sized description each (~200 chars per item serialised).
     items = [

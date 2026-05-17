@@ -41,9 +41,14 @@ Design note on .beads/ and task/context subsystems:
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+from tests.helpers import make_dh_paths_mock
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Parametrize marker — apply to tests that are symmetric across all subsystems
@@ -780,20 +785,4 @@ def test_when_env_var_set_then_beads_auto_detect_is_not_consulted(
 # ---------------------------------------------------------------------------
 
 
-def _make_dh_paths_mock(project_root: Path) -> object:
-    """Return a minimal mock for dh_paths that satisfies DHConfig lookups.
-
-    The mock provides:
-    - git_project_root() → project_root
-    - project_dh_dir(root) → root / ".dh"
-    - _dh_user_root() → Path.home() / ".dh"  (resolved at call time)
-
-    This mirrors the pattern used in test_backend_toml_search.py.
-    """
-    from unittest.mock import MagicMock
-
-    mock = MagicMock()
-    mock.git_project_root.return_value = project_root
-    mock.project_dh_dir.side_effect = lambda root: root / ".dh"
-    mock._dh_user_root.side_effect = lambda: Path.home() / ".dh"
-    return mock
+_make_dh_paths_mock = make_dh_paths_mock

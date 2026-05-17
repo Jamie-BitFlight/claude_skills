@@ -16,14 +16,14 @@ No @pytest.mark.asyncio decorators — asyncio_mode = "auto" is set globally.
 
 from __future__ import annotations
 
-import json
 from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 from backlog_core.models import BacklogError, ValidationError
 from backlog_core.server import mcp
-from fastmcp.client import Client
+
+from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -50,10 +50,11 @@ def _fake_project_node(
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
-    """Call an MCP tool through the in-memory FastMCP transport and parse result."""
-    async with Client(mcp) as client:
-        result = await client.call_tool(tool_name, params or {})
-    return json.loads(result.content[0].text)
+    """Call an MCP tool through the in-memory FastMCP transport and parse result.
+
+    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
+    """
+    return await call_mcp_tool(mcp, tool_name, params)
 
 
 # ---------------------------------------------------------------------------
