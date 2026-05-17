@@ -65,25 +65,6 @@ from sam_schema.core.query import get_task as sam_get_task
 # Alphanumeric task ID pattern: "1", "1.1", "T1", "P0-T01", etc.
 _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 
-_PLAN_ADDR_RE = re.compile(r"P[0-9a-f]+")
-
-
-def _is_plan_address(name: str) -> bool:
-    """Return True when *name* is a bare plan address (not a filesystem path).
-
-    A plan address is the string form returned by Step 3 of
-    ``_resolve_active_task_context`` via ``extract_task_info_from_prompt`` —
-    e.g. ``"Pdec8934d"``. Steps 1 and 2 always return absolute filesystem paths,
-    so only Step 3 (prompt extraction fallback) can produce this form.
-
-    Args:
-        name: The string to test (typically ``task_file_path.name``).
-
-    Returns:
-        ``True`` when *name* matches ``P[0-9a-f]+`` exactly (full-string match).
-    """
-    return bool(_PLAN_ADDR_RE.fullmatch(name))
-
 
 class HookProfile(enum.StrEnum):
     """Runtime profile controlling which hook handlers are active.
@@ -462,7 +443,7 @@ def _extract_plan_addr_from_path(task_file_path: Path) -> str | None:
     Returns:
         Plan address string (e.g. ``"Pf4281187"``) or ``None`` if not found.
     """
-    m = re.search(r"(P[0-9a-f]+)", Path(task_file_path).name)
+    m = re.search(r"(P[0-9a-f]+)", Path(task_file_path).name, re.IGNORECASE)
     return m.group(1) if m else None
 
 
@@ -943,32 +924,6 @@ def _cascade_failed_task(
     sys.exit(0)
 
 
-def _complete_task_via_plan_address(
-    plan_addr: str, task_id: str, sub_agent_session_id: str | None, context_file: Path | None
-) -> None:
-    """Complete a task identified by a bare plan address (no filesystem path available).
-
-    Called from ``handle_subagent_stop`` when ``task_file_path`` is a bare plan address
-    returned by Step 3 of ``_resolve_active_task_context`` (prompt extraction fallback).
-    Skips filesystem operations (exists() check, schema validation) and goes directly to
-    MCP state + update calls.
-
-    Args:
-        plan_addr: Plan address string (e.g. ``"Pdec8934d"``).
-        task_id: Task identifier within the plan.
-        sub_agent_session_id: Agent session ID for context cleanup.
-        context_file: Context file path for cleanup on failure.
-    """
-    timestamp = get_iso_timestamp()
-    state_ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.COMPLETE)
-    if not state_ok:
-        print(f"[hook] SubagentStop: failed to mark {task_id} complete via MCP", file=sys.stderr)
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-    _call_sam_task_update(plan_addr, task_id, {"completed": timestamp})
-    _cleanup_active_task_context(sub_agent_session_id, context_file)
-
-
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
     """Handle SubagentStop event - mark task COMPLETE with timestamp.
 
@@ -1007,13 +962,6 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    # Plan-address path: Step 3 (prompt extraction) can return Path("Pdec8934d") — a bare
-    # plan address with no parent, no suffix, no filesystem existence. Detect this form and
-    # skip filesystem operations (exists() check, _fetch_task_for_stop_hook, strict checks).
-    if _is_plan_address(task_file_path.name):
-        _complete_task_via_plan_address(task_file_path.name, task_id, sub_agent_session_id, context_file)
-        return
-
     full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path
 
     current_task = _fetch_task_for_stop_hook(full_path, task_id, sub_agent_session_id, context_file)
@@ -1039,7 +987,14 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    _complete_task_via_plan_address(plan_addr, task_id, sub_agent_session_id, context_file)
+    timestamp = get_iso_timestamp()
+    state_ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.COMPLETE)
+    if not state_ok:
+        print(f"[hook] SubagentStop: failed to mark {task_id} complete via MCP", file=sys.stderr)
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
+    _call_sam_task_update(plan_addr, task_id, {"completed": timestamp})
+    _cleanup_active_task_context(sub_agent_session_id, context_file)
 
 
 def handle_activity_update(hook_input: dict[str, Any]) -> None:
@@ -1060,15 +1015,6 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     task_file_path, task_id = read_task_context(cwd, session_id)
 
     if task_file_path is None or task_id is None:
-        sys.exit(0)
-
-    # Defensive guard: context files always contain absolute paths (written by LocalContextBackend),
-    # but guard against any future code path that might store a bare plan address in a context file.
-    if _is_plan_address(task_file_path.name):
-        print(
-            f"[hook] PostToolUse: unexpected plan-address form in context file ({task_file_path.name}) — skipping",
-            file=sys.stderr,
-        )
         sys.exit(0)
 
     full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path

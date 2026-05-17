@@ -600,8 +600,8 @@ class BeadsTaskProvider:
         try:
             raw_children = self._runner.run_json(["list", "--parent", epic_id])
             children_by_bd_id = {issue.id: issue for issue in parse_issue_list(raw_children)}
-        except (BdInvocationError, ValidationError):
-            # bd list --parent unavailable or JSON invalid — fall back to per-task shows.
+        except (BdInvocationError, BdJsonDecodeError, ValidationError):
+            # bd list --parent unavailable, output non-JSON, or JSON invalid — fall back to per-task shows.
             for task_id, meta in task_index.items():
                 bd_id = meta["bd_id"]
                 try:

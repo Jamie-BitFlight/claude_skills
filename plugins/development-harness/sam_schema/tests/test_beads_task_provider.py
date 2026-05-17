@@ -305,17 +305,19 @@ class TestAppendTask:
 
 
 # ---------------------------------------------------------------------------
-# TestSubprocessCallCounts — TDD tests for efficiency fixes (currently xfail)
+# TestSubprocessCallCounts — efficiency regression tests
 #
-# Tests A and B assert subprocess-count invariants that break under the current
-# N+1 and once-per-plan patterns.  They are marked xfail(strict=True) so that:
-#   - Today:       tests XFAIL (expected — current code is inefficient)
-#   - After fix:   tests XPASS, which strict=True converts to a test ERROR,
-#                  forcing the xfail marker to be removed when the fix lands.
+# These tests assert subprocess-count invariants to prevent regressions in the
+# batch-fetch and single-recall optimisations:
 #
-# The PlanNotFoundError contract test (Test C, second assertion) is NOT marked
-# xfail because the current code already raises PlanNotFoundError correctly —
-# that test passes today and must keep passing after the fix.
+#   Test A — read_plan issues exactly 1 bd show (epic) + 1 bd list --parent
+#             (children batch), not N+1 individual shows.
+#   Test B — list_plans calls bd memories exactly once via one-pass bucketing,
+#             not once per plan.
+#   Tests C — _bd_id_for_task issues exactly 1 bd recall on the hot path
+#              and raises PlanNotFoundError / TaskNotFoundError on error paths.
+#
+# All tests pass today and must continue to pass.
 # ---------------------------------------------------------------------------
 
 
