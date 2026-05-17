@@ -58,6 +58,7 @@ if _HOOK_SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
 
 # Import directly from submodules for concrete types (avoids lazy __getattr__ object).
+from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.models import Task as SamTask, TaskStatus as SamTaskStatus
 from sam_schema.core.query import get_task as sam_get_task
 
@@ -211,36 +212,60 @@ def parse_hook_input() -> dict[str, Any]:
     return result
 
 
+def _plan_arg_to_path(plan_arg: str) -> Path | None:
+    """Convert a plan argument string (file path or plan address) to an absolute Path.
+
+    File path form (.md/.yaml) is returned as ``Path`` directly.
+    Plan address form (e.g. ``Pdec8934d``) is resolved via ``resolve_plan_address()``.
+
+    Returns:
+        Resolved ``Path``, or ``None`` when resolution fails (plan not found in DH
+        state directory or plan directory does not exist).
+    """
+    if plan_arg.endswith((".md", ".yaml")):
+        return Path(plan_arg)
+    try:
+        return resolve_plan_address(plan_arg, _dh_paths.plan_dir())
+    except (AddressingError, FileNotFoundError):
+        print(
+            f"[hook] extract_task_info: plan address {plan_arg!r} not found in {_dh_paths.plan_dir()} — skipping",
+            file=sys.stderr,
+        )
+        return None
+
+
 def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]:
     """Extract task file path and task ID from sub-agent prompt.
 
     Accepts two arg forms for the plan argument:
-    - File path form: ``<path>.md`` or ``<path>.yaml``
-    - Plan address form: ``P[0-9a-f]+`` (e.g. ``Pdec8934d``)
+    - File path form: ``<path>.md`` or ``<path>.yaml`` — returned as ``Path`` directly.
+    - Plan address form: ``P[0-9a-f]+`` (e.g. ``Pdec8934d``) — resolved to the actual
+      filesystem path via ``resolve_plan_address()``.
 
     Args:
         prompt: The sub-agent's prompt string.
 
     Returns:
         Tuple of (task_file_path, task_id) or (None, None) if not extractable.
-        When the plan argument is a plan address (not a file path), task_file_path
-        is returned as ``Path(plan_address)`` so callers receive the address string
-        via ``task_file_path.name``.
+        Returns (None, None) when a plan address is found but cannot be resolved
+        (plan not found in the DH state directory).
     """
     if not prompt:
         return None, None
 
     # Plan argument pattern: file path (.md/.yaml) OR plan address (P<hex>).
     # Named group ``plan`` captures whichever form is present.
+    # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
     PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
 
     # Pattern 1: /start-task <plan-arg> --task <id>  (literal slash-command)
     # Matches both file-path form and plan-address form.
-    match = re.search(rf"/start-task\s+{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt)
+    match = re.search(rf"/start-task\s+{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt, re.IGNORECASE)
     if match:
-        task_file = Path(match.group("plan"))
-        task_id = match.group("task_id")
-        return task_file, task_id
+        task_file = _plan_arg_to_path(match.group("plan"))
+        if task_file is None:
+            return None, None
+        return task_file, match.group("task_id")
 
     # Pattern 2: Skill(skill="start-task", args="<plan-arg> --task <id>")
     # The orchestrator invokes start-task via the Skill tool, not as a literal command.
@@ -250,11 +275,13 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
         rf"{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?"
         rf'["\']',
         prompt,
+        re.IGNORECASE,
     )
     if skill_match:
-        task_file = Path(skill_match.group("plan"))
-        task_id = skill_match.group("task_id")
-        return task_file, task_id
+        task_file = _plan_arg_to_path(skill_match.group("plan"))
+        if task_file is None:
+            return None, None
+        return task_file, skill_match.group("task_id")
 
     return None, None
 
