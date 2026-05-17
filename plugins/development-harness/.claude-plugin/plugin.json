@@ -6,6 +6,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "8.2.17",
 =======
   "version": "8.2.16",
@@ -22,6 +23,9 @@
 =======
   "version": "8.2.20",
 >>>>>>> 498f0562 (fix(types): consolidate TypedDicts into backend_protocol, remove cast suppressions)
+=======
+  "version": "8.2.21",
+>>>>>>> a05d6c69 (fix(types): remove stale cast() suppressions from create_backend())
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
