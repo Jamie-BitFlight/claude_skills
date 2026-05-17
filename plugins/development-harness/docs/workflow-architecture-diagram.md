@@ -244,7 +244,7 @@ Relevant fields for the pipeline:
 }
 ```
 
-### 2.6 Active-task context file (~/.dh/projects/{slug}/context/active-task-{CLAUDE_SESSION_ID}.json)
+### 2.6 Active-task context file (~/.dh/projects/{slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json)
 
 Written by `/start-task` skill via `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})`.
 Read by `task_status_hook.py` PostToolUse handler.

@@ -55,7 +55,7 @@ Skill(skill="start-task", args="{plan} --task {task_id}")
 
 - Loading task-level skills from task metadata
 - **Claiming the task** via `sam_task(action='claim')`
-- **Registering active-task context** with `${CLAUDE_SESSION_ID}` so the SubagentStop hook marks the task complete when this agent finishes
+- **Registering active-task context** with `${CLAUDE_CODE_SESSION_ID}` so the SubagentStop hook marks the task complete when this agent finishes
 - Implementing against acceptance criteria
 - Marking the task complete via `sam_task(action='state', status='complete')`
 

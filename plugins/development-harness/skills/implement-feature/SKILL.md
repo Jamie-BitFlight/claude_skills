@@ -108,7 +108,7 @@ For each skill, call: Skill(skill="{skill-name}")
 - Launch `dh:task-worker` with a prompt that invokes `start-task`:
 
 ```text
-Skill(skill="start-task", args="{task_file_path} --task {task_id}")
+Skill(skill="start-task", args="{plan_address} --task {task_id}")
 ```
 
 > **Note**: Task-level skills are additive to agent-level skills. If the agent definition
