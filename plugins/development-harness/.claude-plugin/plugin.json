@@ -8,6 +8,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "8.2.17",
 =======
   "version": "8.2.16",
@@ -30,6 +31,9 @@
 =======
   "version": "8.2.22",
 >>>>>>> 36308946 (fix(addressing): numeric plan ID comparison and slug multi-match behavior)
+=======
+  "version": "8.2.23",
+>>>>>>> 621065a6 (refactor(task-status-hook): replace Path plan identifier with str plan_id, route all reads through MCP)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

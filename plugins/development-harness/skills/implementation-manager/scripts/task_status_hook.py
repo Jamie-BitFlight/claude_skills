@@ -60,7 +60,6 @@ if _HOOK_SAM_PACKAGES_DIR not in sys.path:
 # Import directly from submodules for concrete types (avoids lazy __getattr__ object).
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.models import Task as SamTask, TaskStatus as SamTaskStatus
-from sam_schema.core.query import get_task as sam_get_task
 
 # Alphanumeric task ID pattern: "1", "1.1", "T1", "P0-T01", etc.
 _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
@@ -141,26 +140,20 @@ def should_skip_hook(event_name: str, profile: HookProfile, disabled_hooks: set[
     return bool(profile == HookProfile.MINIMAL and event_name == "PostToolUse")
 
 
-def run_strict_pre_completion_checks(task_file_path: Path, task_id: str, hook_input: dict[str, Any]) -> list[str]:
+def run_strict_pre_completion_checks(task: SamTask, task_id: str) -> list[str]:
     """Run pre-completion validation checks for strict mode.
 
     Called when CLAUDE_SKILLS_HOOK_PROFILE=strict and a SubagentStop event fires.
     Warnings are observational — they do not prevent task completion.
 
     Args:
-        task_file_path: Path to the plan file.
-        task_id: Task ID being completed.
-        hook_input: Parsed hook input (reserved for future checks).
+        task: The already-loaded SamTask object (avoids a second MCP round-trip).
+        task_id: Task ID being completed (used in warning messages).
 
     Returns:
         List of warning strings. Empty list means all checks passed.
     """
     warnings: list[str] = []
-    try:
-        task = sam_get_task(task_file_path, task_id)
-    except (KeyError, FileNotFoundError, ValueError, OSError) as e:
-        warnings.append(f"[hook] strict: could not load task {task_id} for pre-completion checks: {e}")
-        return warnings
 
     # Check 1: task must have been claimed (status should be IN_PROGRESS, not NOT_STARTED).
     if task.status == SamTaskStatus.NOT_STARTED:
@@ -285,7 +278,7 @@ def get_context_file_path(cwd: Path, session_id: str) -> Path:
     return _dh_paths.context_dir() / f"active-task-{session_id}.json"
 
 
-def read_task_context(cwd: Path, session_id: str) -> tuple[Path | None, str | None]:
+def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | None]:
     """Read task info from context file.
 
     Args:
@@ -293,7 +286,9 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[Path | None, str | No
         session_id: Session ID from hook input.
 
     Returns:
-        Tuple of (task_file_path, task_id) or (None, None) if not found.
+        Tuple of (plan_id_or_path, task_id) or (None, None) if not found.
+        The first element is the raw string value from the JSON context file
+        (plan address or filesystem path).
     """
     context_file = get_context_file_path(cwd, session_id)
     if not context_file.exists():
@@ -304,14 +299,14 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[Path | None, str | No
         task_file = context_data.get("task_file_path")
         task_id = context_data.get("task_id")
         if task_file and task_id:
-            return Path(task_file), task_id
+            return task_file, task_id
     except json.JSONDecodeError:
         pass
 
     return None, None
 
 
-def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[Path | None, str | None, str | int | None]:
+def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str | None, str | None, str | int | None]:
     """Retrieve active task context via fastmcp CLI call to sam_active_task(action='get').
 
     Primary retrieval path for SubagentStop. Returns parsed fields from the
@@ -324,7 +319,8 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[Path 
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        Tuple of ``(task_file_path, task_id, parent_issue_number)``.
+        Tuple of ``(plan_id, task_id, parent_issue_number)`` where ``plan_id``
+        is the raw string value from the MCP response (plan address or path).
         All ``None`` when the call fails or active task is not set.
     """
     uv = shutil.which("uv")
@@ -375,7 +371,7 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[Path 
         task_id = active.get("task_id")
         if task_file_raw and task_id:
             parent_issue: str | int | None = active.get("parent_issue_number")
-            return Path(task_file_raw), task_id, parent_issue
+            return task_file_raw, task_id, parent_issue
     except (json.JSONDecodeError, KeyError, IndexError):
         pass
 
@@ -576,6 +572,68 @@ def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, An
     return True
 
 
+def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 15) -> SamTask | None:
+    """Read a task via fastmcp CLI call to sam_task(action='read').
+
+    Routes task reads through the SAM MCP server, keeping the hook backend-agnostic.
+    Returns the parsed Task object on success, None on any failure.
+
+    Args:
+        plan_id: Plan address (e.g. ``"Pf4281187"``).
+        task_id: Task ID within the plan (e.g. ``"T1"``).
+        timeout: Subprocess timeout in seconds.
+
+    Returns:
+        The parsed ``SamTask`` on success, ``None`` on any failure.
+    """
+    uv = shutil.which("uv")
+    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
+        return None
+
+    input_data = json.dumps({"plan": plan_id, "task": task_id, "config": {"action": "read"}})
+    env = os.environ.copy()
+    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
+    env["FASTMCP_LOG_ENABLED"] = "false"
+
+    try:
+        result = subprocess.run(
+            [
+                uv,
+                "run",
+                "fastmcp",
+                "call",
+                "--command",
+                f"uv run --script {_SAM_RUN_SERVER_PATH}",
+                "--target",
+                "sam_task",
+                "--input-json",
+                input_data,
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    try:
+        outer = json.loads(result.stdout)
+        text = outer["content"][0]["text"]
+        data: dict[str, Any] = json.loads(text)
+        task_data = data.get("task")
+        if not task_data:
+            return None
+        return SamTask.model_validate(task_data)
+    except (json.JSONDecodeError, KeyError, IndexError, ValueError):
+        return None
+
+
 def _cleanup_active_task_context(session_id: str | None, fallback_context_file: Path | None) -> None:
     """Clean up active task context after SubagentStop completes.
 
@@ -604,22 +662,6 @@ def get_iso_timestamp() -> str:
         ISO formatted timestamp string.
     """
     return datetime.now(UTC).isoformat(timespec="seconds")
-
-
-def _fallback_to_context_file(hook_input: dict[str, Any]) -> tuple[Path | None, str | None]:
-    """Read task info from the active-task context file as a fallback.
-
-    When prompt parsing fails (e.g. Skill() syntax not matched), the context
-    file written by /start-task step 4 provides the task_file_path and task_id.
-
-    Returns:
-        Tuple of (task_file_path, task_id) or (None, None) if context file not found.
-    """
-    cwd = Path(hook_input.get("cwd", "."))
-    session_id = hook_input.get("session_id", "")
-    if session_id:
-        return read_task_context(cwd, session_id)
-    return None, None
 
 
 def _extract_text_from_user_record(record: dict[str, Any]) -> str | None:
@@ -737,14 +779,15 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     return None
 
 
-def _read_context_file(context_file: Path) -> tuple[Path | None, str | None, str | int | None]:
+def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
     """Read task_file_path, task_id, and parent_issue_number from a context file.
 
     Args:
         context_file: Path to an active-task-*.json file.
 
     Returns:
-        Tuple of (task_file_path, task_id, parent_issue_number).
+        Tuple of (plan_id_or_path, task_id, parent_issue_number) where the first
+        element is the raw string value from the JSON (plan address or filesystem path).
         Any field absent or unreadable is returned as None.
     """
     try:
@@ -759,7 +802,7 @@ def _read_context_file(context_file: Path) -> tuple[Path | None, str | None, str
 
     parent_issue: str | int | None = data.get("parent_issue_number")
 
-    return Path(raw_path), task_id, parent_issue
+    return raw_path, task_id, parent_issue
 
 
 def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | None:
@@ -810,7 +853,7 @@ def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | 
 
 def _resolve_active_task_context(
     hook_input: dict[str, Any],
-) -> tuple[str | None, Path | None, str | None, str | int | None, Path | None] | None:
+) -> tuple[str | None, str | None, str | None, str | int | None, Path | None] | None:
     """Resolve the active task context for the agent that just stopped.
 
     Three-step resolution chain:
@@ -826,79 +869,57 @@ def _resolve_active_task_context(
         hook_input: Parsed SubagentStop hook input from stdin.
 
     Returns:
-        ``(sub_agent_session_id, task_file_path, task_id, parent_issue_number, context_file)``
-        when a task is found, or ``None`` when no active task exists (caller should exit 0).
+        ``(sub_agent_session_id, plan_id, task_id, parent_issue_number, context_file)``
+        where ``plan_id`` is a str (plan address or raw path string from context).
+        Returns ``None`` when no active task exists (caller should exit 0).
     """
     transcript_path_raw = hook_input.get("agent_transcript_path", "")
     sub_agent_session_id: str | None = None
     if transcript_path_raw:
         sub_agent_session_id = _extract_session_id_from_transcript(Path(transcript_path_raw))
 
-    task_file_path: Path | None = None
+    plan_id: str | None = None
     task_id: str | None = None
     parent_issue_number: str | int | None = None
     context_file: Path | None = None
 
     # Step 1: MCP lookup via sam_active_task(get)
     if sub_agent_session_id:
-        task_file_path, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
+        plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
 
     # Step 2: Filesystem context file written by /start-task
-    if task_file_path is None or task_id is None:
+    if plan_id is None or task_id is None:
         context_file = _resolve_context_file_from_transcript(hook_input)
         if context_file is not None:
-            task_file_path, task_id, parent_issue_number = _read_context_file(context_file)
+            plan_id, task_id, parent_issue_number = _read_context_file(context_file)
 
     # Step 3: Extract task reference from the agent's prompt in the JSONL transcript
-    if (task_file_path is None or task_id is None) and transcript_path_raw:
+    if (plan_id is None or task_id is None) and transcript_path_raw:
         prompt_text = _extract_prompt_from_transcript(Path(transcript_path_raw))
         if prompt_text:
             extracted_path, extracted_id = extract_task_info_from_prompt(prompt_text)
             if extracted_path is not None and extracted_id is not None:
+                # Convert Path to plan_id string: extract plan address from filename
+                # or use the path string directly as a fallback identifier.
+                extracted_plan_id = _extract_plan_addr_from_path(extracted_path)
+                if extracted_plan_id is None:
+                    extracted_plan_id = str(extracted_path)
                 print(
-                    f"[hook] SubagentStop: resolved task from prompt — {extracted_path} / {extracted_id}",
+                    f"[hook] SubagentStop: resolved task from prompt — {extracted_plan_id} / {extracted_id}",
                     file=sys.stderr,
                 )
-                task_file_path = extracted_path
+                plan_id = extracted_plan_id
                 task_id = extracted_id
                 # parent_issue_number remains None — not available from prompt alone
 
-    if task_file_path is None or task_id is None:
+    if plan_id is None or task_id is None:
         return None
 
-    return sub_agent_session_id, task_file_path, task_id, parent_issue_number, context_file
-
-
-def _fetch_task_for_stop_hook(
-    full_path: Path, task_id: str, sub_agent_session_id: str | None, context_file: Path | None
-) -> SamTask:
-    """Load the current task for the SubagentStop handler; exit on error.
-
-    Wraps sam_get_task with the standard error handling for hook context:
-    - ValueError (schema violation) → exit 2 with stderr message
-    - KeyError / FileNotFoundError / OSError → clean up context, exit 0
-
-    Args:
-        full_path: Absolute path to the plan YAML file.
-        task_id: Task identifier within the plan.
-        sub_agent_session_id: Agent session ID for context cleanup.
-        context_file: Context file path for cleanup on transient errors.
-
-    Returns:
-        The current Task object for task_id.
-    """
-    try:
-        return sam_get_task(full_path, task_id)
-    except ValueError as e:
-        print(f"[hook] SubagentStop: schema violation in task file {full_path} — {e}", file=sys.stderr)
-        sys.exit(2)
-    except (KeyError, FileNotFoundError, OSError):
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
+    return sub_agent_session_id, plan_id, task_id, parent_issue_number, context_file
 
 
 def _cascade_failed_task(
-    full_path: Path, task_id: str, sub_agent_session_id: str | None, context_file: Path | None
+    plan_id: str, task_id: str, sub_agent_session_id: str | None, context_file: Path | None
 ) -> None:
     """Best-effort downstream skip cascade when a task is already in FAILED status.
 
@@ -908,18 +929,14 @@ def _cascade_failed_task(
     critical path must not be blocked by network or write errors.
 
     Args:
-        full_path: Absolute path to the plan YAML file.
+        plan_id: Plan address string (e.g. ``"Pf4281187"``).
         task_id: ID of the task that transitioned to FAILED.
         sub_agent_session_id: Agent session ID for context cleanup.
         context_file: Context file path for cleanup.
     """
-    plan_addr = _extract_plan_addr_from_path(full_path)
-    if plan_addr:
-        ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.FAILED)
-        if not ok:
-            print(f"[hook] SubagentStop: downstream skip cascade failed for {task_id}", file=sys.stderr)
-    else:
-        print(f"[hook] SubagentStop: cannot extract plan address from {full_path} — skipping cascade", file=sys.stderr)
+    ok = _call_sam_task_state(plan_id, task_id, SamTaskStatus.FAILED)
+    if not ok:
+        print(f"[hook] SubagentStop: downstream skip cascade failed for {task_id}", file=sys.stderr)
     _cleanup_active_task_context(sub_agent_session_id, context_file)
     sys.exit(0)
 
@@ -948,23 +965,28 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         hook_input: Parsed hook input from stdin.
         profile: Active hook profile. Defaults to STANDARD.
     """
-    cwd = Path(hook_input.get("cwd", "."))
-
     resolved = _resolve_active_task_context(hook_input)
     if resolved is None:
         sys.exit(0)
 
-    sub_agent_session_id, task_file_path, task_id, _parent_issue_number, context_file = resolved
+    sub_agent_session_id, plan_id, task_id, _parent_issue_number, context_file = resolved
 
-    if task_file_path is None or task_id is None:
+    if plan_id is None or task_id is None:
         if context_file is not None:
             print(f"[hook] SubagentStop: malformed context file {context_file} — cleaning up", file=sys.stderr)
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path
+    # Extract plan address from plan_id: if it looks like a path, extract the P-token;
+    # otherwise use plan_id directly (it already is a plan address string).
+    plan_addr_candidate = _extract_plan_addr_from_path(Path(plan_id))
+    plan_addr = plan_addr_candidate if plan_addr_candidate is not None else plan_id
 
-    current_task = _fetch_task_for_stop_hook(full_path, task_id, sub_agent_session_id, context_file)
+    current_task = _call_sam_task_read(plan_addr, task_id)
+    if current_task is None:
+        # MCP read failed — best-effort: clean up and exit silently.
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
 
     if current_task.status == SamTaskStatus.COMPLETE:
         _cleanup_active_task_context(sub_agent_session_id, context_file)
@@ -973,19 +995,13 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     if current_task.status == SamTaskStatus.FAILED:
         # Agent explicitly set task to FAILED before stopping.
         # Cascade skip signals to all downstream dependents via MCP.
-        _cascade_failed_task(full_path, task_id, sub_agent_session_id, context_file)
+        # _cascade_failed_task is terminal (calls sys.exit(0)); return guards mocked callers.
+        _cascade_failed_task(plan_addr, task_id, sub_agent_session_id, context_file)
+        return
 
     if profile == HookProfile.STRICT:
-        for warning in run_strict_pre_completion_checks(full_path, task_id, hook_input):
+        for warning in run_strict_pre_completion_checks(current_task, task_id):
             print(warning, file=sys.stderr)
-
-    plan_addr = _extract_plan_addr_from_path(full_path)
-    if plan_addr is None:
-        print(
-            f"[hook] SubagentStop: cannot extract plan address from {full_path} — skipping MCP write", file=sys.stderr
-        )
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
 
     timestamp = get_iso_timestamp()
     state_ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.COMPLETE)
@@ -1012,27 +1028,20 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     if not session_id:
         sys.exit(0)
 
-    task_file_path, task_id = read_task_context(cwd, session_id)
+    raw_plan_ref, task_id = read_task_context(cwd, session_id)
 
-    if task_file_path is None or task_id is None:
+    if raw_plan_ref is None or task_id is None:
         sys.exit(0)
 
-    full_path = cwd / task_file_path if not task_file_path.is_absolute() else task_file_path
-
-    # sam_get_task raises KeyError if task not found — treat as "not active", exit silently.
-    try:
-        current_task = sam_get_task(full_path, task_id)
-        if current_task.status == SamTaskStatus.COMPLETE:
-            return
-    except ValueError as e:
-        print(f"[hook] PostToolUse: schema violation in task file {full_path} — {e}", file=sys.stderr)
-        sys.exit(2)
-    except (KeyError, FileNotFoundError, OSError):
-        sys.exit(0)
-
-    plan_addr = _extract_plan_addr_from_path(full_path)
+    # Extract plan address from the raw reference: if it looks like a path, extract
+    # the P-token; otherwise use the string directly as a plan address.
+    plan_addr = _extract_plan_addr_from_path(Path(raw_plan_ref))
     if plan_addr is None:
         sys.exit(0)
+
+    current_task = _call_sam_task_read(plan_addr, task_id)
+    if current_task is not None and current_task.status == SamTaskStatus.COMPLETE:
+        return
 
     timestamp = get_iso_timestamp()
 
