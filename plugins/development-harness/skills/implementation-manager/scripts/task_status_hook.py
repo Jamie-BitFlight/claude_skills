@@ -64,6 +64,11 @@ from sam_schema.core.models import Task as SamTask, TaskStatus as SamTaskStatus
 # Alphanumeric task ID pattern: "1", "1.1", "T1", "P0-T01", etc.
 _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 
+# Plan argument pattern: file path (.md/.yaml) OR plan address (P<hex>).
+# Named group ``plan`` captures whichever form is present.
+# re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
+_PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
+
 
 class HookProfile(enum.StrEnum):
     """Runtime profile controlling which hook handlers are active.
@@ -227,14 +232,11 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
     if not prompt:
         return None, None
 
-    # Plan argument pattern: file path (.md/.yaml) OR plan address (P<hex>).
-    # Named group ``plan`` captures whichever form is present.
-    # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
-    PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
-
     # Pattern 1: /start-task <plan-arg> --task <id>  (literal slash-command)
     # Matches both file-path form and plan-address form.
-    match = re.search(rf"/start-task\s+{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt, re.IGNORECASE)
+    match = re.search(
+        rf"/start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt, re.IGNORECASE
+    )
     if match:
         task_file = _plan_arg_to_path(match.group("plan"))
         if task_file is None:
@@ -246,7 +248,7 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
     # Matches both file-path form and plan-address form.
     skill_match = re.search(
         rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
-        rf"{PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?"
+        rf"{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?"
         rf'["\']',
         prompt,
         re.IGNORECASE,
@@ -428,7 +430,68 @@ def _call_sam_active_task_clear(session_id: str, timeout: int = 10) -> bool:
         return result.returncode == 0
 
 
-def _extract_plan_addr_from_path(task_file_path: Path) -> str | None:
+def _get_uv_executable() -> str | None:
+    """Return the path to the uv executable, or None if not found on PATH.
+
+    Returns:
+        Absolute path string to uv, or None when uv is absent.
+    """
+    return shutil.which("uv")
+
+
+def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15) -> str | None:
+    """Execute a fastmcp call against the SAM server and return raw stdout.
+
+    Handles uv resolution, environment setup, subprocess execution, and
+    common failure modes. Callers are responsible for JSON parsing and
+    context-specific error logging.
+
+    Args:
+        input_data: Dict to serialise as the ``--input-json`` argument.
+        timeout: Subprocess timeout in seconds.
+
+    Returns:
+        Raw stdout string on success, None on any failure (uv missing,
+        server script missing, subprocess error, timeout, non-zero exit).
+    """
+    uv = _get_uv_executable()
+    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
+        return None
+
+    env = {**os.environ, "FASTMCP_SHOW_SERVER_BANNER": "false", "FASTMCP_LOG_ENABLED": "false"}
+    try:
+        result = subprocess.run(
+            [
+                uv,
+                "run",
+                "fastmcp",
+                "call",
+                "--command",
+                f"uv run --script {_SAM_RUN_SERVER_PATH}",
+                "--target",
+                "sam_task",
+                "--input-json",
+                json.dumps(input_data),
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+        return None
+
+    if result.returncode != 0:
+        if result.stderr:
+            print(f"[hook] fastmcp sam_task failed: {result.stderr.strip()}", file=sys.stderr)
+        return None
+
+    return result.stdout
+
+
+def _extract_plan_addr_from_path(task_file_path: str | Path) -> str | None:
     """Extract plan address from a task file path.
 
     Searches for a hex plan ID token (e.g. ``Pf4281187``) in the filename.
@@ -459,45 +522,15 @@ def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, ti
     Returns:
         ``True`` if the MCP call succeeded, ``False`` on any failure.
     """
-    uv = shutil.which("uv")
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
-        return False
-
-    input_data = json.dumps({"plan": plan_addr, "task": task_id, "config": {"action": "state", "status": status}})
-    env = os.environ.copy()
-    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
-    env["FASTMCP_LOG_ENABLED"] = "false"
-
-    try:
-        result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                "sam_task",
-                "--input-json",
-                input_data,
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-        return False
-
-    if result.returncode != 0:
+    stdout = _call_sam_fastmcp(
+        {"plan": plan_addr, "task": task_id, "config": {"action": "state", "status": status}}, timeout=timeout
+    )
+    if stdout is None:
         print(f"[hook] sam_task state={status} failed for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
     try:
-        outer = json.loads(result.stdout)
+        outer = json.loads(stdout)
         json.loads(outer["content"][0]["text"])
     except (json.JSONDecodeError, KeyError, IndexError):
         print(f"[hook] sam_task state: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
@@ -521,49 +554,16 @@ def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, An
     Returns:
         ``True`` if the MCP call succeeded, ``False`` on any failure.
     """
-    uv = shutil.which("uv")
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
-        return False
-
-    input_data = json.dumps({
-        "plan": plan_addr,
-        "task": task_id,
-        "config": {"action": "update", "set_fields_json": set_fields},
-    })
-    env = os.environ.copy()
-    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
-    env["FASTMCP_LOG_ENABLED"] = "false"
-
-    try:
-        result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                "sam_task",
-                "--input-json",
-                input_data,
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-        return False
-
-    if result.returncode != 0:
+    stdout = _call_sam_fastmcp(
+        {"plan": plan_addr, "task": task_id, "config": {"action": "update", "set_fields_json": set_fields}},
+        timeout=timeout,
+    )
+    if stdout is None:
         print(f"[hook] sam_task update failed for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
     try:
-        outer = json.loads(result.stdout)
+        outer = json.loads(stdout)
         json.loads(outer["content"][0]["text"])
     except (json.JSONDecodeError, KeyError, IndexError):
         print(f"[hook] sam_task update: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
@@ -586,44 +586,12 @@ def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 15) -> SamTas
     Returns:
         The parsed ``SamTask`` on success, ``None`` on any failure.
     """
-    uv = shutil.which("uv")
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
-        return None
-
-    input_data = json.dumps({"plan": plan_id, "task": task_id, "config": {"action": "read"}})
-    env = os.environ.copy()
-    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
-    env["FASTMCP_LOG_ENABLED"] = "false"
-
-    try:
-        result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                "sam_task",
-                "--input-json",
-                input_data,
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-        return None
-
-    if result.returncode != 0:
+    stdout = _call_sam_fastmcp({"plan": plan_id, "task": task_id, "config": {"action": "read"}}, timeout=timeout)
+    if stdout is None:
         return None
 
     try:
-        outer = json.loads(result.stdout)
+        outer = json.loads(stdout)
         text = outer["content"][0]["text"]
         data: dict[str, Any] = json.loads(text)
         task_data = data.get("task")
@@ -977,9 +945,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    # Extract plan address from plan_id: if it looks like a path, extract the P-token;
-    # otherwise use plan_id directly (it already is a plan address string).
-    plan_addr_candidate = _extract_plan_addr_from_path(Path(plan_id))
+    plan_addr_candidate = _extract_plan_addr_from_path(plan_id)
     plan_addr = plan_addr_candidate if plan_addr_candidate is not None else plan_id
 
     current_task = _call_sam_task_read(plan_addr, task_id)
@@ -1036,9 +1002,7 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     if raw_plan_ref is None or task_id is None:
         sys.exit(0)
 
-    # Extract plan address from the raw reference: if it looks like a path, extract
-    # the P-token; otherwise use the string directly as a plan address.
-    plan_addr = _extract_plan_addr_from_path(Path(raw_plan_ref))
+    plan_addr = _extract_plan_addr_from_path(raw_plan_ref)
     if plan_addr is None:
         sys.exit(0)
 
@@ -1052,8 +1016,6 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
         return
 
     timestamp = get_iso_timestamp()
-
-    # Best-effort write — no plan address token in filename means no MCP target.
     _call_sam_task_update(plan_addr, task_id, {"last-activity": timestamp})
 
 

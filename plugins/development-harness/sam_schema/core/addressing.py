@@ -154,7 +154,7 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
        → use ``_P_NUMERIC_RE``; anything else treated as a slug.
     3. If the ref part is numeric (``"1"``, ``"719"``, ``"003"``), glob
        ``{PREFIX}{NNN}-*`` files/directories where the numeric portion matches.
-       Zero-padding is flexible: ``"1"`` matches ``P001-``, ``P01-``, ``P1-``.
+       Zero-padding is significant: ``"1"`` matches only ``P1-``, not ``P001-``.
     4. Collision: if multiple entries share the same numeric value, raise
        ``AddressingError`` with the list of matches.
     5. If the ref is a slug (non-numeric, no recognised prefix), glob
@@ -203,11 +203,7 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
             p
             for p in all_entries
             if (m := active_numeric_re.match(p.name))
-            and (
-                int(m.group(1)) == int(ref)
-                if ref.isdigit() and m.group(1).isdigit()
-                else m.group(1).lower() == ref.lower()
-            )
+            and (m.group(1) == ref if m.group(1).isdigit() else m.group(1).lower() == ref.lower())
         ]
         if len(p_matches) == 1:
             if active_prefix == "P":

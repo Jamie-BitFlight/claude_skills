@@ -220,6 +220,34 @@ def _issue_to_task_data(issue: BeadsIssueRaw, task_id: str, plan_id: str) -> Tas
     return data
 
 
+def _build_plan_data(plan_id: str, epic: BeadsIssueRaw, task_data_list: list[TaskData]) -> PlanData:
+    """Build a PlanData dict from a beads epic and task list.
+
+    Args:
+        plan_id: SAM plan identifier.
+        epic: Parsed BeadsIssueRaw for the plan's epic.
+        task_data_list: List of TaskData dicts for the plan's tasks.
+
+    Returns:
+        PlanData TypedDict populated from the epic fields.
+    """
+    plan_data: PlanData = {
+        "plan_id": plan_id,
+        "feature": epic.title,
+        "version": "1.0.0",
+        "description": epic.description or "",
+        "goal": epic.description or "",
+        "context": "",
+        "acceptance_criteria": "",
+        "issue": None,
+        "tasks": task_data_list,
+        "source_path": None,
+        "state": PlanState.READY,
+        "backend_ref": epic.id,
+    }
+    return plan_data
+
+
 # ---------------------------------------------------------------------------
 # BeadsTaskProvider
 # ---------------------------------------------------------------------------
@@ -388,7 +416,6 @@ class BeadsTaskProvider:
             PlanNotFoundError: When no epic is registered for plan_id.
             TaskNotFoundError: When task_id is not in the task index.
         """
-        # Hot path: 1 subprocess call. Fetch task key directly.
         raw = self._remember_get(f"{_TASK_IDX_PREFIX}{plan_id}.{task_id}")
         if raw:
             try:
@@ -600,8 +627,10 @@ class BeadsTaskProvider:
         try:
             raw_children = self._runner.run_json(["list", "--parent", epic_id])
             children_by_bd_id = {issue.id: issue for issue in parse_issue_list(raw_children)}
+        except BdNotInstalledError:
+            raise
         except (BdInvocationError, BdJsonDecodeError, ValidationError):
-            # bd list --parent unavailable, output non-JSON, or JSON invalid — fall back to per-task shows.
+            # bd list --parent unsupported, non-JSON output, or invalid JSON — fall back to per-task shows.
             for task_id, meta in task_index.items():
                 bd_id = meta["bd_id"]
                 try:
@@ -612,23 +641,11 @@ class BeadsTaskProvider:
                     if meta.get("bookend_type") is not None:
                         td["bookend_type"] = meta["bookend_type"]
                     task_data_list.append(td)
+                except BdNotInstalledError:
+                    raise
                 except BdInvocationError:
-                    continue  # issue inaccessible; skip rather than fail whole plan
-            plan_data: PlanData = {
-                "plan_id": plan_id,
-                "feature": epic.title,
-                "version": "1.0.0",
-                "description": epic.description or "",
-                "goal": epic.description or "",
-                "context": "",
-                "acceptance_criteria": "",
-                "issue": None,
-                "tasks": task_data_list,
-                "source_path": None,
-                "state": PlanState.READY,
-                "backend_ref": epic_id,
-            }
-            return plan_data
+                    continue  # individual issue inaccessible; skip rather than fail whole plan
+            return _build_plan_data(plan_id, epic, task_data_list)
 
         # Happy path: join batch result against task index for task_id mapping
         # and bookend metadata. Issues absent from the batch result are skipped —
@@ -646,21 +663,7 @@ class BeadsTaskProvider:
                 td["bookend_type"] = meta["bookend_type"]
             task_data_list.append(td)
 
-        plan_data: PlanData = {
-            "plan_id": plan_id,
-            "feature": epic.title,
-            "version": "1.0.0",
-            "description": epic.description or "",
-            "goal": epic.description or "",
-            "context": "",
-            "acceptance_criteria": "",
-            "issue": None,
-            "tasks": task_data_list,
-            "source_path": None,
-            "state": PlanState.READY,
-            "backend_ref": epic_id,
-        }
-        return plan_data
+        return _build_plan_data(plan_id, epic, task_data_list)
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return plan summaries by scanning bd remember for plan index entries.
@@ -676,7 +679,6 @@ class BeadsTaskProvider:
         Returns:
             List of PlanSummary TypedDicts.
         """
-        # Single-pass bucketing: one bd memories call instead of 1 + M.
         all_entries = self._remember_list()
 
         # Partition entries into plan-index entries and task count by plan_id.
