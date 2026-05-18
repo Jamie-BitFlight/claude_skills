@@ -189,7 +189,7 @@ For each modified file, grep for function/class definitions and extract actual s
 Compare against the contracts defined in the spec.
 Report mismatches in a <concerns> block with severity CONTRACT VIOLATION (signature mismatch)
 or CONTRACT GAP (spec defines contract but implementation is silent).
-If no mismatches are found, return an empty response with no <concerns> block.
+If no mismatches are found, output `No contract concerns — all contracts in scope are satisfied.` with no <concerns> block.
 """
 )
 ```

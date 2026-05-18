@@ -154,8 +154,9 @@ When operating as a **teammate** (spawned via `TeamCreate`), also send:
 
 - Extract contracts from the spec text exactly as written — do not interpret or infer
 - Report only what is observable from the spec and the code — no guesses
-- If the architect spec has no Component Design or Type System Design section, return
-  nothing (no contracts to verify)
+- If the architect spec has no Component Design or Type System Design section, output
+  `No contract concerns — no contracts defined in spec` and, if operating as a teammate,
+  send `SendMessage(to="team-lead", summary="No contract concerns found", message="No Component Design or Type System Design section in spec — no contracts to verify.")`
 - If a modified file does not exist or cannot be read, note it in the concerns block
   as a CONTRACT GAP with reason "file not found"
 - Do not modify any files — this is a read-only verification step
