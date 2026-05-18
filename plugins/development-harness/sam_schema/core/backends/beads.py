@@ -653,8 +653,7 @@ class BeadsTaskProvider:
         # (bd issues deleted in bd but surviving in the remember index are dropped).
         for task_id, meta in task_index.items():
             bd_id = meta["bd_id"]
-            issue = children_by_bd_id.get(bd_id)
-            if issue is None:
+            if (issue := children_by_bd_id.get(bd_id)) is None:
                 continue  # issue deleted in bd but index entry survives; skip
             td = _issue_to_task_data(issue, task_id, plan_id)
             if meta.get("is_bookend"):

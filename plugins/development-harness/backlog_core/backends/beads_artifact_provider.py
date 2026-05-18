@@ -571,8 +571,7 @@ class BeadsArtifactProvider:
         issue = parse_issue(raw)
         if issue.metadata is None:
             return ArtifactManifest(issue_number=0), issue
-        manifest = _extract_manifest_from_metadata(issue.metadata)
-        if manifest is None:
+        if (manifest := _extract_manifest_from_metadata(issue.metadata)) is None:
             return ArtifactManifest(issue_number=0), issue
         return manifest, issue
 

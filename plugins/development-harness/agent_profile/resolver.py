@@ -161,13 +161,14 @@ class SkillResolver:
 
         skill_dir: Path | None = None
 
-        if fmt == "plugin-qualified":
-            skill_dir = self._locate_plugin_qualified(uri, plugin_hint, skill_path, warnings)
-        elif fmt == "domain":
-            skill_dir = self._locate_domain(uri, context_plugin, skill_path, warnings)
-        else:
-            # bare
-            skill_dir = self._locate_bare(uri, context_plugin, skill_path, warnings)
+        match fmt:
+            case "plugin-qualified":
+                skill_dir = self._locate_plugin_qualified(uri, plugin_hint, skill_path, warnings)
+            case "domain":
+                skill_dir = self._locate_domain(uri, context_plugin, skill_path, warnings)
+            case _:
+                # bare
+                skill_dir = self._locate_bare(uri, context_plugin, skill_path, warnings)
 
         if skill_dir is None:
             return None

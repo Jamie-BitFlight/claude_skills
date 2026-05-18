@@ -139,8 +139,7 @@ def _resolve_from_config(subsystem: str) -> str | None:
         Backend name string if found in any config file, otherwise None.
     """
     for config_path in _get_config_search_paths():
-        data = _load_yaml_config(config_path)
-        if data is None:
+        if (data := _load_yaml_config(config_path)) is None:
             continue
 
         # Step 2: subsystem-specific override

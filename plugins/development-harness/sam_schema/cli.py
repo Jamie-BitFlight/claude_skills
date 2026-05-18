@@ -285,12 +285,13 @@ def _read_plan_only(plan_path: Path, output_format: str) -> None:
         _err(str(exc), exit_code=2)
 
     data = result.plan.model_dump(mode="json", by_alias=True, exclude_none=True)
-    if output_format == "json":
-        _output_json(data)
-    elif output_format == "yaml":
-        _output_yaml(data)
-    else:
-        _output_rich_task(data)
+    match output_format:
+        case "json":
+            _output_json(data)
+        case "yaml":
+            _output_yaml(data)
+        case _:
+            _output_rich_task(data)
 
 
 def _read_task_assignment(plan_path: Path, task_id: str, output_format: str) -> None:
@@ -311,17 +312,18 @@ def _read_task_assignment(plan_path: Path, task_id: str, output_format: str) -> 
         _err(str(exc), exit_code=2)
 
     data = assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
-    if output_format == "json":
-        _output_json(data)
-    elif output_format == "yaml":
-        _output_yaml(data)
-    else:
-        console = Console()
-        if assignment.plan_goal:
-            console.print(f"[bold cyan]Plan goal:[/bold cyan] {assignment.plan_goal}")
-        if assignment.plan_context:
-            console.print(f"[bold cyan]Plan context:[/bold cyan] {assignment.plan_context}")
-        _output_rich_task(data.get("task", data))
+    match output_format:
+        case "json":
+            _output_json(data)
+        case "yaml":
+            _output_yaml(data)
+        case _:
+            console = Console()
+            if assignment.plan_goal:
+                console.print(f"[bold cyan]Plan goal:[/bold cyan] {assignment.plan_goal}")
+            if assignment.plan_context:
+                console.print(f"[bold cyan]Plan context:[/bold cyan] {assignment.plan_context}")
+            _output_rich_task(data.get("task", data))
 
 
 @app.command(name="list")
@@ -1225,8 +1227,7 @@ def _attempt_backlog_sync() -> None:
             typer.echo("Backlog synced to GitHub.")
             return
 
-    uv_exe = shutil.which("uv")
-    if uv_exe is None:
+    if not (uv_exe := shutil.which("uv")):
         typer.echo("Warning: backlog sync unavailable (uv not found).", err=True)
         return
 

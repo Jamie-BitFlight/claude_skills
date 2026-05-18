@@ -934,8 +934,7 @@ def fetch_tasks_from_beads(parent_issue_number: str, feature_slug: str, cache_pa
     Returns:
         List of :class:`Task` objects on success, ``None`` on failure.
     """
-    bd = shutil.which("bd")
-    if bd is None:
+    if not (bd := shutil.which("bd")):
         sys.stderr.write("WARNING: bd not found on PATH — cannot fetch tasks from beads.\n")
         return None
 

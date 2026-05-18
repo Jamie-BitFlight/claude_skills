@@ -493,8 +493,7 @@ def _graphql_request(repo: Repository, query: str, variables: dict[str, object] 
         msg = first_error.get("message", str(response["errors"]))
         msg_0 = f"GraphQL error: {msg}"
         raise BacklogError(msg_0)
-    data = response.get("data")
-    if data is None:
+    if (data := response.get("data")) is None:
         msg_0 = f"Unexpected GraphQL response — missing 'data' key: {response!r}"
         raise BacklogError(msg_0)
     return data
@@ -1185,8 +1184,7 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
             error="GITHUB_TOKEN not set",
         )
 
-    repo_obj = try_get_github(repo)
-    if repo_obj is None:
+    if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
             cache_total_count=cache_total_count,
@@ -1265,8 +1263,7 @@ def close_github_issue(
     out = output or Output()
     try:
         repository = get_github(repo)
-        num = parse_issue_number(issue_ref)
-        if num is None:
+        if (num := parse_issue_number(issue_ref)) is None:
             msg = f"Invalid issue ref: {issue_ref!r}"
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
@@ -1298,8 +1295,7 @@ def resolve_github_issue(
     out = output or Output()
     try:
         repository = get_github(repo)
-        num = parse_issue_number(issue_ref)
-        if num is None:
+        if (num := parse_issue_number(issue_ref)) is None:
             msg = f"Invalid issue ref: {issue_ref!r}"
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
@@ -1369,8 +1365,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
     Returns:
         Dict mapping issue_number -> IssueStatus model.
     """
-    repo_obj = try_get_github(repo)
-    if repo_obj is None:
+    if (repo_obj := try_get_github(repo)) is None:
         return {}
     try:
         owner, repo_name = repo_obj.full_name.split("/", 1)
@@ -1380,8 +1375,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
         return {}
     result: dict[int, IssueStatus] = {}
     for item in items:
-        num = parse_issue_number(item.issue)
-        if num is None:
+        if (num := parse_issue_number(item.issue)) is None:
             continue
         if num in issue_map:
             gh_issue = issue_map[num]
@@ -1405,8 +1399,7 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         return ""
     try:
         repository = get_github(repo)
-        num = parse_issue_number(item.issue)
-        if num is None:
+        if (num := parse_issue_number(item.issue)) is None:
             msg = f"Invalid issue ref: {item.issue!r}"
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
@@ -1427,8 +1420,7 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
     out = output or Output()
     try:
         repository = get_github(repo)
-        num = parse_issue_number(item.issue)
-        if num is None:
+        if (num := parse_issue_number(item.issue)) is None:
             msg = f"Invalid issue ref: {item.issue!r}"
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
@@ -1468,8 +1460,7 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
         return
     out = output or Output()
     repository = get_github(repo)
-    num = parse_issue_number(item.issue)
-    if num is None:
+    if (num := parse_issue_number(item.issue)) is None:
         msg = f"Invalid issue ref: {item.issue!r}"
         raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
@@ -1517,8 +1508,7 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
         return
     out = output or Output()
     repository = get_github(repo)
-    num = parse_issue_number(item.issue)
-    if num is None:
+    if (num := parse_issue_number(item.issue)) is None:
         msg = f"Invalid issue ref: {item.issue!r}"
         raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)

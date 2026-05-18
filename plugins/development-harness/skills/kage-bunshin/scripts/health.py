@@ -27,8 +27,7 @@ def capture_pane_by_id(pane_id: str) -> str:
     """
     if not pane_id:
         return ""
-    tmux = shutil.which("tmux")
-    if tmux is None:
+    if not (tmux := shutil.which("tmux")):
         return "(tmux not found)"
     try:
         result = subprocess.run(

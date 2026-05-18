@@ -85,8 +85,7 @@ def _require_exe(name: str) -> str:
     Raises:
         SystemExit: If the executable is not found.
     """
-    path = shutil.which(name)
-    if path is None:
+    if not (path := shutil.which(name)):
         _emit_error(f"required executable not found: {name}")
         sys.exit(1)
     return path
@@ -189,8 +188,7 @@ def _live_tmux_sessions() -> set[str]:
         Set of session name strings. Empty set if tmux is not running or has
         no sessions.
     """
-    tmux = shutil.which("tmux")
-    if tmux is None:
+    if not (tmux := shutil.which("tmux")):
         return set()
     result = subprocess.run(
         [tmux, "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True, check=False
@@ -210,8 +208,7 @@ def _capture_pane(session_name: str, lines: int = 30) -> list[str] | None:
     Returns:
         List of stripped plain-text lines, or None if capture failed.
     """
-    tmux = shutil.which("tmux")
-    if tmux is None:
+    if not (tmux := shutil.which("tmux")):
         return None
     result = subprocess.run(
         [tmux, "capture-pane", "-p", "-J", "-t", session_name, "-S", f"-{lines}"],

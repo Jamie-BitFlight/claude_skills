@@ -4171,23 +4171,24 @@ async def dispatch_item_status(
         for wave in waves:
             for item in wave.items:
                 if item.issue == issue:
-                    if status == "complete":
-                        mgr.set_item_complete(
-                            milestone=milestone, wave_num=wave.wave_num, issue=issue, result=result, cost=cost
-                        )
-                    elif status == "failed":
-                        mgr.set_item_failed(milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error)
-                    elif status == "skipped":
-                        # Treat skipped the same as failed with a standard message.
-                        mgr.set_item_failed(
-                            milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error or "skipped"
-                        )
-                    else:
-                        return {
-                            "error": f"Invalid status '{status}': must be 'complete', 'failed', or 'skipped'",
-                            "milestone": milestone,
-                            "issue": issue,
-                        }
+                    match status:
+                        case "complete":
+                            mgr.set_item_complete(
+                                milestone=milestone, wave_num=wave.wave_num, issue=issue, result=result, cost=cost
+                            )
+                        case "failed":
+                            mgr.set_item_failed(milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error)
+                        case "skipped":
+                            # Treat skipped the same as failed with a standard message.
+                            mgr.set_item_failed(
+                                milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error or "skipped"
+                            )
+                        case _:
+                            return {
+                                "error": f"Invalid status '{status}': must be 'complete', 'failed', or 'skipped'",
+                                "milestone": milestone,
+                                "issue": issue,
+                            }
                     return {
                         "milestone": milestone,
                         "issue": issue,

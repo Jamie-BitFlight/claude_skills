@@ -1902,8 +1902,7 @@ def _reconcile_single_closed_issue(
     # Skip PRs
     if issue_node.get("isPullRequest"):
         return 0
-    local_item = issue_to_item.get(issue_number)
-    if local_item is None:
+    if (local_item := issue_to_item.get(issue_number)) is None:
         return 0  # no local file — skip silently
     filepath = Path(local_item.file_path)
     if not filepath.exists():
@@ -1958,8 +1957,7 @@ def _reconcile_closed_issues(repo_obj: Repository, open_issue_numbers: set[int],
         issue_number = issue_node.get("number", 0)
         if issue_number in open_issue_numbers:
             continue  # open takes precedence
-        local_item = issue_to_item.get(issue_number)
-        if local_item is None:
+        if (local_item := issue_to_item.get(issue_number)) is None:
             continue  # no local file — skip silently
         filepath = Path(local_item.file_path)
         if not filepath.exists():
@@ -2951,8 +2949,7 @@ def sync_push_groomed_content(
             out.warn(f"  WARNING: Skipping item with invalid issue ref '{issue_ref}'")
             continue
         try:
-            issue_node = issue_lookup.get(issue_num)
-            if issue_node is None:
+            if (issue_node := issue_lookup.get(issue_num)) is None:
                 out.warn(f"  WARNING: Issue #{issue_num} not found in bulk fetch (may be closed)")
                 continue
             body = render_issue_body(item, original_body=issue_node["body"])

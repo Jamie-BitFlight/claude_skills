@@ -155,37 +155,32 @@ def _extract_bold_fields(prose: str) -> dict[str, str | list[str] | int]:  # noq
         if yaml_key is None:
             continue
 
-        if yaml_key == "status":
-            normalized = _BOLD_STATUS_MAP.get(raw_value.lower())
-            if normalized is None:
-                # Try upper-case variant (e.g. "COMPLETE")
-                normalized = _BOLD_STATUS_MAP.get(raw_value.upper().replace("_", " ").replace("-", " "))
-            if normalized is None:
-                # Store as-is; normalizer will handle it
+        match yaml_key:
+            case "status":
+                normalized = _BOLD_STATUS_MAP.get(raw_value.lower())
+                if normalized is None:
+                    # Try upper-case variant (e.g. "COMPLETE")
+                    normalized = _BOLD_STATUS_MAP.get(raw_value.upper().replace("_", " ").replace("-", " "))
+                if normalized is None:
+                    # Store as-is; normalizer will handle it
+                    result[yaml_key] = raw_value
+                else:
+                    result[yaml_key] = normalized
+            case "dependencies":
+                result[yaml_key] = _parse_dependency_value(raw_value)
+            case "skills":
+                result[yaml_key] = _parse_skills_value(raw_value)
+            case "parallelize-with":
+                result[yaml_key] = _parse_dependency_value(raw_value)
+            case "priority":
+                try:
+                    result[yaml_key] = int(raw_value)
+                except (ValueError, TypeError):
+                    result[yaml_key] = raw_value
+            case "complexity":
+                result[yaml_key] = raw_value.lower()
+            case _:
                 result[yaml_key] = raw_value
-            else:
-                result[yaml_key] = normalized
-
-        elif yaml_key == "dependencies":
-            result[yaml_key] = _parse_dependency_value(raw_value)
-
-        elif yaml_key == "skills":
-            result[yaml_key] = _parse_skills_value(raw_value)
-
-        elif yaml_key == "parallelize-with":
-            result[yaml_key] = _parse_dependency_value(raw_value)
-
-        elif yaml_key == "priority":
-            try:
-                result[yaml_key] = int(raw_value)
-            except (ValueError, TypeError):
-                result[yaml_key] = raw_value
-
-        elif yaml_key == "complexity":
-            result[yaml_key] = raw_value.lower()
-
-        else:
-            result[yaml_key] = raw_value
 
     return result
 
