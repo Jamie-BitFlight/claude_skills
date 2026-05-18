@@ -319,5 +319,6 @@ class LocalFilesystemArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
         return candidate

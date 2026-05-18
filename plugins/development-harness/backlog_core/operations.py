@@ -681,7 +681,8 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+                    msg = f"Invalid issue ref: {issue_ref!r}"
+                    raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
@@ -729,7 +730,8 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+                    msg = f"Invalid issue ref: {issue_ref!r}"
+                    raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")
@@ -1043,7 +1045,8 @@ def _write_groomed_to_github(
     try:
         num = parse_issue_number(issue_ref)
         if num is None:
-            raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+            msg = f"Invalid issue ref: {issue_ref!r}"
+            raise ValueError(msg)
         updated = sync_groomed_to_github_issue(repository, num, content, section_name, output=out)
     except (GithubException, BacklogError) as e:
         out.warn(f"  WARNING: Could not sync to GitHub: {e}")
@@ -3022,7 +3025,8 @@ def close_item(
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
         if issue_num_val is None:
-            raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+            msg_0 = f"Invalid issue ref: {issue_ref!r}"
+            raise ValueError(msg_0)
         open_prs = check_open_prs_for_issue(issue_num_val, repo)
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
@@ -3574,7 +3578,8 @@ def strike_entry(
             try:
                 num = parse_issue_number(item.issue)
                 if num is None:
-                    raise ValueError(f"Invalid issue ref: {item.issue!r}")
+                    msg_0 = f"Invalid issue ref: {item.issue!r}"
+                    raise ValueError(msg_0)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 body = render_issue_body(item, original_body=issue_node["body"])

@@ -139,10 +139,11 @@ def _reject_beads_issue_number(cls_name: str, issue_number: str | int) -> None:
         TypeError: When *issue_number* is a ``str`` instance.
     """
     if isinstance(issue_number, str):
-        raise TypeError(
+        msg = (
             f"{cls_name} requires an integer issue number, got {issue_number!r}. "
             "Use BeadsArtifactProvider for string (beads) issue identifiers."
         )
+        raise TypeError(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -620,7 +621,8 @@ class GitHubGistArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
         if not candidate.exists():
             return None
         return candidate.read_text(encoding="utf-8")
@@ -648,7 +650,8 @@ class GitHubGistArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
 
     def _get_gist(self, issue_number: int, body: str) -> Gist | None:
         """Load the Gist for *issue_number* from the cache or sentinel in *body*.
@@ -705,9 +708,8 @@ class GitHubGistArtifactProvider:
             )
         except GithubException as exc:
             if exc.status == _GIST_FORBIDDEN_STATUS:
-                raise BacklogError(
-                    "GitHub token missing 'gist' scope — grant it at https://github.com/settings/tokens"
-                ) from exc
+                msg = "GitHub token missing 'gist' scope — grant it at https://github.com/settings/tokens"
+                raise BacklogError(msg) from exc
             raise
         self._gist_cache[issue_number] = gist
         sentinel = f"<!-- artifact-gist:{gist.id} -->"
@@ -774,7 +776,8 @@ class LinearArtifactProvider:
             ValueError: When *api_key* is empty.
         """
         if not api_key:
-            raise ValueError("LINEAR_API_KEY must not be empty")
+            msg = "LINEAR_API_KEY must not be empty"
+            raise ValueError(msg)
         self._api_key = api_key
         self._team_id = team_id
         self._root_worktree = root_worktree or Path(_dh_paths.state_root())
@@ -952,7 +955,8 @@ class LinearArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
         if not candidate.exists():
             return None
         return candidate.read_text(encoding="utf-8")
@@ -974,7 +978,8 @@ class LinearArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
 
 
 # ---------------------------------------------------------------------------
@@ -1034,7 +1039,8 @@ class GitLabArtifactProvider:
             ValueError: When *private_token* is empty.
         """
         if not private_token:
-            raise ValueError("GITLAB_TOKEN must not be empty")
+            msg = "GITLAB_TOKEN must not be empty"
+            raise ValueError(msg)
         self._project_id = project_id
         self._private_token = private_token
         self._gitlab_url = gitlab_url.rstrip("/")
@@ -1208,7 +1214,8 @@ class GitLabArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
         if not candidate.exists():
             return None
         return candidate.read_text(encoding="utf-8")
@@ -1230,7 +1237,8 @@ class GitLabArtifactProvider:
         try:
             candidate.relative_to(self._root_worktree.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
 
     # ------------------------------------------------------------------
     # Snippet linkage helpers
@@ -1317,22 +1325,26 @@ def create_artifact_provider(
     resolved = backend_name or os.environ.get("BACKLOG_BACKEND") or "github"
     if resolved in {BackendName.github, "github"}:
         if not repo:
-            raise BacklogError("GitHub artifact backend requires repo (owner/name)")
+            msg = "GitHub artifact backend requires repo (owner/name)"
+            raise BacklogError(msg)
         return GitHubGistArtifactProvider(repo=repo, root_worktree=root_worktree)
     if resolved in {BackendName.linear, "linear"}:
         api_key = os.environ.get("LINEAR_API_KEY", "")
         team_id = os.environ.get("LINEAR_TEAM_ID", "")
         if not api_key:
-            raise BacklogError("LINEAR_API_KEY env var is required for Linear backend")
+            msg = "LINEAR_API_KEY env var is required for Linear backend"
+            raise BacklogError(msg)
         return LinearArtifactProvider(api_key=api_key, team_id=team_id, root_worktree=root_worktree)
     if resolved in {BackendName.gitlab, "gitlab"}:
         private_token = os.environ.get("GITLAB_TOKEN", "")
         project_id_str = os.environ.get("GITLAB_PROJECT_ID", "")
         gitlab_url = os.environ.get("GITLAB_URL", "https://gitlab.com")
         if not private_token:
-            raise BacklogError("GITLAB_TOKEN env var is required for GitLab backend")
+            msg = "GITLAB_TOKEN env var is required for GitLab backend"
+            raise BacklogError(msg)
         if not project_id_str:
-            raise BacklogError("GITLAB_PROJECT_ID env var is required for GitLab backend")
+            msg = "GITLAB_PROJECT_ID env var is required for GitLab backend"
+            raise BacklogError(msg)
         return GitLabArtifactProvider(
             project_id=int(project_id_str),
             private_token=private_token,
@@ -1348,5 +1360,7 @@ def create_artifact_provider(
             root_worktree=root_worktree or _dh_paths.git_project_root(), manifest_dir=None
         )
     if resolved in {BackendName.sqlite, BackendName.memory, "sqlite", "memory"}:
-        raise BacklogError(f"Backend '{resolved}' does not support artifact storage. Use github, linear, or gitlab.")
-    raise BacklogError(f"Unknown artifact backend: '{resolved}'")
+        msg = f"Backend '{resolved}' does not support artifact storage. Use github, linear, or gitlab."
+        raise BacklogError(msg)
+    msg = f"Unknown artifact backend: '{resolved}'"
+    raise BacklogError(msg)

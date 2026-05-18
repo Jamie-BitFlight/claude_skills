@@ -109,7 +109,8 @@ def linear_graphql_request(api_key: str, query: str, variables: dict[str, Any] |
         response = client.post(_LINEAR_GRAPHQL_URL, headers=headers, json=payload)
 
     if response.status_code in {_HTTP_UNAUTHORIZED, _HTTP_FORBIDDEN}:
-        raise BacklogError("LINEAR_API_KEY is invalid or missing")
+        msg = "LINEAR_API_KEY is invalid or missing"
+        raise BacklogError(msg)
 
     response.raise_for_status()
 
@@ -122,11 +123,13 @@ def linear_graphql_request(api_key: str, query: str, variables: dict[str, Any] |
             if isinstance(first_error, dict)
             else str(first_error)
         )
-        raise BacklogError(f"Linear API error: {message}")
+        msg = f"Linear API error: {message}"
+        raise BacklogError(msg)
 
     data = body.get("data")
     if not isinstance(data, dict):
-        raise BacklogError(f"Unexpected Linear API response shape: {body!r}")
+        msg = f"Unexpected Linear API response shape: {body!r}"
+        raise BacklogError(msg)
 
     return data
 
@@ -164,12 +167,14 @@ def linear_create_attachment(
 
     result = data.get("attachmentCreate")
     if not isinstance(result, dict):
-        raise BacklogError(f"Unexpected attachmentCreate response: {data!r}")
+        msg = f"Unexpected attachmentCreate response: {data!r}"
+        raise BacklogError(msg)
 
     result_d = cast("dict[str, object]", result)
     attachment = result_d.get("attachment")
     if not isinstance(attachment, dict):
-        raise BacklogError(f"attachmentCreate did not return an attachment: {result_d!r}")
+        msg = f"attachmentCreate did not return an attachment: {result_d!r}"
+        raise BacklogError(msg)
 
     return cast("dict[str, object]", attachment)
 
@@ -193,11 +198,13 @@ def linear_get_attachments(api_key: str, issue_id: str) -> list[dict[str, object
 
     attachments = data.get("attachments")
     if not isinstance(attachments, dict):
-        raise BacklogError(f"Unexpected attachments response: {data!r}")
+        msg = f"Unexpected attachments response: {data!r}"
+        raise BacklogError(msg)
 
     attachments_d = cast("dict[str, object]", attachments)
     nodes = attachments_d.get("nodes", [])
     if not isinstance(nodes, list):
-        raise BacklogError(f"Unexpected attachments.nodes shape: {attachments_d!r}")
+        msg = f"Unexpected attachments.nodes shape: {attachments_d!r}"
+        raise BacklogError(msg)
 
     return cast("list[dict[str, object]]", nodes)

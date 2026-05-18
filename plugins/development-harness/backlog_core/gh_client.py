@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -487,14 +486,17 @@ def _graphql_request(repo: Repository, query: str, variables: dict[str, object] 
     try:
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
-        raise BacklogError(f"GraphQL request failed: {exc}") from exc
+        msg = f"GraphQL request failed: {exc}"
+        raise BacklogError(msg) from exc
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))
-        raise BacklogError(f"GraphQL error: {msg}")
+        msg_0 = f"GraphQL error: {msg}"
+        raise BacklogError(msg_0)
     data = response.get("data")
     if data is None:
-        raise BacklogError(f"Unexpected GraphQL response — missing 'data' key: {response!r}")
+        msg_0 = f"Unexpected GraphQL response — missing 'data' key: {response!r}"
+        raise BacklogError(msg_0)
     return data
 
 
@@ -554,7 +556,8 @@ def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_num
     repo_data = data.get("repository") or {}
     raw_issue = repo_data.get("issue") if isinstance(repo_data, dict) else None
     if raw_issue is None:
-        raise BacklogError(f"GraphQL error: Could not resolve to issue #{issue_number}")
+        msg = f"GraphQL error: Could not resolve to issue #{issue_number}"
+        raise BacklogError(msg)
     return _parse_issue_node(raw_issue)
 
 
@@ -869,9 +872,11 @@ def _fetch_comment_by_id_graphql(repo: Repository, comment_node_id: str) -> Issu
     data = _graphql_request(repo, _COMMENT_BY_ID_QUERY, {"id": comment_node_id})
     node = data.get("node")
     if node is None or not isinstance(node, dict):
-        raise BacklogError(f"GraphQL error: Could not resolve comment node {comment_node_id!r}")
+        msg = f"GraphQL error: Could not resolve comment node {comment_node_id!r}"
+        raise BacklogError(msg)
     if "id" not in node:
-        raise BacklogError(f"GraphQL error: Node {comment_node_id!r} is not an IssueComment")
+        msg = f"GraphQL error: Node {comment_node_id!r} is not an IssueComment"
+        raise BacklogError(msg)
     return _parse_comment_node(node)
 
 
@@ -926,7 +931,8 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
 
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
-            raise ValueError(f"Label name contains disallowed characters: {name!r}")
+            msg = f"Label name contains disallowed characters: {name!r}"
+            raise ValueError(msg)
 
     # Build aliased query: labelN: label(name: "...") { id name }
     alias_lines = [f'    label{i}: label(name: "{n}") {{ id name }}' for i, n in enumerate(unique_names)]
@@ -980,7 +986,8 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
     # Validate label names before embedding in query string (security: no injection)
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
-            raise ValueError(f"Label name contains disallowed characters: {name!r}")
+            msg = f"Label name contains disallowed characters: {name!r}"
+            raise ValueError(msg)
 
     aliases = "\n".join(_LABEL_ALIAS_TEMPLATE.format(i=i, name=name) for i, name in enumerate(unique_names))
     query = _LABEL_RESOLUTION_QUERY_TEMPLATE.format(aliases=aliases)
@@ -1118,7 +1125,8 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
     repo = resolve_repo(repo)
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
-        raise GitHubUnavailableError("GITHUB_TOKEN not set")
+        msg = "GITHUB_TOKEN not set"
+        raise GitHubUnavailableError(msg)
     gh = Github(auth=Auth.Token(token), timeout=timeout)
     return gh.get_repo(repo)
 
@@ -1135,17 +1143,12 @@ def try_get_github(repo: str = "") -> Repository | None:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         logger.error("try_get_github: GITHUB_TOKEN not set in environment — GitHub operations will be skipped")
-        print(
-            "backlog-mcp: GITHUB_TOKEN not set — GitHub operations will be unavailable, local operations continue",
-            file=sys.stderr,
-        )
         return None
     try:
         gh = Github(auth=Auth.Token(token), timeout=10)
         return gh.get_repo(repo)
-    except GithubException as e:
+    except GithubException:
         logger.exception("try_get_github: GitHub API error for repo %r", repo)
-        print(f"backlog-mcp: GitHub auth failed — {e}. Local operations continue", file=sys.stderr)
         return None
 
 
@@ -1264,7 +1267,8 @@ def close_github_issue(
         repository = get_github(repo)
         num = parse_issue_number(issue_ref)
         if num is None:
-            raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+            msg = f"Invalid issue ref: {issue_ref!r}"
+            raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         parts = [f"**Closed** ({reason})."]
@@ -1296,7 +1300,8 @@ def resolve_github_issue(
         repository = get_github(repo)
         num = parse_issue_number(issue_ref)
         if num is None:
-            raise ValueError(f"Invalid issue ref: {issue_ref!r}")
+            msg = f"Invalid issue ref: {issue_ref!r}"
+            raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         body_parts = [f"## Resolved\n\n**Summary**: {summary}"]
@@ -1402,7 +1407,8 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         repository = get_github(repo)
         num = parse_issue_number(item.issue)
         if num is None:
-            raise ValueError(f"Invalid issue ref: {item.issue!r}")
+            msg = f"Invalid issue ref: {item.issue!r}"
+            raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith("status:")]
@@ -1423,7 +1429,8 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
         repository = get_github(repo)
         num = parse_issue_number(item.issue)
         if num is None:
-            raise ValueError(f"Invalid issue ref: {item.issue!r}")
+            msg = f"Invalid issue ref: {item.issue!r}"
+            raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         current_names = [lbl["name"] for lbl in issue["labels"]]
@@ -1463,7 +1470,8 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
     repository = get_github(repo)
     num = parse_issue_number(item.issue)
     if num is None:
-        raise ValueError(f"Invalid issue ref: {item.issue!r}")
+        msg = f"Invalid issue ref: {item.issue!r}"
+        raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
     issue = _fetch_issue_graphql(repository, owner, repo_name, num)
     current_names = [lbl["name"] for lbl in issue["labels"]]
@@ -1511,7 +1519,8 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
     repository = get_github(repo)
     num = parse_issue_number(item.issue)
     if num is None:
-        raise ValueError(f"Invalid issue ref: {item.issue!r}")
+        msg = f"Invalid issue ref: {item.issue!r}"
+        raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
     issue = _fetch_issue_graphql(repository, owner, repo_name, num)
     current_names = [lbl["name"] for lbl in issue["labels"]]

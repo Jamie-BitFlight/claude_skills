@@ -41,9 +41,11 @@ def _auth_headers(private_token: str) -> dict[str, str]:
 def _raise_for_gitlab_error(response: httpx.Response) -> None:
     """Raise BacklogError for GitLab API error responses."""
     if response.status_code in {_HTTP_UNAUTHORIZED, _HTTP_FORBIDDEN}:
-        raise BacklogError("GITLAB_TOKEN is invalid or missing")
+        msg = "GITLAB_TOKEN is invalid or missing"
+        raise BacklogError(msg)
     if response.is_error:
-        raise BacklogError(f"GitLab API error {response.status_code}: {response.text}")
+        msg = f"GitLab API error {response.status_code}: {response.text}"
+        raise BacklogError(msg)
 
 
 def gitlab_create_snippet(

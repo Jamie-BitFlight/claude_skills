@@ -40,7 +40,8 @@ def detect_format(path: Path) -> Literal["yaml", "legacy_md"]:
         return "yaml"
     if path.suffix == ".md":
         return "legacy_md"
-    raise ValueError(f"Unsupported file extension: {path.suffix!r} — expected '.yaml' or '.md'")
+    msg = f"Unsupported file extension: {path.suffix!r} — expected '.yaml' or '.md'"
+    raise ValueError(msg)
 
 
 def load_item(path: Path) -> BacklogItem:
@@ -107,9 +108,8 @@ def save_item(item: BacklogItem, path: Path | None = None) -> None:
     else:
         raw = item.file_path
         if not raw:
-            raise ValueError(
-                "save_item: path argument is None and item.file_path is empty — cannot determine write destination."
-            )
+            msg = "save_item: path argument is None and item.file_path is empty — cannot determine write destination."
+            raise ValueError(msg)
         src = Path(raw)
         if src.suffix == ".md":
             resolved = src.with_suffix(".yaml")

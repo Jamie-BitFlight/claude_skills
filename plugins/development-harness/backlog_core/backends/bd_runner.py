@@ -262,9 +262,8 @@ class BdRunner:
             return self._bd_path
         path = shutil.which("bd")
         if path is None:
-            raise BdNotInstalledError(
-                "bd is not installed or not on PATH. Install beads: https://beads.sh/docs/install"
-            )
+            msg = "bd is not installed or not on PATH. Install beads: https://beads.sh/docs/install"
+            raise BdNotInstalledError(msg)
         self._bd_path = path
         return path
 

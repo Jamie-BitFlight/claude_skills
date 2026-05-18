@@ -100,11 +100,12 @@ def get_config() -> BacklogConfig:
                 try:
                     root = _resolve_repo_root()
                 except RuntimeError as exc:
-                    raise RuntimeError(
+                    msg = (
                         "BacklogConfig is not initialised — call init_paths() before accessing config, "
                         "or set one of DH_PROJECT_ROOT / CLAUDE_PROJECT_DIR so the project root can be "
                         "inferred automatically."
-                    ) from exc
+                    )
+                    raise RuntimeError(msg) from exc
                 _log.warning("BacklogConfig auto-initialised from inferred project root: %s", root)
                 init_paths(project_dir=str(root))
     return cast("BacklogConfig", _config)  # init_paths() always sets _config
@@ -202,7 +203,8 @@ def __getattr__(name: str) -> Path | str:
         return get_config().default_repo
     if name == "_REPO_ROOT":
         return get_config().repo_root
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -652,7 +654,8 @@ class Entry(BaseModel):
             ValueError: When struck is True but struck_at is empty.
         """
         if self.struck and not self.struck_at:
-            raise ValueError("struck_at must be non-empty when struck is True")
+            msg = "struck_at must be non-empty when struck is True"
+            raise ValueError(msg)
         return self
 
 
@@ -847,7 +850,8 @@ class BacklogItemMetadata(BaseModel):
             ValueError: When v is non-empty and does not match YYYY-MM-DD.
         """
         if v and not _ADDED_DATE_RE.match(v):
-            raise ValueError(f"added must be YYYY-MM-DD or empty, got {v!r}")
+            msg = f"added must be YYYY-MM-DD or empty, got {v!r}"
+            raise ValueError(msg)
         return v
 
 

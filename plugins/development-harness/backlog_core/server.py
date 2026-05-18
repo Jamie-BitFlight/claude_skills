@@ -1152,9 +1152,10 @@ try:
     _gate_token_path.parent.mkdir(parents=True, exist_ok=True)
     _gate_token_path.write_text(_SESSION_GATE_TOKEN, encoding="utf-8")
 except OSError as _gate_token_err:
-    import sys as _sys
+    _logging.getLogger(__name__).warning(
+        "Could not write session gate token to %s: %s", _gate_token_path, _gate_token_err
+    )
 
-    print(f"WARNING: gate token file write failed: {_gate_token_path} — {_gate_token_err}", file=_sys.stderr)
 
 mcp = FastMCP(
     "backlog",

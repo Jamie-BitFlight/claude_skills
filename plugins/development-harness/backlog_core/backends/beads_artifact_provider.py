@@ -149,7 +149,8 @@ def _parse_manifest_value(raw: object) -> ArtifactManifest:
         return ArtifactManifest.model_validate(data)
     if isinstance(raw, dict):
         return ArtifactManifest.model_validate(raw)
-    raise ValueError(f"Unexpected manifest value type {type(raw).__name__!r}; expected str or dict.")
+    msg = f"Unexpected manifest value type {type(raw).__name__!r}; expected str or dict."
+    raise ValueError(msg)
 
 
 def _extract_content_block(notes: str, artifact_type: str, path: str) -> str | None:
@@ -238,10 +239,11 @@ class BeadsArtifactProvider:
         """
         if isinstance(issue_number, str):
             return self.get_manifest_bd(issue_number)
-        raise NotImplementedError(
+        msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call get_manifest_bd(issue_id: str) with a beads ID instead."
         )
+        raise NotImplementedError(msg)
 
     def set_manifest(self, issue_number: str | int, manifest: ArtifactManifest) -> None:
         """Persist *manifest*.
@@ -260,10 +262,11 @@ class BeadsArtifactProvider:
         if isinstance(issue_number, str):
             self.set_manifest_bd(issue_number, manifest)
             return
-        raise NotImplementedError(
+        msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call set_manifest_bd(issue_id: str, manifest) with a beads ID instead."
         )
+        raise NotImplementedError(msg)
 
     def read_artifact_content(self, path: str) -> str:
         """Read artifact file content from the root worktree.
@@ -304,10 +307,11 @@ class BeadsArtifactProvider:
         if isinstance(issue_number, str):
             self.store_artifact_content_bd(issue_number, artifact_type, path, content)
             return
-        raise NotImplementedError(
+        msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call store_artifact_content_bd(issue_id: str, ...) with a beads ID instead."
         )
+        raise NotImplementedError(msg)
 
     def read_artifact_content_from_remote(self, issue_number: str | int, artifact_type: str, path: str) -> str | None:
         """Search bd notes for a stored artifact content block.
@@ -330,10 +334,11 @@ class BeadsArtifactProvider:
         """
         if isinstance(issue_number, str):
             return self.read_artifact_content_from_remote_bd(issue_number, artifact_type, path)
-        raise NotImplementedError(
+        msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call read_artifact_content_from_remote_bd(issue_id: str, ...) with a beads ID instead."
         )
+        raise NotImplementedError(msg)
 
     def read_local_artifact_content(self, path: str) -> str | None:
         """Read artifact file content from the local filesystem.
@@ -484,10 +489,11 @@ class BeadsArtifactProvider:
         if isinstance(issue_number, str):
             self.delete_entry_bd(issue_number, artifact_type, path)
             return
-        raise NotImplementedError(
+        msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call delete_entry_bd(issue_id: str, ...) with a beads ID instead."
         )
+        raise NotImplementedError(msg)
 
     def delete_entry_bd(self, issue_id: str, artifact_type: str, path: str) -> None:
         """Remove an artifact entry from the manifest and its content block from notes.
@@ -602,4 +608,5 @@ class BeadsArtifactProvider:
         try:
             candidate.relative_to(root.resolve())
         except ValueError:
-            raise ValueError(f"Path traversal detected: {path!r} resolves outside the repository root.") from None
+            msg = f"Path traversal detected: {path!r} resolves outside the repository root."
+            raise ValueError(msg) from None
