@@ -528,6 +528,10 @@ uv run prek run --files <file>
 
 ---
 
+- Agent Output Contracts (explicit terminal output required — no silent exits): `.claude/rules/agent-output-contracts.md`
+
+---
+
 - Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): `.claude/rules/exception-handling.md`
 
 ---

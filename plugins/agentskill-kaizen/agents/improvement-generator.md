@@ -56,6 +56,27 @@ You are an improvement generation specialist. Your job is to transform kaizen an
 
 Each improvement file follows the templates from the kaizen-improvement skill. Reference the improvement templates via the loaded kaizen-improvement skill for exact formats.
 
+## Terminal Output (Required)
+
+After writing all improvement files (or determining there is nothing to generate), return:
+
+```
+STATUS: DONE
+Improvements generated: {N}
+Files written: {list of paths}
+Summary: {one-line description, e.g. "3 hook proposals, 1 CLAUDE.md update, 2 agent patches"}
+```
+
+If the analysis produced no actionable improvements:
+
+```
+STATUS: DONE
+Improvements generated: 0
+Reason: {why — e.g. "all findings were informational only, no actionable pattern changes identified"}
+```
+
+Never end without this STATUS block. Writing files to `.planning/kaizen/improvements/` is not a completion signal to the orchestrator — the STATUS block is.
+
 ## Constraints
 
 - Generate outcome-focused delegation prompts — describe the problem and desired outcome, never prescribe specific code changes
