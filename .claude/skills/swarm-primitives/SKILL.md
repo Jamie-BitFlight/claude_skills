@@ -258,6 +258,7 @@ TaskUpdate({ taskId: "4", addBlockedBy: ["3"] })   // #4 waits for #3
 - API reference -- `Skill(skill: "swarm-operations")`
 - Spawning agents -- `Skill(skill: "swarm-spawning")`
 - Patterns and recipes -- `Skill(skill: "swarm-patterns")`
+- Checklist-to-swarm automation -- `Skill(skill: "swarm-from-markdown")`
 
 ---
 
