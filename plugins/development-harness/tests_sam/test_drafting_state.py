@@ -19,13 +19,20 @@ from typing import TYPE_CHECKING
 # Helpers
 # ---------------------------------------------------------------------------
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+from sam_schema.core.models import Complexity, Priority
 from sam_schema.server import sam_plan
 
 if TYPE_CHECKING:
     from sam_schema.core.backends.memory import InMemoryTaskProvider
 
 _MINIMAL_TASK = TaskDefinition(
-    id="T1", title="First task", status="not-started", agent="test-agent", dependencies=[], priority=2, complexity="low"
+    id="T1",
+    title="First task",
+    status="not-started",
+    agent="test-agent",
+    dependencies=[],
+    priority=Priority.HIGH,
+    complexity=Complexity.LOW,
 )
 
 _DRAFTING_PLAN_CONFIG = CreatePlanConfig(slug="test-plan", goal="Test goal", tasks=[])

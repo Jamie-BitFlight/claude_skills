@@ -447,7 +447,7 @@ class TestADR002TypeWidening:
         """get_manifest(str) delegates to get_manifest_bd without raising."""
         mock_runner.run_json.return_value = _raw_issue()
 
-        result = provider.get_manifest(_ISSUE_ID)  # type: ignore[arg-type]
+        result = provider.get_manifest(_ISSUE_ID)
 
         assert result.issue_number == 0
         mock_runner.run_json.assert_called_once()
@@ -463,7 +463,7 @@ class TestADR002TypeWidening:
         """set_manifest(str, manifest) delegates to set_manifest_bd."""
         manifest = ArtifactManifest(issue_number=0)
 
-        provider.set_manifest(_ISSUE_ID, manifest)  # type: ignore[arg-type]
+        provider.set_manifest(_ISSUE_ID, manifest)
 
         mock_runner.run_text.assert_called_once()
 
@@ -478,7 +478,7 @@ class TestADR002TypeWidening:
         """store_artifact_content(str, ...) delegates to store_artifact_content_bd."""
         mock_runner.run_json.return_value = _raw_issue(notes=None)
 
-        provider.store_artifact_content(_ISSUE_ID, "architect", "plan/foo.md", "content")  # type: ignore[arg-type]
+        provider.store_artifact_content(_ISSUE_ID, "architect", "plan/foo.md", "content")
 
         mock_runner.run_text.assert_called_once()
 
@@ -493,7 +493,7 @@ class TestADR002TypeWidening:
         """read_artifact_content_from_remote(str, ...) delegates to remote_bd variant."""
         mock_runner.run_json.return_value = _raw_issue(notes=None)
 
-        result = provider.read_artifact_content_from_remote(_ISSUE_ID, "architect", "plan/foo.md")  # type: ignore[arg-type]
+        result = provider.read_artifact_content_from_remote(_ISSUE_ID, "architect", "plan/foo.md")
 
         assert result is None
 
@@ -512,7 +512,7 @@ class TestADR002TypeWidening:
             metadata={"dh.artifacts": manifest.model_dump_json(by_alias=True)}, notes=None
         )
 
-        provider.delete_entry(_ISSUE_ID, "architect", "plan/architect.md")  # type: ignore[arg-type]
+        provider.delete_entry(_ISSUE_ID, "architect", "plan/architect.md")
 
         assert mock_runner.run_json.call_count == 1
 

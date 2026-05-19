@@ -497,7 +497,7 @@ class BeadsBackend:
     def create_task_issue(
         self,
         repo: Repository,
-        parent_issue_number: int,
+        parent_issue_number: int | str,
         task: SamTask,
         description: str = "",
         acceptance_criteria: list[str] | None = None,

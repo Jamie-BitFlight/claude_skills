@@ -556,7 +556,12 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     task = TaskDefinition(
-        id="T01", title="First task", status="not-started", agent="test-agent", priority=1, complexity="low"
+        id="T01",
+        title="First task",
+        status="not-started",
+        agent="test-agent",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     # Act
@@ -581,7 +586,12 @@ def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     task = TaskDefinition(
-        id="T01", title="Round-trip task", status="not-started", agent="test-agent", priority=1, complexity="low"
+        id="T01",
+        title="Round-trip task",
+        status="not-started",
+        agent="test-agent",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -633,7 +643,9 @@ def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     # Act
     r1 = sam_plan(config=CreatePlanConfig(slug="first", goal="First", tasks=[minimal_task]), plan_dir=str(p_dir))
@@ -662,7 +674,9 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     create_result = sam_plan(
         config=CreatePlanConfig(slug="update-ctx", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
@@ -695,7 +709,9 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     create_result = sam_plan(
         config=CreatePlanConfig(slug="append-sec", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
@@ -754,7 +770,9 @@ def test_sam_claim_not_started_task_returns_claimed_true(tmp_path: Path) -> None
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     create_result = sam_plan(
         config=CreatePlanConfig(slug="claim-test", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
@@ -781,7 +799,9 @@ def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     create_result = sam_plan(
         config=CreatePlanConfig(slug="double-claim", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
@@ -811,7 +831,9 @@ def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(id="T01", title="Task", status="not-started", agent="a", priority=1, complexity="low")
+    minimal_task = TaskDefinition(
+        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+    )
 
     create_result = sam_plan(
         config=CreatePlanConfig(slug="missing-task", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
@@ -854,7 +876,12 @@ def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     task = TaskDefinition(
-        id="T01", title="First task", status="not-started", agent="test-agent", priority=1, complexity="low"
+        id="T01",
+        title="First task",
+        status="not-started",
+        agent="test-agent",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     # Act
@@ -878,7 +905,12 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     task = TaskDefinition(
-        id="T01", title="First task", status="not-started", agent="test-agent", priority=1, complexity="low"
+        id="T01",
+        title="First task",
+        status="not-started",
+        agent="test-agent",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     # Act
@@ -950,8 +982,8 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
             status="not-started",
             agent="test-agent",
             dependencies=[],
-            priority=2,
-            complexity="low",
+            priority=Priority.HIGH,
+            complexity=Complexity.LOW,
         )
 
         # Act
@@ -994,8 +1026,8 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
             status="not-started",
             agent="test-agent",
             dependencies=[],
-            priority=2,
-            complexity="low",
+            priority=Priority.HIGH,
+            complexity=Complexity.LOW,
         )
 
         # Act
