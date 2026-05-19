@@ -85,26 +85,28 @@ The checkbox `checked` attribute lives on the `Paragraph` child of a `ListItem`,
 
 ```python
 from marko import Markdown
+from marko.block import List, ListItem, Paragraph
+from marko.inline import RawText
 
 md = Markdown(extensions=["gfm"])
 doc = md.parse(markdown_text)      # parse() returns AST — do NOT call md() which returns HTML
 
 results = []
 for node in doc.children:
-    if type(node).__name__ != "List":
+    if not isinstance(node, List):
         continue
     for item in node.children:
-        if type(item).__name__ != "ListItem":
+        if not isinstance(item, ListItem):
             continue
         for child in item.children:
-            if not hasattr(child, "checked"):
+            if not isinstance(child, Paragraph) or not hasattr(child, "checked"):
                 continue
             if child.checked is not False:   # True=checked, None=non-checkbox — both skip
                 continue
             text_parts = [
                 c.children.strip()
                 for c in child.children
-                if type(c).__name__ == "RawText"
+                if isinstance(c, RawText)
             ]
             text = " ".join(text_parts).strip()
             if text:

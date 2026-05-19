@@ -161,7 +161,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("markdown_file", type=Path, help="Path to the markdown file containing checkbox items.")
 
     def positive_int(value: str) -> int:
-        n = int(value)
+        try:
+            n = int(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"must be an integer, got {value!r}") from exc
         if n < 1:
             raise argparse.ArgumentTypeError(f"must be >= 1, got {n}")
         return n
@@ -195,14 +198,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     markdown_file: Path = args.markdown_file
 
-    if not markdown_file.exists():
-        print(f"error: file not found: {markdown_file}", file=sys.stderr)
-        return 1
-
     try:
         pool = build_task_pool(markdown_file, worker_count_override=args.workers)
     except OSError as exc:
-        print(f"error: cannot read file {markdown_file}: {exc}", file=sys.stderr)
+        print(f"error: {markdown_file}: {exc}", file=sys.stderr)
         return 1
     except ValueError as exc:
         print(f"error: failed to parse {markdown_file}: {exc}", file=sys.stderr)
