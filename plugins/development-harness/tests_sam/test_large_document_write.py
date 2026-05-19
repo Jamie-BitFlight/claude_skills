@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.action_models import TaskDefinition
+from sam_schema.core.models import Complexity, Priority
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -46,8 +47,8 @@ def _make_task_def(task_id: str, idx: int, deps: list[str] | None = None) -> Tas
         status="not-started",
         agent="test-agent",
         dependencies=list(deps or []),
-        priority=2,
-        complexity="low",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
         description=f"Description for task {idx:02d}.",
     )
 
@@ -69,8 +70,8 @@ def _make_tasks_list(count: int, start: int = 1) -> list[TaskDefinition]:
             status="not-started",
             agent="test-agent",
             dependencies=[],
-            priority=2,
-            complexity="low",
+            priority=Priority.HIGH,
+            complexity=Complexity.LOW,
             description=f"Description for task {i:02d}.",
         )
         for i in range(start, start + count)

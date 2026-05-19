@@ -10,6 +10,7 @@ import concurrent.futures
 import json
 import threading
 from pathlib import Path
+from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -25,7 +26,7 @@ from hypothesis import HealthCheck, given, settings, strategies as st
 def _make_entry(
     artifact_type: ArtifactType = ArtifactType.ARCHITECT,
     status: ArtifactStatus = ArtifactStatus.CURRENT,
-    storage_tier: str = "remote",
+    storage_tier: Literal["local", "remote"] = "remote",
 ) -> ArtifactEntry:
     """Return a minimal ArtifactEntry suitable for testing."""
     return ArtifactEntry(
@@ -292,7 +293,7 @@ class TestSyncToRemote:
 
     def test_with_backend_arg_still_returns_deferred(self, provider: LocalFilesystemArtifactProvider) -> None:
         """sync_to_remote ignores the backend argument and returns deferred."""
-        result = provider.sync_to_remote(backend=object())
+        result = provider.sync_to_remote(backend=None)
         assert result["status"] == "deferred"
 
 

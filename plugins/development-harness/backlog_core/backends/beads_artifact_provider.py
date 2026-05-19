@@ -471,7 +471,7 @@ class BeadsArtifactProvider:
         notes = issue.notes or ""
         return _extract_content_block(notes, artifact_type, path)
 
-    def delete_entry(self, issue_number: int, artifact_type: str, path: str) -> None:
+    def delete_entry(self, issue_number: str | int, artifact_type: str, path: str) -> None:
         """Remove an artifact entry from the manifest and its content block from notes.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).

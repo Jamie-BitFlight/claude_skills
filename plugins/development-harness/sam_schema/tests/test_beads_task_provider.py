@@ -6,6 +6,7 @@ All tests mock the bd CLI via _FakeBdRunner — no live bd binary required.
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -14,6 +15,9 @@ from sam_schema.core.backends.beads import BeadsTaskProvider
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 
 from .conftest import _FakeBdRunner, make_task_record
+
+if TYPE_CHECKING:
+    from sam_schema.core.task_backend_types import DocumentHandle
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -259,7 +263,7 @@ class TestDocumentRoundTrip:
         created = provider.create_plan("missing-plan", "goal", tasks)
         plan_id = created["plan_id"]
         # Register valid plan so epic lookup succeeds, but ref won't be in notes
-        fake_handle = {
+        fake_handle: DocumentHandle = {
             "content_ref": f"bd://{plan_id}/{plan_id}/stage/type/deadbeef",
             "owner_type": "plan",
             "owner_id": plan_id,
@@ -269,7 +273,7 @@ class TestDocumentRoundTrip:
             "fmt": "md",
         }
         with pytest.raises(DocumentNotFoundError):
-            provider.read_document(fake_handle)  # type: ignore[arg-type]
+            provider.read_document(fake_handle)
 
 
 # ---------------------------------------------------------------------------
