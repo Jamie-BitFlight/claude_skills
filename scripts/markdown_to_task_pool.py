@@ -23,9 +23,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 from marko import Markdown
+from marko.block import List, ListItem, Paragraph
+from marko.inline import RawText
 
 
 class TaskItem(TypedDict):
@@ -61,23 +63,21 @@ def extract_unchecked_items(markdown_text: str) -> list[str]:
     """
     md = Markdown(extensions=["gfm"])
     doc = md.parse(markdown_text)
-    # marko's Element type lacks public attribute stubs; cast to list[Any] to walk the AST.
-    top_nodes = cast("list[Any]", doc.children)
 
     results: list[str] = []
-    for node in top_nodes:
-        if type(node).__name__ != "List":
+    for node in doc.children:
+        if not isinstance(node, List):
             continue
-        for item in cast("list[Any]", node.children):
-            if type(item).__name__ != "ListItem":
+        for item in node.children:
+            if not isinstance(item, ListItem):
                 continue
             for child in item.children:
-                if not hasattr(child, "checked"):
+                if not isinstance(child, Paragraph) or not hasattr(child, "checked"):
                     continue
                 if child.checked is not False:
                     # Skips True (checked [x]/[X]) and None (non-checkbox items)
                     continue
-                text_parts = [c.children.strip() for c in child.children if type(c).__name__ == "RawText"]
+                text_parts = [c.children.strip() for c in child.children if isinstance(c, RawText)]
                 text = " ".join(text_parts).strip()
                 if text:
                     results.append(text)
