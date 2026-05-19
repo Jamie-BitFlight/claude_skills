@@ -77,7 +77,7 @@ The `[x]` checked item never appears in any `TaskCreate` call.
 4. Derive team name from the filename stem: `swarm-{stem}`.
 5. Emit JSON or human-readable output showing the `TaskCreate` sequence and worker count.
 
-Worker IDs are stable: re-running on the same file with new items appended preserves existing IDs. Items in the same position keep the same `worker-{index}` across runs.
+Worker IDs are stable when items are only appended: re-running on the same file with new items added at the end preserves existing IDs. Checking (completing) an earlier item shifts all subsequent unchecked items to lower indices — do not resume a partially-executed swarm after checking items mid-list.
 
 ## marko AST Walk (GFM Checkbox Detection)
 

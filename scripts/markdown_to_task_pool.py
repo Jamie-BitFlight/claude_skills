@@ -159,14 +159,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("markdown_file", type=Path, help="Path to the markdown file containing checkbox items.")
+
+    def positive_int(value: str) -> int:
+        n = int(value)
+        if n < 1:
+            raise argparse.ArgumentTypeError(f"must be >= 1, got {n}")
+        return n
+
     parser.add_argument(
         "--workers",
-        type=int,
+        type=positive_int,
         default=None,
         metavar="N",
         help=(
             "Number of worker agents to spawn (default: number of unchecked items). "
-            "Does not affect the number of tasks emitted."
+            "Must be >= 1. Does not affect the number of tasks emitted."
         ),
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output instead of human-readable text.")
