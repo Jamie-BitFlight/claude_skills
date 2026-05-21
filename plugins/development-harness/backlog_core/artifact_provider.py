@@ -28,7 +28,7 @@ import sys
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypedDict, TypeGuard, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 from github import Auth, Github, GithubException, InputFileContent
 
@@ -124,8 +124,8 @@ def _make_github_client() -> Github:
     return Github(auth=Auth.Token(token))
 
 
-def _require_int_issue_number(cls_name: str, issue_number: str | int) -> int:
-    """Validate *issue_number* is an int and return it; raise TypeError for str.
+def _reject_beads_issue_number(cls_name: str, issue_number: str | int) -> int:
+    """Raise ``TypeError`` when *issue_number* is a string (beads identifier).
 
     All non-beads providers require a positive integer issue number.  Beads
     nanoid strings (e.g. ``"bd-a3f8"``) are only valid for
@@ -139,15 +139,14 @@ def _require_int_issue_number(cls_name: str, issue_number: str | int) -> int:
         The validated integer issue number.
 
     Raises:
-        TypeError: When *issue_number* is a ``str`` (beads identifier).
+        TypeError: When *issue_number* is a ``str`` instance.
     """
-    if not isinstance(issue_number, int) or isinstance(issue_number, bool):
-        raise TypeError(
+    if isinstance(issue_number, str):
+        msg = (
             f"{cls_name} requires an integer issue number, got {issue_number!r}. "
-            "Pass a beads issue ID to the beads-specific provider method instead."
+            "Use BeadsArtifactProvider for string (beads) issue identifiers."
         )
-    if issue_number <= 0:
-        raise ValueError(f"{cls_name} requires a positive integer issue number, got {issue_number!r}.")
+        raise TypeError(msg)
     return issue_number
 
 
@@ -455,7 +454,7 @@ class GitHubGistArtifactProvider:
             backlog_core.models.BacklogError: On GraphQL API or gist-scope
                 failures.
         """
-        issue_number = _require_int_issue_number("GitHubGistArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
         repo = get_github(self._repo)
         owner, repo_name = self._repo.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
@@ -496,7 +495,7 @@ class GitHubGistArtifactProvider:
             backlog_core.models.BacklogError: On GraphQL API or gist-scope
                 failures.
         """
-        issue_number = _require_int_issue_number("GitHubGistArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
         repo = get_github(self._repo)
         owner, repo_name = self._repo.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
@@ -551,7 +550,7 @@ class GitHubGistArtifactProvider:
             path: Repo-relative artifact path, e.g. ``plan/architect-foo.md``.
             content: Full artifact content to store.
         """
-        issue_number = _require_int_issue_number("GitHubGistArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
         repo = get_github(self._repo)
         owner, repo_name = self._repo.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
@@ -582,7 +581,7 @@ class GitHubGistArtifactProvider:
         Returns:
             Stored content string, or ``None`` when not found.
         """
-        issue_number = _require_int_issue_number("GitHubGistArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
         repo = get_github(self._repo)
         owner, repo_name = self._repo.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
@@ -731,33 +730,6 @@ GitHubArtifactProvider = GitHubGistArtifactProvider  # backward-compat alias
 _LINEAR_MANIFEST_WARN_CHARS = 10_000
 
 
-class _LinearAttachmentMetadata(TypedDict, total=False):
-    """Typed shape of the ``metadata`` field in a Linear attachment node.
-
-    All fields are optional (``total=False``) because attachment metadata is
-    provider-controlled and may be absent or contain only a subset of fields.
-    """
-
-    manifest_json: str
-    content: str
-
-
-def _is_linear_attachment_metadata(value: object) -> TypeGuard[_LinearAttachmentMetadata]:
-    """Return ``True`` when *value* is a dict with str keys (Linear attachment metadata shape).
-
-    Used to narrow ``object`` to ``_LinearAttachmentMetadata`` without ``cast``.
-    Only validates structural shape — individual values are checked by callers
-    via ``isinstance``.
-
-    Args:
-        value: Any value from an external API response.
-
-    Returns:
-        ``True`` when *value* is a ``dict`` instance.
-    """
-    return isinstance(value, dict) and all(isinstance(k, str) for k in value)
-
-
 class LinearArtifactProvider:
     """Linear Attachments-backed implementation of :class:`ArtifactBackend`.
 
@@ -832,14 +804,15 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_id = str(issue_number)
-        target_url = f"dh://artifact-manifest/{issue_id}"
-        nodes = linear_get_attachments(self._api_key, issue_id)
+        issue_number = _reject_beads_issue_number("LinearArtifactProvider", issue_number)
+        target_url = f"dh://artifact-manifest/{issue_number}"
+        nodes = linear_get_attachments(self._api_key, str(issue_number))
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
-                if _is_linear_attachment_metadata(raw_metadata):
-                    manifest_json = raw_metadata.get("manifest_json")
+                if isinstance(raw_metadata, dict):
+                    metadata = cast("dict[str, object]", raw_metadata)
+                    manifest_json = metadata.get("manifest_json")
                     if isinstance(manifest_json, str):
                         return ArtifactManifest.model_validate_json(manifest_json)
         return ArtifactManifest(issue_number=issue_number)
@@ -863,14 +836,14 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_id = str(issue_number)
+        issue_number = _reject_beads_issue_number("LinearArtifactProvider", issue_number)
         manifest_json = manifest.model_dump_json(by_alias=True)
         if len(manifest_json) > _LINEAR_MANIFEST_WARN_CHARS:
             logger.warning("Linear manifest exceeds 10K chars; truncation risk (size=%d)", len(manifest_json))
         linear_create_attachment(
             self._api_key,
-            issue_id,
-            url=f"dh://artifact-manifest/{issue_id}",
+            str(issue_number),
+            url=f"dh://artifact-manifest/{issue_number}",
             title="DH Artifact Manifest",
             metadata={"manifest_json": manifest_json},
         )
@@ -892,12 +865,12 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_id = str(issue_number)
+        issue_number = _reject_beads_issue_number("LinearArtifactProvider", issue_number)
         safe_path = path.replace("/", "--")
-        url = f"dh://artifact-content/{issue_id}/{artifact_type}/{safe_path}"
+        url = f"dh://artifact-content/{issue_number}/{artifact_type}/{safe_path}"
         linear_create_attachment(
             self._api_key,
-            issue_id,
+            str(issue_number),
             url=url,
             title=f"DH Artifact: {artifact_type}/{path}",
             metadata={"content": content},
@@ -922,15 +895,16 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_id = str(issue_number)
+        issue_number = _reject_beads_issue_number("LinearArtifactProvider", issue_number)
         safe_path = path.replace("/", "--")
-        target_url = f"dh://artifact-content/{issue_id}/{artifact_type}/{safe_path}"
-        nodes = linear_get_attachments(self._api_key, issue_id)
+        target_url = f"dh://artifact-content/{issue_number}/{artifact_type}/{safe_path}"
+        nodes = linear_get_attachments(self._api_key, str(issue_number))
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
-                if _is_linear_attachment_metadata(raw_metadata):
-                    content = raw_metadata.get("content")
+                if isinstance(raw_metadata, dict):
+                    metadata = cast("dict[str, object]", raw_metadata)
+                    content = metadata.get("content")
                     if isinstance(content, str):
                         return content
         return None
@@ -1089,7 +1063,7 @@ class GitLabArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On GitLab API failures.
         """
-        issue_number = _require_int_issue_number("GitLabArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitLabArtifactProvider", issue_number)
         snippet_id = self._get_snippet_id_from_notes(issue_number)
         if snippet_id is None:
             return ArtifactManifest(issue_number=issue_number)
@@ -1114,7 +1088,7 @@ class GitLabArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On GitLab API failures.
         """
-        issue_number = _require_int_issue_number("GitLabArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitLabArtifactProvider", issue_number)
         manifest_json = manifest.model_dump_json(by_alias=True)
         snippet_id = self._get_or_create_snippet(issue_number)
         gitlab_update_snippet(
@@ -1143,7 +1117,7 @@ class GitLabArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On GitLab API failures.
         """
-        issue_number = _require_int_issue_number("GitLabArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitLabArtifactProvider", issue_number)
         safe_path = path.replace("/", "--") + ".txt"
         snippet_id = self._get_or_create_snippet(issue_number)
         # Attempt update; if the file does not yet exist, create it instead.
@@ -1183,7 +1157,7 @@ class GitLabArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On GitLab API failures.
         """
-        issue_number = _require_int_issue_number("GitLabArtifactProvider", issue_number)
+        issue_number = _reject_beads_issue_number("GitLabArtifactProvider", issue_number)
         safe_path = path.replace("/", "--") + ".txt"
         snippet_id = self._get_snippet_id_from_notes(issue_number)
         if snippet_id is None:
