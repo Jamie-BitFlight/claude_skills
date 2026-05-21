@@ -17,6 +17,8 @@ from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError,
 from .conftest import _FakeBdRunner, make_task_record
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from sam_schema.core.task_backend_types import DocumentHandle
 
 # ---------------------------------------------------------------------------
@@ -290,7 +292,7 @@ class TestAppendTask:
         plan_id = created["plan_id"]
 
         new_task = _task_def("T01", "Appended task")
-        result = provider.append_task(plan_id, new_task)  # type: ignore[arg-type]
+        result = provider.append_task(plan_id, new_task)
 
         assert result["appended"] is True
         assert result["task_id"] == "T01"
@@ -305,7 +307,7 @@ class TestAppendTask:
         plan_id = created["plan_id"]
 
         with pytest.raises(TaskValidationError):
-            provider.append_task(plan_id, _task_def("T01", "Duplicate"))  # type: ignore[arg-type]
+            provider.append_task(plan_id, _task_def("T01", "Duplicate"))
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +340,7 @@ class TestSubprocessCallCounts:
 
     @pytest.mark.parametrize("task_count", [1, 3, 5])
     def test_read_plan_batch_fetches_tasks(
-        self, plan_id_and_runner: tuple[str, _FakeBdRunner], task_count: int
+        self, plan_id_and_runner: tuple[str, _FakeBdRunner], task_count: int, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """read_plan must issue exactly 1 bd show (epic) + 1 bd list (children batch).
 
@@ -361,7 +363,7 @@ class TestSubprocessCallCounts:
         # child issues that are already in runner._issues with that parent.
         original_run_json = runner.run_json
 
-        def _patched_run_json(argv: list[str]) -> object:  # type: ignore[override]
+        def _patched_run_json(argv: Sequence[str]) -> object:
             args = list(argv)
             runner.json_calls.append(args)
             if args[0] == "list" and "--parent" in args:
@@ -376,7 +378,7 @@ class TestSubprocessCallCounts:
             runner.json_calls.pop()  # remove the one we just appended
             return original_run_json(argv)
 
-        runner.run_json = _patched_run_json  # type: ignore[method-assign]
+        monkeypatch.setattr(runner, "run_json", _patched_run_json)
         runner.json_calls.clear()
 
         # Act
