@@ -375,3 +375,19 @@ def test_env_overrides_cannot_inject_blocked_vars(mocker: MockerFixture, monkeyp
     env = mock_run.call_args.kwargs["env"]
     assert "GITHUB_TOKEN" not in env
     assert env["SAFE_VAR"] == "ok"
+
+
+@pytest.mark.unit
+def test_is_available_passes_env_overrides_to_subprocess(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """is_available passes env_overrides into its subprocess call, stripping blocked vars."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc())
+
+    BdRunner(env_overrides={"BD_AVAIL_VAR": "check_value"}).is_available()
+
+    env = mock_run.call_args.kwargs["env"]
+    assert env["BD_AVAIL_VAR"] == "check_value"
+    assert "GITHUB_TOKEN" not in env

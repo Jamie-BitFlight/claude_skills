@@ -137,7 +137,7 @@ class BdRunner:
         mapping take precedence over the inherited process environment.
         Variables listed in :data:`_BLOCKED_ENV_VARS` are removed first,
         then overrides are applied.  Pass ``None`` (default) to use the
-        inherited environment unchanged.
+        inherited environment with blocked variables removed.
     timeout_seconds:
         Maximum number of seconds to wait for any single ``bd`` invocation.
         Defaults to :data:`_DEFAULT_BD_TIMEOUT_SECONDS`.
