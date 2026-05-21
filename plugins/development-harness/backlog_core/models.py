@@ -1378,8 +1378,11 @@ class ArtifactManifest(BaseModel):
     ``backlog_core.artifact_registry``.
     """
 
-    issue_number: int = Field(..., description="GitHub Issue number this manifest belongs to.")
-    """GitHub Issue number this manifest belongs to."""
+    issue_number: str | int = Field(
+        ...,
+        description="Issue identifier this manifest belongs to (int for GitHub/GitLab, str UUID for Linear, str nanoid for beads).",
+    )
+    """Issue identifier this manifest belongs to."""
 
     artifacts: list[ArtifactEntry] = Field(default_factory=list)
     """Ordered list of registered artifact entries."""

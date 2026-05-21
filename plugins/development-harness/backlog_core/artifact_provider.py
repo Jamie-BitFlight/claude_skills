@@ -141,11 +141,13 @@ def _require_int_issue_number(cls_name: str, issue_number: str | int) -> int:
     Raises:
         TypeError: When *issue_number* is a ``str`` (beads identifier).
     """
-    if isinstance(issue_number, str):
+    if not isinstance(issue_number, int) or isinstance(issue_number, bool):
         raise TypeError(
             f"{cls_name} requires an integer issue number, got {issue_number!r}. "
             "Pass a beads issue ID to the beads-specific provider method instead."
         )
+    if issue_number <= 0:
+        raise ValueError(f"{cls_name} requires a positive integer issue number, got {issue_number!r}.")
     return issue_number
 
 
@@ -753,7 +755,7 @@ def _is_linear_attachment_metadata(value: object) -> TypeGuard[_LinearAttachment
     Returns:
         ``True`` when *value* is a ``dict`` instance.
     """
-    return isinstance(value, dict)
+    return isinstance(value, dict) and all(isinstance(k, str) for k in value)
 
 
 class LinearArtifactProvider:
@@ -830,9 +832,9 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_number = _require_int_issue_number("LinearArtifactProvider", issue_number)
-        target_url = f"dh://artifact-manifest/{issue_number}"
-        nodes = linear_get_attachments(self._api_key, str(issue_number))
+        issue_id = str(issue_number)
+        target_url = f"dh://artifact-manifest/{issue_id}"
+        nodes = linear_get_attachments(self._api_key, issue_id)
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
@@ -861,14 +863,14 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_number = _require_int_issue_number("LinearArtifactProvider", issue_number)
+        issue_id = str(issue_number)
         manifest_json = manifest.model_dump_json(by_alias=True)
         if len(manifest_json) > _LINEAR_MANIFEST_WARN_CHARS:
             logger.warning("Linear manifest exceeds 10K chars; truncation risk (size=%d)", len(manifest_json))
         linear_create_attachment(
             self._api_key,
-            str(issue_number),
-            url=f"dh://artifact-manifest/{issue_number}",
+            issue_id,
+            url=f"dh://artifact-manifest/{issue_id}",
             title="DH Artifact Manifest",
             metadata={"manifest_json": manifest_json},
         )
@@ -890,12 +892,12 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_number = _require_int_issue_number("LinearArtifactProvider", issue_number)
+        issue_id = str(issue_number)
         safe_path = path.replace("/", "--")
-        url = f"dh://artifact-content/{issue_number}/{artifact_type}/{safe_path}"
+        url = f"dh://artifact-content/{issue_id}/{artifact_type}/{safe_path}"
         linear_create_attachment(
             self._api_key,
-            str(issue_number),
+            issue_id,
             url=url,
             title=f"DH Artifact: {artifact_type}/{path}",
             metadata={"content": content},
@@ -920,10 +922,10 @@ class LinearArtifactProvider:
         Raises:
             backlog_core.models.BacklogError: On Linear API failures.
         """
-        issue_number = _require_int_issue_number("LinearArtifactProvider", issue_number)
+        issue_id = str(issue_number)
         safe_path = path.replace("/", "--")
-        target_url = f"dh://artifact-content/{issue_number}/{artifact_type}/{safe_path}"
-        nodes = linear_get_attachments(self._api_key, str(issue_number))
+        target_url = f"dh://artifact-content/{issue_id}/{artifact_type}/{safe_path}"
+        nodes = linear_get_attachments(self._api_key, issue_id)
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
