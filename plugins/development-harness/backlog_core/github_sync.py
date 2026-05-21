@@ -40,12 +40,8 @@ _METADATA_LINE_RE = re.compile(r"^(\w+):\s*(.*)$")
 _GROOMED_HEADING_RE = re.compile(r"^##\s+Groomed\s*\(([^)]*)\)")
 _SUBSECTION_RE = re.compile(r"### ([^\n]+)\n([\s\S]*?)(?=\n### |\Z)")
 
-# Section key (used in BacklogItem.sections) -> GitHub markdown heading text
-SECTION_HEADING: dict[str, str] = {
-    "fact_check": "Fact-Check",
-    "rt_ica": "RT-ICA",
-    "issue_classification": "Issue Classification",
-}
+# Re-exported from rendering — canonical definition lives in rendering.SECTION_HEADING
+SECTION_HEADING = _rendering.SECTION_HEADING
 
 # Reverse lookup: heading text (lowercased) -> section key
 _HEADING_TO_KEY: dict[str, str] = {v.lower(): k for k, v in SECTION_HEADING.items()}
