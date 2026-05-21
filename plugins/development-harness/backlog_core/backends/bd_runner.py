@@ -154,8 +154,10 @@ class BdRunner:
         self, *, env_overrides: Mapping[str, str] | None = None, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS
     ) -> None:
         """Store configuration only.  Does not touch the filesystem."""
-        self._env_overrides = env_overrides
         self._timeout_seconds = timeout_seconds
+        self._env_overrides: dict[str, str] = (
+            {k: v for k, v in env_overrides.items() if k not in _BLOCKED_ENV_VARS} if env_overrides else {}
+        )
         self._bd_path: str | None = None
         self._available: bool | None = None
 
@@ -243,7 +245,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=self._build_env(),
+                env=self._effective_env(),
             )
             self._available = True
         except (OSError, subprocess.SubprocessError):
@@ -254,16 +256,17 @@ class BdRunner:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_env(self) -> dict[str, str]:
-        """Return subprocess environment with blocked vars removed and overrides applied.
+    def _effective_env(self) -> dict[str, str]:
+        """Return the filtered base environment merged with instance-level overrides.
 
-        Blocked variables (see :data:`_BLOCKED_ENV_VARS`) are stripped from
-        both the inherited process environment and from *env_overrides*, so
-        callers cannot inadvertently re-inject a blocked credential.
+        Returns:
+        -------
+        dict[str, str]
+            Environment mapping safe to pass to ``bd`` subprocesses.
         """
         env = _bd_env()
         if self._env_overrides:
-            env.update({k: v for k, v in self._env_overrides.items() if k not in _BLOCKED_ENV_VARS})
+            env.update(self._env_overrides)
         return env
 
     def _resolve_bd_path(self) -> str:
@@ -320,7 +323,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=self._build_env(),
+                env=self._effective_env(),
             )
         except subprocess.TimeoutExpired as exc:
             elapsed_ms = int((time.monotonic() - t0) * 1000)

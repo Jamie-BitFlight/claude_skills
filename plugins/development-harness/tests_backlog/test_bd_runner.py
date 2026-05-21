@@ -315,10 +315,10 @@ def test_init_stores_env_overrides() -> None:
 
 
 @pytest.mark.unit
-def test_init_env_overrides_defaults_to_none() -> None:
-    """BdRunner defaults env_overrides to None."""
+def test_init_env_overrides_defaults_to_empty_dict() -> None:
+    """BdRunner defaults env_overrides to an empty dict when None is passed."""
     runner = BdRunner()
-    assert runner._env_overrides is None
+    assert runner._env_overrides == {}
 
 
 @pytest.mark.unit
