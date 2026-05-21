@@ -1,6 +1,23 @@
 # Auto Mode Rules
 
-When <mode/> is `auto`, the following substitutions apply at every interactive decision point:
+When <mode/> is `auto`, the following substitutions apply at every interactive decision point.
+
+**Stage announcement rule**: Before executing each checklist step, emit a one-line progress announcement to the user:
+
+```
+[AUTO] Stage: {step name} — {brief description of what is about to happen}
+```
+
+Examples:
+- `[AUTO] Stage: Locate — finding backlog item "fix auth bug"`
+- `[AUTO] Stage: Validate — checking item state and syncing with GitHub`
+- `[AUTO] Stage: Prepare — grooming and running RT-ICA gate`
+- `[AUTO] Stage: Plan — invoking add-new-feature for feature planning`
+- `[AUTO] Stage: Implement — invoking implement-feature for plan P1234`
+- `[AUTO] Stage: Quality gates — invoking complete-implementation`
+- `[AUTO] Stage: Close — resolving backlog item as complete`
+
+Do not stop for user input after any announcement. Announce then immediately execute.
 
 | Normal behaviour | `--auto` substitution |
 |---|---|

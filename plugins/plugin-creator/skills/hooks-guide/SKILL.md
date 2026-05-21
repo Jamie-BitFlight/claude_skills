@@ -64,6 +64,7 @@ This updates reference files from official sources. Run when upstream docs chang
 
 ## Sources
 
-- Claude Code hooks: `https://docs.anthropic.com/en/docs/claude-code/hooks.md` (accessed 2026-02-27)
+- Claude Code hooks: `https://docs.anthropic.com/en/docs/claude-code/hooks.md` (accessed 2026-05-21)
+- Claude Code hooks guide: `https://docs.anthropic.com/en/docs/claude-code/hooks-guide.md` (accessed 2026-05-21)
 - Claude Code agent frontmatter: `https://docs.anthropic.com/en/docs/claude-code/sub-agents.md` (accessed 2026-02-27)
 - GitHub Copilot coding agent: `https://docs.github.com/en/copilot/using-github-copilot/using-claude-as-your-copilot-llm` (accessed 2026-02-27)

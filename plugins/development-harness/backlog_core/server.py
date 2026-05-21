@@ -1212,11 +1212,11 @@ async def backlog_add(
     if expected_token is None:
         await ctx.warning("Gate token file unreadable for session %s", session_id)
         return {
-            "error": "Gate token file could not be read for this session. Load /dh:create-backlog-item — the skill writes the required token at load time."
+            "error": "Gate token file could not be read for this session. Load /dh:work-backlog-item create — the skill writes the required token at load time."
         }
     if gate_token != expected_token:
         return {
-            "error": "Direct backlog_add calls are not permitted. Load and follow /dh:create-backlog-item — it will provide the required gate_token."
+            "error": 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
         }
     out = Output()
     try:

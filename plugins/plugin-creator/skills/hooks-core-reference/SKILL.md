@@ -4,9 +4,9 @@ description: Hook system fundamentals — all events, configuration structure, m
 user-invocable: true
 ---
 
-# Claude Code Hooks — Core Reference (January 2026)
+# Claude Code Hooks — Core Reference (May 2026)
 
-Hooks execute custom commands or prompts in response to Claude Code events. Use for automation, validation, formatting, and security.
+Hooks execute custom commands, HTTP calls, MCP tool calls, LLM prompts, or agent verifiers in response to Claude Code events. Use for automation, validation, formatting, and security.
 
 For JSON input/output schemas, activate `Skill(skill: "plugin-creator:hooks-io-api")`.
 For working examples and patterns, activate `Skill(skill: "plugin-creator:hooks-patterns")`.
@@ -15,57 +15,72 @@ For working examples and patterns, activate `Skill(skill: "plugin-creator:hooks-
 
 ## All Hook Events
 
-| Event                | When Fired                                                   | Matcher Applies                        | Common Uses             |
-| -------------------- | ------------------------------------------------------------ | -------------------------------------- | ----------------------- |
-| `PreToolUse`         | Before tool execution                                        | Yes — tool name                        | Validation, blocking    |
-| `PermissionRequest`  | When user shown permission dialog                            | Yes — tool name                        | Auto-approval policies  |
-| `PostToolUse`        | After successful tool execution                              | Yes — tool name                        | Formatting, linting     |
-| `PostToolUseFailure` | After tool fails                                             | Yes — tool name                        | Error handling          |
-| `Notification`       | When Claude wants attention                                  | Yes — notification type                | Custom notifications    |
-| `UserPromptSubmit`   | User submits prompt                                          | No                                     | Input validation        |
-| `UserPromptExpansion`| Slash command expands into a full prompt                     | Yes — command name                     | Block expansions, inject context |
-| `Stop`               | Claude finishes response                                     | No                                     | Cleanup, final checks   |
-| `SubagentStart`      | When spawning a subagent                                     | Yes — agent type name                  | Subagent initialization |
-| `SubagentStop`       | Subagent (Agent tool) completes                              | Yes — agent type name                  | Result validation       |
-| `TeammateIdle`       | Agent team teammate about to go idle                         | No                                     | Quality gates           |
-| `TaskCompleted`      | Task being marked as completed                               | No                                     | Completion enforcement  |
-| `InstructionsLoaded` | CLAUDE.md or rules file loaded into context                  | No                                     | Observability           |
-| `ConfigChange`       | Configuration file changes during session                    | Yes — config source                    | Settings auditing       |
-| `WorktreeCreate`     | Worktree being created (`--worktree` or `isolation: worktree`) | No                                   | Custom VCS integration  |
-| `WorktreeRemove`     | Worktree being removed at session exit or subagent finish    | No                                     | Custom VCS cleanup      |
-| `PreCompact`         | Before context compaction                                    | Yes — `manual` or `auto`               | State backup            |
-| `PostCompact`        | After context compaction completes                           | Yes — `manual` or `auto`               | React to new state      |
-| `Elicitation`        | MCP server requests user input mid-task                      | Yes — MCP server name                  | Programmatic responses  |
-| `ElicitationResult`  | User responds to MCP elicitation                             | Yes — MCP server name                  | Observe/modify response |
-| `Setup`              | Repository setup/maintenance                                 | Yes — `init` or `maintenance`          | One-time operations     |
-| `CwdChanged`         | Working directory changes during session                     | No                                     | Reload env, activate toolchains |
-| `FileChanged`        | Watched file changes on disk                                 | Yes — literal filename pattern         | Monitor .env, direnv integration |
-| `PermissionDenied`   | Auto mode classifier denies a tool call                      | Yes — tool name                        | Log denials, allow retry |
-| `SessionStart`       | Session begins or resumes                                    | Yes — `startup`, `resume`, etc.        | Environment setup       |
-| `SessionEnd`         | Session ends                                                 | Yes — exit reason                      | Cleanup, persistence    |
+| Event | When Fired | Matcher Field | Common Uses |
+| --- | --- | --- | --- |
+| `PreToolUse` | Before tool execution | tool name | Validation, blocking |
+| `PermissionRequest` | When user shown permission dialog | tool name | Auto-approval policies |
+| `PermissionDenied` | Auto mode classifier denies a tool call | tool name | Log denials, allow retry |
+| `PostToolUse` | After successful tool execution | tool name | Formatting, linting |
+| `PostToolUseFailure` | After tool fails | tool name | Error handling |
+| `PostToolBatch` | After all tools in a parallel batch resolve, before next model call | no matcher | Batch-level context injection |
+| `Notification` | When Claude wants attention | notification type | Custom notifications |
+| `UserPromptSubmit` | User submits prompt | no matcher | Input validation |
+| `UserPromptExpansion` | Slash command expands into a prompt | command name | Block expansions, inject context |
+| `Stop` | Claude finishes a turn | no matcher | Cleanup, final checks |
+| `StopFailure` | Turn ends due to API error | error type | Logging, alerts |
+| `SubagentStart` | When spawning a subagent | agent type name | Subagent initialization |
+| `SubagentStop` | Subagent (Agent tool) completes — fires in parent session | agent type name | Result validation |
+| `TeammateIdle` | Agent team teammate about to go idle | no matcher | Quality gates |
+| `TaskCreated` | Task being created via TaskCreate | no matcher | Naming enforcement |
+| `TaskCompleted` | Task being marked as completed | no matcher | Completion enforcement |
+| `InstructionsLoaded` | CLAUDE.md or rules file loaded | load reason | Observability |
+| `ConfigChange` | Configuration file changes during session | config source | Settings auditing |
+| `WorktreeCreate` | Worktree being created | no matcher | Custom VCS integration |
+| `WorktreeRemove` | Worktree being removed | no matcher | Custom VCS cleanup |
+| `PreCompact` | Before context compaction | `manual` or `auto` | State backup |
+| `PostCompact` | After context compaction completes | `manual` or `auto` | React to new state |
+| `Elicitation` | MCP server requests user input mid-task | MCP server name | Programmatic responses |
+| `ElicitationResult` | User responds to MCP elicitation | MCP server name | Observe/modify response |
+| `Setup` | Repository setup/maintenance flags | `init` or `maintenance` | One-time operations |
+| `CwdChanged` | Working directory changes during session | no matcher | Reload env, activate toolchains |
+| `FileChanged` | Watched file changes on disk | literal filename pattern | Monitor .env, direnv integration |
+| `SessionStart` | Session begins or resumes | `startup`, `resume`, `clear`, `compact` | Environment setup |
+| `SessionEnd` | Session ends | exit reason | Cleanup, persistence |
 
-> **Note:** The Agent tool was renamed from Task in Claude Code v2.1.63. Use `Agent` as the matcher name for tool-based hooks targeting subagent operations.
+### Stop vs SubagentStop — scope distinction
 
-For a visual overview of the full event sequence, see the `../hooks-guide/references/hooks-lifecycle.png`.
+**`Stop`** fires in **every session** — the main orchestrator session and inside embedded subagents (Agent-tool spawned). When firing inside a subagent, the input includes `agent_id` and `agent_type` fields. Use these to guard hooks that should only run in the main session:
+
+```javascript
+// Only run in the main orchestrator, not inside embedded subagents
+if (data.agent_id || data.agent_type) {
+    process.stdout.write(JSON.stringify({}));
+    process.exit(0);
+}
+```
+
+**`SubagentStop`** fires only in the **parent session** when an Agent-tool call completes.
+
+**Frontmatter exception**: `Stop` hooks defined in skill/agent frontmatter are automatically converted to `SubagentStop` for that component's lifecycle. This only applies to frontmatter-defined hooks, not plugin or settings hooks.
 
 ---
 
 ## Configuration
 
-### Configuration Locations (Precedence highest to lowest)
+### Configuration Locations
 
-1. **Managed** - `managed-settings.json` (enterprise)
-2. **Local** - `.claude/settings.local.json` (gitignored)
-3. **Project** - `.claude/settings.json` (shared via git)
-4. **User** - `~/.claude/settings.json` (personal)
-5. **Plugin** - `hooks/hooks.json` or frontmatter
-6. **Capability** - Skill/Command/Agent frontmatter
+| Location | Scope | Shareable |
+| --- | --- | --- |
+| `~/.claude/settings.json` | All your projects | No |
+| `.claude/settings.json` | Single project | Yes, via git |
+| `.claude/settings.local.json` | Single project | No, gitignored |
+| Managed policy settings | Organization-wide | Yes, admin-controlled |
+| Plugin `hooks/hooks.json` | When plugin is enabled | Yes, bundled with plugin |
+| Skill or agent frontmatter | While component is active | Yes, in component file |
 
-**Note**: Enterprise administrators can use `allowManagedHooksOnly` to block user, project, and plugin hooks.
+Enterprise administrators can use `allowManagedHooksOnly` to block user, project, and plugin hooks. Hooks from plugins force-enabled in managed `enabledPlugins` are exempt.
 
 ### Structure
-
-Hooks are organized by matchers, where each matcher can have multiple hooks:
 
 ```json
 {
@@ -76,7 +91,8 @@ Hooks are organized by matchers, where each matcher can have multiple hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "your-command-here"
+            "command": "your-command-here",
+            "timeout": 30
           }
         ]
       }
@@ -85,429 +101,287 @@ Hooks are organized by matchers, where each matcher can have multiple hooks:
 }
 ```
 
-**Fields:**
+### Hook Handler Fields
 
-- **matcher**: Pattern to match tool names, case-sensitive (for `PreToolUse`, `PermissionRequest`, `PostToolUse`); matches agent type name for `SubagentStart`/`SubagentStop`; matches exit reason for `SessionEnd`; matches config source for `ConfigChange`; matches MCP server name for `Elicitation`/`ElicitationResult`
-  - Simple strings match exactly: `Write` matches only the Write tool
-  - Supports regex: `Edit|Write` or `Notebook.*`
-  - Use `*` to match all tools. Also accepts empty string (`""`) or omit `matcher`
-- **hooks**: Array of hooks to execute when pattern matches
-  - `type`: `"command"` for bash commands, `"prompt"` for LLM evaluation, `"http"` for HTTP POST requests, or `"agent"` for agentic verifiers with tool access
-  - `command`: (For `type: "command"`) The bash command to execute
-  - `url`: (For `type: "http"`) The URL to POST the hook input to
-  - `prompt`: (For `type: "prompt"` or `type: "agent"`) The prompt to send to the model
-  - `timeout`: (Optional) Seconds before canceling (default: 600 for commands, 30 for prompts, 60 for agent hooks)
-  - `async`: (For `type: "command"`) If `true`, runs in background without blocking Claude
-  - `asyncRewake`: (For `type: "command"`) If `true`, runs in background and wakes Claude when process exits with code 2 — stderr/stdout delivered as a system reminder
+**Common fields** (all hook types):
 
-### Project-Specific Hook Scripts
+| Field | Required | Description |
+| --- | --- | --- |
+| `type` | yes | `"command"`, `"http"`, `"mcp_tool"`, `"prompt"`, or `"agent"` |
+| `if` | no | Permission rule syntax to filter when this handler spawns (e.g. `"Bash(git *)"`, `"Edit(*.ts)"`). Only evaluated on tool events. |
+| `timeout` | no | **Seconds** before canceling. Defaults: 600 for `command`/`http`/`mcp_tool`; 30 for `prompt`; 60 for `agent`. `UserPromptSubmit` lowers command/http/mcp_tool default to 30. |
+| `statusMessage` | no | Custom spinner message displayed while hook runs |
+| `once` | no | If `true`, runs once per session then removed. Only honored in skill frontmatter. |
 
-Use `$CLAUDE_PROJECT_DIR` to reference scripts in your project:
+**Command hook fields** (in addition to common):
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-style.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+| Field | Description |
+| --- | --- |
+| `command` | Shell command string (shell form) or executable path (exec form when `args` is set) |
+| `args` | Argument list. When present, `command` is the executable; spawned directly with no shell |
+| `async` | If `true`, runs in background without blocking Claude |
+| `asyncRewake` | If `true`, runs in background and wakes Claude when it exits with code 2 |
+| `shell` | Shell to use: `"bash"` (default) or `"powershell"` (Windows only) |
 
-### Events Without Matchers
+**HTTP hook fields**:
 
-For `UserPromptSubmit` and `Stop`, omit the matcher. `SubagentStart` and `SubagentStop` support matchers filtered by agent type name. `SessionEnd` supports matchers filtered by exit reason. Example for events that don't use matchers:
+| Field | Description |
+| --- | --- |
+| `url` | URL to POST event data to |
+| `headers` | Key-value pairs. Values support `$VAR_NAME` interpolation |
+| `allowedEnvVars` | Which env vars may be interpolated into headers |
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/prompt-validator.py"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+**Prompt/agent hook fields**:
+
+| Field | Description |
+| --- | --- |
+| `prompt` | Prompt text. Use `$ARGUMENTS` as placeholder for hook input JSON |
+| `model` | Model override. Defaults to a fast model |
 
 ---
 
 ## Event-Specific Matchers
 
-### PreToolUse / PermissionRequest / PostToolUse Common Matchers
+### PreToolUse / PermissionRequest / PostToolUse / PostToolUseFailure / PermissionDenied
 
-| Matcher             | Description                    |
-| ------------------- | ------------------------------ |
-| `Agent`             | Subagent operations            |
-| `Bash`              | Shell commands                 |
-| `Glob`              | File pattern matching          |
-| `Grep`              | Content search                 |
-| `Read`              | File reading                   |
-| `Edit`              | File editing                   |
-| `Write`             | File writing                   |
-| `WebFetch`          | Web fetching                   |
-| `WebSearch`         | Web search                     |
-| `Notebook.*`        | NotebookEdit, NotebookRead     |
-| `mcp__<server>__.*` | All tools from MCP server      |
-| `mcp__.*__write.*`  | MCP write tools across servers |
+Matched against `tool_name`. Matcher rules:
 
-### SessionStart Matchers
+- Plain name: `Write` matches only Write tool
+- Pipe list: `Edit|Write` matches either
+- Regex (contains non-alphanumeric chars): `^Notebook` or `mcp__memory__.*`
+- `mcp__<server>__.*` matches all tools from a server (`.*` required — bare `mcp__server` is exact match, finds nothing)
 
-| Matcher   | Trigger                                |
-| --------- | -------------------------------------- |
-| `startup` | New session started                    |
-| `resume`  | `--resume`, `--continue`, or `/resume` |
-| `clear`   | `/clear` command                       |
-| `compact` | Auto or manual compact                 |
+| Matcher | Description |
+| --- | --- |
+| `Agent` | Subagent operations |
+| `Bash` | Shell commands |
+| `Glob` | File pattern matching |
+| `Grep` | Content search |
+| `Read` | File reading |
+| `Edit` | File editing |
+| `Write` | File writing |
+| `WebFetch` | Web fetching |
+| `WebSearch` | Web search |
+| `mcp__<server>__.*` | All tools from MCP server |
 
-### PreCompact Matchers
+### SubagentStart / SubagentStop
 
-| Matcher  | Trigger                     |
-| -------- | --------------------------- |
-| `manual` | `/compact` command          |
-| `auto`   | Auto-compact (full context) |
+Matched against `agent_type`. For custom subagents, `agent_type` is the **`name` field from the agent's frontmatter**, not the filename.
 
-### Setup Matchers
+| Matcher value | Fires for |
+| --- | --- |
+| `general-purpose` | Built-in general-purpose agent |
+| `Explore` | Built-in Explore agent |
+| `Plan` | Built-in Plan agent |
+| `^my-agent-name$` | Custom agent with `name: my-agent-name` in frontmatter |
+| (regex supported) | `^rewrite-room-` matches all agents starting with that prefix |
 
-| Matcher       | Trigger                         |
-| ------------- | ------------------------------- |
-| `init`        | `--init` or `--init-only` flags |
-| `maintenance` | `--maintenance` flag            |
+### SessionStart
 
-### SubagentStart / SubagentStop Matchers
+| Matcher | When |
+| --- | --- |
+| `startup` | New session started |
+| `resume` | `--resume`, `--continue`, or `/resume` |
+| `clear` | `/clear` command |
+| `compact` | Auto or manual compact |
 
-Matched against the agent type name. Values include built-in agents (`Bash`, `Explore`, `Plan`) and custom agent names from `.claude/agents/`.
+### SessionEnd
 
-Note: The Agent tool was renamed from Task in Claude Code v2.1.63. Use `Agent` as the matcher name for `PreToolUse`/`PostToolUse` hooks targeting the subagent-spawning tool call.
+| Matcher | When |
+| --- | --- |
+| `clear` | Session cleared with `/clear` |
+| `resume` | Session switched via interactive `/resume` |
+| `logout` | User logged out |
+| `prompt_input_exit` | User exited while prompt input was visible |
+| `bypass_permissions_disabled` | Bypass permissions mode was disabled |
+| `other` | Other exit reasons |
 
-### SessionEnd Matchers
+### Notification
 
-| Matcher                        | Trigger                                        |
-| ------------------------------ | ---------------------------------------------- |
-| `clear`                        | Session cleared with `/clear` command          |
-| `logout`                       | User logged out                                |
-| `prompt_input_exit`            | User exited while prompt input was visible     |
-| `bypass_permissions_disabled`  | Bypass permissions mode was disabled           |
-| `other`                        | Other exit reasons                             |
+| Matcher | Fires when |
+| --- | --- |
+| `permission_prompt` | Permission requests from Claude |
+| `idle_prompt` | Claude waiting for input |
+| `auth_success` | Authentication success |
+| `elicitation_dialog` | MCP tool elicitation dialog |
+| `elicitation_complete` | MCP elicitation submitted or dismissed |
+| `elicitation_response` | MCP elicitation response sent to server |
 
-### ConfigChange Matchers
+### InstructionsLoaded
 
-| Matcher             | When it fires                             |
-| ------------------- | ----------------------------------------- |
-| `user_settings`     | `~/.claude/settings.json` changes         |
-| `project_settings`  | `.claude/settings.json` changes           |
-| `local_settings`    | `.claude/settings.local.json` changes     |
-| `policy_settings`   | Managed policy settings (non-blocking)    |
-| `skill`             | Skill file changes                        |
+| Matcher | Fires when |
+| --- | --- |
+| `session_start` | File loaded at session start |
+| `nested_traversal` | File loaded when Claude accesses a subdirectory |
+| `path_glob_match` | File loaded via `paths:` frontmatter match |
+| `include` | File loaded via `include` directive |
+| `compact` | File re-loaded after compaction |
 
-### PostCompact Matchers
+### ConfigChange
 
-| Matcher  | Trigger                                             |
-| -------- | --------------------------------------------------- |
-| `manual` | After `/compact` command                            |
-| `auto`   | After auto-compact when the context window is full  |
+| Matcher | When |
+| --- | --- |
+| `user_settings` | `~/.claude/settings.json` changes |
+| `project_settings` | `.claude/settings.json` changes |
+| `local_settings` | `.claude/settings.local.json` changes |
+| `policy_settings` | Managed policy settings (non-blockable) |
+| `skills` | Skill file changes |
 
-### Elicitation / ElicitationResult Matchers
+### PreCompact / PostCompact
 
-Matched against the MCP server name (the server requesting or receiving user input).
+| Matcher | Trigger |
+| --- | --- |
+| `manual` | `/compact` command |
+| `auto` | Auto-compact when context window fills |
 
-### Notification Matchers
+### Setup
 
-| Matcher              | Trigger                              |
-| -------------------- | ------------------------------------ |
-| `permission_prompt`  | Permission requests from Claude      |
-| `idle_prompt`        | Claude waiting for input (60s+ idle) |
-| `auth_success`       | Authentication success               |
-| `elicitation_dialog` | MCP tool elicitation                 |
+| Matcher | Trigger |
+| --- | --- |
+| `init` | `--init` or `--init-only` flags |
+| `maintenance` | `--maintenance` flag |
+
+### StopFailure
+
+| Matcher | Error type |
+| --- | --- |
+| `rate_limit` | Rate limit |
+| `authentication_failed` | Auth failure |
+| `billing_error` | Billing error |
+| `server_error` | API server error |
+| `max_output_tokens` | Output token limit |
+| `unknown` | Unknown error |
+
+### Elicitation / ElicitationResult
+
+Matched against the MCP server name.
+
+### UserPromptExpansion
+
+Matched against `command_name` (the slash command name).
+
+### FileChanged
+
+Matcher value is split on `|` and registered as literal filenames to watch (e.g. `.envrc|.env`). Same value also filters which hook groups run when a file changes.
+
+### No-matcher events
+
+`UserPromptSubmit`, `PostToolBatch`, `Stop`, `TeammateIdle`, `TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove`, `CwdChanged` — matchers are silently ignored on these events. They always fire on every occurrence.
 
 ---
 
-## Important Hook Events
+## Path Placeholders
 
-### Setup Hook
+Use in `command` and `args` fields to reference scripts at stable paths:
 
-Runs when Claude Code is invoked with repository setup and maintenance flags (`--init`, `--init-only`, or `--maintenance`).
+| Placeholder | Value |
+| --- | --- |
+| `${CLAUDE_PROJECT_DIR}` | Project root (where Claude Code was started) |
+| `${CLAUDE_PLUGIN_ROOT}` | Plugin installation directory. Changes on plugin update |
+| `${CLAUDE_PLUGIN_DATA}` | Plugin persistent data directory (`~/.claude/plugins/data/{id}/`). Survives plugin updates |
 
-**Use Setup hooks for**:
+**Exec form** (when `args` is set): Claude Code spawns the executable directly. Each `args` element is one argument with no shell tokenization. Use for paths that may contain spaces.
 
-- One-time or occasional operations (dependency installation, migrations, cleanup)
-- Operations you don't want on every session start
+**Shell form** (when `args` is absent): command string passed to `sh -c`. Wrap placeholders in double-quotes.
 
-**Key characteristics**:
-
-- Requires explicit flags because running automatically would slow down every session start
-- Has access to `CLAUDE_ENV_FILE` for persisting environment variables
-- Output added to Claude's context
-
-### SessionStart Hook
-
-Runs when Claude Code starts a new session or resumes an existing session.
-
-**Use SessionStart hooks for**:
-
-- Loading development context (existing issues, recent changes)
-- Setting up environment variables
-
-**Important**: For one-time operations like installing dependencies or running migrations, use Setup hooks instead. SessionStart runs on every session, so keep these hooks fast.
-
-### PostToolUseFailure Hook
-
-Runs immediately after a tool fails (returns an error). This complements PostToolUse, which only runs on successful tool execution.
-
-**Use PostToolUseFailure hooks for**:
-
-- Error recovery actions
-- Logging tool failures
-- Custom error handling and reporting
-
-**Recognizes the same matcher values as PreToolUse and PostToolUse.**
-
-### SubagentStart Hook
-
-Runs when a Claude Code subagent (Agent tool call) is spawned.
-
-**Use SubagentStart hooks for**:
-
-- Subagent initialization
-- Logging subagent creation
-- Context injection for specific agent types
-
-**Input includes**:
-
-- `agent_id`: Unique identifier for the subagent
-- `agent_type`: Agent name (built-in like "Bash", "Explore", "Plan", or custom agent names)
-
-For the defer permissionDecision and its constraints, see the [hooks-guide reference](../hooks-guide/references/claude-code.md).
+```json
+{
+  "type": "command",
+  "command": "node",
+  "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/my-hook.cjs"]
+}
+```
 
 ---
 
 ## Environment Variables
 
-| Variable             | Description                        | Available In        |
-| -------------------- | ---------------------------------- | ------------------- |
-| `CLAUDE_PROJECT_DIR` | Project root (absolute path)       | All hooks           |
-| `CLAUDE_CODE_REMOTE` | `"true"` if remote, empty if local | All hooks           |
-| `CLAUDE_ENV_FILE`    | Path for persisting env vars       | SessionStart, Setup, CwdChanged, FileChanged |
-| `CLAUDE_PLUGIN_ROOT` | Plugin directory (absolute)        | Plugin hooks        |
+| Variable | Description | Available In |
+| --- | --- | --- |
+| `CLAUDE_PROJECT_DIR` | Project root (absolute path) | All hooks |
+| `CLAUDE_CODE_REMOTE` | `"true"` if remote web, absent if local CLI | All hooks |
+| `CLAUDE_ENV_FILE` | Path for persisting env vars into Bash commands | SessionStart, Setup, CwdChanged, FileChanged |
+| `CLAUDE_PLUGIN_ROOT` | Plugin directory (absolute) | Plugin hooks |
+| `CLAUDE_PLUGIN_DATA` | Plugin persistent data directory | Plugin hooks |
+| `CLAUDE_EFFORT` | Active effort level (`low`/`medium`/`high`/`xhigh`/`max`) | Tool-use context events |
 
-### SessionStart Environment Persistence
+### CLAUDE_ENV_FILE — Persisting Environment Variables
 
-**Example: Setting individual environment variables**
+Variables written to `CLAUDE_ENV_FILE` are sourced before each Bash command. Append (`>>`) to preserve variables set by other hooks.
 
 ```bash
 #!/bin/bash
 if [ -n "$CLAUDE_ENV_FILE" ]; then
   echo 'export NODE_ENV=production' >> "$CLAUDE_ENV_FILE"
-  echo 'export API_KEY=your-api-key' >> "$CLAUDE_ENV_FILE"
   echo 'export PATH="$PATH:./node_modules/.bin"' >> "$CLAUDE_ENV_FILE"
 fi
-exit 0
-```
-
-**Example: Persisting all environment changes (e.g., nvm use)**
-
-```bash
-#!/bin/bash
-ENV_BEFORE=$(export -p | sort)
-
-# Run setup commands that modify environment
-source ~/.nvm/nvm.sh
-nvm use 20
-
-if [ -n "$CLAUDE_ENV_FILE" ]; then
-  ENV_AFTER=$(export -p | sort)
-  comm -13 <(echo "$ENV_BEFORE") <(echo "$ENV_AFTER") >> "$CLAUDE_ENV_FILE"
-fi
-exit 0
-```
-
-Variables in `$CLAUDE_ENV_FILE` are sourced before each Bash command.
-
----
-
-## Working with MCP Tools
-
-MCP tools follow the pattern `mcp__<server>__<tool>`:
-
-- `mcp__memory__create_entities` - Memory server's create entities tool
-- `mcp__filesystem__read_file` - Filesystem server's read file tool
-- `mcp__github__search_repositories` - GitHub server's search tool
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "mcp__memory__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Memory operation initiated' >> ~/mcp-operations.log"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*__write.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/home/user/scripts/validate-mcp-write.py"
-          }
-        ]
-      }
-    ]
-  }
-}
 ```
 
 ---
 
 ## Execution Details
 
-| Aspect              | Behavior                                |
-| ------------------- | --------------------------------------- |
-| **Timeout**         | 600 seconds default for commands, 30s for prompts, 60s for agent hooks, configurable |
-| **Parallelization** | All matching hooks run in parallel      |
-| **Deduplication**   | Identical commands deduplicated         |
-| **Environment**     | Runs in cwd with Claude Code's env      |
-| **Hook order**      | Hooks from all sources execute together |
-
-### Output Handling by Event
-
-| Event                                                      | stdout Handling                  |
-| ---------------------------------------------------------- | -------------------------------- |
-| UserPromptSubmit, SessionStart, Setup                      | Added to Claude's context        |
-| PreToolUse, PostToolUse, Stop                              | Shown in verbose mode (Ctrl+O)   |
-| Notification, SessionEnd, SubagentStart, InstructionsLoaded | Logged to debug only (`--debug`) |
-| PostCompact                                                | Logged to debug only (`--debug`) |
-| TeammateIdle, TaskCompleted, ConfigChange                  | Shown in verbose mode (Ctrl+O)   |
-| WorktreeCreate                                             | Stdout must be the absolute path to the created worktree directory |
-| WorktreeRemove                                             | Non-blocking; logged to debug    |
-| CwdChanged, FileChanged                                    | Non-blocking; logged to debug    |
-| PermissionDenied                                           | Logged to debug only (`--debug`) |
-| Elicitation, ElicitationResult                             | JSON response controls MCP input |
+| Aspect | Behavior |
+| --- | --- |
+| **Parallelism** | All matching hooks in a group run in parallel |
+| **Deduplication** | Identical commands/URLs deduplicated automatically |
+| **Environment** | Runs in cwd with Claude Code's environment |
+| **Terminal** | No controlling terminal (macOS/Linux v2.1.139+). Cannot open `/dev/tty`. Use `terminalSequence` JSON output for bell/notification |
+| **Block cap** | Stop/SubagentStop hooks blocked 8 consecutive times triggers override — subagent is forced to stop |
 
 ---
 
 ## Security Considerations
 
-### Disclaimer
+Command hooks run with your system user's full permissions and can modify, delete, or access any files your account can access.
 
-**USE AT YOUR OWN RISK**: Claude Code hooks execute arbitrary shell commands on your system automatically. By using hooks, you acknowledge that:
-
-- You are solely responsible for the commands you configure
-- Hooks can modify, delete, or access any files your user account can access
-- Malicious or poorly written hooks can cause data loss or system damage
-- Anthropic provides no warranty and assumes no liability for any damages
-- You should thoroughly test hooks in a safe environment before production use
-
-### Security Best Practices
-
-1. **Validate and sanitize inputs** - Never trust input data blindly
-2. **Always quote shell variables** - Use `"$VAR"` not `$VAR`
-3. **Block path traversal** - Check for `..` in file paths
-4. **Use absolute paths via the $CLAUDE_PROJECT_DIR variable** - Specify full paths for scripts (use `$CLAUDE_PROJECT_DIR`)
-5. **Skip sensitive files** - Avoid `.env`, `.git/`, keys, etc.
-
-### Configuration Safety
-
-Direct edits to hooks in settings files don't take effect immediately:
-
-1. Hooks snapshot captured at startup
-2. Snapshot used throughout the session
-3. Warns if hooks are modified externally
-4. Requires review in `/hooks` menu for changes to apply
-
-This prevents malicious hook modifications from affecting your current session.
+**Best practices:**
+1. Validate and sanitize inputs — never trust stdin data blindly
+2. Quote shell variables — use `"$VAR"` not `$VAR`
+3. Block path traversal — check for `..` in file paths
+4. Use `${CLAUDE_PROJECT_DIR}` for absolute paths — never relative
+5. Skip sensitive files — avoid `.env`, `.git/`, keys, etc.
 
 ---
 
 ## Debugging
 
-### Enable Debug Mode
-
 ```bash
-claude --debug
-claude --debug "hooks"  # Filter to hooks only
+# Write debug log to file
+claude --debug-file /tmp/claude.log
+
+# Enable verbose mode mid-session
+ctrl+O
 ```
 
-### Debug Output Example
+Debug output shows which hooks matched, exit codes, and full stdout/stderr.
 
-```text
-[DEBUG] Executing hooks for PostToolUse:Write
-[DEBUG] Getting matching hook commands for PostToolUse with query: Write
-[DEBUG] Found 1 hook matchers in settings
-[DEBUG] Matched 1 hooks for query "Write"
-[DEBUG] Found 1 hook commands to execute
-[DEBUG] Executing hook command: <Your command> with timeout 600000ms
-[DEBUG] Hook command completed with status 0: <Your stdout>
-```
+For more granular matcher details: `CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose`.
 
-### Basic Troubleshooting
+### Troubleshooting
 
-1. **Check configuration** - Run `/hooks` to see if your hook is registered
-2. **Verify syntax** - Ensure your JSON settings are valid
-3. **Test commands** - Run hook commands manually first
-4. **Check permissions** - Make sure scripts are executable
-5. **Review logs** - Use `claude --debug` to see hook execution details
-6. **Validate plugin hooks** - Use `claude plugin validate` or `/plugin validate` for plugin-level hooks
-
-### Common Issues
-
-| Problem              | Cause                            | Fix                                      |
-| -------------------- | -------------------------------- | ---------------------------------------- |
-| Hook not running     | Wrong matcher pattern            | Check case-sensitivity, regex            |
-| Command not found    | Relative path                    | Use `$CLAUDE_PROJECT_DIR`                |
-| JSON not processed   | Non-zero exit code               | Exit 0 for JSON processing               |
-| Hook times out       | Slow script                      | Optimize or increase timeout             |
-| Quotes breaking      | Unescaped in JSON                | Use `\"` inside JSON strings             |
-| Plugin hook not load | Invalid plugin.json hooks config | Validate with `claude plugin validate .` |
-| Path not found       | Missing `${CLAUDE_PLUGIN_ROOT}`  | Use variable for plugin scripts          |
-
-### Validation Commands
-
-**For plugin hooks**:
-
-```bash
-# CLI (from terminal)
-claude plugin validate .
-claude plugin validate ./path/to/plugin
-
-# In Claude Code session
-/plugin validate .
-/plugin validate ./path/to/plugin
-```
-
-**For settings hooks**: JSON validation with:
-
-```bash
-python3 -m json.tool .claude/settings.json
-```
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Hook not running | Wrong matcher pattern | Check case-sensitivity; run `/hooks` to confirm registration |
+| Command not found | Relative path in command | Use `${CLAUDE_PROJECT_DIR}` or exec form with `args` |
+| JSON not processed | Non-zero exit code | Exit 0 for JSON output; use exit 2 only for blocking |
+| Hook times out | Script too slow | Optimize or increase `timeout` field |
+| Stop hook loops | Missing `stop_hook_active` check | Check `stop_hook_active` in Stop input; exit 0 when true |
+| Stop hook runs inside subagents unexpectedly | Missing `agent_id` guard | Check `data.agent_id` in Stop hooks; exit 0 when present |
+| JSON parse error | Shell profile printing text | Wrap profile `echo` in `if [[ $- == *i* ]]` guard |
+| Plugin hook not loading | Invalid `hooks.json` | Run `claude plugin validate .` |
 
 ### Test Commands Manually
 
 ```bash
-echo '{"tool_name":"Write","tool_input":{"file_path":"test.txt"}}' | ./your-hook.sh
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}' | ./your-hook.sh
 ```
 
 ---
 
 ## Sources
 
-- [Hooks Reference](https://code.claude.com/docs/en/hooks.md) (accessed 2026-04-23, updated from 2026-01-28)
-- [Hooks Guide](https://code.claude.com/docs/en/hooks-guide.md)
-- [Settings Reference](https://code.claude.com/docs/en/settings.md)
-- [Plugin Components Reference](https://code.claude.com/docs/en/plugins-reference.md#hooks)
+- [Hooks Reference](https://docs.anthropic.com/en/docs/claude-code/hooks.md) (accessed 2026-05-21)
+- [Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide.md) (accessed 2026-05-21)
+- [Settings Reference](https://docs.anthropic.com/en/docs/claude-code/settings.md)
+- [Plugin Components Reference](https://docs.anthropic.com/en/docs/claude-code/plugins-reference.md#hooks)

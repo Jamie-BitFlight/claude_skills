@@ -3,6 +3,8 @@ name: memory-and-rules
 description: Configure and manage Claude Code persistent memory (CLAUDE.md, auto memory, rules) across sessions. Use when setting up project memory, organizing .claude/rules/, managing auto memory files, creating CLAUDE.md with imports, debugging memory loading, or advising on memory hierarchy and best practices.
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Claude Code Memory and Rules Reference
 

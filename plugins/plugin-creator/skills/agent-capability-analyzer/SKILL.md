@@ -2,6 +2,8 @@
 name: agent-capability-analyzer
 description: Runs the description-drift experiment — spawns all Claude Code agents simultaneously to collect self-reported capabilities, then compares them against static frontmatter descriptions to reveal how reliable orchestrator routing based on descriptions actually is. Use when measuring description drift across the agent fleet, re-running the capability collection experiment, analyzing a specific agent's self-reported capabilities, or auditing whether frontmatter descriptions accurately reflect agent behavior.
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Agent Capability Analyzer
 

@@ -18,9 +18,9 @@ from sam_schema.core.models import Plan, PlanStatus, ReadResult, Task, TaskAssig
 from sam_schema.readers.detect import read_plan
 from sam_schema.readers.normalize import normalize_plan
 from sam_schema.writers.yaml_writer import (
-    LiteralScalarString,
     _atomic_write,
     _make_yaml,
+    _wrap_multiline,
     append_section,
     create_plan_file,
     update_fields,
@@ -171,13 +171,10 @@ def update_plan_fields(
         raw = file_path.read_text(encoding="utf-8")
         data: dict[str, Any] = y.load(raw)
         if context is not None:
-            data["context"] = LiteralScalarString(context) if "\n" in context else context
+            data["context"] = _wrap_multiline(context)
         if set_fields and task_id is None:
             for key, value in set_fields.items():
-                if isinstance(value, str) and "\n" in value:
-                    data[key] = LiteralScalarString(value)
-                else:
-                    data[key] = value
+                data[key] = _wrap_multiline(value) if isinstance(value, str) else value
         buf = io.StringIO()
         y.dump(data, buf)
         _atomic_write(file_path, buf.getvalue())

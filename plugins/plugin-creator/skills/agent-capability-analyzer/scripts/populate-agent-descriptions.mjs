@@ -389,9 +389,19 @@ function buildAgentList() {
       agentFile: 'agent-creator.md',
     },
     {
-      key: 'plugin-creator:contextual-ai-documentation-optimizer',
+      key: 'plugin-creator:ai-doc-optimizer',
       pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'contextual-ai-documentation-optimizer.md',
+      agentFile: 'ai-doc-optimizer.md',
+    },
+    {
+      key: 'plugin-creator:skill-auditor',
+      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
+      agentFile: 'skill-auditor.md',
+    },
+    {
+      key: 'plugin-creator:skill-content-updater',
+      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
+      agentFile: 'skill-content-updater.md',
     },
     {
       key: 'plugin-creator:hook-creator',

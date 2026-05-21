@@ -161,7 +161,7 @@ Toolkit for building, refactoring, and validating plugins. Claude won't drift fr
 
 **Skills include:** `/plugin-creator:skill-creator`, `/plugin-creator:agent-creator`, `/plugin-creator:plugin-lifecycle`, `/plugin-creator:refactor-plugin`, `/plugin-creator:refactor-skill`, `/plugin-creator:claude-skills-overview-2026`, `/plugin-creator:claude-plugins-reference-2026`, `/plugin-creator:hooks-guide`, and more.
 
-**Agents include:** `refactor-planner`, `refactor-executor`, `refactor-validator`, `subagent-refactorer` (applies Anthropic prompt engineering best practices), `contextual-ai-documentation-optimizer`, `plugin-assessor`.
+**Agents include:** `refactor-planner`, `refactor-executor`, `refactor-validator`, `subagent-refactorer` (applies Anthropic prompt engineering best practices), `skill-auditor`, `skill-content-updater`, `ai-doc-optimizer`, `plugin-assessor`.
 
 **Scripts include:** `create_plugin.py` (interactive scaffolding), `auto_sync_manifests.py` (pre-commit hook that bumps versions and syncs component arrays automatically).
 

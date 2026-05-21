@@ -58,21 +58,26 @@ description: Use ONLY when explicitly requested by user or when invoked by a pro
 
 ---
 
-## Example 3: Context Optimizer (Specialized Domain)
+## Example 3: AI Doc Optimizer (Specialized Domain)
 
-**Source**: `.claude/agents/contextual-ai-documentation-optimizer.md`
+**Source**: `plugins/plugin-creator/agents/ai-doc-optimizer.md`
 
 This agent demonstrates:
 
-- Description with embedded examples
-- Skill activation as first action
-- Clear optimization principles
-- Structured output format
+- Precise, action-oriented description with scope front-loaded
+- `skills` field for pre-loading domain expertise at agent start
+- `color` field for visual distinction in agent lists
+- Tight, single-concern scope (content optimization only — not audit or upstream sync)
 
 ```yaml
 ---
-name: contextual-ai-documentation-optimizer
-description: Use this agent for quality audit (read-only scoring), content optimization (rewriting for Claude comprehension), or frontmatter description writing for prompts, SKILL.md, and CLAUDE.md files. Routes to sub-skills for audit-only or description-only tasks.
+name: ai-doc-optimizer
+description: Optimize prompts, SKILL.md, and CLAUDE.md for Claude comprehension using Anthropic prompt-engineering principles — RT-ICA pre-check + CoVe post-check. Use to rewrite AI-facing doc for clarity, frontmatter description writing, prompt optimization, or when asked to optimize CLAUDE.md. Applies positive framing, front-loads constraints, converts decision tables to Mermaid flowcharts.
+skills:
+  - plugin-creator:prompt-optimization
+  - plugin-creator:write-frontmatter-description
+  - plugin-creator:claude-skills-overview-2026
+  - plugin-creator:claude-plugins-reference-2026
 model: sonnet
 color: yellow
 ---
@@ -81,8 +86,9 @@ color: yellow
 **Key Patterns:**
 
 - Uses `color` field for visual distinction
-- Description includes specific file types it handles
-- References skill to load for domain knowledge
+- `skills` field pre-loads four domain skills before any task begins
+- Description states exact file types handled and key techniques applied
+- Single concern: content optimization only (audit → `skill-auditor`; upstream sync → `skill-content-updater`)
 
 ---
 

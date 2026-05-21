@@ -198,3 +198,16 @@ def _patch_gate_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: 
 def gate_token() -> str:
     """Return the fixed gate token used by the file-backed server in tests."""
     return TEST_GATE_TOKEN
+
+
+# ---------------------------------------------------------------------------
+# Quality gate fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def built_plan() -> str:
+    """Standard quality gate plan used by TestBuildQualityGatePlan tests."""
+    from sam_schema.core.quality_gates import build_quality_gate_plan
+
+    return build_quality_gate_plan(slug="test-feature", issue="42", impl_plan_address="P001")

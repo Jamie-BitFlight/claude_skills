@@ -3,6 +3,8 @@ name: review-permissions
 description: Configure Claude Code permissions — tool approval rules, permission modes, managed policies, and sandboxing. Use when setting up permission rules, configuring allow/deny/ask policies, debugging permission prompts, deploying managed settings for organizations, or controlling Bash/Read/Edit/WebFetch/MCP/Agent tool access.
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Claude Code Permissions Reference
 

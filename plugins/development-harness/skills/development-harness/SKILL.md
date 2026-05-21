@@ -47,7 +47,7 @@ flowchart TD
 
     Q1 -->|Work a single specific task<br>inside an existing plan| Single["/dh:start-task {plan path} --task {task-id}<br>Used by implement-feature per-task dispatch —<br>invoke directly to target one task"]
 
-    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>6-phase SAM path (with plan) or<br>3-phase proportional path (issue only):<br>code review → verification → integration →<br>doc drift → doc update → context refinement"]
+    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>7-phase SAM path (with plan) or<br>3-phase proportional path (issue only):<br>multi-perspective review → code review →<br>verification → integration →<br>doc drift → doc update → context refinement"]
 
     Q1 -->|Work a full milestone<br>in parallel isolated worktrees| Milestone["/dh:work-milestone<br>Wave-based parallel execution — each item<br>gets its own worktree. Use /dh:groom-milestone first."]
 ```
@@ -62,7 +62,7 @@ flowchart TD
     Groom["/dh:groom-backlog-item<br>RT-ICA + impact radius + fact-check<br>Item status: needs-grooming → groomed"] --> Work
     Work["/dh:work-backlog-item<br>Auto-groom gate → RT-ICA gate →<br>SAM planning via /add-new-feature<br>Attaches plan to backlog item"] --> Execute
     Execute["/dh:implement-feature<br>SAM dispatch loop — ready tasks →<br>agents → hooks update task status"] --> QG
-    QG["/dh:complete-implementation<br>6 quality gate phases → status:verified label<br>Fixes #N commit — issue closure"] --> Done(["Item resolved"])
+    QG["/dh:complete-implementation<br>7 quality gate phases → status:verified label<br>Fixes #N commit — issue closure"] --> Done(["Item resolved"])
 
     Work -.->|item already has Plan field| Execute
     Work -.->|close or resolve mode| Done

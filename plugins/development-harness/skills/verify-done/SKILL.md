@@ -17,9 +17,16 @@ user-invocable: true
 
 ---
 
+> [!IMPORTANT]
+> When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+> A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
+> When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
+
 ## 2. The "WORKS" Check
 
 <!-- Converted from prose branch instruction: "Choose A or B based on task type" -->
+
+The following diagram is the authoritative procedure for WORKS Check — determining whether the task output is verified as working. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -101,6 +108,8 @@ EVIDENCE:
 ## 5. Proportional Response Check
 
 If the task has an `issue-classification` field in its metadata, verify the response matched the issue type. If no `issue-classification` is present, mark N/A and proceed.
+
+The following diagram is the authoritative procedure for Proportional Response Check — verifying that the response scope matched the issue classification. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -197,6 +206,46 @@ If any of these thoughts occur, STOP and run the verification command:
 
 ---
 
+## 8. Observations, Gaps, and Backlog Capture
+
+Review the task just completed and list every instance of:
+
+- **Workflow gaps** — steps that were missing, unclear, or required guessing to proceed
+- **Workarounds** — anything done as a workaround rather than the correct approach
+- **Process concerns** — agent behaviors or system interactions that indicate a systemic problem
+- **Improvement observations** — things noticed that could be better if addressed, even if not blocking
+
+The following diagram is the authoritative procedure for Observations, Gaps, and Backlog Capture — triaging observations from the completed task into backlog items or recorded notes. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+
+```mermaid
+flowchart TD
+    List["List all instances across the four categories above"] --> Q{"Any items listed?"}
+    Q -->|"None"| None["Record: No observations"]
+    Q -->|"Yes"| Gate{"Any item is contextually significant<br>OR was already flagged during the task<br>as needing a bug or backlog entry?"}
+    Gate -->|"No — minor, not worth a ticket"| ObsOnly["Record as observation only<br>Include in summary below"]
+    Gate -->|"Yes — significant"| Detect{"Which issue system does this project use?"}
+    Detect -->|".beads/dh-backend marker exists"| Beads["bd create --title='...' --description='...' --type=bug --priority=2"]
+    Detect -->|"GitHub remote / dh plugin present"| DH["Skill(skill='dh:work-backlog-item', args='create -- \"...\"')"]
+    Detect -->|"Other"| Other["Create entry in whatever issue system the project uses"]
+    Beads --> Ref["Record issue reference in summary"]
+    DH --> Ref
+    Other --> Ref
+    Ref --> Done(["Observations Check complete"])
+    None --> Done
+    ObsOnly --> Done
+```
+
+```text
+OBSERVATIONS:
+- Workflow gaps:    [list or "none"]
+- Workarounds:      [list or "none"]
+- Process concerns: [list or "none"]
+- Improvements:     [list or "none"]
+- Issues logged:    [issue refs or "none"]
+```
+
+---
+
 ## Quick Reference
 
 ```text
@@ -208,6 +257,7 @@ Proportional Check: [PASS/FAIL/N/A] - Evidence: ___
 Quality Gates: [PASS/FAIL] - Evidence: ___
 Agent Delegation: [PASS/FAIL/N/A] - Evidence: ___
 Honesty Check: [PASS/FAIL]
+Observations: [issue refs logged, or "none"]
 
 VERDICT: [COMPLETE / NOT COMPLETE - reason]
 ```

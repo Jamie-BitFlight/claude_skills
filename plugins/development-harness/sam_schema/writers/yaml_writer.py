@@ -65,6 +65,22 @@ def _make_yaml() -> YAML:
     return y
 
 
+def _wrap_multiline(value: str) -> str | LiteralScalarString:
+    r"""Return a LiteralScalarString when value contains newlines, else the value unchanged.
+
+    Produces YAML literal block scalar (``|``) style for multiline prose fields,
+    which keeps diffs readable and preserves intentional line breaks.
+
+    Args:
+        value: String to wrap if multiline.
+
+    Returns:
+        ``LiteralScalarString(value)`` when ``value`` contains ``\\n``;
+        ``value`` unchanged otherwise.
+    """
+    return LiteralScalarString(value) if "\n" in value else value
+
+
 def _task_to_dict(task: Task) -> dict[str, Any]:
     """Convert a ``Task`` model to a clean dict for YAML serialization.
 

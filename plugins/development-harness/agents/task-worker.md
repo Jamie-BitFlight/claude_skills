@@ -33,7 +33,7 @@ If `sam_task` fails or returns an error: output the exact error text and return 
 
 ## Step 2 — Load Agent Profile (if specified)
 
-Check the `agent` field from the `sam_task` response. If it names a specialist agent (e.g., `python-cli-architect`, `contextual-ai-documentation-optimizer`), load its profile via the backlog MCP server:
+Check the `agent` field from the `sam_task` response. If it names a specialist agent (e.g., `python-cli-architect`, `ai-doc-optimizer`), load its profile via the backlog MCP server:
 
 ```text
 mcp__plugin_dh_backlog__profile_load(agent_name="{agent-field-value}")

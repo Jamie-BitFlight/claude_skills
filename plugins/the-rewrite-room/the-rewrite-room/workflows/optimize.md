@@ -16,27 +16,27 @@ Key principle to carry forward: positive framing over prohibitions (models atten
 ```mermaid
 flowchart TD
     Start([$ARGUMENTS]) --> Q{Target file pattern?}
-    Q -->|"CLAUDE.md, .claude/CLAUDE.md"| CLAUDEmd[Type: CLAUDE.md optimization\nAgent: plugin-creator:contextual-ai-documentation-optimizer]
-    Q -->|"SKILL.md, skills/**/*"| SKILLmd[Type: SKILL.md optimization\nAgent: plugin-creator:contextual-ai-documentation-optimizer]
+    Q -->|"CLAUDE.md, .claude/CLAUDE.md"| CLAUDEmd[Type: CLAUDE.md optimization\nAgent: plugin-creator:ai-doc-optimizer]
+    Q -->|"SKILL.md, skills/**/*"| SKILLmd[Type: SKILL.md optimization\nAgent: plugin-creator:ai-doc-optimizer]
     Q -->|"agents/*.md, */agents/*.md"| AgentFile[Type: Agent definition optimization\nSee agent selection below]
-    Q -->|"Any AI-facing .md prompt file"| Prompt[Type: Prompt optimization\nAgent: plugin-creator:contextual-ai-documentation-optimizer]
+    Q -->|"Any AI-facing .md prompt file"| Prompt[Type: Prompt optimization\nAgent: plugin-creator:ai-doc-optimizer]
     AgentFile --> AgentQ{Optimization type?}
-    AgentQ -->|"Content/structure improvement"| ContentOpt[Agent: plugin-creator:contextual-ai-documentation-optimizer]
+    AgentQ -->|"Content/structure improvement"| ContentOpt[Agent: plugin-creator:ai-doc-optimizer]
     AgentQ -->|"Applying Anthropic official best practices"| BestPractices[Agent: plugin-creator:subagent-refactorer]
-    AgentQ -->|Unclear| DefaultOpt[Default: plugin-creator:contextual-ai-documentation-optimizer\nHandles both]
+    AgentQ -->|Unclear| DefaultOpt[Default: plugin-creator:ai-doc-optimizer\nHandles both]
 ```
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+- Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 ## Step 3 — Read Agent Protocol
 
 Before spawning, read the agent's file:
 
-- contextual-ai-documentation-optimizer: Read `plugins/plugin-creator/agents/contextual-ai-documentation-optimizer.md`
+- ai-doc-optimizer: Read `plugins/plugin-creator/agents/ai-doc-optimizer.md`
   - Note: It runs its own RT-ICA blocking gate. Do not pre-empt it.
   - Note: Pass file PATH — never pre-summarize file content for it.
 
@@ -45,11 +45,11 @@ Before spawning, read the agent's file:
 
 ## Step 4 — Spawn Agent
 
-For contextual-ai-documentation-optimizer:
+For ai-doc-optimizer:
 
 ```text
 Agent(
-  subagent_type="plugin-creator:contextual-ai-documentation-optimizer",
+  subagent_type="plugin-creator:ai-doc-optimizer",
   prompt="Optimize the following file for Claude comprehension:
 
 File: <path>

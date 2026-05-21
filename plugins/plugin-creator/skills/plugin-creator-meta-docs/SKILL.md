@@ -3,7 +3,6 @@ name: plugin-creator-meta-docs
 description: Plugin creator documentation index. Load when needing to read about plugin validation error codes, skill creation, agent creation, or plugin structure.
 user-invocable: false
 ---
-
 # Plugin Creator Documentation
 
 Available documentation:

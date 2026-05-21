@@ -37,6 +37,12 @@ Tool signatures and message schemas -- TeamCreate, SendMessage (direct, broadcas
 
 6 orchestration patterns (parallel specialists, pipeline, swarm, research+implement, plan approval, coordinated refactoring), 3 complete workflows, best practices, quick reference.
 
+### Checklist-to-Swarm Automation
+
+`Skill(skill: "swarm-from-markdown")`
+
+Parse a markdown `- [ ]` checklist file and generate the full `TeamCreate` + `TaskCreate` + `Agent` call sequence automatically. Use when you have a `todo.md` or any checkbox file and want to dispatch items as a self-organizing swarm without writing the TaskCreate loop by hand.
+
 ---
 
 ## Quick Start
@@ -48,7 +54,8 @@ flowchart TD
     Q1 -->|Choose agent types or backends| S[swarm-spawning]
     Q1 -->|Look up tool API or message format| O[swarm-operations]
     Q1 -->|Build a workflow from a recipe| R[swarm-patterns]
-    Q1 -->|Full reference on everything| All[Load all 4 skills]
+    Q1 -->|Dispatch a markdown checklist as a swarm| M[swarm-from-markdown]
+    Q1 -->|Full reference on everything| All[Load all 5 skills]
 ```
 
 ---

@@ -35,8 +35,9 @@ if TYPE_CHECKING:
 # Helpers
 # ---------------------------------------------------------------------------
 
-_EXPECTED_TASK_COUNT = 6
+_EXPECTED_TASK_COUNT = 7
 _EXPECTED_AGENTS = [
+    "task-worker",
     "code-reviewer",
     "feature-verifier",
     "integration-checker",
@@ -45,6 +46,7 @@ _EXPECTED_AGENTS = [
     "context-refinement",
 ]
 _EXPECTED_TITLES = [
+    "Multi-Perspective Review",
     "Code Review",
     "Feature Verification",
     "Integration Check",
@@ -149,11 +151,11 @@ class TestQGPlanCreation:
 
     @pytest.mark.integration
     def test_created_plan_contains_six_tasks(self, tmp_path: Path) -> None:
-        """build_quality_gate_plan generates a plan with exactly 6 tasks.
+        """build_quality_gate_plan generates a plan with exactly 7 tasks.
 
         Tests: build_quality_gate_plan task count
         How: Create plan and load it back; count tasks
-        Why: QG plans must have exactly 6 phases (code review through context refinement)
+        Why: QG plans must have exactly 7 phases (multi-perspective review through context refinement)
         """
         # Arrange
         plan_dir = tmp_path / "plan"
@@ -220,7 +222,7 @@ class TestQGPlanCreation:
         # Arrange
         plan_dir = tmp_path / "plan"
         plan_dir.mkdir()
-        expected_deps = [[], ["T1"], ["T2"], ["T3"], ["T4"], ["T5"]]
+        expected_deps = [[], [], ["T1"], ["T2"], ["T3"], ["T4"], ["T5"]]
 
         # Act
         plan = _create_qg_plan(plan_dir)
@@ -405,11 +407,11 @@ class TestQGReadinessSequencing:
 
     @pytest.mark.integration
     def test_only_t1_ready_initially(self, tmp_path: Path) -> None:
-        """Only T1 is ready when no tasks have been completed.
+        """T0 and T1 are ready when no tasks have been completed.
 
-        Tests: Initial readiness — T1 has no dependencies so it is immediately ready
+        Tests: Initial readiness — T0 and T1 have no dependencies so both are immediately ready
         How: Create plan, query get_ready_tasks without any status transitions
-        Why: The first phase (Code Review) must be the only dispatchable task initially
+        Why: T0 (Multi-Perspective Review) and T1 (Code Review) both have no deps and run first
         """
         # Arrange
         plan_dir = tmp_path / "plan"
@@ -421,8 +423,8 @@ class TestQGReadinessSequencing:
         ready = get_ready_tasks(plan.source_path)
 
         # Assert
-        assert len(ready) == 1
-        assert ready[0].id == "T1"
+        assert len(ready) == 2
+        assert {t.id for t in ready} == {"T0", "T1"}
 
     @pytest.mark.integration
     def test_t2_becomes_ready_after_t1_completes(self, tmp_path: Path) -> None:
@@ -437,6 +439,7 @@ class TestQGReadinessSequencing:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
+        update_status(plan.source_path, "T0", TaskStatus.COMPLETE, timestamp_field="completed")
         update_status(plan.source_path, "T1", TaskStatus.COMPLETE, timestamp_field="completed")
 
         # Act
@@ -460,7 +463,7 @@ class TestQGReadinessSequencing:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
-        for task_id in ("T1", "T2", "T3"):
+        for task_id in ("T0", "T1", "T2", "T3"):
             update_status(plan.source_path, task_id, TaskStatus.COMPLETE, timestamp_field="completed")
 
         # Act
@@ -484,7 +487,7 @@ class TestQGReadinessSequencing:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
-        for task_id in ("T1", "T2", "T3", "T4"):
+        for task_id in ("T0", "T1", "T2", "T3", "T4"):
             update_status(plan.source_path, task_id, TaskStatus.COMPLETE, timestamp_field="completed")
         update_status(plan.source_path, "T5", TaskStatus.SKIPPED)
 
@@ -508,7 +511,7 @@ class TestQGReadinessSequencing:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
-        for task_id in ("T1", "T2", "T3", "T4", "T5", "T6"):
+        for task_id in ("T0", "T1", "T2", "T3", "T4", "T5", "T6"):
             update_status(plan.source_path, task_id, TaskStatus.COMPLETE, timestamp_field="completed")
 
         # Act
@@ -552,16 +555,16 @@ class TestCompletionGateLogic:
         # Act
         status = get_plan_status(plan.source_path)
 
-        # Assert — 6 tasks all not-started means gate must block
+        # Assert — 7 tasks all not-started means gate must block
         assert status.by_status.get("not-started", 0) == _EXPECTED_TASK_COUNT
         assert status.completion_pct == pytest.approx(0.0)
 
     @pytest.mark.integration
-    def test_gate_passes_when_all_six_tasks_complete(self, tmp_path: Path) -> None:
-        """get_plan_status reports 100% completion when all 6 tasks are complete.
+    def test_gate_passes_when_all_seven_tasks_complete(self, tmp_path: Path) -> None:
+        """get_plan_status reports 100% completion when all 7 tasks are complete.
 
         Tests: Completion gate pass condition — all mandatory phases complete
-        How: Mark all tasks complete; verify by_status has 6 complete entries
+        How: Mark all tasks complete; verify by_status has 7 complete entries
         Why: The gate must allow label application only after all phases finish
         """
         # Arrange
@@ -569,7 +572,7 @@ class TestCompletionGateLogic:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
-        for task_id in ("T1", "T2", "T3", "T4", "T5", "T6"):
+        for task_id in ("T0", "T1", "T2", "T3", "T4", "T5", "T6"):
             update_status(plan.source_path, task_id, TaskStatus.COMPLETE, timestamp_field="completed")
 
         # Act
@@ -593,7 +596,7 @@ class TestCompletionGateLogic:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
-        for task_id in ("T1", "T2", "T3", "T4"):
+        for task_id in ("T0", "T1", "T2", "T3", "T4"):
             update_status(plan.source_path, task_id, TaskStatus.COMPLETE, timestamp_field="completed")
         update_status(plan.source_path, "T5", TaskStatus.SKIPPED)
         update_status(plan.source_path, "T6", TaskStatus.COMPLETE, timestamp_field="completed")
@@ -660,6 +663,7 @@ class TestCompletionGateLogic:
         plan_dir.mkdir()
         plan = _create_qg_plan(plan_dir)
         assert plan.source_path is not None
+        update_status(plan.source_path, "T0", TaskStatus.COMPLETE, timestamp_field="completed")
         update_status(plan.source_path, "T1", TaskStatus.COMPLETE, timestamp_field="completed")
         update_status(plan.source_path, "T2", TaskStatus.BLOCKED)
 

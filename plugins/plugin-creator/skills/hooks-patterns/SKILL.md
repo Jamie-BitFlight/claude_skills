@@ -4,7 +4,7 @@ description: Hook recipes and working examples — plugin hooks, frontmatter hoo
 user-invocable: true
 ---
 
-# Claude Code Hooks — Patterns & Examples (January 2026)
+# Claude Code Hooks — Patterns & Examples (May 2026)
 
 Working examples and recipes for building hooks. For hook system fundamentals, activate `Skill(skill: "plugin-creator:hooks-core-reference")`. For JSON I/O schemas, activate `Skill(skill: "plugin-creator:hooks-io-api")`.
 
@@ -159,11 +159,13 @@ LLM-evaluated decisions using a fast model (Haiku). Also known as "agent hooks" 
 
 Alternatively, use `"type": "agent"` for complex verification tasks that require tool access.
 
-| Field     | Required | Description                                        |
-| --------- | -------- | -------------------------------------------------- |
-| `type`    | Yes      | `"prompt"` for LLM evaluation, `"agent"` for tools |
-| `prompt`  | Yes      | Prompt text sent to LLM                            |
-| `timeout` | No       | Seconds (default: 30 for prompt, 60 for agent)     |
+| Field             | Required | Description |
+| ----------------- | -------- | ----------- |
+| `type`            | Yes      | `"prompt"` for LLM evaluation, `"agent"` for multi-turn tool access |
+| `prompt`          | Yes      | Prompt text sent to LLM. Use `$ARGUMENTS` placeholder for hook input JSON |
+| `model`           | No       | Model to use. Defaults to a fast model (Haiku) |
+| `timeout`         | No       | Seconds (default: 30 for prompt, 60 for agent) |
+| `continueOnBlock` | No       | When `ok: false`, feed `reason` back to Claude and continue the turn instead of ending it. Default: `false`. Valid for `PostToolUse`, `TeammateIdle` |
 
 ### Response Schema
 
@@ -235,6 +237,10 @@ Use `` `$ARGUMENTS` `` in prompt to include hook input JSON. If omitted, input i
 | `UserPromptSubmit`  | Context-aware prompt validation       |
 | `PreToolUse`        | Complex permission decisions          |
 | `PermissionRequest` | Intelligent allow/deny dialogs        |
+| `PostToolUse`       | Validate tool output quality (use `continueOnBlock: true` to continue on fail) |
+| `TeammateIdle`      | Quality gate before teammate goes idle (use `continueOnBlock: true`) |
+| `TaskCreated`       | Enforce task naming conventions       |
+| `TaskCompleted`     | Verify completion criteria (tests pass, artifacts exist) |
 
 ### Comparison with Command Hooks
 
@@ -530,6 +536,8 @@ console.log(JSON.stringify(output));
 
 ### Custom Notifications
 
+**`notification_type` / matcher values**: `permission_prompt`, `idle_prompt`, `auth_success`, `elicitation_dialog`, `elicitation_complete`, `elicitation_response`
+
 ```json
 {
   "hooks": {
@@ -580,7 +588,7 @@ console.log(JSON.stringify(output));
 
 ## Sources
 
-- [Hooks Reference](https://code.claude.com/docs/en/hooks.md) (accessed 2026-01-28)
-- [Hooks Guide](https://code.claude.com/docs/en/hooks-guide.md)
-- [Settings Reference](https://code.claude.com/docs/en/settings.md)
-- [Plugin Components Reference](https://code.claude.com/docs/en/plugins-reference.md#hooks)
+- [Hooks Reference](https://docs.anthropic.com/en/docs/claude-code/hooks.md) (accessed 2026-05-21)
+- [Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide.md) (accessed 2026-05-21)
+- [Settings Reference](https://docs.anthropic.com/en/docs/claude-code/settings.md)
+- [Plugin Components Reference](https://docs.anthropic.com/en/docs/claude-code/plugins-reference.md#hooks)

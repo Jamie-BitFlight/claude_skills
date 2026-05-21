@@ -3,6 +3,8 @@ name: optimize
 description: Use when writing delegation instructions to subagents, authoring CLAUDE.md files, rules, skills, or agent definitions, or auditing existing AI-facing content for bloat. Activates on "write a rule for", "add to CLAUDE.md", "create an agent", "update memory", or any request to author AI-facing instruction content. Removes discoverable data, explained-away knowledge, invented constraints, and stale cached facts.
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Writing Lean AI-Facing Instructions
 

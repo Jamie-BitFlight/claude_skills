@@ -1,6 +1,6 @@
 ---
 name: backlog-tools-administrator
-description: 'Administer the backlog tooling ecosystem when a capability gap is discovered. Invoke when backlog.py, backlog skills, or backlog agents lack a needed operation and a workaround was used or is about to be used. Classifies gaps as script (delegates to @python-cli-architect), process (loads improve-processes), or documentation (delegates to @contextual-ai-documentation-optimizer). Domain: backlog.py, create/work/groom-backlog-item skills, backlog-item-groomer agent, hooks, templates, references, rules, and tests.'
+description: 'Administer the backlog tooling ecosystem when a capability gap is discovered. Invoke when backlog.py, backlog skills, or backlog agents lack a needed operation and a workaround was used or is about to be used. Classifies gaps as script (delegates to @python-cli-architect), process (loads improve-processes), or documentation (delegates to @ai-doc-optimizer). Domain: backlog.py, create/work/groom-backlog-item skills, backlog-item-groomer agent, hooks, templates, references, rules, and tests.'
 argument-hint: <gap-description>
 ---
 
@@ -113,7 +113,7 @@ For gaps requiring changes to rules, workflow steps, or state transitions.
 
 For gaps requiring changes to skill instructions, agent prompts, or reference files.
 
-1. Task is optimizing the affected documentation with `subagent_type="plugin-creator:contextual-ai-documentation-optimizer"`
+1. Task is optimizing the affected documentation with `subagent_type="plugin-creator:ai-doc-optimizer"`
    Context to include in the prompt: the file to modify (skill SKILL.md, agent .md, or reference .md), the gap description from Step 1, and `plugins/plugin-creator/skills/claude-skills-overview-2026/SKILL.md` and `plugins/plugin-creator/skills/hooks-guide/SKILL.md` as structural references when modifying skills or hooks
    Output: updated file with the gap addressed, CoVe verification passing
 

@@ -2,6 +2,8 @@
 name: hook-creator
 description: Guide for creating Claude Code plugin hooks — language selection heuristic (Node.js default, match project runtime when obvious), hooks.json configuration, event selection, prompt-based vs command hooks, ${CLAUDE_PLUGIN_ROOT} paths, stdio suppression, timeout sizing, and testing. Use when adding hooks to a plugin, creating PreToolUse/PostToolUse/Stop/SubagentStop/SessionStart/UserPromptSubmit hooks, or wiring hook scripts to hooks.json.
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Hook Creator for Claude Code Plugins
 

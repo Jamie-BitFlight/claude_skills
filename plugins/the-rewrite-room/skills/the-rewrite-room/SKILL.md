@@ -41,7 +41,7 @@ flowchart TD
     Audit --> A1[development-harness:doc-drift-auditor]
     Audit --> A2[development-harness:service-docs-maintainer]
     Audit --> A3[doc-freshness-guardian]
-    Opt --> O1[plugin-creator:contextual-ai-documentation-optimizer]
+    Opt --> O1[plugin-creator:ai-doc-optimizer]
     Opt --> O2[plugin-creator:subagent-refactorer]
     Auth --> B1[gitlab-docs-expert]
     Auth --> B2[documentation-expert]
@@ -109,13 +109,15 @@ This plugin routes to these specialist agents and scripts (not copied — refere
 
 **Optimize agents:**
 
-- `plugins/plugin-creator/agents/contextual-ai-documentation-optimizer.md` — RT-ICA + CoVe prompt optimization with token impact reporting
+- `plugins/plugin-creator/agents/ai-doc-optimizer.md` — RT-ICA + CoVe prompt optimization with token impact reporting
+- `plugins/plugin-creator/agents/skill-auditor.md` — read-only quality audit against completeness categories; no writes
+- `plugins/plugin-creator/agents/skill-content-updater.md` — upstream drift sync (NEW/STALE classification) against live documentation sources
 - `plugins/plugin-creator/agents/subagent-refactorer.md` — Anthropic official best practices refactoring with mandatory research phase
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern (plugin-creator optimization suite):
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+- Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 **Author agents:**

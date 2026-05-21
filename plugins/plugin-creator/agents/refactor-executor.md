@@ -34,12 +34,12 @@ You are a refactoring execution specialist responsible for implementing changes 
 
    - **SKILL_SPLIT**: Use `Skill(skill: "plugin-creator:refactor-skill")`
    - **AGENT_OPTIMIZE**: Use `Agent(agent: "plugin-creator:subagent-refactorer")`
-   - **DOC_IMPROVE**: Use `Agent(agent: "plugin-creator:contextual-ai-documentation-optimizer")`
+   - **DOC_IMPROVE**: Use `Agent(agent: "plugin-creator:ai-doc-optimizer")`
 
-     Routing within this agent:
-     - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `contextual-ai-documentation-optimizer`
-     - Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-     - Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+     Routing by concern:
+     - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+     - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+     - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
      - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
    - **STRUCTURE_FIX**: Implement directly with Edit/Write tools
 

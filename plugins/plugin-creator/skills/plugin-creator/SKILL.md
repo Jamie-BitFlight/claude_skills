@@ -170,6 +170,18 @@ flowchart TD
 
 ---
 
+## Entry Gate: Collect Intent Before Starting
+
+<plugin_concept>$ARGUMENTS</plugin_concept>
+
+If the plugin concept above or the conversation context indicates anything other than creating a new plugin from scratch (for example: improving, fixing, validating, refactoring, auditing, adding a component to, or working on an existing plugin), load `plugin-lifecycle` instead: `Skill(skill="plugin-creator:plugin-lifecycle")`. Do not proceed further in this skill.
+
+If no plugin concept is provided and the intent is not yet clear, STOP and ask: "Are you creating a new plugin from scratch, or working on an existing one?" Route to `plugin-lifecycle` for existing; continue here for new.
+
+If creating a new plugin and no concept is provided, STOP and ask: "What plugin do you want to create? Describe it in 1-2 sentences." Wait for the answer before proceeding to Phase 0.
+
+---
+
 ## Phase 0: RT-ICA Prerequisite Check
 
 <prerequisite_checkpoint>

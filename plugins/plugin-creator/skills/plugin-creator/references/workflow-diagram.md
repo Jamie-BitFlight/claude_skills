@@ -222,14 +222,14 @@ flowchart TD
 
     Check3 -->|"Yes — README present and complete"| Check4{"Check 4 — Honesty Check:<br>Does each factual claim in SKILL.md files<br>have a cited source (URL or reference path)<br>with an access date?"}
 
-    Check4 -->|"No — uncited claims found"| Fix4["Delegate to contextual-ai-documentation-optimizer:<br>subagent_type='plugin-creator:contextual-ai-documentation-optimizer'<br>Add citations to all uncited factual claims"]
+    Check4 -->|"No — uncited claims found"| Fix4["Delegate to ai-doc-optimizer:<br>subagent_type='plugin-creator:ai-doc-optimizer'<br>Add citations to all uncited factual claims"]
     Fix4 --> Check4
 ```
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `ai-doc-optimizer` agent (`plugin-creator:ai-doc-optimizer`)
+- Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 ```mermaid
@@ -290,7 +290,7 @@ flowchart TD
     F4(["Phase 4 validation failure"]) --> F4A{"Which layer failed?"}
     F4A -->|"Layer 1 — script exit non-zero"| F4B["Read script output for error codes;<br>fix file(s) named in output"]
     F4A -->|"Layer 2 — schema violation with file:line"| F4C["Fix the exact field at the<br>file:line location reported"]
-    F4A -->|"Layer 3 — quality score < 7<br>or critical issues listed"| F4D["Delegate fix to contextual-ai-documentation-optimizer<br>(content optimization only) or general-purpose for structural issues"]
+    F4A -->|"Layer 3 — quality score < 7<br>or critical issues listed"| F4D["Delegate fix to ai-doc-optimizer<br>(content optimization only) or general-purpose for structural issues"]
     F4B --> F4E["Re-run the failed layer only"]
     F4C --> F4E
     F4D --> F4E
@@ -302,13 +302,13 @@ flowchart TD
     F6A -->|"Check 1 — Works Check"| F6B(["Return to Phase 4"])
     F6A -->|"Check 2 — Quality Gates"| F6C(["Return to Phase 4"])
     F6A -->|"Check 3 — Docs Check"| F6D(["Return to Phase 5"])
-    F6A -->|"Check 4 — Honesty Check"| F6E["Delegate citation additions<br>to contextual-ai-documentation-optimizer;<br>re-run Check 4 when complete"]
+    F6A -->|"Check 4 — Honesty Check"| F6E["Delegate citation additions<br>to ai-doc-optimizer;<br>re-run Check 4 when complete"]
 ```
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `ai-doc-optimizer` agent (`plugin-creator:ai-doc-optimizer`)
+- Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 ---
@@ -331,14 +331,16 @@ SOURCE: CLAUDE.md global instructions (accessed 2026-01-28)
 |---|---|---|
 | `plugin-assessor` | `plugin-creator:plugin-assessor` | Domain research, code discovery, quality assessment |
 | `plugin-docs-writer` | `plugin-creator:plugin-docs-writer` | README and documentation generation |
-| `contextual-ai-documentation-optimizer` | `plugin-creator:contextual-ai-documentation-optimizer` | Content optimization, citation addition, AI-facing docs |
+| `skill-auditor` | `plugin-creator:skill-auditor` | Read-only quality audit and completeness scoring |
+| `skill-content-updater` | `plugin-creator:skill-content-updater` | Sync skill content against upstream sources |
+| `ai-doc-optimizer` | `plugin-creator:ai-doc-optimizer` | Content optimization, citation addition, AI-facing docs |
 
 SOURCE: Verified from plugin-creator agents directory
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `ai-doc-optimizer` agent (`plugin-creator:ai-doc-optimizer`)
+- Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 ### Validation Scripts

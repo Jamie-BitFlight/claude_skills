@@ -5,6 +5,8 @@ argument-hint: <plugin-name>
 model: sonnet
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Review Plugin for Refactor Workflow
 
@@ -123,7 +125,7 @@ Categorized by:
 Each recommendation must include:
 - Target file path
 - Issue type and severity (Critical/High/Medium/Low)
-- Recommended agent: plugin-creator:refactor-skill | subagent-refactorer | contextual-ai-documentation-optimizer | plugin-docs-writer
+- Recommended agent: plugin-creator:refactor-skill | subagent-refactorer | ai-doc-optimizer | plugin-docs-writer
 - Expected outcome
 </output_specification>
 
@@ -486,7 +488,7 @@ PERFORM these planning steps:
    **Dependencies**: [Comma-separated Task IDs or "None"]
    **Priority**: [Integer 1-5, where 1 is highest]
    **Complexity**: [Low/Medium/High]
-   **Agent**: [plugin-creator:refactor-skill | subagent-refactorer | contextual-ai-documentation-optimizer | plugin-docs-writer]
+   **Agent**: [plugin-creator:refactor-skill | subagent-refactorer | ai-doc-optimizer | plugin-docs-writer]
 
    **Target**: [File path being refactored]
    **Issue Type**: [SKILL_SPLIT | AGENT_OPTIMIZE | DOC_IMPROVE | ORPHAN_RESOLVE | STRUCTURE_FIX]
@@ -515,14 +517,14 @@ PERFORM these planning steps:
    **Agent Selection Rules**:
    - SKILL_SPLIT tasks → `plugin-creator:refactor-skill`
    - AGENT_OPTIMIZE tasks → `subagent-refactorer`
-   - DOC_IMPROVE tasks (skills/agents) → `contextual-ai-documentation-optimizer`
-   - ORPHAN_RESOLVE tasks → `contextual-ai-documentation-optimizer` (integrate) or orchestrator (remove)
+   - DOC_IMPROVE tasks (skills/agents) → `plugin-creator:ai-doc-optimizer`
+   - ORPHAN_RESOLVE tasks → `plugin-creator:ai-doc-optimizer` (integrate) or orchestrator (remove)
    - Documentation generation → `plugin-docs-writer`
 
-   Routing within contextual-ai-documentation-optimizer (DOC_IMPROVE and ORPHAN_RESOLVE):
-   - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `contextual-ai-documentation-optimizer`
-   - Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-   - Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+   Routing by concern (DOC_IMPROVE and ORPHAN_RESOLVE):
+   - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+   - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+   - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
    - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
    AFTER all refactoring tasks, ALWAYS include these verification tasks:

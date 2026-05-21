@@ -4,6 +4,8 @@ description: Start a complete plugin refactoring workflow that analyzes plugin s
 argument-hint: <plugin-path>
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 <plugin_path>$ARGUMENTS</plugin_path>
 

@@ -3,6 +3,7 @@ name = "claude_skills"
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp[tasks]>=3.0.2",
+    "idna>=3.15",
     "marko>=2.2.2",
     "pygithub>=2.8.1",
     "skill-seekers>=3.0.0",

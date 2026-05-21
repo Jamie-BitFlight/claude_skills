@@ -4,6 +4,8 @@ description: Create high-quality Claude Code agents from scratch or by adapting 
 model: sonnet
 user-invocable: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 
 # Agent Creator Skill
 

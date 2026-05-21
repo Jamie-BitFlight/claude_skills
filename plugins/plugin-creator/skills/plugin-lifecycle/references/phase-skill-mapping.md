@@ -17,13 +17,15 @@ Lookup reference: which skill or agent handles each phase, and the exact invocat
 | 5: Debug | `/plugin-creator:refactor-skill` | `Skill(skill="plugin-creator:refactor-skill")` |
 | 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint", args="--fix PATH")` |
 | 6: Optimize | `/plugin-creator:refactor-plugin` | `Skill(skill="plugin-creator:refactor-plugin")` |
-| 6: Optimize | `@contextual-ai-documentation-optimizer` | subagent_type="plugin-creator:contextual-ai-documentation-optimizer" |
+| 6: Optimize | `@ai-doc-optimizer` | subagent_type="plugin-creator:ai-doc-optimizer" |
+| 6: Optimize | `@skill-auditor` | subagent_type="plugin-creator:skill-auditor" |
+| 6: Optimize | `@skill-content-updater` | subagent_type="plugin-creator:skill-content-updater" |
 | 6: Optimize | `@subagent-refactorer` | subagent_type="plugin-creator:subagent-refactorer" |
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `ai-doc-optimizer` agent (subagent_type="plugin-creator:ai-doc-optimizer")
+- Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent (subagent_type="plugin-creator:skill-content-updater")
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 | 6.5: Documentation | `@plugin-assessor` | subagent_type="plugin-creator:plugin-assessor" |
 | 7: Verify | `/plugin-creator:ensure-complete` | `Skill(skill="plugin-creator:ensure-complete")` |

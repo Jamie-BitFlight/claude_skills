@@ -1,21 +1,22 @@
 ---
 name: plugin-lifecycle
 description: Orchestrate the full plugin development lifecycle from blank canvas to marketplace-ready. Use when creating a new plugin, improving an existing plugin, fixing validation errors, or taking a plugin through assessment, research, design, creation, debugging, optimization, and verification. Complements /plugin-creator:plugin-creator which provides the detailed new-plugin creation workflow with discussion capture, parallel research, and atomic implementation.
-argument-hint: <new|existing> <plugin-path-or-concept>
+argument-hint: <new|existing> <plugin-path-or-concept> [intent]
 model: sonnet
 user-invocable: true
 ---
 
 <plugin_mode>$0</plugin_mode>
 <plugin_target>$1</plugin_target>
+<plugin_intent>$2</plugin_intent>
 <invocation_args>$ARGUMENTS</invocation_args>
 
-> When editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` — delegate to `subagent_type="plugin-creator:contextual-ai-documentation-optimizer"`.
+> When editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` for content optimization — delegate to `subagent_type="plugin-creator:ai-doc-optimizer"`.
 >
-> Routing within this agent:
-> - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `contextual-ai-documentation-optimizer`
-> - Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-> - Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+> Routing by concern:
+> - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+> - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+> - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
 > - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 > [!IMPORTANT]
@@ -58,7 +59,25 @@ The following diagram is the authoritative procedure for plugin lifecycle routin
 flowchart TD
     Start(["/plugin-lifecycle <invocation_args/>"]) --> Q1{"First argument is?"}
     Q1 -->|"new — create from scratch"| RTICA["Phase 0 — RT-ICA Prerequisite Check"]
-    Q1 -->|"existing — improve existing plugin"| Assess["Phase 1 — Assess"]
+    Q1 -->|"existing — improve existing plugin"| IntentQ{"Intent from plugin_intent<br>or stated in conversation?"}
+
+    %% Existing path: intent routing
+    IntentQ -->|"blank — not provided"| AskIntent["Ask the user:<br>What do you want to do with this plugin?<br>validate · fix bugs · audit · refactor ·<br>create component skill/agent/hook ·<br>adjust workflow · add hooks · change hooks ·<br>test capabilities · evaluate/optimize ·<br>something else"]
+    AskIntent --> IntentQ
+    IntentQ -->|"validate / fix-bugs / debug"| Debug["Phase 5 — Debug"]
+    IntentQ -->|"audit / assess"| Assess["Phase 1 — Assess"]
+    IntentQ -->|"refactor / optimize / evaluate"| Optimize["Phase 6 — Optimize"]
+    IntentQ -->|"create / skill / agent / workflow / hooks"| Create["Phase 4 — Create"]
+    IntentQ -->|"test / verify"| Verify["Phase 7 — Verify"]
+    IntentQ -->|"something else"| AskMore["Ask a clarifying question<br>to determine appropriate entry phase"]
+    AskMore --> IntentQ
+
+    %% Existing path: Assess then route (reached from audit intent)
+    Assess --> AssessFile{"File .claude/plan/NAME/assessment-REPORT.md<br>exists and is non-empty?"}
+    AssessFile -->|"No — assessor did not complete"| Assess
+    AssessFile -->|"Yes — assessment written"| AssessGate{"Run: uvx skilllint@latest check PATH<br>Exit code?"}
+    AssessGate -->|"0 — no validation errors"| Optimize["Phase 6 — Optimize"]
+    AssessGate -->|"non-zero — errors found"| Debug["Phase 5 — Debug"]
 
     %% New path: RT-ICA gate
     RTICA --> RTICAGate{"RT-ICA decision?"}
@@ -70,13 +89,6 @@ flowchart TD
     DiscussGate -->|"Yes — preferences captured"| Mission["Phase 0.6 — Draft Mission Statement"]
     Mission --> Research["Phase 2 — Research"]
     DiscussGate -->|"No — file absent or empty"| Discuss
-
-    %% Existing path: Assess then validator
-    Assess --> AssessFile{"File .claude/plan/NAME/assessment-REPORT.md<br>exists and is non-empty?"}
-    AssessFile -->|"No — assessor did not complete"| Assess
-    AssessFile -->|"Yes — assessment written"| AssessGate{"Run: uvx skilllint@latest check PATH<br>Exit code?"}
-    AssessGate -->|"0 — no validation errors"| Optimize["Phase 6 — Optimize"]
-    AssessGate -->|"non-zero — errors found"| Debug["Phase 5 — Debug"]
 
     %% New path: Research gate
     Research --> ResearchGate{"File .claude/plan/NAME/research-FINDINGS.md<br>exists and is non-empty?"}
@@ -403,9 +415,9 @@ flowchart TD
 
 ---
 
-## Phase 4: Create (New Plugin Only)
+## Phase 4: Create
 
-Entry condition: Design gate passed.
+Entry condition: Design gate passed (new plugin path) OR user selected a create intent on the existing plugin path (no design plan required — use the user's stated component description directly).
 
 For each component defined in `design-PLAN.md`, invoke the appropriate creator skill:
 
@@ -483,7 +495,7 @@ Optimize improves quality — descriptions, progressive disclosure, agent prompt
    Context to include in the prompt: plugin path, assessment-REPORT.md (if available from Phase 1)
    Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
 
-2. Task is content quality optimization with subagent_type="plugin-creator:contextual-ai-documentation-optimizer"
+2. Task is content quality optimization with subagent_type="plugin-creator:ai-doc-optimizer"
    Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings
    Output: optimized documentation with better Claude comprehension
 

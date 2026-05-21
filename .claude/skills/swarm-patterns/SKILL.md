@@ -150,6 +150,8 @@ Agent({
 // Workers race to claim tasks, naturally load-balance
 ```
 
+> **Automation tip**: The `TaskCreate` pool setup above (creating one task per file) can be generated automatically from a markdown checklist. Use `Skill(skill: "swarm-from-markdown")` to parse a `- [ ]` checklist file and emit the full `TeamCreate` + `TaskCreate` + `Agent` call sequence without writing it by hand.
+
 ---
 
 ## Pattern 4 -- Research + Implementation
@@ -576,6 +578,7 @@ TeamDelete()
 - Core concepts -- `Skill(skill: "swarm-primitives")`
 - Spawning agents -- `Skill(skill: "swarm-spawning")`
 - API reference -- `Skill(skill: "swarm-operations")`
+- Checklist-to-swarm automation -- `Skill(skill: "swarm-from-markdown")`
 
 ---
 

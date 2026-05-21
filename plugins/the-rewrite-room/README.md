@@ -209,12 +209,12 @@ Output: a complete skill directory at `plugins/httpx/` ready for `claude plugin 
 
 - Claude Code v2.0+
 - For `/rwr:audit`: `development-harness` plugin installed (provides `doc-drift-auditor` and `service-docs-maintainer` agents)
-- For `/rwr:optimize`: `plugin-creator` plugin installed (provides `contextual-ai-documentation-optimizer` and `subagent-refactorer` agents)
+- For `/rwr:optimize`: `plugin-creator` plugin installed (provides `ai-doc-optimizer`, `skill-auditor`, `skill-content-updater`, and `subagent-refactorer` agents)
 
-  Routing within `contextual-ai-documentation-optimizer`:
-  - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer`
-  - Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-  - Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+  Routing by concern (plugin-creator optimization suite):
+  - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+  - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+  - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
   - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 - For `/rwr:author` (summarization): `summarizer` plugin installed
 - For `/rwr:author` (GitLab targets): `gitlab-skill` plugin installed

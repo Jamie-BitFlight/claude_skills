@@ -1,10 +1,12 @@
 ---
 name: optimize-claude-md
-description: "Optimize existing CLAUDE.md, SKILL.md, agent definitions, and other AI-facing files for Claude comprehension and economy. Scope: optimization of existing content only — not upstream sync, not read-only auditing. Measures baseline metrics, delegates to @contextual-ai-documentation-optimizer agent with file-type-specific context, runs independent verification via second agent, measures post-optimization metrics, and presents comprehensive before/after report. Supports iterative mode for large targets. Use when improving prompt effectiveness, reducing token waste, or rewriting instructions for LLM consumption. Invoke with /optimize-claude-md <file-or-directory>."
+description: "Optimize existing CLAUDE.md, SKILL.md, agent definitions, and other AI-facing files for Claude comprehension and economy. Scope: optimization of existing content only — not upstream sync, not read-only auditing. Measures baseline metrics, delegates to @ai-doc-optimizer agent with file-type-specific context, runs independent verification via second agent, measures post-optimization metrics, and presents comprehensive before/after report. Supports iterative mode for large targets. Use when improving prompt effectiveness, reducing token waste, or rewriting instructions for LLM consumption. Invoke with /optimize-claude-md <file-or-directory>."
 argument-hint: <file-or-directory-path>
 user-invocable: true
 disable-model-invocation: true
 ---
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+
 # Optimize AI-Facing Files
 
 Orchestrate multi-phase optimization of AI-facing documentation with measurement, delegation, verification, and comprehensive reporting.
@@ -39,7 +41,7 @@ Verify the resolved absolute path exists. Determine scope (single file, skill di
 **For all files**:
 
 - Determine file type (CLAUDE.md, SKILL.md, agent definition, reference file)
-- Measure token count: `uvx skilllint@latest check --check <file>`
+- Measure token count: `uvx skilllint@latest check --tokens-only <file>`
 - Record baseline token count
 
 **For SKILL.md files only**:
@@ -49,7 +51,7 @@ Verify the resolved absolute path exists. Determine scope (single file, skill di
 
 **Record metrics** for reporting.
 
-### Phase 3: Delegate to @contextual-ai-documentation-optimizer
+### Phase 3: Delegate to @ai-doc-optimizer
 
 Spawn the optimization agent via Agent tool with enhanced delegation template (see below). Pass file-type-specific context, baseline metrics, and constraints.
 
@@ -88,7 +90,7 @@ CONSTRAINTS:
 - For SKILL.md: evaluate against 8 completeness categories, keep description <1024 chars, no YAML multiline indicators
 - For agent files: preserve required frontmatter fields (name, description)
 - For CLAUDE.md: front-load critical instructions, use decision flow diagrams for complex logic
-- For CLAUDE.md: read `.claude/skills/optimize-claude-md/references/claude-rules-extraction.md` before analyzing; perform rules extraction phase after optimization analysis, before CoVe
+- For CLAUDE.md: read `${CLAUDE_SKILL_DIR}/references/claude-rules-extraction.md` before analyzing; perform rules extraction phase after optimization analysis, before CoVe
 - Signal DONE when optimization complete, BLOCKED when missing required inputs
 
 OUTPUT STRUCTURE:
@@ -103,10 +105,10 @@ OUTPUT STRUCTURE:
 
 </delegation_template>
 
-Routing within `contextual-ai-documentation-optimizer`:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:contextual-ai-documentation-optimizer` (this skill uses this path)
-- Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+Routing by concern:
+- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer` (this skill uses this path)
+- Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 ### Phase 4: Handle Agent Response
@@ -120,7 +122,8 @@ Routing within `contextual-ai-documentation-optimizer`:
 
 **If agent signals DONE**:
 
-- Proceed to Phase 5 (Independent Verification)
+- Write the agent's "Optimized Content" output to `.tmp/scratch/optimized-{basename}` (where `{basename}` is the target filename, e.g. `SKILL.md` → `optimized-SKILL.md`). Create `.tmp/scratch/` if absent.
+- Proceed to Phase 5 (Independent Verification) — use `.tmp/scratch/optimized-{basename}` as `{path to optimized version}`
 
 ### Phase 5: Independent Verification
 
@@ -162,7 +165,7 @@ OUTPUT:
 
 **For all files**:
 
-- Measure post-optimization token count using same tool
+- Measure post-optimization token count: `uvx skilllint@latest check --tokens-only .tmp/scratch/optimized-{basename}`
 - Calculate delta: `(post - baseline) / baseline * 100`
 
 **For SKILL.md files only**:
@@ -210,6 +213,8 @@ Report to user with structure:
 ### Phase 8: Apply on Approval
 
 Write optimized content ONLY after user confirms. Do not auto-apply.
+
+On user approval: overwrite the original target path with the content from `.tmp/scratch/optimized-{basename}`, then delete the temp file.
 
 ## Iterative Mode for Large Targets
 

@@ -76,14 +76,14 @@ You are an expert plugin refactoring architect specializing in analyzing Claude 
 - Agent assignments based on task type:
   - SKILL_SPLIT → refactor-skill skill
   - AGENT_OPTIMIZE → subagent-refactorer agent
-  - DOC_IMPROVE → contextual-ai-documentation-optimizer agent
-  - ORPHAN_RESOLVE → manual review or context-optimizer
-  - STRUCTURE_FIX → direct implementation
+  - DOC_IMPROVE → `plugin-creator:ai-doc-optimizer` agent
+  - ORPHAN_RESOLVE → `plugin-creator:ai-doc-optimizer` agent
+  - STRUCTURE_FIX → direct implementation (`general-purpose`)
 
-  Routing within contextual-ai-documentation-optimizer:
-  - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `contextual-ai-documentation-optimizer`
-  - Audit quality (read-only, no writes, score against completeness categories) → `/plugin-creator:audit-skill-completeness` skill directly
-  - Sync content against upstream docs (add NEW/fix STALE from live sources) → general-purpose agent with drift report until `skill-content-updater` lands (backlog #1899)
+  Routing by concern:
+  - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
+  - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
+  - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
   - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 
 **Output Format:**
