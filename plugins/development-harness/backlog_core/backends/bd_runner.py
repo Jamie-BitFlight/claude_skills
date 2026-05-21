@@ -24,14 +24,24 @@ import os
 import shutil
 import subprocess
 import time
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypeAlias
 
 from backlog_core.models import BackendUnavailableError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-__all__ = ["_DEFAULT_BD_TIMEOUT_SECONDS", "BdInvocationError", "BdJsonDecodeError", "BdNotInstalledError", "BdRunner"]
+#: Recursive JSON value type — the full set of values ``json.loads`` can return.
+JsonValue: TypeAlias = "str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None"
+
+__all__ = [
+    "_DEFAULT_BD_TIMEOUT_SECONDS",
+    "BdInvocationError",
+    "BdJsonDecodeError",
+    "BdNotInstalledError",
+    "BdRunner",
+    "JsonValue",
+]
 
 _DEFAULT_BD_TIMEOUT_SECONDS: Final[int] = 30
 
@@ -165,7 +175,7 @@ class BdRunner:
     # Public interface
     # ------------------------------------------------------------------
 
-    def run_json(self, argv: Sequence[str]) -> object:
+    def run_json(self, argv: Sequence[str]) -> JsonValue:
         """Run ``bd`` with *argv*, inject ``--json`` if absent, parse output.
 
         Parameters
@@ -176,7 +186,7 @@ class BdRunner:
 
         Returns:
         -------
-        object
+        JsonValue
             Parsed JSON value from ``bd`` stdout.
 
         Raises:

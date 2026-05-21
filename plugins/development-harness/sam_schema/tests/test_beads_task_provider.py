@@ -19,6 +19,7 @@ from .conftest import _FakeBdRunner, make_task_record
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from backlog_core.backends.bd_runner import JsonValue
     from sam_schema.core.task_backend_types import DocumentHandle
 
 # ---------------------------------------------------------------------------
@@ -363,7 +364,7 @@ class TestSubprocessCallCounts:
         # child issues that are already in runner._issues with that parent.
         original_run_json = runner.run_json
 
-        def _patched_run_json(argv: Sequence[str]) -> object:
+        def _patched_run_json(argv: Sequence[str]) -> JsonValue:
             args = list(argv)
             runner.json_calls.append(args)
             if args[0] == "list" and "--parent" in args:

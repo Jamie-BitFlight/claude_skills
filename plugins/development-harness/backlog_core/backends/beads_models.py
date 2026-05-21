@@ -20,7 +20,7 @@ functions ensures a single place to add error enrichment when needed.
 
 Boundary type chain
 -------------------
-``bd`` subprocess → :class:`BdRunner.run_json` returns ``object``
+``bd`` subprocess → :class:`BdRunner.run_json` returns :data:`JsonValue`
 → parse function validates → typed model instance
 
 ``BeadsId`` is a :func:`typing.NewType` for the type-checker; Pydantic
@@ -31,9 +31,12 @@ for runtime pattern enforcement.
 from __future__ import annotations
 
 from enum import IntEnum, StrEnum
-from typing import Annotated, Final, NewType
+from typing import TYPE_CHECKING, Annotated, Final, NewType
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
+
+if TYPE_CHECKING:
+    from backlog_core.backends.bd_runner import JsonValue
 
 __all__ = [
     "BeadsCommentRaw",
@@ -226,7 +229,7 @@ _dep_list_adapter: TypeAdapter[list[BeadsDependencyRaw]] = TypeAdapter(list[Bead
 # ---------------------------------------------------------------------------
 
 
-def parse_issue(data: object) -> BeadsIssueRaw:
+def parse_issue(data: JsonValue) -> BeadsIssueRaw:
     """Validate and return a single issue from raw ``bd --json`` output.
 
     Parameters
@@ -248,7 +251,7 @@ def parse_issue(data: object) -> BeadsIssueRaw:
     return _issue_adapter.validate_python(data)
 
 
-def parse_issue_list(data: object) -> list[BeadsIssueRaw]:
+def parse_issue_list(data: JsonValue) -> list[BeadsIssueRaw]:
     """Validate and return a list of issues from raw ``bd list --json`` output.
 
     Parameters
@@ -269,7 +272,7 @@ def parse_issue_list(data: object) -> list[BeadsIssueRaw]:
     return _issue_list_adapter.validate_python(data)
 
 
-def parse_ready_list(data: object) -> list[BeadsIssueRaw]:
+def parse_ready_list(data: JsonValue) -> list[BeadsIssueRaw]:
     """Validate and return a list of ready issues from ``bd ready --json``.
 
     ``bd ready`` returns the same JSON shape as ``bd list``.  This
@@ -294,7 +297,7 @@ def parse_ready_list(data: object) -> list[BeadsIssueRaw]:
     return _issue_list_adapter.validate_python(data)
 
 
-def parse_dependency_list(data: object) -> list[BeadsDependencyRaw]:
+def parse_dependency_list(data: JsonValue) -> list[BeadsDependencyRaw]:
     """Validate and return a dependency list from ``bd dep --json``.
 
     Parameters

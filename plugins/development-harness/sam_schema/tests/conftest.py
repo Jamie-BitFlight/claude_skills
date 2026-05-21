@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.backends.bd_runner import BdInvocationError, BdNotInstalledError, BdRunner  # noqa: F401
+from backlog_core.backends.bd_runner import BdInvocationError, BdNotInstalledError, BdRunner, JsonValue  # noqa: F401
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -67,7 +67,7 @@ class _FakeBdRunner(BdRunner):
             "closed_at": None,
         }
 
-    def run_json(self, argv: Sequence[str]) -> object:
+    def run_json(self, argv: Sequence[str]) -> JsonValue:
         """Simulate bd commands that produce JSON output."""
         args = list(argv)
         self.json_calls.append(args)
