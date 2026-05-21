@@ -232,6 +232,33 @@ class _FakeBdRunner(BdRunner):
         return issue
 
 
+class _ListParentBdRunner(_FakeBdRunner):
+    """``_FakeBdRunner`` variant that also handles ``bd list --parent <id>``.
+
+    The base ``_FakeBdRunner`` only simulates the ``bd`` commands the
+    production code currently issues.  Efficiency regression tests for the
+    batch-fetch optimisation expect ``read_plan`` to call ``bd list --parent``
+    instead of N individual ``bd show`` calls.  This subclass overrides
+    :meth:`run_json` to recognise that command, returning the child issues
+    whose ``metadata.parent`` matches the requested parent ID.  Every other
+    command is delegated to the base implementation.
+    """
+
+    def run_json(self, argv: Sequence[str]) -> JsonValue:
+        """Handle ``list --parent`` locally; delegate all other commands."""
+        args = list(argv)
+        if args and args[0] == "list" and "--parent" in args:
+            self.json_calls.append(args)
+            parent_idx = args.index("--parent")
+            parent_id = args[parent_idx + 1]
+            return [
+                issue
+                for issue in self._issues.values()
+                if isinstance(issue.get("metadata"), dict) and issue["metadata"].get("parent") == parent_id
+            ]
+        return super().run_json(argv)
+
+
 # ---------------------------------------------------------------------------
 # Shared pytest fixtures
 # ---------------------------------------------------------------------------
@@ -243,6 +270,14 @@ def fake_runner() -> _FakeBdRunner:
     return _FakeBdRunner()
 
 
+def _seed_plan(runner: _FakeBdRunner, plan_id: str = "Ptest0001") -> str:
+    """Insert an epic for *plan_id* into *runner* and return the epic ID."""
+    epic_id = runner._new_id()
+    runner._issues[epic_id] = runner._make_issue(epic_id, "my-plan", issue_type="epic")
+    runner._memory[f"dh.plan-index.{plan_id}"] = epic_id
+    return epic_id
+
+
 @pytest.fixture
 def plan_id_and_runner() -> tuple[str, _FakeBdRunner]:
     """Return a (plan_id, runner) pair where the plan already exists in the runner.
@@ -251,10 +286,23 @@ def plan_id_and_runner() -> tuple[str, _FakeBdRunner]:
     The epic is inserted directly into the runner's issue store.
     """
     runner = _FakeBdRunner()
-    epic_id = runner._new_id()
-    runner._issues[epic_id] = runner._make_issue(epic_id, "my-plan", issue_type="epic")
     plan_id = "Ptest0001"
-    runner._memory[f"dh.plan-index.{plan_id}"] = epic_id
+    _seed_plan(runner, plan_id)
+    return plan_id, runner
+
+
+@pytest.fixture
+def plan_id_and_list_runner() -> tuple[str, _ListParentBdRunner]:
+    """Return a (plan_id, runner) pair using a runner that handles ``bd list --parent``.
+
+    Identical setup to :func:`plan_id_and_runner` but the runner is a
+    :class:`_ListParentBdRunner`, so efficiency tests that exercise the
+    batch-fetch ``bd list --parent`` path do not need to monkey-patch
+    ``run_json`` on a base ``_FakeBdRunner`` instance.
+    """
+    runner = _ListParentBdRunner()
+    plan_id = "Ptest0001"
+    _seed_plan(runner, plan_id)
     return plan_id, runner
 
 

@@ -14,12 +14,9 @@ from sam_schema.core.action_models import TaskDefinition
 from sam_schema.core.backends.beads import BeadsTaskProvider
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 
-from .conftest import _FakeBdRunner, make_task_record
+from .conftest import _FakeBdRunner, _ListParentBdRunner, make_task_record
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from backlog_core.backends.bd_runner import JsonValue
     from sam_schema.core.task_backend_types import DocumentHandle
 
 # ---------------------------------------------------------------------------
@@ -341,7 +338,11 @@ class TestSubprocessCallCounts:
 
     @pytest.mark.parametrize("task_count", [1, 3, 5])
     def test_read_plan_batch_fetches_tasks(
+<<<<<<< HEAD
         self, plan_id_and_runner: tuple[str, _FakeBdRunner], task_count: int, monkeypatch: pytest.MonkeyPatch
+=======
+        self, plan_id_and_list_runner: tuple[str, _ListParentBdRunner], task_count: int
+>>>>>>> cbe1389 (refactor(tests): replace monkey-patch with _ListParentBdRunner subclass)
     ) -> None:
         """read_plan must issue exactly 1 bd show (epic) + 1 bd list (children batch).
 
@@ -351,14 +352,19 @@ class TestSubprocessCallCounts:
 
         Parametrized over task_count to prove the O(1) invariant regardless of
         how many tasks the plan contains.
+
+        Uses :class:`_ListParentBdRunner`, a ``_FakeBdRunner`` subclass that
+        overrides ``run_json`` to handle ``bd list --parent`` — no instance
+        monkey-patching required.
         """
-        plan_id, runner = plan_id_and_runner
+        plan_id, runner = plan_id_and_list_runner
 
         # Arrange: add task_count tasks to the plan
         epic_id = runner._memory[f"dh.plan-index.{plan_id}"]
         for i in range(task_count):
             make_task_record(runner, plan_id, f"T{i:02d}", title=f"Task {i}", parent_id=epic_id)
 
+<<<<<<< HEAD
         # Register a handler for bd list --parent so the batch call succeeds.
         # We patch run_json to intercept "list" with "--parent" and return the
         # child issues that are already in runner._issues with that parent.
@@ -380,6 +386,8 @@ class TestSubprocessCallCounts:
             return original_run_json(argv)
 
         monkeypatch.setattr(runner, "run_json", _patched_run_json)
+=======
+>>>>>>> cbe1389 (refactor(tests): replace monkey-patch with _ListParentBdRunner subclass)
         runner.json_calls.clear()
 
         # Act
