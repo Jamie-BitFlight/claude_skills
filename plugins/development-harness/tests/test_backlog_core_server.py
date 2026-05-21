@@ -168,7 +168,7 @@ async def test_backlog_add_gate_rejects_missing_token():
         )
 
     mock_add.assert_not_called()
-    expected_error = "Direct backlog_add calls are not permitted. Load and follow /dh:create-backlog-item — it will provide the required gate_token."
+    expected_error = 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
     assert response_missing["error"] == expected_error
     assert response_wrong["error"] == expected_error
 
