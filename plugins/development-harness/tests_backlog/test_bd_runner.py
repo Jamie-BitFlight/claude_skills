@@ -361,3 +361,17 @@ def test_env_overrides_none_preserves_inherited_env_without_blocked_vars(
     env = mock_run.call_args.kwargs["env"]
     assert "HOME" in env
     assert "GITHUB_TOKEN" not in env
+
+
+@pytest.mark.unit
+def test_env_overrides_cannot_inject_blocked_vars(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Blocked vars (e.g. GITHUB_TOKEN) in env_overrides are silently stripped."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc(stdout='{"ok": true}'))
+
+    BdRunner(env_overrides={"GITHUB_TOKEN": "injected", "SAFE_VAR": "ok"}).run_json(["show", "bd-a3f8"])
+
+    env = mock_run.call_args.kwargs["env"]
+    assert "GITHUB_TOKEN" not in env
+    assert env["SAFE_VAR"] == "ok"

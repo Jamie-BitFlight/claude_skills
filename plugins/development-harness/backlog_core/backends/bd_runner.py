@@ -255,10 +255,15 @@ class BdRunner:
     # ------------------------------------------------------------------
 
     def _build_env(self) -> dict[str, str]:
-        """Return subprocess environment with blocked vars removed and overrides applied."""
+        """Return subprocess environment with blocked vars removed and overrides applied.
+
+        Blocked variables (see :data:`_BLOCKED_ENV_VARS`) are stripped from
+        both the inherited process environment and from *env_overrides*, so
+        callers cannot inadvertently re-inject a blocked credential.
+        """
         env = _bd_env()
         if self._env_overrides:
-            env.update(self._env_overrides)
+            env.update({k: v for k, v in self._env_overrides.items() if k not in _BLOCKED_ENV_VARS})
         return env
 
     def _resolve_bd_path(self) -> str:
