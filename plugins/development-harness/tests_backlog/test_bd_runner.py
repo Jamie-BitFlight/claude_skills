@@ -2,13 +2,6 @@
 
 Verifies BdRunner subprocess wrapper behavior using pytest-mock.
 No live bd binary is invoked — all subprocess interactions are mocked.
-
-Divergence Note DN-1
---------------------
-Task requirement #10 specified testing an ``env_overrides`` parameter on
-BdRunner.  The actual implementation has no such parameter; GITHUB_TOKEN
-filtering is handled unconditionally by the module-level ``_bd_env()``
-function.  These tests cover the implemented behavior.
 """
 
 from __future__ import annotations
@@ -284,19 +277,12 @@ def test_resolve_bd_path_caches_after_first_call(mocker: MockerFixture) -> None:
 
 # ---------------------------------------------------------------------------
 # _bd_env — GITHUB_TOKEN filtering
-# (DN-1: task req #10 specified an 'env_overrides' parameter that does not
-#  exist; BdRunner filters GITHUB_TOKEN unconditionally via _bd_env())
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 def test_bd_env_removes_github_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_bd_env strips GITHUB_TOKEN to prevent credential leakage into bd subprocesses.
-
-    Note (DN-1): Original requirement specified an ``env_overrides`` parameter
-    that does not exist.  Implemented behavior is unconditional GITHUB_TOKEN
-    removal via the module-level ``_bd_env()`` helper.
-    """
+    """_bd_env strips GITHUB_TOKEN to prevent credential leakage into bd subprocesses."""
     monkeypatch.setenv("GITHUB_TOKEN", "ghp_supersecret")
     monkeypatch.setenv("HOME", "/home/testuser")
 
@@ -314,3 +300,55 @@ def test_bd_env_passes_non_blocked_vars_through(monkeypatch: pytest.MonkeyPatch)
     env = _bd_env()
 
     assert env["MY_CUSTOM_VAR"] == "custom_value"
+
+
+# ---------------------------------------------------------------------------
+# env_overrides — per-instance environment injection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_env_overrides_merged_into_subprocess_env(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """env_overrides are merged into the subprocess environment on each invocation."""
+    monkeypatch.setenv("HOME", "/home/testuser")
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc())
+
+    runner = BdRunner(env_overrides={"BD_WORKSPACE": "/my/workspace"})
+    runner.run_json(["list"])
+
+    _args, call_kwargs = mock_run.call_args
+    assert call_kwargs["env"]["BD_WORKSPACE"] == "/my/workspace"
+    assert "HOME" in call_kwargs["env"]
+
+
+@pytest.mark.unit
+def test_env_overrides_blocked_vars_are_silently_dropped(mocker: MockerFixture) -> None:
+    """Blocked variables in env_overrides are silently dropped — security filter cannot be bypassed."""
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc())
+
+    runner = BdRunner(env_overrides={"GITHUB_TOKEN": "evil_token", "BD_WORKSPACE": "/my/workspace"})
+    runner.run_json(["list"])
+
+    _args, call_kwargs = mock_run.call_args
+    assert "GITHUB_TOKEN" not in call_kwargs["env"]
+    assert call_kwargs["env"]["BD_WORKSPACE"] == "/my/workspace"
+
+
+@pytest.mark.unit
+def test_env_overrides_default_none_does_not_inject_extra_vars(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With default env_overrides=None, _bd_env() is used unmodified — no extra vars injected."""
+    monkeypatch.setenv("HOME", "/home/testuser")
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc())
+
+    runner = BdRunner()
+    runner.run_json(["list"])
+
+    _args, call_kwargs = mock_run.call_args
+    assert "GITHUB_TOKEN" not in call_kwargs["env"]
+    assert "HOME" in call_kwargs["env"]

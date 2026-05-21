@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Final
 from backlog_core.models import BackendUnavailableError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 __all__ = ["_DEFAULT_BD_TIMEOUT_SECONDS", "BdInvocationError", "BdJsonDecodeError", "BdNotInstalledError", "BdRunner"]
 
@@ -131,6 +131,12 @@ class BdRunner:
 
     Parameters
     ----------
+    env_overrides:
+        Extra environment variables merged into the environment passed to each
+        ``bd`` subprocess call.  Applied on top of the base environment produced
+        by :func:`_bd_env`.  Blocked variables (e.g. ``GITHUB_TOKEN``) are
+        silently dropped even if listed here.  ``None`` (default) means no extra
+        variables.
     timeout_seconds:
         Maximum number of seconds to wait for any single ``bd`` invocation.
         Defaults to :data:`_DEFAULT_BD_TIMEOUT_SECONDS`.
@@ -143,9 +149,20 @@ class BdRunner:
     inside the MCP server does not add latency at startup.
     """
 
-    def __init__(self, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS) -> None:
-        """Store configuration only.  Does not touch the filesystem."""
+    def __init__(
+        self, *, env_overrides: Mapping[str, str] | None = None, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS
+    ) -> None:
+        """Store configuration only.  Does not touch the filesystem.
+
+        Args:
+            env_overrides: Extra environment variables merged into every
+                subprocess call.  Blocked variables are silently dropped.
+            timeout_seconds: Subprocess timeout in seconds.
+        """
         self._timeout_seconds = timeout_seconds
+        self._env_overrides: dict[str, str] = (
+            {k: v for k, v in env_overrides.items() if k not in _BLOCKED_ENV_VARS} if env_overrides else {}
+        )
         self._bd_path: str | None = None
         self._available: bool | None = None
 
@@ -233,7 +250,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=_bd_env(),
+                env=self._effective_env(),
             )
             self._available = True
         except (OSError, subprocess.SubprocessError):
@@ -243,6 +260,19 @@ class BdRunner:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _effective_env(self) -> dict[str, str]:
+        """Return the filtered base environment merged with instance-level overrides.
+
+        Returns:
+        -------
+        dict[str, str]
+            Environment mapping safe to pass to ``bd`` subprocesses.
+        """
+        env = _bd_env()
+        if self._env_overrides:
+            env.update(self._env_overrides)
+        return env
 
     def _resolve_bd_path(self) -> str:
         """Lazily locate ``bd`` on ``PATH`` and cache the result.
@@ -298,7 +328,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=_bd_env(),
+                env=self._effective_env(),
             )
         except subprocess.TimeoutExpired as exc:
             elapsed_ms = int((time.monotonic() - t0) * 1000)
