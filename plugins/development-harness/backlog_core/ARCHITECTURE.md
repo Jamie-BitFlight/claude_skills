@@ -213,7 +213,7 @@ transition.
 **Responsibility**: Bidirectional conversion between `BacklogItem` and GitHub issue body markdown.
 Operations layer never writes raw markdown body strings directly — they go through this adapter.
 
-**Public API** (`__all__`): `render_issue_body`, `parse_issue_body`, `merge_item`
+**Public API** (`__all__`): `render_issue_body`, `parse_issue_body`, `merge_item`, `SECTION_HEADING`, `heading_to_section_key`, `heading_to_unknown_key`, `unknown_key_to_heading`
 
 - `render_issue_body(item)` — serialises `BacklogItem` to GitHub markdown; embeds metadata in an
   invisible `<!-- backlog-metadata: -->` HTML comment; renders description, entry-bearing sections,
@@ -224,6 +224,10 @@ Operations layer never writes raw markdown body strings directly — they go thr
 - `merge_item(local, remote)` — merges remote into local; local metadata is authoritative; sections
   are merged per-entry (struck state wins over active; longer content wins on tie; unique entries
   from either side are preserved)
+- `SECTION_HEADING` — dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
+- `heading_to_section_key(heading_text)` — maps a `## Heading` text to its section storage key; returns `None` for unknown headings
+- `heading_to_unknown_key(heading_text)` — converts an unknown heading to an `"unknown__"` prefixed storage key
+- `unknown_key_to_heading(key)` — reverses `heading_to_unknown_key`; strips prefix, title-cases result
 
 **Known section keys** (BacklogItem.sections):
 - `"fact_check"` → `## Fact-Check`
@@ -237,6 +241,24 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 **Imports from other modules**: `from .entry_blocks import parse_entries`,
 `from .models import BacklogItem, Entry, GroomedData, Section`,
 `from .parsing import extract_sections`
+
+---
+
+## Module: rendering.py
+
+**Responsibility**: Backend-neutral shared rendering utilities for backlog sections. Extracts rendering logic from `github_sync` into a location all three `BacklogBackend` implementations (GitHub, SQLite, memory) can import, ensuring identical section rendering across backends.
+
+**Dependency direction**: `models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
+
+**Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `render_groomed_section`, `section_display_title`, `unknown_key_to_heading`
+
+- `SECTION_HEADING` — dict mapping known section storage keys to display heading text (e.g. `"fact_check"` → `"Fact-Check"`); shared constant used by all backends
+- `GROOMED_SUBSECTION_ORDER` — canonical render order for `GroomedData` subsections (heading text as stored)
+- `render_groomed_section(groomed)` — renders a `GroomedData` as `## Groomed ({date})` with `### subsection` children in canonical order; extras appended alphabetically
+- `section_display_title(key, groomed_date)` — returns the human-readable title for a section storage key; handles known keys via `SECTION_HEADING`, `"unknown__"` prefix via `unknown_key_to_heading`, and the special `"groomed"` key with optional date
+- `unknown_key_to_heading(key)` — strips `"unknown__"` prefix, replaces underscores with spaces, and title-cases the result
+
+**Imports from other modules**: `from .models import GroomedData` (type annotation only, under `TYPE_CHECKING`)
 
 ---
 
