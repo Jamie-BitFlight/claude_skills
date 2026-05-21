@@ -33,7 +33,7 @@ import math
 import subprocess
 import tomllib
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -269,7 +269,7 @@ def test_fetch_tasks_from_backend_invalid_string_raises_valueerror() -> None:
 def test_fetch_tasks_from_backend_float_raises_typeerror() -> None:
     """fetch_tasks_from_backend raises TypeError for non-str/int input."""
     with pytest.raises(TypeError, match="parent_issue_number must be int"):
-        fetch_tasks_from_backend(math.pi, "feature-x", Path("/tmp/cache.json"))  # type: ignore[arg-type]
+        fetch_tasks_from_backend(cast("str | int", math.pi), "feature-x", Path("/tmp/cache.json"))
 
 
 # ---------------------------------------------------------------------------
