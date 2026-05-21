@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Final
 from backlog_core.models import BackendUnavailableError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 __all__ = ["_DEFAULT_BD_TIMEOUT_SECONDS", "BdInvocationError", "BdJsonDecodeError", "BdNotInstalledError", "BdRunner"]
 
@@ -131,6 +131,13 @@ class BdRunner:
 
     Parameters
     ----------
+    env_overrides:
+        Optional mapping of environment variable names to values that are
+        merged into every ``bd`` subprocess environment.  Keys in this
+        mapping take precedence over the inherited process environment.
+        Variables listed in :data:`_BLOCKED_ENV_VARS` are removed first,
+        then overrides are applied.  Pass ``None`` (default) to use the
+        inherited environment unchanged.
     timeout_seconds:
         Maximum number of seconds to wait for any single ``bd`` invocation.
         Defaults to :data:`_DEFAULT_BD_TIMEOUT_SECONDS`.
@@ -143,8 +150,11 @@ class BdRunner:
     inside the MCP server does not add latency at startup.
     """
 
-    def __init__(self, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self, *, env_overrides: Mapping[str, str] | None = None, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS
+    ) -> None:
         """Store configuration only.  Does not touch the filesystem."""
+        self._env_overrides = env_overrides
         self._timeout_seconds = timeout_seconds
         self._bd_path: str | None = None
         self._available: bool | None = None
@@ -233,7 +243,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=_bd_env(),
+                env=self._build_env(),
             )
             self._available = True
         except (OSError, subprocess.SubprocessError):
@@ -243,6 +253,13 @@ class BdRunner:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _build_env(self) -> dict[str, str]:
+        """Return subprocess environment with blocked vars removed and overrides applied."""
+        env = _bd_env()
+        if self._env_overrides:
+            env.update(self._env_overrides)
+        return env
 
     def _resolve_bd_path(self) -> str:
         """Lazily locate ``bd`` on ``PATH`` and cache the result.
@@ -298,7 +315,7 @@ class BdRunner:
                 encoding="utf-8",
                 errors="replace",
                 check=False,
-                env=_bd_env(),
+                env=self._build_env(),
             )
         except subprocess.TimeoutExpired as exc:
             elapsed_ms = int((time.monotonic() - t0) * 1000)

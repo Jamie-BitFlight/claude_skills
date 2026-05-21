@@ -2,13 +2,6 @@
 
 Verifies BdRunner subprocess wrapper behavior using pytest-mock.
 No live bd binary is invoked — all subprocess interactions are mocked.
-
-Divergence Note DN-1
---------------------
-Task requirement #10 specified testing an ``env_overrides`` parameter on
-BdRunner.  The actual implementation has no such parameter; GITHUB_TOKEN
-filtering is handled unconditionally by the module-level ``_bd_env()``
-function.  These tests cover the implemented behavior.
 """
 
 from __future__ import annotations
@@ -284,19 +277,12 @@ def test_resolve_bd_path_caches_after_first_call(mocker: MockerFixture) -> None:
 
 # ---------------------------------------------------------------------------
 # _bd_env — GITHUB_TOKEN filtering
-# (DN-1: task req #10 specified an 'env_overrides' parameter that does not
-#  exist; BdRunner filters GITHUB_TOKEN unconditionally via _bd_env())
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 def test_bd_env_removes_github_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_bd_env strips GITHUB_TOKEN to prevent credential leakage into bd subprocesses.
-
-    Note (DN-1): Original requirement specified an ``env_overrides`` parameter
-    that does not exist.  Implemented behavior is unconditional GITHUB_TOKEN
-    removal via the module-level ``_bd_env()`` helper.
-    """
+    """_bd_env strips GITHUB_TOKEN to prevent credential leakage into bd subprocesses."""
     monkeypatch.setenv("GITHUB_TOKEN", "ghp_supersecret")
     monkeypatch.setenv("HOME", "/home/testuser")
 
@@ -314,3 +300,64 @@ def test_bd_env_passes_non_blocked_vars_through(monkeypatch: pytest.MonkeyPatch)
     env = _bd_env()
 
     assert env["MY_CUSTOM_VAR"] == "custom_value"
+
+
+# ---------------------------------------------------------------------------
+# env_overrides — constructor parameter (architect spec §4.1 line 214)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_init_stores_env_overrides() -> None:
+    """BdRunner stores env_overrides for use in subprocess invocations."""
+    runner = BdRunner(env_overrides={"MY_VAR": "my_value"})
+    assert runner._env_overrides == {"MY_VAR": "my_value"}
+
+
+@pytest.mark.unit
+def test_init_env_overrides_defaults_to_none() -> None:
+    """BdRunner defaults env_overrides to None."""
+    runner = BdRunner()
+    assert runner._env_overrides is None
+
+
+@pytest.mark.unit
+def test_run_json_passes_env_overrides_to_subprocess(mocker: MockerFixture) -> None:
+    """run_json merges env_overrides into the subprocess environment."""
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc(stdout='{"ok": true}'))
+
+    BdRunner(env_overrides={"BD_TEST_VAR": "test_value"}).run_json(["show", "bd-a3f8"])
+
+    assert mock_run.call_args.kwargs["env"]["BD_TEST_VAR"] == "test_value"
+
+
+@pytest.mark.unit
+def test_env_overrides_take_precedence_over_inherited_env(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env_overrides values override inherited process environment variables."""
+    monkeypatch.setenv("BD_EXISTING_VAR", "original_value")
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc(stdout='{"ok": true}'))
+
+    BdRunner(env_overrides={"BD_EXISTING_VAR": "overridden_value"}).run_json(["show", "bd-a3f8"])
+
+    assert mock_run.call_args.kwargs["env"]["BD_EXISTING_VAR"] == "overridden_value"
+
+
+@pytest.mark.unit
+def test_env_overrides_none_preserves_inherited_env_without_blocked_vars(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """env_overrides=None passes inherited env minus blocked vars, same as no overrides."""
+    monkeypatch.setenv("HOME", "/home/testuser")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value=_FAKE_BD)
+    mock_run = mocker.patch("backlog_core.backends.bd_runner.subprocess.run", return_value=_proc(stdout='{"ok": true}'))
+
+    BdRunner(env_overrides=None).run_json(["show", "bd-a3f8"])
+
+    env = mock_run.call_args.kwargs["env"]
+    assert "HOME" in env
+    assert "GITHUB_TOKEN" not in env
