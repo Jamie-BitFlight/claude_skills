@@ -218,6 +218,9 @@ parallel-rationale: <why parallelization is safe>
 ## Verification Steps
 
 1. <command or procedure>
+N. (When Expected Outputs lists file paths) Run: `git add <file1> [file2 ...]` then
+   `git commit -m "<type>: <task title>"` — use files from Expected Outputs only, no
+   `git add .` or `git add -A`, no `Fixes #N` / `Closes #N` / `Resolves #N` trailer.
 
 ## CoVe Checks (only if accuracy-risk is medium/high)
 
