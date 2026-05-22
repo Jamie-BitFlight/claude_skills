@@ -297,10 +297,11 @@ def test_write_gh_config_creates_parent_dirs(tmp_path: Path) -> None:
 
 def test_render_gh_examples_substitutes_owner_repo_token(tmp_path: Path) -> None:
     """Arrange: template has <owner/repo> token. Assert: token replaced and file written."""
-    template = tmp_path / "gh-examples.md.template"
-    template.write_text("Run: gh pr list -R <owner/repo>\n")
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (tmp_path / "gh-examples.md.template").write_text("Run: gh pr list -R <owner/repo>\n")
 
-    with patch("setup_gh._SCRIPT_DIR", tmp_path):
+    with patch("setup_gh._SCRIPT_DIR", scripts_dir):
         result = _setup_gh.render_gh_examples("my-org/my-repo")
 
     assert result is True
@@ -310,24 +311,31 @@ def test_render_gh_examples_substitutes_owner_repo_token(tmp_path: Path) -> None
 
 
 def test_render_gh_examples_substitutes_owner_token(tmp_path: Path) -> None:
-    """Arrange: template has both <owner/repo> and <owner> tokens. Assert: both substituted."""
-    template = tmp_path / "gh-examples.md.template"
-    template.write_text("gh pr list -R <owner/repo>\ngh project --owner <owner>\n")
+    """Arrange: template has <owner/repo>, <owner>, and <repo> tokens. Assert: all substituted."""
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (tmp_path / "gh-examples.md.template").write_text(
+        "gh pr list -R <owner/repo>\ngh project --owner <owner>\ngh api repos/<owner>/<repo>\n"
+    )
 
-    with patch("setup_gh._SCRIPT_DIR", tmp_path):
+    with patch("setup_gh._SCRIPT_DIR", scripts_dir):
         result = _setup_gh.render_gh_examples("my-org/my-repo")
 
     assert result is True
     output = (tmp_path / "gh-examples.md").read_text()
     assert "my-org/my-repo" in output
     assert "my-org" in output
+    assert "my-repo" in output
     assert "<owner/repo>" not in output
     assert "<owner>" not in output
+    assert "<repo>" not in output
 
 
 def test_render_gh_examples_returns_false_when_template_missing(tmp_path: Path) -> None:
     """Arrange: template file does not exist. Assert: returns False."""
-    with patch("setup_gh._SCRIPT_DIR", tmp_path):
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    with patch("setup_gh._SCRIPT_DIR", scripts_dir):
         result = _setup_gh.render_gh_examples("my-org/my-repo")
 
     assert result is False

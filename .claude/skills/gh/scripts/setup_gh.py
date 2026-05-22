@@ -29,6 +29,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.parse
 import zipfile
 from dataclasses import dataclass
 from enum import StrEnum
@@ -895,7 +896,7 @@ def detect_owner_repo() -> str | None:
         Emits one warning to stderr when git remote parsing fails or when the
         URL does not match any known pattern. Does not abort the caller.
     """
-    env_repo = os.environ.get("GITHUB_REPO", "")
+    env_repo = os.environ.get("GITHUB_REPO", "").strip()
     if env_repo and _REPO_SLUG_RE.match(env_repo):
         return env_repo
 
@@ -908,7 +909,9 @@ def detect_owner_repo() -> str | None:
         if m:
             return m.group(1)
 
-    error_console.print(f":warning: [yellow]Warning: could not parse owner/repo from remote URL: {url}[/yellow]")
+    parsed = urllib.parse.urlparse(url)
+    safe_url = parsed._replace(netloc=parsed.hostname or "").geturl() if parsed.scheme else url
+    error_console.print(f":warning: [yellow]Warning: could not parse owner/repo from remote URL: {safe_url}[/yellow]")
     return None
 
 
@@ -947,7 +950,7 @@ def write_gh_config(config_path: Path, owner_repo: str) -> bool:
         if config_path.exists():
             with config_path.open("r", encoding="utf-8") as fh:
                 data = yaml.load(fh)
-            if data is None:
+            if not isinstance(data, dict):
                 data = _CommentedMap()
         else:
             data = _CommentedMap()
@@ -958,7 +961,7 @@ def write_gh_config(config_path: Path, owner_repo: str) -> bool:
         error_console.print(f":warning: [yellow]Warning: could not read {config_path}: {exc}[/yellow]")
         return False
 
-    if "gh" not in data:
+    if not isinstance(data.get("gh"), dict):
         data["gh"] = _CommentedMap()
     data["gh"]["repo"] = owner_repo
 
@@ -976,14 +979,17 @@ def write_gh_config(config_path: Path, owner_repo: str) -> bool:
 def render_gh_examples(owner_repo: str) -> bool:
     """Render gh-examples.md.template -> gh-examples.md with owner/repo substituted.
 
-    Reads ``_SCRIPT_DIR / "gh-examples.md.template"``, replaces all
-    ``<owner/repo>`` tokens with ``owner_repo``, then replaces all
-    ``<owner>`` tokens with the owner component (``owner_repo.split("/")[0]``),
-    and writes the result to ``_SCRIPT_DIR / "gh-examples.md"``.
+    Reads ``_SCRIPT_DIR.parent / "gh-examples.md.template"``, substitutes
+    three token types:
+
+    - ``<owner/repo>`` → full slug (e.g. ``Jamie-BitFlight/claude_skills``)
+    - ``<owner>``      → owner component (e.g. ``Jamie-BitFlight``)
+    - ``<repo>``       → repo component (e.g. ``claude_skills``)
+
+    and writes the result to ``_SCRIPT_DIR.parent / "gh-examples.md"``.
 
     Args:
-        owner_repo: Validated owner/repo slug to substitute for all
-                    ``<owner/repo>`` tokens in the template.
+        owner_repo: Validated owner/repo slug to substitute for all tokens.
 
     Returns:
         True when rendering succeeded and gh-examples.md was written.
@@ -993,8 +999,8 @@ def render_gh_examples(owner_repo: str) -> bool:
         Writes ``.claude/skills/gh/gh-examples.md``.
         Emits one warning to stderr on failure. Never raises.
     """
-    template_path = _SCRIPT_DIR / "gh-examples.md.template"
-    output_path = _SCRIPT_DIR / "gh-examples.md"
+    template_path = _SCRIPT_DIR.parent / "gh-examples.md.template"
+    output_path = _SCRIPT_DIR.parent / "gh-examples.md"
 
     if not template_path.exists():
         error_console.print(f":warning: [yellow]Warning: gh-examples.md.template not found at {template_path}[/yellow]")
@@ -1002,8 +1008,8 @@ def render_gh_examples(owner_repo: str) -> bool:
 
     try:
         content = template_path.read_text(encoding="utf-8")
-        owner = owner_repo.split("/", maxsplit=1)[0]
-        rendered = content.replace("<owner/repo>", owner_repo).replace("<owner>", owner)
+        owner, repo = owner_repo.split("/", maxsplit=1)
+        rendered = content.replace("<owner/repo>", owner_repo).replace("<owner>", owner).replace("<repo>", repo)
         output_path.write_text(rendered, encoding="utf-8")
     except OSError as exc:
         error_console.print(f":warning: [yellow]Warning: could not write gh-examples.md: {exc}[/yellow]")
@@ -1078,7 +1084,14 @@ def main(
         os_key, arch, use_cache=not no_cache, cache_ttl_seconds=cache_ttl_seconds
     )
 
-    # 5. Check if update is needed
+    # 5. Auto-detect owner/repo and persist to .dh/config.yaml — runs on every
+    #    invocation so "already installed" runs still refresh config/examples.
+    owner_repo = detect_owner_repo()
+    if owner_repo is not None:
+        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
+        render_gh_examples(owner_repo)
+
+    # 6. Check if update is needed
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
 
     if not needs_update and not force:
@@ -1114,12 +1127,6 @@ def main(
         console.print(f"  {result.stdout.strip()}")
     except (subprocess.SubprocessError, OSError) as exc:
         error_console.print(f":warning: [yellow]Could not verify installation: {exc}[/yellow]")
-
-    # Auto-detect owner/repo and persist to .dh/config.yaml
-    owner_repo = detect_owner_repo()
-    if owner_repo is not None:
-        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
-        render_gh_examples(owner_repo)
 
     raise typer.Exit(code=0)
 

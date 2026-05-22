@@ -1,11 +1,9 @@
+<!-- Generated from gh-examples.md.template by setup_gh.py — do not edit directly. -->
+
 # GitHub CLI (gh) — Command Examples
 
-All commands in this file use `<owner/repo>` as the placeholder for the GitHub repository
-slug (e.g. `owner/repo-name`). The rendered version of this file at `gh-examples.md` has
-the placeholder replaced with the actual repository slug by `setup_gh.py`.
-
-**RULE: Pass `-R` (or `--repo`) on EVERY `gh` command** in proxy environments where git
-remotes point to a local proxy instead of `github.com`.
+**Repository**: `<owner/repo>` — **RULE: Pass `-R` (or `--repo`) on EVERY `gh` command** in
+proxy environments where git remotes point to a local proxy instead of `github.com`.
 
 ---
 
