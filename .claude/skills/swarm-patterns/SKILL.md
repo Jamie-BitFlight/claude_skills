@@ -276,6 +276,8 @@ Agent({
 })
 ```
 
+For deterministic multi-file refactors (symbol renames, import migrations, bulk transforms), load the `/dh:codemod-runner` skill to select the right AST tool and run idempotency-checked batches instead of dispatching LLM workers for mechanical changes.
+
 ---
 
 ## Complete Workflows
