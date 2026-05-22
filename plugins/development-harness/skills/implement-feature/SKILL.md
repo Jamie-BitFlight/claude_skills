@@ -219,6 +219,26 @@ This terminates the teammate immediately rather than leaving it idle. Idle teamm
 
 **Skip when**: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
 
+**Commit Ownership**
+
+Commit responsibility depends on which execution mode is active.
+
+**Same-worktree mode (default — no isolation flag):** The orchestrator owns all commits. After step 4b completes for task N, before dispatching task N+1:
+
+1. Run `git status` to identify unstaged changes attributable to the completed task.
+2. Stage and commit those changes:
+
+   ```bash
+   git add -A
+   git commit -m "feat(task): {task_id} — {task_title}"
+   ```
+
+3. Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers in task-level commits — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
+
+**Why the orchestrator commits:** Multiple agents write to the same filesystem concurrently. An agent committing mid-task risks including another agent's in-progress changes. The orchestrator receives completion messages serially and is the only actor with a safe, serialised view of which files belong to which completed task.
+
+**Isolated-worktree mode (via `/dh:work-milestone`):** Each agent owns its own commits. The agent commits in its isolated worktree after completing its task. The orchestrator merges each worktree back when the completion message arrives. The orchestrator does NOT issue commit calls in this mode.
+
 **Per-task Confirmation Gate** (active when `autonomy_mode == "per_task"` only):
 
 After task N completes (steps 4 through 4b finished), before dispatching task N+1:
