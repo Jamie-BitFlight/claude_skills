@@ -408,6 +408,13 @@ flowchart TD
 | P4_FIX | orchestrator | validator BLOCKED output with gap list | re-invoke `swarm-task-planner` with gap context | loops back to P4_DECOMPOSE |
 | P4_CONTEXT | `@dh:dh-context-gathering` | plan YAML, codebase state, artifact manifest | context manifest written into plan via `sam_update` | always → P4_LINK |
 | P4_LINK | `backlog_update` MCP | item selector (title), plan path | `plan` field linked on backlog item, `status` → `in-progress` | always → P4_DONE |
+
+> **Quick-path exception**: When the fix arrives via the Proactive Fix Gate (--quick), the SAM plan
+> slug is `quick-{slug}` with a single T1 task (complexity=low). The `in-progress` label is set
+> at Step 5 of quick/start.md via backlog_update, not Step 7 of the full work-backlog-item
+> pipeline. The state machine transition is the same (`groomed → in-progress`); the trigger
+> mechanism differs.
+
 | P4_DONE | orchestrator | slug, task file path | completion report, next-step instruction (`/dh:implement-feature`) | terminal |
 
 **Storage**: The SAM plan is created via `sam_create`, which maps to TaskBackend operations (Work Item for the plan, Sub-items for tasks). See [Backend Providers — TaskBackend Protocol](./backend-providers.md#taskbackend-protocol-912--to-be-created).
@@ -418,7 +425,7 @@ flowchart TD
 
 **context-gathering writes into the plan YAML** via `sam_update`, not to a separate file. The plan file path remains `~/.dh/projects/{project-slug}/plan/P{id}-{slug}.yaml`.
 
-**Status advance**: `backlog_update(selector="{title}", plan="plan/P{id}-{slug}.yaml")` links the SAM plan file to the GitHub issue. The `status` field transition to `in-progress` happens via `work-backlog-item` Step 7.
+**Status advance**: `backlog_update(selector="{title}", plan="plan/P{id}-{slug}.yaml")` links the SAM plan file to the GitHub issue. The `status` field transition to `in-progress` happens via `work-backlog-item` Step 7. For the quick-path case, see the Quick-path exception note in the P4_LINK row above.
 
 **Failure paths**:
 
