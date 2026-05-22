@@ -26,9 +26,10 @@ flowchart TD
     C2 -->|"Effort=FULL for P2 or Ideas item"| FBlock2(["BLOCKED: effort/priority mismatch<br>P2/Ideas with FULL effort requires human confirmation"])
     EffortWarn --> C3
 
-    C3{"Criterion 3 — Blast radius<br>Any Impact Radius row contains pattern: field?"}
-    C3 -->|"No pattern: fields present"| ManualCount["Use manual row count<br>(backward-compatible path)"]
-    C3 -->|"Yes — pattern: field found"| RunRg["Run: rg -l '<pattern>' | wc -l<br>Capture as live_count"]
+    C3(["Criterion 3 — Blast radius check"]) --> PatternCheck
+    PatternCheck{"Any Impact Radius row<br>contains pattern: field?"}
+    PatternCheck -->|"No pattern: fields present"| ManualCount["Use manual row count<br>(backward-compatible path)"]
+    PatternCheck -->|"Yes — pattern: field found"| RunRg["Run: rg -l '<pattern>' | wc -l<br>Capture as live_count"]
     RunRg --> Compare{"live_count > 1.5 * manual_count?"}
     Compare -->|"Yes — count diverged"| FBlock3b(["Emit STALE_GROOM warning<br>Require re-grooming before proceeding"])
     Compare -->|"No — counts within threshold"| UseLive["Use live_count as blast radius value"]
