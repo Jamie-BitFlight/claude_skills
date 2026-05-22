@@ -147,8 +147,7 @@ Parser `route` is `none` only when argv is empty (no flags, no positionals, no f
 
 Loads [references/workflows/quick/start.md](./references/workflows/quick/start.md) with `flags.quick = true` (parser flag) and `item_ref` set to the supplied title.
 
-**Proactive fix routing**: The Proactive Fix Gate in `.claude/CLAUDE.md` (Autonomous Action
-Boundary section) routes trivial discovered issues to this `--quick` path autonomously.
+**Proactive fix routing**: The Proactive Fix Gate in `.claude/CLAUDE.md` (Proactive Fix Gate section) routes trivial discovered issues to this `--quick` path autonomously.
 Invocation form: `flags.quick = true` (parser flag). The gate, not the user, authorizes the
 routing decision.
 

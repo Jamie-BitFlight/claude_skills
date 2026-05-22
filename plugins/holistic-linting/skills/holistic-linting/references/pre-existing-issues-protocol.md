@@ -16,12 +16,12 @@ Two outcomes are possible. Apply the correct one based on whether the issue bloc
 ```mermaid
 flowchart TD
     Start([Linter detects issue in file agent did not touch]) --> Q1{Does this issue block CI or the current linter run?}
-    Q1 -->|Yes — exit code nonzero, pipeline fails| Fix["Apply Proactive Fix Gate\nIf trivial: route to --quick\nIf complex: add to plan"]
-    Q1 -->|No — advisory or informational| Record[Record it in the repo tracking system\nDo not defer silently]
-    Fix --> Verify[Verify fix — linter exits 0\nInclude in resolution report]
+    Q1 -->|Yes — exit code nonzero, pipeline fails| Fix["Apply Proactive Fix Gate<br>If trivial: route to --quick<br>If complex: add to plan"]
+    Q1 -->|No — advisory or informational| Record["Record it in the repo tracking system<br>Do not defer silently"]
+    Fix --> Verify["Verify fix — linter exits 0<br>Include in resolution report"]
     Record --> Discover[Discover the repo tracking system]
     Discover --> Write[Write the work item]
-    Write --> Report[Note in resolution report\n'Pre-existing issues recorded — N items']
+    Write --> Report["Note in resolution report<br>'Pre-existing issues recorded — N items'"]
     Verify --> Done([Continue])
     Report --> Done
 ```

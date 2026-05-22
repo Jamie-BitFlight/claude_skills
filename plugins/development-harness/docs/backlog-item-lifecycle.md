@@ -410,10 +410,9 @@ flowchart TD
 | P4_LINK | `backlog_update` MCP | item selector (title), plan path | `plan` field linked on backlog item, `status` → `in-progress` | always → P4_DONE |
 
 > **Quick-path exception**: When the fix arrives via the Proactive Fix Gate (--quick), the SAM plan
-> slug is `quick-{slug}` with a single T1 task (complexity=low). The `in-progress` label is set
-> at Step 5 of quick/start.md via backlog_update, not Step 7 of the full work-backlog-item
-> pipeline. The state machine transition is the same (`groomed → in-progress`); the trigger
-> mechanism differs.
+> slug is `quick-{slug}` with a single T1 task (complexity=low). The state machine transition is
+> the same (`groomed → in-progress`); it occurs during quick-path execution, not at Step 7 of the
+> full work-backlog-item pipeline.
 
 | P4_DONE | orchestrator | slug, task file path | completion report, next-step instruction (`/dh:implement-feature`) | terminal |
 
