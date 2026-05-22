@@ -112,7 +112,6 @@ def parse_agent_file(path: Path) -> tuple[AgentMetadata, str]:
         name=str(meta.get("name", path.stem)),
         description=str(meta.get("description", "")),
         skills=_normalize_skills(meta.get("skills")),
-        eager_skills=_normalize_skills(meta.get("eager-skills")),
         tools=_normalize_skills(meta.get("tools")),
         model=str(raw_model) if (raw_model := meta.get("model")) else None,
         color=str(raw_color) if (raw_color := meta.get("color")) else None,

@@ -68,12 +68,7 @@ class SkillResolver:
     # ------------------------------------------------------------------
 
     def resolve(
-        self,
-        skill_uris: list[str],
-        context_plugin: str,
-        *,
-        eager_uris: frozenset[str] = frozenset(),
-        include_content: bool = False,
+        self, skill_uris: list[str], context_plugin: str, *, include_content: bool = False
     ) -> tuple[list[ResolvedSkill], list[str]]:
         """Resolve *skill_uris* to filesystem-backed :class:`~agent_profile.models.ResolvedSkill` objects.
 
@@ -92,9 +87,6 @@ class SkillResolver:
             context_plugin: Name of the plugin that owns the agent being
                 loaded. Used for bare-name and domain-path resolution
                 (context plugin searched first).
-            eager_uris: Skill URIs that should have ``load_eagerly=True`` in
-                the returned objects. Callers use this flag to decide which
-                skills to load immediately via ``Skill(skill=uri)``.
             include_content: When ``True``, populate ``content`` and
                 ``reference_files`` on each resolved skill. Defaults to
                 ``False`` (metadata-only) to avoid token-budget overflows.
@@ -111,9 +103,7 @@ class SkillResolver:
         warnings: list[str] = []
 
         for uri in skill_uris:
-            self._resolve_into(
-                uri, context_plugin, visited, resolved, warnings, eager_uris=eager_uris, include_content=include_content
-            )
+            self._resolve_into(uri, context_plugin, visited, resolved, warnings, include_content=include_content)
 
         return resolved, warnings
 
@@ -129,7 +119,6 @@ class SkillResolver:
         resolved: list[ResolvedSkill],
         warnings: list[str],
         *,
-        eager_uris: frozenset[str] = frozenset(),
         include_content: bool = False,
     ) -> None:
         """Resolve *uri* and append result to *resolved*, warnings to *warnings*.
@@ -143,14 +132,10 @@ class SkillResolver:
                 chain, used for circular dependency detection.
             resolved: Accumulator list for successfully resolved skills.
             warnings: Accumulator list for non-fatal warning messages.
-            eager_uris: Forwarded to :meth:`_resolve_single`. See
-                :meth:`resolve` for semantics.
             include_content: Forwarded to :meth:`_resolve_single`. See
                 :meth:`resolve` for semantics.
         """
-        skill = self._resolve_single(
-            uri, context_plugin, visited, warnings, eager_uris=eager_uris, include_content=include_content
-        )
+        skill = self._resolve_single(uri, context_plugin, visited, warnings, include_content=include_content)
         if skill is None:
             return
 
@@ -165,25 +150,10 @@ class SkillResolver:
             return
 
         for sub_uri in sub_uris:
-            self._resolve_into(
-                sub_uri,
-                skill.plugin,
-                visited,
-                resolved,
-                warnings,
-                eager_uris=eager_uris,
-                include_content=include_content,
-            )
+            self._resolve_into(sub_uri, skill.plugin, visited, resolved, warnings, include_content=include_content)
 
     def _resolve_single(
-        self,
-        uri: str,
-        context_plugin: str,
-        visited: set[str],
-        warnings: list[str],
-        *,
-        eager_uris: frozenset[str] = frozenset(),
-        include_content: bool = False,
+        self, uri: str, context_plugin: str, visited: set[str], warnings: list[str], *, include_content: bool = False
     ) -> ResolvedSkill | None:
         """Resolve one URI string to a :class:`~agent_profile.models.ResolvedSkill`.
 
@@ -196,8 +166,6 @@ class SkillResolver:
             visited: Visited-path set. If the resolved path is already in
                 this set, returns ``None`` with a circular-dependency warning.
             warnings: Warning accumulator.
-            eager_uris: URIs whose resolved skill should have
-                ``load_eagerly=True``.
             include_content: When ``True``, read and return SKILL.md content
                 and reference files. When ``False`` (default), only path
                 metadata is returned.
@@ -262,7 +230,6 @@ class SkillResolver:
             resolved_path=skill_md,
             plugin=resolved_plugin,
             skill_name=resolved_skill_name,
-            load_eagerly=uri in eager_uris,
             content=content,
             reference_files=reference_files,
         )

@@ -91,9 +91,7 @@ def _load(
     resolver = SkillResolver(plugins_root=plugins_root)
     resolved_skills: list[ResolvedSkill]
     warnings: list[str]
-    resolved_skills, warnings = resolver.resolve(
-        metadata.skills, context_plugin=entry.plugin, eager_uris=frozenset(metadata.eager_skills)
-    )
+    resolved_skills, warnings = resolver.resolve(metadata.skills, context_plugin=entry.plugin)
 
     profile = AgentProfile(
         name=metadata.name,

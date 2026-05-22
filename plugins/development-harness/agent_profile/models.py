@@ -42,14 +42,6 @@ class AgentMetadata(BaseModel):
         default_factory=list,
         description="Ordered list of skill URIs this agent loads, e.g. ['python3-development', 'dh:subagent-contract'].",
     )
-    eager_skills: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Skill URIs the agent should load immediately after profile_load returns. "
-            "Declared via the ``eager-skills:`` frontmatter key. "
-            "All URIs here must also appear in ``skills``."
-        ),
-    )
     tools: list[str] = Field(
         default_factory=list, description="MCP tool names or glob patterns the agent is allowed to call."
     )
@@ -76,14 +68,6 @@ class ResolvedSkill(BaseModel):
     resolved_path: Path = Field(description="Absolute filesystem path to the resolved SKILL.md file.")
     plugin: str = Field(description="Name of the plugin that owns this skill, e.g. 'development-harness'.")
     skill_name: str = Field(description="Leaf skill directory name, e.g. 'subagent-contract'.")
-    load_eagerly: bool = Field(
-        default=False,
-        description=(
-            "When True, the caller should load this skill immediately via "
-            "``Skill(skill=uri)`` after receiving the profile. "
-            "Controlled by the ``eager-skills:`` field in the agent frontmatter."
-        ),
-    )
     content: str | None = Field(
         default=None,
         description=(
