@@ -1,0 +1,74 @@
+# SAM Task Plan — Gate Token Remote Execution Fix
+#
+# Canonical source: SAM plan Pf60e2c24 (registered via sam_plan, issue #2406).
+# This file is a human-readable mirror. Downstream tools (plan-validator,
+# implement-feature) read the SAM plan by ID — not this file.
+# Read tasks authoritatively via: sam_plan(plan="Pf60e2c24", action="read")
+---
+plan_id: Pf60e2c24
+feature: gate-token-remote-execution-fix
+version: "1.0"
+issue: 2406
+branch: claude/work-backlog-2406-hvgUw
+state: ready
+autonomy: full_auto
+
+goal: >-
+  Fix gate token failure in remote execution environments: add an mtime-ordered
+  fallback directory scan to _read_gate_token() in backlog_core/server.py so the
+  token is found when the MCP server's CLAUDE_CODE_SESSION_ID differs from the
+  Bash subprocess session ID, and add two unit tests covering the fallback path.
+
+context: >-
+  P1 bug fix for issue #2406. Architecture is fully specified in the architect
+  spec (artifact_read issue=2406 type=architect). Scope is exactly one function
+  plus two new unit tests. Single-function patch — no interface changes, no
+  consumer migration, no get-gate-token.mjs changes.
+
+acceptance_criteria:
+  - "AC1: Primary path (exact session ID) still resolves — covered by the existing conftest autouse _patch_gate_token fixture."
+  - "AC2: Fallback resolves when session IDs differ — new test test_read_gate_token_fallback_when_session_id_mismatch."
+  - "AC3: mtime ordering selects the most-recent token when multiple candidates exist — new test test_read_gate_token_fallback_picks_most_recent."
+  - "AC4: No regressions — uv run pytest plugins/development-harness/tests/ -x passes."
+  - "AC5: Linting clean — uv run prek run --files plugins/development-harness/backlog_core/server.py plugins/development-harness/tests/test_backlog_core_server.py."
+
+tasks:
+  - id: T01
+    title: "Add mtime-ordered fallback directory scan to _read_gate_token()"
+    status: not-started
+    agent: python3-development:python-cli-architect
+    dependencies: []
+    priority: 1
+    complexity: low
+    accuracy-risk: medium
+    skills:
+      - python-engineering:python3-core
+    parallelize-with: []
+    expected-outputs:
+      - plugins/development-harness/backlog_core/server.py
+    reason: >-
+      Defect locus — the function reads only the exact session-ID path; remote
+      sessions need a fallback scan.
+
+  - id: T02
+    title: "Add two unit tests for the _read_gate_token() fallback path"
+    status: not-started
+    agent: python3-development:python-cli-architect
+    dependencies:
+      - T01
+    priority: 2
+    complexity: low
+    accuracy-risk: low
+    skills:
+      - python-engineering:python3-testing
+    parallelize-with: []
+    expected-outputs:
+      - plugins/development-harness/tests/test_backlog_core_server.py
+    reason: >-
+      The autouse _patch_gate_token fixture means the fallback path is never
+      exercised by the existing suite — this is the coverage gap the issue's
+      RT-ICA flagged as MEDIUM risk.
+
+# Execution: T01 then T02 (T02 depends on T01 so the new tests pass against the
+# patched function). No parallel work — two tasks on a strict dependency chain.
+# No bookend tasks: the plan carries no acceptance-criteria-structured entries.
