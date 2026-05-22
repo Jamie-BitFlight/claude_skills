@@ -34,7 +34,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run -q fastmcp call plugins/development-harness/.mcp.json backlog_backlog_sync
+          uv run -q fastmcp call \
+            --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
+            --target backlog_sync
 
       - name: Commit and push if updated
         run: |
