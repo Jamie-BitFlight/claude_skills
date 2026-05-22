@@ -11,13 +11,3 @@ All "yes, unaddressed" answers must be resolved before proceeding.
 - [ ] Were tests run — or is there an explicit reason they cannot be?
 - [ ] Does any output contain a hard-coded truncation or length limit?
 
----
-
-Run the automated checker:
-
-```bash
-uv run .claude/skills/boil/scripts/check_completion.py [file_or_dir]
-```
-
-Exit 0 = no automated violations.
-Non-zero = review flagged lines, apply fixes, re-run until exit 0.

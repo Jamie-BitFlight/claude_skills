@@ -54,7 +54,6 @@ NEVER use the following exits when the permanent solve is reachable:
 When the permanent solve is genuinely unreachable due to an external constraint, use this form.
 Template: [./assets/blocked-declaration-template.md](./assets/blocked-declaration-template.md)
 Full contract: [./references/blocked-declaration-contract.md](./references/blocked-declaration-contract.md)
-Generator: `uv run .claude/skills/boil/scripts/generate_blocked.py`
 
 ```text
 BLOCKED: [specific reason the permanent solve cannot be completed now]
@@ -96,43 +95,6 @@ Before marking any task complete, answer each question:
 4. Were tests run — or is there an explicit reason they cannot be?
 5. Does any output contain a hard-coded truncation or length limit?
 
-Run the automated checker against files:
-
-```bash
-.claude/skills/boil/scripts/check_completion.py [file_or_dir]
-```
-
-Check agent response text (pipe stdout or paste):
-
-```bash
-echo "response text" | .claude/skills/boil/scripts/check_completion.py --stdin
-```
-
-The `--stdin` mode uses additional response-level patterns (workaround phrasing, deferral
-language, simplicity-excuses) that only appear in prose, not code. Both modes return exit 0
-for clean output, exit 1 for violations.
-
-Note: running the checker against `scripts/check_completion.py` itself produces false positives
-because the pattern definition strings trigger their own rules. This is expected. Exclude the
-`scripts/` directory when scanning the skill itself.
-
-**When the checker exits non-zero:**
-
-```mermaid
-flowchart TD
-    Run["Run: check_completion.py [path]<br>Exit code?"] --> Q{Exit code?}
-    Q -->|"0 — no violations"| Pass["Proceed — task is complete"]
-    Q -->|"non-zero — violations found"| Route{"Violation type?"}
-    Route -->|"INVENTED_LIMIT"| FixLimit["Read references/invented-limit-patterns.md<br>Remove the limit; add --offset/--limit parameter if needed<br>Re-run checker"]
-    Route -->|"WORKAROUND"| FixWorkaround["Apply root cause fix instead<br>Verify the workaround line is deleted<br>Re-run checker"]
-    Route -->|"DEFERRAL"| FixDeferral["Complete the deferred work now<br>Or declare BLOCKED with full contract<br>Re-run checker"]
-    Route -->|"INCOMPLETE (TODO/FIXME/PENDING)"| FixIncomplete["Resolve the marker<br>Do not delete the marker without doing the work<br>Re-run checker"]
-    FixLimit --> Run
-    FixWorkaround --> Run
-    FixDeferral --> Run
-    FixIncomplete --> Run
-```
-
 ## Pre-Existing Issue Rule
 
 When a pre-existing issue is found during a task, "pre-existing issue not related to my changes" is a trigger to act, not a dismissal.
@@ -172,11 +134,6 @@ I've implemented the core logic. The edge cases and tests can be added later.
 # RIGHT — complete delivery
 Core logic implemented. Edge cases handled: [list]. Tests written and passing.
 ```
-
-## Scripts
-
-- `scripts/check_completion.py` — scan files for prohibited patterns; exit 0 = clean
-- `scripts/generate_blocked.py` — scaffold a BLOCKED declaration interactively or from args
 
 ## Sources
 
