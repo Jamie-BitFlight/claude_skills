@@ -81,6 +81,9 @@ handoff: [What the worker must report back: summary, evidence, blockers]
 ## Verification Steps
 1. [How to verify criterion 1]
 2. [How to verify criterion 2]
+N. (When Expected Outputs lists file paths) Run: `git add <file1> [file2 ...]` then
+   `git commit -m "<type>: <task title>"` — use files from Expected Outputs only, no
+   `git add .` or `git add -A`, no `Fixes #N` / `Closes #N` / `Resolves #N` trailer.
 
 ## CoVe Checks (ONLY if accuracy-risk is medium or high)
 - Key claims to verify:
@@ -101,5 +104,8 @@ Before returning the task prompt, you MUST lint it using the existing rules:
 - Logical: sections in canonical order
 - Explicit: objective, outputs, acceptance criteria, verification are concrete
 - CoVe: included only when Accuracy Risk is Medium/High, and questions are falsifiable
+- Commit step: when `## Expected Outputs` lists one or more repo-relative file paths,
+  `## Verification Steps` MUST end with a `git add <files> && git commit` step scoped
+  to those exact files — never `git add .` or `git add -A`, never a `Fixes #N` trailer
 
 If any lint check fails, revise the task prompt and re-lint.
