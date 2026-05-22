@@ -1002,7 +1002,7 @@ def _apply_repo_detection() -> str | None:
     """
     owner_repo = detect_owner_repo()
     if owner_repo is not None:
-        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
+        _ = write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
     return owner_repo
 
 
@@ -1010,6 +1010,10 @@ def _run_detect_only() -> None:
     """Execute --detect-only mode: refresh config and print rendered examples to stdout."""
     owner_repo = _apply_repo_detection()
     if owner_repo is None:
+        error_console.print(
+            ":warning: [yellow]Warning: could not detect owner/repo from git remote. "
+            "Set GITHUB_REPO=owner/repo to override.[/yellow]"
+        )
         return
     rendered = _render_template(owner_repo)
     if rendered is not None:

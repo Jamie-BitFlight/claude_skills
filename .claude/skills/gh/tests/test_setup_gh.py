@@ -337,3 +337,87 @@ def test_render_template_returns_none_when_template_missing(tmp_path: Path) -> N
         result = _setup_gh._render_template("my-org/my-repo")
 
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Tests for _apply_repo_detection()
+# ---------------------------------------------------------------------------
+
+
+def test_apply_repo_detection_returns_slug_when_detected(tmp_path: Path) -> None:
+    """Arrange: detection succeeds. Assert: returns the slug."""
+    with (
+        patch("setup_gh.detect_owner_repo", return_value="my-org/my-repo"),
+        patch("setup_gh.write_gh_config", return_value=True),
+        patch("setup_gh.Path.cwd", return_value=tmp_path),
+    ):
+        result = _setup_gh._apply_repo_detection()
+
+    assert result == "my-org/my-repo"
+
+
+def test_apply_repo_detection_returns_none_when_detection_fails() -> None:
+    """Arrange: detection returns None. Assert: returns None and skips config write."""
+    with patch("setup_gh.detect_owner_repo", return_value=None), patch("setup_gh.write_gh_config") as mock_write:
+        result = _setup_gh._apply_repo_detection()
+
+    assert result is None
+    mock_write.assert_not_called()
+
+
+def test_apply_repo_detection_calls_write_gh_config(tmp_path: Path) -> None:
+    """Arrange: detection succeeds. Assert: write_gh_config called with correct path and slug."""
+    config_path = tmp_path / ".dh" / "config.yaml"
+    with (
+        patch("setup_gh.detect_owner_repo", return_value="my-org/my-repo"),
+        patch("setup_gh.write_gh_config", return_value=True) as mock_write,
+        patch("setup_gh.Path.cwd", return_value=tmp_path),
+    ):
+        _setup_gh._apply_repo_detection()
+
+    mock_write.assert_called_once_with(config_path, "my-org/my-repo")
+
+
+# ---------------------------------------------------------------------------
+# Tests for _run_detect_only()
+# ---------------------------------------------------------------------------
+
+
+def test_run_detect_only_writes_rendered_template_to_stdout(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Arrange: detection succeeds, template exists. Assert: rendered content written to stdout."""
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (tmp_path / "gh-examples.md.template").write_text("gh pr list -R <owner/repo>\n")
+
+    with (
+        patch("setup_gh._apply_repo_detection", return_value="my-org/my-repo"),
+        patch("setup_gh._SCRIPT_DIR", scripts_dir),
+    ):
+        _setup_gh._run_detect_only()
+
+    captured = capsys.readouterr()
+    assert "gh pr list -R my-org/my-repo" in captured.out
+
+
+def test_run_detect_only_emits_warning_when_detection_fails(capsys: pytest.CaptureFixture[str]) -> None:
+    """Arrange: detection returns None. Assert: warning emitted, no stdout output."""
+    with patch("setup_gh._apply_repo_detection", return_value=None):
+        _setup_gh._run_detect_only()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_run_detect_only_silent_when_template_missing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Arrange: detection succeeds but template is absent. Assert: no stdout output."""
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+
+    with (
+        patch("setup_gh._apply_repo_detection", return_value="my-org/my-repo"),
+        patch("setup_gh._SCRIPT_DIR", scripts_dir),
+    ):
+        _setup_gh._run_detect_only()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
