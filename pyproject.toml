@@ -83,7 +83,6 @@ extra-paths = [
     "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
     "./.claude/skills/daily-releases/scripts/daily_releases_lib",
-    "./.claude/skills/boil/scripts",
 ]
 root = ["./"]
 
