@@ -55,6 +55,15 @@ inform your output.
 
 Research-type artifacts (`artifact_type="research"`) are especially valuable — they contain investigation findings gathered before planning began. Phase agents should read these first when present.
 
+**Research artifacts as discovery pointers (not authoritative sources):** Research entries
+record summary findings and upstream source references — they are NOT the primary source.
+The YAML frontmatter of a research artifact may contain `resource_url` and/or `github_url`
+fields pointing to the upstream content. Phase agents receiving a research artifact MUST
+check these fields and fetch the upstream source before adapting content from the summary.
+This is especially important for Phase 1 (feature-researcher) and Phase 3 (architect).
+Failure to fetch the primary source causes information loss from the summary layer to
+propagate into feature context and architecture decisions.
+
 ---
 
 ## Orchestrator Discipline

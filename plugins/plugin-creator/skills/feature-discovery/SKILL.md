@@ -154,6 +154,17 @@ EXPLORE:
   - Record: upstream source URL, update frequency
   - Examples: API specs, CLI references, framework guides
 
+**Primary source verification (when research artifacts are present):** If the orchestrator
+passed a `prior_artifacts` block containing a research artifact, inspect its YAML frontmatter
+for `resource_url` and `github_url` fields. If either is present:
+
+1. Fetch the upstream URL using `WebFetch` or `mcp__Ref__ref_read_url`.
+2. Treat the fetched content as the authoritative source; use the local research summary
+   as an index only.
+3. If the URL is absent or unreachable (4xx/5xx/timeout), log a note in the output
+   document: `"Upstream URL unreachable — discovery based on local research summary."`
+   Then continue normally. Never hard-fail because a URL is unreachable.
+
 For each similar pattern found, record:
 
 - File path and line numbers

@@ -85,6 +85,9 @@ Your training data is 6-18 months stale. Treat pre-existing knowledge as hypothe
 1. **Verify before asserting** - Read files before claiming what's in them
 2. **Cite sources** - Reference file:line for all claims about the codebase
 3. **Flag uncertainty** - "Based on patterns I found" not "The codebase does X"
+4. **Follow upstream URLs** - When research artifacts contain `resource_url` or
+   `github_url`, fetch the primary source before adapting. Local research summaries
+   are discovery artifacts, not authoritative documents.
 
 ## Discovery is Understanding, Not Design
 
@@ -168,6 +171,42 @@ For either input type, identify:
 | **WHY**  | What problem does this solve? |
 
 Do NOT answer HOW - that's implementation.
+
+## Step 2.5: Fetch Primary Sources from Research Artifact Frontmatter
+
+If the orchestrator provided `prior_artifacts` that include a research artifact, read
+that artifact via `artifact_read` and inspect its YAML frontmatter for `resource_url`
+and `github_url` fields.
+
+```python
+# Pseudocode — detect and follow upstream URLs
+if prior_artifacts contains artifact_type="research":
+    content = artifact_read(issue_number, "research")
+    frontmatter = parse_yaml_frontmatter(content)
+    resource_url = frontmatter.get("resource_url")
+    github_url   = frontmatter.get("github_url")
+```
+
+For each URL found:
+
+1. Fetch the URL using `mcp__Ref__ref_read_url` (preferred) or `WebFetch` as fallback.
+2. Treat the fetched content as the **authoritative primary source**.
+3. Use the local research summary only as an index — a map to the primary source, not a
+   substitute for it.
+
+**Fallback rule**: If a URL is absent, returns 4xx/5xx, or times out:
+
+- Log a warning in the feature-context document under a `## Research Source Notes` section:
+  `"resource_url {url} unreachable ({reason}) — proceeding from local research summary."`
+- Continue with the local research summary as the source.
+- NEVER hard-fail the pipeline because a URL is unreachable.
+
+**Conditional trigger**: This step runs ONLY when:
+- A research artifact is present in `prior_artifacts`, AND
+- The research artifact frontmatter contains at least one of `resource_url` or `github_url`
+
+When no research artifact is present, or when no URL fields appear in its frontmatter,
+skip this step entirely and proceed to Step 3.
 
 ## Step 3: Explore Codebase
 

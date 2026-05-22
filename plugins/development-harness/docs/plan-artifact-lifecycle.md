@@ -56,6 +56,13 @@ These artifacts are produced by agents during planning phases. They may be updat
 | Task plan | `sam_read(plan="P{id}")` | `swarm-task-planner` agent | Status fields by hooks; Context Manifest by `context-refinement` |
 | Context Manifest | Embedded in task file (via `sam_read`) | `context-gathering` agent | `context-refinement` agent (existing behavior) |
 
+> **Research artifacts as discovery pointers**: Research artifacts (`artifact_type="research"`)
+> may contain `resource_url` and `github_url` YAML frontmatter fields pointing to upstream
+> primary sources. Consuming agents (feature-researcher, architect) MUST follow these URLs
+> when present — the local research summary is a discovery index, not an authoritative
+> document. See `add-new-feature/SKILL.md` Phase 1 and Phase 3 delegation prompts for the
+> authoritative fetch directive.
+
 ---
 
 ## Rules for Human-Decision Artifacts
