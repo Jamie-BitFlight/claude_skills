@@ -39,9 +39,10 @@ The script:
 **CLI options:**
 
 ```text
---force     Reinstall even if already at latest version
---dry-run   Show what would happen without installing
---bin-dir   Override install directory (default: auto-detect from PATH)
+--force          Reinstall even if already at latest version
+--dry-run        Show what would happen without installing
+--bin-dir        Override install directory (default: auto-detect from PATH)
+--detect-only    Detect owner/repo, refresh .dh/config.yaml and gh-examples.md, print examples to stdout. No network calls.
 ```
 
 ---
@@ -84,9 +85,7 @@ This applies to ALL `gh` subcommands: `pr`, `issue`, `run`, `api`, `release`, `p
 
 ## Common Commands
 
-Commands below are loaded from the rendered examples file for this repository. Run `setup_gh.py` once to generate or refresh them with the detected `owner/repo`.
-
-!`cat .claude/skills/gh/gh-examples.md`
+!`uv run --script .claude/skills/gh/scripts/setup_gh.py --detect-only 2>/dev/null`
 
 ---
 

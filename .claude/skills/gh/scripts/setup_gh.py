@@ -1018,6 +1018,22 @@ def render_gh_examples(owner_repo: str) -> bool:
     return True
 
 
+def _apply_repo_detection() -> None:
+    """Detect owner/repo from git remote and refresh .dh/config.yaml + gh-examples.md."""
+    owner_repo = detect_owner_repo()
+    if owner_repo is not None:
+        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
+        render_gh_examples(owner_repo)
+
+
+def _run_detect_only() -> None:
+    """Execute --detect-only mode: refresh config and print examples to stdout."""
+    _apply_repo_detection()
+    examples_path = _SCRIPT_DIR.parent / "gh-examples.md"
+    if examples_path.exists():
+        sys.stdout.write(examples_path.read_text(encoding="utf-8"))
+
+
 # ---------------------------------------------------------------------------
 # CLI command
 # ---------------------------------------------------------------------------
@@ -1035,6 +1051,15 @@ def main(
     bin_dir: Annotated[
         Path | None, typer.Option("--bin-dir", help="Override install directory (default: auto-detect from PATH)")
     ] = None,
+    detect_only: Annotated[
+        bool,
+        typer.Option(
+            "--detect-only",
+            help="Detect owner/repo from git remote, write .dh/config.yaml, render gh-examples.md, "
+            "then print the rendered examples to stdout. Skips all network calls and gh install logic. "
+            "Designed for use with the skill !-notation: !`uv run --script setup_gh.py --detect-only`.",
+        ),
+    ] = False,
 ) -> None:
     """Install or update the GitHub CLI (gh) from GitHub Releases.
 
@@ -1052,7 +1077,13 @@ def main(
         no_cache: Disable local release metadata cache reads/writes.
         cache_ttl_seconds: Cache freshness TTL in seconds.
         bin_dir: Override the default install directory.
+        detect_only: Skip install; detect repo, update config, print examples.
     """
+    # --detect-only: no network calls, no install — refresh config and emit examples to stdout.
+    if detect_only:
+        _run_detect_only()
+        raise typer.Exit(code=0)
+
     # 1. Check if gh is already installed
     gh_which = shutil.which(BINARY_NAME)
     installed_version = get_installed_version()
@@ -1084,12 +1115,9 @@ def main(
         os_key, arch, use_cache=not no_cache, cache_ttl_seconds=cache_ttl_seconds
     )
 
-    # 5. Auto-detect owner/repo and persist to .dh/config.yaml — runs on every
-    #    invocation so "already installed" runs still refresh config/examples.
-    owner_repo = detect_owner_repo()
-    if owner_repo is not None:
-        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
-        render_gh_examples(owner_repo)
+    # 5. Auto-detect owner/repo — runs on every invocation so "already installed"
+    #    exits still refresh .dh/config.yaml and gh-examples.md.
+    _apply_repo_detection()
 
     # 6. Check if update is needed
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
