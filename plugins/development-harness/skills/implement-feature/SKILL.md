@@ -223,19 +223,25 @@ This terminates the teammate immediately rather than leaving it idle. Idle teamm
 
 Commit responsibility depends on which execution mode is active.
 
-**Same-worktree mode (default — no isolation flag):** The orchestrator owns all commits. After step 4b completes for task N, before dispatching task N+1:
+**Same-worktree mode (default — no isolation flag):** The orchestrator owns all commits. Commit timing depends on `autonomy_mode`:
 
-1. Run `git status` to identify unstaged changes attributable to the completed task.
-2. Stage and commit those changes:
+- **`per_task` mode**: The Per-task Confirmation Gate (below) ensures only one task runs at a time. Commit after step 4b, before dispatching the next task — no concurrent agents are writing:
 
-   ```bash
-   git add -A
-   git commit -m "feat(task): {task_id} — {task_title}"
-   ```
+  ```bash
+  git add -A
+  git commit -m "<type>(task): {task_id} — {task_title}"
+  ```
 
-3. Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers in task-level commits — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
+- **`full_auto` and `checkpoint` modes**: Multiple tasks in a batch execute concurrently. Do NOT commit after each individual step 4b — other batch agents may still be writing to the worktree. Commit once **after step 5** confirms all tasks in the current batch are complete:
 
-**Why the orchestrator commits:** Multiple agents write to the same filesystem concurrently. An agent committing mid-task risks including another agent's in-progress changes. The orchestrator receives completion messages serially and is the only actor with a safe, serialised view of which files belong to which completed task.
+  ```bash
+  git add -A
+  git commit -m "<type>(task-batch): {plan_address} — {task_ids}"
+  ```
+
+In both cases, choose `<type>` to match the dominant change in the committed work (`feat`, `fix`, `docs`, `refactor`, etc.). Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
+
+**Why the orchestrator commits:** Multiple agents write to the same filesystem concurrently. An agent committing mid-task risks including another agent's in-progress changes. The orchestrator is the only actor that knows when a batch is fully settled, making it the safe commit point.
 
 **Isolated-worktree mode (via `/dh:work-milestone`):** Each agent owns its own commits. The agent commits in its isolated worktree after completing its task. The orchestrator merges each worktree back when the completion message arrives. The orchestrator does NOT issue commit calls in this mode.
 
