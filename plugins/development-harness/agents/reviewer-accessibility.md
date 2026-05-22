@@ -5,6 +5,7 @@ model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
 skills:
   - dh:subagent-contract
+  - dh:file-classification
 user-invocable: false
 color: green
 ---

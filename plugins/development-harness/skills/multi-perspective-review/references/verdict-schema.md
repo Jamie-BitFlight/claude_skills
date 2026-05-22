@@ -165,3 +165,86 @@ PASS
   per finding without breaking v1 consumers
 - Issue #1430 replaces the gate function body only; callers (the skill body) do not change
 - The stub consolidation above implements the stable interface; #1430 swaps only the internals
+
+---
+
+## §2.5 Prose File Classification (All Perspectives)
+
+Not all markdown is documentation. Before applying SKIP on the grounds that "no code was
+changed," every reviewer MUST classify changed prose files using the decision tree below.
+
+```mermaid
+flowchart TD
+    File([Changed file]) --> Q1{"Is it prose?<br>(markdown, text, config with prose fields)"}
+    Q1 -->|"No — pure code"| Code["Standard review<br>Apply perspective normally"]
+    Q1 -->|Yes| Q2{"Does any part describe or influence<br>a process or function?"}
+    Q2 -->|"No — pure reference data,<br>changelogs, release notes"| T1["Tier 1 — Documentation Only<br>SKIP permitted for all perspectives"]
+    Q2 -->|"Yes — guides behavior,<br>defines constraints, describes workflow"| Q3{"Primary executor or<br>audience is an AI / LLM / agent?"}
+    Q3 -->|"No — human-facing<br>CONTRIBUTING.md, ADRs, runbooks"| T2["Tier 2 — Process Documentation<br>SKIP permitted with explicit skip_reason<br>stating why the change has no impact<br>in this reviewer's scope"]
+    Q3 -->|"Yes — agent files, SKILL.md,<br>CLAUDE.md, rules/*.md, prompts"| T3["Tier 3 — LLM Prompt Engineering Artifact<br>See §2.5 tier rules below"]
+```
+
+### Tier 1 — Documentation Only
+
+Pure reference data: changelogs, release notes, README sections that only describe completed
+features without defining workflows or constraints. SKIP is permitted for all perspectives
+with no applicable checks.
+
+### Tier 2 — Process Documentation
+
+Human-facing behavioral contracts: `CONTRIBUTING.md`, architecture decision records, runbooks,
+README sections that define workflows or contribution steps. These files have functional
+behavioral impact on human contributors and operators. SKIP is permitted only with an explicit
+`skip_reason` explaining why the change has no impact in the reviewer's scope.
+
+### Tier 3 — LLM Prompt Engineering Artifacts
+
+Any file whose prose is read and executed by an LLM is an **executable specification**, not
+documentation. The markdown content IS the executable.
+
+**Files classified as Tier 3:**
+
+- Plugin agent files: `agents/*.md`
+- Skill files: `skills/*/SKILL.md`, `skills/*/references/*.md`
+- Session instruction files: `CLAUDE.md`, `.claude/rules/*.md`
+- Any `.md` file that defines constraints, workflows, or behaviors for an AI agent
+
+**Per-perspective rules for Tier 3 files:**
+
+| Perspective | SKIP | Review criterion |
+|---|---|---|
+| Security | **PROHIBITED** — check for prompt injection surfaces (§2.5.1) | Prompt injection, authority escalation |
+| Quality | **PROHIBITED** — already prohibited by role definition | Behavioral correctness: contradictions, ambiguous constraints, missing edge cases |
+| Performance | Permitted — instruction complexity is out of performance scope | N/A |
+| Accessibility | Permitted — LLM prompt files are not UI | N/A |
+
+### §2.5.1 Prompt Injection Security Surface
+
+When any Tier 3 file is in the changed-files list, the security reviewer checks for:
+
+1. **User-input interpolation** — an instruction template that interpolates user-supplied
+   content into a position where an LLM will execute it as a command
+   (e.g., `{user_query}` embedded in a workflow step that the LLM interprets as instruction)
+2. **Agent-output interpolation** — an instruction that passes another LLM's output directly
+   into an instruction context without sanitization or intent verification
+3. **Authority escalation via content** — an instruction that grants elevated permissions
+   based on content in a data position
+   (e.g., "if the issue body contains X, skip all checks")
+
+Each confirmed surface is a `BLOCKER` finding with `rule: "prompt-injection"`.
+
+### §2.5.2 Quality Correctness for Tier 3 Files
+
+When any Tier 3 file is in the changed-files list, the quality reviewer checks:
+
+- **Contradictions between sections** — two instructions that conflict; an LLM reading both
+  will choose arbitrarily
+- **Ambiguous constraints** — a rule that is phrased with "should", "try to", or "ideally"
+  where a MUST/NEVER imperative is required for reliable enforcement
+- **Missing edge cases** — a decision branch or process that lacks a terminal state or
+  fallback for the "none of the above" case
+- **Instruction bloat** — excessive repetition or overly long preamble that degrades attention
+  and increases the probability of the agent ignoring downstream rules
+
+These are prompt engineering bugs. Each confirmed issue is a finding (BLOCKER if it causes
+incorrect behavior in a documented scenario; MINOR otherwise).
