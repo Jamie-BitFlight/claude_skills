@@ -276,7 +276,7 @@ Agent({
 })
 ```
 
-For deterministic multi-file refactors (symbol renames, import migrations, bulk transforms), load the `/dh:codemod-runner` skill to select the right AST tool and run idempotency-checked batches instead of dispatching LLM workers for mechanical changes.
+> **Large-scale structural transforms**: When refactoring involves AST-level changes (renaming symbols, migrating API call-sites, enforcing new patterns across ≥10 files), use `Skill(skill: "dh:codemod-runner")` to select the right tool (comby/ast-grep/jscodeshift/ts-morph/LibCST), assess scope with `rg -l`, and verify idempotency before committing. Assign one batch per swarm worker.
 
 ---
 
