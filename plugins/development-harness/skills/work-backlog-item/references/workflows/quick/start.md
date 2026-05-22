@@ -2,6 +2,17 @@
 
 **Trigger:** <mode/> is `--quick`. Skips grooming, RT-ICA, and SAM planning. For one-file fixes, broken links, and typo patches where full pipeline overhead is disproportionate.
 
+**Entry point from proactive fix gate:** When the Proactive Fix Gate (CLAUDE.md) routes a fix
+to --quick, the agent invokes this workflow as:
+  /dh:work-backlog-item --quick {item title or #N}
+
+If no backlog item exists for the fix, the agent does NOT call backlog_add first. Instead it
+passes the descriptive title directly to `--quick`, which creates a minimal item inline (Step 2
+of this workflow). The gate, not the user, authorizes the --quick routing decision.
+
+**Invocation form:** `flags.quick = true` (parser flag). Not a registry command. The title
+or issue reference is passed as `item_ref`.
+
 1. Extract title from <item_ref/>+ joined. Build slug: title lowercased, spaces → hyphens.
 
 2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
@@ -74,6 +85,10 @@
    ```
 
    `<gate_token>` is the session token injected by the skill at load time from the `<gate_token>` block in SKILL.md. It is not a literal placeholder — the skill resolves it to the actual token value before these instructions are read.
+
+   Note: When arriving via the proactive fix gate with no prior backlog item, this creation step
+   is the correct path. The gate's complexity classification already confirmed the fix is trivial —
+   no grooming or RT-ICA is needed.
 
    If found, extract description and acceptance criteria from `response["sections"]`.
 
