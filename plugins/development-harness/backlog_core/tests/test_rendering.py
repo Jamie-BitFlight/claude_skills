@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from backlog_core import rendering as _rendering
+from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
@@ -30,20 +31,25 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(params=["github", "sqlite", "memory"])
+@pytest.fixture(params=["github", "sqlite", "memory", "beads"])
 def backend_instance(request: pytest.FixtureRequest) -> BacklogBackend:
     """Parametrised fixture yielding each BacklogBackend implementation.
 
-    Covers GitHubBackend, SQLiteBackend (in-memory), and InMemoryBackend so
-    that rendering tests exercise all three without repeating test logic.
-    GitHubBackend rendering methods delegate to backlog_core.rendering and do
-    not call the GitHub API, so no mocking is required.
+    Covers GitHubBackend, SQLiteBackend (in-memory), InMemoryBackend, and
+    BeadsBackend so that rendering tests exercise all four without repeating
+    test logic.  All rendering methods on every backend delegate to
+    backlog_core.rendering and do not call external services, so no mocking
+    is required.  BeadsBackend is lazily-validating — the constructor does not
+    touch the filesystem or spawn processes, so it is safe to instantiate here
+    even when the ``bd`` CLI is not installed.
     """
     name: str = request.param
     if name == "github":
         return cast("BacklogBackend", GitHubBackend())
     if name == "sqlite":
         return cast("BacklogBackend", SQLiteBackend(db_path=":memory:"))
+    if name == "beads":
+        return cast("BacklogBackend", BeadsBackend())
     return cast("BacklogBackend", InMemoryBackend())
 
 
@@ -203,3 +209,45 @@ class TestUnknownKeyToHeading:
         """
         result = _rendering.unknown_key_to_heading(key)
         assert result == expected, f"unknown_key_to_heading({key!r}) returned {result!r}, expected {expected!r}"
+
+
+# ---------------------------------------------------------------------------
+# Test 5 — section_display_title is identical across all backends
+# ---------------------------------------------------------------------------
+
+
+class TestSectionDisplayTitleConsistency:
+    """section_display_title on all four backends produces identical output.
+
+    Regression guard: verifies that every BacklogBackend delegates
+    ``section_display_title`` to ``backlog_core.rendering.section_display_title``
+    rather than re-implementing the logic locally.  A backend that diverges
+    (e.g. returns a different heading for the same key) would produce
+    inconsistent UI rendering that CI would otherwise miss.
+
+    Covers three representative input classes:
+    - A known key present in ``SECTION_HEADING`` (canonical lookup path).
+    - The special ``"groomed"`` key with a non-empty date (date-suffix path).
+    - An ``unknown__`` prefixed key not in ``SECTION_HEADING`` (fallback path).
+    """
+
+    @pytest.mark.parametrize(
+        ("key", "groomed_date"),
+        [("fact_check", ""), ("groomed", "2026-04-04"), ("unknown__custom_section", "")],
+        ids=["known_key", "groomed_key_with_date", "unknown_key"],
+    )
+    def test_section_display_title_returns_same_output_for_all_backends(
+        self, backend_instance: BacklogBackend, key: str, groomed_date: str
+    ) -> None:
+        """Each backend's section_display_title matches the canonical rendering module output.
+
+        Asserts that ``backend.section_display_title(key, groomed_date)`` equals
+        ``_rendering.section_display_title(key, groomed_date)`` for every backend
+        and every representative input combination.
+        """
+        expected = _rendering.section_display_title(key, groomed_date)
+        result = backend_instance.section_display_title(key, groomed_date)
+        assert result == expected, (
+            f"{type(backend_instance).__name__}.section_display_title({key!r}, {groomed_date!r}) "
+            f"returned {result!r}; expected {expected!r}"
+        )
