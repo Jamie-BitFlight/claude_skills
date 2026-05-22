@@ -606,6 +606,7 @@ In addition to existing requirements:
 - Every task MUST have Objective, Constraints, and `accuracy-risk` in YAML frontmatter
 - Every task MUST have Verification Steps that are executable or unambiguous
 - Do NOT generate `Fixes #N`, `Closes #N`, or `Resolves #N` in task acceptance criteria or verification steps — these trailers cause premature GitHub issue closure. Issue closure is handled exclusively by `/complete-implementation` in its final commit step.
+- Every task whose `## Expected Outputs` lists one or more repo-relative file paths MUST include a git commit step as the final entry in `## Verification Steps`. The commit step MUST: (1) stage only the files named in `## Expected Outputs` using `git add <file1> [file2 ...]` — never `git add .` or `git add -A`, which pollute commits in shared-worktree execution; (2) commit with a conventional-commits subject derived from task type and title (e.g., `git commit -m "docs: <task title>"`); (3) NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` per the rule above and per `commit-conventions.md`. Tasks whose `## Expected Outputs` list only non-file artifacts (registered MCP artifacts, analysis verdicts) are exempt.
 - If `accuracy-risk` is `medium` or `high`, include CoVe Checks with falsifiable questions
 - Prefer primary sources: repo code, tests, official docs, config schemas
 - **Bookend generation**: After decomposing implementation tasks, check whether the plan's `acceptance-criteria-structured` field is non-empty. If yes, apply the templates and dependency rules defined in the **Bookend Task Generation** section above. Insert T0 before any implementation task and TN after all implementation tasks. Add `T0` to the `dependencies` list of every non-bookend task.
@@ -672,6 +673,14 @@ Add these validations:
 - Skills values are valid skill activation names (string, optionally colon-separated `plugin:skill`)
 - If architecture spec prescribes skills for a task type, verify they are present
 - Skills match the Skills Mapping Table patterns based on task title and requirements
+
+11. Commit step presence check (NEW)
+
+- For every task whose `## Expected Outputs` lists one or more repo-relative file paths: verify
+  that `## Verification Steps` contains a final step with `git add <files>` and `git commit`
+- Confirm the `git add` form is file-scoped (not `git add .` or `git add -A`)
+- Confirm no `Fixes #N`, `Closes #N`, or `Resolves #N` appears in the commit step
+- If any check fails, add or correct the commit step before emitting the plan
 
 ## Success Metrics (UPDATED)
 
