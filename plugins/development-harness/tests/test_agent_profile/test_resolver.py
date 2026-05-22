@@ -403,7 +403,13 @@ class TestResolverEdgeCases:
     def test_read_skill_content_missing_after_path_check_produces_warning(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Cover lines 200-202: FileNotFoundError from read_skill_content after path safety passes."""
+        """read_skill_content is only called when include_content=True.
+
+        When include_content=False (the default), patching read_skill_content has no
+        effect: the skill resolves successfully with content=None and no warnings are
+        produced.  This verifies the metadata-only fast path does not invoke the
+        content reader.
+        """
         plugins_root = tmp_path / "plugins"
         _make_skill(plugins_root, "plugin-a", "disappearing-skill", "Content.")
 
@@ -415,10 +421,15 @@ class TestResolverEdgeCases:
         monkeypatch.setattr(resolver_module, "read_skill_content", always_raise)
 
         resolver = SkillResolver(plugins_root)
+        # Default include_content=False — read_skill_content is never called.
         skills, warnings = resolver.resolve(["plugin-a:disappearing-skill"], "plugin-a")
 
-        assert skills == []
-        assert any("SKILL.md not found" in w for w in warnings)
+        assert len(skills) == 1
+        skill = skills[0]
+        assert skill is not None
+        assert skill.content is None
+        assert skill.reference_files is None
+        assert warnings == []
 
     def test_non_directory_entries_in_plugins_root_skipped(self, tmp_path: Path) -> None:
         """Cover line 336: non-directory entries in plugins_root iterdir are skipped."""

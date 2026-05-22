@@ -234,16 +234,22 @@ class TestProfileLoad:
         first_skill = skills[0]
         assert _RESOLVED_SKILL_KEYS.issubset(first_skill.keys())
         assert first_skill["skill_name"] == "skill-a"
-        assert "Skill A content" in first_skill["content"]
+        # profile_load uses metadata-only mode (include_content=False by default);
+        # content and reference_files are None in the returned dict.
+        assert first_skill["content"] is None
+        assert first_skill["reference_files"] is None
 
     async def test_load_skill_includes_reference_files(
         self, mocker: MockerFixture, tmp_path: Path, single_plugin_root: Path
     ) -> None:
-        """profile_load includes reference files from the skill's references/ directory.
+        """profile_load returns reference_files=None in metadata-only mode.
 
-        Tests: reference_files dict is populated in resolved skill.
-        How: Use single_plugin_root which has skill-a with two reference files.
-        Why: Reference files are part of the bundled skill context.
+        Tests: reference_files is None in resolved skill when profile_load uses the
+               default include_content=False resolver mode.
+        How: Use single_plugin_root which has skill-a with two reference files;
+             verify the resolved skill carries None for reference_files.
+        Why: profile_load is metadata-only by default; callers load content via
+             Skill(skill=uri) using the uri field.
         """
         # Arrange
         agents_dir = single_plugin_root / "test-plugin" / "agents"
@@ -259,13 +265,12 @@ class TestProfileLoad:
         async with Client(mcp) as client:
             result = await client.call_tool("load", {"agent_name": "single-skill-agent"})
 
-        # Assert
+        # Assert — metadata-only mode returns None for content fields
         skills = result.data["skills"]
         skill_a = next(s for s in skills if s["skill_name"] == "skill-a")
-        ref_files = skill_a["reference_files"]
-        assert "guide.md" in ref_files
-        assert "reference.md" in ref_files
-        assert "Guide content." in ref_files["guide.md"]
+        assert skill_a is not None
+        assert skill_a["reference_files"] is None
+        assert skill_a["content"] is None
 
     async def test_load_returns_warnings_for_missing_skill(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """profile_load returns a partial profile with warnings when a skill is unresolvable.
@@ -687,7 +692,8 @@ class TestProfileLoadDomainPath:
         skills = result.data["skills"]
         assert len(skills) == 1
         assert skills[0]["skill_name"] == "enterprise-foo"
-        assert "Enterprise Foo skill content" in skills[0]["content"]
+        # profile_load uses metadata-only mode; content is None by default.
+        assert skills[0]["content"] is None
 
 
 # ---------------------------------------------------------------------------
