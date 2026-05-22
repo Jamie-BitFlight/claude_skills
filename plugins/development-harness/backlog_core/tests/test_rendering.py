@@ -173,3 +173,33 @@ class TestBackendProtocolSectionHeadingProperty:
         required_keys = {"fact_check", "rt_ica", "issue_classification"}
         missing = required_keys - heading_map.keys()
         assert not missing, f"{type(backend_instance).__name__}.section_heading is missing required keys: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — unknown_key_to_heading strips prefix and title-cases
+# ---------------------------------------------------------------------------
+
+
+class TestUnknownKeyToHeading:
+    """unknown_key_to_heading strips the ``unknown__`` prefix and title-cases the result."""
+
+    @pytest.mark.parametrize(
+        ("key", "expected"),
+        [
+            ("unknown__rt_ica", "Rt Ica"),
+            ("unknown__custom_analysis", "Custom Analysis"),
+            ("unknown__story", "Story"),
+            ("unknown__my_custom_section", "My Custom Section"),
+            ("unknown__single", "Single"),
+        ],
+        ids=["rt_ica", "custom_analysis", "story", "my_custom_section", "single_word"],
+    )
+    def test_unknown_key_to_heading_strips_prefix_and_title_cases(self, key: str, expected: str) -> None:
+        """Strips the ``unknown__`` prefix, replaces underscores with spaces, title-cases.
+
+        Verifies that the canonical rendering module correctly reverses the
+        ``unknown__`` prefixing applied during section storage, producing a
+        human-readable heading for display.
+        """
+        result = _rendering.unknown_key_to_heading(key)
+        assert result == expected, f"unknown_key_to_heading({key!r}) returned {result!r}, expected {expected!r}"
