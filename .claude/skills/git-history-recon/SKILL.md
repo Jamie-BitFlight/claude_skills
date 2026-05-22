@@ -111,10 +111,10 @@ git log --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c |
 **Command**:
 
 ```bash
-git log --grep='fix|bug|broken|hotfix|revert' --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c | sort -rn | head -N
+git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c | sort -rn | head -N
 ```
 
-**Note**: The `--grep` pattern uses extended regex. Files from commits whose message matches any of: `fix`, `bug`, `broken`, `hotfix`, `revert`.
+**Note**: The `--grep` pattern uses BRE alternation (`\|`). Files from commits whose message matches any of: `fix`, `bug`, `broken`, `hotfix`, `revert`.
 
 **Caveat**: This detection is convention-dependent. Repositories using ticket-ID-only messages, Conventional Commits without these keywords, or non-English commit conventions will have under-reported results. The report header discloses this limitation.
 
@@ -176,7 +176,7 @@ git log --since=WINDOW --format='%Y-%m' | sort | uniq -c
 **Command**:
 
 ```bash
-git log --since=WINDOW --grep='revert|hotfix|rollback' --oneline | wc -l
+git log --since=WINDOW --grep='revert\|hotfix\|rollback' --oneline | wc -l
 ```
 
 **Output shape**: Single integer (count of firefighting commits in the analysis window).
