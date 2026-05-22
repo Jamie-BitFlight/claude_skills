@@ -57,6 +57,7 @@ Research-type artifacts (`artifact_type="research"`) are especially valuable —
 
 **Research artifacts as discovery pointers (not authoritative sources):** Research entries
 record summary findings and upstream source references — they are NOT the primary source.
+Research artifacts are discovery pointers, not authoritative documents.
 The YAML frontmatter of a research artifact may contain `resource_url` and/or `github_url`
 fields pointing to the upstream content. Phase agents receiving a research artifact MUST
 check these fields and fetch the upstream source before adapting content from the summary.
@@ -86,6 +87,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 ```
 
@@ -113,6 +120,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Research #{issue}: "{title}".
@@ -173,6 +186,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Analyze {focus_area} for #{issue}: "{title}".
@@ -337,6 +356,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Design the implementation for #{issue}: "{title}".
@@ -390,6 +415,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Decompose #{issue}: "{title}" into executable tasks.
@@ -451,6 +482,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Validate plan P{N} for #{issue}: "{title}".
@@ -477,6 +514,12 @@ product quality improvements and aligning with the design intent. If you see som
 that seems misaligned, verify it, and then note your concerns and findings concisely
 in your response in a <concerns></concerns> block. Point out duplication, contradictions,
 statements of fact without citation, code smells, missing documentation.
+
+For claims derived from research artifacts: verify the claim against the upstream
+primary source, not just the local research summary. If the research artifact frontmatter
+contains `resource_url` or `github_url`, fetch that URL and check the claim against it.
+Cite the fetched primary URL, not the research summary file path, when the claim originates
+from external upstream content.
 </quality_vigilance>
 
 Add context manifest to plan P{N} for #{issue}: "{title}".
