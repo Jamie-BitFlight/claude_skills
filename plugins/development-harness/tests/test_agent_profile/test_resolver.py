@@ -279,9 +279,10 @@ class TestResolvedSkillContent:
         _make_skill(plugins_root, "plugin-a", "my-skill", "Specific content here.")
 
         resolver = SkillResolver(plugins_root)
-        skills, _ = resolver.resolve(["plugin-a:my-skill"], "plugin-a")
+        skills, _ = resolver.resolve(["plugin-a:my-skill"], "plugin-a", include_content=True)
 
         assert len(skills) == 1
+        assert skills[0].content is not None
         assert "Specific content here." in skills[0].content
 
     def test_resolved_skill_includes_reference_files(self, tmp_path: Path) -> None:
@@ -292,8 +293,9 @@ class TestResolvedSkillContent:
         (refs_dir / "guide.md").write_text("Guide content.", encoding="utf-8")
 
         resolver = SkillResolver(plugins_root)
-        skills, _ = resolver.resolve(["plugin-a:my-skill"], "plugin-a")
+        skills, _ = resolver.resolve(["plugin-a:my-skill"], "plugin-a", include_content=True)
 
+        assert skills[0].reference_files is not None
         assert "guide.md" in skills[0].reference_files
         assert skills[0].reference_files["guide.md"] == "Guide content."
 
