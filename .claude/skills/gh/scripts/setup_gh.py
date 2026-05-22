@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "httpx>=0.28.1",
+#     "ruamel.yaml>=0.18.0",
 #     "typer>=0.21.0",
 # ]
 # ///
@@ -20,6 +21,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -44,6 +46,8 @@ if isinstance(sys.stderr, TextIOWrapper):
 import httpx
 import typer
 from rich.console import Console
+from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
+from ruamel.yaml.comments import CommentedMap as _CommentedMap
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -68,6 +72,25 @@ ARCH_MAP: dict[str, str] = {
     "i386": "386",
     "i686": "386",
 }
+
+#: Resolved at module load time so tests can patch ``setup_gh._SCRIPT_DIR``.
+_SCRIPT_DIR: Path = Path(__file__).parent
+
+#: Matches the canonical ``owner/repo`` slug format.
+_REPO_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+#: SSH SCP remote pattern: ``git@github.com:owner/repo.git``
+_SSH_REMOTE_RE = re.compile(r"git@[^:]+:([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$")
+
+#: HTTPS / HTTP remote pattern: ``https://github.com/owner/repo[.git]``
+_HTTPS_REMOTE_RE = re.compile(r"https?://[^/]+/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$")
+
+#: SSH protocol remote pattern: ``ssh://git@github.com/owner/repo.git``
+_SSH_PROTO_REMOTE_RE = re.compile(r"ssh://[^/]+/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$")
+
+#: Proxy remote pattern: ``http://local_proxy@127.0.0.1:{port}/git/{owner}/{repo}``
+#: Matches any host/port proxy URL with a ``/git/`` path prefix.
+_PROXY_REMOTE_RE = re.compile(r".*/git/([^/]+/[^/]+?)(?:\.git)?/?$")
 
 # ---------------------------------------------------------------------------
 # Console setup
@@ -814,6 +837,182 @@ def download_and_install(
 
 
 # ---------------------------------------------------------------------------
+# Owner/repo auto-detection and config helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_git_remote_url() -> str | None:
+    """Run ``git remote get-url origin`` and return the raw URL, or None on failure.
+
+    Args:
+        None — always targets the ``origin`` remote of the current working directory.
+
+    Returns:
+        The raw URL string returned by git, or None when the subprocess exits
+        non-zero, git is not on PATH, or the working directory is not a git
+        repository. Emits one warning line to stderr per failure condition.
+
+    Side effects:
+        May write one warning line to stderr.
+        Never raises.
+    """
+    git_bin = shutil.which("git") or "git"
+    try:
+        result = subprocess.run(
+            [git_bin, "remote", "get-url", "origin"], check=False, capture_output=True, text=True, timeout=10
+        )
+    except OSError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not run git — {exc}[/yellow]")
+        return None
+    except subprocess.SubprocessError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not run git — {exc}[/yellow]")
+        return None
+
+    if result.returncode != 0:
+        error_console.print(
+            f":warning: [yellow]Warning: git remote get-url origin failed (exit {result.returncode})[/yellow]"
+        )
+        return None
+
+    return result.stdout.strip() or None
+
+
+def detect_owner_repo() -> str | None:
+    """Detect the GitHub ``owner/repo`` slug for the current checkout.
+
+    Detection order:
+    1. ``GITHUB_REPO`` environment variable — if set and matches
+       ``owner/repo`` slug format, return it immediately.
+    2. ``git remote get-url origin`` — result passed through four regex
+       patterns in priority order (see module-level regex constants).
+       First match wins.
+
+    Returns:
+        Validated ``owner/repo`` slug string, or ``None`` when all detection
+        methods fail. Never raises.
+
+    Side effects:
+        Emits one warning to stderr when git remote parsing fails or when the
+        URL does not match any known pattern. Does not abort the caller.
+    """
+    env_repo = os.environ.get("GITHUB_REPO", "")
+    if env_repo and _REPO_SLUG_RE.match(env_repo):
+        return env_repo
+
+    url = _get_git_remote_url()
+    if url is None:
+        return None
+
+    for pattern in (_SSH_REMOTE_RE, _HTTPS_REMOTE_RE, _SSH_PROTO_REMOTE_RE, _PROXY_REMOTE_RE):
+        m = pattern.match(url)
+        if m:
+            return m.group(1)
+
+    error_console.print(f":warning: [yellow]Warning: could not parse owner/repo from remote URL: {url}[/yellow]")
+    return None
+
+
+def write_gh_config(config_path: Path, owner_repo: str) -> bool:
+    """Upsert ``gh.repo`` in a ruamel.yaml round-trip config file.
+
+    Reads the existing YAML at ``config_path`` (or starts from an empty
+    mapping if the file does not exist), sets ``data['gh']['repo'] = owner_repo``,
+    and writes back preserving all existing keys and inline comments.
+
+    Args:
+        config_path: Absolute or CWD-relative path to the target YAML file.
+                     Typically ``Path.cwd() / ".dh" / "config.yaml"``.
+        owner_repo:  Validated ``owner/repo`` slug string to persist.
+
+    Returns:
+        ``True`` when the file was written (key already present with same
+        value counts as written — idempotent). ``False`` when the write was
+        skipped because of an unrecoverable I/O or YAML error.
+
+        Note: this function returns ``True`` for both a new write and an
+        idempotent write (value already correct). Callers MUST NOT branch on
+        the return value to distinguish "wrote new" from "already set".
+
+    Raises:
+        Nothing. All I/O errors emit one warning to stderr and return ``False``.
+
+    Side effects:
+        Creates parent directories and the file when absent.
+        Writes the YAML file in ruamel.yaml round-trip mode.
+    """
+    yaml = _YAML()
+    yaml.default_flow_style = False
+
+    try:
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as fh:
+                data = yaml.load(fh)
+            if data is None:
+                data = _CommentedMap()
+        else:
+            data = _CommentedMap()
+    except _YAMLError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not parse {config_path}: {exc}[/yellow]")
+        return False
+    except OSError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not read {config_path}: {exc}[/yellow]")
+        return False
+
+    if "gh" not in data:
+        data["gh"] = _CommentedMap()
+    data["gh"]["repo"] = owner_repo
+
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with config_path.open("w", encoding="utf-8") as fh:
+            yaml.dump(data, fh)
+    except OSError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not write {config_path}: {exc}[/yellow]")
+        return False
+
+    return True
+
+
+def render_gh_examples(owner_repo: str) -> bool:
+    """Render gh-examples.md.template -> gh-examples.md with owner/repo substituted.
+
+    Reads ``_SCRIPT_DIR / "gh-examples.md.template"``, replaces all
+    ``<owner/repo>`` tokens with ``owner_repo``, then replaces all
+    ``<owner>`` tokens with the owner component (``owner_repo.split("/")[0]``),
+    and writes the result to ``_SCRIPT_DIR / "gh-examples.md"``.
+
+    Args:
+        owner_repo: Validated owner/repo slug to substitute for all
+                    ``<owner/repo>`` tokens in the template.
+
+    Returns:
+        True when rendering succeeded and gh-examples.md was written.
+        False when the template file is missing or the write fails.
+
+    Side effects:
+        Writes ``.claude/skills/gh/gh-examples.md``.
+        Emits one warning to stderr on failure. Never raises.
+    """
+    template_path = _SCRIPT_DIR / "gh-examples.md.template"
+    output_path = _SCRIPT_DIR / "gh-examples.md"
+
+    if not template_path.exists():
+        error_console.print(f":warning: [yellow]Warning: gh-examples.md.template not found at {template_path}[/yellow]")
+        return False
+
+    try:
+        content = template_path.read_text(encoding="utf-8")
+        owner = owner_repo.split("/", maxsplit=1)[0]
+        rendered = content.replace("<owner/repo>", owner_repo).replace("<owner>", owner)
+        output_path.write_text(rendered, encoding="utf-8")
+    except OSError as exc:
+        error_console.print(f":warning: [yellow]Warning: could not write gh-examples.md: {exc}[/yellow]")
+        return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # CLI command
 # ---------------------------------------------------------------------------
 @app.command()
@@ -915,6 +1114,14 @@ def main(
         console.print(f"  {result.stdout.strip()}")
     except (subprocess.SubprocessError, OSError) as exc:
         error_console.print(f":warning: [yellow]Could not verify installation: {exc}[/yellow]")
+
+    # Auto-detect owner/repo and persist to .dh/config.yaml
+    owner_repo = detect_owner_repo()
+    if owner_repo is not None:
+        write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
+        render_gh_examples(owner_repo)
+
+    raise typer.Exit(code=0)
 
 
 if __name__ == "__main__":
