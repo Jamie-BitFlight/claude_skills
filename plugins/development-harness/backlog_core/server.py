@@ -1137,20 +1137,27 @@ if _args.project_dir is not None:
     _init_models(_args.project_dir)
 
 
-def _read_gate_token() -> str | None:
-    """Read the session gate token written by the work-backlog-item skill at load time.
+def _read_gate_token(gate_token: str) -> str | None:
+    """Read the session gate token file and return its contents for comparison.
 
     The token is generated and written by
     ``skills/work-backlog-item/scripts/get-gate-token.mjs`` when the skill loads.
-    This function constructs the same path and reads it at request time.
+    The token format is ``{session_id}:{hex_token}`` — the session ID is extracted
+    from the caller-provided value so the MCP server never needs its own
+    CLAUDE_CODE_SESSION_ID to locate the file.
+
+    Args:
+        gate_token: The value passed by the caller. Must contain a ``:`` separating
+            the session ID from the random hex portion.
 
     Returns:
-        The token string, or None when CLAUDE_CODE_SESSION_ID is absent from
-        the environment or when the file cannot be read.
+        The file contents (the full ``{session_id}:{hex_token}`` string), or None
+        when the format is invalid or the file cannot be read.
     """
-    session_id = _os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if not session_id:
+    colon = gate_token.find(":")
+    if colon < 1:
         return None
+    session_id = gate_token[:colon]
     dh_state_home = _os.environ.get("DH_STATE_HOME", "")
     dh_root = Path(dh_state_home).expanduser() if dh_state_home else Path.home() / ".dh"
     token_path = dh_root / "sessions" / session_id / ".gate-token"
@@ -1202,17 +1209,15 @@ async def backlog_add(
         Dict with file_path, title, priority, issue number (if created),
         and output messages/warnings. On error, dict contains an error key.
     """
-    session_id = _os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if not session_id:
-        await ctx.warning("CLAUDE_CODE_SESSION_ID not set — gate token validation skipped, denying access")
+    if not gate_token:
         return {
-            "error": "CLAUDE_CODE_SESSION_ID is not set in the server environment. Cannot validate gate token. Load /dh:create-backlog-item to ensure the token is available."
+            "error": "Gate token required. Load /dh:work-backlog-item create — the skill provides the gate_token at load time."
         }
-    expected_token = _read_gate_token()
+    expected_token = _read_gate_token(gate_token)
     if expected_token is None:
-        await ctx.warning("Gate token file unreadable for session %s", session_id)
+        await ctx.warning("Gate token file unreadable — format invalid or session file missing")
         return {
-            "error": "Gate token file could not be read for this session. Load /dh:work-backlog-item create — the skill writes the required token at load time."
+            "error": 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
         }
     if gate_token != expected_token:
         return {

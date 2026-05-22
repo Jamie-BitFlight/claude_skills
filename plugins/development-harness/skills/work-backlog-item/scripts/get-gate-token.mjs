@@ -16,7 +16,7 @@ const dhRoot = process.env.DH_STATE_HOME
 const tokenDir = join(dhRoot, 'sessions', sessionId);
 const tokenPath = join(tokenDir, '.gate-token');
 
-const token = randomBytes(32).toString('hex');
+const token = `${sessionId}:${randomBytes(32).toString('hex')}`;
 mkdirSync(tokenDir, { recursive: true });
 writeFileSync(tokenPath, token, 'utf8');
 process.stdout.write(token);

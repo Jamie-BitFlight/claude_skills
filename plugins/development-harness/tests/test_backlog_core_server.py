@@ -168,26 +168,42 @@ async def test_backlog_add_gate_rejects_missing_token():
         )
 
     mock_add.assert_not_called()
-    expected_error = 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
-    assert response_missing["error"] == expected_error
-    assert response_wrong["error"] == expected_error
+    assert (
+        response_missing["error"]
+        == "Gate token required. Load /dh:work-backlog-item create — the skill provides the gate_token at load time."
+    )
+    assert (
+        response_wrong["error"]
+        == 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
+    )
 
 
 @pytest.mark.e2e
 def test_gate_token_file_readable_at_runtime() -> None:
-    """Gate token file must be readable via _read_gate_token() when CLAUDE_CODE_SESSION_ID is set.
+    """Gate token written by get-gate-token.mjs must be readable via _read_gate_token().
 
-    This is an e2e test that assumes the skill has already written the token file
-    for the current session before the server was started.
+    Finds the token file by scanning ~/.dh/sessions/, reads it, verifies the
+    {session_id}:{hex} format, then confirms _read_gate_token() returns the same value.
     """
     import os
+    from pathlib import Path
 
     from backlog_core.server import _read_gate_token
 
-    assert os.environ.get("CLAUDE_CODE_SESSION_ID"), "CLAUDE_CODE_SESSION_ID must be set for this e2e test"
-    token = _read_gate_token()
-    assert token is not None, "_read_gate_token() returned None — token file missing or unreadable"
-    assert len(token) == 64, f"Expected 64-char hex token, got length {len(token)}"
+    dh_state_home = os.environ.get("DH_STATE_HOME", "")
+    dh_root = Path(dh_state_home).expanduser() if dh_state_home else Path.home() / ".dh"
+    sessions_dir = dh_root / "sessions"
+
+    candidates = (
+        [p for d in sessions_dir.iterdir() if (p := d / ".gate-token").exists()] if sessions_dir.exists() else []
+    )
+    assert candidates, f"No .gate-token file found under {sessions_dir}"
+
+    token = candidates[0].read_text(encoding="utf-8").strip()
+    assert ":" in token, f"Token format invalid — expected session_id:hex, got {token!r}"
+
+    result = _read_gate_token(token)
+    assert result == token, f"_read_gate_token() returned {result!r}, expected {token!r}"
 
 
 # ---------------------------------------------------------------------------
