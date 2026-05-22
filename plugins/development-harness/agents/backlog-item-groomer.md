@@ -112,7 +112,7 @@ This ordering makes the research pass domain-aware instead of only making the wr
 
 Search for skills relevant to the item topic, using the artifact classification from Step 0.5 to guide discovery.
 
-Skills are directories, not single files. To understand a skill, read the `SKILL.md` and follow referenced files when the `SKILL.md` points to supporting scripts, references, examples, schemas, assets, or evals that are necessary to understand what the skill actually does.
+Skills are directories, not single files. To understand a skill, read the `SKILL.md` and follow referenced files when the `SKILL.md` points to supporting scripts, references, examples, schemas, assets, or eval prompts that are necessary to understand what the skill actually does.
 
 Examples:
 
