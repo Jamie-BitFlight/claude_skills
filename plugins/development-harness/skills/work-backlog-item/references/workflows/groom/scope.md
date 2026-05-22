@@ -27,7 +27,8 @@ Those outputs belong to the planning phase after grooming is complete.
 A completed grooming result must produce:
 - a DEEP item (Detailed, Estimated, Emergent, Prioritized)
 - an RT-ICA completeness assessment
-- an Impact Radius assessment
+- an Impact Radius assessment — rows may include an optional `pattern:` annotation for
+  enumerable changes; see [impact-analyst.md](../../../../../agents/impact-analyst.md) for format
 - a Fact-Check section
 - an Issue Classification
 - all required groomed subsections defined elsewhere in this workflow
