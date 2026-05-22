@@ -205,7 +205,7 @@ documentation. The markdown content IS the executable.
 **Files classified as Tier 3:**
 
 - Plugin agent files: `agents/*.md`
-- Skill files: `skills/*/SKILL.md`, `skills/*/references/*.md`
+- Skill files: `skills/*/SKILL.md`, `skills/*/references/**`
 - Session instruction files: `CLAUDE.md`, `.claude/rules/*.md`
 - Any `.md` file that defines constraints, workflows, or behaviors for an AI agent
 

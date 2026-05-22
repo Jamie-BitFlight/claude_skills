@@ -120,7 +120,7 @@ Apply the verdict rule from
 - `SKIP` — the changed files contain no backend, credential, or infrastructure files
   AND no Tier 3 prose files. Before applying SKIP to a markdown-only diff, classify
   each `.md` file using `dh:file-classification`: agent files (`agents/*.md`), skill
-  files (`skills/*/SKILL.md`, `skills/*/references/*.md`), `CLAUDE.md`, and
+  files (`skills/*/SKILL.md`, `skills/*/references/**`), `CLAUDE.md`, and
   `.claude/rules/*.md` are Tier 3 and MUST be checked for prompt injection surfaces
   (§2.5.1 in verdict-schema.md) — SKIP is prohibited for these files.
   (e.g., SKIP applies only when files are Tier 1/2 prose such as changelogs or

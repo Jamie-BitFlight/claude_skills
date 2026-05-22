@@ -42,7 +42,7 @@ Tier 3 file patterns:
 
 - `agents/*.md` — plugin agent instruction files
 - `skills/*/SKILL.md` — skill instruction files
-- `skills/*/references/*.md` — skill reference files
+- `skills/*/references/**` — skill reference files (any depth)
 - `CLAUDE.md` — session instruction files
 - `.claude/rules/*.md` — scoped behavioral rules
 
