@@ -24,9 +24,8 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from agent_profile.discovery import find_agent, get_plugins_root, scan_all_agents
-from agent_profile.models import AgentProfile, ProfileListEntry, ResolvedSkill
+from agent_profile.models import AgentProfile, ProfileListEntry
 from agent_profile.parser import parse_agent_file
-from agent_profile.resolver import SkillResolver
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +50,13 @@ def _load(
         ),
     ],
 ) -> dict:
-    """Compile an agent definition into a loadable skill bundle.
+    """Compile an agent definition into a loadable profile.
 
     Locates the agent file by name, parses its YAML frontmatter and instruction
-    body, resolves all declared skills (including recursive sub-skills), and
-    returns a complete ``AgentProfile`` dict ready for context injection into a
-    task-worker. Exposed as ``profile_load`` in the backlog MCP namespace.
+    body, and returns an ``AgentProfile`` dict ready for context injection into a
+    task-worker. Skill URIs are returned as raw strings — load each skill via
+    ``Skill(skill=uri)`` using the Claude Code SDK. Exposed as ``profile_load``
+    in the backlog MCP namespace.
 
     Args:
         agent_name: Agent name in bare or plugin-qualified form.
@@ -64,7 +64,7 @@ def _load(
     Returns:
         On success: ``AgentProfile`` model serialised as a dict, containing
         ``name``, ``plugin``, ``description``, ``model``, ``tools``, ``body``,
-        ``skills`` (list of resolved skill dicts), and ``warnings``.
+        ``skills`` (list of raw URI strings), and ``warnings``.
 
         On failure: ``{"error": "<description>"}`` — never raises a Python
         exception to the MCP client.
@@ -88,10 +88,9 @@ def _load(
     except ValueError as exc:
         return {"error": f"Failed to parse agent file '{entry.path}': {exc}"}
 
-    resolver = SkillResolver(plugins_root=plugins_root)
-    resolved_skills: list[ResolvedSkill]
-    warnings: list[str]
-    resolved_skills, warnings = resolver.resolve(metadata.skills, context_plugin=entry.plugin)
+    warnings: list[str] = []
+    if not body:
+        warnings.append(f"Agent '{entry.name}': instruction body is empty.")
 
     profile = AgentProfile(
         name=metadata.name,
@@ -100,7 +99,7 @@ def _load(
         model=metadata.model,
         tools=metadata.tools,
         body=body,
-        skills=resolved_skills,
+        skills=metadata.skills,
         warnings=warnings,
     )
     return profile.model_dump(mode="json")

@@ -33,8 +33,10 @@ profile_list success:
 Each agent entry in profile_list:
     {name, plugin, description, skill_count, model}
 
-Each resolved skill in profile_load.skills:
-    {uri, resolved_path, plugin, skill_name, content, reference_files}
+Each skill in profile_load.skills:
+    A raw URI string, e.g. "dh:subagent-contract". Resolution is handled by
+    the caller via ``Skill(skill=uri)`` — the server returns URIs only.
+    Skills are plain strings, not dicts.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from agent_profile.models import AgentEntry, AgentMetadata, ResolvedSkill
+from agent_profile.models import AgentEntry, AgentMetadata
 from agent_profile.server import mcp
 from fastmcp.client import Client
 
@@ -58,7 +60,6 @@ if TYPE_CHECKING:
 _AGENT_PROFILE_KEYS = frozenset({"name", "plugin", "description", "model", "tools", "body", "skills", "warnings"})
 _PROFILE_LIST_KEYS = frozenset({"agents", "count", "plugin_filter"})
 _PROFILE_LIST_ENTRY_KEYS = frozenset({"name", "plugin", "description", "skill_count", "model"})
-_RESOLVED_SKILL_KEYS = frozenset({"uri", "resolved_path", "plugin", "skill_name", "content", "reference_files"})
 
 
 def _make_agent_entry(tmp_path: Path, plugin: str = "test-plugin", name: str = "my-agent") -> AgentEntry:
@@ -76,22 +77,6 @@ def _make_metadata(name: str = "my-agent", skills: list[str] | None = None) -> A
     """Create a minimal AgentMetadata for mocking parse_agent_file."""
     return AgentMetadata(
         name=name, description="Test agent description", skills=skills or [], tools=[], model=None, color=None
-    )
-
-
-def _make_resolved_skill(plugins_root: Path, plugin: str, skill_name: str, uri: str) -> ResolvedSkill:
-    """Create a ResolvedSkill backed by a real file in plugins_root."""
-    skill_dir = plugins_root / plugin / "skills" / skill_name
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_md = skill_dir / "SKILL.md"
-    skill_md.write_text(f"# {skill_name}\n\nSkill content.", encoding="utf-8")
-    return ResolvedSkill(
-        uri=uri,
-        resolved_path=skill_md,
-        plugin=plugin,
-        skill_name=skill_name,
-        content=f"# {skill_name}\n\nSkill content.",
-        reference_files={},
     )
 
 
@@ -203,23 +188,19 @@ class TestProfileLoad:
         assert result.data["skills"] == []
         assert result.data["warnings"] == []
 
-    async def test_load_returns_resolved_skills_with_correct_keys(
-        self, mocker: MockerFixture, tmp_path: Path, single_plugin_root: Path
-    ) -> None:
-        """profile_load returns resolved skill dicts with all ResolvedSkill keys.
+    async def test_load_returns_skills_as_raw_uri_strings(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """profile_load returns skills as raw URI strings, not resolved dicts.
 
-        Tests: skills list contains correctly shaped ResolvedSkill dicts.
-        How: Use single_plugin_root fixture for real skill files; mock discovery
-             to point at that root; parse agent with a skill.
-        Why: Consumers depend on skill content for context injection.
+        Tests: skills list contains plain URI strings from frontmatter.
+        How: Mock metadata with a skill URI list, verify each skill is a string.
+        Why: Resolution is handled by the caller via Skill(skill=uri) — the
+             server returns URIs only and does not resolve filesystem paths.
         """
         # Arrange
-        agents_dir = single_plugin_root / "test-plugin" / "agents"
-        agent_file = agents_dir / "list-skills-agent.md"
-        entry = AgentEntry(name="list-skills-agent", plugin="test-plugin", path=agent_file)
-        metadata = _make_metadata(name="list-skills-agent", skills=["skill-a"])
+        entry = _make_agent_entry(tmp_path, plugin="test-plugin", name="list-skills-agent")
+        metadata = _make_metadata(name="list-skills-agent", skills=["skill-a", "dh:subagent-contract"])
 
-        mocker.patch("agent_profile.server.get_plugins_root", return_value=single_plugin_root)
+        mocker.patch("agent_profile.server.get_plugins_root", return_value=tmp_path / "plugins")
         mocker.patch("agent_profile.server.find_agent", return_value=entry)
         mocker.patch("agent_profile.server.parse_agent_file", return_value=(metadata, "Body."))
 
@@ -230,55 +211,46 @@ class TestProfileLoad:
         # Assert
         assert result.is_error is False
         skills = result.data["skills"]
-        assert len(skills) >= 1
-        first_skill = skills[0]
-        assert _RESOLVED_SKILL_KEYS.issubset(first_skill.keys())
-        assert first_skill["skill_name"] == "skill-a"
-        # profile_load uses metadata-only mode (include_content=False by default);
-        # content and reference_files are None in the returned dict.
-        assert first_skill["content"] is None
-        assert first_skill["reference_files"] is None
+        assert len(skills) == 2
+        assert skills[0] == "skill-a"
+        assert skills[1] == "dh:subagent-contract"
+        # Each skill is a plain string, not a dict.
+        assert all(isinstance(s, str) for s in skills)
 
-    async def test_load_skill_includes_reference_files(
-        self, mocker: MockerFixture, tmp_path: Path, single_plugin_root: Path
-    ) -> None:
-        """profile_load returns reference_files=None in metadata-only mode.
+    async def test_load_returns_skill_uri_preserved_exactly(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """profile_load preserves skill URI strings exactly as declared in frontmatter.
 
-        Tests: reference_files is None in resolved skill when profile_load uses the
-               default include_content=False resolver mode.
-        How: Use single_plugin_root which has skill-a with two reference files;
-             verify the resolved skill carries None for reference_files.
-        Why: profile_load is metadata-only by default; callers load content via
-             Skill(skill=uri) using the uri field.
+        Tests: URI strings in skills list match frontmatter declarations verbatim.
+        How: Mock metadata with a plugin-qualified URI; verify round-trip fidelity.
+        Why: Callers pass each URI directly to Skill(skill=uri); any mutation breaks loading.
         """
         # Arrange
-        agents_dir = single_plugin_root / "test-plugin" / "agents"
-        agent_file = agents_dir / "single-skill-agent.md"
-        entry = AgentEntry(name="single-skill-agent", plugin="test-plugin", path=agent_file)
-        metadata = _make_metadata(name="single-skill-agent", skills=["skill-a"])
+        entry = _make_agent_entry(tmp_path)
+        metadata = _make_metadata(skills=["python3-development:subagent-contract"])
 
-        mocker.patch("agent_profile.server.get_plugins_root", return_value=single_plugin_root)
+        mocker.patch("agent_profile.server.get_plugins_root", return_value=tmp_path / "plugins")
         mocker.patch("agent_profile.server.find_agent", return_value=entry)
         mocker.patch("agent_profile.server.parse_agent_file", return_value=(metadata, "Body."))
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool("load", {"agent_name": "single-skill-agent"})
+            result = await client.call_tool("load", {"agent_name": "my-agent"})
 
-        # Assert — metadata-only mode returns None for content fields
+        # Assert
         skills = result.data["skills"]
-        skill_a = next(s for s in skills if s["skill_name"] == "skill-a")
-        assert skill_a is not None
-        assert skill_a["reference_files"] is None
-        assert skill_a["content"] is None
+        assert skills == ["python3-development:subagent-contract"]
 
-    async def test_load_returns_warnings_for_missing_skill(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """profile_load returns a partial profile with warnings when a skill is unresolvable.
+    async def test_load_returns_no_warnings_for_unresolvable_skill_uri(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """profile_load returns skill URIs without warnings even when the URI is unresolvable.
 
-        Tests: warnings field in AgentProfile when skill resolution fails.
-        How: Mock a metadata with a skill URI that cannot be resolved in the
-             tmp_path tree (no matching skill directory exists).
-        Why: ADR-3 — partial profile preferred over total failure.
+        Tests: The server does not validate or resolve skill URIs — no warnings are
+               produced for URIs that may not exist on this filesystem.
+        How: Mock metadata with an obviously nonexistent skill URI, verify it is
+             returned as-is with no warnings.
+        Why: Resolution is the caller's responsibility via Skill(skill=uri). The
+             server never touches the filesystem for skill content.
         """
         # Arrange
         plugins_root = tmp_path / "plugins"
@@ -296,10 +268,8 @@ class TestProfileLoad:
 
         # Assert
         assert result.is_error is False
-        assert result.data.get("skills") == []
-        warnings = result.data.get("warnings", [])
-        assert len(warnings) >= 1
-        assert any("totally-nonexistent-skill-xyz" in w for w in warnings)
+        assert result.data.get("skills") == ["totally-nonexistent-skill-xyz"]
+        assert result.data.get("warnings") == []
 
 
 # ---------------------------------------------------------------------------
@@ -610,44 +580,38 @@ class TestProfileList:
 # ---------------------------------------------------------------------------
 
 
-class TestProfileLoadCircularDependency:
-    """Tests for circular skill dependency handling in profile_load.
+class TestProfileLoadSkillPassthrough:
+    """Tests that profile_load passes skill URIs through without resolution.
 
-    Tests: Circular dependency detection does not produce infinite recursion.
-    Strategy: Use circular_plugin_root fixture with no mocks — the server
-              uses a SkillResolver internally which detects cycles.
+    Tests: Skills are returned as-is from frontmatter; no filesystem resolution occurs.
+    Strategy: Patch discovery and parser functions; verify skills are plain URI strings.
     """
 
-    async def test_load_with_circular_skill_deps_returns_profile_with_warning(
-        self, mocker: MockerFixture, circular_plugin_root: Path
-    ) -> None:
-        """profile_load returns a partial profile with warnings for circular skill deps.
+    async def test_load_with_multiple_skills_returns_all_uris(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """profile_load returns all declared skill URIs without modification.
 
-        Tests: Circular A→B→A does not cause infinite recursion; warnings are present.
-        How: Use circular_plugin_root fixture (skill-a→skill-b→skill-a).
-             Redirect server to that root; load the agent that declares skill-a.
-        Why: ADR-4 — circular dependencies produce warnings, not errors or infinite loops.
+        Tests: All skill URIs from agent frontmatter appear in the response.
+        How: Mock metadata with multiple skill URIs; verify each appears in skills list.
+        Why: The server is a passthrough for skills — no resolution, no filtering.
         """
         # Arrange
-        agents_dir = circular_plugin_root / "circ-plugin" / "agents"
-        agent_file = agents_dir / "circ-agent.md"
-        entry = AgentEntry(name="circ-agent", plugin="circ-plugin", path=agent_file)
-        metadata = _make_metadata(name="circ-agent", skills=["skill-a"])
+        entry = _make_agent_entry(tmp_path, plugin="test-plugin", name="multi-skill-agent")
+        metadata = _make_metadata(name="multi-skill-agent", skills=["skill-a", "skill-b", "dh:subagent-contract"])
 
-        mocker.patch("agent_profile.server.get_plugins_root", return_value=circular_plugin_root)
+        mocker.patch("agent_profile.server.get_plugins_root", return_value=tmp_path / "plugins")
         mocker.patch("agent_profile.server.find_agent", return_value=entry)
         mocker.patch("agent_profile.server.parse_agent_file", return_value=(metadata, "Body."))
 
         # Act
         async with Client(mcp) as client:
-            result = await client.call_tool("load", {"agent_name": "circ-agent"})
+            result = await client.call_tool("load", {"agent_name": "multi-skill-agent"})
 
         # Assert
         assert result.is_error is False
         assert "error" not in result.data
-        warnings = result.data.get("warnings", [])
-        assert len(warnings) >= 1
-        assert any("circular" in w.lower() for w in warnings)
+        skills = result.data["skills"]
+        assert skills == ["skill-a", "skill-b", "dh:subagent-contract"]
+        assert result.data["warnings"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -655,31 +619,27 @@ class TestProfileLoadCircularDependency:
 # ---------------------------------------------------------------------------
 
 
-class TestProfileLoadDomainPath:
-    """Tests for flat skill URI resolution in profile_load.
+class TestProfileLoadSkillUriFormats:
+    """Tests that profile_load preserves various skill URI formats verbatim.
 
-    Tests: Flat skills/{name}/ URIs resolve correctly relative to the context plugin.
-    Strategy: Use domain_plugin_root fixture; patch get_plugins_root only.
+    Tests: Different URI formats (bare, plugin-qualified, domain-path) are returned
+           unchanged as plain strings.
+    Strategy: Mock metadata with different URI shapes; verify exact string preservation.
     """
 
-    async def test_load_with_flat_skill_resolves_correctly(
-        self, mocker: MockerFixture, domain_plugin_root: Path
-    ) -> None:
-        """profile_load resolves a flat skill URI to the correct SKILL.md.
+    async def test_load_with_bare_skill_uri_returns_raw_string(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """profile_load returns a bare skill name as a plain string.
 
-        Tests: Flat skills/{name}/ format resolves relative to the context plugin.
-        How: Use domain_plugin_root with enterprise-foo skill (flat, not nested).
-             Mock get_plugins_root to point at that root.
-        Why: Skills must be directly under skills/ — nested paths are not supported.
-             This test verifies flat skill resolution works correctly.
+        Tests: Bare skill URI (no colon) is passed through without transformation.
+        How: Mock metadata with a bare skill URI, verify exact string in response.
+        Why: Caller invokes Skill(skill=uri) with the raw value — any transformation
+             would break skill loading.
         """
         # Arrange
-        agents_dir = domain_plugin_root / "domain-plugin" / "agents"
-        agent_file = agents_dir / "domain-agent.md"
-        entry = AgentEntry(name="domain-agent", plugin="domain-plugin", path=agent_file)
+        entry = _make_agent_entry(tmp_path, plugin="domain-plugin", name="domain-agent")
         metadata = _make_metadata(name="domain-agent", skills=["enterprise-foo"])
 
-        mocker.patch("agent_profile.server.get_plugins_root", return_value=domain_plugin_root)
+        mocker.patch("agent_profile.server.get_plugins_root", return_value=tmp_path / "plugins")
         mocker.patch("agent_profile.server.find_agent", return_value=entry)
         mocker.patch("agent_profile.server.parse_agent_file", return_value=(metadata, "Body."))
 
@@ -691,9 +651,8 @@ class TestProfileLoadDomainPath:
         assert "error" not in result.data
         skills = result.data["skills"]
         assert len(skills) == 1
-        assert skills[0]["skill_name"] == "enterprise-foo"
-        # profile_load uses metadata-only mode; content is None by default.
-        assert skills[0]["content"] is None
+        assert skills[0] == "enterprise-foo"
+        assert isinstance(skills[0], str)
 
 
 # ---------------------------------------------------------------------------
@@ -815,6 +774,8 @@ class TestRealPluginsIntegration:
         assert result.data["plugin"] == "development-harness"
         assert len(result.data["body"]) > 0
         assert isinstance(result.data["skills"], list)
+        # Skills are raw URI strings, not dicts — resolution is caller's responsibility.
+        assert all(isinstance(s, str) for s in result.data["skills"])
         assert isinstance(result.data["warnings"], list)
 
     async def test_profile_load_nonexistent_agent_returns_error_without_exception(self) -> None:
