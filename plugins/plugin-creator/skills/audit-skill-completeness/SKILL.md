@@ -1,28 +1,27 @@
 ---
 name: audit-skill-completeness
-description: Evaluate a single skill's quality against 8 completeness categories derived from Anthropic's official skills repository. Scores preparation, progression, verification, scripts, examples, anti-patterns, references, and assets. Generates scored report to .claude/audits/. Use when auditing skill quality, checking marketplace readiness, evaluating skill completeness score, performing pre-publication evaluation, or comparing to Anthropic skills.
+description: Evaluate a single skill's quality against its stated purpose. Classifies the skill's purpose type, then scores applicable quality categories — universal dimensions always apply; structural dimensions (scripts, references, assets) are scored only when warranted by the skill's purpose. A focused 20-line behavioral skill with no bundled resources scores fully on all applicable categories. Use when auditing skill quality, checking marketplace readiness, evaluating skill completeness, performing pre-publication evaluation.
 argument-hint: <skill-path>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
 
+If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
 
 # Audit Skill Completeness
 
-## Purpose
+## Core Principle
 
-Evaluates a single skill directory against 8 quality categories derived from Anthropic's official skills repository. Each category is scored 0-3, producing an overall completeness percentage and actionable recommendations for improvement.
+**The primary evaluation question is: "Does this skill have everything it needs to achieve its stated purpose reliably?"**
+
+Scripts, references, and assets are extension patterns — each is warranted when the skill's purpose calls for it and unnecessary when it does not. Their absence is only a gap when the purpose requires them. A small, complete, purpose-aligned skill scores as complete; a skill with unused scripts and padding scores lower than one with clear, sufficient instructions.
 
 ## When to Use
 
-Invoke this skill when:
-
-- Pre-marketplace publication review - verify skill meets quality standards
-- Post-creation quality check - evaluate newly created skills
-- Skill improvement planning - identify specific quality gaps
-- Comparing local skills to Anthropic patterns - benchmark against official standards
-- Marketplace readiness assessment - determine if skill is publication-ready
+- Pre-marketplace publication review — verify skill meets quality standards
+- Post-creation quality check — evaluate newly created skills
+- Skill improvement planning — identify specific quality gaps
+- Marketplace readiness assessment — determine if skill is publication-ready
 
 ## Workflow
 
@@ -30,56 +29,71 @@ Invoke this skill when:
 
 Read the skill directory structure:
 
-```
+```text
 skill-path/
 ├── SKILL.md          # Required - main skill definition
-├── scripts/          # Optional - executable automation
-├── references/       # Optional - supporting documentation
-└── assets/           # Optional - reusable output resources
+├── scripts/          # Optional - executable automation (when warranted)
+├── references/       # Optional - supporting documentation (when warranted)
+└── assets/           # Optional - reusable output resources (when warranted)
 ```
 
 **Actions:**
 
-1. Verify SKILL.md exists
-2. Check for scripts/, references/, assets/ directories
-3. Read SKILL.md frontmatter and body
-4. List all files in each directory
+1. Verify SKILL.md exists; report error and exit if missing
+2. Read SKILL.md frontmatter and body
+3. Note any scripts/, references/, assets/ directories and their contents
 
-**Validation:**
+### Step 2: Classify purpose type
 
-- If SKILL.md missing, report error and exit
-- If path is not a directory, report error and exit
+Classify the skill into one of these purpose types based on the frontmatter description and body:
 
-### Step 2: Evaluate Quality Categories
+| Purpose Type | Characteristics | Scripts | References | Assets |
+|---|---|---|---|---|
+| **Behavioral / enforcement** | Teaches Claude how to approach a problem; enforces standards or constraints through instructions | Not warranted — behavior is internalized, not scripted | Only if domain-specific lookup needed | Not warranted |
+| **Tool / format wrapping** | Wraps fragile operations on file formats (DOCX, PDF, XLSX, images) | Warranted — fragile transforms benefit from deterministic scripts | Warranted — format specs, schemas | Often warranted — templates |
+| **Workflow orchestration** | Multi-step process coordination; skill-creation, plugin lifecycle | Often warranted — scaffolding scripts useful | Often warranted — process patterns | Sometimes |
+| **Reference / knowledge** | IS the reference material; provides domain knowledge | Not warranted | The reference files ARE the product | Not warranted |
+| **Domain expertise** | Encodes expert conventions (financial modeling, legal drafting) | Not warranted | Warranted — lookup tables, standards | Not warranted |
 
-Run through each of the 8 categories using the detailed checklist in `references/skill-completeness-checklist.md`.
+If the skill spans multiple types, apply the union of warranted categories.
 
-**Quality Categories:**
+### Step 3: Evaluate quality categories
 
-| Category | Evaluates | Key Indicators |
-|----------|-----------|----------------|
-| **1. Preparation** | Prerequisites met before work begins | Environment verification, input inspection, metadata extraction scripts |
-| **2. Progression** | Concrete steps with right level of control | Clear sequence, deterministic scripts, working examples, decision trees |
-| **3. Verification** | Output correctness confirmed before success | Explicit verification steps, automated checks, error-correction loops, acceptance criteria |
-| **4. Scripts** | Executable automation for core operations | Repetitive operations scripted, --help support, edge case handling, tested output |
-| **5. Examples** | Teaching through demonstration | Working code with imports, exact input→output pairs, common cases, edge case handling |
-| **6. Anti-Patterns** | Explicit "what NOT to do" | Known failure modes documented, bad output shown, corrections side-by-side |
-| **7. References** | Domain knowledge AI cannot generate | API/schema/format documentation, organized sections, linked from workflow steps |
-| **8. Assets** | Reusable output resources bundled | Templates, fonts, images, boilerplate the AI uses (not reads) |
+Five categories are **universal** (always scored). Three are **conditional** (scored only when warranted by purpose; marked N/A otherwise).
 
-**Evaluation Process:**
+**Universal categories:**
 
-For each category:
+| Category | Evaluates |
+|----------|-----------|
+| **Preparation** | Prerequisites met before work begins |
+| **Progression** | Concrete steps with right level of control |
+| **Verification** | Output correctness confirmed before declaring success |
+| **Examples** | Teaching through demonstration |
+| **Anti-Patterns** | Explicit "what NOT to do" documentation |
 
-1. Read the category definition from `references/skill-completeness-checklist.md`
+**Conditional categories — apply warranted test first:**
+
+| Category | Warranted when... |
+|----------|-------------------|
+| **Scripts** | The skill involves operations that are fragile, error-prone, or would be rewritten by the agent each invocation; deterministic code improves reliability |
+| **References** | The skill requires domain-specific knowledge (API formats, schemas, conventions, standards) that an AI cannot reliably generate from training data |
+| **Assets** | The skill produces output that uses templates, fonts, images, or boilerplate that should be bundled for use (not read into context) |
+
+If a conditional category is not warranted: record N/A. Do not count it in the score denominator. Do not list its absence as a gap. Do not recommend adding it.
+
+For each applicable category:
+
+1. Read the category definition from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md)
 2. Review checklist items for that category
 3. Search SKILL.md and supporting files for evidence
-4. Score 0-3 based on rubric (below)
+4. Score 0–3 based on rubric (below)
 5. Document findings with file:line references
 
-### Step 3: Score and Report
+### Step 4: Score and report
 
-Calculate overall score and write report to `.claude/audits/completeness-report-{skill-slug}.md`.
+Calculate overall score. Denominator = 15 (universal) + 3 × (number of applicable conditional categories).
+
+Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
 
 **Report Structure:**
 
@@ -87,152 +101,118 @@ Calculate overall score and write report to `.claude/audits/completeness-report-
 # Skill Completeness Report: {skill-name}
 
 **Evaluated:** {timestamp}
-**Skill Path:** {absolute-path}
+**Skill Path:** {path}
+**Purpose type:** {type}
+**Conditional categories applicable:** Scripts={Yes|No}, References={Yes|No}, Assets={Yes|No}
 
-## Overall Score: {percentage}% ({score}/24)
+## Overall Score: {score}/{applicable-max} ({percentage}%)
 
-| Category | Score | Label | Findings |
-|----------|-------|-------|----------|
-| 1. Preparation | 2 | Adequate | Environment checks present, missing metadata extraction |
-| 2. Progression | 3 | Exemplary | Clear workflow, deterministic scripts, decision tree |
-| ... | ... | ... | ... |
+| Category | Applicable | Score | Label | Findings |
+|----------|-----------|-------|-------|----------|
+| 1. Preparation | Yes | 2 | Adequate | Environment checks present |
+| 2. Progression | Yes | 3 | Exemplary | Clear workflow, decision tree |
+| 3. Verification | Yes | 2 | Adequate | Steps defined, no automation |
+| 4. Scripts | No | N/A | — | Not warranted for this skill type |
+| 5. Examples | Yes | 2 | Adequate | Working examples, common cases covered |
+| 6. Anti-Patterns | Yes | 3 | Exemplary | Failure modes with corrections |
+| 7. References | No | N/A | — | Not warranted for this skill type |
+| 8. Assets | No | N/A | — | Not warranted for this skill type |
 
 ## Category Details
 
 ### 1. Preparation (2/3 - Adequate)
 
-**What was evaluated:**
-- Environment verification before starting
-- Input inspection before acting
-- Metadata extraction scripts
-
 **Evidence found:**
 - ✅ Environment check at SKILL.md:45-50
 - ✅ Input validation at SKILL.md:65
-- ❌ No metadata extraction script in scripts/
+- ❌ Missing: {specific gap}
 
 **Recommendation:**
-Add a script to extract structured metadata from inputs so the AI operates on verified data instead of assumptions.
+{Concrete recommendation}
 
-### 2. Progression (3/3 - Exemplary)
+### 4. Scripts (N/A — not warranted)
+
+This skill enforces behavior through instructions Claude internalizes. Scripts are not warranted.
+No gap. No recommendation.
 
 ...
 
 ## Recommendations for Improvement
 
-1. **High Priority:** Add metadata extraction script (Preparation)
-2. **Medium Priority:** Include anti-pattern examples (Anti-Patterns)
-3. **Low Priority:** Add visual validation examples (Verification)
+Only list recommendations for applicable categories with scores below 3:
 
-## Reference
-
-This audit follows patterns from Anthropic's official skills repository:
-- https://github.com/anthropics/skills
-
-Checklist: [Skill Completeness Checklist](./references/skill-completeness-checklist.md)
+1. **High Priority:** {recommendation} (Category)
+2. **Medium Priority:** {recommendation} (Category)
 ```
 
-**Output Location:**
-
-Report written to `.claude/audits/completeness-report-{skill-slug}.md`
-
-If `.claude/audits/` does not exist, create it.
+**Output Location:** `.claude/audits/completeness-report-{skill-slug}.md`. Create `.claude/audits/` if it does not exist.
 
 ## Scoring Rubric
 
-Each category is scored 0-3 based on presence and quality of evidence:
+Each **applicable** category is scored 0–3:
 
-| Score | Label | Meaning | Criteria |
-|-------|-------|---------|----------|
-| **0** | None | Category not addressed | No evidence found for any checklist items |
-| **1** | Minimal | Basic attempt, significant gaps | 1-2 checklist items present, core patterns missing |
-| **2** | Adequate | Meets expectations, minor gaps | 3-4 checklist items present, core patterns followed |
-| **3** | Exemplary | Exceeds expectations, Anthropic patterns | All or most checklist items present, matches Anthropic quality |
+| Score | Label | Meaning |
+|-------|-------|---------|
+| **0** | None | Category not addressed — no evidence found |
+| **1** | Minimal | Basic attempt, significant gaps |
+| **2** | Adequate | Meets expectations, minor gaps |
+| **3** | Exemplary | Fully addressed, matches Anthropic quality patterns |
 
-**Overall Score Calculation:**
-
-```
-Sum of category scores / 24 * 100 = percentage
-```
-
-**Scoring Guidelines:**
+**Universal category guidelines:**
 
 - **Preparation (0-3):**
-  - 0: No environment checks, no input validation, no metadata extraction
+  - 0: No environment checks, no input validation
   - 1: Environment checks OR input validation present
-  - 2: Environment checks AND input validation present
-  - 3: Environment checks, input validation, AND metadata extraction scripts
+  - 2: Both environment checks AND input validation present
+  - 3: Full prerequisite verification, input inspection, structured pre-flight
 
 - **Progression (0-3):**
-  - 0: No clear workflow, AI must generate all code
-  - 1: Workflow defined but no scripts or examples
-  - 2: Workflow defined with scripts OR examples
-  - 3: Workflow defined with scripts AND examples AND decision trees
+  - 0: No clear workflow defined
+  - 1: Workflow mentioned but steps are vague or incomplete
+  - 2: Clear step sequence with decision points
+  - 3: Clear steps, decision trees, degree-of-freedom calibration appropriate to task fragility
 
 - **Verification (0-3):**
   - 0: No verification steps mentioned
-  - 1: Manual verification suggested but not enforced
+  - 1: Manual verification suggested but not specified
   - 2: Verification steps defined with acceptance criteria
-  - 3: Automated verification scripts with error-correction loops
-
-- **Scripts (0-3):**
-  - 0: No scripts provided
-  - 1: 1-2 scripts, limited functionality
-  - 2: 3-5 scripts covering core operations
-  - 3: 6+ scripts, --help support, comprehensive coverage
+  - 3: Explicit error-correction loop (verify → fix → re-verify)
 
 - **Examples (0-3):**
   - 0: No examples provided
-  - 1: Abstract examples or pseudocode only
-  - 2: Working examples with imports and realistic data
-  - 3: Working examples covering common AND edge cases
+  - 1: Abstract descriptions or pseudocode only
+  - 2: Concrete examples covering common cases
+  - 3: Examples covering common AND edge cases, with exact input→output pairs
 
 - **Anti-Patterns (0-3):**
   - 0: No anti-patterns documented
-  - 1: Anti-patterns mentioned but not shown
+  - 1: Anti-patterns mentioned but not demonstrated
   - 2: Anti-patterns shown with corrections
-  - 3: Anti-patterns shown with corrections AND reasoning
+  - 3: Anti-patterns shown with corrections AND reasoning for why the wrong form fails
 
-- **References (0-3):**
-  - 0: No reference material
-  - 1: External links only (not bundled)
-  - 2: 1-2 reference files in references/
-  - 3: 3+ reference files, organized by topic, linked from workflow
+**Conditional category guidelines (only when warranted):**
 
-- **Assets (0-3):**
-  - 0: No assets provided
-  - 1: 1-2 asset files
-  - 2: 3-5 asset files, organized
-  - 3: 6+ asset files or comprehensive asset library
+- **Scripts (0-3, or N/A):**
+  - N/A: Skill's purpose does not involve fragile or repetitive operations
+  - 0: Warranted but no scripts provided
+  - 1: 1-2 scripts, limited coverage of core operations
+  - 2: Scripts cover core operations with error handling
+  - 3: Comprehensive coverage; scripts self-document with --help; edge cases handled
 
-## Output Format
+- **References (0-3, or N/A):**
+  - N/A: Skill's purpose does not require domain knowledge beyond training data
+  - 0: Warranted but no reference material bundled
+  - 1: External links only — not bundled for offline use
+  - 2: Reference files bundled, organized by topic
+  - 3: Reference files linked from the specific workflow steps where they're needed
 
-Report filename: `completeness-report-{skill-slug}.md`
-
-Where `{skill-slug}` is the skill directory name (e.g., `audit-skill-completeness` → `completeness-report-audit-skill-completeness.md`)
-
-Report sections:
-
-1. **Header** - skill name, path, timestamp
-2. **Overall Score** - percentage and raw score
-3. **Summary Table** - all categories with scores
-4. **Category Details** - for each category:
-   - Score and label
-   - What was evaluated (checklist items)
-   - Evidence found (file:line references)
-   - Recommendations for improvement
-5. **Recommendations Summary** - prioritized list
-6. **Reference** - link to checklist and Anthropic repository
+- **Assets (0-3, or N/A):**
+  - N/A: Skill does not produce output requiring bundled resources
+  - 0: Warranted but no assets provided
+  - 1: 1-2 asset files present
+  - 2: Assets organized, cover the main output types
+  - 3: Comprehensive asset library with clear usage instructions
 
 ## Quality Categories Reference
 
-All 8 categories are detailed in `references/skill-completeness-checklist.md` with:
-
-- Checklist items for each category
-- Examples from Anthropic's official skills
-- Patterns observed across creative, document, and developer skills
-- Rationale for why each pattern matters
-
-## Additional Resources
-
-- `references/skill-completeness-checklist.md` - detailed quality categories, checklist items, and examples from Anthropic's official skills repository
+Detailed checklist items and Anthropic skill examples: [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md)

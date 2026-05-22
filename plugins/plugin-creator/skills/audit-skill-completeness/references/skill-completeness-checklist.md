@@ -4,6 +4,36 @@ A checklist for evaluating whether a skill provides everything an AI agent needs
 
 ---
 
+## How to Use This Checklist
+
+**Apply categories selectively based on the skill's purpose.** Categories 1–3 and 5–6 are universal. Categories 4, 7, and 8 are conditional — apply them only when the skill's purpose warrants them.
+
+### When is each conditional category warranted?
+
+**Scripts (Category 4)** — warranted when the skill wraps operations that are:
+- Fragile (format-specific XML manipulation, PDF field filling, coordinate transforms)
+- Error-prone without deterministic code (binary file parsing, LibreOffice automation)
+- Repeatedly rewritten from scratch each invocation (AI generates the same boilerplate every time)
+
+Not warranted when: the skill enforces behavior through instructions Claude internalizes; the task is text-based reasoning; the skill is a reference document or behavioral standard.
+
+**References (Category 7)** — warranted when the skill requires:
+- API schemas, format specifications, or standards the AI cannot reliably reconstruct
+- Domain conventions that are correct-by-convention rather than correct-by-logic (financial modeling color codes, legal citation formats, brand hex values)
+- Documentation for a tool or library that changes over time
+
+Not warranted when: the skill IS the reference material; the knowledge is stable and well-represented in training data; the skill is short enough that inline content is sufficient.
+
+**Assets (Category 8)** — warranted when the skill:
+- Produces output that depends on bundled templates, fonts, or boilerplate (PPTX themes, HTML scaffolds, brand fonts)
+- Benefits from reusable output resources the AI uses (not reads into context)
+
+Not warranted when: the skill produces instructional or behavioral output with no associated output resources.
+
+**If a category is not warranted: absence of scripts/references/assets is correct. It is not a gap. Do not recommend adding them.**
+
+---
+
 ## 1. Preparation — Does the skill ensure prerequisites are met before work begins?
 
 - [ ] Does the skill verify the environment has required tools/dependencies before starting?
