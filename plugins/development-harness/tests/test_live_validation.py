@@ -18,11 +18,33 @@ import uuid
 import backlog_core.models as _bc_models
 import pytest
 from backlog_core.models import BacklogConfig
-from backlog_core.server import _read_gate_token, mcp
+from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
 
 logger = logging.getLogger(__name__)
+
+
+def _find_latest_gate_token() -> str:
+    """Return the contents of the most recently modified .gate-token file.
+
+    Scans ``{DH_STATE_HOME}/sessions/*/.gate-token`` (or ``~/.dh/sessions/``
+    when ``DH_STATE_HOME`` is not set).  In e2e live tests there is no skill
+    injection, so the test must locate the token file itself rather than
+    receiving it through context.
+
+    Returns:
+        The raw token string, or an empty string when no file is found.
+    """
+    from pathlib import Path
+
+    dh_root = Path(os.environ.get("DH_STATE_HOME", Path.home() / ".dh"))
+    candidates = list(dh_root.glob("sessions/*/.gate-token"))
+    if not candidates:
+        return ""
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    return latest.read_text(encoding="utf-8").strip()
+
 
 # ---------------------------------------------------------------------------
 # Module-level skip + mark
@@ -183,7 +205,7 @@ class TestLiveLifecycle:
                 "description": "Live validation test item",
                 "source": "test",
                 "force": True,
-                "gate_token": _read_gate_token(),
+                "gate_token": _find_latest_gate_token(),
             },
         )
 
@@ -305,7 +327,7 @@ class TestLiveLifecycle:
                 "description": "Item to be resolved",
                 "source": "test",
                 "force": True,
-                "gate_token": _read_gate_token(),
+                "gate_token": _find_latest_gate_token(),
             },
         )
         assert isinstance(create_result["issue_num"], int)
