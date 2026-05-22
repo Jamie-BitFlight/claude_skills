@@ -271,6 +271,43 @@ Use this exact structure:
 ### Systems Inventory
 - `{path}` | Role: {role} | Connection: {why this file is related} | Action: {VERIFY_COMPATIBLE|CODE_CHANGE|CONTENT_UPDATE|TEST_UPDATE|CONFIG_UPDATE|CI_UPDATE|AGENT_UPDATE|MULTIPLE} | Risk: {LOW|MEDIUM|HIGH}
 
+### Optional `pattern:` Annotation on Systems Inventory Rows
+
+The `pattern:` column is optional. Existing rows without `pattern:` are fully valid and require no modification.
+
+**What it is**: When a Systems Inventory row includes `pattern: '<value>'`, the feasibility gate
+runs `rg -l '<value>' | wc -l` at evaluation time to get a live file count. This lets the gate
+detect when manually-authored row counts have gone stale relative to the actual codebase.
+
+**When to use `pattern:`**: Annotate rows where the affected scope is enumerable via a grep
+pattern — for example:
+
+- Renaming an API endpoint (pattern is the old route string)
+- Migrating an import path (pattern is the old import)
+- Replacing a CLI flag (pattern is the flag name)
+- Propagating a type rename (pattern is the old type name)
+
+**When NOT to use `pattern:`**: Do not annotate rows for conceptual or categorical scopes where
+no single grep pattern reliably enumerates the affected files — for example, "all documentation",
+"system-wide configuration", or "any file that might be affected". A grep pattern must precisely
+enumerate the scope; if it cannot, omit `pattern:`.
+
+**Column format**: Add `| pattern: '<grep-value>'` at the end of the row, after the Risk field.
+
+**Worked example**:
+
+```markdown
+### Systems Inventory
+- `src/api/` | Role: API layer | Connection: exposes old_api_v1 endpoint being renamed | Action: CODE_CHANGE | Risk: HIGH | pattern: 'old_api_v1'
+- `tests/integration/` | Role: Integration tests | Connection: verifies old_api_v1 contract | Action: TEST_UPDATE | Risk: MEDIUM | pattern: 'old_api_v1'
+- `docs/reference.md` | Role: Documentation | Connection: documents endpoint behavior | Action: CONTENT_UPDATE | Risk: LOW
+```
+
+In this example, the feasibility gate will run `rg -l 'old_api_v1' | wc -l` when it evaluates
+Criterion 3. If the live count exceeds 1.5× the manually-authored row count, the gate emits a
+STALE_GROOM warning and requires re-grooming before the item can proceed. The third row has no
+`pattern:` field — this is valid; the gate uses the manual count for that row.
+
 ### Risk Summary
 - Overall system risk: {LOW|MEDIUM|HIGH}
 - Highest-risk systems:
