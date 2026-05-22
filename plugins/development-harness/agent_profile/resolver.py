@@ -67,7 +67,14 @@ class SkillResolver:
     # Public interface
     # ------------------------------------------------------------------
 
-    def resolve(self, skill_uris: list[str], context_plugin: str) -> tuple[list[ResolvedSkill], list[str]]:
+    def resolve(
+        self,
+        skill_uris: list[str],
+        context_plugin: str,
+        *,
+        eager_uris: frozenset[str] = frozenset(),
+        include_content: bool = False,
+    ) -> tuple[list[ResolvedSkill], list[str]]:
         """Resolve *skill_uris* to filesystem-backed :class:`~agent_profile.models.ResolvedSkill` objects.
 
         Calls :meth:`_resolve_single` for each URI. Missing or unresolvable
@@ -85,6 +92,12 @@ class SkillResolver:
             context_plugin: Name of the plugin that owns the agent being
                 loaded. Used for bare-name and domain-path resolution
                 (context plugin searched first).
+            eager_uris: Skill URIs that should have ``load_eagerly=True`` in
+                the returned objects. Callers use this flag to decide which
+                skills to load immediately via ``Skill(skill=uri)``.
+            include_content: When ``True``, populate ``content`` and
+                ``reference_files`` on each resolved skill. Defaults to
+                ``False`` (metadata-only) to avoid token-budget overflows.
 
         Returns:
             A two-element tuple of:
@@ -98,7 +111,9 @@ class SkillResolver:
         warnings: list[str] = []
 
         for uri in skill_uris:
-            self._resolve_into(uri, context_plugin, visited, resolved, warnings)
+            self._resolve_into(
+                uri, context_plugin, visited, resolved, warnings, eager_uris=eager_uris, include_content=include_content
+            )
 
         return resolved, warnings
 
@@ -107,7 +122,15 @@ class SkillResolver:
     # ------------------------------------------------------------------
 
     def _resolve_into(
-        self, uri: str, context_plugin: str, visited: set[str], resolved: list[ResolvedSkill], warnings: list[str]
+        self,
+        uri: str,
+        context_plugin: str,
+        visited: set[str],
+        resolved: list[ResolvedSkill],
+        warnings: list[str],
+        *,
+        eager_uris: frozenset[str] = frozenset(),
+        include_content: bool = False,
     ) -> None:
         """Resolve *uri* and append result to *resolved*, warnings to *warnings*.
 
@@ -120,8 +143,14 @@ class SkillResolver:
                 chain, used for circular dependency detection.
             resolved: Accumulator list for successfully resolved skills.
             warnings: Accumulator list for non-fatal warning messages.
+            eager_uris: Forwarded to :meth:`_resolve_single`. See
+                :meth:`resolve` for semantics.
+            include_content: Forwarded to :meth:`_resolve_single`. See
+                :meth:`resolve` for semantics.
         """
-        skill = self._resolve_single(uri, context_plugin, visited, warnings)
+        skill = self._resolve_single(
+            uri, context_plugin, visited, warnings, eager_uris=eager_uris, include_content=include_content
+        )
         if skill is None:
             return
 
@@ -136,10 +165,25 @@ class SkillResolver:
             return
 
         for sub_uri in sub_uris:
-            self._resolve_into(sub_uri, skill.plugin, visited, resolved, warnings)
+            self._resolve_into(
+                sub_uri,
+                skill.plugin,
+                visited,
+                resolved,
+                warnings,
+                eager_uris=eager_uris,
+                include_content=include_content,
+            )
 
     def _resolve_single(
-        self, uri: str, context_plugin: str, visited: set[str], warnings: list[str]
+        self,
+        uri: str,
+        context_plugin: str,
+        visited: set[str],
+        warnings: list[str],
+        *,
+        eager_uris: frozenset[str] = frozenset(),
+        include_content: bool = False,
     ) -> ResolvedSkill | None:
         """Resolve one URI string to a :class:`~agent_profile.models.ResolvedSkill`.
 
@@ -152,6 +196,11 @@ class SkillResolver:
             visited: Visited-path set. If the resolved path is already in
                 this set, returns ``None`` with a circular-dependency warning.
             warnings: Warning accumulator.
+            eager_uris: URIs whose resolved skill should have
+                ``load_eagerly=True``.
+            include_content: When ``True``, read and return SKILL.md content
+                and reference files. When ``False`` (default), only path
+                metadata is returned.
 
         Returns:
             :class:`~agent_profile.models.ResolvedSkill` on success,
@@ -196,11 +245,14 @@ class SkillResolver:
 
         visited.add(abs_key)
 
-        try:
-            content, reference_files = read_skill_content(resolved_dir)
-        except FileNotFoundError:
+        if not skill_md.exists():
             warnings.append(f"Skill '{uri}': SKILL.md not found at {resolved_dir} — skipping.")
             return None
+
+        content: str | None = None
+        reference_files: dict[str, str] | None = None
+        if include_content:
+            content, reference_files = read_skill_content(resolved_dir)
 
         # Derive plugin and skill_name from the resolved directory.
         resolved_plugin, resolved_skill_name = _plugin_and_name_from_dir(resolved_dir, self._plugins_root)
@@ -210,6 +262,7 @@ class SkillResolver:
             resolved_path=skill_md,
             plugin=resolved_plugin,
             skill_name=resolved_skill_name,
+            load_eagerly=uri in eager_uris,
             content=content,
             reference_files=reference_files,
         )

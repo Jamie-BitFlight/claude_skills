@@ -33,15 +33,25 @@ If `sam_task` fails or returns an error: output the exact error text and return 
 
 ## Step 2 — Load Agent Profile (if specified)
 
-Check the `agent` field from the `sam_task` response. If it names a specialist agent (e.g., `python-cli-architect`, `ai-doc-optimizer`), load its profile via the backlog MCP server:
+Check the `agent` field from the `sam_task` response.
+
+**If the `agent` field is absent:** skip to Step 3 — no specialist profile is required.
+
+**If the `agent` field names a specialist agent** (e.g., `python-cli-architect`, `ai-doc-optimizer`), load its profile:
 
 ```text
 mcp__plugin_dh_backlog__profile_load(agent_name="{agent-field-value}")
 ```
 
-This reads the named agent's definition, resolves all skills declared in its frontmatter, and returns the bundled content. Inject it into your context — you now have the specialist's domain knowledge.
+If `profile_load` returns an error: output the exact error text and return STATUS: BLOCKED. A task that specifies an `agent` field requires that specialist — continuing without the profile produces unreliable output.
 
-If `profile_load` fails or the `agent` field is absent, continue — profile loading is non-fatal.
+If `profile_load` succeeds: inject the `body` field into your context. Then check the `skills` list for entries where `load_eagerly` is `true` and immediately call `Skill` for each:
+
+```text
+Skill(skill="{skill.uri}")
+```
+
+Loading a skill twice is a no-op. Remaining skills in the profile are available on demand when the task guidance references them.
 
 ## Step 3 — Delegate to start-task
 

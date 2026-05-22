@@ -42,6 +42,14 @@ class AgentMetadata(BaseModel):
         default_factory=list,
         description="Ordered list of skill URIs this agent loads, e.g. ['python3-development', 'dh:subagent-contract'].",
     )
+    eager_skills: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Skill URIs the agent should load immediately after profile_load returns. "
+            "Declared via the ``eager-skills:`` frontmatter key. "
+            "All URIs here must also appear in ``skills``."
+        ),
+    )
     tools: list[str] = Field(
         default_factory=list, description="MCP tool names or glob patterns the agent is allowed to call."
     )
@@ -54,10 +62,12 @@ class AgentMetadata(BaseModel):
 
 
 class ResolvedSkill(BaseModel):
-    """A skill URI fully resolved to its filesystem location and content.
+    """A skill URI resolved to its filesystem location with optional content.
 
-    Produced by ``resolver.py`` after locating and reading a ``SKILL.md`` file
-    and collecting any accompanying reference documents.
+    Produced by ``resolver.py``. By default (metadata-only mode) ``content``
+    and ``reference_files`` are ``None`` — the caller loads skill content via
+    ``Skill(skill=uri)`` using the ``uri`` field. Pass ``include_content=True``
+    to the resolver to populate the content fields.
     """
 
     uri: str = Field(
@@ -66,12 +76,26 @@ class ResolvedSkill(BaseModel):
     resolved_path: Path = Field(description="Absolute filesystem path to the resolved SKILL.md file.")
     plugin: str = Field(description="Name of the plugin that owns this skill, e.g. 'development-harness'.")
     skill_name: str = Field(description="Leaf skill directory name, e.g. 'subagent-contract'.")
-    content: str = Field(description="Full text content of the SKILL.md file.")
-    reference_files: dict[str, str] = Field(
-        default_factory=dict,
+    load_eagerly: bool = Field(
+        default=False,
         description=(
-            "Mapping of reference file name to its text content for all .md files "
-            "found in the skill's references/ subdirectory, keyed by filename."
+            "When True, the caller should load this skill immediately via "
+            "``Skill(skill=uri)`` after receiving the profile. "
+            "Controlled by the ``eager-skills:`` field in the agent frontmatter."
+        ),
+    )
+    content: str | None = Field(
+        default=None,
+        description=(
+            "Full text content of the SKILL.md file. None in metadata-only mode "
+            "(the default). Use ``Skill(skill=uri)`` to load content into context."
+        ),
+    )
+    reference_files: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Mapping of reference file name to its text content. None in metadata-only mode. "
+            "Populated only when ``include_content=True`` is passed to the resolver."
         ),
     )
 
