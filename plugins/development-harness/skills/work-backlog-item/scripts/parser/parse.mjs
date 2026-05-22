@@ -140,7 +140,9 @@ try {
 
   for (let i = 0; i < positionals.length; i++) {
     const token = positionals[i];
-    if (registryKeys.includes(token)) {
+    // Registry commands must be the first positional — they are subcommand verbs, not title words.
+    // Scanning all positionals caused words like "close" inside a title to steal the route.
+    if (i === 0 && registryKeys.includes(token)) {
       discriminators.push({ type: 'registry', value: token, index: i });
     } else if (issueRegex.test(token)) {
       discriminators.push({ type: 'item_ref', value: token, index: i, parsed: parseIssue(token) });
