@@ -219,6 +219,32 @@ This terminates the teammate immediately rather than leaving it idle. Idle teamm
 
 **Skip when**: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
 
+**Commit Ownership**
+
+Commit responsibility depends on which execution mode is active.
+
+**Same-worktree mode (default — no isolation flag):** The orchestrator owns all commits. Commit timing depends on `autonomy_mode`:
+
+- **`per_task` mode**: The Per-task Confirmation Gate (below) ensures only one task runs at a time. Commit after step 4b, before dispatching the next task — no concurrent agents are writing:
+
+  ```bash
+  git add -A
+  git commit -m "<type>(task): {task_id} — {task_title}"
+  ```
+
+- **`full_auto` and `checkpoint` modes**: Multiple tasks in a batch execute concurrently. Do NOT commit after each individual step 4b — other batch agents may still be writing to the worktree. Commit once **after step 5** confirms all tasks in the current batch are complete:
+
+  ```bash
+  git add -A
+  git commit -m "<type>(task-batch): {plan_address} — {task_ids}"
+  ```
+
+In both cases, choose `<type>` to match the dominant change in the committed work (`feat`, `fix`, `docs`, `refactor`, etc.). Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
+
+**Why the orchestrator commits:** Multiple agents write to the same filesystem concurrently. An agent committing mid-task risks including another agent's in-progress changes. The orchestrator is the only actor that knows when a batch is fully settled, making it the safe commit point.
+
+**Isolated-worktree mode (via `/dh:work-milestone`):** Each agent owns its own commits. The agent commits in its isolated worktree after completing its task. The orchestrator merges each worktree back when the completion message arrives. The orchestrator does NOT issue commit calls in this mode.
+
 **Per-task Confirmation Gate** (active when `autonomy_mode == "per_task"` only):
 
 After task N completes (steps 4 through 4b finished), before dispatching task N+1:
