@@ -746,6 +746,21 @@ class TestRealPluginsIntegration:
     Strategy: No mocking — tools use the real get_plugins_root() resolution.
     """
 
+    @pytest.fixture(autouse=True)
+    def _set_plugin_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Set CLAUDE_PLUGIN_ROOT to the development-harness plugin directory.
+
+        In the MCP server process, CLAUDE_PLUGIN_ROOT may point to a plugin cache
+        path rather than the development-harness repo root, causing get_plugins_root()
+        to resolve to a directory with zero agents.  Overriding the env var here
+        directs discovery at the correct source tree for the duration of each test.
+        """
+        from pathlib import Path
+
+        # tests/test_agent_profile/test_server.py → development-harness/
+        plugin_dir = str(Path(__file__).parent.parent.parent)
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", plugin_dir)
+
     async def test_profile_list_returns_nonzero_count(self) -> None:
         """profile_list against real plugins returns at least one agent.
 
