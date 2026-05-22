@@ -74,11 +74,45 @@ The skill provides the authoritative definitions of `AVAILABLE`, `DERIVABLE`, an
 
 If the orchestrator or `rtica-assessor` has pre-computed RT-ICA, prefer that result over running your own pass.
 
+### Step 0.5 - Classify Artifact and Behavioral Boundary
+
+Before searching for supporting skills, agents, prior work, dependencies, or blockers, classify the backlog item's primary artifact type.
+
+Use this classification to make the rest of discovery artifact-aware.
+
+| Artifact Type | Observable Boundary | Discovery Should Look For | Acceptance Criteria Should Evaluate |
+|---------------|---------------------|---------------------------|-------------------------------------|
+| Skill | Agent behavior after loading or using the skill | Existing skill conventions, eval prompts, behavioral tests, agents that should use the skill, activation patterns, prior skill assessment examples | Activation, task performance, edge-case handling, eval prompts, progressive disclosure, agent compatibility |
+| Agent | Behavior when assigned a task | Related agents, tool policies, skill usage patterns, delegation conventions, output contracts | Role boundary, tool usage, skill usage, delegation, output contract, blocking behavior |
+| MCP tool | Tool call behavior | Existing MCP tools, schemas, error patterns, side effects, permission boundaries | Input schema, output schema, side effects, errors, idempotency, permissions |
+| Backlog item | Planning readiness | Similar groomed backlog items, schema docs, dependency patterns, prior RT-ICA outputs | Clear scope, dependencies, blockers, domain-informed acceptance criteria, planning handoff quality |
+| Bug fix | Previously failing behavior | Repro steps, logs, failing tests, prior related fixes | Reproduction no longer fails, expected behavior appears, regression evidence exists |
+| Feature | User-visible or agent-visible workflow | Existing workflows, related features, current gaps, expected outputs | Representative workflow succeeds, output is correct, errors are handled |
+| Refactor | Behavior-preserving internal change | Existing tests, public interfaces, dependent code, compatibility constraints | Existing behavior remains unchanged, tests pass, interfaces remain stable |
+| Documentation | Reader task completion | Existing docs, reader workflow, missing decisions, examples | Target reader can perform the intended task or make the intended decision |
+| Test or eval | Verification behavior | Existing test patterns, eval harnesses, fixtures, representative cases | It fails before the change, passes after the change, and checks the right domain behavior |
+
+If the item involves creating or modifying a skill, classify the primary artifact as `Skill`.
+
+For a Skill:
+
+- Treat the skill as behavioral automation guidance for agents.
+- Search for eval conventions, representative prompts, prior skill assessment patterns, and agents that should use the skill.
+- Do not treat the skill as a static document.
+- Do not make acceptance criteria only about file existence, frontmatter, formatting, or documentation completeness.
+- Acceptance criteria must verify that an agent using the skill behaves better or more correctly on representative tasks.
+- Verify activation boundaries: when the skill should be used and when it should not be used.
+- Verify progressive disclosure: concise `SKILL.md`, with large examples, scripts, references, schemas, or templates in supporting files when appropriate.
+- Verify that the skill encodes domain-specific procedures, constraints, edge cases, and validation checks.
+- Verify that relevant agents can discover or use the skill when appropriate.
+
+This ordering makes the research pass domain-aware instead of only making the writing phase domain-aware.
+
 ### Step 1 - Find Supporting Skills
 
-Search for skills relevant to the item topic.
+Search for skills relevant to the item topic, using the artifact classification from Step 0.5 to guide discovery.
 
-Skills are directories, not single files. To understand a skill, read the `SKILL.md` and follow referenced files when the `SKILL.md` points to supporting scripts, references, examples, schemas, or assets that are necessary to understand what the skill actually does.
+Skills are directories, not single files. To understand a skill, read the `SKILL.md` and follow referenced files when the `SKILL.md` points to supporting scripts, references, examples, schemas, assets, or evals that are necessary to understand what the skill actually does.
 
 Examples:
 
@@ -89,13 +123,22 @@ Glob: plugins/*/skills/*/SKILL.md
 
 Read the first 50 lines of each match. Check frontmatter, `description`, and early instructions for relevance to item keywords.
 
+If the item is classified as Skill, also search for:
+
+- Existing skill creation conventions
+- Skill evaluation patterns
+- Representative eval prompts
+- Prior skill grooming examples
+- Agents that list or invoke relevant skills
+- Supporting files referenced by comparable skills
+
 If a skill is relevant and references supporting files needed to understand its behavior, read those files selectively.
 
-Stop after 5 relevant skill matches unless the item directly concerns skill creation or skill behavior, in which case continue until you have enough context to evaluate existing skill conventions.
+Stop after 5 relevant skill matches unless the item directly concerns skill creation, skill behavior, or skill evaluation, in which case continue until you have enough context to evaluate existing skill conventions.
 
 ### Step 2 - Find Related Agents
 
-Search for agents with relevant capabilities.
+Search for agents with relevant capabilities, using the artifact classification from Step 0.5 to guide discovery.
 
 Examples:
 
@@ -106,13 +149,21 @@ Glob: plugins/*/agents/*.md
 
 Read the first 50 lines of each match. Match each agent's `description`, tool list, skill list, and role boundary to the item needs.
 
-When the item involves skills, check whether relevant agents can use skills and whether the target skill should be discoverable or callable by those agents.
+If the item is classified as Skill, identify:
+
+- Agents that should be able to use the skill
+- Agents that already use related skills
+- Whether the target skill should be listed in an agent's skills block
+- Whether the target skill should be discovered dynamically
+- Behavioral gaps the skill is expected to correct in those agents
+
+When an item involves skills, acceptance criteria may need to verify the combined behavior of agent plus skill.
 
 Stop after 5 relevant agent matches unless the item directly concerns agent behavior, delegation, or skill usage.
 
 ### Step 3 - Check for Prior Work in Codebase
 
-Search local files for references to the item's key terms.
+Search local files for references to the item's key terms, using the artifact classification from Step 0.5 to guide discovery.
 
 Examples:
 
@@ -121,7 +172,7 @@ Grep pattern: {key terms from item title and description}
 Path: . repository root
 ```
 
-Stop after 5 relevant matches per key term.
+Stop after 5 relevant matches per key term unless the item directly concerns the artifact type being searched.
 
 Look for:
 
@@ -132,6 +183,18 @@ Look for:
 - Existing agent conventions
 - Existing schemas, templates, or docs
 - Current behavior that the item intends to change
+
+If the item is classified as Skill, also search for:
+
+- `eval`
+- `evaluation`
+- `representative prompt`
+- `activation`
+- `SKILL.md`
+- `skills:`
+- Similar skill directories
+- Prior groomed items involving skills
+- Examples where an agent's behavior changed because of a skill
 
 ### Step 4 - Identify Dependencies
 
@@ -158,38 +221,7 @@ Enumerate missing prerequisites:
 
 During grooming, blockers do not stop the output. They are surfaced as `Blockers`, `Human Input`, or `Questions for Human`.
 
-### Step 5.5 - Classify Artifact and Behavioral Boundary
-
-Before writing `Expected Behavior`, `Desired Structure`, or `Acceptance Criteria`, classify the backlog item's primary artifact type.
-
-Use the classification to determine what "observable" means.
-
-| Artifact Type | Observable Boundary | Acceptance Criteria Should Evaluate |
-|---------------|---------------------|-------------------------------------|
-| Skill | Agent behavior after loading or using the skill | Activation, task performance, edge-case handling, eval prompts, progressive disclosure, agent compatibility |
-| Agent | Behavior when assigned a task | Role boundary, tool usage, skill usage, delegation, output contract, blocking behavior |
-| MCP tool | Tool call behavior | Input schema, output schema, side effects, errors, idempotency, permissions |
-| Backlog item | Planning readiness | Clear scope, dependencies, blockers, domain-informed acceptance criteria, planning handoff quality |
-| Bug fix | Previously failing behavior | Reproduction no longer fails, expected behavior appears, regression evidence exists |
-| Feature | User-visible or agent-visible workflow | Representative workflow succeeds, output is correct, errors are handled |
-| Refactor | Behavior-preserving internal change | Existing behavior remains unchanged, tests pass, interfaces remain stable |
-| Documentation | Reader task completion | Target reader can perform the intended task or make the intended decision |
-| Test or eval | Verification behavior | It fails before the change, passes after the change, and checks the right domain behavior |
-
-If the item involves creating or modifying a skill, classify the primary artifact as `Skill`.
-
-For a Skill:
-
-- Treat the skill as behavioral automation guidance for agents.
-- Do not treat the skill as a static document.
-- Do not make acceptance criteria only about file existence, frontmatter, formatting, or documentation completeness.
-- Acceptance criteria must verify that an agent using the skill behaves better or more correctly on representative tasks.
-- Verify activation boundaries: when the skill should be used and when it should not be used.
-- Verify progressive disclosure: concise `SKILL.md`, with large examples, scripts, references, or schemas in supporting files when appropriate.
-- Verify that the skill encodes domain-specific procedures, constraints, edge cases, and validation checks.
-- Verify that relevant agents can discover or use the skill when appropriate.
-
-### Step 5.6 - Derive Domain-Semantic Checks
+### Step 5.5 - Derive Domain-Semantic Checks
 
 Before writing acceptance criteria, derive domain-semantic checks.
 
