@@ -109,11 +109,16 @@ Return to the orchestrator with the UNRESOLVED documentation. The orchestrator w
 
 ## Pre-Existing Issues Protocol
 
+**Pre-fix gate required**: Before acting on any discovered issue, apply the three-step
+Proactive Fix Gate from CLAUDE.md (Proactive Fix Gate section): (1) load domain skill,
+(2) state mission alignment, (3) classify complexity and route to --quick or planning.
+Do not proceed to any fix step without completing the gate.
+
 When the initial linter run reveals issues in files you did not touch, apply the Pre-Existing Issues Protocol:
 
 **Classify each issue:**
 
-- **Blocking** — linter exits nonzero, CI would fail, or the current task's verification cannot pass while this issue exists → fix it now using the standard resolution workflow
+- **Blocking** — linter exits nonzero, CI would fail, or the current task's verification cannot pass while this issue exists → apply the Proactive Fix Gate: load domain skill, state alignment, classify complexity. Trivial: route to --quick. Multi-file or design decision: add to plan.
 - **Non-blocking** — advisory warning, or in a file unrelated to the current task → record it in the repo's tracking system
 
 **Discover the tracking system** (search in this order):

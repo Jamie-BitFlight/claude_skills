@@ -219,6 +219,20 @@ Agent(subagent_type="holistic-linting:linting-root-cause-resolver", prompt="Form
 # If the tracking system was created fresh, acknowledge it.
 ```
 
+**Fixing blocking issues without the gate** — the fix gate applies even when the fix is obvious:
+
+```text
+# Wrong:
+# Resolver returned blocking issue → agent patches it inline without skill loading or --quick.
+
+# Correct:
+# Resolver returned blocking issue → orchestrator applies Proactive Fix Gate:
+#   1. Load domain skill for the affected file's plugin.
+#   2. State one-sentence mission alignment.
+#   3. Classify: single file + clear root cause + no design decision → --quick.
+#      Otherwise → add to plan, do not fix inline.
+```
+
 **Verifying agent's work by running linters** — read reports instead:
 
 ```text
