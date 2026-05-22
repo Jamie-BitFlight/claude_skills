@@ -1,147 +1,151 @@
 ---
 name: codemod-runner
-description: "Choose and run the right codemod tool for AST-based or structural multi-file refactors. Covers regex (sed/comby), structural (ast-grep), and full-AST (jscodeshift/ts-morph/LibCST). Use when renaming symbols, migrating imports, or applying mechanical transformations across 10-200 files. Triggers on: rename API, migrate imports, symbol rename, multi-file refactor, codemod, bulk edit."
+description: "Execute large-scale automated code transformations safely and idempotently. Use when renaming symbols across a codebase, migrating API call-sites, enforcing new patterns at scale, or applying structural edits to many files at once. Triggers on: 'codemod', 'mass rename', 'migrate all usages', 'transform codebase', 'apply pattern at scale', AST-based refactoring, or any task requiring consistent edits across 10 or more files."
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # Codemod Runner
 
-Run deterministic multi-file refactors using the right tool for the job. LLM Edit loops are non-deterministic and unverifiable for bulk changes; codemods are reproducible and idempotency-checkable.
+Apply automated code transformations at scale using the right AST tool for the job — with scope assessment, batch execution, and idempotency verification before committing.
 
-## Tool Selection Flowchart
+---
+
+## Tool Selection
 
 ```mermaid
 flowchart TD
-    Start([Describe the transform]) --> Q1{Is the transform pure<br>text or line-level?}
-    Q1 -->|Yes — line-level regex| Sed[Use sed or perl -pi]
-    Q1 -->|Yes — structural text patterns<br>with holes and context| Comby[Use comby<br>structural regex with holes]
-    Q1 -->|No — needs syntax awareness| Q2{Does the transform require<br>full AST manipulation?}
-    Q2 -->|No — structural pattern matching<br>without type info| AstGrep[Use ast-grep<br>language-aware structural search]
-    Q2 -->|Yes — rename symbols, preserve types,<br>cross-file references| Q3{Target language?}
-    Q3 -->|JavaScript| Jscodeshift[Use jscodeshift<br>JS/JSX codemods via AST]
-    Q3 -->|TypeScript| TsMorph[Use ts-morph<br>TS-aware AST with type info]
-    Q3 -->|Python| LibCST[Use LibCST or rope<br>Python CST with whitespace fidelity]
-    Sed --> Scope
+    Start([Codemod task received]) --> Q1{Language?}
+    Q1 -->|Python| Q2{Transformation type?}
+    Q1 -->|JavaScript / TypeScript| Q3{Needs full type info?}
+    Q1 -->|Multi-language or<br>language-agnostic| Comby["comby<br>Structural search-replace<br>Works on any language<br>Pattern: comby 'old' 'new' .py"]
+    Q2 -->|Rename, rewrite,<br>API migration| LibCST["LibCST<br>Preserves formatting<br>Python CST with type safety<br>pip install libcst"]
+    Q2 -->|Lightweight search-replace<br>or regex-like patterns| Comby
+    Q3 -->|Yes — needs type resolution,<br>cross-file inference| TSMorph["ts-morph<br>Full TypeScript compiler API<br>npx ts-morph-cli or use API<br>Best for typed refactors"]
+    Q3 -->|No — structural only| Q4{Ecosystem preference?}
+    Q4 -->|AST patterns preferred| AstGrep["ast-grep<br>Fast structural search<br>npm install -g @ast-grep/cli<br>sg run -p 'pattern' -r 'rewrite'"]
+    Q4 -->|Codemod ecosystem,<br>existing transforms| JSCodeshift["jscodeshift<br>Facebook codemod runner<br>npx jscodeshift -t transform.js src/"]
     Comby --> Scope
-    AstGrep --> Scope
-    Jscodeshift --> Scope
-    TsMorph --> Scope
     LibCST --> Scope
-    Scope([Pre-execution scope check])
+    TSMorph --> Scope
+    AstGrep --> Scope
+    JSCodeshift --> Scope
+    Scope([Proceed to scope assessment])
 ```
 
-**Tool summary:**
+---
 
-| Tool | Best for | Language scope |
-|---|---|---|
-| `sed` / `perl -pi` | Line-level text replacement | Any |
-| `comby` | Structural patterns with holes, multi-line context | Any |
-| `ast-grep` | Pattern-based structural search without type resolution | JS/TS/Python/Go/Rust/more |
-| `jscodeshift` | Full AST rewrites, JS/JSX symbol renames | JavaScript, JSX |
-| `ts-morph` | TypeScript-aware refactors with type information | TypeScript |
-| `LibCST` / `rope` | Python CST transforms preserving whitespace and comments | Python |
+## Phase 1 — Scope Assessment (run before any transformation)
 
-SOURCE: `research/skill-generation-tools/composio-codebase-migrate.md` line 142 (accessed 2026-05-22) — tool catalog (jscodeshift, ts-morph, comby, ast-grep, LibCST). Note: Python LibCST/rope examples in that research source are sparse; do not fabricate API idioms — consult LibCST official docs before implementing.
-
-## Pre-Execution Scope Check
-
-Establish blast radius before running any codemod:
+Assess impact size before touching files:
 
 ```bash
 # Count affected files
-rg -l '<pattern>' | wc -l
+rg -l 'old-pattern' | wc -l
 
-# Create first batch list (25 files)
-rg -l '<pattern>' | head -25 > batch.list
-
-# Inspect the batch before touching it
+# Preview first 25 affected files (saves to batch list)
+rg -l 'old-pattern' | head -25 > batch.list
 cat batch.list
+
+# Count total occurrences (not just files)
+rg -c 'old-pattern' | awk -F: '{sum+=$2} END {print sum}'
 ```
 
-Process in batches of 25. Review each batch diff before proceeding to the next.
-
-## Per-Batch Execution
+If the file count exceeds 50, process in batches using `batch.list`:
 
 ```bash
-# Run codemod on batch
-<codemod-command> $(cat batch.list)
+# Build per-batch lists of 25 files each
+rg -l 'old-pattern' | split -l 25 - batch-
+ls batch-*  # batch-aa, batch-ab, ...
+```
 
-# Review diff
+---
+
+## Phase 2 — Batch Execution
+
+Run the codemod against one batch at a time. Replace `TOOL_CMD` with the selected tool:
+
+```bash
+# ast-grep example
+sg run -p 'old_fn($A)' -r 'new_fn($A)' --lang python $(cat batch-aa)
+
+# comby example
+comby 'old_fn(:[args])' 'new_fn(:[args])' -f .py $(cat batch-aa)
+
+# jscodeshift example
+npx jscodeshift -t transform.js $(cat batch-aa)
+
+# LibCST — use a script, pass files as args
+uv run codemod_script.py $(cat batch-aa)
+
+# ts-morph — use a script targeting the batch
+npx ts-node transform.ts --files $(cat batch-aa)
+```
+
+---
+
+## Phase 3 — Per-Batch Idempotency Check
+
+After each batch completes, verify the transformation is idempotent (running it twice produces zero diff):
+
+```bash
+# Run the transformation a second time on the same batch
+TOOL_CMD $(cat batch-aa)
+
+# Confirm no further changes
 git diff --stat
-git diff
+# Expected output: (empty — no changes)
 ```
 
-Commit or stash the batch diff before moving to the next batch.
+If `git diff` shows changes after the second run, the transformation is not idempotent. Investigate the transform logic before proceeding to the next batch.
 
-## Idempotency Check
+---
 
-Run the codemod twice on the same batch. The second run must produce zero diffs:
+## Phase 4 — Verification Trend
+
+After each batch, measure progress toward zero remaining occurrences:
 
 ```bash
-# First run (already applied above)
-<codemod-command> $(cat batch.list)
-git stash   # save first-run result
+# Before starting:  rg 'old-pattern' | wc -l  → baseline count N
+# After batch 1:    rg 'old-pattern' | wc -l  → should decrease
+# After all batches: rg 'old-pattern' | wc -l  → 0
 
-# Second run on same inputs
-git stash pop
-<codemod-command> $(cat batch.list)
-
-# Assert idempotency — must be empty
-git diff --stat
+# One-liner to track trend across iterations
+echo "Remaining: $(rg 'old-pattern' | wc -l)"
 ```
 
-If `git diff --stat` shows changes after the second run, the codemod is not idempotent. Fix the transform before proceeding to additional batches.
+The count MUST decrease monotonically after each batch. If it does not decrease, the transform did not apply — investigate before continuing.
 
-## Verification Trend
+Final state: `rg 'old-pattern' | wc -l` returns `0`.
 
-Track match count across batches. It must decrease monotonically and reach 0:
+---
+
+## Phase 5 — Commit
+
+Once all batches pass idempotency and the verification count reaches 0:
 
 ```bash
-# After each batch — count remaining matches
-rg '<old-pattern>' | wc -l
+git add -p   # or specific files
+git commit -m "codemod: migrate old-pattern → new-pattern"
 ```
 
-Record the count after each batch. A non-decreasing count signals the codemod is not working or the pattern is wrong. Reach 0 to confirm completion.
+Commit after all batches complete and verification passes — not per-batch.
 
-## Tool-Specific Notes
+---
 
-### comby
+## Tool Quick Reference
 
-Structural regex with holes. Install: `brew install comby` or download from [comby.dev](https://comby.dev) (accessed 2026-05-22).
+SOURCE: Tool official documentation — comby (comby.dev, accessed 2026-05-22), ast-grep (ast-grep.github.io, accessed 2026-05-22), jscodeshift (github.com/facebook/jscodeshift, accessed 2026-05-22), ts-morph (ts-morph.com, accessed 2026-05-22), LibCST (libcst.readthedocs.io, accessed 2026-05-22).
 
-```bash
-# Match and rewrite across all .go files
-comby 'old_func(:[args])' 'new_func(:[args])' .go -in-place
-```
+| Tool | Install | Strengths | Avoid when |
+|---|---|---|---|
+| **comby** | `brew install comby` or binary | Language-agnostic, structural | Need type information |
+| **ast-grep** | `npm i -g @ast-grep/cli` | Fast, multi-language AST patterns | Complex rewrites needing APIs |
+| **jscodeshift** | `npm i -g jscodeshift` | Rich JS/TS ecosystem, existing codemods | Python or non-JS targets |
+| **ts-morph** | `npm i ts-morph` | Full TypeScript type resolution | No TypeScript in project |
+| **LibCST** | `pip install libcst` | Format-preserving Python CST | JS/TS or multi-language |
 
-### ast-grep
+---
 
-Language-aware structural search. Install: `cargo install ast-grep` or `npm install -g @ast-grep/cli`.
+## Large-Scale Codemod Swarm Pattern
 
-```bash
-# Find all calls to old_func in TypeScript files
-ast-grep --lang typescript --pattern 'old_func($$$)' src/
-# Rewrite
-ast-grep --lang typescript --pattern 'old_func($$$)' --rewrite 'new_func($$$)' src/ --update-all
-```
-
-### jscodeshift
-
-JavaScript/JSX AST rewrites. Install: `npm install -g jscodeshift`.
-
-```bash
-jscodeshift -t transform.js src/ --extensions=js,jsx
-```
-
-### ts-morph
-
-TypeScript-aware AST manipulation. Install: `npm install ts-morph`.
-
-Use as a Node script — ts-morph manipulates the TS compiler API directly, preserving type information across renames.
-
-### LibCST (Python)
-
-Concrete Syntax Tree for Python. Preserves whitespace, comments, and formatting. Install: `pip install libcst`.
-
-Sparse examples exist in the research source cited above. Consult [LibCST official documentation](https://libcst.readthedocs.io/) (accessed 2026-05-22) before writing transforms — do not fabricate API idioms.
-
-SOURCE: `research/skill-generation-tools/composio-codebase-migrate.md` line 142 (accessed 2026-05-22). Python LibCST/rope example coverage in that source is sparse.
+For codebases with thousands of files, coordinate parallel workers across file batches using the `/swarm-patterns` skill (Pattern 6). Each worker owns one batch file, runs the codemod + idempotency check, and reports its completion count to the team lead before the final commit.
