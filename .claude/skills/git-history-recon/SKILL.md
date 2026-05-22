@@ -32,7 +32,7 @@ flowchart TD
     ShallowCheck -->|"outputs false or missing"| Phase0
     ShallowWarn --> Phase0
 
-    Phase0["Phase 0 — Repo Size Probe<br>Run: git rev-list --count HEAD<br>Run: git shortlog -sn --no-merges \| wc -l"]
+    Phase0["Phase 0 — Repo Size Probe<br>Run: git rev-list --count HEAD<br>Run: git shortlog -sn HEAD --no-merges \| wc -l"]
 
     Phase0 --> SizeClass{"Commit count?"}
     SizeClass -->|"< 500 — small"| WindowAll["Window: all history (omit --since)<br>N = 20"]
@@ -52,9 +52,9 @@ flowchart TD
 
     Phase1 --> P1["Pipeline 1: Hotspots<br>git log --name-only --since=WINDOW --format='' \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
     Phase1 --> P2["Pipeline 2: Bug Magnets<br>git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
-    Phase1 --> P3["Pipeline 3: Bus Factor<br>git shortlog -sn --no-merges \| head -20"]
-    Phase1 --> P4["Pipeline 4: Active vs Total Contributors<br>git shortlog -sn --no-merges --since='3 months ago' \| wc -l (active)<br>git shortlog -sn --no-merges \| wc -l (total)"]
-    Phase1 --> P5["Pipeline 5: Momentum<br>git log --since=WINDOW --format='%Y-%m' \| sort \| uniq -c"]
+    Phase1 --> P3["Pipeline 3: Bus Factor<br>git shortlog -sn HEAD --no-merges \| head -20"]
+    Phase1 --> P4["Pipeline 4: Active vs Total Contributors<br>git shortlog -sn HEAD --no-merges --since='3 months ago' \| wc -l (active)<br>git shortlog -sn HEAD --no-merges \| wc -l (total)"]
+    Phase1 --> P5["Pipeline 5: Momentum<br>git log --since=WINDOW --pretty=format:'%cd' --date=format:'%Y-%m' \| sort \| uniq -c"]
     Phase1 --> P6["Pipeline 6: Firefighting<br>git log --since=WINDOW --grep='revert\|hotfix\|rollback' --oneline \| wc -l"]
     Phase1 --> P7["Pipeline 7: Newly Added Files<br>git log --since=WINDOW --diff-filter=A --name-only --format='' \| grep -v '^$' \| sort -u \| head -N"]
 
@@ -127,7 +127,7 @@ git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --f
 **Command**:
 
 ```bash
-git shortlog -sn --no-merges | head -20
+git shortlog -sn HEAD --no-merges | head -20
 ```
 
 **Output shape**: `COUNT  AUTHOR` lines, sorted descending by commit count (all-time).
@@ -149,10 +149,10 @@ Report this as: "N contributors account for 80% of commits."
 
 ```bash
 # Active contributors (last 3 months)
-git shortlog -sn --no-merges --since='3 months ago' | wc -l
+git shortlog -sn HEAD --no-merges --since='3 months ago' | wc -l
 
 # Total contributors (all time)
-git shortlog -sn --no-merges | wc -l
+git shortlog -sn HEAD --no-merges | wc -l
 ```
 
 **Output shape**: Two integers (active count, total count).
@@ -164,8 +164,10 @@ git shortlog -sn --no-merges | wc -l
 **Command**:
 
 ```bash
-git log --since=WINDOW --format='%Y-%m' | sort | uniq -c
+git log --since=WINDOW --pretty=format:'%cd' --date=format:'%Y-%m' | sort | uniq -c
 ```
+
+**Note**: Do NOT use `--format='%Y-%m'` — in git's tformat, `%m` means "boundary mark" (renders as `<`, `>`, or `-`), not "month". The `--pretty=format:'%cd'` placeholder emits the committer date; `--date=format:'%Y-%m'` controls the output shape.
 
 **Output shape**: `COUNT  YYYY-MM` lines — commit activity by month in the analysis window.
 
