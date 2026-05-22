@@ -112,12 +112,13 @@ Action:     metadata.plan set to plan file path
 
 ```
 Trigger:    /work-backlog-item --quick — after backlog_update links quick-{slug} plan
-Precondition: Item status is `groomed`
+Precondition: Item status is `groomed` OR `needs-grooming` (newly created inline by quick/start.md
+              Step 2 when no prior item exists — gate classification substitutes for grooming)
               Proactive Fix Gate completed (domain skill loaded, alignment stated, trivial classification)
               quick-{slug} SAM plan created by sam_plan(action='create')
 Action:     metadata.plan set to quick-{slug}
              metadata.status = in-progress
-             GitHub label: remove status:groomed, add status:in-progress
+             GitHub label: remove status:groomed (or status:needs-grooming), add status:in-progress
              NOTE: this transition is distinct from the in-milestone → in-progress path;
                    it bypasses RT-ICA and milestone assignment intentionally.
 ```

@@ -193,13 +193,9 @@ Multi-file or design-decision fix (route to planning):
 - The root cause is a pattern repeated across multiple locations
 
 When routed to `--quick`:
-If a backlog item already exists for the problem, invoke `/dh:work-backlog-item --quick {item title or #N}`.
-
-If no backlog item exists yet, add the tasks directly to the active SAM plan:
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "append_task", ...})
-```
+Invoke `/dh:work-backlog-item --quick {item title or #N}` whether or not a backlog item already
+exists. The `--quick` workflow (quick/start.md Step 2) handles item creation internally when no
+prior item exists — do not pre-create one.
 
 Do NOT call `backlog_add` for a fix you are about to perform immediately — that creates
 unnecessary grooming overhead for work already in flight.
