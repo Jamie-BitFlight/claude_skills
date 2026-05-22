@@ -110,7 +110,7 @@ Return to the orchestrator with the UNRESOLVED documentation. The orchestrator w
 ## Pre-Existing Issues Protocol
 
 **Pre-fix gate required**: Before acting on any discovered issue, apply the three-step
-Proactive Fix Gate from CLAUDE.md (Proactive Fix Gate section): (1) load domain skill,
+Proactive Fix Gate from `.claude/CLAUDE.md` (Proactive Fix Gate section): (1) load domain skill,
 (2) state mission alignment, (3) classify complexity and route to --quick or planning.
 Do not proceed to any fix step without completing the gate.
 

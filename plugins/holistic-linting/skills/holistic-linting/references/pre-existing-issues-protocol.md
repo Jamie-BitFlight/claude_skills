@@ -9,7 +9,7 @@ When a linter run reveals issues in files the current agent did not modify, the 
 Two outcomes are possible. Apply the correct one based on whether the issue blocks the pipeline:
 
 > **Pre-fix gate required**: Before acting on any discovered issue, apply the three-step
-> Proactive Fix Gate from CLAUDE.md (Proactive Fix Gate section): (1) load domain skill,
+> Proactive Fix Gate from `.claude/CLAUDE.md` (Proactive Fix Gate section): (1) load domain skill,
 > (2) state mission alignment, (3) classify complexity and route to --quick or planning.
 > Do not proceed to any fix step without completing the gate.
 
