@@ -8,6 +8,23 @@
 
 **Repository**: Claude Code Marketplace Plugin with modular skills (specialized knowledge, workflows, tools).
 
+## Plugins and Skills Are LLM Prompt Engineering Artifacts
+
+Plugin agent files (`agents/*.md`) and skill files (`skills/*/SKILL.md`, `skills/*/references/*.md`) are **LLM prompt engineering code**, not documentation. The markdown content IS the executable: it controls how AI agents reason, what constraints they enforce, and what outputs they produce.
+
+**Consequences for review and quality gates:**
+
+- Do NOT classify these files as "documentation-only" to justify SKIP verdicts or reduced scrutiny
+- Ambiguity, omissions, and internal inconsistencies in phrasing are **prompt engineering bugs** — they produce incorrect agent behavior, the same way a logic error in Python produces incorrect program behavior
+- The correctness standard is **behavioral**: will an LLM following this prompt produce the desired output across all specified inputs and edge cases?
+- Security reviewers must assess **prompt injection surfaces** — places where user-supplied or agent-generated content is interpolated into instructions that another LLM will execute
+- Quality reviewers must check for **contradictions between sections** — an agent reading two conflicting rules will choose one arbitrarily
+- Performance reviewers must check for **instruction bloat** — overly long or redundant instructions degrade attention and increase the probability of the agent ignoring rules
+
+**SKIP is appropriate only when** the changed content has zero effect on any LLM instruction path (e.g., a pure metadata field change with no reasoning impact). When in doubt, review.
+
+---
+
 ## Standard of Excellence
 
 The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that the user is genuinely impressed — not politely satisfied, actually impressed. Never offer to 'table this for later' when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't 'good enough' — it's 'holy shit, that's done.' Search before building. Test before shipping. Ship the complete thing. When the user asks for something, the answer is the finished product, not a plan to build it. Time is not an excuse. Fatigue is not an excuse. Complexity is not an excuse. Boil the ocean.
