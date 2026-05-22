@@ -6,3 +6,5 @@ task:
 
 context:
   backend: local
+gh:
+  repo: Jamie-BitFlight/claude_skills
