@@ -42,7 +42,7 @@ Field derivation:
 |---|---|
 | `title` | Use `item_title` exactly after trimming outer whitespace. |
 | `priority` | Use explicit user-provided priority if present and valid. Otherwise assign `P1` only when the input contains explicit urgency evidence such as `critical`, `required`, `must`, or an explicit priority flag. Assign `P2` for `nice to have` or `optional`. Otherwise default to `P2`. Do not infer `P0` unless the user explicitly stated `P0`. |
-| `description` | Write a problem-only summary from the user input and research context. Keep only: what is broken, missing, or requested; where it was observed; and what impact it has. Remove implementation steps, architecture ideas, suggested fixes, and file-level prescriptions as defined by the scope boundary rules above. If the user supplied a possible fix, preserve it as `**User-provided context**: {verbatim text}` and not as a requirement. If the input contains lines beginning with `?` or `Research:`, preserve them under `**Research first**: {content}`. |
+| `description` | Classify the item using scope.md Step 0 first. If **BEHAVIORAL/PROCESS**: preserve the full procedural description as written — do not strip. If **MIXED**: preserve the behavioral spec as written; isolate file/code prescriptions as `**User-provided context**: {verbatim text}`. If **PRODUCT/FEATURE**: write a problem-only summary. Keep only: what is broken, missing, or requested; where it was observed; and what impact it has. Remove implementation steps, architecture ideas, suggested fixes, and file-level prescriptions as defined by the scope boundary rules above. If the user supplied a possible fix, preserve it as `**User-provided context**: {verbatim text}` and not as a requirement. If the input contains lines beginning with `?` or `Research:`, preserve them under `**Research first**: {content}`. |
 | `source` | If a research file was used, set `source` to `Agent task - auto-derived from research/{filename}`. Otherwise set `source` to `Agent task - auto-derived from input`. |
 | `type` | Assign `Bug` for defect reports, `Feature` for new requested capability, `Refactor` for restructuring-only work, `Docs` for documentation-only work, and `Chore` otherwise. |
 
@@ -69,6 +69,8 @@ Use `AskUserQuestion` to collect any missing required fields:
 If the user supplies implementation details, extract only the problem statement into `description`. Preserve the removed content as:
 `**User-provided context**: {verbatim text}`
 
+Exception: if the item is a BEHAVIORAL or process-design item (the description defines what an agent, workflow, or system must do), preserve the full procedural description as written. Apply scope.md Step 0 to classify before extracting.
+
 ## Step 2: Validate inputs
 
 Required fields before write:
@@ -77,7 +79,7 @@ Required fields before write:
 - `description`: non-empty after trimming
 
 Validation rules:
-- Strip implementation instructions from `description` using the scope boundary rules above.
+- Apply the scope boundary rules in scope.md. For BEHAVIORAL/PROCESS items, the procedural description is preserved as written. For PRODUCT/FEATURE items, strip implementation instructions. For MIXED items, the behavioral spec is preserved and code prescriptions are isolated as `**User-provided context**`.
 - If stripping leaves `description` empty, stop and request a problem-only description.
 - Treat `warnings` as non-blocking unless the tool also returns `error` or non-empty `errors`.
 

@@ -33,7 +33,7 @@ Never introduce hard-coded truncation or length limits on content that a consume
 1. !`uv self update || true` — ensure uv is v0.10.0 or newer
 2. !`uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge || true` — enable git hooks
 3. Follow `./CONTRIBUTING.md` procedures when modifying plugins
-4. Multi-step work identified: capture new backlog items via `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"` — add items freely, they get groomed and checked later.
+4. Multi-step work identified: capture new backlog items via `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"` — add items freely, they get groomed and checked later. For behavioral/process items — descriptions of what an agent, workflow, or system must do — include the full procedural description. It is the requirement specification, not an implementation instruction, and the skill's classification gate will preserve it correctly.
 
 **Runtime**: All Python via `uv`, `uv run`, `uv run python -c 'some python code'`. All pre-commit via `prek`, `uv run prek run --files <file>`
 
