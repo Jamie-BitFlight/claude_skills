@@ -1,9 +1,4 @@
-<!-- Generated from gh-examples.md.template by setup_gh.py — do not edit directly. -->
-
-# GitHub CLI (gh) — Command Examples
-
-**Repository**: `Jamie-BitFlight/claude_skills` — **RULE: Pass `-R` (or `--repo`) on EVERY `gh` command** in
-proxy environments where git remotes point to a local proxy instead of `github.com`.
+**Repository**: `Jamie-BitFlight/claude_skills`
 
 ---
 
