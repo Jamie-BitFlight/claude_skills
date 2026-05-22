@@ -225,6 +225,10 @@ unfixable = ["F401"]
 "**/sam_schema/server.py" = ["TC001", "TC002", "PLR0911", "C901", "PLR0912"]
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — protocol surface includes _-prefixed methods that delegate to _-prefixed gh_client functions by design
+# JsonValue is used in parse_* function annotations — must be available at runtime for
+# typing.get_type_hints() consumers. TC001/TC002 would silently move it to TYPE_CHECKING.
+"**/backlog_core/backends/beads_models.py" = ["TC001", "TC002"]
+# GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 "**/backlog_core/backends/github_backend.py" = ["PLR0904", "SLF001"]
 # GitHubTaskProvider implements every method of TaskBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — BacklogBackend Protocol surface includes _-prefixed GraphQL methods by design (same justification as github_backend.py)

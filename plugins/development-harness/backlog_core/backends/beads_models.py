@@ -31,12 +31,11 @@ for runtime pattern enforcement.
 from __future__ import annotations
 
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Annotated, Final, NewType
+from typing import Annotated, Final, NewType
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
 
-if TYPE_CHECKING:
-    from backlog_core.backends.bd_runner import JsonValue
+from backlog_core.backends.bd_runner import JsonValue
 
 __all__ = [
     "BeadsCommentRaw",

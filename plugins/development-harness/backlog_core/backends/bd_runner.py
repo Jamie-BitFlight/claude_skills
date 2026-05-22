@@ -24,7 +24,7 @@ import os
 import shutil
 import subprocess
 import time
-from typing import TYPE_CHECKING, Final, TypeAlias
+from typing import TYPE_CHECKING, Final, TypeAlias, Union
 
 from backlog_core.models import BackendUnavailableError
 
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 #: Recursive JSON value type — the full set of values ``json.loads`` can return.
-JsonValue: TypeAlias = "str | int | float | bool | list[JsonValue] | dict[str, JsonValue] | None"
+JsonValue: TypeAlias = Union[str, int, float, bool, "list[JsonValue]", "dict[str, JsonValue]", None]
 
 __all__ = [
     "_DEFAULT_BD_TIMEOUT_SECONDS",
@@ -141,6 +141,9 @@ class BdRunner:
 
     Parameters
     ----------
+    timeout_seconds:
+        Maximum number of seconds to wait for any single ``bd`` invocation.
+        Defaults to :data:`_DEFAULT_BD_TIMEOUT_SECONDS`.
     env_overrides:
         Optional mapping of environment variable names to values that are
         merged into every ``bd`` subprocess environment.  Keys in this
@@ -148,9 +151,7 @@ class BdRunner:
         Variables listed in :data:`_BLOCKED_ENV_VARS` are removed first,
         then overrides are applied.  Pass ``None`` (default) to use the
         inherited environment with blocked variables removed.
-    timeout_seconds:
-        Maximum number of seconds to wait for any single ``bd`` invocation.
-        Defaults to :data:`_DEFAULT_BD_TIMEOUT_SECONDS`.
+        Keyword-only parameter.
 
     Notes:
     -----
@@ -161,7 +162,7 @@ class BdRunner:
     """
 
     def __init__(
-        self, *, env_overrides: Mapping[str, str] | None = None, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS
+        self, timeout_seconds: int = _DEFAULT_BD_TIMEOUT_SECONDS, *, env_overrides: Mapping[str, str] | None = None
     ) -> None:
         """Store configuration only.  Does not touch the filesystem."""
         self._timeout_seconds = timeout_seconds
