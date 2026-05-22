@@ -138,7 +138,8 @@ and `github_url` fields. If either is present, fetch the upstream source using
 mcp__Ref__ref_read_url (or WebFetch as fallback) and treat it as the authoritative
 primary source. Use the local research summary as an index to the primary source only.
 If the URL is absent or unreachable (4xx/5xx/timeout), log a warning in the
-feature-context document and proceed from the local summary — never hard-fail.
+`## Research Source Notes` section of the feature-context document and proceed from the
+local summary — never hard-fail.
 Produce feature-context-{slug}.md content with WHAT/WHY analysis — problem space, desired
 outcome, stakeholders, risks, open questions.
 Do NOT prescribe HOW to build it.
@@ -382,8 +383,8 @@ After reading any research artifact, inspect its YAML frontmatter for `resource_
 and `github_url` fields. If either is present, fetch the upstream source using
 mcp__Ref__ref_read_url (or WebFetch as fallback) and verify currency and completeness
 of the research summary against the primary source before designing. If the URL is
-absent or unreachable (4xx/5xx/timeout), log a warning in the architect document
-and proceed from the research summary — never hard-fail.
+absent or unreachable (4xx/5xx/timeout), log a warning in the `## Research Source Notes`
+section of the architect document and proceed from the research summary — never hard-fail.
 Additionally, run a WebSearch for current best practices relevant to this feature before
 finalizing the architecture. Training data is stale; current community practice may differ.
 Produce architect-{slug}.md content with interfaces, contracts, data models, module boundaries.

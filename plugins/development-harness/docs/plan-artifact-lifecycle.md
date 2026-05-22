@@ -60,7 +60,7 @@ These artifacts are produced by agents during planning phases. They may be updat
 > may contain `resource_url` and `github_url` YAML frontmatter fields pointing to upstream
 > primary sources. Consuming agents (feature-researcher, architect) MUST follow these URLs
 > when present — the local research summary is a discovery index, not an authoritative
-> document. See `add-new-feature/SKILL.md` Phase 1 and Phase 3 delegation prompts for the
+> document. See [add-new-feature/SKILL.md](../skills/add-new-feature/SKILL.md) Phase 1 and Phase 3 delegation prompts for the
 > authoritative fetch directive.
 
 ---

@@ -187,11 +187,13 @@ if prior_artifacts contains artifact_type="research":
     github_url   = frontmatter.get("github_url")
 ```
 
-For each URL found:
+For each URL found, use ordered fallback:
 
-1. Fetch the URL using `mcp__Ref__ref_read_url` (preferred) or `WebFetch` as fallback.
-2. Treat the fetched content as the **authoritative primary source**.
-3. Use the local research summary only as an index — a map to the primary source, not a
+1. If `resource_url` is present, fetch it first using `mcp__Ref__ref_read_url` (preferred) or
+   `WebFetch` as fallback.
+2. Use `github_url` only if `resource_url` is absent or returns 4xx/5xx/timeout.
+3. Treat the fetched content as the **authoritative primary source**.
+4. Use the local research summary only as an index — a map to the primary source, not a
    substitute for it.
 
 **Fallback rule**: If a URL is absent, returns 4xx/5xx, or times out:
