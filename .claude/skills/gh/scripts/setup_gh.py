@@ -976,62 +976,44 @@ def write_gh_config(config_path: Path, owner_repo: str) -> bool:
     return True
 
 
-def render_gh_examples(owner_repo: str) -> bool:
-    """Render gh-examples.md.template -> gh-examples.md with owner/repo substituted.
-
-    Reads ``_SCRIPT_DIR.parent / "gh-examples.md.template"``, substitutes
-    three token types:
-
-    - ``<owner/repo>`` → full slug (e.g. ``Jamie-BitFlight/claude_skills``)
-    - ``<owner>``      → owner component (e.g. ``Jamie-BitFlight``)
-    - ``<repo>``       → repo component (e.g. ``claude_skills``)
-
-    and writes the result to ``_SCRIPT_DIR.parent / "gh-examples.md"``.
+def _render_template(owner_repo: str) -> str | None:
+    """Render gh-examples.md.template with owner/repo substituted, return as string.
 
     Args:
         owner_repo: Validated owner/repo slug to substitute for all tokens.
 
     Returns:
-        True when rendering succeeded and gh-examples.md was written.
-        False when the template file is missing or the write fails.
-
-    Side effects:
-        Writes ``.claude/skills/gh/gh-examples.md``.
-        Emits one warning to stderr on failure. Never raises.
+        Rendered string, or None if the template file is missing.
     """
     template_path = _SCRIPT_DIR.parent / "gh-examples.md.template"
-    output_path = _SCRIPT_DIR.parent / "gh-examples.md"
-
     if not template_path.exists():
         error_console.print(f":warning: [yellow]Warning: gh-examples.md.template not found at {template_path}[/yellow]")
-        return False
-
-    try:
-        content = template_path.read_text(encoding="utf-8")
-        owner, repo = owner_repo.split("/", maxsplit=1)
-        rendered = content.replace("<owner/repo>", owner_repo).replace("<owner>", owner).replace("<repo>", repo)
-        output_path.write_text(rendered, encoding="utf-8")
-    except OSError as exc:
-        error_console.print(f":warning: [yellow]Warning: could not write gh-examples.md: {exc}[/yellow]")
-        return False
-
-    return True
+        return None
+    owner, repo = owner_repo.split("/", maxsplit=1)
+    content = template_path.read_text(encoding="utf-8")
+    return content.replace("<owner/repo>", owner_repo).replace("<owner>", owner).replace("<repo>", repo)
 
 
-def _apply_repo_detection() -> None:
-    """Detect owner/repo from git remote and refresh .dh/config.yaml + gh-examples.md."""
+def _apply_repo_detection() -> str | None:
+    """Detect owner/repo from git remote and write to .dh/config.yaml.
+
+    Returns:
+        The detected owner/repo slug, or None if detection failed.
+    """
     owner_repo = detect_owner_repo()
     if owner_repo is not None:
         write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
-        render_gh_examples(owner_repo)
+    return owner_repo
 
 
 def _run_detect_only() -> None:
-    """Execute --detect-only mode: refresh config and print examples to stdout."""
-    _apply_repo_detection()
-    examples_path = _SCRIPT_DIR.parent / "gh-examples.md"
-    if examples_path.exists():
-        sys.stdout.write(examples_path.read_text(encoding="utf-8"))
+    """Execute --detect-only mode: refresh config and print rendered examples to stdout."""
+    owner_repo = _apply_repo_detection()
+    if owner_repo is None:
+        return
+    rendered = _render_template(owner_repo)
+    if rendered is not None:
+        sys.stdout.write(rendered)
 
 
 # ---------------------------------------------------------------------------
@@ -1055,8 +1037,9 @@ def main(
         bool,
         typer.Option(
             "--detect-only",
-            help="Detect owner/repo from git remote, write .dh/config.yaml, render gh-examples.md, "
-            "then print the rendered examples to stdout. Skips all network calls and gh install logic. "
+            help="Detect owner/repo from git remote, write .dh/config.yaml, "
+            "then render and print gh command examples to stdout. "
+            "Skips all network calls and gh install logic. "
             "Designed for use with the skill !-notation: !`uv run --script setup_gh.py --detect-only`.",
         ),
     ] = False,
@@ -1116,7 +1099,7 @@ def main(
     )
 
     # 5. Auto-detect owner/repo — runs on every invocation so "already installed"
-    #    exits still refresh .dh/config.yaml and gh-examples.md.
+    #    exits still refresh .dh/config.yaml.
     _apply_repo_detection()
 
     # 6. Check if update is needed
