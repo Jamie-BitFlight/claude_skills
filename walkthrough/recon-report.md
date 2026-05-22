@@ -1,8 +1,8 @@
 # Codebase Risk Profile
 
-**Generated**: 2026-05-22T01:14:57Z
+**Generated**: 2026-05-22T10:42:00Z
 **Repository**: claude_skills
-**Size Class**: small (51 commits, 4 contributors) (shallow clone)
+**Size Class**: small (53 commits, 4 contributors) (shallow clone)
 **Analysis Window**: all history
 **Bug-Magnet Keywords**: fix, bug, broken, hotfix, revert
 **Caveat**: Bug-magnet detection relies on commit-message keyword matching. Repositories
@@ -97,10 +97,10 @@ in few contributors.
 |---------|-------------|
 | 37 | Jamie McGregor Nelson |
 | 10 | Jamie Nelson |
+| 3 | Claude |
 | 3 | dependabot[bot] |
-| 1 | Claude |
 
-**Bus Factor Assessment**: 2 contributors account for 80% of commits (47 of 51 commits).
+**Bus Factor Assessment**: 2 contributors account for 80% of commits (47 of 53 commits).
 Note: "Jamie McGregor Nelson" and "Jamie Nelson" are likely the same person committing
 under two identities — effective bus factor for this repository is 1.
 
@@ -110,7 +110,7 @@ Commit activity by month in the analysis window.
 
 | Month | Commits |
 |-------|---------|
-| 2026-05 | 51 |
+| 2026-05 | 53 |
 
 **Active Contributors (last 3 months)**: 4 of 4 total contributors.
 
@@ -165,7 +165,7 @@ insufficient documentation, or architectural drift.
    truncated history.
 4. **Firefighting**: low — 0% of commits are revert/hotfix/rollback. No firefighting signal
    in the analyzed window.
-5. **New code review**: 20+ new files were added in the analysis window (skill and reference
+5. **New code review**: 20 new files were added in the analysis window (skill and reference
    files under `.agents/skills/` and `.agent/`); verify documentation completeness and any
    associated tests.
 6. **Detection caveat**: Bug-magnet detection relies on commit-message keywords. Repositories
