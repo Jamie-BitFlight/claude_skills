@@ -109,10 +109,12 @@ Return to the orchestrator with the UNRESOLVED documentation. The orchestrator w
 
 ## Pre-Existing Issues Protocol
 
-**Pre-fix gate required**: Before acting on any discovered issue, apply the three-step
-Proactive Fix Gate from `.claude/CLAUDE.md` (Proactive Fix Gate section): (1) load domain skill,
-(2) state mission alignment, (3) classify complexity and route to --quick or planning.
-Do not proceed to any fix step without completing the gate.
+**Pre-fix gate required**: Before acting on any discovered issue, complete these three steps:
+(1) Load the domain skill for the affected file — without it the file is static docs, not a
+behavioral contract. (2) State in one sentence how the fix aligns with that plugin's mission —
+if you cannot, defer it. (3) Classify complexity: trivial (one file, obvious root cause,
+single Edit) → fix now; multi-file or design-decision → add to the project's backlog and defer.
+Do not proceed to any fix step without completing all three.
 
 When the initial linter run reveals issues in files you did not touch, apply the Pre-Existing Issues Protocol:
 

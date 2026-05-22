@@ -2,8 +2,8 @@
 
 **Trigger:** <mode/> is `--quick`. Skips grooming, RT-ICA, and SAM planning. For one-file fixes, broken links, and typo patches where full pipeline overhead is disproportionate.
 
-**Entry point from proactive fix gate:** When the Proactive Fix Gate (`.claude/CLAUDE.md`) routes a fix
-to --quick, the agent invokes this workflow as:
+**Entry point from proactive fix routing:** When an agent's pre-fix check classifies a discovered
+issue as trivial and routes it to --quick, the agent invokes this workflow as:
   /dh:work-backlog-item --quick {item title or #N}
 
 If no backlog item exists for the fix, the agent does NOT call backlog_add first. Instead it

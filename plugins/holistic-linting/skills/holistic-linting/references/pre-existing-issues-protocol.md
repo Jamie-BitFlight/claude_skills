@@ -8,10 +8,11 @@ When a linter run reveals issues in files the current agent did not modify, the 
 
 Two outcomes are possible. Apply the correct one based on whether the issue blocks the pipeline:
 
-> **Pre-fix gate required**: Before acting on any discovered issue, apply the three-step
-> Proactive Fix Gate from `.claude/CLAUDE.md` (Proactive Fix Gate section): (1) load domain skill,
-> (2) state mission alignment, (3) classify complexity and route to --quick or planning.
-> Do not proceed to any fix step without completing the gate.
+> **Pre-fix gate required**: Before acting on any discovered issue, complete these three steps:
+> (1) load the domain skill for the affected file, (2) state in one sentence how the fix aligns
+> with that plugin's mission, (3) classify complexity — trivial (one file, obvious root cause,
+> single Edit): fix now; multi-file or design-decision: add to the project backlog and defer.
+> Do not proceed to any fix step without completing all three.
 
 ```mermaid
 flowchart TD
