@@ -376,7 +376,7 @@ When a linter run reveals issues in files the current agent did not modify, "pre
 
 **Two outcomes based on whether the issue blocks the pipeline:**
 
-- **Blocking** (linter exits nonzero, CI would fail, or current task verification cannot pass) → fix it now using the standard resolution workflow
+- **Blocking** (linter exits nonzero, CI would fail, or current task verification cannot pass) → apply the Proactive Fix Gate (CLAUDE.md, Proactive Fix Gate section): load domain skill, state mission alignment, classify complexity. Trivial: route to `--quick`. Multi-file or design-decision: add to backlog and defer.
 - **Non-blocking** (advisory warning, file unrelated to current task) → discover the repo's tracking system and record it
 
 **Discover the tracking system** (search in order): `.claude/backlog/` per-item files, `.claude/tasks/`, `TODO.md`, `TODO`, `docs/TODO.md`, `.gsd/`, `sam.md`. If none exists, create a per-item file in `.claude/backlog/`.

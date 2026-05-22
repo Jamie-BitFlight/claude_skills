@@ -20,6 +20,8 @@ stateDiagram-v2
     blocked --> resolved : user cancels item
 
     groomed --> in_milestone : group-items-to-milestone
+    groomed --> in_progress : work-backlog-item --quick (Proactive Fix Gate, trivial classification)
+    needs_grooming --> in_progress : work-backlog-item --quick (Proactive Fix Gate, trivial, new item)
 
     in_milestone --> in_progress : work-backlog-item (RT-ICA APPROVED + planning started)
     in_milestone --> groomed : work-backlog-item (RT-ICA BLOCKED — item pulled back)
