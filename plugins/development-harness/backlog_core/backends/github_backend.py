@@ -452,10 +452,13 @@ class GitHubBackend:
     def unknown_key_to_heading(self, key: str) -> str:
         """Convert an unknown section key to a markdown heading string.
 
+        Delegates to :func:`backlog_core.rendering.unknown_key_to_heading` so
+        that all backends share a single canonical implementation.
+
         Returns:
             Heading text string (e.g. ``"My Section"``).
         """
-        return github_sync.unknown_key_to_heading(key)
+        return _rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:

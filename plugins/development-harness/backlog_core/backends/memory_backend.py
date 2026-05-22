@@ -514,8 +514,15 @@ class InMemoryBackend:
         return remote
 
     def unknown_key_to_heading(self, key: str) -> str:
-        """Convert a snake_case key to a Title Case heading."""
-        return key.replace("_", " ").title()
+        """Convert an unknown section key to a markdown heading string.
+
+        Delegates to :func:`backlog_core.rendering.unknown_key_to_heading` to
+        strip the ``"unknown__"`` prefix before title-casing.
+
+        Returns:
+            Heading text string (e.g. ``"Rt Ica"`` for ``"unknown__rt_ica"``).
+        """
+        return _rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:

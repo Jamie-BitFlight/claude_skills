@@ -961,6 +961,11 @@ def write_gh_config(config_path: Path, owner_repo: str) -> bool:
         error_console.print(f":warning: [yellow]Warning: could not read {config_path}: {exc}[/yellow]")
         return False
 
+    existing_gh = data.get("gh")
+    if existing_gh is not None and not isinstance(existing_gh, dict):
+        error_console.print(
+            f":warning: [yellow]Warning: replacing non-dict 'gh' value ({type(existing_gh).__name__}) in {config_path}[/yellow]"
+        )
     if not isinstance(data.get("gh"), dict):
         data["gh"] = _CommentedMap()
     data["gh"]["repo"] = owner_repo
@@ -1001,23 +1006,30 @@ def _apply_repo_detection() -> str | None:
         The detected owner/repo slug, or None if detection failed.
     """
     owner_repo = detect_owner_repo()
-    if owner_repo is not None:
-        _ = write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo)
+    if owner_repo is not None and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
+        error_console.print(
+            ":warning: [yellow]Warning: write_gh_config returned False — config may not have been persisted[/yellow]"
+        )
     return owner_repo
 
 
-def _run_detect_only() -> None:
-    """Execute --detect-only mode: refresh config and print rendered examples to stdout."""
+def _run_detect_only() -> bool:
+    """Execute --detect-only mode: refresh config and print rendered examples to stdout.
+
+    Returns:
+        True if detection and rendering succeeded, False if owner/repo could not be determined.
+    """
     owner_repo = _apply_repo_detection()
     if owner_repo is None:
         error_console.print(
             ":warning: [yellow]Warning: could not detect owner/repo from git remote. "
             "Set GITHUB_REPO=owner/repo to override.[/yellow]"
         )
-        return
+        return False
     rendered = _render_template(owner_repo)
     if rendered is not None:
         sys.stdout.write(rendered)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -1068,8 +1080,8 @@ def main(
     """
     # --detect-only: no network calls, no install — refresh config and emit examples to stdout.
     if detect_only:
-        _run_detect_only()
-        raise typer.Exit(code=0)
+        success = _run_detect_only()
+        raise typer.Exit(code=0 if success else 1)
 
     # 1. Check if gh is already installed
     gh_which = shutil.which(BINARY_NAME)
