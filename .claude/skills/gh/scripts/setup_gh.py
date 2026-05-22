@@ -1027,8 +1027,9 @@ def _run_detect_only() -> bool:
         )
         return False
     rendered = _render_template(owner_repo)
-    if rendered is not None:
-        sys.stdout.write(rendered)
+    if rendered is None:
+        return False
+    sys.stdout.write(rendered)
     return True
 
 

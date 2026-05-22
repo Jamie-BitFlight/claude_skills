@@ -1002,15 +1002,15 @@ class SQLiteBackend:
         return remote
 
     def unknown_key_to_heading(self, key: str) -> str:
-        """Convert a snake_case key to a Title Case heading.
+        """Convert an unknown section key to a markdown heading string.
 
-        Args:
-            key: Section key string.
+        Delegates to :func:`backlog_core.rendering.unknown_key_to_heading` to
+        strip the ``"unknown__"`` prefix before title-casing.
 
         Returns:
-            Title Case heading string.
+            Heading text string (e.g. ``"Rt Ica"`` for ``"unknown__rt_ica"``).
         """
-        return key.replace("_", " ").title()
+        return _rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:

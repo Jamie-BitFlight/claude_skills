@@ -171,9 +171,9 @@ class BdRunner:
             if blocked:
                 for key in blocked:
                     _log.warning("env_overrides key %r is blocked and will be ignored", key)
-            self._env_overrides = {k: v for k, v in env_overrides.items() if k not in _BLOCKED_ENV_VARS}
+            self._env_overrides: dict[str, str] = {k: v for k, v in env_overrides.items() if k not in _BLOCKED_ENV_VARS}
         else:
-            self._env_overrides = {}
+            self._env_overrides: dict[str, str] = {}
         self._bd_path: str | None = None
         self._available: bool | None = None
 
