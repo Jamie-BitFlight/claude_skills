@@ -143,6 +143,15 @@ Parser `route` is `none` only when argv is empty (no flags, no positionals, no f
 /work-backlog-item --language python --stack python-fastapi Add auth  # Layer 2 stack profile
 ```
 
+### --quick mode
+
+Loads [references/workflows/quick/start.md](./references/workflows/quick/start.md) with `flags.quick = true` (parser flag) and `item_ref` set to the supplied title.
+
+**Proactive fix routing**: The Proactive Fix Gate in `.claude/CLAUDE.md` (Autonomous Action
+Boundary section) routes trivial discovered issues to this `--quick` path autonomously.
+Invocation form: `flags.quick = true` (parser flag). The gate, not the user, authorizes the
+routing decision.
+
 ### --auto mode rules
 
 All interactive `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the full substitution table.
