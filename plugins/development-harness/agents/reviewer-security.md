@@ -118,8 +118,14 @@ Apply the verdict rule from
 - `REJECT` — any finding with `severity: BLOCKER`
 - `APPROVE` — no BLOCKER findings (MINOR or INFO findings may exist)
 - `SKIP` — the changed files contain no backend, credential, or infrastructure files
-  (e.g., only `.md`, `.txt`, `.rst` documentation; no `.py`, `.js`, `.ts`, `.sh`,
-  `.json`, `.yaml`/`.yml` config, or similar code/config files)
+  AND no Tier 3 prose files. Before applying SKIP to a markdown-only diff, classify
+  each `.md` file using `dh:file-classification`: agent files (`agents/*.md`), skill
+  files (`skills/*/SKILL.md`, `skills/*/references/*.md`), `CLAUDE.md`, and
+  `.claude/rules/*.md` are Tier 3 and MUST be checked for prompt injection surfaces
+  (§2.5.1 in verdict-schema.md) — SKIP is prohibited for these files.
+  (e.g., SKIP applies only when files are Tier 1/2 prose such as changelogs or
+  `CONTRIBUTING.md`, with no `.py`, `.js`, `.ts`, `.sh`, `.json`, `.yaml`/`.yml`
+  config, or similar code/config files)
 
 When SKIP applies: set `skip_reason` to a brief explanation (e.g., "no backend or
 credential files in changeset").
