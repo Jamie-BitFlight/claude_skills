@@ -57,7 +57,21 @@ Classify the skill into one of these purpose types based on the frontmatter desc
 
 If the skill spans multiple types, apply the union of warranted categories.
 
-### Step 3: Evaluate quality categories
+### Step 3: Evaluate agentskills.io best practices (primary)
+
+Apply the 5 best-practice checks from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md) — section "agentskills.io Best Practice Checks". Rate each PASS / PARTIAL / FAIL with evidence from SKILL.md.
+
+| Check | Question |
+|-------|----------|
+| **1. Approach vs Output** | Is the skill scoped to a class of problems or a narrow one-shot recipe? |
+| **2. Lean Instructions** | Does the skill over-specify, adding rules that narrow behavior without improving outcomes? |
+| **3. Reasoning over Directives** | Does the skill explain the *why* behind its rules, or rely on bare imperatives? |
+| **4. Description Trigger Accuracy** | Does the description generate a clear should-trigger / should-not-trigger boundary? |
+| **5. Bundle Signal** | Are repetitive operations bundled, or will the agent re-implement them each run? |
+
+For each check: state the verdict, cite specific evidence (file:line where possible), and note what an eval would test.
+
+### Step 4: Evaluate structural quality categories (secondary)
 
 Five categories are **universal** (always scored). Three are **conditional** (scored only when warranted by purpose; marked N/A otherwise).
 
@@ -89,9 +103,37 @@ For each applicable category:
 4. Score 0–3 based on rubric (below)
 5. Document findings with file:line references
 
-### Step 4: Score and report
+### Step 5: Generate starter evals
 
-Calculate overall score. Denominator = 15 (universal) + 3 × (number of applicable conditional categories).
+For each best-practice check rated FAIL or PARTIAL, generate 1–2 test case entries using the eval type from the mapping table in [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md).
+
+Additionally generate:
+
+- **3–5 behavioral scenarios:** prompts where the skill would be active; assertions check the agent follows the skill's *approach*, not exact output
+- **2–3 should-trigger queries:** non-obvious prompts where the skill SHOULD activate (tests description trigger accuracy)
+- **2–3 should-not-trigger queries:** prompts at the edge of scope where the skill SHOULD NOT activate
+
+Write the starter evals to `<skill-path>/evals/evals.json`. Create the `evals/` directory if it does not exist. Use the exact schema from the skill-creator `references/schemas.md`:
+
+```json
+{
+  "skill_name": "{skill-name-from-frontmatter}",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "...",
+      "expected_output": "...",
+      "expectations": ["..."]
+    }
+  ]
+}
+```
+
+`files` is optional — omit it when the eval does not require input files.
+
+### Step 6: Score and report
+
+Calculate overall structural score. Denominator = 15 (universal) + 3 × (number of applicable conditional categories).
 
 Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
 
@@ -105,7 +147,23 @@ Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
 **Purpose type:** {type}
 **Conditional categories applicable:** Scripts={Yes|No}, References={Yes|No}, Assets={Yes|No}
 
-## Overall Score: {score}/{applicable-max} ({percentage}%)
+## agentskills.io Best Practice Checks
+
+| Check | Verdict | Evidence |
+|-------|---------|----------|
+| 1. Approach vs Output | PASS/PARTIAL/FAIL | {evidence} |
+| 2. Lean Instructions | PASS/PARTIAL/FAIL | {evidence} |
+| 3. Reasoning over Directives | PASS/PARTIAL/FAIL | {evidence} |
+| 4. Description Trigger Accuracy | PASS/PARTIAL/FAIL | {evidence} |
+| 5. Bundle Signal | PASS/PARTIAL/FAIL | {evidence} |
+
+## Starter Evals
+
+Written to: {skill-path}/evals/evals.json
+Total test cases: {N} ({behavioral} behavioral, {trigger} should-trigger,
+  {no-trigger} should-not-trigger, {gap} gap-coverage)
+
+## Structural Score: {score}/{applicable-max} ({percentage}%)
 
 | Category | Applicable | Score | Label | Findings |
 |----------|-----------|-------|-------|----------|
@@ -135,14 +193,13 @@ Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
 This skill enforces behavior through instructions Claude internalizes. Scripts are not warranted.
 No gap. No recommendation.
 
-...
-
 ## Recommendations for Improvement
 
-Only list recommendations for applicable categories with scores below 3:
+Only list recommendations for applicable categories with scores below 3, or best-practice checks
+rated FAIL:
 
-1. **High Priority:** {recommendation} (Category)
-2. **Medium Priority:** {recommendation} (Category)
+1. **High Priority:** {recommendation} (Category or Check)
+2. **Medium Priority:** {recommendation} (Category or Check)
 ```
 
 **Output Location:** `.claude/audits/completeness-report-{skill-slug}.md`. Create `.claude/audits/` if it does not exist.
