@@ -98,7 +98,7 @@ class LocalFilesystemArtifactProvider:
         guarantees a reader sees either the old or new file, never torn data).
 
         Args:
-            item_id: Issue number (positive integer).
+            item_id: Issue number or beads string identifier (``str | int``).
 
         Returns:
             ``ArtifactManifest`` for the issue.  Empty manifest when no file
@@ -110,10 +110,7 @@ class LocalFilesystemArtifactProvider:
         """
         manifest_path = self._manifest_path(item_id)
         if not manifest_path.exists():
-            # Use 0 as a sentinel when item_id is a beads string — the manifest
-            # field is typed int, but the local provider stores by filename stem only.
-            issue_int = item_id if isinstance(item_id, int) else 0
-            return ArtifactManifest(issue_number=issue_int)
+            return ArtifactManifest(issue_number=item_id)
         content = manifest_path.read_text(encoding="utf-8")
         # json.loads raises json.JSONDecodeError (a ValueError subclass) for corrupt JSON.
         # Using two-step parse so corrupt JSON raises ValueError, not pydantic.ValidationError.
@@ -132,7 +129,7 @@ class LocalFilesystemArtifactProvider:
         ensures all entries carry ``storage_tier='local'`` before writing.
 
         Args:
-            item_id: Issue number (positive integer).
+            item_id: Issue number or beads string identifier (``str | int``).
             manifest: Updated manifest to persist.
         """
         manifest_path = self._manifest_path(item_id)

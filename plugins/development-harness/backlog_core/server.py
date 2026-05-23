@@ -28,7 +28,7 @@ from pydantic import Field
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
 from . import models as _models, operations
-from .artifact_provider import ArtifactBackend, create_artifact_provider
+from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import IssueNode as _IssueNode, get_config as _get_config
@@ -3169,15 +3169,15 @@ def _dispatch_plan_path(milestone_number: int) -> Path:
     return _ds.dispatch_plan_path(milestone_number, _models.get_repo_root())
 
 
-def _try_register_dispatch_plan_artifact(issue_number: int, plan_path: Path) -> None:
+def _try_register_dispatch_plan_artifact(item_id: ItemId, plan_path: Path) -> None:
     """Register the newly written dispatch plan file as a dispatch-plan artifact.
 
     Best-effort: logs a warning on any failure but never raises.  Called after
     ``dispatch_create_plan`` writes the plan file when the caller provides an
-    associated GitHub issue number.
+    associated issue identifier.
 
     Args:
-        issue_number: GitHub issue number to register the artifact against.
+        item_id: Issue number or beads string identifier to register the artifact against.
         plan_path: Absolute or repo-relative path to the created plan file.
     """
     log = _logging.getLogger(__name__)
@@ -3193,16 +3193,13 @@ def _try_register_dispatch_plan_artifact(issue_number: int, plan_path: Path) -> 
             status=ArtifactStatus.CURRENT,
             agent="dispatch_create_plan",
         )
-        manifest = provider.get_manifest(issue_number)
+        manifest = provider.get_manifest(item_id)
         updated_manifest = _artifact_registry.register(manifest, entry)
-        provider.set_manifest(issue_number, updated_manifest)
-        log.info("dispatch_create_plan: registered dispatch-plan artifact %s for issue #%d", plan_path, issue_number)
+        provider.set_manifest(item_id, updated_manifest)
+        log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", plan_path, item_id)
     except (BacklogError, _GithubException) as exc:
         log.warning(
-            "dispatch_create_plan: artifact registration failed for issue #%d (path=%s): %s",
-            issue_number,
-            plan_path,
-            exc,
+            "dispatch_create_plan: artifact registration failed for item %s (path=%s): %s", item_id, plan_path, exc
         )
 
 
@@ -3659,7 +3656,7 @@ def _migrate_classify_plan_file(file_path: Path) -> ArtifactType | None:
     return None
 
 
-_MigrateCandidate = tuple[str, ArtifactType, int | None, str | None]
+_MigrateCandidate = tuple[str, ArtifactType, ItemId | None, str | None]
 
 #: Return type for candidate discovery — (actionable candidates, filtered-out count).
 _MigrateDiscoveryResult = tuple[list[_MigrateCandidate], int]
@@ -3811,7 +3808,7 @@ def _migrate_discover_candidates(
 
 
 def _migrate_register_one(
-    provider: ArtifactBackend, rel_path: str, artifact_type: ArtifactType, issue_number: int
+    provider: ArtifactBackend, rel_path: str, artifact_type: ArtifactType, item_id: ItemId
 ) -> tuple[bool, str]:
     """Register a single artifact, uploading content when available.
 
@@ -3821,7 +3818,7 @@ def _migrate_register_one(
         provider: Initialised ``ArtifactBackend`` instance.
         rel_path: Repo-relative path string.
         artifact_type: Resolved artifact type.
-        issue_number: GitHub issue number (must be positive).
+        item_id: Issue number or beads string identifier.
 
     Returns:
         Tuple of ``(success: bool, message: str)``.
@@ -3833,14 +3830,14 @@ def _migrate_register_one(
         created_at=_datetime.now(UTC).isoformat(),
         agent="artifact-migrate",
     )
-    manifest = provider.get_manifest(issue_number)
+    manifest = provider.get_manifest(item_id)
     existed = any(e.artifact_type == artifact_type and e.artifact_id == rel_path for e in manifest.artifacts)
     updated_manifest = _artifact_registry.register(manifest, entry)
-    provider.set_manifest(issue_number, updated_manifest)
+    provider.set_manifest(item_id, updated_manifest)
 
     local_content = provider.read_local_artifact_content(rel_path)
     if local_content is not None:
-        provider.store_artifact_content(issue_number, str(artifact_type), rel_path, local_content)
+        provider.store_artifact_content(item_id, str(artifact_type), rel_path, local_content)
         content_note = " (content uploaded)"
     else:
         content_note = " (no local file — manifest-only)"
@@ -3898,16 +3895,16 @@ def _migrate_dry_run(issue_number: int | None) -> dict:
 
 
 def _migrate_queue_manifest_only(
-    provider: ArtifactBackend, issue_number: int, candidates: list[_MigrateCandidate], out: Output
+    provider: ArtifactBackend, item_id: ItemId, candidates: list[_MigrateCandidate], out: Output
 ) -> list[_MigrateCandidate]:
     """Append manifest-only entries (content_stored=False) to the candidate list.
 
-    Called when ``issue_number`` is provided so already-registered entries
+    Called when ``item_id`` is provided so already-registered entries
     without uploaded content are re-processed to trigger the auto-upload path.
 
     Args:
         provider: Initialised provider used to read the manifest.
-        issue_number: Issue whose manifest to inspect.
+        item_id: Issue number or beads string identifier whose manifest to inspect.
         candidates: Existing candidate list (may be mutated by extension).
         out: Output accumulator for warnings.
 
@@ -3915,9 +3912,9 @@ def _migrate_queue_manifest_only(
         Extended candidate list.
     """
     try:
-        manifest = provider.get_manifest(issue_number)
+        manifest = provider.get_manifest(item_id)
     except (BacklogError, _GithubException):
-        out.warn(f"Could not read existing manifest for issue #{issue_number}. Skipping manifest check.")
+        out.warn(f"Could not read existing manifest for item {item_id!r}. Skipping manifest check.")
         return candidates
 
     result = list(candidates)
@@ -3931,7 +3928,7 @@ def _migrate_queue_manifest_only(
             if skip_reason is None
         )
         if not already_queued:
-            result.append((entry.artifact_id, entry.artifact_type, issue_number, None))
+            result.append((entry.artifact_id, entry.artifact_type, item_id, None))
             out.warn(f"Queued manifest-only entry for re-registration: {entry.artifact_id!r}")
     return result
 

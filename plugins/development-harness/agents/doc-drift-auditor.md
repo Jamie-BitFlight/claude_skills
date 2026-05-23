@@ -164,7 +164,7 @@ Assemble the audit report content in memory, then register it via:
 
 ```text
 artifact_register(
-  item_id={issue_number},
+  item_id={item_id},
   type="audit-report",
   artifact_id="doc-drift-audit-{slug}",
   content={report_markdown},

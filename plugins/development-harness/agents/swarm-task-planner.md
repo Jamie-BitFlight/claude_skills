@@ -374,7 +374,7 @@ Run all structured acceptance criteria commands and record baseline results via 
 
 ## Inputs
 - Plan file: the task file containing `acceptance-criteria-structured` entries
-- `issue_number`: `str | int` — GitHub integer issue number or beads string ID (e.g., `bd-a3f8`); obtained from the plan's `issue` field
+- `item_id`: `str | int` — GitHub integer issue number or beads string ID (e.g., `bd-a3f8`); obtained from the plan's `issue` field
 
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
@@ -416,7 +416,7 @@ Re-run acceptance criteria and compare against T0 baseline; register verdict via
 
 ## Inputs
 - Plan file: the task file containing `acceptance-criteria-structured` entries
-- `issue_number`: `str | int` — GitHub integer issue number or beads string ID (e.g., `bd-a3f8`); obtained from the plan's `issue` field
+- `item_id`: `str | int` — GitHub integer issue number or beads string ID (e.g., `bd-a3f8`); obtained from the plan's `issue` field
 - T0 baseline: retrieved via `artifact_read(item_id, "T0-baseline")`
 
 ## Requirements

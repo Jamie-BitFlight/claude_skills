@@ -165,7 +165,7 @@ Register via MCP:
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
+  item_id={item_id},
   type="codebase-analysis",
   artifact_id="code-review-{task_id}-{slug}",
   content={report_markdown},
@@ -242,7 +242,7 @@ Return this as your final response after registering the artifact:
 STATUS: DONE
 SUMMARY: {one paragraph — verdict, criteria status, key findings}
 ARTIFACTS:
-  - Review report: registered as artifact codebase-analysis / code-review-{task_id}-{slug} on item {issue_number}
+  - Review report: registered as artifact codebase-analysis / code-review-{task_id}-{slug} on item {item_id}
   - Verdict: PASS | FAIL | NEEDS-WORK
   - Criteria met: {N}/{total}
   - Blocking findings: {count}
