@@ -122,12 +122,12 @@ whether minor issues were observed in config files.
 
 ### Step 5: Register Artifact
 
-Register the verdict as a `codebase-analysis` artifact if an `issue_number` is available in
+Register the verdict as a `codebase-analysis` artifact if an `item_id` is available in
 the task or delegation prompt:
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   artifact_type="codebase-analysis",
   content={structured_verdict_json},
   status="complete",
@@ -135,7 +135,7 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-If no issue_number is available, skip registration and include the verdict JSON only in the
+If no item_id is available, skip registration and include the verdict JSON only in the
 SendMessage body.
 
 ### Step 6: Send Verdict to Team Lead
@@ -187,7 +187,7 @@ Perspective: performance
 Verdict: APPROVE | REJECT | SKIP
 Findings: {count BLOCKER} blocker(s), {count MINOR} minor
 Summary line: Performance: {token per §2.2}
-Artifact: registered as codebase-analysis on issue {N} | no issue_number — not registered
+Artifact: registered as codebase-analysis on issue {N} | no item_id — not registered
 ```
 
 ## STATUS Output (MANDATORY)
@@ -200,7 +200,7 @@ SUMMARY: {one sentence — verdict, key findings, basis for decision}
 VERDICT_JSON:
 {paste the full structured verdict block}
 ARTIFACTS:
-  - codebase-analysis registered on issue {N} | not registered (no issue_number)
+  - codebase-analysis registered on issue {N} | not registered (no item_id)
 NOTES:
   - {files inspected vs skipped}
   - {any scope limitations}

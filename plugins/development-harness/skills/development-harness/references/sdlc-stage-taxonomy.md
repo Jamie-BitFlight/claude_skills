@@ -29,7 +29,7 @@ skill_activation: /dh:discovery
 purpose: Understand the feature request, identify constraints, and survey the codebase state before any planning occurs.
 inputs: Feature description, codebase root path, any prior context files
 outputs: DISCOVERY artifact containing problem framing, constraint inventory, affected surfaces, and open questions
-artifact_access: artifact_register(issue_number, "feature-context", path, agent, content=...) / artifact_read(issue_number, "feature-context")
+artifact_access: artifact_register(item_id, "feature-context", path, agent, content=...) / artifact_read(item_id, "feature-context")
 ```
 
 #### S2 — `planning`
@@ -41,7 +41,7 @@ skill_activation: /dh:planning
 purpose: Produce a structured plan covering solution architecture, acceptance tests, risk assessment, and RT-ICA completeness gate.
 inputs: DISCOVERY artifact, codebase context
 outputs: PLAN artifact with architecture, acceptance tests in Given/When/Then format, risk assessment, task skeletons, and RT-ICA gate result
-artifact_access: artifact_register(issue_number, "architect", path, agent, content=...) / artifact_read(issue_number, "architect")
+artifact_access: artifact_register(item_id, "architect", path, agent, content=...) / artifact_read(item_id, "architect")
 ```
 
 #### S3 — `context-integration`
@@ -53,7 +53,7 @@ skill_activation: /dh:context-integration
 purpose: Validate the S2 plan against actual codebase state, resolving gaps and updating the plan artifact before task decomposition.
 inputs: PLAN artifact, live codebase read access
 outputs: Amended PLAN artifact with resolved gaps, confirmed assumptions, and updated constraints
-artifact_access: artifact_read(issue_number, "architect") / artifact_register(issue_number, "architect", path, agent, content=...)
+artifact_access: artifact_read(item_id, "architect") / artifact_register(item_id, "architect", path, agent, content=...)
 ```
 
 #### S4 — `task-decomposition`

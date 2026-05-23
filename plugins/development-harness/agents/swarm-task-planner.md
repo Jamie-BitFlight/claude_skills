@@ -379,17 +379,17 @@ Run all structured acceptance criteria commands and record baseline results via 
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Record exit code, stdout, stderr, and timestamp per criterion
-3. Register results via `artifact_register(issue_number, artifact_type="T0-baseline", content=..., status="complete", agent="t0-baseline-capture")`
+3. Register results via `artifact_register(item_id, artifact_type="T0-baseline", content=..., status="complete", agent="t0-baseline-capture")`
 
 ## Expected Outputs
-- T0-baseline artifact registered and retrievable via `artifact_read(issue_number, "T0-baseline")`
+- T0-baseline artifact registered and retrievable via `artifact_read(item_id, "T0-baseline")`
 
 ## Acceptance Criteria
-1. `artifact_read(issue_number, "T0-baseline")` returns content
+1. `artifact_read(item_id, "T0-baseline")` returns content
 2. Content contains one entry per structured criterion with exit code, stdout, stderr, timestamp
 
 ## Verification Steps
-1. Call `artifact_read(issue_number, "T0-baseline")` and confirm `criteria_count` matches plan
+1. Call `artifact_read(item_id, "T0-baseline")` and confirm `criteria_count` matches plan
 ```
 
 ### TN Task Template
@@ -417,12 +417,12 @@ Re-run acceptance criteria and compare against T0 baseline; register verdict via
 ## Inputs
 - Plan file: the task file containing `acceptance-criteria-structured` entries
 - `issue_number`: `str | int` — GitHub integer issue number or beads string ID (e.g., `bd-a3f8`); obtained from the plan's `issue` field
-- T0 baseline: retrieved via `artifact_read(issue_number, "T0-baseline")`
+- T0 baseline: retrieved via `artifact_read(item_id, "T0-baseline")`
 
 ## Requirements
 1. For each criterion in `acceptance-criteria-structured`, run its `check-command` via Bash
 2. Compare exit code against T0 baseline using the 4-cell status matrix
-3. Assemble per-criterion verdict and overall verdict in memory; register via `artifact_register(issue_number, artifact_type="TN-verification", content=...)`
+3. Assemble per-criterion verdict and overall verdict in memory; register via `artifact_register(item_id, artifact_type="TN-verification", content=...)`
 4. Overall verdict is PASS only when no criterion has status `regressed`
 
 ## Expected Outputs
@@ -433,7 +433,7 @@ Re-run acceptance criteria and compare against T0 baseline; register verdict via
 2. No criterion has status `regressed`
 
 ## Verification Steps
-1. Read TN-verification artifact via `artifact_read(issue_number, "TN-verification")` and confirm `verdict` is `PASS`
+1. Read TN-verification artifact via `artifact_read(item_id, "TN-verification")` and confirm `verdict` is `PASS`
 ```
 
 ### Dependency Rule

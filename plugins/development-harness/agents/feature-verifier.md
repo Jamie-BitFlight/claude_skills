@@ -81,8 +81,8 @@ Read the architecture spec and task file to understand:
 - What did the tasks claim to deliver (artifacts)?
 
 ```bash
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="architect")
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="task-plan")
+mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="architect")
+mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="task-plan")
 ```
 
 > **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.

@@ -74,7 +74,7 @@ Re-register the updated plan via MCP:
 
 ```text
 artifact_register(
-  issue_number={issue},
+  item_id={issue},
   artifact_type="architect",
   path="plan/architect-{slug}.md",
   agent="context-integration",
@@ -87,12 +87,12 @@ Add the Contextualization section and mark the status checkbox as complete.
 
 ## Input
 
-- `ARTIFACT:PLAN` via `artifact_read(issue_number={issue}, artifact_type="architect")`
+- `ARTIFACT:PLAN` via `artifact_read(item_id={issue}, artifact_type="architect")`
 - Read access to the codebase
 
 ## Output
 
-Updated `ARTIFACT:PLAN` re-registered via `artifact_register(issue_number={issue}, artifact_type="architect", path="plan/architect-{slug}.md", agent="context-integration", content="{full_updated_plan_markdown}")` with the following section appended:
+Updated `ARTIFACT:PLAN` re-registered via `artifact_register(item_id={issue}, artifact_type="architect", path="plan/architect-{slug}.md", agent="context-integration", content="{full_updated_plan_markdown}")` with the following section appended:
 
 ```markdown
 ## Contextualization

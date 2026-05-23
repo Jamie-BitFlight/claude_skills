@@ -79,7 +79,7 @@ For each identified risk:
 
 ## Input
 
-- `ARTIFACT:DISCOVERY` via `artifact_read(issue_number={issue}, artifact_type="feature-context")`
+- `ARTIFACT:DISCOVERY` via `artifact_read(item_id={issue}, artifact_type="feature-context")`
 
 ## Output
 
@@ -87,7 +87,7 @@ Artifact registered via MCP:
 
 ```text
 artifact_register(
-    issue_number={issue},
+    item_id={issue},
     artifact_type="architect",
     path="plan/architect-{slug}.md",
     agent="planning",

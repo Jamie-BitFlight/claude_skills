@@ -15,13 +15,13 @@ Runs after `intake.md` completes with PROCEED.
 1. Check for existing discovery artifact:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type='feature-context')
+mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
 ```
 
 2. If `count > 0`: load the artifact and pass it to swarm agents as prior context.
 
 ```text
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type='feature-context')
+mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type='feature-context')
 ```
 
 → **CONTINUE** to RT-ICA snapshot.
@@ -41,7 +41,7 @@ Inspect `response["sections"]`. If **all three** of the following are non-empty:
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number={issue_number},
+    item_id={issue_number},
     artifact_type='feature-context',
     path='plan/feature-context-{slug}.md',
     agent='discovery',
@@ -61,7 +61,7 @@ Skill(skill='dh:discovery', args='{item_ref}')
 5. Verify artifact was registered:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type='feature-context')
+mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
 ```
 
 - `count > 0` → load artifact via `artifact_read`, **CONTINUE**.
@@ -69,7 +69,7 @@ mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type
 
 ```text
 Skill(skill='dh:discovery', args='{item_ref}')
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue_number}, artifact_type='feature-context')
+mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
 ```
 
 - `count > 0` after retry → load artifact, **CONTINUE**.

@@ -68,7 +68,7 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
 
 2. **Produce artifacts at every stage**
    - Use `ARTIFACT:{TYPE}({ID})` tokens in artifact headers; cross-reference predecessor/successor.
-   - In claude_skills: Register via MCP — `artifact_register(issue_number, artifact_type, path, agent, content)` for discovery and plan artifacts. For task plans, choose a creation path based on plan size:
+   - In claude_skills: Register via MCP — `artifact_register(item_id, artifact_type, path, agent, content)` for discovery and plan artifacts. For task plans, choose a creation path based on plan size:
 
      **Monolithic path** (fewer than 16 tasks):
 

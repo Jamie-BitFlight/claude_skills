@@ -313,7 +313,7 @@ flowchart TD
     P3_RTICA_GATE -->|APPROVED| P3_COMPOSE["work-backlog-item Step 5:<br>Compose feature request<br>Carry DERIVABLE items as<br>'Assumptions to confirm'"]
     P3_COMPOSE --> P3_INVOKE["work-backlog-item Step 6:<br>Skill(skill='add-new-feature',<br>args='{composed feature request}')<br>Direct skill call — not a suggestion"]
 
-    P3_INVOKE --> P3_ARTIFACT_DISCOVER{"Pre-Phase:<br>Artifact Discovery<br>artifact_list(issue_number=N)<br>Existing artifacts?"}
+    P3_INVOKE --> P3_ARTIFACT_DISCOVER{"Pre-Phase:<br>Artifact Discovery<br>artifact_list(item_id=N)<br>Existing artifacts?"}
     P3_ARTIFACT_DISCOVER -->|"Artifacts exist —<br>inject into delegation prompts"| P3_ARTIFACT_APPEND["Append prior_artifacts block<br>to each phase delegation prompt"]
     P3_ARTIFACT_DISCOVER -->|"No artifacts —<br>start fresh"| P3_RESEARCH
     P3_ARTIFACT_APPEND --> P3_RESEARCH
@@ -340,7 +340,7 @@ flowchart TD
 | P3_BLOCKED | orchestrator | MISSING conditions list | user-facing report, skill NOT invoked | terminal |
 | P3_COMPOSE | orchestrator (`work-backlog-item` Step 5) | groomed item, DERIVABLE items | composed feature request with 'Assumptions to confirm' | always → P3_INVOKE |
 | P3_INVOKE | orchestrator (`work-backlog-item` Step 6) | composed feature request | `Skill()` call to `add-new-feature` | always → P3_ARTIFACT_DISCOVER |
-| P3_ARTIFACT_DISCOVER | `artifact_list` MCP | `issue_number` | existing artifact manifest (or empty) | artifacts exist → P3_ARTIFACT_APPEND, none → P3_RESEARCH |
+| P3_ARTIFACT_DISCOVER | `artifact_list` MCP | `item_id` | existing artifact manifest (or empty) | artifacts exist → P3_ARTIFACT_APPEND, none → P3_RESEARCH |
 | P3_ARTIFACT_APPEND | orchestrator | artifact manifest | `prior_artifacts` block added to delegation prompts | always → P3_RESEARCH |
 | P3_RESEARCH | `@dh:feature-researcher` | composed feature request, prior artifacts (if any) | `plan/feature-context-{slug}.md`, `artifact_register(type='feature-context')` | always → P3_CODEBASE |
 | P3_CODEBASE | orchestrator | feature context, codebase state | codebase analysis decision | invoked → P3_CODEBASE_OUT, skipped → P3_ARCHITECT |
@@ -349,11 +349,11 @@ flowchart TD
 
 **Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → general-purpose fallback).
 
-**Artifact registration**: Each phase calls `artifact_register` after writing its file, with `issue_number`, `artifact_type`, `path` (state-relative), and `agent` fields.
+**Artifact registration**: Each phase calls `artifact_register` after writing its file, with `item_id`, `artifact_type`, `path` (state-relative), and `agent` fields.
 
 **Storage**: Feature context and architecture specs are registered as Documents via the artifact manifest system. See [Backend Providers — SAM Storage Model](./backend-providers.md#sam-storage-model) for the document lifecycle.
 
-**Artifact access is MCP-first**: Consumers retrieve artifacts via `artifact_read(issue_number, artifact_type)` and register them via `artifact_register(issue_number, artifact_type, path, agent, content)`. Task plans are accessed via `sam_read(plan, task)`. The MCP servers resolve storage internally — consumers never construct filesystem paths.
+**Artifact access is MCP-first**: Consumers retrieve artifacts via `artifact_read(item_id, artifact_type)` and register them via `artifact_register(item_id, artifact_type, path, agent, content)`. Task plans are accessed via `sam_read(plan, task)`. The MCP servers resolve storage internally — consumers never construct filesystem paths.
 
 **No feasibility gate exists** between RT-ICA APPROVED and SAM planning invocation. The transition from "do we have enough information?" to "start planning" is direct — no assessment of technical feasibility, effort/value, risk, or alternative approaches (audit Finding 1).
 
@@ -544,7 +544,7 @@ flowchart TD
     P6_TN_CHECK -->|"Any regressed"| P6_TN_BLOCK(["STOP — list each criterion<br>with check_command, T0/TN stdout<br>Block completion"])
     P6_TN_CHECK -->|"All passed or file absent"| P6_ARTIFACT_DISCOVER
 
-    P6_ARTIFACT_DISCOVER["Pre-Phase 1a: Artifact Discovery<br>artifact_list(issue_number=N)<br>when parent issue number is known<br>Pass manifest to QG agents"]
+    P6_ARTIFACT_DISCOVER["Pre-Phase 1a: Artifact Discovery<br>artifact_list(item_id=N)<br>when parent issue number is known<br>Pass manifest to QG agents"]
 
     P6_ARTIFACT_DISCOVER --> P6_CONCERNS{"Pre-Phase 1b: Process Concerns<br>backlog_view — does item have<br>## Concerns section with<br>unchecked items?"}
     P6_CONCERNS -->|"Unchecked concerns exist"| P6_CONCERNS_VERIFY["For each concern:<br>Verify by reading file/running check<br>If verified: check off + create backlog item<br>If not verified: check off as 'Not confirmed'<br>Update via backlog_groom section='Concerns'"]
@@ -603,7 +603,7 @@ flowchart TD
 | P6_START | orchestrator | task file path (from P5_INVOKE_QG) | skill invocation | always → P6_TN_CHECK |
 | P6_TN_CHECK | orchestrator | `TN-verification-{slug}.yaml` | aggregated TN result (pass/regressed) | any regressed → P6_TN_BLOCK, all passed or file absent → P6_ARTIFACT_DISCOVER |
 | P6_TN_BLOCK | orchestrator | per-criterion regression details (check_command, T0/TN stdout) | regression report | terminal (blocks completion) |
-| P6_ARTIFACT_DISCOVER | `artifact_list` MCP | `issue_number` | artifact manifest for QG agents | always → P6_CONCERNS |
+| P6_ARTIFACT_DISCOVER | `artifact_list` MCP | `item_id` | artifact manifest for QG agents | always → P6_CONCERNS |
 | P6_CONCERNS | `backlog_view` MCP | item selector | `## Concerns` section with unchecked items | unchecked concerns → P6_CONCERNS_VERIFY, no concerns → P6_QG_CREATE |
 | P6_CONCERNS_VERIFY | orchestrator | unchecked concern items | per-concern: verified → backlog item created, not verified → checked off as 'Not confirmed'; `backlog_groom(section='Concerns')` | always → P6_QG_CREATE |
 | P6_QG_CREATE | `sam_list` MCP | `search='qg-{slug}'` | existing QG plan presence check | no plan → P6_QG_BUILD, plan with remaining tasks → P6_QG_RESET, all terminal → P6_VERIFY_GATE |

@@ -31,7 +31,7 @@ Before starting any phase, check whether the feature request references a tracke
 ```mermaid
 flowchart TD
     Start([Parse feature_request]) --> Q{"Contains 'GitHub Issue: #N' / '#N'<br>OR 'Beads Issue: bd-ID' / bare beads ID?"}
-    Q -->|Yes — issue selector found| List["Call artifact_list(issue_number=N)<br>to discover registered artifacts<br>(N may be int for GitHub or str for beads)"]
+    Q -->|Yes — issue selector found| List["Call artifact_list(item_id=N)<br>to discover registered artifacts<br>(N may be int for GitHub or str for beads)"]
     Q -->|No — no issue reference| Skip[Skip artifact discovery<br>Proceed normally]
     List --> Found{Artifacts returned?}
     Found -->|Yes| Store["Store artifact list as discovered_artifacts<br>Include paths and types in each<br>phase delegation prompt"]
@@ -45,7 +45,7 @@ When `discovered_artifacts` is non-empty, append this block to each phase delega
 ```text
 <prior_artifacts>
 The following artifacts are already registered for this issue. Read any relevant
-ones via artifact_read(issue_number={issue}, artifact_type="{type}") before
+ones via artifact_read(item_id={issue}, artifact_type="{type}") before
 starting your work — they contain prior research and analysis that should
 inform your output.
 
@@ -120,7 +120,7 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 
 Research #{issue}: "{title}".
 If research artifacts exist for this issue, read them via
-artifact_read(issue_number={issue}, artifact_type="research") before starting
+artifact_read(item_id={issue}, artifact_type="research") before starting
 discovery — they contain prior investigation findings that should be incorporated.
 IMPORTANT: Research artifacts are discovery pointers, not authoritative documents.
 After reading the research artifact, inspect its YAML frontmatter for `resource_url`
@@ -142,14 +142,14 @@ document. Surface any PARTIAL or MISSING capabilities as questions.
 Register your deliverable with:
     artifact_type="feature-context"
     artifact_id="plan/feature-context-{slug}.md"
-    issue_number={issue}
+    item_id={issue}
     agent="feature-researcher"
 ```
 
 After the agent completes, verify the artifact was registered:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue}, artifact_type="feature-context")
+mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="feature-context")
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -188,7 +188,7 @@ Do NOT prescribe changes.
 Register each document with:
     artifact_type="codebase-analysis"
     artifact_id="codebase-{focus}-{slug}"  (logical id — use lowercase focus area, e.g. codebase-patterns-{slug})
-    issue_number={issue}
+    item_id={issue}
     agent="codebase-analyzer"
 
 A single invocation covering multiple focus areas issues one artifact_register call per
@@ -198,7 +198,7 @@ focus area with a distinct artifact_id per focus.
 After the agent completes, verify the artifact was registered:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue}, artifact_type="codebase-analysis")
+mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="codebase-analysis")
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -339,10 +339,10 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 {quality_vigilance}
 
 Design the implementation for #{issue}: "{title}".
-Read the feature context via artifact_read(issue_number={issue}, artifact_type="feature-context").
-[If codebase analysis exists: Read via artifact_read(issue_number={issue}, artifact_type="codebase-analysis").]
+Read the feature context via artifact_read(item_id={issue}, artifact_type="feature-context").
+[If codebase analysis exists: Read via artifact_read(item_id={issue}, artifact_type="codebase-analysis").]
 If research artifacts exist for this issue, read them via
-artifact_read(issue_number={issue}, artifact_type="research") for prior research
+artifact_read(item_id={issue}, artifact_type="research") for prior research
 findings that should inform the architecture.
 IMPORTANT: Research artifacts are discovery pointers, not authoritative documents.
 After reading any research artifact, inspect its YAML frontmatter for `resource_url`
@@ -377,7 +377,7 @@ Register your deliverable and return:
 After the agent completes, verify the artifact was registered:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number={issue}, artifact_type="architect")
+mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="architect")
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -406,8 +406,8 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 {quality_vigilance}
 
 Decompose #{issue}: "{title}" into executable tasks.
-Read the architecture spec via artifact_read(issue_number={issue}, artifact_type="architect").
-Read the feature context via artifact_read(issue_number={issue}, artifact_type="feature-context").
+Read the architecture spec via artifact_read(item_id={issue}, artifact_type="architect").
+Read the feature context via artifact_read(item_id={issue}, artifact_type="feature-context").
 Goal: {goal_from_feature_request}
 Create the plan via sam_plan with CLEAR+CoVe task definitions.
 

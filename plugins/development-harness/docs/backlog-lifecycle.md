@@ -506,4 +506,4 @@ SOURCE: Architect spec Issue #398, Section 9 (AC7 severity policy decision) (acc
 - [Backend Providers](./backend-providers.md) — BacklogBackend Protocol, available backends, configuration
 - [State Machine](../skills/backlog/references/state-machine.md) — canonical state DAG source
 - [Feasibility Gate](../skills/work-backlog-item/references/feasibility-gate.md) — work stage feasibility check
-- Architect Spec — access via `artifact_read(issue_number=398, artifact_type="architect")` — authoritative design decisions
+- Architect Spec — access via `artifact_read(item_id=398, artifact_type="architect")` — authoritative design decisions

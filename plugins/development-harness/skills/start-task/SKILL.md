@@ -59,14 +59,14 @@ $ARGUMENTS
    If the `TaskAssignment` JSON contains a `parent_issue_number` or the plan has an `issue` field, query the artifact manifest to discover available plan artifacts:
 
    ```text
-   mcp__plugin_dh_backlog__artifact_list(issue_number=N)
+   mcp__plugin_dh_backlog__artifact_list(item_id=N)
    ```
 
    If the response contains artifacts (non-empty `artifacts` list), use `artifact_read` to fetch the architect spec and feature context content:
 
    ```text
-   mcp__plugin_dh_backlog__artifact_read(issue_number=N, artifact_type="architect")
-   mcp__plugin_dh_backlog__artifact_read(issue_number=N, artifact_type="feature-context")
+   mcp__plugin_dh_backlog__artifact_read(item_id=N, artifact_type="architect")
+   mcp__plugin_dh_backlog__artifact_read(item_id=N, artifact_type="feature-context")
    ```
 
    Use the returned content as context for implementation instead of reading filesystem paths directly. This is especially important for worktree-isolated agents that cannot access uncommitted plan files from the root worktree.
@@ -143,7 +143,7 @@ handles any external tracker sync on task completion. No additional call is requ
 
 ### DN-1: {Brief title}
 
-- **Plan artifact**: `artifact_read(issue_number={N}, artifact_type="architect")`, section "{section name}"
+- **Plan artifact**: `artifact_read(item_id={N}, artifact_type="architect")`, section "{section name}"
 - **Plan claim**: "{quoted text from plan artifact}"
 - **Actual implementation**: "{what was actually done and why}"
 - **Classification**: design-refinement | intent-divergence

@@ -484,11 +484,11 @@ When delegated with a plan path like `plan/Pa5b6c7d8-some-slug.yaml`, extract th
 Read the architect spec and feature context via artifact MCP tools:
 
 ```text
-artifact_read(issue_number={N}, artifact_type="architect")
-artifact_read(issue_number={N}, artifact_type="feature-context")
+artifact_read(item_id={N}, artifact_type="architect")
+artifact_read(item_id={N}, artifact_type="feature-context")
 ```
 
-If no issue number is available, read them via `artifact_list(issue_number={N})` first to discover paths, then `artifact_read`.
+If no issue number is available, read them via `artifact_list(item_id={N})` first to discover paths, then `artifact_read`.
 
 ## Step 2: Extract Feature Goals
 

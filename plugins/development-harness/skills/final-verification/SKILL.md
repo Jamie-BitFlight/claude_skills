@@ -44,7 +44,7 @@ flowchart TD
 
 ### Step 1 — Extract Original Goals
 
-Read the feature-context artifact via `artifact_read(issue_number={issue}, artifact_type="feature-context")` and extract:
+Read the feature-context artifact via `artifact_read(item_id={issue}, artifact_type="feature-context")` and extract:
 
 - All goals from the Goals section
 - All anti-goals from the Anti-Goals section
@@ -81,7 +81,7 @@ Document evidence for each truth — file paths, test output, observed behavior.
 
 ### Step 4 — Check Acceptance Tests
 
-Read the architect artifact via `artifact_read(issue_number={issue}, artifact_type="architect")` and extract the acceptance tests (Given/When/Then).
+Read the architect artifact via `artifact_read(item_id={issue}, artifact_type="architect")` and extract the acceptance tests (Given/When/Then).
 For each acceptance test:
 
 - Verify the precondition (Given) can be established
@@ -103,8 +103,8 @@ For the quality gate protocol, reference `/dh:validation-protocol`.
 ## Input
 
 - All review results via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})` per task — review content is stored in task body sections
-- Feature-context artifact via `artifact_read(issue_number={issue}, artifact_type="feature-context")`
-- Architect artifact via `artifact_read(issue_number={issue}, artifact_type="architect")`
+- Feature-context artifact via `artifact_read(item_id={issue}, artifact_type="feature-context")`
+- Architect artifact via `artifact_read(item_id={issue}, artifact_type="architect")`
 - Read access to the codebase
 
 ## Output

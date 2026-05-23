@@ -106,7 +106,7 @@ Artifact registered via MCP:
 
 ```text
 artifact_register(
-    issue_number={issue},
+    item_id={issue},
     artifact_type="feature-context",
     path="plan/feature-context-{slug}.md",
     agent="discovery",

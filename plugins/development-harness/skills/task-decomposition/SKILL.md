@@ -111,7 +111,7 @@ Role-to-agent resolution happens at execution time via the language manifest.
 Retrieve the contextualized plan via MCP:
 
 ```text
-artifact_read(issue_number={issue}, artifact_type="architect")
+artifact_read(item_id={issue}, artifact_type="architect")
 ```
 
 Returns `{type, path, content, status, messages, warnings}`. The `content`

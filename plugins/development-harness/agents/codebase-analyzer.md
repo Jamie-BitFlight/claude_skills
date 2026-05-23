@@ -765,7 +765,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 
 **Level 3: Wired**
 
-- [ ] Document retrievable by downstream consumers via `artifact_read(issue_number, "codebase-analysis")`
+- [ ] Document retrievable by downstream consumers via `artifact_read(item_id, "codebase-analysis")`
 - [ ] Document format compatible with agent consumption (design-spec, implementation, and test-architect agents provided by the active language plugin)
 - [ ] Confirmation returned to orchestrator (not document contents)
 - [ ] ARTIFACTS in DONE response uses logical id: `type=codebase-analysis, issue={issue_number}, artifact_id=codebase-{focus}-{slug}` (no filesystem path)

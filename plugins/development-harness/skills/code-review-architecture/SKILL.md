@@ -457,7 +457,7 @@ Register one artifact:
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   type="codebase-analysis",
   artifact_id="architecture-graph-{slug}",
   content={report_markdown},
@@ -473,7 +473,7 @@ Register each diagram as a separate artifact. Register the parent first, then ea
 ```text
 %% Parent
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   type="codebase-analysis",
   artifact_id="architecture-graph-{slug}",
   content={parent_report_markdown},
@@ -483,7 +483,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 %% Each child cluster
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   type="codebase-analysis",
   artifact_id="architecture-graph-{slug}-{cluster-name}",
   content={child_report_markdown},
@@ -492,7 +492,7 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-If `issue_number` is not available, output all reports inline (parent first, then children) and note that artifact registration was skipped.
+If `item_id` is not available, output all reports inline (parent first, then children) and note that artifact registration was skipped.
 
 </workflow>
 

@@ -172,7 +172,7 @@ done
 **Via self-discovery (the session does this itself):**
 
 - Groomed description and acceptance criteria — via `backlog_view(selector="#{issue}")`
-- Plan artifacts — via `artifact_list(issue_number={issue})` then `artifact_read(...)`
+- Plan artifacts — via `artifact_list(item_id={issue})` then `artifact_read(...)`
 - SAM task plan — via `sam_plan` if a plan exists
 - Skills to load — from `skills` field in SAM task metadata
 

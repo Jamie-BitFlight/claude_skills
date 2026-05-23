@@ -161,7 +161,7 @@ Concerns accumulate across all task agents. They feed into the validation stage 
 4a. If a parent issue number is known (`str | int` — GitHub integer ID or beads string ID), attempt contract verification against the architect spec:
 
 ```text
-mcp__plugin_dh_backlog__artifact_read(issue_number=N, artifact_type="architect")
+mcp__plugin_dh_backlog__artifact_read(item_id=N, artifact_type="architect")
 ```
 
 If `artifact_read` returns content (architect spec exists), resolve the files modified by the just-completed task:
@@ -318,14 +318,14 @@ When the parent story issue number is known (`str | int` — GitHub integer ID o
 
 ```text
 After writing plan/T0-baseline-{slug}.yaml, register it:
-  mcp__plugin_dh_backlog__artifact_register(issue_number=N, artifact_type="T0-baseline", path="plan/T0-baseline-{slug}.yaml", agent="t0-baseline-capture")
+  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="T0-baseline", path="plan/T0-baseline-{slug}.yaml", agent="t0-baseline-capture")
 ```
 
 **TN delegation prompt addition:**
 
 ```text
 After writing plan/TN-verification-{slug}.yaml, register it:
-  mcp__plugin_dh_backlog__artifact_register(issue_number=N, artifact_type="TN-verification", path="plan/TN-verification-{slug}.yaml", agent="tn-verification-gate")
+  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="TN-verification", path="plan/TN-verification-{slug}.yaml", agent="tn-verification-gate")
 ```
 
 If the issue number is not known, skip registration. The artifacts remain discoverable via filesystem conventions.

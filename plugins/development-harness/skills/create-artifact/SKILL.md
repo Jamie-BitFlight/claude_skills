@@ -13,7 +13,7 @@ inline.
 
 - **Disk writes** produce a file only accessible from the root worktree. Worktree-isolated agents
   and CI environments cannot reach `~/.dh/...` paths via filesystem — they must use
-  `artifact_read(issue_number, artifact_type)` over MCP.
+  `artifact_read(item_id, artifact_type)` over MCP.
 - **Inline returns** are truncated by the task-notification summary when the agent runs as a
   background-dispatched task. The orchestrator receives a partial summary, not the full document.
 
@@ -24,7 +24,7 @@ worktree or environment — can retrieve it via `artifact_read`.
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=<int>,           # GitHub issue number — REQUIRED
+    item_id=<int>,                # GitHub issue number — REQUIRED
     artifact_type=<str>,          # Artifact type string — REQUIRED (see table below)
     artifact_id=<str>,            # Logical identifier — REQUIRED (see path format below)
     status="current",             # Lifecycle status: draft | current | superseded | archived
@@ -71,7 +71,7 @@ Do NOT use `~/.dh/...` paths — these are MCP-server internals, not stable agen
 ### `content`
 
 Pass the full markdown string. When `content` is provided, it is stored as a structured GitHub
-issue comment retrievable via `artifact_read(issue_number, artifact_type)` from any environment.
+issue comment retrievable via `artifact_read(item_id, artifact_type)` from any environment.
 
 When `content` is `None`: the server attempts to read a local file at `artifact_id` (resolved
 against the root worktree). If no file exists, a manifest-only entry is registered and a warning
@@ -83,7 +83,7 @@ is emitted. For background-dispatched agents, always pass `content=` explicitly.
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=1770,
+    item_id=1770,
     artifact_type="feature-context",
     artifact_id="plan/feature-context-my-feature.md",
     content=feature_context_markdown,
@@ -95,7 +95,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=1770,
+    item_id=1770,
     artifact_type="codebase-analysis",
     artifact_id="codebase-patterns-my-feature",  # logical id: codebase-{focus}-{slug}
     content=patterns_markdown,
@@ -103,7 +103,7 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=1770,
+    item_id=1770,
     artifact_type="codebase-analysis",
     artifact_id="codebase-architecture-my-feature",  # logical id: codebase-{focus}-{slug}
     content=architecture_markdown,
@@ -115,7 +115,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=1770,
+    item_id=1770,
     artifact_type="architect",
     artifact_id="plan/architect-my-feature.md",
     content=architect_markdown,
@@ -132,7 +132,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ```python
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number=1770,
+    item_id=1770,
     artifact_type="research",
     artifact_id="plan/swarm-rationale-my-feature.md",
     content=rationale_markdown,

@@ -134,7 +134,7 @@ Register via MCP:
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   artifact_type="codebase-analysis",
   content={verdict_block_json},
   status="complete",
@@ -142,7 +142,7 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-Where `{issue_number}` is provided in the task context. If not provided, skip registration and note in STATUS.
+Where `{issue_number}` is the item ID provided in the task context. If not provided, skip registration and note in STATUS.
 
 </workflow>
 

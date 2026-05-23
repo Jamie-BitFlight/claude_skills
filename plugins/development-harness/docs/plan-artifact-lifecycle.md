@@ -50,9 +50,9 @@ These artifacts are produced by agents during planning phases. They may be updat
 
 | Artifact | Access | Created by | Updated by |
 |---|---|---|---|
-| Feature context | `artifact_read(issue_number, 'feature-context')` | `feature-researcher` agent | `context-refinement` agent |
-| Codebase analysis | `artifact_read(issue_number, 'codebase-analysis')` | `codebase-analyzer` agent | Not updated (informational snapshot) |
-| Architecture spec | `artifact_read(issue_number, 'architect')` | `python-cli-design-spec` agent | `context-refinement` agent |
+| Feature context | `artifact_read(item_id, 'feature-context')` | `feature-researcher` agent | `context-refinement` agent |
+| Codebase analysis | `artifact_read(item_id, 'codebase-analysis')` | `codebase-analyzer` agent | Not updated (informational snapshot) |
+| Architecture spec | `artifact_read(item_id, 'architect')` | `python-cli-design-spec` agent | `context-refinement` agent |
 | Task plan | `sam_read(plan="P{id}")` | `swarm-task-planner` agent | Status fields by hooks; Context Manifest by `context-refinement` |
 | Context Manifest | Embedded in task file (via `sam_read`) | `context-gathering` agent | `context-refinement` agent (existing behavior) |
 
@@ -139,7 +139,7 @@ During task execution, agents record divergence observations in the task file un
 
 ### DN-1: {Brief title}
 
-- **Plan artifact**: `artifact_read(issue_number={N}, artifact_type="architect")`, section "{section name}"
+- **Plan artifact**: `artifact_read(item_id={N}, artifact_type="architect")`, section "{section name}"
 - **Plan claim**: "{quoted text from plan artifact}"
 - **Actual implementation**: "{what was actually done and why}"
 - **Classification**: design-refinement | intent-divergence

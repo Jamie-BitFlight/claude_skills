@@ -181,7 +181,7 @@ and `github_url` fields.
 ```python
 # Pseudocode — detect and follow upstream URLs
 if prior_artifacts contains artifact_type="research":
-    content = artifact_read(issue_number, "research")
+    content = artifact_read(item_id, "research")
     frontmatter = parse_yaml_frontmatter(content)
     resource_url = frontmatter.get("resource_url")
     github_url   = frontmatter.get("github_url")

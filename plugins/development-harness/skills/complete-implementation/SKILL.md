@@ -272,7 +272,7 @@ Before invoking Phase 1, check for a TN verification report produced by `tn-veri
 
 Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the `P{id}-` prefix and `.yaml` suffix).
 
-Read the TN-verification artifact via `artifact_read(issue_number={N}, artifact_type="TN-verification")`.
+Read the TN-verification artifact via `artifact_read(item_id={N}, artifact_type="TN-verification")`.
 
 The file contains a list of per-criterion `BookendVerification` records — one per `acceptance-criteria-structured` entry. There is no top-level `verdict` field. Aggregate the verdict by scanning all records: the overall result is FAIL if any record has `status: regressed`; otherwise PASS.
 
@@ -280,7 +280,7 @@ The following diagram is the authoritative procedure for Pre-Phase 1 TN Verifica
 
 ```mermaid
 flowchart TD
-    Read["artifact_read(issue_number, 'TN-verification')"] --> Exists{Artifact exists?}
+    Read["artifact_read(item_id, 'TN-verification')"] --> Exists{Artifact exists?}
     Exists -->|No| Proceed["No structured criteria — proceed to Phase 1"]
     Exists -->|Yes| Scan["Scan all per-criterion records<br>for status: regressed"]
     Scan --> AnyRegressed{Any criterion<br>has status: regressed?}
@@ -332,7 +332,7 @@ If signal found — confirm all four fidelity items from the reference before pr
 When the parent story issue number is known (from the plan's `issue` field or the backlog item), query the artifact manifest to discover all plan artifacts for this feature:
 
 ```text
-mcp__plugin_dh_backlog__artifact_list(issue_number=N)
+mcp__plugin_dh_backlog__artifact_list(item_id=N)
 ```
 
 If the response contains artifacts, pass the manifest to quality gate agents (Phases T0-T6) so they can access plan artifacts via `artifact_read` instead of filesystem paths. This is critical for worktree-isolated agents.
@@ -581,7 +581,7 @@ After all phases complete, route any follow-up task files created by Phase 1 (co
 Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
 
 ```text
-mcp__plugin_dh_backlog__artifact_read(issue_number={issue_number}, artifact_type="codebase-analysis")
+mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="codebase-analysis")
 ```
 
 Check the `verdict` field in the report:

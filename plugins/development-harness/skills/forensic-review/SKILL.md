@@ -54,7 +54,7 @@ sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 Extract:
 
 - `task_file_path` — the path to the task YAML file (e.g., `plan/P{id}-{slug}.yaml`)
-- `issue_number` — required for artifact registration; if absent, BLOCK immediately
+- `item_id` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)
 - `acceptance_criteria` — the explicit success conditions to verify
@@ -67,14 +67,14 @@ Context to include in the prompt:
 
 - `task_file_path` — path to the SAM task file
 - `implementation_files` — the files from the task's Expected Outputs
-- `issue_number` — required for `artifact_register` inside the agent
+- `item_id` — required for `artifact_register` inside the agent
 
 ```text
 Task is S6 forensic review with subagent_type="dh:code-reviewer"
-Context: task_file_path={task_file_path}, issue_number={issue_number},
+Context: task_file_path={task_file_path}, item_id={item_id},
   implementation_files={expected_outputs}
 Output: STATUS block containing Verdict (PASS / FAIL / NEEDS-WORK) and ARTIFACTS
-  section confirming codebase-analysis artifact registered on issue #{issue_number}
+  section confirming codebase-analysis artifact registered on issue #{item_id}
 ```
 
 The agent independently reads the task, detects the stack, verifies acceptance criteria,
@@ -96,7 +96,7 @@ NEEDED section as the reason.
 Retrieve the registered review report:
 
 ```text
-artifact_read(issue_number={issue_number}, artifact_type="codebase-analysis")
+artifact_read(item_id={item_id}, artifact_type="codebase-analysis")
 ```
 
 Use this to populate the SAM task's Review Results section and to extract blocking findings
@@ -115,7 +115,7 @@ sam_task(
 ## Input
 
 - `ARTIFACT:EXECUTION` + `ARTIFACT:TASK` via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})`
-- `issue_number` — must be present; used by `@dh:code-reviewer` for `artifact_register` and
+- `item_id` — must be present; used by `@dh:code-reviewer` for `artifact_register` and
   by this skill for `artifact_read`
 
 ## NEEDS_WORK Remediation Loop
@@ -152,6 +152,6 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 ## Success Criteria
 
 - `@dh:code-reviewer` returns STATUS: DONE with a PASS, FAIL, or NEEDS-WORK verdict
-- `codebase-analysis` artifact is registered on issue #{issue_number}
+- `codebase-analysis` artifact is registered on issue #{item_id}
 - Review Results appended to the SAM task via `sam_task(action='update')`
 - Blocking findings (if any) have concrete remediation tasks created

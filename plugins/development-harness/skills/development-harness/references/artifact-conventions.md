@@ -47,9 +47,9 @@ Artifacts are stored and retrieved via two distinct MCP systems. No stage reads 
 
 Document-level artifacts (discovery, plan, context integration) are managed by the backlog MCP server:
 
-- **Write:** `artifact_register(issue_number, artifact_type, path, agent, content)` — registers the artifact and uploads content to a GitHub Issue comment for worktree-isolated access.
-- **Read:** `artifact_read(issue_number, artifact_type)` — returns `{type, path, content, status}`. Resolves from GitHub Issue comments first, filesystem fallback second.
-- **List:** `artifact_list(issue_number, artifact_type=None)` — enumerates registered artifacts for an issue.
+- **Write:** `artifact_register(item_id, artifact_type, path, agent, content)` — registers the artifact and uploads content to a GitHub Issue comment for worktree-isolated access.
+- **Read:** `artifact_read(item_id, artifact_type)` — returns `{type, path, content, status}`. Resolves from GitHub Issue comments first, filesystem fallback second.
+- **List:** `artifact_list(item_id, artifact_type=None)` — enumerates registered artifacts for an issue.
 
 Artifact types used in the S1–S7 pipeline:
 

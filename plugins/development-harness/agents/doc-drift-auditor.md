@@ -19,7 +19,7 @@ Audit documentation against actual implementation to identify drift and produce 
 
 **Required inputs:**
 
-- `issue_number` — the backlog item ID (GitHub issue number, or bead ID when using beads backend) to register the audit report against (REQUIRED)
+- `item_id` — the backlog item ID (GitHub issue number, or bead ID when using beads backend) to register the audit report against (REQUIRED)
 - `project_root` — absolute path to the project root being audited
 
 **You do:**
@@ -164,7 +164,7 @@ Assemble the audit report content in memory, then register it via:
 
 ```text
 artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   type="audit-report",
   artifact_id="doc-drift-audit-{slug}",
   content={report_markdown},
@@ -204,7 +204,7 @@ SUGGESTED NEXT STEP:
 
 Block immediately if:
 
-- `issue_number` was not provided — cannot register artifact without it
+- `item_id` was not provided — cannot register artifact without it
 - `artifact_register` returns an error — report the exact error text and do not fall back to writing to disk
 
 ## Report Structure

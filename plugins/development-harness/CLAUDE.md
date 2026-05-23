@@ -123,7 +123,7 @@ to detect or recover from concurrent appends. Behavior under concurrent writes i
 Two distinct types of plan data exist:
 
 - **SAM task plan YAML files** (`P{id}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.
-- **Plan artifact markdown files** (`plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`, etc.) — written to the repo root worktree's `plan/` directory. Not visible from isolated worktrees. Access via `artifact_read(issue_number, artifact_type)` — not filesystem path.
+- **Plan artifact markdown files** (`plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`, etc.) — written to the repo root worktree's `plan/` directory. Not visible from isolated worktrees. Access via `artifact_read(item_id, artifact_type)` — not filesystem path.
 
 ---
 
@@ -133,7 +133,7 @@ Plan artifacts are registered in a structured manifest stored in the GitHub Issu
 
 **MCP tools (on backlog server) — Artifact Management:**
 
-- `artifact_register` — Register or update an artifact entry (issue_number, type, path, status, agent)
+- `artifact_register` — Register or update an artifact entry (item_id, type, path, status, agent)
 - `artifact_list` — List all artifacts for an issue, optionally filtered by type
 - `artifact_get` — Get metadata for a specific artifact type on an issue
 - `artifact_read` — Read artifact file content from root worktree path (with path safety validation)
@@ -148,8 +148,8 @@ Plan artifacts are registered in a structured manifest stored in the GitHub Issu
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
-- `Write(file_path="~/.dh/...")` for any artifact — use `artifact_register(issue_number, type, content=..., path=logical_id)` instead
-- `Read(file_path="~/.dh/.../T0-baseline-*.yaml")` — use `artifact_read(issue_number, "T0-baseline")` instead
+- `Write(file_path="~/.dh/...")` for any artifact — use `artifact_register(item_id, type, content=..., path=logical_id)` instead
+- `Read(file_path="~/.dh/.../T0-baseline-*.yaml")` — use `artifact_read(item_id, "T0-baseline")` instead
 - `artifact_register(...)` without `content=` — path-only registration stores a pointer to a local file that is unreachable from worktree-isolated agents and CI environments
 
 ## Dispatch Orchestration System
