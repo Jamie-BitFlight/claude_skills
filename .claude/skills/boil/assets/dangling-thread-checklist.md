@@ -1,7 +1,8 @@
 # Dangling Thread Checklist
 
+**Usage:** Copy this block into your response as a structured self-review, or work through it mentally. Each "yes, unaddressed" answer requires resolution — return to Preparation, apply the fix, then re-check.
+
 Answer each question before marking any task complete.
-All "yes, unaddressed" answers must be resolved before proceeding.
 
 ---
 

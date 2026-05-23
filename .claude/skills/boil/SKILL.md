@@ -85,7 +85,7 @@ Rules:
 
 ## Dangling Thread Protocol
 
-Template: [./assets/dangling-thread-checklist.md](./assets/dangling-thread-checklist.md)
+Template: [./assets/dangling-thread-checklist.md](./assets/dangling-thread-checklist.md) — copy into your response as a structured self-review block, or work through it mentally before marking complete.
 
 Before marking any task complete, answer each question:
 
@@ -94,6 +94,8 @@ Before marking any task complete, answer each question:
 3. Was search performed before building anything new?
 4. Were tests run — or is there an explicit reason they cannot be?
 5. Does any output contain a hard-coded truncation or length limit?
+
+If any question is answered yes and the thread is unaddressed, return to Preparation: scope the fix, apply it, then re-check before marking complete.
 
 ## Pre-Existing Issue Rule
 
@@ -107,17 +109,6 @@ Required response:
 "Backlog" means a trackable record that prevents loss.
 
 ## Anti-Patterns
-
-```text
-# WRONG — workaround presented as solution
-The issue is that the config file is malformed. As a workaround, you can set
-the ENV variable directly to bypass the config loader.
-
-# RIGHT — root cause fixed
-The config loader fails on empty string values (config.py:47).
-Fixed: added a guard that converts empty strings to None before validation.
-Tests pass. No ENV variable workaround needed.
-```
 
 ```text
 # WRONG — invented limit silently truncates
