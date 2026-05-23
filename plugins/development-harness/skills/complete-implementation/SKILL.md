@@ -249,7 +249,15 @@ Fix the error (check backend credentials and access), then re-run /complete-impl
 
 Stop. Do not proceed to the Final Step commit.
 
-**Step 7 -- No recursive follow-up handling**:
+**Step 7 -- Resolve the issue**:
+
+```text
+mcp__plugin_dh_backlog__backlog_resolve(selector="#{issue_number}", summary="Implementation complete — PR merged, AC verified PASS")
+```
+
+On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
+
+**Step 8 -- No recursive follow-up handling**:
 
 The issue-only path does not produce follow-up task files. Skip directly to "Final Step: Commit and Push Remaining Changes".
 
@@ -864,15 +872,25 @@ Stop. Do not proceed to the Final Step commit.
 
 ---
 
+## Resolve the Issue
+
+Using `{matched_item_title}` from the Apply status:verified Label step above:
+
+```text
+mcp__plugin_dh_backlog__backlog_resolve(selector="{matched_item_title}", summary="Implementation complete — PR merged, AC verified PASS")
+```
+
+On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
+
+---
+
 ## Final Step: Commit and Push Remaining Changes
 
-After all phases and follow-up routing are complete, check for uncommitted changes. Phases T0-T6 and the Recursive Follow-up Handling steps modify files (task file context manifests, backlog item files, plan annotations). Commit any remaining modifications in a single commit and push to the current branch.
+Check for uncommitted changes and commit any remaining modifications in a single commit.
 
 ```bash
 git status
 ```
-
-If there are staged or unstaged changes: stage the modified files and commit.
 
 **Issue number in commit message**: Before committing, check the backlog item for the current feature slug:
 
@@ -880,9 +898,9 @@ If there are staged or unstaged changes: stage the modified files and commit.
 mcp__plugin_dh_backlog__backlog_list(title="{slug}")
 ```
 
-Check the `issue` field on the matching item. If present and this commit resolves that issue, append `Fixes #NNN` to the commit message body (NNN = GitHub integer issue number; omit for beads IDs — no commit-message closure). If no issue number is found, omit it.
+Check the `issue` field on the matching item. If present, append `Fixes #NNN` to the commit message body (NNN = GitHub integer issue number; omit for beads IDs). If no issue number is found, omit it.
 
-Push after committing. If the working tree is clean, skip this step.
+Push after committing; skip if the working tree is clean.
 
 ---
 

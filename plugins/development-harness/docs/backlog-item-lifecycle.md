@@ -630,8 +630,9 @@ flowchart TD
 | P6_RECURSE | orchestrator | follow-up slug, follow-up priority, parent slug | recursion gate evaluation | slug matches parent AND priority=High → P6_RECURSE_IMMEDIATE, either not met → P6_DEFER |
 | P6_RECURSE_IMMEDIATE | orchestrator | follow-up plan path | `Skill('implement-feature', followup)` then re-run `complete-implementation` | always → P6_APPLY_VERIFIED |
 | P6_DEFER | orchestrator | follow-up title | deferred follow-up message | always → P6_APPLY_VERIFIED |
-| P6_APPLY_VERIFIED | `backlog_update` MCP | item selector, `verified=True` | `status:verified` label applied to GitHub Issue | always → P6_FINAL |
-| P6_FINAL | orchestrator | — | final commit, push, handoff message | terminal |
+| P6_APPLY_VERIFIED | `backlog_update` MCP | item selector, `verified=True` | `status:verified` label applied to GitHub Issue | always → P6_RESOLVE |
+| P6_RESOLVE | `backlog_resolve` MCP | item selector, summary | issue closed, item state → resolved | always → P6_FINAL |
+| P6_FINAL | orchestrator | — | final commit, push | terminal |
 
 **Input modes**: The skill accepts either a plan file path (SAM path → 6-task QG) or an issue number (proportional path → 3-task QG when issue has no linked plan).
 
@@ -653,9 +654,7 @@ flowchart TD
 
 **Out-of-scope routing**: A follow-up task file with `## Scope: out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never reaches the recursion gate. This prevents out-of-scope findings from blocking the current implementation cycle.
 
-**complete-implementation does NOT invoke work-backlog-item close/resolve**. After quality gates pass, it: (1) applies `status:verified` label, (2) commits and pushes, (3) outputs a handoff message telling the user to run `/dh:work-backlog-item <next-item>`. The explicit instruction to resolve the current item is absent from the output (audit Finding 9 Gap D — partially resolved).
-
-**Recommended resolve handoff**: After applying `status:verified`, the best path is for the orchestrator to output: "Resolve the current item: `/dh:work-backlog-item resolve {current-item-title}`" before any "work next item" instruction. This ensures the verified item transitions to closure rather than lingering in a verified-but-not-resolved state.
+**complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies `status:verified` label, (2) calls `backlog_resolve(selector, summary="Implementation complete — PR merged, AC verified PASS")` to close the issue and transition to resolved, (3) commits and pushes. This closes the GitHub Issue (or equivalent per backend) without requiring manual follow-up. `/work-backlog-item resolve` remains available as a fallback if `complete-implementation` was interrupted before the resolve step.
 
 **Failure paths**:
 
