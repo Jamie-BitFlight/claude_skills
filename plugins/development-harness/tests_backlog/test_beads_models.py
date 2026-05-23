@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from backlog_core.backends.beads_models import (
@@ -29,6 +30,9 @@ from backlog_core.backends.beads_models import (
 from hypothesis import given, settings, strategies as st
 from pydantic import ValidationError
 
+if TYPE_CHECKING:
+    from backlog_core.backends.bd_runner import JsonValue
+
 # ---------------------------------------------------------------------------
 # Fixture helpers
 # ---------------------------------------------------------------------------
@@ -36,7 +40,7 @@ from pydantic import ValidationError
 _FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "beads"
 
 
-def _load_json(filename: str) -> object:
+def _load_json(filename: str) -> JsonValue:
     """Load a JSON fixture file from the beads fixtures directory."""
     return json.loads((_FIXTURES / filename).read_text(encoding="utf-8"))
 
