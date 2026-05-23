@@ -220,18 +220,17 @@ flowchart TD
     Found -->|pyproject.toml| Py[Search Python language manifest]
     Found -->|package.json| TS[Search TypeScript language manifest]
     Found -->|Cargo.toml| Rust[Search Rust language manifest]
-    Found -->|None| FB["Fallback: dh:task-worker<br>(no specialist profile loaded)"]
+    Found -->|None| FB["Fallback: subagent_type='general-purpose'"]
     Py --> ManifestFound{Manifest exists?}
     TS --> ManifestFound
     Rust --> ManifestFound
-    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python example: python-engineering:python-cli-design-spec)"]
-    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist profile loaded"]
-    Resolve --> Store["Store as {resolved_agent}<br>profile_load(agent_name='{resolved_agent}') in delegation prompt"]
-    Store --> Delegate["Dispatch subagent_type='dh:task-worker'"]
-    FB --> Delegate
+    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: python-engineering:python-cli-design-spec)"]
+    ManifestFound -->|No| FB
+    Resolve --> Delegate["Dispatch subagent_type='{resolved_agent}' directly"]
+    FB --> FBDelegate["Dispatch subagent_type='general-purpose'"]
 ```
 
-Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
+Phase 3 dispatches the resolved specialist **directly** — not through `dh:task-worker`. `task-worker` requires a SAM task reference (`P{N}/T{M}`) to execute its lifecycle (read, claim, start-task). Phase 3 is an orchestrator-level delegation with no SAM task, matching the same pattern as Phases 1, 2, and 4. When a specialist is resolved (e.g. `python-engineering:python-cli-design-spec`), dispatch it with `subagent_type="{resolved_agent}"`. When no manifest exists, fall back to `subagent_type="general-purpose"`. Use `{resolved_agent}` (or `"general-purpose"` for the fallback) as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
