@@ -224,15 +224,14 @@ flowchart TD
     Py --> ManifestFound{Manifest exists?}
     TS --> ManifestFound
     Rust --> ManifestFound
-    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: python-engineering:python-cli-design-spec)"]
-    ManifestFound -->|No| FB
-    Resolve --> Store["Store as {resolved_agent}<br>Use as subagent_type when dispatching"]
-    Store --> Delegate[Delegate to resolved agent]
-    FB --> FBStore["Store {resolved_agent} = 'dh:task-worker'"]
-    FBStore --> Delegate
+    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python example: python-engineering:python-cli-design-spec)"]
+    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist skill loaded"]
+    Resolve --> Store["Store as {resolved_agent}<br>Load inside dh:task-worker via Skill()"]
+    Store --> Delegate["Dispatch subagent_type='dh:task-worker'<br>Prompt includes: Skill(skill='{resolved_agent}')"]
+    FB --> Delegate
 ```
 
-After resolution, `{resolved_agent}` holds the fully-qualified agent name (e.g., `python-engineering:python-cli-design-spec` for Python). Pass `subagent_type="{resolved_agent}"` when dispatching. Use it as the `agent=` metadata value in `artifact_register` so the artifact manifest records which agent produced the spec.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. The resolved specialist from the language manifest is loaded inside task-worker via a `Skill()` call at the top of the delegation prompt — it is never the `subagent_type`. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -334,9 +333,12 @@ documentation loaded by these skills.
 If `{domain_skills}` is empty, do not add any skill-loading block — proceed directly to
 the delegation prompt below without modification.
 
+Dispatch: `subagent_type="dh:task-worker"`. Build the delegation prompt from the template below.
+
 Delegation prompt template:
 
 ```text
+{specialist_skill_block}
 You are part of a team that is currently working on the {work_type} {feature_name}.
 Read the details about the milestone and plan you are a part of at backlog_view(selector="#{issue}").
 
@@ -377,6 +379,11 @@ Register your deliverable and return:
        STATUS: DONE
        path: plan/architect-{slug}.md
 ```
+
+`{specialist_skill_block}` is built by the orchestrator before dispatch:
+
+- When `{resolved_agent}` is set (manifest found): `"Load your specialist skill before starting: Skill(skill='{resolved_agent}'). This is a BLOCKING prerequisite — complete it before reading any artifacts or designing.\n\n"`
+- When no manifest found (fallback): `""` (empty string — task-worker needs no specialist loading)
 
 After the agent completes, verify the artifact was registered:
 
