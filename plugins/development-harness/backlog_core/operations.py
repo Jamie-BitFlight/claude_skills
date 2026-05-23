@@ -864,9 +864,9 @@ def _apply_groomed_entries(
                 return
         section.entries.append(Entry(id=entry_id, content=groomed_content))
         return
-    # Default: seed from added_date if no entries exist yet, else append.
+    # Default: seed with a current timestamp if no entries exist yet, else append.
     if not section.entries and bool(groomed_content.strip()):
-        section.entries.append(Entry(id=f"{added_date}T00:00:00Z", content=groomed_content))
+        section.entries.append(Entry(id=now_iso(), content=groomed_content))
     else:
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
 
