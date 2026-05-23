@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from .models import Entry
 from .parsing import now_iso
@@ -140,7 +141,8 @@ def parse_entries(
         _deduplicate_timestamps(raw_entries)
 
     if since:
-        raw_entries = [e for e in raw_entries if (e.id.split("Z")[0] + "Z" if "Z" in e.id else e.id) >= since]
+        since_dt = datetime.fromisoformat(since)
+        raw_entries = [e for e in raw_entries if datetime.fromisoformat(e.id) >= since_dt]
 
     return _apply_show_filter(raw_entries, show)
 

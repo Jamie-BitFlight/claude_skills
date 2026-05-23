@@ -15,7 +15,7 @@ Covers:
   (LOW)
 - Finding 6b: empty groomed_content on empty section must add no entries (LOW)
 
-The original epoch-sentinel regression test is preserved unchanged at the
+The original zero-date sentinel regression test is preserved unchanged at the
 bottom of this module.
 """
 
@@ -221,7 +221,7 @@ def test_now_iso_format_includes_subsecond_precision() -> None:
 def test_apply_groomed_entries_added_date_does_not_set_entry_id() -> None:
     """added_date must have no effect on the entry id produced by _apply_groomed_entries.
 
-    The parameter was previously used to seed ids (the epoch-sentinel bug, now
+    The parameter was previously used to seed ids (the zero-date sentinel bug, now
     fixed).  This test verifies the fix persists: passing added_date="1999-01-01"
     must NOT produce an entry with id "1999-01-01T00:00:00Z".
     """
@@ -307,7 +307,35 @@ def test_apply_groomed_entries_empty_content_on_empty_section_adds_no_entries() 
 
 
 # ---------------------------------------------------------------------------
-# Original regression test — epoch-sentinel bug (preserved)
+# Regression — since filtering must use datetime comparison, not string comparison
+# ---------------------------------------------------------------------------
+
+
+def test_parse_entries_since_filter_handles_fractional_second_entry_ids() -> None:
+    """parse_entries(since=...) must include fractional-second entry IDs at or after since.
+
+    String comparison of '2026-05-23T12:00:00.123456Z' >= '2026-05-23T12:00:00Z' is False
+    because '.' (ASCII 46) < 'Z' (ASCII 90), so fractional-second entries were silently
+    dropped whenever callers passed second-precision since values.  The fix converts both
+    sides to datetime objects before comparing.
+    """
+    from backlog_core.entry_blocks import wrap_entry_with_timestamp
+
+    fractional_id = "2026-05-23T12:00:00.123456Z"
+    since = "2026-05-23T12:00:00Z"
+    body = wrap_entry_with_timestamp("content", fractional_id)
+
+    entries = parse_entries(body, since=since)
+
+    assert len(entries) == 1, (
+        f"parse_entries dropped an entry with id={fractional_id!r} when since={since!r}. "
+        "Fractional-second IDs must not be filtered out by second-precision since values."
+    )
+    assert entries[0].id == fractional_id
+
+
+# ---------------------------------------------------------------------------
+# Original regression test — zero-date sentinel bug (preserved)
 # ---------------------------------------------------------------------------
 
 
