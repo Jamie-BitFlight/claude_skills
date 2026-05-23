@@ -514,3 +514,29 @@ When all phases complete, provide the user:
 - the feature slug
 - the task file path
 - next step: run the `implement-feature` skill with the slug or task file path
+
+---
+
+### Discovered During Implementation
+
+[Date: 2026-05-23 / Session: issue #1527 — Phase 3 write-to-disk refactor]
+
+During implementation of issue #1527, Phase 3's architect delegation prompt was changed from returning full spec content inline to a three-step write-to-disk + register + return-path pattern. This change revealed several constraints and alignment points that are not obvious from reading the skill in isolation.
+
+**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. When returned inline from the agent, the JSONL session output grows to 300KB or more. The orchestrator cannot read this back — it exceeds what can be reasoned about in a single context window. The write-to-disk pattern is not an optimization; it is mandatory for specs of this size. Future implementors should not revert to inline return regardless of apparent simplicity of a given feature.
+
+**Phase 4 already established this pattern via `sam_create`.** The swarm-task-planner (Phase 4) has always written its output to disk as a YAML plan file and registered it via `sam_plan(action='create')`. Phase 3 now aligns with this established write-then-register pattern. When extending the skill with new phases, the presumption should be that all artifact-producing phases follow write-to-disk + register, not inline return.
+
+**`artifact_register` tier-2 auto-read works in main worktree context.** When Phase 3 runs in the main worktree (the normal case for `add-new-feature`), `artifact_register` with a path pointing to `plan/architect-{slug}.md` triggers the server to auto-read the file. This works correctly because the file is in the root worktree path. Worktree-isolated contexts (e.g., parallel dispatch in `work-milestone`) cannot see root worktree `plan/` files — this is a future concern tracked as a concern in issue #1527 and is not addressed by the Phase 3 change.
+
+**`agent="python-cli-design-spec"` in `artifact_register` is Python-specific.** The Phase 3 delegation prompt hardcodes `agent="python-cli-design-spec"` in the `artifact_register` call. This is intentional for the Python workflow (the language manifest maps the architect role to `@python3-development:python-cli-design-spec`) but is incorrect for non-Python projects. A future improvement should resolve the agent name dynamically from the manifest's role mapping rather than hardcoding it. This is logged as a future concern in issue #1527 and does not affect the current Python-first deployment.
+
+**The large-file write strategy (Strategy B) is the correct fallback for oversized specs.** The reference at `.claude/rules/large-file-write-strategy.md` describes a skeleton + Edit-fill pattern for files exceeding 25,000 characters. This integrates correctly with the Phase 3 three-step flow: the agent writes the skeleton with `Write`, fills sections with `Edit`, then calls `artifact_register` in step 2. The 25,000-character threshold in the Phase 3 instruction is correct and matches the strategy document.
+
+#### Updated Technical Details
+
+- Phase 3 architect agent must write to `plan/architect-{slug}.md` before calling `artifact_register` — inline `content=` return is not viable for real-world spec sizes
+- The `artifact_register` call uses `artifact_id="plan/architect-{slug}.md"` as the logical path; the server auto-reads from the root worktree at that path
+- `agent="python-cli-design-spec"` in the `artifact_register` call is a Python-language-specific hardcode; non-Python projects will need this resolved from the language manifest
+- Spec size threshold for Strategy B (skeleton + Edit-fill): 25,000 characters, per `.claude/rules/large-file-write-strategy.md`
+- Phase 4 (`sam_plan(action='create')`) auto-registers the `task-plan` artifact — no separate `artifact_register` call is needed or valid for that type
