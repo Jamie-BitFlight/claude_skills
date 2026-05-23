@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from .models import Entry
 from .parsing import now_iso
@@ -142,7 +142,17 @@ def parse_entries(
 
     if since:
         since_dt = datetime.fromisoformat(since)
-        raw_entries = [e for e in raw_entries if datetime.fromisoformat(e.id) >= since_dt]
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=UTC)
+
+        def _entry_dt(entry_id: str) -> datetime:
+            # IDs may carry a dedup suffix (e.g. "2026-03-10T08:00:00Z-0").
+            # Extract only the ISO timestamp prefix before parsing.
+            m = _LEGACY_ISO_RE.match(entry_id)
+            ts = m.group(1) if m else entry_id
+            return datetime.fromisoformat(ts)
+
+        raw_entries = [e for e in raw_entries if _entry_dt(e.id) >= since_dt]
 
     return _apply_show_filter(raw_entries, show)
 
