@@ -6,7 +6,7 @@ Answer each question before marking any task complete.
 
 ---
 
-- [ ] Is there a thread that can be tied off in under 5 minutes?
+- [ ] Is there an open thread — a TODO, FIXME, PENDING marker, partial implementation, or untested behavior?
 - [ ] Is the current solution a workaround when the real fix exists?
 - [ ] Was search performed before building anything new?
 - [ ] Were tests run — or is there an explicit reason they cannot be?
