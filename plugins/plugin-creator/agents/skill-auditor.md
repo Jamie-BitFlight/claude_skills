@@ -124,7 +124,7 @@ Use the exact schema (IDs are sequential integers starting at 1; `files` field i
 }
 ```
 
-Create the `evals/` directory if it does not exist. Write to `<skill-path>/evals/evals.json`.
+Write to `.tmp/scratch/evals/{slug}-evals.json`. Create `.tmp/scratch/evals/` if it does not exist. This keeps the audited skill tree unmodified — required for skill-sync Stage 2 compatibility, where Stage 4 runs a clean-tree gate (`git status --porcelain`).
 
 ### Step 7: Write audit report
 
@@ -168,7 +168,7 @@ Findings: {list of SK006/SK007 violations, or "none"}
 
 ## Starter Evals
 
-Written to: {skill-path}/evals/evals.json
+Written to: .tmp/scratch/evals/{slug}-evals.json
 Total test cases: {N} ({behavioral} behavioral, {trigger} should-trigger,
   {no-trigger} should-not-trigger, {gap} gap-coverage)
 
@@ -209,7 +209,7 @@ After writing both files, emit a terminal STATUS block:
 ```text
 STATUS: DONE
 Report: .tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md
-Evals: {skill-path}/evals/evals.json ({N} test cases)
+Evals: .tmp/scratch/evals/{slug}-evals.json ({N} test cases)
 Best practices: {N PASS, N PARTIAL, N FAIL}
 Structural score: {X}/{applicable-max} ({Y}%), skilllint {exit 0 | SK006 | SK007}
 Purpose type: {type}, N/A categories: {list or "none"}
@@ -220,7 +220,7 @@ No-findings case (all best-practice checks PASS, all applicable structural categ
 ```text
 STATUS: DONE — audit complete, all best-practice checks pass, no structural gaps found
 Report: .tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md
-Evals: {skill-path}/evals/evals.json ({N} test cases — behavioral and trigger coverage only)
+Evals: .tmp/scratch/evals/{slug}-evals.json ({N} test cases — behavioral and trigger coverage only)
 ```
 
 Do NOT exit silently. Always emit a STATUS block — even when no issues are found.

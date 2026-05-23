@@ -126,7 +126,9 @@ Not warranted when: the skill enforces behavior through instructions Claude inte
 - Domain conventions that are correct-by-convention rather than correct-by-logic (financial modeling color codes, legal citation formats, brand hex values)
 - Documentation for a tool or library that changes over time
 
-Not warranted when: the skill IS the reference material; the knowledge is stable and well-represented in training data; the skill is short enough that inline content is sufficient.
+Not warranted when: the knowledge is stable and well-represented in training data; the skill is short enough that inline content is sufficient.
+
+**Special case — reference/knowledge skills**: References ARE warranted by definition. The reference files are the product. Score this category against the 0–3 rubric (organization, discoverability, linkage from SKILL.md) rather than marking N/A.
 
 **Assets (Category 8)** — warranted when the skill:
 - Produces output that depends on bundled templates, fonts, or boilerplate (PPTX themes, HTML scaffolds, brand fonts)

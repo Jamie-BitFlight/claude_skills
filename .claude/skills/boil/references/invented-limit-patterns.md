@@ -120,9 +120,9 @@ or accept `--limit N` as a CLI argument.
 
 ---
 
-## Detector Regex Patterns
+## Known Regex Patterns
 
-The `scripts/check_completion.py` script scans for these patterns:
+These patterns represent documented invented-limit forms. When new patterns are discovered in the codebase, add a row to this table.
 
 | Pattern | Category |
 |---|---|
@@ -130,9 +130,6 @@ The `scripts/check_completion.py` script scans for these patterns:
 | `MAX_LEN\s*=\s*\d+` | Hard-coded constant |
 | `max_length\s*=\s*\d+` | Hard-coded parameter |
 | `truncate.*=.*True` | Explicit truncation flag |
-
-Add new patterns to `PROHIBITED_PATTERNS` in `check_completion.py` when new limit forms are
-identified in the codebase.
 
 ---
 
