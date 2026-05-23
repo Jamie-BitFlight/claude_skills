@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     # Imported for type annotations only.  At runtime this module may be loaded
     # before artifact_provider.py (T03 wires the two together), so the runtime
     # import is deferred to TYPE_CHECKING to avoid a circular import.
-    from backlog_core.artifact_provider import ArtifactBackend
+    from backlog_core.artifact_provider import ArtifactBackend, ItemId
 
 
 class LocalFilesystemArtifactProvider:
@@ -90,15 +90,15 @@ class LocalFilesystemArtifactProvider:
     # ArtifactBackend protocol implementation
     # ------------------------------------------------------------------
 
-    def get_manifest(self, issue_number: str | int) -> ArtifactManifest:
-        """Retrieve the artifact manifest for *issue_number*.
+    def get_manifest(self, item_id: ItemId) -> ArtifactManifest:
+        """Retrieve the artifact manifest for *item_id*.
 
         Returns an empty manifest when no manifest file exists for the issue —
         this is not an error.  Reads are lock-free (``os.replace`` atomicity
         guarantees a reader sees either the old or new file, never torn data).
 
         Args:
-            issue_number: Issue number (positive integer).
+            item_id: Issue number (positive integer).
 
         Returns:
             ``ArtifactManifest`` for the issue.  Empty manifest when no file
@@ -108,11 +108,11 @@ class LocalFilesystemArtifactProvider:
             ValueError: When the manifest file exists but contains invalid JSON
                 (``json.JSONDecodeError`` is a subclass of ``ValueError``).
         """
-        manifest_path = self._manifest_path(issue_number)
+        manifest_path = self._manifest_path(item_id)
         if not manifest_path.exists():
-            # Use 0 as a sentinel when issue_number is a beads string — the manifest
+            # Use 0 as a sentinel when item_id is a beads string — the manifest
             # field is typed int, but the local provider stores by filename stem only.
-            issue_int = issue_number if isinstance(issue_number, int) else 0
+            issue_int = item_id if isinstance(item_id, int) else 0
             return ArtifactManifest(issue_number=issue_int)
         content = manifest_path.read_text(encoding="utf-8")
         # json.loads raises json.JSONDecodeError (a ValueError subclass) for corrupt JSON.
@@ -120,8 +120,8 @@ class LocalFilesystemArtifactProvider:
         data = json.loads(content)
         return ArtifactManifest.model_validate(data)
 
-    def set_manifest(self, issue_number: str | int, manifest: ArtifactManifest) -> None:
-        """Persist *manifest* for *issue_number* atomically.
+    def set_manifest(self, item_id: ItemId, manifest: ArtifactManifest) -> None:
+        """Persist *manifest* for *item_id* atomically.
 
         Acquires an exclusive advisory lock on the per-issue lock file before
         writing, then writes to a temporary file and replaces the target
@@ -132,11 +132,11 @@ class LocalFilesystemArtifactProvider:
         ensures all entries carry ``storage_tier='local'`` before writing.
 
         Args:
-            issue_number: Issue number (positive integer).
+            item_id: Issue number (positive integer).
             manifest: Updated manifest to persist.
         """
-        manifest_path = self._manifest_path(issue_number)
-        lock_path = self._lock_path(issue_number)
+        manifest_path = self._manifest_path(item_id)
+        lock_path = self._lock_path(item_id)
 
         # Create the manifest directory on first write (mode 0o700 — not world-readable).
         manifest_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -190,7 +190,7 @@ class LocalFilesystemArtifactProvider:
         resolved = self._validate_artifact_path(path)
         return resolved.read_text(encoding="utf-8")
 
-    def store_artifact_content(self, issue_number: str | int, artifact_type: str, path: str, content: str) -> None:
+    def store_artifact_content(self, item_id: ItemId, artifact_type: str, path: str, content: str) -> None:
         """Store artifact content as a file in the repository worktree.
 
         Writes content only when the target file does **not** already exist.
@@ -198,7 +198,7 @@ class LocalFilesystemArtifactProvider:
         Manifest updates are the caller's responsibility via :meth:`set_manifest`.
 
         Args:
-            issue_number: Issue number (positive integer or beads string).  Not used by this
+            item_id: Issue number (positive integer or beads string).  Not used by this
                 provider — included to satisfy the :class:`ArtifactBackend`
                 protocol.
             artifact_type: Artifact type string (e.g. ``"research"``).  Not
@@ -215,14 +215,14 @@ class LocalFilesystemArtifactProvider:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
-    def read_artifact_content_from_remote(self, issue_number: str | int, artifact_type: str, path: str) -> str | None:
+    def read_artifact_content_from_remote(self, item_id: ItemId, artifact_type: str, path: str) -> str | None:
         """Read artifact content.
 
         This provider has no remote backend.  Delegates to
         :meth:`read_local_artifact_content`.
 
         Args:
-            issue_number: Issue number (positive integer or beads string).  Not used.
+            item_id: Issue number (positive integer or beads string).  Not used.
             artifact_type: Artifact type string.  Not used.
             path: Repo-relative path to the artifact file.
 
@@ -274,30 +274,30 @@ class LocalFilesystemArtifactProvider:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _manifest_path(self, issue_number: str | int) -> Path:
-        """Return the path to the manifest JSON file for *issue_number*.
+    def _manifest_path(self, item_id: ItemId) -> Path:
+        """Return the path to the manifest JSON file for *item_id*.
 
         Args:
-            issue_number: Issue number (integer or beads string — used as filename stem).
+            item_id: Issue number (integer or beads string — used as filename stem).
 
         Returns:
-            Absolute path: ``{manifest_dir}/{issue_number}.json``.
+            Absolute path: ``{manifest_dir}/{item_id}.json``.
         """
-        return self._manifest_dir / f"{issue_number}.json"
+        return self._manifest_dir / f"{item_id}.json"
 
-    def _lock_path(self, issue_number: str | int) -> Path:
-        """Return the path to the advisory lock file for *issue_number*.
+    def _lock_path(self, item_id: ItemId) -> Path:
+        """Return the path to the advisory lock file for *item_id*.
 
         Lock files are created on first acquire and **never** deleted
         (TOCTOU risk per architect ADR-003).
 
         Args:
-            issue_number: Issue number.
+            item_id: Issue number.
 
         Returns:
-            Absolute path: ``{manifest_dir}/{issue_number}.lock``.
+            Absolute path: ``{manifest_dir}/{item_id}.lock``.
         """
-        return self._manifest_dir / f"{issue_number}.lock"
+        return self._manifest_dir / f"{item_id}.lock"
 
     def _validate_artifact_path(self, path: str) -> Path:
         """Resolve *path* relative to the root worktree and check for traversal.

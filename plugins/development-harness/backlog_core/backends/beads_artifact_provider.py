@@ -50,7 +50,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_models import BeadsIssueRaw, parse_issue
@@ -62,6 +62,9 @@ if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
 import dh_paths as _dh_paths
+
+if TYPE_CHECKING:
+    from backlog_core.artifact_provider import ItemId
 
 __all__ = ["BeadsArtifactProvider"]
 
@@ -218,7 +221,7 @@ class BeadsArtifactProvider:
     # ArtifactBackend Protocol implementation
     # -----------------------------------------------------------------------
 
-    def get_manifest(self, issue_number: str | int) -> ArtifactManifest:
+    def get_manifest(self, item_id: ItemId) -> ArtifactManifest:
         """Retrieve the artifact manifest.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).
@@ -226,7 +229,7 @@ class BeadsArtifactProvider:
         integer issue numbers.
 
         Args:
-            issue_number: Beads string ID accepted at runtime (e.g.
+            item_id: Beads string ID accepted at runtime (e.g.
                 ``"bd-a3f8"``).  Actual ``int`` values raise
                 :exc:`NotImplementedError`.
 
@@ -235,32 +238,32 @@ class BeadsArtifactProvider:
             manifest is stored — this is not an error.
 
         Raises:
-            NotImplementedError: When *issue_number* is an actual ``int``.
+            NotImplementedError: When *item_id* is an actual ``int``.
         """
-        if isinstance(issue_number, str):
-            return self.get_manifest_bd(issue_number)
+        if isinstance(item_id, str):
+            return self.get_manifest_bd(item_id)
         msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call get_manifest_bd(issue_id: str) with a beads ID instead."
         )
         raise NotImplementedError(msg)
 
-    def set_manifest(self, issue_number: str | int, manifest: ArtifactManifest) -> None:
+    def set_manifest(self, item_id: ItemId, manifest: ArtifactManifest) -> None:
         """Persist *manifest*.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).
         Raises when called with an actual ``int``.
 
         Args:
-            issue_number: Beads string ID accepted at runtime.  Actual
+            item_id: Beads string ID accepted at runtime.  Actual
                 ``int`` values raise :exc:`NotImplementedError`.
             manifest: Updated manifest to persist.
 
         Raises:
-            NotImplementedError: When *issue_number* is an actual ``int``.
+            NotImplementedError: When *item_id* is an actual ``int``.
         """
-        if isinstance(issue_number, str):
-            self.set_manifest_bd(issue_number, manifest)
+        if isinstance(item_id, str):
+            self.set_manifest_bd(item_id, manifest)
             return
         msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
@@ -288,24 +291,24 @@ class BeadsArtifactProvider:
         resolved = (self._resolved_root_worktree / path).resolve()
         return resolved.read_text(encoding="utf-8")
 
-    def store_artifact_content(self, issue_number: str | int, artifact_type: str, path: str, content: str) -> None:
+    def store_artifact_content(self, item_id: ItemId, artifact_type: str, path: str, content: str) -> None:
         """Store artifact content in bd notes as a sentinel-delimited block.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).
         Raises when called with an actual ``int``.
 
         Args:
-            issue_number: Beads string ID accepted at runtime.  Actual
+            item_id: Beads string ID accepted at runtime.  Actual
                 ``int`` values raise :exc:`NotImplementedError`.
             artifact_type: Artifact type string (e.g. ``"research"``).
             path: Logical artifact identifier used as the block ``id``.
             content: Full artifact content to store.
 
         Raises:
-            NotImplementedError: When *issue_number* is an actual ``int``.
+            NotImplementedError: When *item_id* is an actual ``int``.
         """
-        if isinstance(issue_number, str):
-            self.store_artifact_content_bd(issue_number, artifact_type, path, content)
+        if isinstance(item_id, str):
+            self.store_artifact_content_bd(item_id, artifact_type, path, content)
             return
         msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
@@ -313,14 +316,14 @@ class BeadsArtifactProvider:
         )
         raise NotImplementedError(msg)
 
-    def read_artifact_content_from_remote(self, issue_number: str | int, artifact_type: str, path: str) -> str | None:
+    def read_artifact_content_from_remote(self, item_id: ItemId, artifact_type: str, path: str) -> str | None:
         """Search bd notes for a stored artifact content block.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).
         Raises when called with an actual ``int``.
 
         Args:
-            issue_number: Beads string ID accepted at runtime.  Actual
+            item_id: Beads string ID accepted at runtime.  Actual
                 ``int`` values raise :exc:`NotImplementedError`.
             artifact_type: Artifact type string to match.
             path: Logical artifact identifier to match.
@@ -330,10 +333,10 @@ class BeadsArtifactProvider:
             matching block exists.
 
         Raises:
-            NotImplementedError: When *issue_number* is an actual ``int``.
+            NotImplementedError: When *item_id* is an actual ``int``.
         """
-        if isinstance(issue_number, str):
-            return self.read_artifact_content_from_remote_bd(issue_number, artifact_type, path)
+        if isinstance(item_id, str):
+            return self.read_artifact_content_from_remote_bd(item_id, artifact_type, path)
         msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
             "Call read_artifact_content_from_remote_bd(issue_id: str, ...) with a beads ID instead."
@@ -471,23 +474,23 @@ class BeadsArtifactProvider:
         notes = issue.notes or ""
         return _extract_content_block(notes, artifact_type, path)
 
-    def delete_entry(self, issue_number: str | int, artifact_type: str, path: str) -> None:
+    def delete_entry(self, item_id: ItemId, artifact_type: str, path: str) -> None:
         """Remove an artifact entry from the manifest and its content block from notes.
 
         Accepts a beads string ID at runtime (ADR-002 type widening).
         Raises when called with an actual ``int``.
 
         Args:
-            issue_number: Beads string ID accepted at runtime.  Actual
+            item_id: Beads string ID accepted at runtime.  Actual
                 ``int`` values raise :exc:`NotImplementedError`.
             artifact_type: Artifact type string to match.
             path: Logical artifact identifier to match.
 
         Raises:
-            NotImplementedError: When *issue_number* is an actual ``int``.
+            NotImplementedError: When *item_id* is an actual ``int``.
         """
-        if isinstance(issue_number, str):
-            self.delete_entry_bd(issue_number, artifact_type, path)
+        if isinstance(item_id, str):
+            self.delete_entry_bd(item_id, artifact_type, path)
             return
         msg = (
             "BeadsArtifactProvider does not support integer issue numbers. "
