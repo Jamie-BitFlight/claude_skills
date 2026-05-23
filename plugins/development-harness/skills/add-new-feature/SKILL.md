@@ -220,17 +220,17 @@ flowchart TD
     Found -->|pyproject.toml| Py[Search Python language manifest]
     Found -->|package.json| TS[Search TypeScript language manifest]
     Found -->|Cargo.toml| Rust[Search Rust language manifest]
-    Found -->|None| FB["Fallback: subagent_type='general-purpose'"]
+    Found -->|None| FB["No manifest — fallback path"]
     Py --> ManifestFound{Manifest exists?}
     TS --> ManifestFound
     Rust --> ManifestFound
     ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: python-engineering:python-cli-design-spec)"]
     ManifestFound -->|No| FB
-    Resolve --> Delegate["Dispatch subagent_type='{resolved_agent}' directly"]
-    FB --> FBDelegate["Dispatch subagent_type='general-purpose'"]
+    Resolve --> Delegate["Dispatch dh:task-worker<br>specialist_skill_block = profile_load('{resolved_agent}')"]
+    FB --> FBDelegate["Dispatch dh:task-worker<br>specialist_skill_block = '' (executes directly)"]
 ```
 
-Phase 3 dispatches the resolved specialist **directly** — not through `dh:task-worker`. `task-worker` requires a SAM task reference (`P{N}/T{M}`) to execute its lifecycle (read, claim, start-task). Phase 3 is an orchestrator-level delegation with no SAM task, matching the same pattern as Phases 1, 2, and 4. When a specialist is resolved (e.g. `python-engineering:python-cli-design-spec`), dispatch it with `subagent_type="{resolved_agent}"`. When no manifest exists, fall back to `subagent_type="general-purpose"`. Use `{resolved_agent}` (or `"general-purpose"` for the fallback) as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
+Phase 3 always dispatches `dh:task-worker` (`subagent_type="dh:task-worker"`). Unlike Phases 1, 2, and 4 — which use native DH agents for process steps that are not stack-specific (`@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:swarm-task-planner`) — Phase 3 is language-specific. The architect role is resolved from the language manifest and the specialist is loaded into task-worker via `profile_load`. When a specialist is resolved (e.g. `python-engineering:python-cli-design-spec`), the `{specialist_skill_block}` contains `profile_load(agent_name='{resolved_agent}')`. When no manifest exists, `{specialist_skill_block}` is empty and task-worker executes directly as the fallback architect. Use `{resolved_agent}` (or `"dh:task-worker"` for the fallback) as the `agent=` metadata in `artifact_register`.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
