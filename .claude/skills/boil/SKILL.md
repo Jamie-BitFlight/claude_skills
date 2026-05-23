@@ -111,6 +111,17 @@ Required response:
 ## Anti-Patterns
 
 ```text
+# WRONG — workaround presented as solution
+The issue is that the config file is malformed. As a workaround, you can set
+the ENV variable directly to bypass the config loader.
+
+# RIGHT — root cause fixed
+The config loader fails on empty string values (config.py:47).
+Fixed: added a guard that converts empty strings to None before validation.
+Tests pass. No ENV variable workaround needed.
+```
+
+```text
 # WRONG — invented limit silently truncates
 return content[:500]  # keep it brief
 

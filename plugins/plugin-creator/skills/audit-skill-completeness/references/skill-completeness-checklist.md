@@ -34,10 +34,12 @@ SOURCE: agentskills.io design principles (accessed 2026-05-22)
 
 **Question:** Does the skill over-specify, adding rules that narrow behavior without improving outcomes?
 
+**Scope:** This check applies to procedural instructions and rules only. Anti-pattern examples (wrong/right pairs, contrast demonstrations) are behavioral anchoring points — repetition in examples is intentional and correct. Do not apply this check to the Anti-Patterns category or to example blocks.
+
 | Verdict | Criteria | Example evidence |
 |---------|----------|-----------------|
 | **PASS** | Each instruction has a clear purpose; removing any would reduce quality | Concise steps; each step maps to a failure mode it prevents |
-| **PARTIAL** | Most instructions are purposeful; a section feels like padding or redundancy | Repetitive prohibitions; restates the same constraint in multiple places |
+| **PARTIAL** | Most instructions are purposeful; a rule section feels like padding or restates the same constraint in multiple places | Same prohibition stated in two separate rule blocks (not examples) |
 | **FAIL** | Instructions are exhaustive to the point of constraining valid approaches | More than 10 "never do X" rules; multi-page procedural checklists for simple tasks |
 
 **Generating an eval for FAIL:** Create a prompt that has a valid, high-quality solution the over-constraints would prohibit. Check whether the skill allows it.
