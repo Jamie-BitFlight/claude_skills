@@ -43,7 +43,7 @@ jobs:
 
       - name: Commit if changed
         run: |
-          if git diff --quiet .claude-plugin/marketplace.json; then
+          if git diff HEAD --quiet .claude-plugin/marketplace.json; then
             echo "No marketplace changes to commit"
           else
             git config user.name "github-actions[bot]"
