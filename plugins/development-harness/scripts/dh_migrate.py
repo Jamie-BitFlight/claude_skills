@@ -361,8 +361,8 @@ def _update_artifact_manifests(project_root: Path, out: Console) -> None:
     out.print("[yellow]:warning:  Artifact manifests in GitHub Issue bodies may contain old path prefixes.[/yellow]")
     out.print(
         "Run the following via the backlog MCP server for each affected issue:\n"
-        "  [dim]artifact_list(issue_number=N)[/dim] — find entries with old prefixes\n"
-        "  [dim]artifact_register(issue_number=N, type=T, path=<new_relative_path>)[/dim]"
+        "  [dim]artifact_list(item_id=N)[/dim] — find entries with old prefixes\n"
+        "  [dim]artifact_register(item_id=N, artifact_type=T, artifact_id=<new_relative_path>)[/dim]"
         " — re-register with new path\n"
     )
     out.print("[dim]Old prefixes to look for:[/dim]")

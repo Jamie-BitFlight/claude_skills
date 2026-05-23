@@ -765,7 +765,7 @@ class TestMCPToolArtifactRegister:
             result = await client.call_tool(
                 "artifact_register",
                 {
-                    "issue_number": 965,
+                    "item_id": 965,
                     "artifact_type": "feature-context",
                     "artifact_id": "plan/feature-context-foo.md",
                     "status": "current",
@@ -796,7 +796,7 @@ class TestMCPToolArtifactRegister:
             await client.call_tool(
                 "artifact_register",
                 {
-                    "issue_number": 965,
+                    "item_id": 965,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
                     "status": "draft",
@@ -808,7 +808,7 @@ class TestMCPToolArtifactRegister:
             result = await client.call_tool(
                 "artifact_register",
                 {
-                    "issue_number": 965,
+                    "item_id": 965,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
                     "status": "current",
@@ -835,7 +835,7 @@ class TestMCPToolArtifactRegister:
         async with Client(patched_mcp_server) as client:
             result = await client.call_tool(
                 "artifact_register",
-                {"issue_number": 100, "artifact_type": "not-a-real-type", "artifact_id": "plan/something.md"},
+                {"item_id": 100, "artifact_type": "not-a-real-type", "artifact_id": "plan/something.md"},
             )
 
         # Assert
@@ -855,7 +855,7 @@ class TestMCPToolArtifactRegister:
             result = await client.call_tool(
                 "artifact_register",
                 {
-                    "issue_number": 100,
+                    "item_id": 100,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
                     "status": "not-a-real-status",
@@ -897,7 +897,7 @@ class TestMCPToolArtifactList:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_list", {"issue_number": 965})
+            result = await client.call_tool("artifact_list", {"item_id": 965})
 
         # Assert
         data = result.data
@@ -928,7 +928,7 @@ class TestMCPToolArtifactList:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_list", {"issue_number": 10, "artifact_type": "architect"})
+            result = await client.call_tool("artifact_list", {"item_id": 10, "artifact_type": "architect"})
 
         # Assert
         data = result.data
@@ -948,7 +948,7 @@ class TestMCPToolArtifactList:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_list", {"issue_number": 999})
+            result = await client.call_tool("artifact_list", {"item_id": 999})
 
         # Assert
         data = result.data
@@ -987,7 +987,7 @@ class TestMCPToolArtifactGet:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_get", {"issue_number": 50, "artifact_type": "architect"})
+            result = await client.call_tool("artifact_get", {"item_id": 50, "artifact_type": "architect"})
 
         # Assert
         data = result.data
@@ -1015,7 +1015,7 @@ class TestMCPToolArtifactGet:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_get", {"issue_number": 51, "artifact_type": "task-plan"})
+            result = await client.call_tool("artifact_get", {"item_id": 51, "artifact_type": "task-plan"})
 
         # Assert
         assert "error" in result.data
@@ -1053,7 +1053,7 @@ class TestMCPToolArtifactRead:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_read", {"issue_number": 200, "artifact_type": "feature-context"})
+            result = await client.call_tool("artifact_read", {"item_id": 200, "artifact_type": "feature-context"})
 
         # Assert
         data = result.data
@@ -1076,7 +1076,7 @@ class TestMCPToolArtifactRead:
 
         # Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool("artifact_read", {"issue_number": 300, "artifact_type": "architect"})
+            result = await client.call_tool("artifact_read", {"item_id": 300, "artifact_type": "architect"})
 
         # Assert
         assert "error" in result.data
@@ -1118,7 +1118,7 @@ class TestMCPToolArtifactRead:
         # Act / Assert — FileNotFoundError propagates as ToolError
         with pytest.raises(ToolError):
             async with Client(patched_mcp_server) as client:
-                await client.call_tool("artifact_read", {"issue_number": 400, "artifact_type": "task-plan"})
+                await client.call_tool("artifact_read", {"item_id": 400, "artifact_type": "task-plan"})
 
 
 # ---------------------------------------------------------------------------
