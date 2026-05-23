@@ -455,29 +455,33 @@ class GitHubGistArtifactProvider:
                 failures.
         """
         issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
-        repo = get_github(self._repo)
-        owner, repo_name = self._repo.split("/", 1)
-        issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
-        body = issue.get("body") or ""
+        try:
+            repo = get_github(self._repo)
+            owner, repo_name = self._repo.split("/", 1)
+            issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
+            body = issue.get("body") or ""
 
-        # Current format: Gist-backed manifest.
-        gist = self._get_gist(issue_number, body)
-        if gist is not None:
-            gist_file = gist.files.get("manifest.json")
-            if gist_file is not None:
-                return ArtifactManifest.model_validate_json(gist_file.content)
+            # Current format: Gist-backed manifest.
+            gist = self._get_gist(issue_number, body)
+            if gist is not None:
+                gist_file = gist.files.get("manifest.json")
+                if gist_file is not None:
+                    return ArtifactManifest.model_validate_json(gist_file.content)
+                return ArtifactManifest(issue_number=issue_number)
+
+            # Legacy inline manifest — lazy migration to Gist storage.
+            if "<!-- artifact-manifest:begin -->" in body:
+                manifest = parse_manifest_section(body, issue_number)
+                manifest_json = manifest.model_dump_json(by_alias=True)
+                self._create_and_link_gist(
+                    issue_number, issue["id"], body, {"manifest.json": InputFileContent(manifest_json)}
+                )
+                return manifest
+
             return ArtifactManifest(issue_number=issue_number)
-
-        # Legacy inline manifest — lazy migration to Gist storage.
-        if "<!-- artifact-manifest:begin -->" in body:
-            manifest = parse_manifest_section(body, issue_number)
-            manifest_json = manifest.model_dump_json(by_alias=True)
-            self._create_and_link_gist(
-                issue_number, issue["id"], body, {"manifest.json": InputFileContent(manifest_json)}
-            )
-            return manifest
-
-        return ArtifactManifest(issue_number=issue_number)
+        except GithubException as exc:
+            msg = f"GitHub API error retrieving artifact manifest for issue #{issue_number}: {exc}"
+            raise BacklogError(msg) from exc
 
     def set_manifest(self, issue_number: str | int, manifest: ArtifactManifest) -> None:
         """Persist *manifest* by writing it to the linked Gist.
@@ -496,21 +500,27 @@ class GitHubGistArtifactProvider:
                 failures.
         """
         issue_number = _reject_beads_issue_number("GitHubGistArtifactProvider", issue_number)
-        repo = get_github(self._repo)
-        owner, repo_name = self._repo.split("/", 1)
-        issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
-        body = issue.get("body") or ""
+        try:
+            repo = get_github(self._repo)
+            owner, repo_name = self._repo.split("/", 1)
+            issue = _fetch_issue_graphql(repo, owner, repo_name, issue_number)
+            body = issue.get("body") or ""
 
-        # Stamp last_updated before serialising.
-        manifest = manifest.model_copy(update={"last_updated": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")})
-        manifest_json = manifest.model_dump_json(by_alias=True)
+            # Stamp last_updated before serialising.
+            manifest = manifest.model_copy(update={"last_updated": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")})
+            manifest_json = manifest.model_dump_json(by_alias=True)
 
-        gist = self._get_gist(issue_number, body)
-        if gist is not None:
-            gist.edit(files={"manifest.json": InputFileContent(manifest_json)})
-            return
+            gist = self._get_gist(issue_number, body)
+            if gist is not None:
+                gist.edit(files={"manifest.json": InputFileContent(manifest_json)})
+                return
 
-        self._create_and_link_gist(issue_number, issue["id"], body, {"manifest.json": InputFileContent(manifest_json)})
+            self._create_and_link_gist(
+                issue_number, issue["id"], body, {"manifest.json": InputFileContent(manifest_json)}
+            )
+        except GithubException as exc:
+            msg = f"GitHub API error persisting artifact manifest for issue #{issue_number}: {exc}"
+            raise BacklogError(msg) from exc
 
     def read_artifact_content(self, path: str) -> str:
         """Read artifact file content from the root worktree filesystem.
