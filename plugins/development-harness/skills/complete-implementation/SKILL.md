@@ -251,7 +251,7 @@ Stop. Do not proceed to the Final Step commit.
 
 **Step 7 -- No recursive follow-up handling**:
 
-The issue-only path does not produce follow-up task files. Skip directly to "Final Step: Commit and Push Remaining Changes", then proceed to "Resolve the Issue".
+The issue-only path does not produce follow-up task files. Skip directly to "Final Step: Commit and Push Remaining Changes", then "Team Shutdown", then "Resolve the Issue".
 
 ---
 
