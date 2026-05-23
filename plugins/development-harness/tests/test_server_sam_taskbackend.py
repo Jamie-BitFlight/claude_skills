@@ -717,6 +717,272 @@ async def test_sam_update_set_fields_json_writes_via_update_task(backend_mock: M
 
 
 # ---------------------------------------------------------------------------
+# Regression #1528: kebab-case field merge and list[Model] YAML serialization
+# ---------------------------------------------------------------------------
+
+
+def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) -> None:
+    """_validated_task_patch correctly merges kebab-case patch fields without key duplication.
+
+    Regression guard for Fix 1 in #1528: model_dump() without by_alias=True produced
+    snake_case keys. Merging that with raw_fields (kebab-case) created both
+    'parallelize_with' and 'parallelize-with' in the merged dict, causing
+    Task.model_validate to ignore the patched value.
+
+    With the fix, model_dump(by_alias=True, mode='json') emits kebab-case keys on both
+    sides of the merge, so the kebab-case raw_fields value wins cleanly.
+
+    Arrange: create a plan with one task that has parallelize_with=[]; call
+             _validated_task_patch directly with raw_fields using the kebab-case key.
+    Act: pass raw_fields={"parallelize-with": ["T01", "T02"]} to _validated_task_patch.
+    Assert:
+        1. returned Task.parallelize_with == ["T01", "T02"]
+        2. model_dump() produces a single key for the field (no duplication)
+    """
+    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.models import Complexity, Priority
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.server import _validated_task_patch, sam_plan  # type: ignore[attr-defined]
+
+    # Arrange: create a plan with a task that has no parallelize_with entries
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    minimal_task = TaskDefinition(
+        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
+    )
+    backend = LocalYamlTaskProvider(p_dir)
+    set_task_config(TaskConfig(backend=backend))
+    try:
+        result = sam_plan(
+            config=CreatePlanConfig(slug="kebabmerge", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
+        )
+        assert "error" not in result, f"sam_plan create failed: {result}"
+        plan_id = result["plan_id"]
+
+        # Act: patch parallelize-with using the MCP wire (kebab-case) key
+        raw_fields: dict = {"parallelize-with": ["T01", "T02"]}
+        patched_task = _validated_task_patch(backend, plan_id, "T01", raw_fields)
+
+        # Assert 1: field value is correct
+        assert patched_task.parallelize_with == ["T01", "T02"], (
+            f"Expected ['T01', 'T02'] but got {patched_task.parallelize_with!r}.\n"
+            "This is the kebab/snake key collision bug from #1528 Fix 1."
+        )
+
+        # Assert 2: model_dump produces exactly one key for the parallelize field — no duplication
+        dumped = patched_task.model_dump()
+        assert "parallelize_with" in dumped, "Expected 'parallelize_with' snake_case key in model_dump()"
+        assert "parallelize-with" not in dumped, (
+            "Unexpected 'parallelize-with' key found in model_dump() — "
+            "this means both snake and kebab keys survived the merge."
+        )
+    finally:
+        reset_task_config()
+
+
+def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> None:
+    """sam_task action=update with a kebab-case field persists the value correctly in YAML.
+
+    Integration regression guard for Fix 1 in #1528: after patching parallelize-with
+    via the MCP sam_task update action, the stored YAML must contain a proper sequence,
+    not a repr string or an empty list.
+
+    Arrange: create a plan with one task via LocalYamlTaskProvider.
+    Act: call sam_task update with set_fields_json={"parallelize-with": ["T01", "T02"]}.
+    Assert: raw YAML file contains parallelize-with as a list, not a repr string.
+    """
+    import asyncio
+    from pathlib import Path as _Path
+
+    from ruamel.yaml import YAML
+    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.models import Complexity, Priority
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.server import sam_plan
+
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    minimal_task = TaskDefinition(
+        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
+    )
+    backend = LocalYamlTaskProvider(p_dir)
+    set_task_config(TaskConfig(backend=backend))
+    try:
+        result = sam_plan(
+            config=CreatePlanConfig(slug="kebabint", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
+        )
+        assert "error" not in result, f"sam_plan create failed: {result}"
+        plan_id = result["plan_id"]
+
+        # Act: update via the MCP handler using the kebab-case wire key
+        update_result = asyncio.run(
+            _call(
+                "sam_task",
+                {
+                    "plan": plan_id,
+                    "task": "T01",
+                    "config": {"action": "update", "set_fields_json": {"parallelize-with": ["T01", "T02"]}},
+                },
+            )
+        )
+        assert "error" not in update_result, f"sam_task update failed: {update_result}"
+
+        # Assert: read raw YAML back and verify parallelize-with is a list
+        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}-*.yaml"))
+        assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
+        yaml = YAML()
+        loaded = yaml.load(plan_yaml_files[0])
+        tasks_raw = loaded.get("tasks") or []
+        t01 = next((t for t in tasks_raw if t.get("task") == "T01" or t.get("id") == "T01"), None)
+        assert t01 is not None, f"T01 not found in raw YAML. Keys: {list(loaded.keys())}"
+        pw_raw = t01.get("parallelize-with", t01.get("parallelize_with", []))
+        assert isinstance(pw_raw, list), (
+            f"Expected list for 'parallelize-with' in YAML but got {type(pw_raw).__name__!r}: {pw_raw!r}\n"
+            "Fix 1 in #1528 should have prevented the kebab/snake merge collision."
+        )
+        assert list(pw_raw) == ["T01", "T02"], f"Expected ['T01', 'T02'] but got: {list(pw_raw)!r}"
+    finally:
+        reset_task_config()
+
+
+def test_sam_plan_update_serializes_list_model_fields_as_dicts(tmp_path: Path) -> None:
+    """sam_plan update with acceptance-criteria-structured stores plain dicts, not model reprs.
+
+    Regression guard for Fix 2 in #1528: model_dump(by_alias=True) without mode='json'
+    returns AcceptanceCriterion instances for list[AcceptanceCriterion] fields.
+    ruamel.yaml serializes those as Python repr strings. mode='json' ensures the values
+    are JSON-native dicts before passing to the backend.
+
+    Arrange: create a plan; update it with a structured acceptance criterion via MCP.
+    Act: read the plan back via backend.read_plan.
+    Assert: acceptance-criteria-structured is a list of dicts, not model reprs.
+    """
+    import asyncio
+
+    from sam_schema.core.action_models import CreatePlanConfig
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.server import sam_plan
+
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    backend = LocalYamlTaskProvider(p_dir)
+    set_task_config(TaskConfig(backend=backend))
+    try:
+        result = sam_plan(config=CreatePlanConfig(slug="acstest", goal="Goal", tasks=[]), plan_dir=str(p_dir))
+        assert "error" not in result, f"sam_plan create failed: {result}"
+        plan_id = result["plan_id"]
+
+        # Act: update the plan with a structured acceptance criterion via MCP call
+        # Using _call (MCP handler) so the discriminated-union config deserialization runs
+        ac_value = [
+            {
+                "criterion-id": "AC01",
+                "description": "The thing works",
+                "check-command": "echo ok",
+                "expected-baseline": "any",
+                "expected-final": "pass",
+            }
+        ]
+        update_result = asyncio.run(
+            _call(
+                "sam_plan",
+                {
+                    "plan": plan_id,
+                    "plan_dir": str(p_dir),
+                    "config": {"action": "update", "set_fields_json": {"acceptance-criteria-structured": ac_value}},
+                },
+            )
+        )
+        assert "error" not in update_result, f"sam_plan update failed: {update_result}"
+
+        # Assert: read the plan back — acceptance_criteria_structured must be list of dicts
+        plan_data = backend.read_plan(plan_id)
+        acs = plan_data.get("acceptance-criteria-structured") or plan_data.get("acceptance_criteria_structured") or []
+        assert isinstance(acs, list), f"Expected list but got {type(acs).__name__!r}: {acs!r}"
+        assert len(acs) == 1, f"Expected 1 criterion but got {len(acs)}: {acs!r}"
+        first = acs[0]
+        assert isinstance(first, dict), (
+            f"Expected dict for criterion but got {type(first).__name__!r}: {first!r}\n"
+            "This is the model_dump without mode='json' bug from #1528 Fix 2 — "
+            "AcceptanceCriterion instances must be serialized to dicts."
+        )
+        criterion_id = first.get("criterion-id") or first.get("criterion_id")
+        assert criterion_id == "AC01", f"Expected criterion-id 'AC01' but got: {criterion_id!r}"
+    finally:
+        reset_task_config()
+
+
+def test_sam_plan_update_list_field_no_repr_in_yaml(tmp_path: Path) -> None:
+    """sam_plan update does not write AcceptanceCriterion repr strings to YAML.
+
+    Regression guard for Fix 2 in #1528: raw YAML must not contain the class name
+    'AcceptanceCriterion' anywhere — that would mean Pydantic model instances were
+    passed to ruamel.yaml instead of plain dicts.
+
+    Arrange: create a plan; update acceptance-criteria-structured via MCP.
+    Act: read the raw YAML file.
+    Assert: 'AcceptanceCriterion' does not appear anywhere in the YAML content.
+    """
+    import asyncio
+    from pathlib import Path as _Path
+
+    from sam_schema.core.action_models import CreatePlanConfig
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.server import sam_plan
+
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    backend = LocalYamlTaskProvider(p_dir)
+    set_task_config(TaskConfig(backend=backend))
+    try:
+        result = sam_plan(config=CreatePlanConfig(slug="noreprtest", goal="Goal", tasks=[]), plan_dir=str(p_dir))
+        assert "error" not in result, f"sam_plan create failed: {result}"
+        plan_id = result["plan_id"]
+
+        # Act: update the plan with a structured acceptance criterion via MCP call
+        ac_value = [
+            {
+                "criterion-id": "AC01",
+                "description": "No repr allowed",
+                "check-command": "echo pass",
+                "expected-baseline": "any",
+                "expected-final": "pass",
+            }
+        ]
+        update_result = asyncio.run(
+            _call(
+                "sam_plan",
+                {
+                    "plan": plan_id,
+                    "plan_dir": str(p_dir),
+                    "config": {"action": "update", "set_fields_json": {"acceptance-criteria-structured": ac_value}},
+                },
+            )
+        )
+        assert "error" not in update_result, f"sam_plan update failed: {update_result}"
+
+        # Assert: raw YAML must not contain the Pydantic class name
+        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}-*.yaml"))
+        assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
+        raw_content = plan_yaml_files[0].read_text()
+        assert "AcceptanceCriterion" not in raw_content, (
+            "Found 'AcceptanceCriterion' in raw YAML — Pydantic model instances were "
+            "serialized as repr strings instead of dicts.\n"
+            "This is the model_dump without mode='json' bug from #1528 Fix 2.\n"
+            f"YAML content snippet: {raw_content[:500]!r}"
+        )
+    finally:
+        reset_task_config()
+
+
+# ---------------------------------------------------------------------------
 # sam_active_task: set→get round-trip with parent_issue_number
 # ---------------------------------------------------------------------------
 

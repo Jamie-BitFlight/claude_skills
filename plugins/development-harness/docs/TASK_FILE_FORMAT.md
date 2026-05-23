@@ -526,6 +526,58 @@ uv run sam update Pc7d8e9f0/T04 \
   --section-content "### DN-1: Brief title\n..."
 ```
 
+### set_fields_json — List-Valued Fields
+
+The `set_fields_json` parameter (used in `sam_task`, `sam_plan`, and `sam_active_task` update actions)
+accepts a JSON object whose values are passed directly to the Task or Plan Pydantic model. For
+list-valued fields, the value **must** be a native JSON array — not a string.
+
+**Correct form** — native JSON array:
+
+```json
+{"dependencies": ["T01", "T02"]}
+```
+
+This serializes to valid YAML:
+
+```yaml
+dependencies:
+  - T01
+  - T02
+```
+
+**Incorrect form** — comma-separated string:
+
+```json
+{"dependencies": "T01, T02"}
+```
+
+This stores a string scalar instead of a sequence: `dependencies: "T01, T02"`. Downstream
+consumers that expect a list will fail or silently produce wrong results.
+
+**Incorrect form** — Python repr string (observed in bug reports):
+
+```json
+{"dependencies": "['T01', 'T02']"}
+```
+
+This stores a Python list repr as a YAML string literal, causing parsing failures when the
+field is read back as a list.
+
+**Affected list fields:**
+
+| Field | Model |
+|-------|-------|
+| `dependencies` | Task |
+| `parallelize-with` | Task |
+| `blocked-by` | Task |
+| `skills` | Task |
+| `acceptance_criteria` | Plan |
+
+Pass these as JSON arrays in every `set_fields_json` call. The underlying fix (GitHub #1528)
+ensures correct YAML serialization when a native array is supplied — the behavior for string
+values remains unchanged (strings are stored as strings).
+
 ### sam state — Transition task status
 
 ```bash

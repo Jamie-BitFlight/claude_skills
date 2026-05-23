@@ -256,7 +256,7 @@ def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_
     """
     task_data = backend.read_task(plan_id, task_id)
     current = Task.model_validate(task_data)
-    return Task.model_validate({**current.model_dump(), **raw_fields})
+    return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
 
 
 def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
@@ -413,7 +413,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
         raw_fields: dict[str, Any] = config.set_fields_json
         validated = _validated_plan_patch(backend, plan, raw_fields)
         # by_alias=True: raw_fields uses kebab-case keys (MCP wire convention); alias keys must match
-        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True).items() if k in raw_fields}
+        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in raw_fields}
     backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
     return {"updated": True, "address": plan}
 
