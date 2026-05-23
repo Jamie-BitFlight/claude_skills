@@ -8,7 +8,7 @@ A checklist for evaluating whether a skill provides everything an AI agent needs
 
 Five checks derived from agentskills.io design principles. Each check applies to any skill, regardless of purpose type. Evaluate PASS / PARTIAL / FAIL with evidence from SKILL.md.
 
-SOURCE: agentskills.io design principles (accessed 2026-05-22)
+SOURCE: agentskills.io/skill-creation/best-practices (accessed 2026-05-23). Principle quotes are paraphrased from the source; verdict criteria (PASS/PARTIAL/FAIL) are operationalized from the principles and are not verbatim from agentskills.io.
 
 ---
 
@@ -30,7 +30,7 @@ SOURCE: agentskills.io design principles (accessed 2026-05-22)
 
 ### Check 2: Lean Instructions
 
-**Principle:** "Fewer, better instructions often outperform exhaustive rules. If pass rates plateau despite adding more rules, the skill may be over-constrained."
+**Principle:** "Concise, stepwise guidance with a working example tends to outperform exhaustive documentation. When you find yourself covering every edge case, consider whether most are better handled by the agent's own judgment." (paraphrased from agentskills.io/skill-creation/best-practices, accessed 2026-05-23 — exact wording on site differs)
 
 **Question:** Does the skill over-specify, adding rules that narrow behavior without improving outcomes?
 
