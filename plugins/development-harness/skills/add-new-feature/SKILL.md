@@ -224,11 +224,15 @@ flowchart TD
     Py --> ManifestFound{Manifest exists?}
     TS --> ManifestFound
     Rust --> ManifestFound
-    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: @python3-development:python-cli-design-spec)"]
+    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: python-engineering:python-cli-design-spec)"]
     ManifestFound -->|No| FB
-    Resolve --> Delegate[Delegate to resolved agent]
-    FB --> Delegate
+    Resolve --> Store["Store as {resolved_agent}<br>Use as subagent_type when dispatching"]
+    Store --> Delegate[Delegate to resolved agent]
+    FB --> FBStore["Store {resolved_agent} = 'dh:task-worker'"]
+    FBStore --> Delegate
 ```
+
+After resolution, `{resolved_agent}` holds the fully-qualified agent name (e.g., `python-engineering:python-cli-design-spec` for Python). Pass `subagent_type="{resolved_agent}"` when dispatching. Use it as the `agent=` metadata value in `artifact_register` so the artifact manifest records which agent produced the spec.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -361,11 +365,11 @@ Register your deliverable and return:
 1. Call `artifact_register` with the full spec content:
 
        mcp__plugin_dh_backlog__artifact_register(
-           issue_number={issue},
+           item_id={issue},
            artifact_type="architect",
            artifact_id="plan/architect-{slug}.md",
            content="<full spec markdown>",
-           agent="python-cli-design-spec"
+           agent="{resolved_agent}"
        )
 
 2. Return:
@@ -522,7 +526,5 @@ When all phases complete, provide the user:
 **Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. The problem with the pre-#1527 pattern was that the orchestrator received the content inline in the agent response — the JSONL session output grew to 300KB or more, which the orchestrator cannot process. The fix is for the architect agent to call `artifact_register(content=...)` directly: the content stays within the agent's context window and is uploaded to the artifact backend (GitHub Gist); the orchestrator receives only `STATUS: DONE`. No Write tool step is needed or correct.
 
 **`artifact_register` without `content=` is a prohibited pattern.** Calling `artifact_register` with a path but no `content=` stores only a pointer to a local file. That file is unreachable from worktree-isolated agents, CI environments, and any other machine. Always pass `content=` explicitly. Source: `plugins/development-harness/CLAUDE.md` — "Prohibited patterns" section.
-
-**`agent="python-cli-design-spec"` in `artifact_register` is Python-specific.** The Phase 3 delegation prompt hardcodes this value. It is correct for the Python workflow but incorrect for non-Python projects. A future improvement should resolve the agent name dynamically from the language manifest's role mapping.
 
 **Phase 4 (`sam_plan(action='create')`) auto-registers the `task-plan` artifact** — no separate `artifact_register` call is needed or valid for that type.
