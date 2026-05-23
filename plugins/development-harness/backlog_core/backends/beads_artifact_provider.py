@@ -32,15 +32,16 @@ in-place; otherwise it is appended to the notes.
 ADR-002 type widening
 ---------------------
 The :class:`~backlog_core.artifact_provider.ArtifactBackend` Protocol defines
-``issue_number: int`` parameters, but the beads backend uses string issue IDs
-(e.g. ``bd-a3f8``).  The Protocol methods raise :exc:`NotImplementedError`
-when called with an actual ``int``.  All beads-aware callers should use the
-shadow ``*_bd(issue_id: str)`` methods directly.
+``item_id: ItemId`` parameters (``ItemId = str | int``), but the beads backend
+uses string issue IDs (e.g. ``bd-a3f8``).  The Protocol methods raise
+:exc:`NotImplementedError` when called with an actual ``int``.  All
+beads-aware callers should use the shadow ``*_bd(issue_id: str)`` methods
+directly.
 
-At runtime the Protocol methods also accept ``str`` values transparently (type
+At runtime the Protocol methods accept ``str`` values transparently (type
 widening), so code that has already resolved a beads ID string and stores it
-in a variable typed as ``int`` will work correctly — this matches the widened
-behaviour described in ADR-002.
+in a variable typed as ``ItemId`` will work correctly — this matches the
+widened behaviour described in ADR-002.
 """
 
 from __future__ import annotations

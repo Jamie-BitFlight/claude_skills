@@ -30,8 +30,12 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from .models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType
+
+if TYPE_CHECKING:
+    from .artifact_provider import ItemId
 
 # ---------------------------------------------------------------------------
 # Manifest section constants
@@ -115,7 +119,7 @@ def _extract_table_from_rendered(rendered: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def parse_manifest_section(issue_body: str, issue_number: int) -> ArtifactManifest:
+def parse_manifest_section(issue_body: str, item_id: ItemId) -> ArtifactManifest:
     """Extract and parse the artifact manifest section from an issue body.
 
     Returns an empty ``ArtifactManifest`` when no manifest section is found —
@@ -124,7 +128,7 @@ def parse_manifest_section(issue_body: str, issue_number: int) -> ArtifactManife
 
     Args:
         issue_body: Full GitHub Issue body text.
-        issue_number: Issue number for the returned manifest object.
+        item_id: Item identifier for the returned manifest object (``str | int``).
 
     Returns:
         ``ArtifactManifest`` parsed from the delimited section, or an empty
@@ -132,7 +136,7 @@ def parse_manifest_section(issue_body: str, issue_number: int) -> ArtifactManife
     """
     match = _MANIFEST_SECTION_RE.search(issue_body)
     if not match:
-        return ArtifactManifest(issue_number=issue_number)
+        return ArtifactManifest(issue_number=item_id)
 
     section = match.group(0)
     artifacts: list[ArtifactEntry] = []
@@ -140,7 +144,7 @@ def parse_manifest_section(issue_body: str, issue_number: int) -> ArtifactManife
         entry = _parse_table_row(line)
         if entry is not None:
             artifacts.append(entry)
-    return ArtifactManifest(issue_number=issue_number, artifacts=artifacts)
+    return ArtifactManifest(issue_number=item_id, artifacts=artifacts)
 
 
 def render_manifest_section(manifest: ArtifactManifest) -> str:
