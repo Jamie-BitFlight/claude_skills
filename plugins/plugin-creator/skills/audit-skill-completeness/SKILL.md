@@ -93,15 +93,18 @@ Five categories are **universal** (always scored). Three are **conditional** (sc
 | **References** | The skill requires domain-specific knowledge (API formats, schemas, conventions, standards) that an AI cannot reliably generate from training data |
 | **Assets** | The skill produces output that uses templates, fonts, images, or boilerplate that should be bundled for use (not read into context) |
 
-If a conditional category is not warranted: record N/A. Do not count it in the score denominator. Do not list its absence as a gap. Do not recommend adding it.
+For each of the eight categories:
 
-For each applicable category:
-
-1. Read the category definition from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md)
-2. Review checklist items for that category
-3. Search SKILL.md and supporting files for evidence
-4. Score 0–3 based on rubric (below)
-5. Document findings with file:line references
+1. **Warrant check (conditional categories only — Scripts, References, Assets):**
+   - Ask: is this category warranted for this skill's purpose type (from Step 2)?
+   - **If NO → record N/A. STOP. Do not execute steps 2–5. Do not add to score denominator. Do not list absence as a gap. Do not recommend adding it.**
+   - If YES → continue to step 2.
+   - Universal categories (Preparation, Progression, Verification, Examples, Anti-Patterns) always continue to step 2.
+2. Read the category definition from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md)
+3. Review checklist items for that category
+4. Search SKILL.md and supporting files for evidence
+5. Score 0–3 based on rubric (below)
+6. Document findings with file:line references
 
 ### Step 5: Suggest eval scenarios
 
