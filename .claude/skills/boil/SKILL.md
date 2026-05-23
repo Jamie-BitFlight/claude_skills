@@ -99,13 +99,6 @@ Copy [./assets/blocked-declaration-template.md](./assets/blocked-declaration-tem
 Full contract: [./references/blocked-declaration-contract.md](./references/blocked-declaration-contract.md)
 
 ```text
-BLOCKED: [specific reason the permanent solve cannot be completed now]
-- What was completed: [list]
-- What remains: [list with specific file paths or commands]
-- Unblocking condition: [observable, testable change]
-```
-
-```text
 # WRONG — workaround instead of BLOCKED
 The build fails because the dependency is missing. As a workaround,
 comment out the import for now.
