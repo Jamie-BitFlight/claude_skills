@@ -218,7 +218,7 @@ Each **applicable** category is scored 0–3:
   - 0: No verification steps mentioned
   - 1: Manual verification suggested but not specified
   - 2: Verification steps defined with acceptance criteria
-  - 3: Explicit error-correction loop (verify → fix → re-verify)
+  - 3: Explicit error-correction loop (verify → fix → re-verify), expressed either as behavioral instructions Claude follows or as automated scripts — either form satisfies this level
 
 - **Examples (0-3):**
   - 0: No examples provided
@@ -235,11 +235,11 @@ Each **applicable** category is scored 0–3:
 **Conditional category guidelines (only when warranted):**
 
 - **Scripts (0-3, or N/A):**
-  - N/A: Skill's purpose does not involve fragile or repetitive operations
-  - 0: Warranted but no scripts provided
-  - 1: 1-2 scripts, limited coverage of core operations
-  - 2: Scripts cover core operations with error handling
-  - 3: Comprehensive coverage; scripts self-document with --help; edge cases handled
+  - N/A: Skill's purpose does not involve deterministic or repetitive operations that benefit from scripting
+  - 0: Operations clearly need scripting (agent would regenerate the same logic each invocation) but no scripts provided
+  - 1: Scripts exist but the operations most likely to be regenerated wastefully remain unscripted
+  - 2: Scripts cover the operations the agent would otherwise rewrite each run; eliminates the primary sources of wasted agent turns
+  - 3: All deterministic operations that the agent would otherwise regenerate are scripted; scripts are self-documenting (--help) and handle edge cases — the agent never writes boilerplate
 
 - **References (0-3, or N/A):**
   - N/A: Skill's purpose does not require domain knowledge beyond training data
@@ -249,11 +249,11 @@ Each **applicable** category is scored 0–3:
   - 3: Reference files linked from the specific workflow steps where they're needed
 
 - **Assets (0-3, or N/A):**
-  - N/A: Skill does not produce output requiring bundled resources
-  - 0: Warranted but no assets provided
-  - 1: 1-2 asset files present
-  - 2: Assets organized, cover the main output types
-  - 3: Comprehensive asset library with clear usage instructions
+  - N/A: Skill's output does not depend on templates, fonts, images, or boilerplate resources
+  - 0: Output clearly requires bundled resources but none provided — agent generates required materials ad-hoc each invocation
+  - 1: Some assets bundled but key output resources the agent needs are still generated ad-hoc
+  - 2: Main output resources bundled; agent can produce its primary output without generating supporting materials
+  - 3: All output resources the agent needs are bundled; agent never generates supporting materials ad-hoc; asset usage is clearly specified
 
 ## Quality Categories Reference
 
