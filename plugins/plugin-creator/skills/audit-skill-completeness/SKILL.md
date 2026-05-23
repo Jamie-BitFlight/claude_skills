@@ -103,33 +103,19 @@ For each applicable category:
 4. Score 0–3 based on rubric (below)
 5. Document findings with file:line references
 
-### Step 5: Generate starter evals
+### Step 5: Suggest eval scenarios
 
-For each best-practice check rated FAIL or PARTIAL, generate 1–2 test case entries using the eval type from the mapping table in [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md).
+You do not have the domain context needed to author high-quality evals. Suggest scenarios that a domain expert can use as starting points.
 
-Additionally generate:
+For each best-practice check rated FAIL or PARTIAL, describe 1–2 prompts that would expose the gap (use the eval-type mapping in [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md)).
 
-- **3–5 behavioral scenarios:** prompts where the skill would be active; assertions check the agent follows the skill's *approach*, not exact output
-- **2–3 should-trigger queries:** non-obvious prompts where the skill SHOULD activate (tests description trigger accuracy)
-- **2–3 should-not-trigger queries:** prompts at the edge of scope where the skill SHOULD NOT activate
+Additionally suggest:
 
-Write the starter evals to `<skill-path>/evals/evals.json`. Create the `evals/` directory if it does not exist. Use the exact schema from the skill-creator `references/schemas.md`:
+- **3–5 behavioral scenarios** — prompts where the skill would be active; note what the assertion should check (the agent's *approach*, not exact output)
+- **2–3 should-trigger queries** — non-obvious prompts where the skill SHOULD activate (tests description trigger accuracy)
+- **2–3 should-not-trigger queries** — prompts at the edge of scope where the skill SHOULD NOT activate
 
-```json
-{
-  "skill_name": "{skill-name-from-frontmatter}",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "...",
-      "expected_output": "...",
-      "expectations": ["..."]
-    }
-  ]
-}
-```
-
-`files` is optional — omit it when the eval does not require input files.
+Format each as a short paragraph: the prompt idea, what makes it a good test, what a passing response demonstrates. Do NOT write JSON — the skill author needs domain knowledge to fill in the assertions.
 
 ### Step 6: Score and report
 
@@ -157,11 +143,10 @@ Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
 | 4. Description Trigger Accuracy | PASS/PARTIAL/FAIL | {evidence} |
 | 5. Bundle Signal | PASS/PARTIAL/FAIL | {evidence} |
 
-## Starter Evals
+## Suggested Eval Scenarios
 
-Written to: {skill-path}/evals/evals.json
-Total test cases: {N} ({behavioral} behavioral, {trigger} should-trigger,
-  {no-trigger} should-not-trigger, {gap} gap-coverage)
+{Short paragraph per scenario: prompt idea, why it's a good test, what a passing response demonstrates.
+Gap-coverage: {N} | Behavioral: {N} | Should-trigger: {N} | Should-not-trigger: {N}}
 
 ## Structural Score: {score}/{applicable-max} ({percentage}%)
 
