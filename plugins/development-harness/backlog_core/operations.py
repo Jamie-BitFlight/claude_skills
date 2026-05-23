@@ -864,10 +864,9 @@ def _apply_groomed_entries(
                 return
         section.entries.append(Entry(id=entry_id, content=groomed_content))
         return
-    # Default: seed with a current timestamp if no entries exist yet, else append.
-    if not section.entries and bool(groomed_content.strip()):
-        section.entries.append(Entry(id=now_iso(), content=groomed_content))
-    else:
+    # Default: append only when content is non-empty and not already present.
+    # Identical content in any existing unstruck entry is treated as idempotent.
+    if groomed_content.strip() and not any(e.content == groomed_content and not e.struck for e in section.entries):
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
 
 

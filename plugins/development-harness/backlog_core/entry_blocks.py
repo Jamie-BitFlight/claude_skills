@@ -9,6 +9,9 @@ from .parsing import now_iso
 
 ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
 STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>\s*(.*?)</details>", re.DOTALL)
+# Matches ISO 8601 timestamps (with or without sub-second fraction) at the start of a string.
+# Used in parse_entries to detect entries seeded with now_iso() ids before wrapping.
+_LEGACY_ISO_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
 
 
 def wrap_entry(content: str) -> str:
@@ -126,7 +129,12 @@ def parse_entries(
         content = section_body.strip()
         if not content:
             return []
-        raw_entries = [Entry(id=f"{added_date}T00:00:00Z", content=content)]
+        # If the content begins with an ISO timestamp (now_iso() format), use it
+        # directly as the entry id so that round-trips after an unwrapped seed
+        # preserve the original id rather than reconstructing from added_date.
+        ts_match = _LEGACY_ISO_RE.match(content)
+        entry_id = ts_match.group(1) if ts_match else f"{added_date}T00:00:00Z"
+        raw_entries = [Entry(id=entry_id, content=content)]
     else:
         raw_entries = [_parse_match_to_entry(m) for m in matches]
         _deduplicate_timestamps(raw_entries)

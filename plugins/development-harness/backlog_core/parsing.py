@@ -184,8 +184,12 @@ def today() -> str:
 
 
 def now_iso() -> str:
-    """Return current UTC time as ISO 8601 string for last_synced tracking."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Return current UTC time as ISO 8601 string with microsecond precision.
+
+    Microsecond precision ensures uniqueness across rapid successive calls,
+    preventing entry id collisions in batch groom operations.
+    """
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # ---------------------------------------------------------------------------
