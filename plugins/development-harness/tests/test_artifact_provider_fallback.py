@@ -236,7 +236,7 @@ async def test_warning_surfaces_in_artifact_register_response(active_fallback: L
     result = await _call(
         "artifact_register",
         {
-            "issue_number": 9999,
+            "item_id": 9999,
             "artifact_type": "research",
             "artifact_id": "research-fallback-warning-test",
             "content": "test content for warning merge test",
@@ -247,17 +247,17 @@ async def test_warning_surfaces_in_artifact_register_response(active_fallback: L
 
 async def test_warning_surfaces_in_artifact_list_response(active_fallback: LocalFilesystemArtifactProvider) -> None:
     """artifact_list response warnings list contains the local-provider warning."""
-    result = await _call("artifact_list", {"issue_number": 9999})
+    result = await _call("artifact_list", {"item_id": 9999})
     assert _EXPECTED_WARNING in result.get("warnings", [])
 
 
 async def test_warning_surfaces_in_artifact_get_response(active_fallback: LocalFilesystemArtifactProvider) -> None:
     """artifact_get response warnings list contains the local-provider warning."""
-    result = await _call("artifact_get", {"issue_number": 9999, "artifact_type": "research"})
+    result = await _call("artifact_get", {"item_id": 9999, "artifact_type": "research"})
     assert _EXPECTED_WARNING in result.get("warnings", [])
 
 
 async def test_warning_surfaces_in_artifact_read_response(active_fallback: LocalFilesystemArtifactProvider) -> None:
     """artifact_read response warnings list contains the local-provider warning."""
-    result = await _call("artifact_read", {"issue_number": 9999, "artifact_type": "research"})
+    result = await _call("artifact_read", {"item_id": 9999, "artifact_type": "research"})
     assert _EXPECTED_WARNING in result.get("warnings", [])

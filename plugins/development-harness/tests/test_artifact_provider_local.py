@@ -211,10 +211,7 @@ class TestStoreArtifactContent:
     def test_writes_new_file(self, provider: LocalFilesystemArtifactProvider, root_worktree: Path) -> None:
         """store_artifact_content creates the file with the given content."""
         provider.store_artifact_content(
-            issue_number=1,
-            artifact_type=ArtifactType.ARCHITECT,
-            path="plan/new-artifact.md",
-            content="# Architect Spec\n",
+            item_id=1, artifact_type=ArtifactType.ARCHITECT, path="plan/new-artifact.md", content="# Architect Spec\n"
         )
         target = root_worktree / "plan" / "new-artifact.md"
         assert target.exists()
@@ -227,7 +224,7 @@ class TestStoreArtifactContent:
         target.write_text("original content", encoding="utf-8")
 
         provider.store_artifact_content(
-            issue_number=1, artifact_type=ArtifactType.ARCHITECT, path="plan/existing.md", content="new content"
+            item_id=1, artifact_type=ArtifactType.ARCHITECT, path="plan/existing.md", content="new content"
         )
         assert target.read_text(encoding="utf-8") == "original content"
 

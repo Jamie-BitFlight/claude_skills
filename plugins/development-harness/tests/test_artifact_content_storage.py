@@ -492,7 +492,7 @@ async def test_artifact_register_without_content_and_no_local_file_registers_man
         )
         # Act
         result = await _call(
-            "artifact_register", {"issue_number": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
+            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
         )
 
     # Assert
@@ -528,12 +528,7 @@ async def test_artifact_register_with_content_stores_to_github() -> None:
         # Act
         result = await _call(
             "artifact_register",
-            {
-                "issue_number": 42,
-                "artifact_type": "research",
-                "artifact_id": "plan/r.md",
-                "content": "# Research content",
-            },
+            {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research content"},
         )
 
     # Assert
@@ -567,7 +562,7 @@ async def test_artifact_register_without_content_reads_local_file_and_uploads() 
         )
         # Act
         result = await _call(
-            "artifact_register", {"issue_number": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
+            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
         )
 
     # Assert
@@ -589,7 +584,7 @@ async def test_artifact_register_with_invalid_type_returns_error() -> None:
     """
     # Arrange / Act
     result = await _call(
-        "artifact_register", {"issue_number": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md"}
+        "artifact_register", {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md"}
     )
 
     # Assert
@@ -621,7 +616,7 @@ async def test_artifact_read_returns_github_content_when_available() -> None:
     ):
         mock_registry.get_by_type.return_value = [entry]
         # Act
-        result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "research"})
+        result = await _call("artifact_read", {"item_id": 42, "artifact_type": "research"})
 
     # Assert
     assert result.get("error") is None
@@ -650,7 +645,7 @@ async def test_artifact_read_falls_back_to_filesystem_when_github_returns_none(t
     ):
         mock_registry.get_by_type.return_value = [entry]
         # Act
-        result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "research"})
+        result = await _call("artifact_read", {"item_id": 42, "artifact_type": "research"})
 
     # Assert
     assert result.get("error") is None
@@ -676,7 +671,7 @@ async def test_artifact_read_returns_error_when_type_not_found() -> None:
     ):
         mock_registry.get_by_type.return_value = []
         # Act
-        result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "research"})
+        result = await _call("artifact_read", {"item_id": 42, "artifact_type": "research"})
 
     # Assert
     assert "error" in result
@@ -690,7 +685,7 @@ async def test_artifact_read_returns_error_for_invalid_type() -> None:
     Why: Input validation must reject invalid types before touching GitHub.
     """
     # Arrange / Act
-    result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "not-real"})
+    result = await _call("artifact_read", {"item_id": 42, "artifact_type": "not-real"})
 
     # Assert
     assert "error" in result
@@ -728,7 +723,7 @@ async def test_artifact_read_multi_entry_returns_most_recent_and_warns() -> None
         # Registry returns insertion-order list (older first)
         mock_registry.get_by_type.return_value = [older_entry, newer_entry]
         # Act
-        result = await _call("artifact_read", {"issue_number": 42, "artifact_type": "research"})
+        result = await _call("artifact_read", {"item_id": 42, "artifact_type": "research"})
 
     # Assert: most recent returned
     assert result.get("error") is None
