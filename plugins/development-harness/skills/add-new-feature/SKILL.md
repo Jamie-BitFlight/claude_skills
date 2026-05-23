@@ -220,17 +220,18 @@ flowchart TD
     Found -->|pyproject.toml| Py[Search Python language manifest]
     Found -->|package.json| TS[Search TypeScript language manifest]
     Found -->|Cargo.toml| Rust[Search Rust language manifest]
-    Found -->|None| FB["No manifest — fallback path"]
+    Found -->|None| FB["Fallback: dh:task-worker<br>(no specialist profile loaded)"]
     Py --> ManifestFound{Manifest exists?}
     TS --> ManifestFound
     Rust --> ManifestFound
-    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python: python-engineering:python-cli-design-spec)"]
-    ManifestFound -->|No| FB
-    Resolve --> Delegate["Dispatch dh:task-worker<br>specialist_skill_block = profile_load('{resolved_agent}')"]
-    FB --> FBDelegate["Dispatch dh:task-worker<br>specialist_skill_block = '' (executes directly)"]
+    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python example: python-engineering:python-cli-design-spec)"]
+    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist profile loaded"]
+    Resolve --> Store["Store as {resolved_agent}<br>profile_load(agent_name='{resolved_agent}') in delegation prompt"]
+    Store --> Delegate["Dispatch subagent_type='dh:task-worker'"]
+    FB --> Delegate
 ```
 
-Phase 3 always dispatches `dh:task-worker` (`subagent_type="dh:task-worker"`). Unlike Phases 1, 2, and 4 — which use native DH agents for process steps that are not stack-specific (`@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:swarm-task-planner`) — Phase 3 is language-specific. The architect role is resolved from the language manifest and the specialist is loaded into task-worker via `profile_load`. When a specialist is resolved (e.g. `python-engineering:python-cli-design-spec`), the `{specialist_skill_block}` contains `profile_load(agent_name='{resolved_agent}')`. When no manifest exists, `{specialist_skill_block}` is empty and task-worker executes directly as the fallback architect. Use `{resolved_agent}` (or `"dh:task-worker"` for the fallback) as the `agent=` metadata in `artifact_register`.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
