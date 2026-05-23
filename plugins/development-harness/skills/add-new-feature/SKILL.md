@@ -356,11 +356,24 @@ finalizing the architecture. Training data is stale; current community practice 
 Produce architect-{slug}.md content with interfaces, contracts, data models, module boundaries.
 Do NOT implement — define WHAT to build, not the code.
 
-Register your deliverable with:
-    artifact_type="architect"
-    artifact_id="plan/architect-{slug}.md"
-    issue_number={issue}
-    agent="python-cli-design-spec"
+Write your deliverable to disk, register it, then return:
+
+1. Write the spec to `plan/architect-{slug}.md` using the `Write` tool.
+   Large-file rule: if the spec exceeds 25 000 characters, use Strategy B from
+   `.claude/rules/large-file-write-strategy.md` — write a skeleton first, then
+   fill each section with separate `Edit` calls, before proceeding to step 2.
+
+2. Register the artifact (the server auto-reads the file you wrote in step 1):
+       mcp__plugin_dh_backlog__artifact_register(
+           issue_number={issue},
+           artifact_type="architect",
+           artifact_id="plan/architect-{slug}.md",
+           agent="python-cli-design-spec"
+       )
+
+3. Return:
+       STATUS: DONE
+       path: plan/architect-{slug}.md
 ```
 
 After the agent completes, verify the artifact was registered:
@@ -370,9 +383,9 @@ mcp__plugin_dh_backlog__artifact_list(issue_number={issue}, artifact_type="archi
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
-reminder that `artifact_register(content=...)` is the agent's responsibility, not the
-orchestrator's. The orchestrator MUST NOT call `artifact_register` as a workaround —
-the MCP-native rule is that agents own their artifact storage.
+reminder that the agent must write the file to `plan/architect-{slug}.md` and call
+`artifact_register` itself — the orchestrator MUST NOT call `artifact_register` as a
+workaround. The MCP-native rule is that agents own their artifact storage.
 
 ---
 
