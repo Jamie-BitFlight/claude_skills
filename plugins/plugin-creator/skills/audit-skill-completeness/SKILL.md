@@ -121,7 +121,7 @@ Format each as a short paragraph: the prompt idea, what makes it a good test, wh
 
 Calculate overall structural score. Denominator = 15 (universal) + 3 × (number of applicable conditional categories).
 
-Write report to `.claude/audits/completeness-report-{skill-slug}.md`.
+Write report to `.tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md`. Create `.tmp/scratch/reports/` if it does not exist.
 
 **Report Structure:**
 
@@ -187,7 +187,7 @@ rated FAIL:
 2. **Medium Priority:** {recommendation} (Category or Check)
 ```
 
-**Output Location:** `.claude/audits/completeness-report-{skill-slug}.md`. Create `.claude/audits/` if it does not exist.
+**Output Location:** `.tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md`. Create `.tmp/scratch/reports/` if it does not exist.
 
 ## Scoring Rubric
 

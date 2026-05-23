@@ -96,7 +96,7 @@ SOURCE: agentskills.io design principles (accessed 2026-05-22)
 
 ### Mapping FAIL/PARTIAL to Eval Test Cases
 
-For each Check rated FAIL or PARTIAL, generate 1–2 eval entries in `evals/evals.json`:
+For each Check rated FAIL or PARTIAL, suggest 1–2 eval scenarios in the audit report (natural language paragraphs — do not write a JSON file):
 
 | Check | Suggested eval type | What to assert |
 |-------|--------------------|-|
