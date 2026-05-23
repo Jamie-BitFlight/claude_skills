@@ -654,7 +654,7 @@ flowchart TD
 
 **Out-of-scope routing**: A follow-up task file with `## Scope: out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never reaches the recursion gate. This prevents out-of-scope findings from blocking the current implementation cycle.
 
-**complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies `status:verified` label, (2) calls `backlog_resolve(selector, summary="Implementation complete — PR merged, AC verified PASS")` to close the issue and transition to resolved, (3) commits and pushes. This closes the GitHub Issue (or equivalent per backend) without requiring manual follow-up. `/work-backlog-item resolve` remains available as a fallback if `complete-implementation` was interrupted before the resolve step.
+**complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies `status:verified` label, (2) calls `backlog_resolve(selector, summary="Implementation complete — AC verified PASS")` to close the issue and transition to resolved, (3) commits and pushes. This closes the GitHub Issue (or equivalent per backend) without requiring manual follow-up. `/work-backlog-item resolve` remains available as a fallback if `complete-implementation` was interrupted before the resolve step.
 
 **Failure paths**:
 

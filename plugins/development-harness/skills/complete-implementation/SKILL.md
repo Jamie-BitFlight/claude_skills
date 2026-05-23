@@ -249,17 +249,9 @@ Fix the error (check backend credentials and access), then re-run /complete-impl
 
 Stop. Do not proceed to the Final Step commit.
 
-**Step 7 -- Resolve the issue**:
+**Step 7 -- No recursive follow-up handling**:
 
-```text
-mcp__plugin_dh_backlog__backlog_resolve(selector="#{issue_number}", summary="Implementation complete — PR merged, AC verified PASS")
-```
-
-On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
-
-**Step 8 -- No recursive follow-up handling**:
-
-The issue-only path does not produce follow-up task files. Skip directly to "Final Step: Commit and Push Remaining Changes".
+The issue-only path does not produce follow-up task files. Skip directly to "Final Step: Commit and Push Remaining Changes", then proceed to "Resolve the Issue".
 
 ---
 
@@ -872,18 +864,6 @@ Stop. Do not proceed to the Final Step commit.
 
 ---
 
-## Resolve the Issue
-
-Using `{matched_item_title}` from the Apply status:verified Label step above:
-
-```text
-mcp__plugin_dh_backlog__backlog_resolve(selector="{matched_item_title}", summary="Implementation complete — PR merged, AC verified PASS")
-```
-
-On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
-
----
-
 ## Final Step: Commit and Push Remaining Changes
 
 Check for uncommitted changes and commit any remaining modifications in a single commit.
@@ -917,6 +897,20 @@ SendMessage(to="{name}", message={"type": "shutdown_request"})
 
 3. Note: broadcast to `"*"` does not support structured shutdown messages — send individually
    to each named member.
+
+---
+
+## Resolve the Issue
+
+**PQG path (issue-only)**: Use `selector="#{issue_number}"`.
+
+**SAM path (plan-linked)**: Use `selector="{matched_item_title}"` from the Apply status:verified Label step. Skip this step if no backlog item was matched in that step.
+
+```text
+mcp__plugin_dh_backlog__backlog_resolve(selector="<selector>", summary="Implementation complete — AC verified PASS")
+```
+
+On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
 
 ---
 

@@ -16,7 +16,7 @@ Skip the interactive report. Instead, continue directly to implementation:
    Skill(skill: "dh:complete-implementation", args: "{plan_address}")
    ```
 
-3. After completion, proceed to close/resolve path to mark the item done.
+3. `/dh:complete-implementation` calls `backlog_resolve` as its terminal step — the issue is closed automatically.
 
 Do not stop for user input at any point.
 

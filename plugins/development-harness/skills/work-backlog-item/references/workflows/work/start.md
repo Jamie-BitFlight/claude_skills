@@ -55,7 +55,7 @@ flowchart TD
 5. [ ] **Plan** ([plan.md](./plan.md)) — compose feature request and invoke SAM planning (Steps 5.1–5.4; Step 5.5 runs the auto-mode branch: continue to step 6 without stopping)
 6. [ ] **Invoke implement-feature** — `Skill(skill: "dh:implement-feature", args: "{plan_address}")` — do not stop for user input
 7. [ ] **Invoke complete-implementation** — `Skill(skill: "dh:complete-implementation", args: "{plan_address}")` — do not stop for user input
-8. [ ] **Verify issue resolved** — `/dh:complete-implementation` calls `backlog_resolve` as its terminal step. Verify the issue is now closed. If it remains open (e.g., `complete-implementation` was interrupted), call `backlog_resolve` manually (see [post-planning.md](./post-planning.md)).
+8. [ ] **Verify issue resolved** — `/dh:complete-implementation` calls `backlog_resolve` as its terminal step. Verify the issue is now closed. If it remains open (e.g., `complete-implementation` was interrupted), use `/work-backlog-item resolve` as fallback (see [post-planning.md](./post-planning.md)).
 9. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "docs(workflow): update work backlog item instructions"`)
 
 ## Error Routing
