@@ -1378,6 +1378,10 @@ class ArtifactManifest(BaseModel):
     ``backlog_core.artifact_registry``.
     """
 
+    # Intentional mismatch: ArtifactBackend Protocol uses `item_id` as the parameter name;
+    # this internal model field keeps `issue_number` because it is never serialized to an
+    # external format (manifests live in GitHub Issue body markdown, not JSON files) and
+    # renaming would touch 97 call sites across 11 files for zero functional gain.
     issue_number: str | int = Field(
         ...,
         description="Issue identifier this manifest belongs to (int for GitHub/GitLab, str UUID for Linear, str nanoid for beads).",
