@@ -225,13 +225,13 @@ flowchart TD
     TS --> ManifestFound
     Rust --> ManifestFound
     ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python example: python-engineering:python-cli-design-spec)"]
-    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist skill loaded"]
-    Resolve --> Store["Store as {resolved_agent}<br>Load inside dh:task-worker via Skill()"]
-    Store --> Delegate["Dispatch subagent_type='dh:task-worker'<br>Prompt includes: Skill(skill='{resolved_agent}')"]
+    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist profile loaded"]
+    Resolve --> Store["Store as {resolved_agent}<br>profile_load(agent_name='{resolved_agent}') in delegation prompt"]
+    Store --> Delegate["Dispatch subagent_type='dh:task-worker'"]
     FB --> Delegate
 ```
 
-Phase 3 always dispatches `subagent_type="dh:task-worker"`. The resolved specialist from the language manifest is loaded inside task-worker via a `Skill()` call at the top of the delegation prompt — it is never the `subagent_type`. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -382,8 +382,8 @@ Register your deliverable and return:
 
 `{specialist_skill_block}` is built by the orchestrator before dispatch:
 
-- When `{resolved_agent}` is set (manifest found): `"Load your specialist skill before starting: Skill(skill='{resolved_agent}'). This is a BLOCKING prerequisite — complete it before reading any artifacts or designing.\n\n"`
-- When no manifest found (fallback): `""` (empty string — task-worker needs no specialist loading)
+- When `{resolved_agent}` is set (manifest found): `"Load your specialist profile before starting: mcp__plugin_dh_backlog__profile_load(agent_name='{resolved_agent}'). This is a BLOCKING prerequisite — complete it before reading any artifacts or designing.\n\n"`
+- When no manifest found (fallback): `""` (empty string — task-worker executes directly without a specialist profile)
 
 After the agent completes, verify the artifact was registered:
 
