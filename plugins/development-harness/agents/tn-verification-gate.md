@@ -138,8 +138,8 @@ Register the assembled YAML string directly via `artifact_register` with `conten
 
 ```bash
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number={item_id},
-    type="TN-verification",
+    item_id={item_id},
+    artifact_type="TN-verification",
     artifact_id="TN-verification-{slug}",
     content={yaml_string},
     status="complete",

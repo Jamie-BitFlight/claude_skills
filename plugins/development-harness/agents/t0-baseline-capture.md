@@ -121,8 +121,8 @@ Register the assembled YAML content in the backlog item's artifact manifest so i
 
 ```bash
 mcp__plugin_dh_backlog__artifact_register(
-    issue_number={item_id},
-    type="T0-baseline",
+    item_id={item_id},
+    artifact_type="T0-baseline",
     artifact_id="T0-baseline-{slug}",
     content={yaml_string},
     status="complete",

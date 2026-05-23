@@ -123,7 +123,7 @@ Register the verdict as a `codebase-analysis` artifact via MCP. Use `issue_numbe
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
-  issue_number={issue_number},
+  item_id={issue_number},
   artifact_type="codebase-analysis",
   content={verdict_block_json},
   status="complete",
