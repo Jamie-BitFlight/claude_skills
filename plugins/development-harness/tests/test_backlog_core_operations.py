@@ -1473,6 +1473,25 @@ class TestBuildListEntryTypeTopicFields:
         assert items[0]["type"] == ""
         assert items[0]["topic"] == ""
 
+    def test_build_list_entry_preserves_groomed_date_string(self, mocker: MockerFixture) -> None:
+        """_build_list_entry preserves the groomed date string, not coercing it to True.
+
+        Tests: groomed field propagation in _build_list_entry (regression for #1134).
+        How: Create item with groomed="2026-05-24"; call list_items; assert date string preserved.
+        Why: Staleness detection needs the actual date for git log --after= comparisons.
+             Coercing to bool True silently discards the date, breaking drift detection.
+        """
+        item = BacklogItem(title="Groomed Item", section="P1", skip=False, groomed="2026-05-24")
+        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items()
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["groomed"] == "2026-05-24"
+        assert items[0]["groomed"] is not True
+
 
 # ---------------------------------------------------------------------------
 # _build_item_body: full-text body construction

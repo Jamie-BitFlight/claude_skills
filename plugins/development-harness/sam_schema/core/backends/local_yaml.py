@@ -506,15 +506,15 @@ class LocalYamlTaskProvider:
         write_plan(updated_plan, path, force_single=True)
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
-        """Append markdown content to a named section of a task body.
+        """Append markdown content to a named section of a task's context_notes.
 
-        Reads the current ``body`` field, appends the section heading and
-        content, then writes back via ``set_fields``.  This satisfies the
-        Protocol contract that content appears in ``task["body"]``.
+        Reads the current ``context_notes`` field, appends a ``## {section_name}``
+        heading and content, then writes back via ``update_plan_fields``.
 
-        The underlying ``query.update_plan_fields(append_section_name=...)``
-        writes to ``context_notes`` rather than ``body``, so this method
-        performs a read-modify-write on the ``body`` field directly.
+        Note: Content is stored in ``task["context_notes"]``, not ``task["body"]``.
+        The yaml_writer does not support direct writes to the body field.
+        See #1492 for the cross-backend divergence: GitHubTaskProvider writes to
+        ``body``; this backend writes to ``context_notes``.
 
         Args:
             plan_id: Backend-assigned plan identifier.
