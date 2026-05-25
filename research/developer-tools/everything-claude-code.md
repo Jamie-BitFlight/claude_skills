@@ -418,3 +418,4 @@ This repository is the closest peer project to `claude_skills` in the Claude Cod
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [Claude CodePro](./../coding-agents/claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |

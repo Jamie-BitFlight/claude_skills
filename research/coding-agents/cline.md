@@ -284,3 +284,11 @@ For trusted, low-risk operations, users can configure auto-approval rules to red
 - Check pricing changes (Teams tier was free through Q1 2026, then $20/user/month)
 - Watch for MCP marketplace expansions
 - Monitor star growth trajectory (highly active community)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |

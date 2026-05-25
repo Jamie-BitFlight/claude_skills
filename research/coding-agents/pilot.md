@@ -205,3 +205,11 @@ executor:
 - [GitHub API: repos/alekspetrov/pilot](https://api.github.com/repos/alekspetrov/pilot) (accessed 2026-02-19)
 - [GitHub API: releases/latest v1.46.7](https://api.github.com/repos/alekspetrov/pilot/releases/latest) (accessed 2026-02-19)
 - [Business Source License 1.1](https://mariadb.com/bsl11/) (accessed 2026-02-19)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |

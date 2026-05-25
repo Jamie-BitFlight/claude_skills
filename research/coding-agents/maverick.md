@@ -477,6 +477,7 @@ This means cloud infrastructure features (remote workers, AMI building, instance
 | [Claude Code Templates](../skill-generation-tools/claude-code-templates.md) | skill-generation-tools | 100+ ready-to-use agents, skills, and MCPs with browser installer; shares skill templating and community marketplace patterns |
 | [SkillsMP](../skill-generation-tools/skillsmp.md) | skill-generation-tools | Open marketplace for 66,500+ AI agent skills with SKILL.md standard; represents decentralized skill distribution alternative to Maverick's integrated approach |
 | [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | Quality enforcement layer with hooks pipeline, /spec workflow, persistent memory, and smart model routing; direct parallel to Maverick's multi-mode workflow architecture |
+| [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
 
 ---
 
