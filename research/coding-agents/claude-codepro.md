@@ -296,12 +296,12 @@ SOURCE: pyproject.toml (accessed 2026-05-25), .devcontainer/devcontainer.json (a
 
 - [Claude CodePro Repository](https://github.com/maxritter/claude-codepro) — GitHub repository, accessed 2026-05-25
 - [Claude CodePro Website](https://claude-code.pro) — Official project website, accessed 2026-05-25
-- [README.md](https://github.com/lcatlett/claude-codepro/blob/main/README.md) — Project documentation, accessed 2026-05-25
-- [pyproject.toml](https://github.com/lcatlett/claude-codepro/blob/main/pyproject.toml) — Python project metadata and dependencies, accessed 2026-05-25
-- [.devcontainer/devcontainer.json](https://github.com/lcatlett/claude-codepro/blob/main/.devcontainer/devcontainer.json) — Dev Container specification, accessed 2026-05-25
-- [install.sh](https://github.com/lcatlett/claude-codepro/blob/main/install.sh) — Installation script, accessed 2026-05-25
-- [.releaserc.json](https://github.com/lcatlett/claude-codepro/blob/main/.releaserc.json) — Semantic Release configuration, accessed 2026-05-25
-- [LICENSE](https://github.com/lcatlett/claude-codepro/blob/main/LICENSE) — GNU AGPL v3 license, accessed 2026-05-25
+- [README.md](https://github.com/maxritter/claude-codepro/blob/main/README.md) — Project documentation, accessed 2026-05-25
+- [pyproject.toml](https://github.com/maxritter/claude-codepro/blob/main/pyproject.toml) — Python project metadata and dependencies, accessed 2026-05-25
+- [.devcontainer/devcontainer.json](https://github.com/maxritter/claude-codepro/blob/main/.devcontainer/devcontainer.json) — Dev Container specification, accessed 2026-05-25
+- [install.sh](https://github.com/maxritter/claude-codepro/blob/main/install.sh) — Installation script, accessed 2026-05-25
+- [.releaserc.json](https://github.com/maxritter/claude-codepro/blob/main/.releaserc.json) — Semantic Release configuration, accessed 2026-05-25
+- [LICENSE](https://github.com/maxritter/claude-codepro/blob/main/LICENSE) — GNU AGPL v3 license, accessed 2026-05-25
 
 ---
 
