@@ -794,6 +794,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [abtop.md](./developer-tools/abtop.md) | abtop is a real-time terminal user interface monitor for AI coding agents, inspired by btop (a system resource monitor). It displays live metrics for Claude Code and Codex CLI sessions, including token consumption, context window utilization, rate limit quotas, running child processes, and orphaned ports. The tool read | 2026-04-25 |
 | [sigmap.md](./developer-tools/sigmap.md) | Zero-dependency AI context engine extracting codebase signatures for ranked file retrieval | 2026-05-08 |
 | [tolaria.md](./developer-tools/tolaria.md) | Tolaria is a desktop application for macOS and Linux designed for managing markdown-based knowledge bases and second brains. Built with Tauri (Rust backend), React, and TypeScript, it provides a four-panel interface for organizing, searching, and collaborating on personal notes, company documentation, and AI agent cont | 2026-04-26 |
+| [claude-codepro.md](./developer-tools/claude-codepro.md) | Claude CodePro — containerized Claude Code dev environment (lcatlett fork): Alpine Linux container, Node 22, Python 3.12, 5 MCP servers, modular rules, hooks, and spec-driven slash commands (/setup, /plan, /implement, /verify) (AGPL-3.0) | 2026-05-25 |
 
 **Key Topics**:
 
@@ -959,6 +960,8 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [code-simplifier.md](./coding-agents/code-simplifier.md) | The Code Simplifier is an official Anthropic Claude Code plugin that provides an autonomous agent (powered by Claude Opus) for simplifying and refining code for clarity, consistency, and maintainability. It operates proactively after code is written or modified — without requiring explicit user requests — applying proj | 2026-02-23 |
 | [pi-mono.md](./coding-agents/pi-mono.md) | A TypeScript monorepo providing a minimal, extensible coding agent CLI, unified multi-provider LLM API, TUI and web UI libraries, Slack bot, and vLLM pod management. Designed for workflow adaptability via extensions, skills, and prompt templates rather than opinionated built-in features. | 2026-02-26 |
 | [soulforge.md](./coding-agents/soulforge.md) | SoulForge is a graph-powered multi-agent coding assistant that builds a live SQLite-backed dependency graph of entire codebases on startup. Instead of performing naive file reads and grep operations like traditional AI coding tools, SoulForge indexes every file, symbol, import, and export with PageRank importance ranki | 2026-04-05 |
+| [pilot-shell.md](./coding-agents/pilot-shell.md) | Pilot Shell v9.0.5 — commercial spec-driven development framework for Claude Code: `/spec` TDD workflow, `/fix` bugfix automation, `pilot bot` 24/7 background agent, RTK compression (60–90% token reduction), 7 preconfigured MCP servers, Solo/Team/Enterprise tiers (source-available) | 2026-05-25 |
+| [claude-codepro.md](./coding-agents/claude-codepro.md) | Claude CodePro v3.3.8 (maxritter) — dev environment framework for Claude Code: Alpine Linux container, Python 3.12, 5 MCP servers (Claude Mem, Claude Context, Tavily, Ref, MCP Lazy Loading), modular rules management, two-phase install, AGPL-3.0 | 2026-05-25 |
 
 **Key Topics**:
 
@@ -1703,6 +1706,7 @@ Comprehensive collections of algorithm implementations, code examples, and educa
 | [2026-05-10-gh-skill-improvements.md](./insights/2026-05-10-gh-skill-improvements.md) | `setup_gh.py` (lines 1-770) performs platform detection, binary download, SHA256 verification, and PATH installation, but never inspects git remote configuration. There is zero occurrence of `remote`, `proxy`, `127.0.0.1`, or `git config` in the script (verified via grep on 2026-05-10). | 2026-05-12 |
 | [2026-05-10-gh-skill-utilization.md](./insights/2026-05-10-gh-skill-utilization.md) | The `create-milestone` skill currently delegates milestone creation to the `github_project_setup.py` script at line 87, invoking a custom Python wrapper around GitHub's REST API. Reading the research entry (lines 174–179, "No native milestone subcommand"), the skill has no dedicated `gh milestone` subcommand, so it use | 2026-05-12 |
 | [2026-05-10-octogent-improvements.md](./insights/2026-05-10-octogent-improvements.md) | The swarm patterns in `.claude/skills/swarm-patterns/SKILL.md` Pattern 3 (Self-Organizing) require the orchestrator to write per-task `TaskCreate({ subject, description, activeForm })` calls before spawning workers. There is no mechanism to read a markdown file containing checkbox items (`- [ ] description`) and auto-g | 2026-05-12 |
+| [2026-05-25-pilot-shell-improvements.md](./insights/2026-05-25-pilot-shell-improvements.md) | **Research entry**: ./research/coding-agents/pilot-shell.md **Generated**: 2026-05-25 **Patterns assessed**: 9 **Backlog items created**: 4 (issues recorded inline below) **Deferred (low confidence)**: 3 **Skipped (al... | 2026-05-25 |
 
 ### Installer Tools
 
