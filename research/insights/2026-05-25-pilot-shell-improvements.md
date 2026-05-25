@@ -3,7 +3,7 @@
 **Research entry**: ./research/coding-agents/pilot-shell.md
 **Generated**: 2026-05-25
 **Patterns assessed**: 9
-**Backlog items created**: 4 (issues recorded inline below)
+**Backlog items created**: 4 (issues: #2444, #2445, #2447, #2448)
 **Deferred (low confidence)**: 3
 **Skipped (already covered or tracked)**: 2
 
@@ -15,7 +15,7 @@
 **Local system**: /home/user/claude_skills/plugins/development-harness/skills/add-new-feature/SKILL.md and implement-feature/SKILL.md
 **Confidence**: High
 **Impact**: High
-**Backlog**: #issue-1 (created — see issue numbers section)
+**Backlog**: #2444 created
 
 ### Current state
 
@@ -37,7 +37,7 @@ Field `artifact_type="plan-approval"` is listed in development-harness/CLAUDE.md
 **Local system**: /home/user/claude_skills/.claude/rules/fix-delegation-discipline.md and /home/user/claude_skills/plugins/development-harness/skills/work-backlog-item/SKILL.md (`--quick` mode)
 **Confidence**: High
 **Impact**: High
-**Backlog**: #issue-2
+**Backlog**: #2445 created
 
 ### Current state
 
@@ -67,7 +67,7 @@ File `plugins/development-harness/skills/fix/SKILL.md` exists with frontmatter `
 **Local system**: /home/user/claude_skills/plugins/development-harness/skills/impact-measurement/SKILL.md
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #issue-3
+**Backlog**: #2447 created
 
 ### Current state
 
@@ -95,7 +95,7 @@ File `plugins/development-harness/skills/benchmark/SKILL.md` exists. Running it 
 **Local system**: /home/user/claude_skills/plugins/development-harness/skills/start-task/SKILL.md (PostToolUse hook) and /home/user/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: #issue-4
+**Backlog**: #2448 created
 
 ### Current state
 
