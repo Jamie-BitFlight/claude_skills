@@ -68,7 +68,7 @@ Unified feature and bugfix workflow with planning, implementation, and verificat
 - Strict TDD: RED → GREEN → REFACTOR for each task
 - Quality hooks auto-lint, format, type-check on every edit
 - Full test suite runs after each task
-- No manual code edits — all changes go through claude Code's Edit tool
+- No manual code edits — all changes go through Claude Code's Edit tool
 
 **Verification phase**:
 - Full test suite + actual program execution

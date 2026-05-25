@@ -27,7 +27,7 @@ A new skill `/dh:approve-plan` (or extension of `add-new-feature/SKILL.md`) writ
 
 ### Measurable signal
 
-Field `artifact_type="plan-approval"` is listed in development-harness/CLAUDE.md under "Artifact types". Running `mcp__plugin_dh_backlog__artifact_get(item_id=N, artifact_type="plan-approval")` returns a JSON object with required keys `status`, `annotations`. `implement-feature/SKILL.md` Progress Loop Step 0 (new step inserted before Step 1) refuses to proceed when `status != "approved"`.
+Artifact ID `"plan-approval"` is registered under development-harness artifact conventions. Running `mcp__plugin_dh_backlog__artifact_get(item_id=N, artifact_id="plan-approval")` returns a JSON object with required keys `status`, `annotations`. `implement-feature/SKILL.md` Progress Loop Step 0 (new step inserted before Step 1) refuses to proceed when `status != "approved"`.
 
 ---
 
@@ -57,7 +57,7 @@ The bail-out condition is a Mermaid decision diamond in the SKILL.md, and the ar
 
 ### Measurable signal
 
-File `plugins/development-harness/skills/fix/SKILL.md` exists with frontmatter `name: fix`. Running `mcp__plugin_dh_backlog__artifact_list(item_id=N)` on a bail-out item returns an entry with `type: "fix-escalation"`. `complete-implementation/SKILL.md` recognizes a `fix-escalation` artifact and stops with status referencing `/dh:add-new-feature` as the next action.
+File `plugins/development-harness/skills/fix/SKILL.md` exists with frontmatter `name: fix`. Running `mcp__plugin_dh_backlog__artifact_list(item_id=N)` on a bail-out item returns an entry with `artifact_id: "fix-escalation"`. `complete-implementation/SKILL.md` recognizes a `fix-escalation` artifact and stops with status referencing `/dh:add-new-feature` as the next action.
 
 ---
 

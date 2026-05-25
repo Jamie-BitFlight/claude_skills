@@ -43,7 +43,7 @@ SOURCE: README.md "📦 What's Inside" section (accessed 2026-05-25)
 ## Key Statistics
 
 - **Version**: 3.3.8
-- **Python Requirement**: Python 3.12–3.12 (exact match)
+- **Python Requirement**: Python 3.12.x only (>=3.12,<3.13)
 - **Installer Line Count**: ~2,939 lines of Python across core modules
 - **Key Dependencies**: rich (>=14.0.0), httpx (>=0.28.1), typer (>=0.21.0), platformdirs (>=4.3.6), pyinstaller (>=6.17.0)
 - **Development Node Version**: Node 22 (explicitly specified as "Claude Context is not compatible with later versions")
@@ -280,7 +280,7 @@ The MCP Lazy Loading mechanism addresses a fundamental constraint in Claude Code
 
 - **IDE Extension Dependency**: The Dev Containers VS Code extension is mandatory. This requirement excludes developers using IDEs without Dev Containers support (e.g., WebStorm, IntelliJ IDEA without VSCode integration).
 
-- **Python Version Precision**: The pyproject.toml specifies Python `>=3.12,<3.13` — an exact minor version lock. This is unusually strict and may prevent use in environments with Python 3.12.x patch variations or newer 3.13+ releases.
+- **Python Version Precision**: The pyproject.toml specifies Python `>=3.12,<3.13` — all 3.12.x patch releases are supported, but Python 3.13 and newer are excluded. This is unusually strict and prevents use with any Python 3.13+ release.
 
 - **Network Dependency During Installation**: The installer downloads files from GitHub during setup. Installations in air-gapped or low-bandwidth environments will fail. Network failures during download do not persist partial state — downloads must succeed completely or installation restarts.
 
@@ -329,7 +329,7 @@ SOURCE: pyproject.toml (accessed 2026-05-25), .devcontainer/devcontainer.json (a
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Pilot Shell](./pilot.md) | coding-agents | autonomous development pipeline extending Claude Code with orchestration and execution |
+| [Pilot Shell](./pilot-shell.md) | coding-agents | spec-driven TDD framework for Claude Code with autonomous development pipeline and RTK compression |
 | [Maverick](./maverick.md) | coding-agents | modular rules and standards integration with Claude Code context system |
 | [Claude Code Templates](./claude-code-templates.md) | coding-agents | project scaffolding and starter configurations for Claude Code workflows |
 | [Cline](./cline.md) | coding-agents | autonomous agent architecture with dev environment integration |

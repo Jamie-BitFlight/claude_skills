@@ -83,7 +83,7 @@ SOURCE: README.md § "💡 Modular Rules System", `.claude/skills/` directory li
 
 ### Enhanced Context and Capabilities via MCP Servers
 
-Three MCP servers extend Claude Code's capabilities:
+Three MCP servers are configured in the lcatlett fork's `.mcp.json` (the upstream maxritter project documents five servers including Claude Mem and MCP Lazy Loading, which are not present in this fork):
 
 - **claude-context** - Semantic search across codebase via `@zilliz/claude-context-mcp@latest`
 - **tavily** - Web search capabilities via `tavily-mcp@latest`
@@ -91,7 +91,7 @@ Three MCP servers extend Claude Code's capabilities:
 
 Configuration: `.mcp.json` declares servers; Claude Code loads them automatically on `/mcp` command.
 
-SOURCE: .mcp.json file contents (accessed 2026-05-25), README.md § "🔌 Enhanced Context and Capabilities via MCP Servers"
+SOURCE: .mcp.json file contents (accessed 2026-05-25) — lcatlett fork; README.md § "🔌 Enhanced Context and Capabilities via MCP Servers" (upstream maxritter, describes 5 servers)
 
 ### Intelligent Hooks for Quality, Standards, and Context
 
@@ -110,7 +110,7 @@ SOURCE: README.md § "🛠️ Intelligent Hooks for Quality, Standards and Conte
 Complete setup via automated script with containerization:
 
 - **LSP Servers** - Python and TypeScript language servers for extended IDE code intelligence
-- **Dev Container Required** - Isolated Linux environment (Ubuntu-based) with all tools pre-configured
+- **Dev Container Required** - Isolated Linux environment (Alpine-based) with all tools pre-configured
 - **Automated Setup Script** - Single command installs Docker image, configures IDE extensions, injects rules, initializes MCP servers
 - **Shell Integration** - Auto-configures bash, fish, and zsh with `ccp` alias for launching Claude Code
 - **IDE Compatible** - Works with VS Code, Cursor, Windsurf, and Antigravity (any IDE supporting Claude Code extension)
