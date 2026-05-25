@@ -1490,7 +1490,7 @@ class TestBuildListEntryTypeTopicFields:
         items = cast("list[dict[str, str | bool]]", result["items"])
         assert len(items) == 1
         assert items[0]["groomed"] == "2026-05-24"
-        assert items[0]["groomed"] is not True
+        assert isinstance(items[0]["groomed"], str)
 
 
 # ---------------------------------------------------------------------------

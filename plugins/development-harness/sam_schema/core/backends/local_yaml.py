@@ -508,8 +508,9 @@ class LocalYamlTaskProvider:
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append markdown content to a named section of a task's context_notes.
 
-        Reads the current ``context_notes`` field, appends a ``## {section_name}``
-        heading and content, then writes back via ``update_plan_fields``.
+        Reads the current ``context_notes`` field. If the ``## {section_name}``
+        heading is absent, prepends it before the content; if the heading already
+        exists, appends only the content. Writes back via ``update_plan_fields``.
 
         Note: Content is stored in ``task["context_notes"]``, not ``task["body"]``.
         The yaml_writer does not support direct writes to the body field.
