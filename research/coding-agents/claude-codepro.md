@@ -325,6 +325,21 @@ SOURCE: pyproject.toml (accessed 2026-05-25), .devcontainer/devcontainer.json (a
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Pilot Shell](./pilot.md) | coding-agents | autonomous development pipeline extending Claude Code with orchestration and execution |
+| [Maverick](./maverick.md) | coding-agents | modular rules and standards integration with Claude Code context system |
+| [Claude Code Templates](./claude-code-templates.md) | coding-agents | project scaffolding and starter configurations for Claude Code workflows |
+| [Cline](./cline.md) | coding-agents | autonomous agent architecture with dev environment integration |
+| [OpenHands](../agent-frameworks/openhands.md) | agent-frameworks | agent-driven environment setup and sandboxing patterns |
+| [OpenSpec MCP](../mcp-ecosystem/openspec-mcp.md) | mcp-ecosystem | specification-driven MCP server integration approaches |
+| [Everything Claude Code](../developer-tools/everything-claude-code.md) | developer-tools | comprehensive Claude Code resource and capability reference |
+| [Research Agent Patterns](../research-agent-patterns/agent-execution-and-environment.md) | research-agent-patterns | agent environment isolation and context management strategies |
+
+---
+
 ## Research Metadata
 
 **Entry Type**: coding-agent | dev-tool
