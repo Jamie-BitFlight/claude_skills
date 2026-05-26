@@ -21,7 +21,12 @@ From the JSON response build the working item:
 | `milestone` | `milestone` |
 | `plan` | `plan` field, or search `body` for `**Plan**:` line |
 
-The `backlog_view` MCP tool merges local cache with live GitHub issue data. All fields needed for subsequent steps are available in the response — do not read local files directly.
+The `backlog_view` MCP tool operates in two modes depending on GitHub reachability (architect spec §5.2, ADR-002):
+
+- **Connected**: sections and `sections_index` are derived from the live GitHub issue body (takes priority over local cache)
+- **Offline**: sections and `sections_index` are derived from local YAML cache; the response `warnings` field contains `"backend unreachable"` indicating potentially stale data
+
+All fields needed for subsequent steps are available in the response — do not read local files directly.
 
 Note: The issue-first path skips Steps 2.1–2.3 because the item is resolved via GitHub Issue
 number — it already has an issue (skips 2.2–2.3) and the `backlog_view` response includes

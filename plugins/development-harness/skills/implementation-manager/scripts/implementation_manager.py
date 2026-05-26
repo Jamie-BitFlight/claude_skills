@@ -124,7 +124,7 @@ _YAML_STATUS_TO_ENUM_REVERSE: dict[TaskStatus, str] = {
 
 # Statuses that satisfy a dependency requirement.  FAILED is excluded: a failed
 # parent must not unblock its downstream tasks.
-_SUCCESSFUL_STATUSES: frozenset[TaskStatus] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED})
+_SUCCESSFUL_STATUSES: frozenset[TaskStatus] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED, TaskStatus.SKIPPED})
 
 # Statuses that end a task's lifecycle (includes failure).  Used for plan-done checks.
 _TERMINAL_STATUSES: frozenset[TaskStatus] = frozenset({

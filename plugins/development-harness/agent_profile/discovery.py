@@ -18,6 +18,8 @@ lookup syntax used by skills also works for agents.
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import os
 import re
@@ -195,6 +197,103 @@ def _resolve_agents_dir(plugin_dir: Path) -> Path | None:
     return _resolve_plugin_subdir(plugin_dir, "agents")
 
 
+@functools.cache
+def _build_manifest_name_index(plugins_root: Path) -> dict[str, Path]:
+    """Scan *plugins_root* for ``.claude-plugin/plugin.json`` manifests and return a name→directory mapping.
+
+    Handles both repo layout (manifest directly under plugin dir) and cache layout
+    (manifest under a semver-named version subdir — picks the highest version).
+    Malformed or unreadable manifests are skipped with a warning so that sibling
+    plugins remain resolvable.
+
+    Args:
+        plugins_root: Absolute path to the directory whose children are individual
+            plugin directories (e.g. ``plugins/``).
+
+    Returns:
+        ``dict`` mapping manifest ``"name"`` field value → absolute plugin directory
+        ``Path`` (not the versioned subdir).
+
+    Raises:
+        ValueError: When two plugin directories declare the same manifest name,
+            listing both conflicting paths in the message.
+    """
+    index: dict[str, Path] = {}
+    if not plugins_root.is_dir():
+        return index
+
+    for plugin_dir in sorted(plugins_root.iterdir()):
+        if not plugin_dir.is_dir() or _looks_like_semver(plugin_dir.name):
+            continue
+
+        # Repo layout: <plugin-dir>/.claude-plugin/plugin.json
+        manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
+        if not manifest_path.is_file():
+            # Cache layout: <plugin-dir>/<semver>/.claude-plugin/plugin.json
+            version_dirs = [d for d in plugin_dir.iterdir() if d.is_dir() and _looks_like_semver(d.name)]
+            if version_dirs:
+                best = max(version_dirs, key=lambda p: tuple(int(x) for x in p.name.split(".")))
+                manifest_path = best / ".claude-plugin" / "plugin.json"
+
+        if not manifest_path.is_file():
+            continue
+
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            name: str = data["name"]
+        except (json.JSONDecodeError, KeyError, OSError) as exc:
+            logger.warning("Skipping malformed manifest %s: %s", manifest_path, exc)
+            continue
+
+        if name in index:
+            raise ValueError(
+                f"Duplicate plugin manifest name '{name}' declared by two plugins: {index[name]} and {plugin_dir}"
+            )
+        index[name] = plugin_dir
+
+    return index
+
+
+def _resolve_plugin_dir_by_manifest_name(plugin_name: str, plugins_root: Path) -> Path | None:
+    """Return the plugin directory for *plugin_name* by scanning manifests, or ``None``.
+
+    Args:
+        plugin_name: The ``"name"`` field value from a ``.claude-plugin/plugin.json``
+            manifest (e.g. ``"dh"``).
+        plugins_root: Absolute path to the directory whose children are individual
+            plugin directories.
+
+    Returns:
+        Absolute :class:`~pathlib.Path` to the matching plugin directory, or ``None``
+        if no manifest declares *plugin_name*.
+    """
+    index = _build_manifest_name_index(plugins_root)
+    return index.get(plugin_name)
+
+
+def _get_manifest_name_for_dir(plugin_dir: Path, plugins_root: Path) -> str:
+    """Return the manifest name for *plugin_dir*, falling back to directory name.
+
+    Calls :func:`_build_manifest_name_index` (cached) and performs a reverse
+    lookup — given a resolved directory, return the manifest ``"name"`` value
+    if one exists.
+
+    Args:
+        plugin_dir: Absolute path to the resolved plugin directory.
+        plugins_root: Absolute path to the plugins root (used for cache key).
+
+    Returns:
+        Manifest ``"name"`` field if *plugin_dir* appears in the index; otherwise
+        ``plugin_dir.name`` (the directory name as fallback).
+    """
+    index = _build_manifest_name_index(plugins_root)
+    # Reverse lookup: find the manifest name whose value is plugin_dir.
+    for manifest_name, dir_path in index.items():
+        if dir_path == plugin_dir:
+            return manifest_name
+    return plugin_dir.name
+
+
 def _agent_name_from_path(agent_path: Path, agents_dir: Path) -> str:
     """Derive the colon-separated agent name from its path relative to agents_dir.
 
@@ -251,7 +350,9 @@ def scan_all_agents(plugins_root: Path | None = None) -> list[AgentEntry]:
         if agents_dir is None:
             continue
 
-        plugin_name = plugin_dir.name
+        # Use manifest name when .claude-plugin/plugin.json declares one; fall back
+        # to directory name so that plugins without a manifest continue to work.
+        plugin_name = _get_manifest_name_for_dir(plugin_dir, plugins_root)
 
         for agent_file in sorted(agents_dir.rglob("*.md")):
             if not agent_file.is_file():
@@ -325,9 +426,22 @@ def _find_plugin_qualified(agent_name: str, plugins_root: Path) -> AgentEntry:
         FileNotFoundError: When the expected file does not exist.
     """
     plugin_part, _, rest = agent_name.partition(":")
-    plugin_dir = plugins_root / plugin_part
-    agents_dir = _resolve_agents_dir(plugin_dir)
 
+    # Fast path: try treating plugin_part as a filesystem directory name.
+    candidate_dir = plugins_root / plugin_part
+    if candidate_dir.is_dir():
+        plugin_dir = candidate_dir
+    else:
+        # Manifest fallback: resolve plugin_part via .claude-plugin/plugin.json name fields.
+        resolved = _resolve_plugin_dir_by_manifest_name(plugin_part, plugins_root)
+        if resolved is None:
+            raise FileNotFoundError(
+                f"No plugin named '{plugin_part}' (checked directory names and "
+                f".claude-plugin/plugin.json manifests) in {plugins_root}"
+            )
+        plugin_dir = resolved
+
+    agents_dir = _resolve_agents_dir(plugin_dir)
     if agents_dir is None:
         raise FileNotFoundError(f"Agent '{agent_name}' not found: no agents/ directory under {plugin_dir}")
 
@@ -339,7 +453,11 @@ def _find_plugin_qualified(agent_name: str, plugins_root: Path) -> AgentEntry:
         raise FileNotFoundError(f"Agent '{agent_name}' not found: expected file at {agent_file}")
 
     name = _agent_name_from_path(agent_file, agents_dir)
-    return AgentEntry(name=name, plugin=plugin_part, path=agent_file)
+    # Normalise plugin field to manifest name (Option A policy).  When the caller
+    # used the directory name as the qualifier, the manifest name takes precedence so
+    # that AgentEntry.plugin is consistent across find_agent() and scan_all_agents().
+    normalised_plugin = _get_manifest_name_for_dir(plugin_dir, plugins_root)
+    return AgentEntry(name=name, plugin=normalised_plugin, path=agent_file)
 
 
 def _find_bare(agent_name: str, plugins_root: Path) -> AgentEntry:

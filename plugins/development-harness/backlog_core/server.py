@@ -76,16 +76,16 @@ _enc: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
 _VIEW_BODY_CHARS_THRESHOLD = _VIEW_TOKEN_BUDGET * 4
 
 
-def _token_count(obj: object) -> int:
-    """Count cl100k_base tokens in the JSON serialization of *obj*.
+def _token_count(serialised: str) -> int:
+    """Count cl100k_base tokens in an already-serialized JSON string.
 
     Args:
-        obj: Any JSON-serializable object.
+        serialised: A JSON string produced by json.dumps.
 
     Returns:
         Token count as an integer.
     """
-    return len(_enc.encode(_json.dumps(obj)))
+    return len(_enc.encode(serialised))
 
 
 # Fields searched by default when no field-specific prefix is given.
@@ -910,7 +910,7 @@ def _compute_match_tokens(item: dict[str, object]) -> int:
     # Serialize the match output (header + all match text lines) and count tokens.
     # We use json.dumps on the relevant keys rather than subscript access to stay
     # type-safe: item is dict[str, object] so individual values are object.
-    return _token_count({"h": item.get("match_header"), "m": item.get("matches")})
+    return _token_count(_json.dumps({"h": item.get("match_header"), "m": item.get("matches")}))
 
 
 def _paginate_match_items(
@@ -1568,7 +1568,7 @@ async def backlog_list(
         candidate = all_items[offset:]
         effective_limit = len(candidate)
         while effective_limit > 1:
-            token_count = _token_count(candidate[:effective_limit])
+            token_count = _token_count(_json.dumps(candidate[:effective_limit]))
             if token_count <= _LIST_TOKEN_BUDGET:
                 break
             effective_limit = max(1, effective_limit // 2)
@@ -1849,25 +1849,24 @@ async def backlog_view(
         if not summary:
             # Primitive 3: filter to named sections when requested.
             if sections is not None:
-                return _filter_view_sections(full_response, sections)
-            # Auto-compact: when the full response exceeds the token budget and the
-            # caller has not narrowed the request (no sections/section filter), return
-            # a compact section-directory form so the caller can request only what it
-            # needs.  Callers that have already narrowed via sections= or section= get
-            # the filtered result unchanged — it is their responsibility to paginate
-            # further if needed.
-            if section is None:
-                # Heuristic pre-check: if body alone exceeds the chars threshold the
-                # full response is almost certainly over budget — skip serialisation.
-                # The precise token count is still computed for borderline cases where
-                # the body is small but other fields push the total over the limit.
-                body_chars = len(result.body)
-                if body_chars > _VIEW_BODY_CHARS_THRESHOLD:
-                    serialised = _json.dumps(full_response)
-                    return _build_over_budget_view(result, len(serialised), selector)
+                full_response = _filter_view_sections(full_response, sections)
+            # Auto-compact: when the response exceeds the token budget return a compact
+            # section-directory form so the caller can request only what it needs.
+            # This check runs unconditionally for all summary=False calls — the caller's
+            # sections= or section= filter does NOT bypass enforcement.  The contract is:
+            # agents must never receive a response that overflows their context; the tool
+            # is the correct enforcement point.
+            # Heuristic pre-check: if body alone exceeds the chars threshold the full
+            # response is almost certainly over budget — skip serialisation.  The precise
+            # token count is still computed for borderline cases where the body is small
+            # but other fields push the total over the limit.
+            body_chars = len(result.body)
+            if body_chars > _VIEW_BODY_CHARS_THRESHOLD:
                 serialised = _json.dumps(full_response)
-                if _token_count(serialised) > _VIEW_TOKEN_BUDGET:
-                    return _build_over_budget_view(result, len(serialised), selector)
+                return _build_over_budget_view(result, len(serialised), selector)
+            serialised = _json.dumps(full_response)
+            if _token_count(serialised) > _VIEW_TOKEN_BUDGET:
+                return _build_over_budget_view(result, len(serialised), selector)
             return full_response
         return _build_compact_manifest(result, full_response, selector)
     except BacklogError as e:

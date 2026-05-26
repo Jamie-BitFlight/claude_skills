@@ -101,7 +101,7 @@ def test_get_ready_tasks_deferred_dep_satisfies_dependency() -> None:
     assert [t.id for t in ready] == ["T2"]
 
 
-def test_get_ready_tasks_skipped_dep_does_not_satisfy_dependency() -> None:
+def test_get_ready_tasks_skipped_dep_satisfies_dependency() -> None:
     # Arrange
     tasks = [make_task("T1", status=TaskStatus.SKIPPED), make_task("T2", dependencies=["T1"])]
     graph = DependencyGraph(tasks)
@@ -109,8 +109,8 @@ def test_get_ready_tasks_skipped_dep_does_not_satisfy_dependency() -> None:
     # Act
     ready = graph.get_ready_tasks()
 
-    # Assert — skipped is terminal but not successful for dependency dispatch
-    assert ready == []
+    # Assert — skipped is terminal and satisfies dependency, so T2 is ready
+    assert [t.id for t in ready] == ["T2"]
 
 
 def test_get_ready_tasks_in_progress_dep_does_not_satisfy() -> None:

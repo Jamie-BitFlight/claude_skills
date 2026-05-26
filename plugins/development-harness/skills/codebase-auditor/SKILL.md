@@ -17,6 +17,23 @@ Audit target received from orchestrator:
 
 $ARGUMENTS
 
+## Plugin Context Check
+
+Before running any sub-mode, check whether the target path is inside a plugin directory.
+
+If the target path contains `plugins/` as a path component — apply the zip-and-move test to every design decision in this audit:
+
+> If this plugin directory were zipped, moved to a new machine, and unzipped at an arbitrary path — would the change still work?
+
+Read `plugins/development-harness/docs/plugin-deployment-model.md` for the full gotchas and constraints. Key points:
+
+- Plugin scripts cannot reach outside their bundle after installation — no `.claude/utilities/`, no sibling plugins, no repo root paths
+- Any `sys.path.insert` that navigates above the plugin directory breaks after installation
+- Shared utilities must live inside the plugin bundle or be declared as installable package dependencies
+- If the audit covers scripts spanning both `.claude/` and `plugins/`, flag the cross-boundary constraint explicitly in findings
+
+Record the result: `plugin-context: YES | NO` at the top of your findings output.
+
 ## Tool Discovery
 
 Before running any sub-mode, identify the best available tools for code exploration. Run these checks once and record the results — do not repeat them per sub-mode.

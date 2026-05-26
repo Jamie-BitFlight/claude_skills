@@ -2328,6 +2328,36 @@ def _section_display_title(key: str, groomed_date: str = "") -> str:
     return get_config().backend.section_display_title(key, groomed_date)
 
 
+def _build_sections_index_from_body(body: str) -> str:
+    r"""Build a ``## Sections`` index block from a raw body string.
+
+    Produces the same format as :func:`_render_section_index` but derives
+    section data from the live body string rather than the local YAML cache.
+    Used when *result.body* is populated from GitHub so that live data is
+    preferred over the local cache, maintaining cache coherence under concurrent
+    groom writes.
+
+    Returns empty string when *body* is empty or contains no ``### `` headers.
+
+    Args:
+        body: Full issue/item body text.
+
+    Returns:
+        Index block string ending with ``"\\n"`` or ``""`` when no sections.
+    """
+    if not body:
+        return ""
+    sections = _build_sections_compact(body)
+    if not sections:
+        return ""
+    lines: list[str] = ["## Sections"]
+    for idx, sec in enumerate(sections):
+        name = str(sec.get("name", ""))
+        count = int(sec.get("num_entries", 0))
+        lines.append(f"[{idx}] {name} ({count} entries)")
+    return "\n".join(lines) + "\n"
+
+
 def _render_section_index(item: BacklogItem) -> str:
     r"""Render a ``## Sections`` index block listing all sections with counts.
 
@@ -2710,10 +2740,10 @@ def _assemble_view_content(
         if body:
             result.sections = _build_sections_metadata(body, show, since)
             # Prepend section index so agents see it regardless of body source.
-            if item and item.sections:
-                index = _render_section_index(item)
-                if index:
-                    result.body = index + "\n" + body
+            # Prefer live body data over local YAML cache for cache coherence.
+            index = _build_sections_index_from_body(body)
+            if index:
+                result.body = index + "\n" + body
         elif item and item.sections:
             _populate_yaml_item_content(result, item, section)
             body = result.body
@@ -2736,7 +2766,12 @@ def _assemble_view_content(
             _populate_yaml_item_compact(result, item)
         # Always include section index in summary mode so agents know what sections
         # exist on first access, without needing a second round-trip.
-        if item and item.sections:
+        # Prefer live body data over local YAML cache for cache coherence.
+        if body:
+            index = _build_sections_index_from_body(body)
+            if index:
+                result.sections_index = index
+        elif item and item.sections:
             index = _render_section_index(item)
             if index:
                 result.sections_index = index
@@ -2796,8 +2831,11 @@ def view_item(
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
     if issue_num:
-        if not view_enrich_from_github(result, issue_num, repo) and not item:
-            raise ItemNotFoundError(selector)
+        enriched = view_enrich_from_github(result, issue_num, repo)
+        if not enriched:
+            if not item:
+                raise ItemNotFoundError(selector)
+            out.warnings.append("backend unreachable — sections_index reflects local cache, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to local YAML frontmatter, so preserve the date string.
         if item:
@@ -4090,7 +4128,7 @@ def update_sam_task_status(
     return {"updated": updated, "issue_number": issue_number, "new_status": new_status, **out.to_dict()}
 
 
-_SAM_SUCCESSFUL_STATUSES: frozenset[str] = frozenset({"complete", "deferred", "closed", "done"})
+_SAM_SUCCESSFUL_STATUSES: frozenset[str] = frozenset({"complete", "deferred", "closed", "done", "skipped"})
 
 
 def _extract_feature_slug(tasks: list[dict[str, object]]) -> str:

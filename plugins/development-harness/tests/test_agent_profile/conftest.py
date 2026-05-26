@@ -6,11 +6,13 @@ No fixture accesses the real plugins/ filesystem.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -201,5 +203,97 @@ def domain_plugin_root(tmp_path: Path) -> Path:
     skill_dir = skills_dir / "enterprise-foo"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text("Enterprise Foo skill content.", encoding="utf-8")
+
+    return plugins_root
+
+
+# ---------------------------------------------------------------------------
+# Manifest helpers (for manifest-name index tests)
+# ---------------------------------------------------------------------------
+
+
+def _write_manifest(plugin_dir: Path, name: str, extra: dict | None = None) -> Path:
+    """Write a .claude-plugin/plugin.json manifest declaring the given plugin name.
+
+    Args:
+        plugin_dir: The plugin directory that will contain .claude-plugin/.
+        name: The manifest ``name`` field value (e.g. "dh").
+        extra: Additional fields to merge into the manifest JSON.
+
+    Returns:
+        Path to the written plugin.json file.
+    """
+    manifest_dir = plugin_dir / ".claude-plugin"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = manifest_dir / "plugin.json"
+    payload: dict = {"name": name, "version": "1.0.0"}
+    if extra:
+        payload.update(extra)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+    return manifest_path
+
+
+# ---------------------------------------------------------------------------
+# Cache-clear autouse fixture — prevents cross-test cache pollution
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_manifest_index_cache() -> Generator[None, None, None]:
+    """Clear _build_manifest_name_index cache before and after every test.
+
+    This prevents a cached plugins_root from one test bleeding into another.
+    The function may not exist before implementation; the fixture degrades
+    gracefully in that case.
+    """
+    try:
+        from agent_profile.discovery import _build_manifest_name_index
+
+        _build_manifest_name_index.cache_clear()
+    except (ImportError, AttributeError):
+        pass
+    yield
+    try:
+        from agent_profile.discovery import _build_manifest_name_index
+
+        _build_manifest_name_index.cache_clear()
+    except (ImportError, AttributeError):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Manifest-name plugin root fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def manifest_plugin_root(tmp_path: Path) -> Path:
+    """A plugins/ root where the plugin directory is 'development-harness'
+    but the manifest declares name 'dh'.
+
+    Directory structure::
+
+        plugins/
+          development-harness/
+            .claude-plugin/
+              plugin.json   <- {"name": "dh", ...}
+            agents/
+              tn-verification-gate.md
+              task-worker.md
+
+    This is the exact scenario that triggers the bug: callers using the
+    manifest name "dh" cannot resolve to the directory "development-harness".
+    """
+    plugins_root = tmp_path / "plugins"
+    plugin_dir = plugins_root / "development-harness"
+    agents_dir = plugin_dir / "agents"
+    agents_dir.mkdir(parents=True)
+
+    _write_manifest(plugin_dir, "dh")
+
+    _write_agent(
+        agents_dir, "tn-verification-gate", "name: tn-verification-gate\ndescription: Verification gate agent\n"
+    )
+    _write_agent(agents_dir, "task-worker", "name: task-worker\ndescription: Task execution agent\n")
 
     return plugins_root

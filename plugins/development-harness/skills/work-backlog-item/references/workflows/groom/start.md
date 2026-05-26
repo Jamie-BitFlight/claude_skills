@@ -36,7 +36,7 @@ flowchart TD
 | Finalize | [finalize.md](./finalize.md) | RT-ICA final pass, output validation gate, write with `mark_groomed` |
 | Drift | [groom-drift.md](./groom-drift.md) | Sub-workflow when item is already groomed today |
 | Error | [error.md](./error.md) | Agent failure, workflow block, system error handling |
-| Finally | [finally.md](./finally.md) | Sync state, report terminal outcome, return control |
+| Finally | [finally.md](./finally.md) | Refresh local cache (if needed), report terminal outcome, return control |
 
 ## Checklist
 
@@ -65,7 +65,7 @@ Track progress using your task list. Check off each step as it completes.
      - If missing: retry same model with targeted prompt (up to 3 attempts, then blocked)
      - If pass: continue
    - Write groomed content via `backlog_groom(selector='{item_ref}', sections={...}, mark_groomed=True)`
-6. [ ] **Finally** (`finally.md`) — sync state, report terminal outcome, return control
+6. [ ] **Finally** (`finally.md`) — refresh local cache (if needed), report terminal outcome, return control
 
 ## Error Routing
 

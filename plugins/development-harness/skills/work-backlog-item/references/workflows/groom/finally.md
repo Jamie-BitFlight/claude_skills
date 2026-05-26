@@ -4,7 +4,11 @@ Runs after every groom workflow exit — whether the outcome is Groomed, Blocked
 
 ## Steps
 
-1. **Sync state**: call `mcp__plugin_dh_backlog__backlog_sync(flush_only=true)` to export current state to JSONL. This ensures any status changes (blocked, groomed) are persisted regardless of how the workflow exited.
+1. **Refresh local cache** (if needed): `backlog_groom` writes each section to GitHub synchronously as it runs — no explicit flush step is required. If the local cache needs to reflect the current GitHub state after grooming, call `backlog_pull(selector=<item_ref>)` to refresh that single item.
+
+   > **Do NOT call `backlog_sync()` — that runs a full sweep of all issues and is expensive.**
+
+   > **Note (#2452):** The sync-state step and JSONL export claim that appeared here were removed in #2452 — both referenced a capability that was never implemented.
 
 2. **Report terminal state**: emit a one-line summary to the caller with the outcome:
 

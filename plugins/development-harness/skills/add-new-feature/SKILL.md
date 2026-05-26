@@ -139,11 +139,22 @@ local module, enumerate the replacement's capabilities, and produce a coverage m
 (COVERED/PARTIAL/MISSING for each capability). Include the matrix in the feature-context
 document. Surface any PARTIAL or MISSING capabilities as questions.
 
-Register your deliverable with:
-    artifact_type="feature-context"
-    artifact_id="plan/feature-context-{slug}.md"
-    item_id={issue}
-    agent="feature-researcher"
+Register your deliverable and return:
+
+1. Call `artifact_register` with the full feature-context content:
+
+       mcp__plugin_dh_backlog__artifact_register(
+           item_id={issue},
+           artifact_type="feature-context",
+           artifact_id="plan/feature-context-{slug}.md",
+           content="<full feature-context markdown>",
+           agent="feature-researcher"
+       )
+
+2. Return:
+
+       STATUS: DONE
+       path: plan/feature-context-{slug}.md
 ```
 
 After the agent completes, verify the artifact was registered:
@@ -170,7 +181,7 @@ If helpful, delegate to `@dh:codebase-analyzer` for one or more focus areas:
 - testing
 - conventions
 
-Each focus area produces a markdown document. The agent returns the content in its response; the orchestrator then registers it as an artifact.
+Each focus area produces a markdown document. The agent self-registers each document via `artifact_register(content=...)` and returns only `STATUS: DONE` with the artifact ID(s).
 
 Delegation prompt template (one per focus area):
 
@@ -185,14 +196,25 @@ Produce {focus_area}.md content documenting what exists today — patterns,
 conventions, constraints.
 Do NOT prescribe changes.
 
-Register each document with:
-    artifact_type="codebase-analysis"
-    artifact_id="codebase-{focus}-{slug}"  (logical id — use lowercase focus area, e.g. codebase-patterns-{slug})
-    item_id={issue}
-    agent="codebase-analyzer"
+Register each document and return:
 
-A single invocation covering multiple focus areas issues one artifact_register call per
-focus area with a distinct artifact_id per focus.
+1. Call `artifact_register` with the full codebase analysis content for each focus area:
+
+       mcp__plugin_dh_backlog__artifact_register(
+           item_id={issue},
+           artifact_type="codebase-analysis",
+           artifact_id="codebase-{focus}-{slug}",
+           content="<full codebase analysis markdown>",
+           agent="codebase-analyzer"
+       )
+
+   Note: A single invocation covering multiple focus areas issues one `artifact_register` call per
+   focus area with a distinct `artifact_id` per focus.
+
+2. Return:
+
+       STATUS: DONE
+       path: codebase-{focus}-{slug}
 ```
 
 After the agent completes, verify the artifact was registered:
@@ -419,7 +441,6 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 Decompose #{issue}: "{title}" into executable tasks.
 Read the architecture spec via artifact_read(item_id={issue}, artifact_type="architect").
 Read the feature context via artifact_read(item_id={issue}, artifact_type="feature-context").
-Goal: {goal_from_feature_request}
 Create the plan via sam_plan with CLEAR+CoVe task definitions.
 
 REQUIRED — skills field propagation:
@@ -509,7 +530,6 @@ Fill these values before constructing each delegation prompt. All values come fr
 | `{work_type}` | "production of the feature" for new features; "fixing of an issue in" for bug fixes |
 | `{feature_name}` | Human-readable feature name from the issue title |
 | `{focus_area}` | One of: `patterns`, `architecture`, `testing`, `conventions` (Phase 2 only) |
-| `{goal_from_feature_request}` | The one-sentence goal extracted from the feature context doc (Phase 4 only) |
 | `{domain_skills}` | Pre-formatted YAML list lines (e.g., `- plugin-creator:hook-creator`) collected by the Phase 3 domain signal scan; empty string if no signals matched; passed verbatim into Phase 4 delegation prompt |
 | `{N}` | SAM plan number returned by `sam_plan` after Phase 4 completes |
 | `{quality_vigilance}` | Full `<quality_vigilance>...</quality_vigilance>` block — canonical text defined in §Shared Delegation Preamble above; substitute verbatim when constructing delegation prompts |

@@ -13,7 +13,7 @@ from sam_schema.core.models import BookendType, Plan, Task, TaskStatus
 # Statuses that satisfy a dependency — a downstream task may proceed only when
 # its dependency is in one of these statuses.  FAILED is intentionally excluded:
 # a failed parent must NOT unblock its dependents (they should be auto-skipped).
-SUCCESSFUL_STATUSES: frozenset[str] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED})
+SUCCESSFUL_STATUSES: frozenset[str] = frozenset({TaskStatus.COMPLETE, TaskStatus.DEFERRED, TaskStatus.SKIPPED})
 
 # Statuses that represent the end of a task's lifecycle (no further transitions
 # are expected).  Used for cycle detection and plan-completion checks.
@@ -81,7 +81,7 @@ class DependencyGraph:
 
         1. Its status is ``not-started``.
         2. All tasks listed in its ``dependencies`` are in a successful status
-           (``complete`` or ``deferred``).
+           (``complete``, ``deferred``, or ``skipped``).
 
         Tasks referencing dependency IDs that do not exist in the task list
         are treated as having an unsatisfied dependency and are therefore

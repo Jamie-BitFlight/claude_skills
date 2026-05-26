@@ -3929,19 +3929,19 @@ async def test_backlog_view_auto_compact_not_triggered_when_under_token_budget(m
     assert "body" in response
 
 
-async def test_backlog_view_auto_compact_bypassed_when_sections_filter_provided(mocker) -> None:
-    """backlog_view skips auto-compact when sections= filter is provided by the caller.
+async def test_backlog_view_auto_compact_enforced_when_sections_filter_provided(mocker) -> None:
+    """backlog_view enforces budget even when sections= filter is provided by the caller.
 
-    Tests: sections= bypass — explicit sections filter always returns filtered content,
-           never the compact form, even when the filtered content would be over budget.
+    Tests: budget enforcement applies unconditionally for all summary=False calls —
+           the sections= filter does not bypass auto-compact.
     How: Mock _enc.encode to return an over-budget count.  Call with sections=['Plan'].
-         Assert _over_budget is absent — the sections filter bypassed the compact branch.
-    Why: Callers who already narrowed the response via sections= should not be bounced
-         back to the compact form.  They have already done the right thing.
+         Assert _over_budget is present — the budget check ran after filtering.
+    Why: The contract is: agents must never receive a response that overflows their context.
+         The tool is the correct enforcement point; caller flags do not override it.
     """
     from backlog_core.server import _VIEW_TOKEN_BUDGET
 
-    # Arrange — encoder still returns over-budget count
+    # Arrange — encoder returns over-budget count
     mocker.patch("backlog_core.server._enc.encode", return_value=list(range(_VIEW_TOKEN_BUDGET + 1)))
 
     op_result = _make_view_result({
@@ -3954,29 +3954,32 @@ async def test_backlog_view_auto_compact_bypassed_when_sections_filter_provided(
         "sections": {"Plan": {"num_entries": 1, "num_struck": 0, "entries": []}},
     })
 
-    # Act — explicit sections= filter must bypass auto-compact
+    # Act — sections= filter must not bypass budget enforcement
     with patch("backlog_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#15", "summary": False, "sections": ["Plan"]})
 
-    # Assert — compact form must not activate
-    assert "_over_budget" not in response, (
-        f"sections= filter must bypass auto-compact, but got _over_budget={response.get('_over_budget')}"
+    # Assert — compact form must activate because response is over budget
+    assert "_over_budget" in response, (
+        f"Budget enforcement must apply even with sections= filter, but _over_budget is absent. "
+        f"Got keys: {list(response.keys())}"
     )
+    assert response["_over_budget"] is True
 
 
-async def test_backlog_view_auto_compact_bypassed_when_section_filter_provided(mocker) -> None:
-    """backlog_view skips auto-compact when section= filter is provided by the caller.
+async def test_backlog_view_auto_compact_enforced_when_section_filter_provided(mocker) -> None:
+    """backlog_view enforces budget even when section= filter is provided by the caller.
 
-    Tests: section= bypass — explicit section filter returns filtered content without
-           triggering the compact branch, regardless of token count.
+    Tests: budget enforcement applies unconditionally for all summary=False calls —
+           the section= filter does not bypass auto-compact.
     How: Mock _enc.encode to return an over-budget count.  Call with section='0'.
-         Assert _over_budget is absent.
-    Why: section= (singular) is a separate parameter from sections= (list).  Both must
-         independently bypass the auto-compact branch so callers are never double-blocked.
+         Assert _over_budget is present — the budget check ran after filtering.
+    Why: The contract is: agents must never receive a response that overflows their context.
+         The tool is the correct enforcement point; caller flags do not override it.
+         section= (singular) and sections= (list) are both covered by this enforcement.
     """
     from backlog_core.server import _VIEW_TOKEN_BUDGET
 
-    # Arrange — encoder still returns over-budget count
+    # Arrange — encoder returns over-budget count
     mocker.patch("backlog_core.server._enc.encode", return_value=list(range(_VIEW_TOKEN_BUDGET + 1)))
 
     op_result = _make_view_result({
@@ -3989,11 +3992,13 @@ async def test_backlog_view_auto_compact_bypassed_when_section_filter_provided(m
         "sections": {"Plan": {"num_entries": 1, "num_struck": 0, "entries": []}},
     })
 
-    # Act — explicit section= filter must bypass auto-compact
+    # Act — section= filter must not bypass budget enforcement
     with patch("backlog_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#20", "summary": False, "section": "0"})
 
-    # Assert — compact form must not activate
-    assert "_over_budget" not in response, (
-        f"section= filter must bypass auto-compact, but got _over_budget={response.get('_over_budget')}"
+    # Assert — compact form must activate because response is over budget
+    assert "_over_budget" in response, (
+        f"Budget enforcement must apply even with section= filter, but _over_budget is absent. "
+        f"Got keys: {list(response.keys())}"
     )
+    assert response["_over_budget"] is True
