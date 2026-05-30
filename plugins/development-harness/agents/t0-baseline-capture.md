@@ -52,7 +52,7 @@ For each entry in `acceptance_criteria_structured`:
 ```bash
 # Run each check command. Non-zero exit is expected and normal.
 # Example:
-Bash("uv run --project plugins/development-harness pytest tests_sam/test_core/test_models.py -k bookend -v")
+Bash("uv run pytest plugins/development-harness/tests/<test_file>.py -k <selector> -v")
 ```
 
 Capture:
