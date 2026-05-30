@@ -27,6 +27,19 @@ compared literally as a header name, misses, leaves the body unchanged
 (full size), and therefore (1) reports ``section_filter_miss: True`` and
 (2) trips defect (a)'s over-budget gate.
 
+Defect (c) — sections metadata desyncs from the resolved body filter
+--------------------------------------------------------------------
+``_assemble_view_content`` builds ``result.sections`` via
+``_build_sections_metadata(..., section=section)`` BEFORE the body is narrowed
+by ``_apply_body_section_filter``.  ``_build_sections_metadata`` only matches a
+section by EXACT case-insensitive *name*; it does not interpret the numeric,
+comma, regex, or non-exact substring forms that ``_apply_body_section_filter``
+now resolves via ``_resolve_section_indices``.  For those resolved forms the
+body is narrowed correctly but ``result.sections`` is ``{}`` — body and
+sections metadata desync, breaking the contract that ``sections`` stays in
+sync with ``body``.  Only the exact-name form stays in sync (both match), so
+only the newly-supported forms regress.  See ``TestSectionsMetadataInSync``.
+
 Both test classes MUST FAIL against current code and PASS after the fix.
 
 Test naming: every test contains ``over_budget`` or ``numeric_section`` so
@@ -38,6 +51,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+from backlog_core import operations
 from backlog_core.models import BacklogItem, Section, ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
 
@@ -400,3 +414,123 @@ class TestReviewRoundContract:
             "the response must set section_filter_miss=True so the caller learns the names were "
             "invalid (m1, #2495).  Got keys: " + repr(sorted(resp))
         )
+
+
+# ---------------------------------------------------------------------------
+# Defect (c): result.sections must stay in sync with the resolved body filter
+# ---------------------------------------------------------------------------
+
+# A small multi-section raw body.  '## Issue Classification' and '## Issue
+# Triage' share the substring 'Issue' so a substring form matches both.  Section
+# headers (document order, zero-based):
+#   [0] Story  [1] Description  [2] RT-ICA  [3] Issue Classification
+#   [4] Issue Triage  [5] Impact Radius
+_SYNC_BODY = (
+    "## Story\n\nstory body\n\n"
+    "## Description\n\ndescription body\n\n"
+    "## RT-ICA\n\nrt-ica body\n\n"
+    "## Issue Classification\n\nclassification body\n\n"
+    "## Issue Triage\n\ntriage body\n\n"
+    "## Impact Radius\n\nimpact body\n"
+)
+
+
+def _body_section_names(body: str) -> list[str]:
+    """Extract ``## ``/``### `` header names from *body* in document order."""
+    return [hdr.group(1).strip() for hdr in operations._SECTION_BOUNDARY_RE.finditer(body)]
+
+
+def _view(mocker: MockerFixture, body: str, section: str) -> ViewItemResult:
+    """Drive ``operations.view_item`` against a controlled raw GitHub body."""
+    _patch_github_body(mocker, 2495, body)
+    return operations.view_item(selector="2495", include_content=True, section=section)
+
+
+class TestSectionsMetadataInSync:
+    """``result.sections`` must mirror the narrowed ``result.body`` for ALL forms.
+
+    Defect (c): ``_build_sections_metadata`` filters by exact name only, so for
+    numeric / comma / regex / non-exact-substring forms the body is narrowed but
+    ``result.sections`` is ``{}`` — the two desync.  After the fix the section
+    metadata keys must equal the headers present in the narrowed body for every
+    resolved form, and a genuine miss must yield empty sections plus
+    ``section_filter_miss=True``.
+    """
+
+    def test_numeric_section_keeps_sections_in_sync_with_body(self, mocker: MockerFixture) -> None:
+        """section='2' (numeric, in range) narrows body AND populates sections.
+
+        RED: body becomes the RT-ICA slice, but result.sections is {} because
+        _build_sections_metadata matched the literal name '2' and missed.
+        """
+        result = _view(mocker, _SYNC_BODY, "2")
+
+        assert result.section_filter_miss is False, "section='2' resolves to index 2 (RT-ICA); must not miss."
+        assert "## RT-ICA" in result.body, f"body must be the RT-ICA slice; got {result.body[:60]!r}."
+        assert set(result.sections) == set(_body_section_names(result.body)), (
+            "result.sections keys must equal the headers in the narrowed body. "
+            f"sections={sorted(result.sections)} body_headers={_body_section_names(result.body)}. "
+            "Defect (c): numeric form narrows body but leaves sections empty (desync)."
+        )
+        assert result.sections, "result.sections must be non-empty for a resolved numeric section."
+
+    def test_regex_section_keeps_sections_in_sync_with_body(self, mocker: MockerFixture) -> None:
+        """section='/Impact.*/' (regex) narrows body AND populates sections in sync.
+
+        RED: body becomes the Impact Radius slice, sections stays {}.
+        """
+        result = _view(mocker, _SYNC_BODY, "/Impact.*/")
+
+        assert result.section_filter_miss is False, "regex '/Impact.*/' must match the Impact Radius header."
+        assert "## Impact Radius" in result.body, f"body must be the Impact Radius slice; got {result.body[:60]!r}."
+        assert set(result.sections) == set(_body_section_names(result.body)), (
+            "result.sections must mirror the narrowed body for the regex form. "
+            f"sections={sorted(result.sections)} body_headers={_body_section_names(result.body)}."
+        )
+        assert set(result.sections) == {"Impact Radius"}, (
+            f"only the matched section's metadata must be present; got {sorted(result.sections)}."
+        )
+
+    def test_substring_section_multi_match_keeps_sections_in_sync(self, mocker: MockerFixture) -> None:
+        """section='Issue' (substring) matches two headers; sections holds both in sync.
+
+        RED: body holds both 'Issue Classification' and 'Issue Triage' slices, but
+        sections is {} because neither header name equals 'Issue' exactly.
+        """
+        result = _view(mocker, _SYNC_BODY, "Issue")
+
+        assert result.section_filter_miss is False, "substring 'Issue' matches two headers; must not miss."
+        body_headers = _body_section_names(result.body)
+        assert body_headers == ["Issue Classification", "Issue Triage"], (
+            f"body must contain both matched sections in document order; got {body_headers}."
+        )
+        assert set(result.sections) == set(body_headers), (
+            "result.sections must contain ALL matched sections, in sync with the body. "
+            f"sections={sorted(result.sections)} body_headers={body_headers}. "
+            "Defect (c): substring form narrows body but leaves sections empty (desync)."
+        )
+
+    def test_exact_name_section_stays_in_sync(self, mocker: MockerFixture) -> None:
+        """section='RT-ICA' (exact name) keeps body and sections in sync (regression guard).
+
+        The exact-name form already stays in sync today; this guards the fix from
+        regressing the one form that previously worked.
+        """
+        result = _view(mocker, _SYNC_BODY, "RT-ICA")
+
+        assert result.section_filter_miss is False, "exact name 'RT-ICA' must match."
+        assert "## RT-ICA" in result.body, f"body must be the RT-ICA slice; got {result.body[:60]!r}."
+        assert set(result.sections) == set(_body_section_names(result.body)) == {"RT-ICA"}, (
+            f"exact-name form must keep body and sections in sync; sections={sorted(result.sections)}."
+        )
+
+    def test_true_miss_empties_sections_and_sets_filter_miss(self, mocker: MockerFixture) -> None:
+        """A genuine miss must empty sections AND set section_filter_miss=True.
+
+        section='/zzz-nomatch/' resolves to no header under any form; the contract
+        requires empty sections and the miss flag set (preserving miss behaviour).
+        """
+        result = _view(mocker, _SYNC_BODY, "/zzz-nomatch/")
+
+        assert result.section_filter_miss is True, "an unresolvable section form must set section_filter_miss=True."
+        assert result.sections == {}, f"a genuine miss must leave result.sections empty; got {sorted(result.sections)}."

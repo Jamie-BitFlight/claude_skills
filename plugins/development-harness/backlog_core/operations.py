@@ -2993,11 +2993,23 @@ def _assemble_view_content(
 
     if include_content:
         if body:
-            result.sections = _build_sections_metadata(body, show, since, section=section)
             if section is not None:
-                # Narrow the body to the requested section only.
+                # Resolve the section form once: narrow the body, then derive the
+                # sections metadata from that SAME narrowed body so the two stay in
+                # sync for every section form (numeric, comma, regex, substring,
+                # name) -- not just the exact-name form that
+                # ``_build_sections_metadata``'s name filter recognises (#2495
+                # defect c).  The narrowed body already contains only the matched
+                # section slices, so ``section=None`` here selects exactly those.
                 body = _apply_body_section_filter(result, body, section)
+                # On a genuine miss ``_apply_body_section_filter`` sets
+                # ``section_filter_miss`` and leaves the body unchanged; the
+                # contract requires empty sections in that case.
+                result.sections = (
+                    {} if result.section_filter_miss else _build_sections_metadata(body, show, since, section=None)
+                )
             else:
+                result.sections = _build_sections_metadata(body, show, since, section=None)
                 # Prepend section index so agents see it regardless of body source.
                 # Prefer live body data over local YAML cache for cache coherence.
                 index = _build_sections_index_from_body(body)
@@ -3010,8 +3022,11 @@ def _assemble_view_content(
             _paginate_body_result(result, body, offset, limit)
             # Bound the structured sections dict to the paginated slice so a
             # paged request cannot overflow the view budget via an un-paged
-            # sections dump (issue #2495 defect a).
-            result.sections = _build_sections_metadata(result.body, show, since, section=section)
+            # sections dump (issue #2495 defect a).  ``result.body`` is already
+            # narrowed to the matched section(s) when a ``section`` filter was
+            # applied, so ``section=None`` here keeps the metadata in sync with
+            # the paginated slice instead of re-applying the name-only filter.
+            result.sections = _build_sections_metadata(result.body, show, since, section=None)
     else:
         _assemble_view_compact(result, item, body, section=section)
 
