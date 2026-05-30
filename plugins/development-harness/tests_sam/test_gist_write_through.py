@@ -637,3 +637,229 @@ def test_list_plans_no_gist_content_fetch_for_index_only_plans(tmp_path: Path) -
     assert by_id["Pindex001"]["issue"] == "201", "issue must be serialised to str from index entry"
     assert by_id["Pindex002"]["feature"] == "index-plan-beta"
     assert by_id["Pindex002"]["issue"] == "202"
+
+
+# ---------------------------------------------------------------------------
+# list_plans: merge behavior (T3 / gist_task_layer.py)
+# ---------------------------------------------------------------------------
+
+
+def test_list_plans_merges_gist_and_local(gist_layer: GistTaskLayer) -> None:
+    """list_plans returns plans from both Gist-registered index and local-only store.
+
+    Verifies the merge strategy: a plan with an issue (written through to Gist
+    and registered in the plan index) and a plan without an issue (local-only,
+    not indexed) both appear in the list_plans result without duplication.
+    """
+    tasks = _two_tasks()
+
+    # Arrange: create one plan with an issue — written to Gist and plan index.
+    gist_data = gist_layer.create_plan(
+        slug="merge-gist-plan", goal="Plan with Gist registration", tasks=tasks, issue=_PLAN_ISSUE
+    )
+    gist_plan_id = gist_data["plan_id"]
+
+    # Create a second plan without an issue — local-only, not indexed.
+    local_data = gist_layer.create_plan(
+        slug="merge-local-plan", goal="Local-only plan with no Gist registration", tasks=tasks
+    )
+    local_plan_id = local_data["plan_id"]
+
+    # Act: list all plans via the merge layer.
+    summaries = gist_layer.list_plans()
+
+    # Assert: both plan_ids appear in the merged result.
+    plan_ids = {s["plan_id"] for s in summaries}
+    assert gist_plan_id in plan_ids, "Gist-registered plan must appear in list_plans result"
+    assert local_plan_id in plan_ids, "Local-only plan must appear in list_plans result"
+
+    # Assert: no duplicates — each plan_id appears exactly once.
+    all_ids = [s["plan_id"] for s in summaries]
+    assert all_ids.count(gist_plan_id) == 1, "Gist-registered plan must appear exactly once (no duplicates)"
+    assert all_ids.count(local_plan_id) == 1, "Local-only plan must appear exactly once (no duplicates)"
+
+
+def test_list_plans_returns_empty_when_no_plans(tmp_path: Path) -> None:
+    """list_plans returns an empty list when no plans exist in index or local store.
+
+    Verifies that a fresh GistTaskLayer with an empty plan index and an empty
+    local directory returns [] rather than raising or returning None.
+    """
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    local_backend = LocalYamlTaskProvider(plan_dir)
+    empty_store = _InMemoryArtifactStore()
+    client = _make_fake_client(empty_store)
+    plan_index = _make_fake_plan_index(client, sentinel_issue=_SENTINEL_ISSUE)
+    layer = GistTaskLayer(local_backend=local_backend, artifact_client=client, plan_index=plan_index)
+
+    # Act: list plans on a completely empty layer.
+    summaries = layer.list_plans()
+
+    # Assert: empty result, no exception raised.
+    assert summaries == [], f"Empty layer must return [], got {summaries!r}"
+
+
+# ---------------------------------------------------------------------------
+# Write-through mutations: persistence to Gist (T3 / gist_task_layer.py)
+# ---------------------------------------------------------------------------
+
+
+def test_update_plan_fields_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """update_plan_fields writes through to Gist; fresh read observes the changed goal.
+
+    Verifies that calling update_plan_fields() with a new goal uploads the
+    post-mutation YAML to Gist, so a subsequent read_plan() from a session
+    without a local file sees the updated goal value.
+    """
+    # Arrange: create a plan with an issue so write-through is active.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(slug="update-plan-fields", goal="Original goal", tasks=tasks, issue=_PLAN_ISSUE)
+    plan_id = plan_data["plan_id"]
+
+    # Act: mutate the plan goal via set_fields.
+    gist_layer.update_plan_fields(plan_id, set_fields={"goal": "Updated goal via set_fields"})
+
+    # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
+    local_dir = gist_layer._local._plan_dir
+    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+        yaml_file.unlink()
+
+    # Assert: read from Gist returns the mutated goal.
+    retrieved = gist_layer.read_plan(plan_id)
+    assert gist_layer.last_read_source == "gist", "Post-delete read must come from Gist"
+    assert retrieved["goal"] == "Updated goal via set_fields", (
+        "Goal mutation must persist to Gist and be visible on fresh read"
+    )
+
+
+def test_update_task_fields_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """update_task_fields writes through to Gist; fresh read observes the changed title.
+
+    Verifies that updating a task field (title) uploads the post-mutation YAML
+    to Gist, so a subsequent read_plan() from a session without a local file
+    sees the updated task title.
+    """
+    # Arrange: create a plan with two tasks.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="update-task-fields",
+        goal="Verify task field mutation persistence via Gist",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Act: mutate T1's title via update_task_fields.
+    gist_layer.update_task_fields(plan_id, "T1", {"title": "Renamed via update_task_fields"})
+
+    # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
+    local_dir = gist_layer._local._plan_dir
+    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+        yaml_file.unlink()
+
+    # Assert: read from Gist returns the updated task title.
+    retrieved = gist_layer.read_plan(plan_id)
+    assert gist_layer.last_read_source == "gist", "Post-delete read must come from Gist"
+    task_t1 = next(t for t in retrieved["tasks"] if t["id"] == "T1")
+    assert task_t1["title"] == "Renamed via update_task_fields", (
+        "Task title mutation must persist to Gist and be visible on fresh read"
+    )
+
+
+def test_update_task_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """update_task writes through to Gist; fresh read observes the replaced task.
+
+    Verifies that replacing a full Task object via update_task() uploads the
+    post-mutation YAML to Gist, so a subsequent read_plan() from a session
+    without a local file sees the replacement task's title and status.
+    """
+    # Arrange: create a plan with two tasks.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="update-task", goal="Verify full task replacement persistence via Gist", tasks=tasks, issue=_PLAN_ISSUE
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Act: replace T1 with a new Task object (different title and status).
+    replacement = Task(
+        id="T1",
+        title="Replaced via update_task",
+        status=TaskStatus.IN_PROGRESS,
+        agent="replacement-agent",
+        dependencies=[],
+    )
+    gist_layer.update_task(plan_id, replacement)
+
+    # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
+    local_dir = gist_layer._local._plan_dir
+    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+        yaml_file.unlink()
+
+    # Assert: read from Gist returns the replacement task's fields.
+    retrieved = gist_layer.read_plan(plan_id)
+    assert gist_layer.last_read_source == "gist", "Post-delete read must come from Gist"
+    task_t1 = next(t for t in retrieved["tasks"] if t["id"] == "T1")
+    assert task_t1["title"] == "Replaced via update_task", (
+        "Replaced task title must persist to Gist and be visible on fresh read"
+    )
+    assert task_t1["status"] == "in-progress", "Replaced task status must persist to Gist and be visible on fresh read"
+
+
+def test_append_task_section_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """append_task_section writes through to Gist; Gist YAML contains the appended section.
+
+    Verifies that appending a named markdown section to a task uploads the
+    post-mutation YAML to Gist, so the Gist store contains both the section
+    name and its content after the write-through.  The section content is
+    verified in the raw stored YAML rather than through the parsed PlanData to
+    avoid coupling the test to the exact deserialization path for body sections.
+    """
+    # Arrange: create a plan with two tasks.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="append-task-section",
+        goal="Verify task section append persistence via Gist",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Act: append a named section to T1.
+    section_name = "Implementation Notes"
+    section_content = "Added by test_append_task_section_persists_to_gist."
+    gist_layer.append_task_section(plan_id, "T1", section_name, section_content)
+
+    # Assert: the Gist store contains the appended section name and content.
+    stored_yaml = store.read(_PLAN_ISSUE, "task-plan")
+    assert stored_yaml is not None, "Gist store must be populated after append_task_section"
+    assert section_name in stored_yaml, (
+        f"Section name {section_name!r} must appear in the Gist-stored YAML after append"
+    )
+    assert section_content in stored_yaml, "Section content must appear in the Gist-stored YAML after append"
+
+
+def test_mutation_raises_on_gist_write_failure(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """update_plan_fields propagates ArtifactWriteError when Gist store fails.
+
+    Verifies that when artifact_client.store() is forced to fail during a
+    write-through mutation, GistTaskLayer raises ArtifactWriteError rather
+    than swallowing it silently.  Tests the no-silent-swallow contract for
+    write-through mutations (AC7 analog for update_plan_fields).
+    """
+    # Arrange: create a plan successfully while the store is healthy.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="mutation-write-failure",
+        goal="Verify write failure propagation for mutations",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable store failure before the mutation attempt.
+    store.force_store_failure = True
+
+    # Act + Assert: ArtifactWriteError must propagate (no silent swallow).
+    with pytest.raises(ArtifactWriteError):
+        gist_layer.update_plan_fields(plan_id, set_fields={"goal": "Attempted update during failure"})
