@@ -153,7 +153,7 @@ class ArtifactRegistryClient:
                 issue,
                 path,
             )
-        except (BacklogError, OSError, Exception) as exc:
+        except (BacklogError, OSError, ValueError) as exc:
             _log.error(
                 "ArtifactRegistryClient.store: write failed for issue #%d (artifact_type=%s): %s",
                 issue,
@@ -243,7 +243,7 @@ class ArtifactRegistryClient:
                 sentinel_issue, artifact_type=_PLAN_INDEX_TYPE, path=_PLAN_INDEX_PATH, content=content
             )
             _log.info("ArtifactRegistryClient.store_index: uploaded plan-index to sentinel issue #%d", sentinel_issue)
-        except (BacklogError, OSError, Exception) as exc:
+        except (BacklogError, OSError, ValueError) as exc:
             _log.error(
                 "ArtifactRegistryClient.store_index: write failed for sentinel issue #%d: %s", sentinel_issue, exc
             )
