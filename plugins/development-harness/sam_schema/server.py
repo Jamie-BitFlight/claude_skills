@@ -248,12 +248,28 @@ _SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready
 
 
 def _sam_plan_read(plan: str, plan_dir: str) -> dict:
-    """Return Plan fields for the given plan address."""
+    """Return Plan fields for the given plan address.
+
+    When ``GistTaskLayer`` serves the plan from local cache (``last_read_source == "local"``),
+    a ``warnings`` key is added to the response with the annotated-source warning string
+    (ADR-2509-5).  This surfaces the degraded-source status to the MCP caller without
+    changing the response shape — the ``warnings`` key is additive.
+    """
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
     plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
     plan_model = Plan.model_validate(plan_dict)
-    return plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
+    result = plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    # Surface source annotation when plan was served from local cache.
+    if isinstance(backend, GistTaskLayer) and backend.last_read_source == "local":
+        result["warnings"] = [
+            f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
+        ]
+
+    return result
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
