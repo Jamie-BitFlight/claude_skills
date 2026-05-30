@@ -51,12 +51,23 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+import pytest
+
 from backlog_core import operations
 from backlog_core.models import BacklogItem, Section, SectionEntryDict, ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
+from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+# These tests assert over/under the token budget using real cl100k_base counts.
+# The offline stub (conftest) lacks real BPE compression, so skip them when the
+# real encoding is unavailable rather than fail on miscalibrated counts (PR #2496).
+pytestmark = pytest.mark.skipif(
+    not REAL_CL100K_AVAILABLE,
+    reason="token-budget tests require the real cl100k_base encoding (offline stub lacks BPE compression)",
+)
 
 
 # ---------------------------------------------------------------------------

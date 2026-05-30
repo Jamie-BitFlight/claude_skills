@@ -33,14 +33,26 @@ class _StubEncoder:
         return [0] * ((len(text) + 3) // 4)
 
 
-def _ensure_cl100k_cached() -> None:
-    """Pre-warm tiktoken's encoding cache so importing ``server`` never downloads."""
+def _ensure_cl100k_cached() -> bool:
+    """Pre-warm tiktoken's encoding cache so importing ``server`` never downloads.
+
+    Returns True when the REAL ``cl100k_base`` encoding is available (cache or
+    network). When it is unavailable, seeds a deterministic stub so ``server``
+    still imports, and returns False — token-budget tests skip in that case
+    because the stub lacks real BPE compression and cannot reproduce their
+    calibrated counts (a repeated-character body that compresses far under budget
+    with the real encoder would measure over budget with a len-based stub).
+    """
     if "cl100k_base" in tiktoken.registry.ENCODINGS:
-        return
+        return True
     try:
         tiktoken.get_encoding("cl100k_base")  # populates ENCODINGS from cache/network
-    except Exception:  # noqa: BLE001 - tiktoken raises undeclared download/network errors when its cache is empty and the network is unreachable; the concrete class is not part of its public API, so seed a deterministic stub to keep tests runnable offline.
+    except Exception:  # noqa: BLE001 - tiktoken raises undeclared download/network errors when its cache is empty and the network is unreachable; the concrete class is not part of its public API, so seed a deterministic stub to keep server importable offline.
         tiktoken.registry.ENCODINGS["cl100k_base"] = cast("tiktoken.Encoding", _StubEncoder())
+        return False
+    else:
+        return True
 
 
-_ensure_cl100k_cached()
+REAL_CL100K_AVAILABLE = _ensure_cl100k_cached()
+"""True when the real cl100k_base encoding loaded; token-budget tests skip if False."""
