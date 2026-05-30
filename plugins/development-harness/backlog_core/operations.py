@@ -3269,7 +3269,10 @@ def view_item(
         only the matched section(s).
     """
     out = output or Output()
-    section = section or None
+    # Normalize blank/whitespace-only section filters to None so they behave as
+    # an omitted filter (full content), not a no-match. strip() preserves real
+    # values like "0". (PR #2496 Codex finding.)
+    section = (section or "").strip() or None
     item = find_item(parse_backlog(), selector)
     issue_num = parse_issue_selector(selector)
 
