@@ -63,7 +63,7 @@ if TYPE_CHECKING:
 # Fixtures
 # ---------------------------------------------------------------------------
 
-# A multi-section body padded above _VIEW_BODY_CHARS_THRESHOLD (16000 chars) so
+# A multi-section body padded so its serialised response exceeds _VIEW_TOKEN_BUDGET
 # the auto-compact gate engages, mirroring the real #2438 body.  Sections use
 # the same ``## `` top-level / ``### `` subsection mix as real issue bodies.
 _FILLER = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 60  # ~3.3k chars per block
@@ -103,6 +103,35 @@ def _patch_github_body(mocker: MockerFixture, issue_num: int, body: str) -> None
         return True
 
     mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+
+
+def _resp_body(resp: dict[str, object]) -> str:
+    """Return the response ``body`` as a typed ``str`` (boundary accessor).
+
+    ``backlog_view`` returns ``dict[str, object]``; ``dict.get`` therefore yields
+    ``object``.  This narrows the ``body`` field to ``str`` once so call sites do
+    not each repeat an ``isinstance`` narrowing inside a compound assertion.
+    """
+    body = resp.get("body")
+    assert isinstance(body, str), f"response 'body' must be a str; got {type(body).__name__}."
+    return body
+
+
+def _resp_metadata(resp: dict[str, object]) -> list[dict[str, object]]:
+    """Return ``sections_metadata`` as a list of typed dicts (boundary accessor).
+
+    ``backlog_view`` returns ``dict[str, object]``; each metadata entry is itself a
+    serialised ``SectionMeta`` dict.  Validating the shape here once yields fully
+    typed ``dict[str, object]`` entries so call sites can index ``"name"`` without
+    repeating ``isinstance`` narrowing or hitting ``dict.get`` overload mismatches.
+    """
+    meta = resp.get("sections_metadata")
+    assert isinstance(meta, list), f"response 'sections_metadata' must be a list; got {type(meta).__name__}."
+    entries: list[dict[str, object]] = []
+    for entry in meta:
+        assert isinstance(entry, dict), f"each metadata entry must be a dict; got {type(entry).__name__}."
+        entries.append({str(k): v for k, v in entry.items()})
+    return entries
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +295,17 @@ class TestOverBudgetGateHonoursNarrowing:
             "not discard the requested page and return the metadata-only over-budget shape. "
             "Got keys: " + repr(sorted(resp)) + ".  This is defect (a) of #2495."
         )
-        assert resp.get("body") is not None, (
-            "A paged offset/limit request must return a 'body' field, not the over-budget metadata-only response."
+        body = _resp_body(resp)
+        assert body, (
+            "A paged offset/limit request must return a non-empty 'body' field, not the "
+            "over-budget metadata-only response."
+        )
+        # The body must be the requested PAGE, not the whole item: an early section is
+        # referenced in the page while the last section's content does not leak through.
+        assert "Section 0" in body, f"offset=0/limit=2 must include the first section in the page; got {body[:80]!r}."
+        assert "## Section 7" not in body, (
+            "offset=0/limit=2 must exclude later sections from the page — the full body must "
+            "not leak through; got a body containing '## Section 7'."
         )
 
     def test_over_budget_sections_filter_returns_named_sections(self, mocker: MockerFixture) -> None:
@@ -293,6 +331,20 @@ class TestOverBudgetGateHonoursNarrowing:
             "sections=[...] narrows the payload to the named sections; backlog_view must "
             "return those sections, not fall back to the over-budget metadata-only shape. "
             "Got keys: " + repr(sorted(resp)) + ".  This is defect (a) of #2495."
+        )
+        # The returned body must actually carry the requested section content, in document
+        # order, and must NOT leak the non-requested sections (#2495 finding #10 test quality).
+        body = _resp_body(resp)
+        assert body, "sections=[...] must return a non-empty 'body' field."
+        assert "## RT-ICA" in body, "the narrowed body must contain the requested 'RT-ICA' section."
+        assert "## Issue Classification" in body, (
+            "the narrowed body must contain the requested 'Issue Classification' section."
+        )
+        assert "## Root-Cause Analysis" not in body, (
+            "the narrowed body must NOT contain a non-requested section; got a body leaking '## Root-Cause Analysis'."
+        )
+        assert body.find("## RT-ICA") < body.find("## Issue Classification"), (
+            "matched sections must appear in document order (RT-ICA before Issue Classification)."
         )
 
 
@@ -534,3 +586,282 @@ class TestSectionsMetadataInSync:
 
         assert result.section_filter_miss is True, "an unresolvable section form must set section_filter_miss=True."
         assert result.sections == {}, f"a genuine miss must leave result.sections empty; got {sorted(result.sections)}."
+
+
+# ---------------------------------------------------------------------------
+# Code-review round (#2495): regex crash, miss+pagination empties, compact
+# miss-signal, case/format drift, sections=[] normalisation, redundant gate
+# branch, shared-slicer coverage.
+# ---------------------------------------------------------------------------
+
+
+class TestMalformedRegexDoesNotCrash:
+    """Finding #1: a malformed ``/regex/`` must degrade, not raise ``re.error``."""
+
+    _BODY = "## Alpha\n\nalpha body\n\n## Beta\n\nbeta body\n"
+
+    def test_malformed_regex_does_not_raise(self) -> None:
+        """section='/[/' (unbalanced char class) must not raise ``re.error``.
+
+        RED (pre-fix): ``re.compile('[')`` raises an uncaught ``re.error`` that
+        crashes ``backlog_view`` for raw GitHub bodies, where the delimited
+        expression is untrusted caller input.
+        """
+        result = ViewItemResult()
+        # Must not raise; degrades to a literal-substring interpretation.
+        returned = _apply_body_section_filter(result, self._BODY, "/[/")
+
+        assert isinstance(returned, str), "a malformed regex must still return a body string, never raise."
+        # No header is literally named '[' so the substring fallback resolves nothing → miss.
+        assert result.section_filter_miss is True, (
+            "section='/[/' matches no header under the literal-substring fallback, so it must "
+            "report a miss — not crash and not silently return the full body."
+        )
+
+    def test_malformed_regex_literal_substring_matches_named_header(self) -> None:
+        """A malformed-regex expression that is a literal header substring still matches.
+
+        ``/a[/`` is an invalid regex (unbalanced ``[``).  The degraded path treats the
+        whole delimited expression literally — consistent with the regex-matched-nothing
+        fallback, which also substring-matches the full ``/.../`` form so a header
+        literally named like the expression stays reachable.  A header whose text
+        contains ``/a[/`` must therefore match rather than miss.
+        """
+        body = "## weird /a[/ header\n\nbody one\n\n## Beta\n\nbody two\n"
+        result = ViewItemResult()
+        returned = _apply_body_section_filter(result, body, "/a[/")
+
+        assert result.section_filter_miss is False, (
+            "'/a[/' is a malformed regex; the degraded literal-substring fallback uses the full "
+            "delimited expression, which is a substring of the '## weird /a[/ header' header, so "
+            "it must match rather than miss (finding #1 graceful degradation)."
+        )
+        assert "/a[/ header" in returned, (
+            f"degraded substring fallback must return the matching section; got {returned[:50]!r}."
+        )
+
+
+class TestSectionMissEmptiesBodyAndSections:
+    """Findings #2 and #3: a section miss yields an EMPTY body and EMPTY sections."""
+
+    def test_view_item_section_miss_with_limit_empties_body_and_sections(self, mocker: MockerFixture) -> None:
+        """view_item(section='NOPE', limit=3) → miss True, body '' and sections {}.
+
+        RED (pre-fix): the post-pagination metadata rebuild ran unconditionally and
+        overwrote the empty sections dict (#2); the full unchanged body was paginated
+        and returned, leaking item content (#3).
+        """
+        result = _view(mocker, _SYNC_BODY, "NOPE")
+        # Re-run through view_item with a limit to exercise the pagination path.
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        result = operations.view_item(selector="2495", include_content=True, section="NOPE", limit=3)
+
+        assert result.section_filter_miss is True, "section='NOPE' matches no header — must report a miss."
+        assert result.body == "", (
+            f"a section miss must yield an EMPTY body (no leaked full-item content); got {result.body[:60]!r}. "
+            "Finding #3."
+        )
+        assert result.sections == {}, (
+            f"a section miss must yield EMPTY sections even with limit set; got {sorted(result.sections)}. "
+            "Finding #2: the post-pagination rebuild must not overwrite the empty dict."
+        )
+
+    def test_view_item_section_typo_empties_body(self, mocker: MockerFixture) -> None:
+        """view_item(section='typo', limit=5) → miss True and body empty (no leak)."""
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        result = operations.view_item(selector="2495", include_content=True, section="typo", limit=5)
+
+        assert result.section_filter_miss is True, "section='typo' matches no header — must report a miss."
+        assert result.body == "", (
+            f"section miss must not leak the full item body through pagination; got {result.body[:60]!r}."
+        )
+
+
+class TestCompactValidNamesNotReportedAsMiss:
+    """Finding #4: include_content=False with VALID names must not report a miss."""
+
+    def test_compact_valid_section_name_not_miss_and_metadata_filtered(self, mocker: MockerFixture) -> None:
+        """backlog_view(summary=False, include_content=False, sections=['RT-ICA']).
+
+        Compact mode carries no body and an empty sections dict — the inventory is in
+        sections_metadata.  A VALID name must filter that inventory and must NOT set
+        section_filter_miss.
+
+        RED (pre-fix): dict_matched and body_matched are both False in compact mode, so
+        a valid name was wrongly reported as section_filter_miss.
+        """
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        from backlog_core import server
+
+        resp = asyncio.run(
+            server.backlog_view(selector="2495", summary=False, include_content=False, sections=["RT-ICA"])
+        )
+
+        assert resp.get("section_filter_miss") is not True, (
+            "a VALID section name in compact mode must NOT report section_filter_miss. "
+            "Got keys: " + repr(sorted(resp)) + ".  Finding #4."
+        )
+        meta = _resp_metadata(resp)
+        assert meta, "compact mode must return sections_metadata for a valid name."
+        names = {str(entry.get("name", "")) for entry in meta}
+        assert names == {"RT-ICA"}, (
+            f"sections_metadata must be filtered to only the requested name; got {sorted(names)}."
+        )
+
+    def test_compact_invalid_section_name_reports_miss(self, mocker: MockerFixture) -> None:
+        """An INVALID name in compact mode still reports a miss (no false negative)."""
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        from backlog_core import server
+
+        resp = asyncio.run(
+            server.backlog_view(selector="2495", summary=False, include_content=False, sections=["DOES-NOT-EXIST"])
+        )
+
+        assert resp.get("section_filter_miss") is True, (
+            "an invalid name in compact mode must still report section_filter_miss so the miss "
+            "signal is not lost by the finding #4 fix."
+        )
+
+
+class TestStructuredKeyDriftStillDelivered:
+    """Finding #5: dict matches but body header drifts → matched slice, not directory."""
+
+    def test_structured_key_format_drift_returns_matched_not_directory(self, mocker: MockerFixture) -> None:
+        """A YAML item whose structured keys differ in FORMAT from the body headers.
+
+        Arrange a local YAML item whose structured section key is 'RT-ICA' while the
+        rendered body header is formatted differently ('RT ICA'), so the structured
+        ``sections`` dict matches the requested name but ``narrow_body_to_named_sections``
+        finds no exact body header.  The matched narrowing must still be delivered (the
+        body cleared so the matched ``sections`` fit the budget) rather than replaced by
+        the over-budget directory.
+
+        RED (pre-fix): the un-narrowed full body was retained, tripping the over-budget
+        gate and returning the directory — defeating the explicit narrowing.
+        """
+        from backlog_core import operations as ops, server
+
+        # Build a response dict directly to exercise _filter_view_sections in isolation,
+        # avoiding GitHub-enrichment coupling: structured sections dict has the key, but
+        # the body header text drifts so the exact-name body match misses.
+        big = "padding line.\n" * 4000  # ~56k chars → un-narrowed body is over budget
+        result = ops.ViewItemResult(
+            number=2495,
+            title="drift",
+            body=f"## RT ICA\n\n{big}",
+            sections={"RT-ICA": ops._SectionMetadata(num_entries=1, num_struck=0, entries=[])},
+        )
+        response = result.model_dump()
+        filtered = server._filter_view_sections(response, ["RT-ICA"], result)
+
+        assert filtered.get("section_filter_miss") is not True, (
+            "the structured 'RT-ICA' key matched, so this is NOT a miss even though the body "
+            "header text drifted. Finding #5."
+        )
+        filtered_sections = filtered.get("sections")
+        assert isinstance(filtered_sections, dict), "filtered response 'sections' must be a dict."
+        assert "RT-ICA" in filtered_sections, "the matched structured section must be retained."
+        assert filtered.get("body") == "", (
+            "when the structured dict matched but the body header drifted, the un-narrowed body "
+            "must be cleared so the matched narrowing fits the budget instead of tripping the "
+            f"over-budget gate; got body of {len(str(filtered.get('body', '')))} chars. Finding #5."
+        )
+
+
+class TestEmptySectionsListBehavesLikeNone:
+    """Finding #6: sections=[] must behave identically to sections=None."""
+
+    def test_empty_sections_list_matches_none_behaviour(self, mocker: MockerFixture) -> None:
+        """backlog_view(summary=False, sections=[]) == backlog_view(summary=False).
+
+        sections=[] must not empty the sections dict, must not disable the heuristic,
+        and must not report a miss — it is "no section filter".
+        """
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        from backlog_core import server
+
+        resp_empty = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=[]))
+        _patch_github_body(mocker, 2495, _SYNC_BODY)
+        resp_none = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=None))
+
+        assert resp_empty.get("section_filter_miss") is not True, (
+            "sections=[] must not report a miss — it is equivalent to no filter. Finding #6."
+        )
+        assert resp_empty.get("body") == resp_none.get("body"), (
+            "sections=[] must return the same body as sections=None (no narrowing applied)."
+        )
+        assert sorted(resp_empty.get("sections", {})) == sorted(resp_none.get("sections", {})), (
+            "sections=[] must leave the sections dict identical to sections=None — it must not empty it."
+        )
+
+
+class TestUnboundedOverBudgetStillReturnsDirectory:
+    """Finding #7: removing the body-chars branch must not regress the default gate."""
+
+    def test_unbounded_over_budget_default_returns_directory(self, mocker: MockerFixture) -> None:
+        """summary=False with NO narrowing on a huge body still returns the directory.
+
+        Guards the finding #7 simplification: the unconditional token-count check must
+        still gate an unbounded over-budget default call to the compact directory.
+        """
+        _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
+        from backlog_core import server
+
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+
+        assert resp.get("_over_budget") is True, (
+            "an unbounded over-budget default call (no section/sections/offset/limit) must still "
+            "return the compact over-budget directory after the body-chars heuristic removal. "
+            "Got keys: " + repr(sorted(resp)) + ".  Finding #7."
+        )
+
+
+class TestCommaSectionFormOnRawBody:
+    """Finding 8/10 coverage gap: comma index form on raw GitHub bodies."""
+
+    _BODY = "## Alpha\n\nalpha body\n\n## Beta\n\nbeta body\n\n## Gamma\n\ngamma body\n\n## Delta\n\ndelta body\n"
+
+    def test_comma_indices_select_named_sections_in_order(self) -> None:
+        """section='0,2' selects Alpha and Gamma in document order on a raw body."""
+        result = ViewItemResult()
+        returned = _apply_body_section_filter(result, self._BODY, "0,2")
+
+        assert result.section_filter_miss is False, "section='0,2' (comma indices) must resolve, not miss."
+        assert "## Alpha" in returned, f"comma form must include index 0 (Alpha); got {returned[:60]!r}."
+        assert "## Gamma" in returned, f"comma form must include index 2 (Gamma); got {returned[:60]!r}."
+        assert "## Beta" not in returned, "comma form '0,2' must exclude index 1 (Beta)."
+        assert returned.find("## Alpha") < returned.find("## Gamma"), (
+            "comma-selected sections must be concatenated in document order."
+        )
+
+
+class TestNarrowBodyToNamedSectionsUnit:
+    """Finding 8/10: direct unit coverage for narrow_body_to_named_sections."""
+
+    _BODY = "## Alpha\n\nalpha body\n\n## Beta\n\nbeta body\n\n## Gamma\n\ngamma body\n"
+
+    def test_no_match_returns_body_unchanged_and_false(self) -> None:
+        """No matching name → (body, False) with body returned unchanged."""
+        narrowed, matched = operations.narrow_body_to_named_sections(self._BODY, ["Nonexistent"])
+
+        assert matched is False, "no requested name matched — matched flag must be False."
+        assert narrowed == self._BODY, "on a no-match the body must be returned unchanged (no content loss)."
+
+    def test_case_insensitive_exact_name_match(self) -> None:
+        """Names match case-insensitively against ``## ``/``### `` headers."""
+        narrowed, matched = operations.narrow_body_to_named_sections(self._BODY, ["bEtA"])
+
+        assert matched is True, "case-insensitive exact name 'bEtA' must match the '## Beta' header."
+        assert "## Beta" in narrowed, f"narrowed body must contain the matched Beta section; got {narrowed[:40]!r}."
+        assert "## Alpha" not in narrowed, "narrowed body must exclude non-requested sections."
+
+    def test_multiple_names_kept_in_document_order(self) -> None:
+        """Matched sections are concatenated in DOCUMENT order, not request order."""
+        # Request Gamma before Alpha; result must still be Alpha-then-Gamma (document order).
+        narrowed, matched = operations.narrow_body_to_named_sections(self._BODY, ["Gamma", "Alpha"])
+
+        assert matched is True, "both names exist — matched must be True."
+        assert narrowed.find("## Alpha") < narrowed.find("## Gamma"), (
+            "matched sections must follow document order regardless of request order."
+        )
+        assert "## Beta" not in narrowed, "the non-requested Beta section must be excluded."

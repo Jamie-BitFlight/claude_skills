@@ -2536,7 +2536,19 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
 
     # --- /regex/ pattern ---
     if stripped.startswith("/") and stripped.endswith("/") and len(stripped) > 1:
-        compiled = re.compile(stripped[1:-1], re.IGNORECASE)
+        try:
+            compiled = re.compile(stripped[1:-1], re.IGNORECASE)
+        except re.error:
+            # A malformed pattern (e.g. ``/[/``) reaches this path for raw GitHub
+            # bodies, where the delimited expression is untrusted caller input.
+            # ``re.error`` is the only exception ``re.compile`` is documented to
+            # raise for an invalid pattern; catch it narrowly and degrade
+            # gracefully instead of crashing ``backlog_view`` (#2495).  Treat the
+            # delimited text as a literal substring so a candidate literally named
+            # like the expression stays reachable; ``_substring_indices`` returns
+            # ``[]`` when nothing matches, which the caller reports as a
+            # section_filter_miss.
+            return _substring_indices()
         regex_matches = [i for i, name in enumerate(candidates) if compiled.search(name)]
         # Fallback: a candidate literally named like the delimited expression
         # ("/foo/") stays reachable when the regex interpretation matches nothing.
@@ -2850,6 +2862,35 @@ def _populate_yaml_item_compact(result: ViewItemResult, item: BacklogItem) -> No
 _SECTION_BOUNDARY_RE = re.compile(r"^#{2,3} (.+?)$", re.MULTILINE)
 
 
+def _slice_body_by_header_indices(body: str, headers: list[re.Match[str]], indices: list[int]) -> str:
+    """Concatenate the *body* slices for the given *header* *indices* in order.
+
+    The single shared body-slicing implementation (issue #2495, findings #8/#10):
+    both the singular ``section=`` resolver (:func:`_apply_body_section_filter`)
+    and the plural ``sections=[...]`` resolver (:func:`narrow_body_to_named_sections`)
+    delegate the header-find -> index -> slice-join mechanics here.  Only the
+    *matching contract* (how an index list is derived from a filter expression)
+    differs between the two callers; the slicing geometry is identical and lives
+    once.
+
+    Each slice runs from its header's start to the next header's start (or end of
+    *body* for the final header), so the header line and its body travel together.
+
+    Args:
+        body: Full issue body text.
+        headers: Ordered ``## ``/``### `` header matches from
+            :data:`_SECTION_BOUNDARY_RE` over *body*.
+        indices: Indices into *headers* to keep, already in document order.
+
+    Returns:
+        The concatenated slices for *indices* (empty string when *indices* is
+        empty).
+    """
+    return "".join(
+        body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in indices
+    )
+
+
 def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) -> str:
     """Narrow *body* and *result.body* to the requested section(s).
 
@@ -2858,8 +2899,15 @@ def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) 
     comma-separated indices (``"0,2"``), regex (``"/impact.*/"``), and
     substring/name forms advertised by the ``backlog_view`` tool all work on raw
     GitHub bodies — not only the name form.  The matched header slices are
-    concatenated in document order.  When no form resolves to a header,
+    concatenated in document order via the shared
+    :func:`_slice_body_by_header_indices`.  When no form resolves to a header,
     ``result.section_filter_miss`` is set and the body is left unchanged.
+
+    Matching contract: the *singular* ``section=`` form (substring / numeric index
+    / comma list / regex) — distinct from the plural ``sections=[...]`` exact
+    case-insensitive contract in :func:`narrow_body_to_named_sections`.  Both
+    contracts are documented on the ``backlog_view`` tool and preserved as-is;
+    only the slicing mechanics are shared (#2495 findings #8/#10).
 
     Args:
         result: ViewItemResult to update in-place.
@@ -2873,10 +2921,7 @@ def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) 
     names = [hdr.group(1).strip() for hdr in headers]
     matched = _resolve_section_indices(names, section)
     if matched:
-        slices = [
-            body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in matched
-        ]
-        body = "".join(slices)
+        body = _slice_body_by_header_indices(body, headers, matched)
     else:
         result.section_filter_miss = True
     result.body = body
@@ -2913,10 +2958,10 @@ def narrow_body_to_named_sections(body: str, names: list[str]) -> tuple[str, boo
     matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().lower() in wanted]
     if not matched:
         return body, False
-    narrowed = "".join(
-        body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in matched
-    )
-    return narrowed, True
+    # Exact case-insensitive name matching above is the plural ``sections=[...]``
+    # contract; only the slice-join mechanics are shared with the singular
+    # ``section=`` path (#2495 findings #8/#10).
+    return _slice_body_by_header_indices(body, headers, matched), True
 
 
 def _assemble_view_compact(
@@ -2990,42 +3035,63 @@ def _assemble_view_content(
     loading the full body.
     """
     body = result.body
+    paginate = offset > 0 or limit > 0
 
     if include_content:
         if body:
             if section is not None:
-                # Resolve the section form once: narrow the body, then derive the
-                # sections metadata from that SAME narrowed body so the two stay in
-                # sync for every section form (numeric, comma, regex, substring,
-                # name) -- not just the exact-name form that
-                # ``_build_sections_metadata``'s name filter recognises (#2495
-                # defect c).  The narrowed body already contains only the matched
-                # section slices, so ``section=None`` here selects exactly those.
+                # Resolve the section form once: narrow the body to the matched
+                # section slices (numeric, comma, regex, substring, name -- not
+                # just the exact-name form ``_build_sections_metadata`` recognises;
+                # #2495 defect c).  On a genuine miss ``_apply_body_section_filter``
+                # sets ``section_filter_miss`` and leaves the body unchanged.
                 body = _apply_body_section_filter(result, body, section)
-                # On a genuine miss ``_apply_body_section_filter`` sets
-                # ``section_filter_miss`` and leaves the body unchanged; the
-                # contract requires empty sections in that case.
-                result.sections = (
-                    {} if result.section_filter_miss else _build_sections_metadata(body, show, since, section=None)
-                )
+                if result.section_filter_miss:
+                    # A miss must yield an EMPTY body and EMPTY sections, not the
+                    # full unchanged body (#2495 defects #2/#3).  Returning the full
+                    # body here would leak the whole item and (because it is still
+                    # large) trip the over-budget gate, defeating the narrowing the
+                    # caller asked for.  Empty body + empty sections is the single
+                    # consistent "nothing matched" signal alongside
+                    # ``section_filter_miss``; skip pagination and the metadata
+                    # rebuild below entirely.
+                    result.body = ""
+                    result.sections = {}
+                    return
+                # Derive section metadata from the SAME narrowed body so the two
+                # stay in sync for every resolved form.  Skip when pagination will
+                # run: the pagination branch rebuilds the metadata from the
+                # paginated slice, so building it here too would compute and discard
+                # it (#2495 finding #9 — build the body-derived metadata at most
+                # once, from the final body).
+                if not paginate:
+                    result.sections = _build_sections_metadata(body, show, since, section=None)
             else:
-                result.sections = _build_sections_metadata(body, show, since, section=None)
                 # Prepend section index so agents see it regardless of body source.
                 # Prefer live body data over local YAML cache for cache coherence.
+                # The index is display-only; metadata is built from ``body`` (without
+                # it) so no spurious ``Sections`` key is produced.  Skip the metadata
+                # build when pagination will rebuild it from the paginated slice.
+                if not paginate:
+                    result.sections = _build_sections_metadata(body, show, since, section=None)
                 index = _build_sections_index_from_body(body)
                 if index:
                     result.body = index + "\n" + body
         elif item and item.sections:
+            # YAML fallback: ``_populate_yaml_item_content`` builds the richer
+            # structured-section metadata via ``_build_sections_from_yaml_item``
+            # (preserving struck counts and unknown-section shapes).  Do NOT
+            # overwrite it with a body re-parse -- that loses information the YAML
+            # path carries.  When pagination runs the metadata is re-bounded to the
+            # paginated slice below (mirroring the pre-#2495 behaviour).
             _populate_yaml_item_content(result, item, section)
-            body = result.body
-        if body and (offset > 0 or limit > 0):
-            _paginate_body_result(result, body, offset, limit)
-            # Bound the structured sections dict to the paginated slice so a
-            # paged request cannot overflow the view budget via an un-paged
-            # sections dump (issue #2495 defect a).  ``result.body`` is already
-            # narrowed to the matched section(s) when a ``section`` filter was
-            # applied, so ``section=None`` here keeps the metadata in sync with
-            # the paginated slice instead of re-applying the name-only filter.
+        # Pagination (when requested) re-bounds the body and its section metadata
+        # to the paginated slice so a paged request cannot overflow the view budget
+        # via an un-paged sections dump (#2495 defect a).  This is the single
+        # metadata build for the paginated case (finding #9): the per-path builds
+        # above are skipped when ``paginate`` is True.
+        if paginate and result.body:
+            _paginate_body_result(result, result.body, offset, limit)
             result.sections = _build_sections_metadata(result.body, show, since, section=None)
     else:
         _assemble_view_compact(result, item, body, section=section)
