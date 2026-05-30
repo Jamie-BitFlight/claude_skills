@@ -1049,3 +1049,158 @@ class TestSectionNoneLinePaginationNotDisplacedByIndex:
         assert "Sections" not in result.sections, (
             f"the entry-block path must not produce a spurious 'Sections' key; got {sorted(result.sections)}."
         )
+
+
+# ---------------------------------------------------------------------------
+# Codex P2 (#2495): case-insensitive sections=[...] dict filter
+# ---------------------------------------------------------------------------
+
+
+def _filter_sections_isolated(
+    body: str,
+    structured_keys: list[str],
+    requested: list[str],
+    *,
+    sections_metadata: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    """Run ``_filter_view_sections`` in isolation over a hand-built result.
+
+    Builds a :class:`ViewItemResult` with the given raw *body*, structured
+    ``sections`` keyed by *structured_keys*, and optional *sections_metadata*,
+    serialises it with ``model_dump()``, and returns the filtered response dict.
+    Avoids GitHub-enrichment coupling so the dict / metadata / body arms of
+    ``_filter_view_sections`` are exercised directly.
+
+    Args:
+        body: Raw body text carrying ``## ``/``### `` headers.
+        structured_keys: Keys for the structured ``sections`` dict (the
+            ``include_content=True`` inventory).
+        requested: The ``sections=[...]`` names to filter by.
+        sections_metadata: Optional compact ``sections_metadata`` inventory
+            (the ``include_content=False`` arm); each entry is a ``SectionMeta``
+            shaped dict.
+
+    Returns:
+        The filtered response dict returned by ``_filter_view_sections``.
+    """
+    from backlog_core import operations as ops, server
+
+    result = ops.ViewItemResult(
+        number=2495,
+        title="case-insensitive filter",
+        body=body,
+        sections={key: ops._SectionMetadata(num_entries=1, num_struck=0, entries=[]) for key in structured_keys},
+        sections_metadata=[],
+    )
+    response = result.model_dump()
+    if sections_metadata is not None:
+        # model_dump() flattens SectionMeta entries to plain dicts; set the compact
+        # inventory directly so the include_content=False metadata arm is exercised.
+        response["sections_metadata"] = sections_metadata
+    return server._filter_view_sections(response, requested, result)
+
+
+class TestSectionsDictFilterIsCaseInsensitive:
+    """Codex P2 (#2495): the ``sections=[...]`` dict filter must match case-insensitively.
+
+    ``narrow_body_to_named_sections`` (body arm) and the ``sections_metadata`` arm
+    both match section names case-insensitively, but the structured ``sections``
+    dict filter used a CASE-SENSITIVE ``k in requested`` membership test.  When
+    ``sections=[...]`` named a section differing only by case from the parsed key
+    (e.g. ``["rt-ica"]`` against an ``RT-ICA`` key / ``## RT-ICA`` header), the body
+    arm matched and narrowed the body while the dict arm dropped the metadata —
+    leaving ``sections={}`` with NO ``section_filter_miss`` signal, silently breaking
+    the body/metadata sync contract.
+
+    Only the case-sensitivity of the plural ``sections=[...]`` dict filter changes;
+    the exact-name (not substring) matching semantics are preserved.
+    """
+
+    def test_lowercase_request_keeps_matching_dict_entry_and_body(self) -> None:
+        """``sections=['rt-ica']`` against an ``RT-ICA`` key / ``## RT-ICA`` header.
+
+        RED (pre-fix): the body is narrowed (the body arm is case-insensitive) but the
+        structured ``sections`` dict is empty (the dict arm was case-sensitive), so the
+        caller receives the body slice with ``sections: {}`` and NO ``section_filter_miss``
+        — a silent body/metadata desync.
+        """
+        body = f"## Story\n\nstory body\n\n## RT-ICA\n\nrt-ica body\n\n## Impact Radius\n\n{'pad ' * 50}\n"
+        filtered = _filter_sections_isolated(body, ["RT-ICA"], ["rt-ica"])
+
+        sections = filtered.get("sections")
+        assert isinstance(sections, dict), "filtered response 'sections' must be a dict."
+        assert "RT-ICA" in sections, (
+            "a lowercase 'rt-ica' request must keep the case-differing 'RT-ICA' structured key — "
+            f"the dict filter must be case-insensitive like the body filter; got keys {sorted(sections)}. Codex P2."
+        )
+        assert "rt-ica body" in str(filtered.get("body", "")), (
+            "the body arm narrows case-insensitively; the narrowed RT-ICA slice must be present."
+        )
+        assert "story body" not in str(filtered.get("body", "")), (
+            "only the requested RT-ICA section must remain in the narrowed body."
+        )
+        assert filtered.get("section_filter_miss") is not True, (
+            "a case-differing name that matches a structured key AND a body header is NOT a miss — "
+            "section_filter_miss must not be set. Codex P2."
+        )
+
+    def test_uppercase_request_keeps_matching_dict_entry(self) -> None:
+        """``sections=['RT-ICA']`` (upper) against a lowercase ``rt-ica`` key / ``## rt-ica`` header.
+
+        Mirror of the lowercase case proving the comparison folds case in both
+        directions, not merely lowercasing the request.
+        """
+        body = f"## Summary\n\nsummary body\n\n## rt-ica\n\nlower header body\n\n## Tail\n\n{'pad ' * 50}\n"
+        filtered = _filter_sections_isolated(body, ["rt-ica"], ["RT-ICA"])
+
+        sections = filtered.get("sections")
+        assert isinstance(sections, dict), "filtered response 'sections' must be a dict."
+        assert "rt-ica" in sections, (
+            "an uppercase 'RT-ICA' request must keep the lowercase 'rt-ica' structured key; "
+            f"got keys {sorted(sections)}. Codex P2."
+        )
+        assert "lower header body" in str(filtered.get("body", "")), (
+            "the case-insensitive body arm must narrow to the matching lowercase header slice."
+        )
+        assert filtered.get("section_filter_miss") is not True, (
+            "an uppercase request matching a lowercase key/header is not a miss. Codex P2."
+        )
+
+    def test_case_insensitive_dict_match_keeps_metadata_arm_in_sync(self) -> None:
+        """Compact ``sections_metadata`` arm: a case-differing valid name stays a non-miss.
+
+        Exercises the ``include_content=False`` arm (already case-insensitive from
+        finding #4) alongside the now-aligned dict arm: a lowercase request against a
+        mixed-case metadata entry filters the inventory and does not report a miss.
+        """
+        body = f"## RT-ICA\n\nrt-ica body\n\n## Other\n\n{'pad ' * 50}\n"
+        meta: list[dict[str, object]] = [
+            {"name": "RT-ICA", "num_entries": 1, "num_struck": 0},
+            {"name": "Other", "num_entries": 0, "num_struck": 0},
+        ]
+        filtered = _filter_sections_isolated(body, ["RT-ICA"], ["rt-ica"], sections_metadata=meta)
+
+        kept_meta = _resp_metadata(filtered)
+        kept_names = {str(entry.get("name", "")) for entry in kept_meta}
+        assert kept_names == {"RT-ICA"}, (
+            f"the metadata arm must filter to only the case-insensitively matching name; got {sorted(kept_names)}."
+        )
+        assert filtered.get("section_filter_miss") is not True, (
+            "the dict, body, and metadata arms must all agree this is a match, not a miss. Codex P2."
+        )
+
+    def test_genuinely_absent_name_still_sets_filter_miss(self) -> None:
+        """A name absent from the dict, body headers, AND metadata still sets section_filter_miss.
+
+        Guards that the case-folding change does not weaken the no-match signal: a name
+        that matches nothing — in any case — must still report a miss.
+        """
+        body = f"## Story\n\nstory body\n\n## RT-ICA\n\nrt-ica body\n\n## Tail\n\n{'pad ' * 50}\n"
+        meta: list[dict[str, object]] = [{"name": "RT-ICA", "num_entries": 1, "num_struck": 0}]
+        filtered = _filter_sections_isolated(body, ["RT-ICA"], ["does-not-exist"], sections_metadata=meta)
+
+        assert filtered.get("sections") == {}, "an absent name must leave the structured sections dict empty."
+        assert filtered.get("section_filter_miss") is True, (
+            "a name absent from the dict, body, and metadata in EVERY case must still set "
+            "section_filter_miss — the case-folding fix must not suppress genuine misses. Codex P2."
+        )

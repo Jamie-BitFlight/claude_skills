@@ -1103,8 +1103,11 @@ def _filter_view_sections(
     """Filter the backlog_view response to only the requested sections.
 
     Identity fields (number, title, status, type, priority) are always included.
-    The ``sections`` dict in the response is filtered to the named keys only.
-    All other top-level keys are preserved.
+    The ``sections`` dict in the response is filtered to the named keys only,
+    matched case-insensitively (case-folded, exact-name not substring) so a
+    ``sections=['rt-ica']`` request keeps an ``RT-ICA`` structured key — consistent
+    with the body and ``sections_metadata`` arms (Codex P2, #2495).  All other
+    top-level keys are preserved.
 
     In compact mode (``include_content=False``) the response carries no body and
     an empty ``sections`` dict; the inventory lives in ``sections_metadata``.  The
@@ -1140,23 +1143,31 @@ def _filter_view_sections(
     Returns:
         Filtered response dict (same object, mutated in place).
     """
-    requested: frozenset[str] = frozenset(sections)
-    requested_lower: frozenset[str] = frozenset(s.lower() for s in sections)
+    # Case-folded set of requested names — shared by the structured-dict, body, and
+    # metadata arms so all three match section names case-insensitively (the plural
+    # ``sections=[...]`` contract is exact-name, case-insensitive — Codex P2, #2495).
+    requested_folded: frozenset[str] = frozenset(s.casefold() for s in sections)
     raw_sections = response.get("sections")
     dict_matched = False
     if isinstance(raw_sections, dict):
-        kept = {k: v for k, v in raw_sections.items() if k in requested}
+        # Case-INSENSITIVE membership: a ``sections=['rt-ica']`` request must keep an
+        # ``RT-ICA`` structured key, consistent with ``narrow_body_to_named_sections``
+        # (body arm) and the ``sections_metadata`` arm.  A case-sensitive ``k in
+        # requested`` test silently dropped the metadata while the body arm matched,
+        # desyncing ``sections`` from ``body`` with no ``section_filter_miss`` signal
+        # (Codex P2, #2495).  Exact-name (not substring) semantics are preserved.
+        kept = {k: v for k, v in raw_sections.items() if isinstance(k, str) and k.casefold() in requested_folded}
         response["sections"] = kept
         dict_matched = bool(kept)
     # Compact view (include_content=False) carries no body and an empty ``sections``
     # dict; its inventory lives in ``sections_metadata`` instead.  Match and filter
     # that inventory by name so VALID section names are NOT reported as a miss in
     # compact mode (issue #2495 finding #4).  Names are compared case-insensitively
-    # to mirror the body-header contract.
+    # (case-folded) to mirror the body-header and structured-dict contract.
     raw_metadata = response.get("sections_metadata")
     metadata_matched = False
     if isinstance(raw_metadata, list):
-        kept_meta = [entry for entry in raw_metadata if _metadata_entry_name(entry).lower() in requested_lower]
+        kept_meta = [entry for entry in raw_metadata if _metadata_entry_name(entry).casefold() in requested_folded]
         response["sections_metadata"] = kept_meta
         metadata_matched = bool(kept_meta)
     # Keep the raw body self-consistent with the section filter so a sections=[...]
