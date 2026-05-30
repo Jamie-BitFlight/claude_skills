@@ -20,7 +20,7 @@ Both tests MUST FAIL before the fix is applied and PASS after.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from backlog_core.models import BacklogItem, Section
 from backlog_core.operations import _build_sections_compact, view_item
@@ -28,7 +28,20 @@ from backlog_core.operations import _build_sections_compact, view_item
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-    from backlog_core.models import SectionEntryDict, SectionEntryMetadata, ViewItemResult
+    from backlog_core.models import GroomedSectionMetadata, SectionEntryDict, SectionEntryMetadata, ViewItemResult
+
+
+def _is_section_entry_metadata(
+    section: SectionEntryMetadata | GroomedSectionMetadata,
+) -> TypeGuard[SectionEntryMetadata]:
+    """Narrow a section union to SectionEntryMetadata by presence of the 'entries' key.
+
+    SectionEntryMetadata is discriminated from GroomedSectionMetadata by the 'entries'
+    key (entry-block sections have timestamped entries; groomed sections do not).
+    This TypeGuard lets ty narrow the union after an assertion or conditional check.
+    """
+    return "entries" in section
+
 
 # ---------------------------------------------------------------------------
 # Test body fixtures
@@ -223,7 +236,10 @@ class TestSectionEntryDoesNotIncludeNextSectionHeader:
             "header.  If absent, section parsing failed entirely."
         )
 
-        concerns: SectionEntryMetadata = result.sections["Concerns"]  # type: ignore[assignment]
+        concerns: SectionEntryMetadata | GroomedSectionMetadata = result.sections["Concerns"]
+        assert _is_section_entry_metadata(concerns), (
+            "Concerns section must be a SectionEntryMetadata (entry-block) not a GroomedSectionMetadata"
+        )
         assert concerns["entries"], (
             "Concerns section must have at least one entry.  The body contains plain "
             "text under '### Concerns' so parse_entries must produce one entry."
@@ -267,7 +283,10 @@ class TestSectionEntryDoesNotIncludeNextSectionHeader:
         # Assert — Plan section must be present and clean
         assert "Plan" in result.sections, "result.sections must contain 'Plan' when the body has a '### Plan' header."
 
-        plan: SectionEntryMetadata = result.sections["Plan"]  # type: ignore[assignment]
+        plan: SectionEntryMetadata | GroomedSectionMetadata = result.sections["Plan"]
+        assert _is_section_entry_metadata(plan), (
+            "Plan section must be a SectionEntryMetadata (entry-block) not a GroomedSectionMetadata"
+        )
         assert plan["entries"], "Plan section must have at least one entry."
 
         plan_content = plan["entries"][0]["content"]

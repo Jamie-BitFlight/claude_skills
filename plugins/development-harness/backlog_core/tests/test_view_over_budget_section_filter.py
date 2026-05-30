@@ -52,7 +52,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from backlog_core import operations
-from backlog_core.models import BacklogItem, Section, ViewItemResult
+from backlog_core.models import BacklogItem, Section, SectionEntryDict, ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
 
 if TYPE_CHECKING:
@@ -1556,7 +1556,7 @@ def _drift_view_result() -> ViewItemResult:
         body=f"## RT ICA\n\n{_DRIFT_CONTENT}",
         sections={
             "RT-ICA": operations._SectionMetadata(
-                num_entries=1, num_struck=0, entries=[{"id": "e1", "struck": False, "content": _DRIFT_CONTENT}]
+                num_entries=1, num_struck=0, entries=[SectionEntryDict(id="e1", struck=False, content=_DRIFT_CONTENT)]
             )
         },
     )
