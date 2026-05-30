@@ -138,7 +138,20 @@ Plan artifacts are registered in a structured manifest stored in the GitHub Issu
 - `artifact_get` — Get metadata for a specific artifact type on an issue
 - `artifact_read` — Read artifact file content from root worktree path (with path safety validation)
 
-**Artifact types:** `feature-context`, `architect`, `task-plan`, `codebase-analysis`, `T0-baseline`, `TN-verification`, `dispatch-plan`, `audit-report`
+**Artifact types and owners:**
+
+| Type | Owner agent | Notes |
+|---|---|---|
+| `feature-context` | `@dh:feature-researcher` | S1 discovery output |
+| `architect` | `@dh:swarm-task-planner` | S2 architecture output |
+| `task-plan` | SAM (`sam_plan create`) | Auto-registered on plan creation |
+| `codebase-analysis` | **`@dh:code-reviewer`** | Code review verdict; read by `complete-implementation` Phase T1 |
+| `T0-baseline` | `@dh:t0-baseline-capture` | Pre-implementation baseline |
+| `TN-verification` | `@dh:tn-verification-gate` | Post-implementation verification |
+| `dispatch-plan` | `dispatch_create_plan` | Milestone dispatch plan |
+| `audit-report` | **`@dh:doc-drift-auditor`** | Documentation drift audit; NOT used by `@dh:code-reviewer` |
+
+**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
 
 **Registration:** Producers call `artifact_register` after creation. Auto-registration is built into `sam_create` and `backlog_update(plan=...)`.
 
