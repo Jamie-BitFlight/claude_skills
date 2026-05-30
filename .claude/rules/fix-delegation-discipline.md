@@ -1,6 +1,6 @@
 # Fix Delegation Discipline
 
-When delegating a bug fix to any agent (subagent, kage-bunshin, teammate), the delegation prompt MUST follow the reproduction-first cycle. Applies to all fix work — ad-hoc prompts, SAM tasks, kage-bunshin session prompts.
+Delegation prompts for bug fixes MUST follow the reproduction-first cycle — applies to all agent types (subagent, kage-bunshin, teammate).
 
 ## Fix Cycle
 
@@ -58,7 +58,7 @@ If it still fails, research the root cause and repeat. After 3 cycles without pr
 
 ## Wrong / Right Examples
 
-### Ad-hoc agent delegation
+### Single failure (canonical)
 
 **Wrong** — no reproduction, no validation:
 
@@ -81,15 +81,9 @@ Re-run the exact same reproduction command. If it passes, commit and report DONE
 If it still fails, research the root cause and repeat. After 3 cycles without progress, report BLOCKED.
 ```
 
-### Kage-bunshin session prompts
+### Multiple failures (kage-bunshin / batch)
 
-**Wrong** — no reproduction steps:
-
-```text
-Fix the CI failures. Check gh run view and fix what you find.
-```
-
-**Right** — reproduction cycle for each failure:
+When a prompt covers several independent failures, list each reproduction command separately and apply the cycle to each independently:
 
 ```text
 Problem: Three CI failures on main — ruff ANN401, ty unresolved-attribute, pytest ImportError

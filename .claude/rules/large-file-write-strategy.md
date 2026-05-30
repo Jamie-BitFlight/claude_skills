@@ -67,14 +67,7 @@ Read the completed file. Confirm:
 
 ## Wrong / Right Examples
 
-**Wrong** -- single Write call with 40K characters:
-
-```python
-# 40K character string assembled in memory
-content = frontmatter + section_1 + section_2 + section_3 + section_4
-# Single Write risks truncation or timeout
-Write(file_path="plan/architect-auth-system.md", content=content)
-```
+**Wrong** -- assembling a 40K+ string and issuing a single `Write` call risks truncation or timeout.
 
 **Right** -- Write skeleton (~2K chars), then Edit calls filling each section (3-5K chars each):
 
@@ -107,14 +100,10 @@ title: Auth System Architecture
 <!-- PENDING: Error taxonomy and recovery strategies -->
 """)
 
-# Step 3: Fill each section individually
+# Step 3: Fill each section individually — one Edit per section
 Edit(file_path="plan/architect-auth-system.md",
      old_string="<!-- PENDING: System overview and goals -->",
      new_string="The auth system provides token-based authentication...")
-
-Edit(file_path="plan/architect-auth-system.md",
-     old_string="<!-- PENDING: Entity definitions and relationships -->",
-     new_string="### User\n\n| Field | Type | Constraint |...")
 
 # ... one Edit per section ...
 

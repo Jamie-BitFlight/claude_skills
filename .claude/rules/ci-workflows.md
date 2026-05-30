@@ -13,9 +13,8 @@ Before writing/modifying workflow YAML:
 
 1. Read existing workflow file(s) in `.github/workflows/` to understand current state
 2. Identify specific problem/requirement (broken, missing, needs change)
-3. Research best practices for pattern needed (quality gates, caching, matrix builds)
-4. Search established patterns in mature projects (CPython, Rust, TypeScript)
-5. Document findings: patterns, trade-offs, scenario fit
+3. Research best practices and search established patterns in mature projects (CPython, Rust, TypeScript)
+4. Document findings: patterns, trade-offs, scenario fit
 
 **Gate**: State what pattern to use and why, citing at least one external reference.
 
@@ -47,9 +46,8 @@ Before executing, review plan:
 Implement plan:
 
 1. Make changes to workflow YAML files
-2. Validate workflow structure: `uv run prek run --files .github/workflows/<file>` (runs `actionlint` for schema validation and `check-yaml` for parsability)
-3. Run `uv run prek run --files <file>` for non-workflow files if applicable
-4. Commit with descriptive message explaining what changed and why
+2. Validate: `uv run prek run --files <file>` (workflow and non-workflow files)
+3. Commit with descriptive message explaining what changed and why
 
 **Gate**: Changes committed and pass local validation.
 
@@ -57,7 +55,7 @@ Implement plan:
 
 After execution, verify:
 
-1. Re-read modified workflow file(s) and confirm match plan
+1. Confirm modified workflow file(s) match plan
 2. Trace quality gate logic: which jobs required? Which advisory? Does gate correctly aggregate?
 3. Confirm no exit codes swallowed (`|| true`, `|| echo`, bare `continue-on-error` without explanation)
 4. If pre-existing failures exist, confirm handled via `alls-green` allowed-failures pattern (not masked)
@@ -76,7 +74,7 @@ Repository uses `alls-green` quality gate pattern (following CPython established
 - Jobs with known pre-existing failures listed in `allowed-failures`
 - Gate passes if all non-allowed jobs succeed and allowed jobs either succeed or fail
 
-**Implementation:** Uses `re-actors/alls-green` action.
+**Implementation:** Uses `re-actors/alls-green` action — verify the current pinned version in `.github/workflows/`.
 
 ```yaml
 quality-gate:
@@ -85,7 +83,7 @@ quality-gate:
   needs: [lint, test, type-check, validate-plugins]
   runs-on: ubuntu-latest
   steps:
-    - uses: re-actors/alls-green@v1.2.2
+    - uses: re-actors/alls-green@<version>
       with:
         allowed-failures: validate-plugins
         jobs: ${{ toJSON(needs) }}

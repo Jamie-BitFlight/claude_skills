@@ -64,8 +64,7 @@ Key properties:
 @subagent-refactorer
 ```
 
-Claude reads `@subagent-refactorer` as a reference notation, not an instruction. There is no
-context, no output, and no agent routing.
+No context, no output, no agent routing — Claude reads `@name` as reference notation, not instruction.
 
 ### 2. Tool API call templates
 
@@ -74,8 +73,7 @@ context, no output, and no agent routing.
 Agent(subagent_type="plugin-creator:subagent-refactorer", prompt="Fix the agent")
 ```
 
-This is Tool API syntax. Workflow documentation is not code. Claude already knows the Agent tool
-signature. Embedding call templates in docs teaches nothing and adds noise.
+Tool API syntax belongs in code, not workflow docs. Use the Correct Format above.
 
 ### 3. Arrow routing notation
 
@@ -84,8 +82,7 @@ signature. Embedding call templates in docs teaches nothing and adds noise.
 Step 3 → subagent_type="plugin-creator:subagent-refactorer"
 ```
 
-Arrow notation identifies a destination but omits workflow context (what to pass) and expected
-output (what to verify). The agent receiving this has no basis for writing a delegation prompt.
+Omits context (what to pass) and output (what to verify).
 
 ### 4. Act-as roleplay in general-purpose Task
 
@@ -94,9 +91,7 @@ output (what to verify). The agent receiving this has no basis for writing a del
 Use a general-purpose agent and tell it to act as @subagent-refactorer
 ```
 
-A general-purpose agent roleplaying a specialist does not load the specialist's skills,
-does not apply the specialist's training, and produces lower-quality output. Use the actual
-specialist agent.
+Roleplay does not load the specialist's skills or training. Use the actual specialist agent.
 
 ### 5. Tables with subagent_type column
 
@@ -107,8 +102,7 @@ specialist agent.
 | 3    | plugin-creator:subagent-refactorer | fix prompt |
 ```
 
-Tables flatten context and output into generic columns. The agent reading this cannot determine
-what to pass or what to verify. Tables are acceptable for flat data — not for workflow steps.
+Tables flatten context and output into generic columns. The agent cannot determine what to pass or verify. Tables are acceptable for flat data — not for workflow steps.
 
 ### 6. `\n` in Mermaid node labels
 
@@ -132,4 +126,3 @@ Colons inside Mermaid quoted strings can break rendering. Use `=` for assignment
 # CORRECT
 Fix["subagent_type='plugin-creator:subagent-refactorer'"]
 ```
-
