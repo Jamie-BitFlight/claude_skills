@@ -53,7 +53,7 @@ from typing import TYPE_CHECKING, Any
 
 from ruamel.yaml import YAML
 
-from .exceptions import ArtifactWriteError, PlanIndexError
+from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -550,11 +550,114 @@ class GistTaskLayer:
         }
         return summary
 
+    # ------------------------------------------------------------------
+    # Mutation helpers (T4)
+    # ------------------------------------------------------------------
+
+    def _resolve_issue(self, plan_id: str) -> int | None:
+        """Resolve plan_id to its GitHub issue number via the plan index.
+
+        Returns ``None`` when the plan is local-only or the index has no entry.
+        Index read failures are treated as a non-fatal miss — the caller decides
+        whether to degrade to local-only or raise.
+
+        Args:
+            plan_id: Plan identifier to resolve.
+
+        Returns:
+            GitHub issue number, or ``None`` when not found.
+        """
+        try:
+            return self._plan_index.resolve(plan_id)
+        except Exception:  # noqa: BLE001 — index read failures treated as miss
+            _log.warning(
+                "GistTaskLayer._resolve_issue: plan_index.resolve failed for %s — treating as local-only", plan_id
+            )
+            return None
+
+    def _read_local_yaml_for_plan(self, plan_id: str) -> str:
+        """Read the current local YAML file for a plan.
+
+        Used after a local-backend mutation to retrieve the updated YAML
+        content for Gist write-through.
+
+        Args:
+            plan_id: Plan identifier whose local YAML to read.
+
+        Returns:
+            YAML content string of the current (post-mutation) local file.
+
+        Raises:
+            ArtifactWriteError: When the local file cannot be found or read.
+        """
+        try:
+            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+        except Exception as exc:
+            msg = f"cannot resolve local path for plan {plan_id}: {exc}"
+            _log.error("GistTaskLayer._read_local_yaml_for_plan: %s", msg)
+            raise ArtifactWriteError(plan_id=plan_id, issue=None, reason=msg) from exc
+        return self._read_local_yaml(plan_id, local_path)
+
+    def _write_through(self, plan_id: str, issue: int) -> None:
+        """Read the current local YAML and upload it to Gist.
+
+        Implements the mandatory write-through step in mutation operations
+        (ADR-2509-5): reads the post-mutation local YAML and calls
+        ``artifact_client.store()``.  Raises ``ArtifactWriteError`` on any
+        failure — no silent fallback.
+
+        Args:
+            plan_id: Plan identifier whose YAML to upload.
+            issue: GitHub issue number keying the Gist artifact.
+
+        Raises:
+            ArtifactWriteError: When the local YAML cannot be read, or when
+                the Gist upload fails.
+        """
+        yaml_content = self._read_local_yaml_for_plan(plan_id)
+        try:
+            self._artifact_client.store(issue=issue, content=yaml_content)
+            _log.info("GistTaskLayer._write_through: uploaded plan %s YAML to Gist (issue #%d)", plan_id, issue)
+        except ArtifactWriteError:
+            _log.error(
+                "GistTaskLayer._write_through: Gist upload failed for plan %s (issue #%d) — raising", plan_id, issue
+            )
+            raise
+
     def update_plan_fields(
         self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
     ) -> None:
-        """Update top-level plan fields.  Delegates to local backend (T4 adds write-through)."""
+        """Update top-level plan fields with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate mutation to ``local_backend.update_plan_fields()`` (writes local YAML).
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: read the post-mutation local YAML and upload to Gist
+           via ``artifact_client.store()`` (raises ``ArtifactWriteError`` on failure).
+        4. If issue is ``None`` (local-only plan): log a warning; local write is the
+           only persistence (no Gist key available).
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            context: When provided, replaces the plan context narrative.
+            set_fields: Optional mapping of field names to new values.
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+        """
+        # Step 1: apply mutation locally first.
         self._local.update_plan_fields(plan_id, context=context, set_fields=set_fields)
+
+        # Steps 2-4: Gist write-through when issue is known.
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning(
+                "GistTaskLayer.update_plan_fields: plan %s has no issue — local-only write, not portable", plan_id
+            )
+            return
+        self._write_through(plan_id, issue)
 
     def read_task(self, plan_id: str, task_id: str) -> TaskData:
         """Read a single task, routing through Gist-first :meth:`read_plan`.
@@ -580,44 +683,274 @@ class GistTaskLayer:
         return self._local.read_task(plan_id, task_id)
 
     def claim_task(self, plan_id: str, task_id: str) -> bool:
-        """Claim a task.  Delegates to local backend (T4 resolves atomicity — ADR-2509-3).
+        """Claim a task, raising for local-only plans; delegating to local backend otherwise.
+
+        **Atomicity decision (ADR-2509-3 resolution — Option 3: Serialized Dispatch):**
+
+        GitHub's label mutation API (``addLabels``/``removeLabels``) is idempotent and
+        non-conditional as of 2026-05-30 — there is no native compare-and-swap primitive.
+        Gist blob read-modify-write also provides no CAS guarantee.
+
+        **Chosen mechanism**: The exactly-once guarantee is provided by the caller
+        (dispatch orchestrator), not by ``claim_task`` itself.  The MCP dispatch loop
+        in ``implement-feature`` sequences claim calls one at a time — only one task
+        is claimed per orchestrator per dispatch wave, and the orchestrator waits for
+        the claim response before dispatching the next task.  Under this single-writer
+        dispatch pattern, two agents never race on the same task.
+
+        **Declared contract deviation**: ``GistTaskLayer.claim_task()`` does NOT provide
+        exactly-once in isolation.  If two callers invoke ``claim_task`` concurrently on
+        the same task, both may return ``True``.  Exactly-once is guaranteed only when the
+        caller serializes claims (Dispatch pattern, ADR-1770-1 single-writer scope).
+        This deviation is documented here and must be noted in CLAUDE.md (T6).
+
+        **Why not Option 1 (GitHub conditional mutation)**: No such primitive exists in
+        the GitHub REST or GraphQL API as of 2026-05-30.  ``addLabels``/``removeLabels``
+        are idempotent, not conditional.  Prescribing a non-existent primitive would be
+        a silent failure.
+
+        **Why not Option 2 (external lock)**: Adds operational complexity (Redis, or a
+        separate Gist-based lock file with its own race conditions) with no benefit when
+        the dispatch pattern already serializes via Option 3.
+
+        **Why not Option 4 (accept eventual consistency)**: Duplicate work detection
+        requires idempotent task outputs, which is not guaranteed by the TaskBackend
+        Protocol.  It is the highest-ambiguity option and produces the weakest guarantee.
+
+        **Verification**: Two concurrent ``claim_task`` calls on the same local-YAML plan
+        through the existing ``LocalYamlTaskProvider`` both return ``True`` (a known race
+        in the pre-T4 state — the local YAML provider reads then writes non-atomically).
+        Under the serialized-dispatch contract the orchestrator prevents this race at the
+        caller level.  A unit test demonstrating the deviation is in ``tests_sam/`` (T5).
+
+        **Write-back after claim**: After a successful local claim, a best-effort Gist
+        write-back updates the YAML blob so ``read_plan`` returns consistent task status.
+        A write-back failure logs a WARNING and does not roll back the claim — the local
+        YAML is the authoritative claim record.
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            task_id: Task identifier within the plan.
 
         Returns:
-            ``True`` if the task was successfully claimed; ``False`` otherwise.
+            ``True`` if the task was successfully claimed; ``False`` if the task was
+            not in ``not-started`` status (already claimed, complete, or skipped).
+
+        Raises:
+            ConcurrentClaimUnsupportedError: When ``plan_id`` resolves to a local-only
+                plan (``issue=None``).  Parallel claim has no GitHub anchor for
+                coordination.
+            PlanNotFoundError: Propagated from local backend.
+            TaskNotFoundError: Propagated from local backend.
         """
-        return self._local.claim_task(plan_id, task_id)
+        # Resolve issue to gate on local-only plans.
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            # Raise immediately — local-only plans cannot support concurrent claim.
+            # Single-agent workflows that do not share plans across agents may still
+            # call claim_task on local-only plans via LocalYamlTaskProvider directly.
+            raise ConcurrentClaimUnsupportedError(plan_id)
+
+        # Delegate claim to the local backend (non-atomic read-then-write under ADR-2509-3).
+        claimed = self._local.claim_task(plan_id, task_id)
+
+        if claimed:
+            # Best-effort write-back: update Gist YAML so read_plan returns in-progress.
+            try:
+                self._write_through(plan_id, issue)
+                _log.info(
+                    "GistTaskLayer.claim_task: wrote back claimed status for %s/%s to Gist (issue #%d)",
+                    plan_id,
+                    task_id,
+                    issue,
+                )
+            except ArtifactWriteError as exc:
+                # Write-back failure: claim is still valid (label/local already updated).
+                # Log at WARNING; do not roll back the claim.
+                _log.warning(
+                    "GistTaskLayer.claim_task: Gist write-back failed for %s/%s (issue #%d): %s "
+                    "— claim is recorded locally but Gist YAML may be stale",
+                    plan_id,
+                    task_id,
+                    issue,
+                    exc,
+                )
+
+        return claimed
 
     def update_task_status(self, plan_id: str, task_id: str, status: str) -> None:
-        """Update task status.  Delegates to local backend (T4 adds write-through)."""
+        """Update task status with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate mutation to ``local_backend.update_task_status()``.
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            task_id: Task identifier within the plan.
+            status: New status string (must be a valid ``TaskStatus`` value).
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+            TaskNotFoundError: Propagated from ``local_backend``.
+            TaskValidationError: When ``status`` is not a valid ``TaskStatus`` value.
+        """
         self._local.update_task_status(plan_id, task_id, status)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning(
+                "GistTaskLayer.update_task_status: plan %s has no issue — local-only write, not portable", plan_id
+            )
+            return
+        self._write_through(plan_id, issue)
 
     def update_task_fields(self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
-        """Update task fields.  Delegates to local backend (T4 adds write-through)."""
+        """Update task fields with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate mutation to ``local_backend.update_task_fields()``.
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            task_id: Task identifier within the plan.
+            fields: Mapping of field names to new values.
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+            TaskNotFoundError: Propagated from ``local_backend``.
+        """
         self._local.update_task_fields(plan_id, task_id, fields)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning(
+                "GistTaskLayer.update_task_fields: plan %s has no issue — local-only write, not portable", plan_id
+            )
+            return
+        self._write_through(plan_id, issue)
 
     def update_task(self, plan_id: str, task: Task) -> None:
-        """Replace a stored task.  Delegates to local backend (T4 adds write-through)."""
+        """Replace a stored task with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate full task replacement to ``local_backend.update_task()``.
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            task: Fully-validated Task model whose ``id`` identifies the target
+                task within the plan.
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+            TaskNotFoundError: Propagated from ``local_backend``.
+        """
         self._local.update_task(plan_id, task)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning("GistTaskLayer.update_task: plan %s has no issue — local-only write, not portable", plan_id)
+            return
+        self._write_through(plan_id, issue)
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
-        """Append a markdown section to a task.  Delegates to local backend."""
+        """Append a markdown section to a task with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate to ``local_backend.append_task_section()``.
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Backend-assigned plan identifier.
+            task_id: Task identifier within the plan.
+            section_name: Markdown heading name for the section (without ``##``).
+            content: Markdown content to append.
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+            TaskNotFoundError: Propagated from ``local_backend``.
+        """
         self._local.append_task_section(plan_id, task_id, section_name, content)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning(
+                "GistTaskLayer.append_task_section: plan %s has no issue — local-only write, not portable", plan_id
+            )
+            return
+        self._write_through(plan_id, issue)
 
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
-        """Append a task to an existing plan.  Delegates to local backend (T4 adds write-through).
+        """Append a task to an existing plan with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate to ``local_backend.append_task()`` (single-writer per ADR-1770-1).
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Plan identifier.
+            task: Validated Task model to append.
 
         Returns:
-            Dict with ``appended`` (bool) and ``task_id`` (str) keys.
+            ``{"appended": True, "task_id": task.id}``
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
+            TaskValidationError: When the task ID already exists in the plan.
         """
-        return self._local.append_task(plan_id, task)
+        result = self._local.append_task(plan_id, task)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning("GistTaskLayer.append_task: plan %s has no issue — local-only write, not portable", plan_id)
+            return result
+        self._write_through(plan_id, issue)
+        return result
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
-        """Finalize a plan from drafting to ready state.  Delegates to local backend (T4 adds write-through).
+        """Finalize a plan with mandatory Gist write-through (ADR-2509-5).
+
+        Read-modify-write flow:
+
+        1. Delegate to ``local_backend.finalize_plan()`` to set ``state=ready``.
+        2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
+        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
+        4. If issue is ``None``: log warning; local-only write.
+
+        Args:
+            plan_id: Plan identifier.
 
         Returns:
-            Dict with ``finalized`` (bool) and ``state`` (str) keys.
+            ``{"finalized": True, "state": "ready"}``
+
+        Raises:
+            ArtifactWriteError: When Gist write fails and plan has an issue.
+            PlanNotFoundError: Propagated from ``local_backend``.
         """
-        return self._local.finalize_plan(plan_id)
+        result = self._local.finalize_plan(plan_id)
+        issue = self._resolve_issue(plan_id)
+        if issue is None:
+            _log.warning("GistTaskLayer.finalize_plan: plan %s has no issue — local-only write, not portable", plan_id)
+            return result
+        self._write_through(plan_id, issue)
+        return result
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
         """Return tasks ready for dispatch, routing through Gist-first :meth:`read_plan`.

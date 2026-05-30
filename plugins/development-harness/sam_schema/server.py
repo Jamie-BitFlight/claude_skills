@@ -39,7 +39,13 @@ from sam_schema.core.action_models import (
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import ArtifactWriteError, PlanNotFoundError, SamError, TaskNotFoundError
+from sam_schema.core.exceptions import (
+    ArtifactWriteError,
+    ConcurrentClaimUnsupportedError,
+    PlanNotFoundError,
+    SamError,
+    TaskNotFoundError,
+)
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
@@ -75,6 +81,40 @@ try:
     get_context_config()
 except RuntimeError:
     set_context_config(ContextConfig(backend=create_context_backend()))
+
+
+def _claim_task_via_backend(backend: TaskBackend, plan_id: str, task_id: str) -> tuple[bool, str | None]:
+    """Claim a task, falling back to the local backend for local-only plans.
+
+    Returns a ``(claimed, warning)`` tuple where *warning* is non-``None`` when
+    the claim fell back to the local backend because the plan has no GitHub issue.
+    ADR-2509-3: exactly-once is provided by serialized dispatch at the caller level.
+
+    Args:
+        backend: Backend to attempt claim through.
+        plan_id: Plan identifier.
+        task_id: Task identifier.
+
+    Returns:
+        ``(True, None)`` on successful Gist-backed claim.
+        ``(True, warning_str)`` when claim fell back to local backend.
+        ``(False, None)`` when task is not claimable.
+    """
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+
+    try:
+        return backend.claim_task(plan_id, task_id), None
+    except ConcurrentClaimUnsupportedError:
+        # Local-only plan (issue=None): fall back to local backend claim.
+        local_backend = backend._local if isinstance(backend, GistTaskLayer) else backend  # noqa: SLF001
+        claimed = local_backend.claim_task(plan_id, task_id)
+        warning = (
+            f"Plan '{plan_id}' has no associated GitHub issue — claimed locally only. "
+            "Parallel dispatch is not supported for local-only plans. "
+            "Associate a GitHub issue with this plan for multi-agent dispatch support."
+        )
+        _log.warning("_claim_task_via_backend: %s", warning)
+        return claimed, warning
 
 
 def _get_backend(plan_dir_str: str) -> TaskBackend:
@@ -597,15 +637,14 @@ def sam_task(
         Action-specific dict. See individual action descriptions.
     """
     backend = _get_backend(plan_dir)
-    plan_id = plan
 
     match config.action:
         case "read":
-            plan_data = backend.read_plan(plan_id)
-            task_data = backend.read_task(plan_id, task)
+            plan_data = backend.read_plan(plan)
+            task_data = backend.read_task(plan, task)
             task_model = Task.model_validate(task_data)
             assignment = TaskAssignment(
-                plan_number=plan_data.get("plan_id", plan_id),
+                plan_number=plan_data.get("plan_id", plan),
                 plan_slug=plan_data.get("feature") or None,
                 plan_goal=plan_data.get("goal") or None,
                 plan_context=plan_data.get("context") or None,
@@ -617,10 +656,13 @@ def sam_task(
             return assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
 
         case "claim":
-            claimed = backend.claim_task(plan_id, task)
+            # ADR-2509-3: GistTaskLayer raises ConcurrentClaimUnsupportedError for
+            # local-only plans.  _claim_task_via_backend falls back to the local
+            # backend for single-agent workflows and returns a warning string.
+            claimed, claim_warning = _claim_task_via_backend(backend, plan, task)
             if not claimed:
                 try:
-                    task_data = backend.read_task(plan_id, task)
+                    task_data = backend.read_task(plan, task)
                     current_status = task_data["status"]
                 except (PlanNotFoundError, TaskNotFoundError, SamError):
                     return {
@@ -630,22 +672,27 @@ def sam_task(
                 else:
                     return {
                         "claimed": False,
-                        "error": f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'.",
+                        "error": (
+                            f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."
+                        ),
                     }
-            return {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
+            result: dict[str, object] = {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
+            if claim_warning is not None:
+                result["warnings"] = [claim_warning]
+            return result
 
         case "state":
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
-            backend.update_task_status(plan_id, task, config.status)
+            backend.update_task_status(plan, task, config.status)
             if config.status == TaskStatus.FAILED:
-                plan_data = backend.read_plan(plan_id)
+                plan_data = backend.read_plan(plan)
                 tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
                 graph = DependencyGraph(tasks)
                 skipped: list[str] = graph.mark_downstream_skipped(task)
                 for skipped_task_id in skipped:
-                    backend.update_task_status(plan_id, skipped_task_id, TaskStatus.SKIPPED)
-                    backend.update_task_fields(plan_id, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
+                    backend.update_task_status(plan, skipped_task_id, TaskStatus.SKIPPED)
+                    backend.update_task_fields(plan, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
                 return {"id": task, "status": config.status, "skipped_downstream": skipped}
             return {"id": task, "status": config.status}
 
@@ -654,11 +701,11 @@ def sam_task(
                 raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
             update_config = config
             if update_config.set_fields_json is not None:
-                validated_task = _validated_task_patch(backend, plan_id, task, update_config.set_fields_json)
-                backend.update_task(plan_id, validated_task)
+                validated_task = _validated_task_patch(backend, plan, task, update_config.set_fields_json)
+                backend.update_task(plan, validated_task)
             if update_config.append_section is not None:
                 backend.append_task_section(
-                    plan_id, task, update_config.append_section, update_config.section_content or ""
+                    plan, task, update_config.append_section, update_config.section_content or ""
                 )
             return {"updated": True, "address": f"{plan}/{task}"}
 
