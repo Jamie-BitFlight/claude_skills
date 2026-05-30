@@ -127,6 +127,11 @@ make it explicit, then split. Examples:
 **The tell:** any instruction containing "ensure … follows", "review for", "look for …
 opportunities", or a named framework is an implicit (or pre-partitioned) checklist.
 
+For the full typology of implicit-checklist patterns grouped by partition-readiness — named
+principle sets, "modernization / idiomatic / pythonic", "review X for quality", and
+prompt-engineering / skill-quality self-review (with per-pattern examples) — load
+[./references/partitioning-patterns.md](./references/partitioning-patterns.md).
+
 ## Prior Art and Reference Implementation
 
 The pattern is already running in-repo as a partial implementation:
