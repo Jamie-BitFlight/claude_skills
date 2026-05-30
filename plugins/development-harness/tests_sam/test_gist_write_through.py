@@ -28,7 +28,7 @@ from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import Task, TaskStatus
-from sam_schema.core.plan_id_index import PlanIdIndex
+from sam_schema.core.plan_id_index import PlanIdIndex, PlanIndexEntry, _serialize_index_yaml
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -483,3 +483,157 @@ def test_full_content_equality_roundtrip(gist_layer: GistTaskLayer, store: _InMe
     deps_t3 = by_id["T3"].get("dependencies") or []
     assert "T1" in deps_t3
     assert "T2" in deps_t3
+
+
+# ---------------------------------------------------------------------------
+# Counting store subclass — used by perf-fix behavioral tests
+# ---------------------------------------------------------------------------
+
+
+class _CountingArtifactStore(_InMemoryArtifactStore):
+    """_InMemoryArtifactStore subclass that tracks read() and read_index() call counts.
+
+    Overrides both read methods to increment counters before delegating to the
+    parent.  Using a proper subclass avoids assigning plain closures to method
+    attributes, which would confuse ty's type checker.
+    """
+
+    def __init__(self) -> None:
+        """Initialise with zero call counters."""
+        super().__init__()
+        self.read_call_count: int = 0
+        self.read_index_call_count: int = 0
+
+    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+        """Increment read_call_count, then delegate to parent.
+
+        Args:
+            issue: GitHub issue number keying the artifact.
+            artifact_type: Artifact type key (default ``"task-plan"``).
+
+        Returns:
+            Stored content string, or ``None`` when absent.
+        """
+        self.read_call_count += 1
+        return super().read(issue, artifact_type)
+
+    def read_index(self, sentinel_issue: int) -> str | None:
+        """Increment read_index_call_count, then delegate to parent.
+
+        Args:
+            sentinel_issue: Sentinel issue number keying the index blob.
+
+        Returns:
+            Stored index YAML string, or ``None`` when absent.
+        """
+        self.read_index_call_count += 1
+        return super().read_index(sentinel_issue)
+
+
+# ---------------------------------------------------------------------------
+# Perf fix: PlanIdIndex session cache (T1 / plan_id_index.py)
+# ---------------------------------------------------------------------------
+
+
+def test_read_entries_cache_reduces_gist_calls() -> None:
+    """Session cache: multiple resolve/list_all calls trigger at most one Gist index fetch.
+
+    Verifies that PlanIdIndex._read_entries() caches its result so repeated
+    calls to resolve() and list_all() within the same invocation do not each
+    perform a separate Gist round-trip.  The read_index_call_count on the
+    counting store must equal 1 regardless of how many public methods are invoked.
+    """
+    counting_store = _CountingArtifactStore()
+    client = _make_fake_client(counting_store)
+    index = PlanIdIndex(artifact_client=client, sentinel_issue=_SENTINEL_ISSUE)
+
+    # Pre-populate the index store with one entry (bypassing register so the
+    # counter starts from a clean state without counting the setup fetch).
+    initial_entry = PlanIndexEntry(
+        plan_id="Pabc12345", issue=100, slug="cache-test-plan", created_at="2026-01-01T00:00:00Z"
+    )
+    counting_store.store_index(_SENTINEL_ISSUE, _serialize_index_yaml([initial_entry]))
+    counting_store.read_index_call_count = 0  # reset after setup
+
+    # Three operations on the same object — should only fetch from Gist once.
+    result_resolve_1 = index.resolve("Pabc12345")
+    result_list_all = index.list_all()
+    result_resolve_2 = index.resolve("Pabc12345")
+
+    assert result_resolve_1 == 100, "resolve() must return the correct issue number"
+    assert len(result_list_all) == 1, "list_all() must return the one registered entry"
+    assert result_resolve_2 == 100, "second resolve() must still return correct issue"
+    assert counting_store.read_index_call_count == 1, (
+        f"Expected exactly 1 Gist index fetch for 3 public method calls, got {counting_store.read_index_call_count}"
+    )
+
+
+def test_register_updates_cache_in_place() -> None:
+    """After register(), the cache reflects the new entry without a re-fetch.
+
+    Verifies that PlanIdIndex.register() updates _entries_cache to the
+    written state so the next resolve()/list_all() in the same invocation
+    returns the registered entry without an extra Gist round-trip.
+    """
+    counting_store = _CountingArtifactStore()
+    client = _make_fake_client(counting_store)
+    index = PlanIdIndex(artifact_client=client, sentinel_issue=_SENTINEL_ISSUE)
+
+    # register() reads entries once (empty index → 1 fetch), then writes and
+    # updates the cache.  A subsequent resolve() must not trigger a second fetch.
+    index.register(plan_id="Pnew00001", issue=999, slug="new-plan")
+    calls_after_register = counting_store.read_index_call_count
+
+    resolved = index.resolve("Pnew00001")
+
+    assert resolved == 999, "resolve() must return issue registered in the same invocation"
+    assert counting_store.read_index_call_count == calls_after_register, (
+        "resolve() after register() must not trigger an additional Gist fetch (cache hit expected)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Perf fix: list_plans N+1 elimination (T1 / gist_task_layer.py)
+# ---------------------------------------------------------------------------
+
+
+def test_list_plans_no_gist_content_fetch_for_index_only_plans(tmp_path: Path) -> None:
+    """list_plans must not call artifact_client.read() for index-only plans.
+
+    Verifies that GistTaskLayer.list_plans() synthesises PlanSummary objects
+    from index metadata alone — without fetching the full plan YAML blob from
+    Gist for each index-only plan.  This prevents the N+1 API call pattern
+    that grows unboundedly with the number of registered plans.
+    """
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    local_backend = LocalYamlTaskProvider(plan_dir)
+    counting_store = _CountingArtifactStore()
+    client = _make_fake_client(counting_store)
+    plan_index = _make_fake_plan_index(client, sentinel_issue=_SENTINEL_ISSUE)
+    layer = GistTaskLayer(local_backend=local_backend, artifact_client=client, plan_index=plan_index)
+
+    # Register two plans in the index (no local files, no Gist content store).
+    plan_index.register(plan_id="Pindex001", issue=201, slug="index-plan-alpha")
+    plan_index.register(plan_id="Pindex002", issue=202, slug="index-plan-beta")
+
+    # Reset counter — register() writes the index but never calls read().
+    counting_store.read_call_count = 0
+
+    # list_plans — must not call read() for either index-only plan.
+    summaries = layer.list_plans()
+
+    assert counting_store.read_call_count == 0, (
+        f"list_plans must not call artifact_client.read(), got {counting_store.read_call_count} call(s)"
+    )
+
+    # Both index-only plans must appear in the result with index-derived metadata.
+    plan_ids = {s["plan_id"] for s in summaries}
+    assert "Pindex001" in plan_ids, "Index-only plan Pindex001 must appear in list_plans result"
+    assert "Pindex002" in plan_ids, "Index-only plan Pindex002 must appear in list_plans result"
+
+    by_id = {s["plan_id"]: s for s in summaries}
+    assert by_id["Pindex001"]["feature"] == "index-plan-alpha", "feature must equal the index slug"
+    assert by_id["Pindex001"]["issue"] == "201", "issue must be serialised to str from index entry"
+    assert by_id["Pindex002"]["feature"] == "index-plan-beta"
+    assert by_id["Pindex002"]["issue"] == "202"

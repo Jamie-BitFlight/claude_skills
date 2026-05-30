@@ -29,8 +29,8 @@ Read-path contract (ADR-2509-5):
     ``list_plans`` merges the ``PlanIdIndex`` (Gist-registered plans) with
     ``LocalYamlTaskProvider.list_plans()`` (local YAML files), deduplicates by
     ``plan_id`` (Gist precedence), then applies search/offset/limit.  For index-only
-    plans not present in the local cache, the YAML is fetched from Gist and a summary
-    is computed from the blob content.
+    plans not present in the local cache, a minimal summary is synthesised from the
+    index entry metadata (``plan_id``, ``slug``, ``issue``) — no extra Gist round-trip.
 
 T2 scope:
     ``create_plan`` write-through.
@@ -108,8 +108,9 @@ class GistTaskLayer:
     - Merges ``PlanIdIndex.list_all()`` (Gist-registered) with
       ``LocalYamlTaskProvider.list_plans()`` (local YAML files).
     - Deduplicates by ``plan_id`` (Gist entry takes precedence).
-    - For index-only plans (not in local cache), fetches YAML from Gist to
-      construct a full :class:`PlanSummary`.
+    - For index-only plans (not in local cache), synthesises a minimal
+      :class:`PlanSummary` from the index entry (``plan_id``, ``slug``,
+      ``issue``) — no Gist API call, preventing N+1 growth.
     - Applies search/offset/limit after the merge.
 
     Informational warnings (e.g., plan index registration failure after a
@@ -433,11 +434,13 @@ class GistTaskLayer:
         1. Call ``plan_index.list_all()`` to enumerate Gist-registered plans.
         2. Call ``local_backend.list_plans()`` to enumerate local YAML plans.
         3. Build a unified dict keyed by ``plan_id`` (Gist entry takes precedence).
-        4. For index entries that are not in the local set: fetch YAML from Gist
-           via ``artifact_client.read(issue)`` to build a full
-           :class:`~sam_schema.core.task_backend_types.PlanSummary`.
-           Index entries with ``issue=None`` cannot be fetched from Gist — they
-           are included in the merge only when the local backend has them.
+        4. For index entries that are not in the local set: synthesise a minimal
+           :class:`~sam_schema.core.task_backend_types.PlanSummary` from the index
+           entry metadata (``plan_id``, ``slug``, ``issue``) without any Gist API call.
+           ``goal``, ``description``, and ``task_count`` default to empty/zero because
+           that data is only available in the full plan YAML blob.
+           Index entries with ``issue=None`` are skipped — they are not in local cache
+           and cannot be reconstructed without a Gist fetch.
         5. Apply ``search`` filter (substring match on feature + goal + description).
         6. Apply ``offset`` and ``limit``.
 
@@ -473,15 +476,26 @@ class GistTaskLayer:
                     merged[entry.plan_id]["issue"] = str(entry.issue)  # type: ignore[typeddict-unknown-key]
                 continue
 
-            # Index-only plan (not in local cache).  Attempt Gist fetch.
+            # Index-only plan (not in local cache).
             if entry.issue is None:
-                # Local-only plan with no issue — cannot fetch from Gist and not
-                # present locally, so there's nothing to include.
+                # Local-only plan recorded with issue=null — cannot reconstruct
+                # without a Gist fetch and is not present locally; skip.
                 continue
 
-            gist_summary = self._fetch_gist_summary(entry)
-            if gist_summary is not None:
-                merged[entry.plan_id] = gist_summary
+            # Build a metadata-only summary from the index entry.  goal,
+            # description, and task_count are unknown without fetching the
+            # full plan YAML blob, but list_plans only needs these fields for
+            # optional search filtering — the trade-off eliminates one Gist
+            # API call per index-only plan (prevents unbounded N+1 growth).
+            merged[entry.plan_id] = {
+                "plan_id": entry.plan_id,
+                "feature": entry.slug,
+                "goal": "",
+                "description": "",
+                "task_count": 0,
+                "source_path": None,
+                "issue": str(entry.issue),
+            }
 
         all_summaries = list(merged.values())
 
@@ -499,56 +513,6 @@ class GistTaskLayer:
         if limit is not None:
             paginated = paginated[:limit]
         return paginated
-
-    def _fetch_gist_summary(self, entry: PlanIndexEntry) -> PlanSummary | None:
-        """Fetch plan YAML from Gist and construct a :class:`PlanSummary`.
-
-        Used by ``list_plans`` for index-only plans not present in the local cache.
-        Returns ``None`` when the Gist fetch fails or content cannot be parsed.
-
-        Args:
-            entry: Plan index entry containing ``plan_id``, ``issue``, and ``slug``.
-
-        Returns:
-            :class:`~sam_schema.core.task_backend_types.PlanSummary` or ``None``.
-        """
-        if entry.issue is None:
-            return None
-        try:
-            yaml_content = self._artifact_client.read(entry.issue)
-        except Exception:  # noqa: BLE001 — Gist read failures produce no summary
-            _log.warning(
-                "GistTaskLayer._fetch_gist_summary: artifact_client.read failed for %s (issue #%d)",
-                entry.plan_id,
-                entry.issue,
-            )
-            return None
-
-        if yaml_content is None:
-            return None
-
-        try:
-            data = _yaml_safe.load(StringIO(yaml_content))
-        except Exception:  # noqa: BLE001 — ruamel raises many internal types
-            _log.warning("GistTaskLayer._fetch_gist_summary: failed to parse YAML for %s — skipping", entry.plan_id)
-            return None
-
-        if not isinstance(data, dict):
-            return None
-
-        tasks_raw = data.get("tasks") or []
-        task_count = len(tasks_raw) if isinstance(tasks_raw, list) else 0
-
-        summary: PlanSummary = {
-            "plan_id": entry.plan_id,
-            "feature": str(data.get("feature") or entry.slug),
-            "goal": str(data.get("goal") or ""),
-            "description": str(data.get("description") or ""),
-            "task_count": task_count,
-            "source_path": None,
-            "issue": str(entry.issue),
-        }
-        return summary
 
     # ------------------------------------------------------------------
     # Mutation helpers (T4)
