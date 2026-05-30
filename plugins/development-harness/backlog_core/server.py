@@ -81,6 +81,69 @@ def _token_count(serialised: str) -> int:
     return len(_enc.encode(serialised))
 
 
+def _view_payload_token_count(full_response: dict[str, object]) -> int:
+    """Token-count the delivered ``backlog_view`` payload without double-counting.
+
+    The full-content view returns the section content TWICE: once in
+    ``full_response["body"]`` (the rendered body) and again inside each
+    ``full_response["sections"][name]["entries"][i]["content"]`` entry.  Counting
+    the serialised payload verbatim therefore measures the section content roughly
+    twice, so a body whose own token count sits comfortably under
+    ``_VIEW_TOKEN_BUDGET`` can trip the over-budget directory purely from this
+    metadata duplication (issue #2495 finding #4).
+
+    The caller reads the content from ``body``; the per-entry ``content`` strings
+    are redundant for sizing.  This helper measures a copy of the payload with
+    those per-entry ``content`` strings blanked, so the gate reflects the size the
+    caller actually pays for the content (once) plus the structural metadata
+    (section names, counts, entry ids).  ``body`` is measured in full, so a body
+    that genuinely exceeds the budget on its own still gates.
+
+    The returned payload itself is never mutated — only the measurement copy is.
+
+    Args:
+        full_response: The serialised ``ViewItemResult`` dict about to be returned.
+
+    Returns:
+        Token count of the de-duplicated measurement copy.
+    """
+    raw_sections = full_response.get("sections")
+    if not isinstance(raw_sections, dict) or not raw_sections:
+        # No structured sections dict to de-duplicate against — measure verbatim.
+        return _token_count(_json.dumps(full_response))
+    measured = dict(full_response)
+    measured["sections"] = {name: _section_without_entry_content(sec) for name, sec in raw_sections.items()}
+    return _token_count(_json.dumps(measured))
+
+
+def _section_without_entry_content(section: object) -> object:
+    """Return a copy of *section* with each entry's ``content`` blanked.
+
+    Used by :func:`_view_payload_token_count` so the over-budget gate does not
+    count section content that the body already carries.  Non-entry-block section
+    shapes (e.g. groomed ``{"type": "groomed", ...}``) are returned unchanged —
+    they carry no duplicated body content to subtract.
+
+    Args:
+        section: A single ``sections`` dict value (entry-block or groomed shape).
+
+    Returns:
+        A shallow copy with blanked entry ``content`` for entry-block sections, or
+        the original object for shapes without an ``entries`` list.
+    """
+    if not isinstance(section, dict):
+        return section
+    # ``isinstance`` narrows ``object`` to ``dict[Never, Never]`` under ty; rebuild a
+    # concrete ``dict[str, object]`` so the ``entries`` access has a real value type.
+    section_map: dict[str, object] = {str(k): v for k, v in section.items()}
+    raw_entries = section_map.get("entries")
+    if not isinstance(raw_entries, list):
+        return section
+    trimmed: dict[str, object] = dict(section_map)
+    trimmed["entries"] = [{**entry, "content": ""} if isinstance(entry, dict) else entry for entry in raw_entries]
+    return trimmed
+
+
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
 # built by operations._build_item_body so that plain-text and regex searches
@@ -1983,8 +2046,16 @@ async def backlog_view(
             # correctly deliver such a large-but-compressible body inline (No Invented
             # Limits) — while still gating bodies whose token count genuinely exceeds the
             # budget, including incompressible prose that the old heuristic also caught.
+            # Measure the de-duplicated delivered payload (issue #2495 finding #4):
+            # the per-entry ``content`` in the ``sections`` dict duplicates the body
+            # text the caller already receives once via ``body``, so counting it
+            # again wrongly inflates the measured size and can trip the directory for
+            # a body that is comfortably under budget on its own.  ``body`` is still
+            # measured in full, so a genuinely-too-large body (or narrowed slice)
+            # still gates.  ``_full_chars`` in the directory hint reports the real
+            # serialised char length of the full payload the caller would receive.
             serialised = _json.dumps(full_response)
-            if _token_count(serialised) > _VIEW_TOKEN_BUDGET:
+            if _view_payload_token_count(full_response) > _VIEW_TOKEN_BUDGET:
                 return _build_over_budget_view(result, len(serialised), selector)
             return full_response
         return _build_compact_manifest(result, full_response, selector)

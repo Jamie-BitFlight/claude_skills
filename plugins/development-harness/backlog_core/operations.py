@@ -2743,12 +2743,88 @@ def _build_sections_compact(body: str) -> list[dict[str, str | int]]:
     return result
 
 
+def _entry_owning_headers(body: str) -> list[str | None]:
+    """Map each entry block in *body* to the ``## ``/``### `` header that owns it.
+
+    Returns one element per :data:`ENTRY_RE` match in document order; the value is
+    the full source header LINE (e.g. ``## Log`` or ``### Detail``) of the nearest
+    preceding section header, or ``None`` when an entry precedes the first header
+    (a headerless preamble entry).  The full line (not just the name) is kept so the
+    paged body reproduces the original header level.
+
+    The result aligns positionally with :func:`parse_entries` (which iterates the
+    same ``ENTRY_RE`` matches in the same order), so the i-th owning header
+    describes the i-th parsed entry.  Used by :func:`_paginate_body_result` to
+    re-attach the owning header to each paged entry, keeping the paginated body
+    self-describing so the section-metadata rebuild stays in sync with the page
+    (#2495 finding #5).
+
+    Args:
+        body: Full (unpaginated) body text containing entry blocks.
+
+    Returns:
+        List of owning header lines (or ``None``) aligned with the entry order
+        produced by :func:`parse_entries`.
+    """
+    headers = list(_SECTION_BOUNDARY_RE.finditer(body))
+    owners: list[str | None] = []
+    for entry_match in ENTRY_RE.finditer(body):
+        pos = entry_match.start()
+        owner: str | None = None
+        for hdr in headers:
+            if hdr.start() <= pos:
+                # Reproduce the source header line verbatim (its ``## ``/``### `` marker
+                # and text) so a paged subsection keeps the level it had.
+                owner = hdr.group(0).strip()
+            else:
+                break
+        owners.append(owner)
+    return owners
+
+
+def _render_paged_entry_body(entries: list[Entry], owners: list[str | None]) -> str:
+    """Render *entries* grouped under their owning ``## ``/``### `` headers.
+
+    Consecutive entries sharing an owning header are emitted once under that
+    header, so the paginated body keeps the section structure that
+    :func:`_render_entry_raw` alone discards.  Entries with a ``None`` owner
+    (headerless preamble) are emitted without a header line.
+
+    Args:
+        entries: The paged (sliced) entries to render, in document order.
+        owners: Owning header lines aligned positionally with *entries*.
+
+    Returns:
+        The rendered body with section headers re-attached to their entries.
+    """
+    blocks: list[str] = []
+    last_owner: str | None = None
+    first = True
+    for entry, owner in zip(entries, owners, strict=True):
+        if first or owner != last_owner:
+            if owner is not None:
+                # ``owner`` is the full source header line (e.g. ``## Log`` or
+                # ``### Detail``), reproduced verbatim to preserve the header level.
+                blocks.append(owner)
+            last_owner = owner
+            first = False
+        blocks.append(_render_entry_raw(entry))
+    return "\n\n".join(blocks)
+
+
 def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit: int) -> None:
     """Apply offset/limit pagination to the ``body`` field of *result* in-place.
 
     Paginates by entry blocks when the body contains timestamped entry blocks
     (``<div><sub>…</sub>…</div>``). Falls back to line-based pagination for
     plain-text bodies that contain no entry blocks.
+
+    For the entry-block path the owning ``## ``/``### `` header of each paged
+    entry is re-attached to the rendered page (#2495 finding #5).  Without it the
+    rendered page is a bare run of ``<div><sub>…</sub></div>`` blocks with no
+    header, so the downstream ``_build_sections_metadata`` rebuild parses a
+    headerless page and produces ``{}`` — desyncing the section metadata from a
+    body that does in fact belong to a named section.
 
     Args:
         result: Mutable ViewItemResult whose ``body`` field will be replaced.
@@ -2758,13 +2834,17 @@ def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit:
     """
     has_entry_blocks = bool(ENTRY_RE.search(body))
     if has_entry_blocks:
-        # Entry-block aware pagination
+        # Entry-block aware pagination.  Owners are captured from the ORIGINAL body
+        # (before the slice) so each paged entry can be rendered under the header it
+        # belongs to, keeping the page self-describing for the metadata rebuild.
         entries = parse_entries(body, show="all")
+        owners = _entry_owning_headers(body)
         total = len(entries)
-        sliced = entries[offset:] if offset > 0 else entries
-        if limit > 0:
-            sliced = sliced[:limit]
-        result.body = "\n\n".join(_render_entry_raw(e) for e in sliced)
+        start = max(0, offset)
+        end = start + limit if limit > 0 else len(entries)
+        sliced = entries[start:end]
+        sliced_owners = owners[start:end]
+        result.body = _render_paged_entry_body(sliced, sliced_owners)
         remaining = total - offset - len(sliced)
         if remaining > 0:
             result.body_truncated = True
@@ -2953,9 +3033,13 @@ def narrow_body_to_named_sections(body: str, names: list[str]) -> tuple[str, boo
         no header matched, in which case *body* is returned unchanged so the
         caller can surface the no-match signal without losing content.
     """
-    wanted = {n.lower() for n in names}
+    # Case-fold with ``.casefold()`` (not ``.lower()``) so the plural
+    # ``sections=[...]`` body arm uses the one Unicode-correct case-fold rule shared
+    # with the structured-dict arm (``_filter_view_sections``) and the metadata arm
+    # (#2495 minor).  No behaviour change for ASCII names.
+    wanted = {n.casefold() for n in names}
     headers = list(_SECTION_BOUNDARY_RE.finditer(body))
-    matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().lower() in wanted]
+    matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().casefold() in wanted]
     if not matched:
         return body, False
     # Exact case-insensitive name matching above is the plural ``sections=[...]``

@@ -360,6 +360,13 @@ class TestOverBudgetGateHonoursNarrowing:
 _HUGE_SINGLE = "Lorem ipsum dolor sit amet consectetur adipiscing elit. " * 600  # ~33k chars
 _SINGLE_OVER_BUDGET_BODY = f"## Tiny\n\nshort intro\n\n## Huge\n\n{_HUGE_SINGLE}\n\n"
 
+# A ``## ``-headed body whose OWN prose (the body field alone, before any sections
+# duplication) genuinely exceeds _VIEW_TOKEN_BUDGET.  Distinct from _OVER_BUDGET_BODY,
+# whose body-alone token count sits UNDER the budget and is now (correctly, finding #4)
+# delivered inline — so the unbounded-directory test needs a body that is genuinely too
+# large on its own to keep exercising the gate.
+_GENUINELY_OVER_BUDGET_BODY = f"## Story\n\nintro\n\n## Huge One\n\n{_HUGE_SINGLE}\n\n## Huge Two\n\n{_HUGE_SINGLE}\n\n"
+
 # A body with two headers sharing a common substring ('Section') plus 'Other',
 # to pin substring-widening (multiple matches concatenated in document order).
 _SUBSTRING_BODY = (
@@ -799,20 +806,30 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
     """Finding #7: removing the body-chars branch must not regress the default gate."""
 
     def test_unbounded_over_budget_default_returns_directory(self, mocker: MockerFixture) -> None:
-        """summary=False with NO narrowing on a huge body still returns the directory.
+        """summary=False with NO narrowing on a genuinely-too-large body returns the directory.
 
-        Guards the finding #7 simplification: the unconditional token-count check must
-        still gate an unbounded over-budget default call to the compact directory.
+        Guards the finding #7 simplification AND the finding #4 measurement change: an
+        unbounded body whose OWN content genuinely exceeds _VIEW_TOKEN_BUDGET must still
+        gate to the compact directory.  The body field alone is over budget here, so the
+        de-duplicated measurement (finding #4 — body counted once, per-entry content not
+        double-counted) is still over budget and the directory is returned.
         """
-        _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
         from backlog_core import server
+
+        # Premise: the body field ALONE exceeds the budget, so this is a genuine over-budget
+        # case independent of any sections-dict content duplication (finding #4).
+        body_tokens = server._token_count(_GENUINELY_OVER_BUDGET_BODY)
+        assert body_tokens > server._VIEW_TOKEN_BUDGET, (
+            f"premise: the body alone must exceed _VIEW_TOKEN_BUDGET; got {body_tokens} tokens. "
+            "A genuinely-too-large unbounded body must still gate after the finding #4 measurement change."
+        )
+        _patch_github_body(mocker, 2495, _GENUINELY_OVER_BUDGET_BODY)
 
         resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
 
         assert resp.get("_over_budget") is True, (
-            "an unbounded over-budget default call (no section/sections/offset/limit) must still "
-            "return the compact over-budget directory after the body-chars heuristic removal. "
-            "Got keys: " + repr(sorted(resp)) + ".  Finding #7."
+            "an unbounded genuinely-over-budget default call (no section/sections/offset/limit) must "
+            "still return the compact over-budget directory.  Got keys: " + repr(sorted(resp)) + "."
         )
 
     def test_unbounded_large_but_compressible_body_delivered_inline(self, mocker: MockerFixture) -> None:
@@ -859,6 +876,170 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
         body = _resp_body(resp)
         assert ("a" * 20000) in body, (
             "the full compressible body must be delivered inline without truncation (No Invented Limits)."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding #4 (#2495): the over-budget gate must measure the DELIVERED payload
+# without double-counting per-entry content the body already carries once.
+# ---------------------------------------------------------------------------
+
+
+def _entry_block_body_under_budget_with_dup_overflow() -> str:
+    """Build a ``## ``-headed entry-block body for the finding #4 boundary.
+
+    The body field's own token count sits comfortably UNDER _VIEW_TOKEN_BUDGET,
+    but ``_build_sections_metadata`` copies each entry's content into the
+    structured ``sections`` dict, so the verbatim full-response token count
+    (body + duplicated content) exceeds the budget.  The de-duplicated
+    measurement (finding #4) must keep this body inline.
+    """
+    filler = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod. "
+    entries = "\n\n".join(f"<div><sub>2026-05-{i + 1:02d}</sub>\n\n{filler * 70}\n</div>" for i in range(3))
+    return f"## Log\n\n{entries}\n"
+
+
+class TestOverBudgetMeasurementExcludesDuplicatedContent:
+    """Finding #4: a body under budget on its own must not be gated by content duplication."""
+
+    def test_headed_under_budget_body_delivered_inline_despite_sections_dup(self, mocker: MockerFixture) -> None:
+        """A ``## ``-headed entry-block body under budget on its own is delivered INLINE.
+
+        RED (pre-fix): the over-budget gate serialises the whole ``full_response`` —
+        including the ``sections`` dict whose per-entry ``content`` DUPLICATES the body
+        text — and measures THAT.  The duplicated content pushes a body that is
+        comfortably under ``_VIEW_TOKEN_BUDGET`` on its own over the budget, so the gate
+        wrongly returns the metadata-only over-budget directory.
+
+        After the fix the gate measures the de-duplicated payload (body counted once,
+        per-entry ``content`` not double-counted), so the body is delivered inline.
+        """
+        from backlog_core import server
+
+        body = _entry_block_body_under_budget_with_dup_overflow()
+
+        # Premise: body-alone is under budget, but the verbatim full response (with the
+        # content-duplicating sections dict) is over budget — the exact finding #4 trap.
+        _patch_github_body(mocker, 2495, body)
+        result = operations.view_item(selector="2495", include_content=True)
+        full_response = result.model_dump()
+        body_tokens = server._token_count(str(full_response["body"]))
+        verbatim_tokens = server._token_count(server._json.dumps(full_response))
+        assert body_tokens <= server._VIEW_TOKEN_BUDGET, (
+            f"premise: the body alone must be UNDER budget; got {body_tokens} tokens."
+        )
+        assert verbatim_tokens > server._VIEW_TOKEN_BUDGET, (
+            f"premise: the verbatim full response (with duplicated per-entry content) must EXCEED "
+            f"the budget so the old gate would trip; got {verbatim_tokens} tokens."
+        )
+
+        _patch_github_body(mocker, 2495, body)
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+
+        assert resp.get("_over_budget") is not True, (
+            "a ``## ``-headed body comfortably under budget on its own must be delivered INLINE; the "
+            "over-budget gate must not count the per-entry content the body already carries once. "
+            "Got keys: " + repr(sorted(resp)) + ".  Finding #4."
+        )
+        delivered = _resp_body(resp)
+        assert "Lorem ipsum" in delivered, "the body content must be delivered inline, not replaced by the directory."
+
+
+# ---------------------------------------------------------------------------
+# Finding #5 (#2495): paginating an entry-block section must keep result.sections
+# describing the paged section (non-empty), not desync to {}.
+# ---------------------------------------------------------------------------
+
+
+class TestPagedEntryBlockKeepsSectionMetadata:
+    """Finding #5: paged entry-block body must keep its describing section metadata."""
+
+    _LOG_BODY = (
+        "## Log\n\n"
+        "<div><sub>2026-05-01</sub> first entry content</div>\n\n"
+        "<div><sub>2026-05-02</sub> second entry content</div>\n"
+    )
+
+    def test_paged_entry_block_section_metadata_non_empty(self, mocker: MockerFixture) -> None:
+        """view_item(section=None, limit=1) on a ``## Log`` entry-block body keeps sections.
+
+        RED (pre-fix): ``_paginate_body_result`` rendered the page as a bare run of
+        ``<div><sub>…</sub></div>`` blocks with the ``## Log`` header stripped, so the
+        downstream ``_build_sections_metadata`` rebuild parsed a headerless page and set
+        ``result.sections = {}`` — a valid page returned the requested entry but EMPTY
+        section metadata, breaking the body/metadata sync contract.
+
+        After the fix the page retains its owning ``## Log`` header, so the metadata
+        rebuild describes the paged section: ``result.sections`` is non-empty, keyed by
+        the real ``Log`` section, and ``num_entries`` reflects the single paged entry.
+        """
+        _patch_github_body(mocker, 2495, self._LOG_BODY)
+        result = operations.view_item(selector="2495", include_content=True, section=None, limit=1)
+
+        assert result.sections, (
+            "a paged entry-block section must keep NON-EMPTY section metadata; got {}.  Finding #5: "
+            "the headerless paged page rebuilt section metadata as empty."
+        )
+        assert set(result.sections) == {"Log"}, (
+            f"result.sections must be keyed by the real paged section 'Log'; got {sorted(result.sections)}."
+        )
+        log_meta = result.sections["Log"]
+        assert log_meta.get("num_entries") == 1, (
+            f"the paged section metadata must describe the single paged entry; got {log_meta.get('num_entries')}."
+        )
+        assert "Sections" not in result.sections, (
+            f"the paged section metadata must not carry a spurious 'Sections' key; got {sorted(result.sections)}."
+        )
+        # The requested page content is preserved (no regression of entry-block pagination).
+        assert "first entry content" in result.body, "the first entry must be on the page."
+        assert "second entry content" not in result.body, "the second entry must be excluded by limit=1."
+        assert result.body_truncated is True, "one of two entries shown — body_truncated must be True."
+        assert result.body_total_entries == 2, (
+            f"entry-block totals must reflect both entries; got {result.body_total_entries}."
+        )
+
+    def test_paged_offset_into_second_section_keeps_correct_metadata(self, mocker: MockerFixture) -> None:
+        """offset paging across two entry-block sections keeps metadata for the paged section.
+
+        A two-section entry-block body (``## Alpha`` with one entry, ``## Beta`` with one
+        entry) paged with offset=1/limit=1 must land on the Beta entry and report
+        ``result.sections == {'Beta'}`` — proving the owning header is re-attached per
+        entry, not assumed to be the first section.
+        """
+        two_section_body = (
+            "## Alpha\n\n"
+            "<div><sub>2026-05-01</sub> alpha entry</div>\n\n"
+            "## Beta\n\n"
+            "<div><sub>2026-05-02</sub> beta entry</div>\n"
+        )
+        _patch_github_body(mocker, 2495, two_section_body)
+        result = operations.view_item(selector="2495", include_content=True, section=None, offset=1, limit=1)
+
+        assert set(result.sections) == {"Beta"}, (
+            f"offset=1/limit=1 lands on the Beta entry; result.sections must be {{'Beta'}}; "
+            f"got {sorted(result.sections)}.  Finding #5: owning header must be re-attached per entry."
+        )
+        assert "beta entry" in result.body, "the paged body must carry the Beta entry content."
+        assert "alpha entry" not in result.body, "offset=1 must skip the Alpha entry."
+
+    def test_paged_subsection_preserves_header_level(self, mocker: MockerFixture) -> None:
+        """A ``### `` subsection paged with limit=1 keeps its ``### `` level in the page.
+
+        Re-attaching the owning header must reproduce the original ``## ``/``### `` level,
+        not flatten a subsection to ``## ``.  Metadata is keyed by name regardless of
+        level, so this guards display fidelity rather than the sync contract.
+        """
+        sub_body = (
+            "### Detail\n\n"
+            "<div><sub>2026-05-01</sub> first detail</div>\n\n"
+            "<div><sub>2026-05-02</sub> second detail</div>\n"
+        )
+        _patch_github_body(mocker, 2495, sub_body)
+        result = operations.view_item(selector="2495", include_content=True, section=None, limit=1)
+
+        assert "### Detail" in result.body, f"the paged subsection must keep its '### ' level; got {result.body!r}."
+        assert set(result.sections) == {"Detail"}, (
+            f"the paged subsection metadata must be keyed by name 'Detail'; got {sorted(result.sections)}."
         )
 
 
