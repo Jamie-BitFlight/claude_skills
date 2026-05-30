@@ -2768,13 +2768,20 @@ def _entry_owning_headers(body: str) -> list[str | None]:
         List of owning header lines (or ``None``) aligned with the entry order
         produced by :func:`parse_entries`.
     """
-    headers = list(_SECTION_BOUNDARY_RE.finditer(body))
+    entry_spans = [(m.start(), m.end()) for m in ENTRY_RE.finditer(body)]
+    # A ``## ``/``### `` line INSIDE an entry block's content is part of that
+    # entry's text, not a real section boundary — exclude it so a later entry is
+    # not mis-attributed to a header embedded in a prior entry (#2495 C4).
+    headers = [
+        hdr
+        for hdr in _SECTION_BOUNDARY_RE.finditer(body)
+        if not any(start <= hdr.start() < end for start, end in entry_spans)
+    ]
     owners: list[str | None] = []
-    for entry_match in ENTRY_RE.finditer(body):
-        pos = entry_match.start()
+    for entry_start, _entry_end in entry_spans:
         owner: str | None = None
         for hdr in headers:
-            if hdr.start() <= pos:
+            if hdr.start() <= entry_start:
                 # Reproduce the source header line verbatim (its ``## ``/``### `` marker
                 # and text) so a paged subsection keeps the level it had.
                 owner = hdr.group(0).strip()
@@ -2847,7 +2854,11 @@ def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit:
         sliced = entries[start:end]
         sliced_owners = owners[start:end]
         result.body = _render_paged_entry_body(sliced, sliced_owners)
-        remaining = total - offset - len(sliced)
+        # Use the clamped ``start`` (not raw ``offset``) so a negative offset
+        # — which clamps to 0 and returns every entry — does not report a bogus
+        # remaining count. Offset past the end yields an empty body with no
+        # truncation flag (intended contract; see test_paginate_body.py).
+        remaining = total - start - len(sliced)
         if remaining > 0:
             result.body_truncated = True
             result.body_remaining_entries = remaining
@@ -2856,12 +2867,13 @@ def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit:
         # Fallback: line-based pagination for plain-text bodies with no entry blocks
         lines = body.splitlines()
         total = len(lines)
-        if offset > 0:
-            lines = lines[offset:]
+        start = max(0, offset)
+        if start > 0:
+            lines = lines[start:]
         if limit > 0:
             lines = lines[:limit]
         result.body = "\n".join(lines)
-        remaining = total - offset - len(lines)
+        remaining = total - start - len(lines)
         if remaining > 0:
             result.body_truncated = True
             result.body_remaining_lines = remaining
