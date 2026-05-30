@@ -127,6 +127,13 @@ too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decor
 exclude = ["plugins/uv/skills/uv", ".tmp"]
 include = ["**/*.py"]
 
+[tool.uv.workspace]
+members = [
+    "plugins/development-harness",
+    "plugins/scientific-method/mcp/experiment-registry",
+    ".claude/skills/daily-releases/scripts/daily_releases_lib",
+]
+
 [tool.ruff]
 # Exclude git symlinks - Windows reads target path as file content; linters fail.
 # See [tool.ty.src] exclude for full list. Add new symlinked .py paths here.
