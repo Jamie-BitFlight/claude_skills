@@ -100,9 +100,22 @@ task cognitive requirement.
 
 **Do NOT use when:**
 
-- Tight deterministic pipelines or single-pass transforms (map-reduce overhead exceeds the return).
+- Single-pass transforms with no ruleset (map-reduce overhead exceeds the return).
 - Tasks needing one coherent creative judgment that cannot be partitioned without losing whole-picture context.
 - Rulesets under ~5 criteria (splitting yields little).
+
+**Multi-phase / sequential workflows are NOT disqualified.** Do not score the whole pipeline as
+one unit — score each phase. A sequential workflow is the conductor; each rule-following phase
+becomes its own internal ensemble and each independent-work phase becomes a work-partition
+fan-out, while the phase ordering stays sequential. There are two fan-out flavors:
+
+- **Ensemble-denoising** (this skill's core) — same input, overlapping rule slices, corroboration
+  weighting. For checking / review / rubric phases.
+- **Work-partition** — disjoint independent work items in parallel, no corroboration, pure
+  speedup. For generative phases (implement N functions, write N test files, scan N docs).
+
+See [./references/composing-in-workflows.md](./references/composing-in-workflows.md) for the
+per-phase classification rule and a worked map of a 9-phase workflow.
 
 ## How to Partition the Ruleset
 

@@ -270,8 +270,14 @@ clusters the first pass missed. Marked NEW (missed by pass 1) or CONFIRMED.
 - modernpython — 10 PEP-roster principles (implicit→explicit) — fit5 — NEW
 - comprehensive-test-review — fit5 — CONFIRMED
 - designing-ui-for-cli (Nielsen /40 + 22-item) — fit4 — CONFIRMED
-- stinkysnake (9 phases / 12 smell categories), snakepolish (4 categories), debug (6-phase),
-  pre-commit (9 stages), lint, code-reviewer agent — fit4 — NEW
+- debug (6-phase), pre-commit (9 stages), lint, code-reviewer agent — fit4 — NEW
+- stinkysnake (9-phase workflow), snakepolish (8-step impl phase) — CONVERT PER-PHASE, not
+  whole-skill. Verified 2026-05-30: these are sequential workflows, NOT flat single-pass
+  rulesets. The whole skill fails the When-to-Use gate; individual rule-bearing phases do not.
+  For stinkysnake, the ensemble targets are Phase 2 (type-gap inventory), Phase 3 (modernization
+  construct/PEP roster), and Phase 4 (plan review); Phases 6/8/9 are work-partition fan-outs.
+  See `composing-in-workflows.md`. (Correction: an earlier pass mis-scored these as flat fit4
+  rulesets.)
 
 ### python3-development — DO NOT CONVERT (deprecated plugin)
 
