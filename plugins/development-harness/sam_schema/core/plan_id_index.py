@@ -177,6 +177,12 @@ class PlanIdIndex:
         """
         self._client = artifact_client
         self._sentinel_issue = sentinel_issue
+        # Session-scoped read cache — valid for the lifetime of this object,
+        # which is one MCP handler invocation (_get_backend() constructs a
+        # fresh GistTaskLayer + PlanIdIndex per call).  Eliminates redundant
+        # Gist round-trips when resolve(), list_all(), and register() are
+        # called in the same invocation (e.g. create_plan: register + list).
+        self._entries_cache: list[PlanIndexEntry] | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -217,9 +223,16 @@ class PlanIdIndex:
         try:
             self._client.store_index(self._sentinel_issue, yaml_str)
         except ArtifactWriteError as exc:
+            # Invalidate cache — the write may or may not have committed;
+            # the next read must go to Gist for the authoritative state.
+            self._entries_cache = None
             raise PlanIndexError(
                 plan_id=plan_id, reason=f"Gist write failed for sentinel issue #{self._sentinel_issue}: {exc.reason}"
             ) from exc
+        # Success: cache the written state so subsequent resolve()/list_all()
+        # calls in this invocation return the updated entries without a Gist
+        # round-trip.
+        self._entries_cache = updated
 
     def resolve(self, plan_id: str) -> int | None:
         """Return the GitHub issue number for a registered plan_id.
@@ -246,7 +259,7 @@ class PlanIdIndex:
         """Return all registered plan index entries.
 
         Used by ``GistTaskLayer.list_plans()`` to enumerate plans registered
-        in the Gist index, supplemented by ``LocalYamlTaskBackend.list_plans()``
+        in the Gist index, supplemented by ``LocalYamlTaskProvider.list_plans()``
         for plans not yet registered.
 
         Returns:
@@ -265,17 +278,27 @@ class PlanIdIndex:
     # ------------------------------------------------------------------
 
     def _read_entries(self) -> list[PlanIndexEntry]:
-        """Fetch and parse the plan-index YAML blob from Gist.
+        """Fetch and parse the plan-index YAML blob from Gist, with session caching.
+
+        The result is cached in :attr:`_entries_cache` for the lifetime of
+        this object (one MCP handler invocation).  Subsequent calls return
+        the cached list directly without touching the network.  The cache is
+        updated by :meth:`register` after a successful write, and invalidated
+        on write failure.
 
         Returns an empty list when the blob is absent or unparseable.
 
         Returns:
             List of :class:`PlanIndexEntry` from the current Gist blob.
         """
+        if self._entries_cache is not None:
+            return self._entries_cache
         yaml_str = self._client.read_index(self._sentinel_issue)
         if yaml_str is None:
-            return []
-        return _parse_index_yaml(yaml_str)
+            self._entries_cache = []
+        else:
+            self._entries_cache = _parse_index_yaml(yaml_str)
+        return self._entries_cache
 
 
 def create_plan_id_index(artifact_client: ArtifactRegistryClient) -> PlanIdIndex:

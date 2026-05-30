@@ -745,7 +745,7 @@ Existing users are unaffected. When no `TASKBACKEND` variable and no `taskbacken
 
 #### GistTaskLayer — Gist-Backed Plan Storage (#2509)
 
-`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that the MCP server applies on top of `LocalYamlTaskBackend`. It is NOT a backend identifier — selecting `task.backend: local` in `.dh/config.yaml` activates `GistTaskLayer(LocalYamlTaskBackend)` in the server context automatically. CLI or test code that instantiates `LocalYamlTaskBackend` directly does not receive this wrapping.
+`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that the MCP server applies on top of `LocalYamlTaskProvider`. It is NOT a backend identifier — selecting `task.backend: local` in `.dh/config.yaml` activates `GistTaskLayer(LocalYamlTaskProvider)` in the server context automatically. CLI or test code that instantiates `LocalYamlTaskProvider` directly does not receive this wrapping.
 
 **Write-path (mandatory, raises on failure):**
 

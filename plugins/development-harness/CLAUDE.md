@@ -533,7 +533,7 @@ The backlog MCP server also exposes `profile_load` (agent_profile tool) for load
 
 The SAM MCP server uses a `TaskBackend` Protocol (`sam_schema/core/task_backend.py`) to decouple plan/task operations from storage. The following backends are available:
 
-- `local` (default) — wraps existing YAML I/O stack. **In the MCP server context**, `local` resolves to `GistTaskLayer(LocalYamlTaskBackend)` — plans with an associated GitHub issue are written through to Gist and are portable across environments (CI, worktrees, fresh checkouts). Plans without an issue (`issue=None`) are local-only and emit a non-portability warning. CLI/direct callers that instantiate `LocalYamlTaskBackend` directly do NOT get GistTaskLayer wrapping and remain single-machine only.
+- `local` (default) — wraps existing YAML I/O stack. **In the MCP server context**, `local` resolves to `GistTaskLayer(LocalYamlTaskProvider)` — plans with an associated GitHub issue are written through to Gist and are portable across environments (CI, worktrees, fresh checkouts). Plans without an issue (`issue=None`) are local-only and emit a non-portability warning. CLI/direct callers that instantiate `LocalYamlTaskProvider` directly do NOT get GistTaskLayer wrapping and remain single-machine only.
 - `github` — maps plans to GitHub Issues, tasks to sub-issues with `sam:{status}` labels. Requires IssueBackend + DocumentBackend (#984).
 - `memory` — in-memory test double. No persistence.
 - `beads` — maps plans to beads epics, tasks to child issues with `--parent` links. Context persisted via `bd remember`.
@@ -557,7 +557,7 @@ context:
 
 ### GistTaskLayer — Write-Through Plan Storage
 
-`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that sits between the MCP server and `LocalYamlTaskBackend`. It is active in the MCP server context only — CLI callers use `LocalYamlTaskBackend` directly.
+`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that sits between the MCP server and `LocalYamlTaskProvider`. It is active in the MCP server context only — CLI callers use `LocalYamlTaskProvider` directly.
 
 **Write-through (create and mutations):**
 

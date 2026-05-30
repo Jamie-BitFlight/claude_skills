@@ -496,7 +496,7 @@ flowchart TD
 2. Optionally discovers plan artifacts via `artifact_list` + `artifact_read`
 3. Selects task (from `--task` argument or first `not-started` with resolved deps)
 4. Loads task-level skills via `Skill(skill="{skill-name}")` for each name in `task.skills`
-5. `sam_claim(plan="P{N}", task="T{M}")` — if `claimed: false`, STOP (do not implement). **Storage**: Task claiming uses atomic `sam_claim` which maps to TaskBackend's `claim_task` — an atomic conditional write preventing concurrent claims. See [Backend Providers — TaskBackend Protocol](./backend-providers.md#taskbackend-protocol-912--to-be-created).
+5. `sam_task(action='claim', plan="P{N}", task="T{M}")` — if `claimed: false`, STOP (do not implement). **Storage**: `claim_task` on the `TaskBackend` transitions status to `in-progress`. Under `GistTaskLayer` (MCP server context), exactly-once is provided by serialized dispatch at the orchestrator level, not by the operation itself — two concurrent callers may both receive `True` (ADR-2509-3, Option 3). See [Backend Providers — TaskBackend Protocol](./backend-providers.md#taskbackend-protocol-912--to-be-created).
 6. Writes active-task context file to `~/.dh/projects/{project-slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json` (required for hook-driven updates)
 7. Implements against acceptance criteria and verification steps
 8. Commits (prohibition on `Fixes #N` trailers — only `/dh:complete-implementation` Final Step may include these)
