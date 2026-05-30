@@ -863,3 +863,143 @@ def test_mutation_raises_on_gist_write_failure(gist_layer: GistTaskLayer, store:
     # Act + Assert: ArtifactWriteError must propagate (no silent swallow).
     with pytest.raises(ArtifactWriteError):
         gist_layer.update_plan_fields(plan_id, set_fields={"goal": "Attempted update during failure"})
+
+
+# ---------------------------------------------------------------------------
+# Write-through: append_task and finalize_plan persistence to Gist
+# ---------------------------------------------------------------------------
+
+
+def test_append_task_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """append_task writes through to Gist; fresh read observes the appended task.
+
+    Verifies that calling append_task() uploads the post-mutation YAML to Gist so
+    a subsequent read_plan() from a session without a local file sees the appended
+    task.  Tests the AC5 write-through contract for append_task (gist_task_layer.py:861).
+    """
+    # Arrange: create a plan with two tasks so append_task adds a third.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="append-task", goal="Verify append_task persistence via Gist", tasks=tasks, issue=_PLAN_ISSUE
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Append a third task to the plan.
+    new_task = Task(
+        id="T3",
+        title="Appended third task",
+        status=TaskStatus.NOT_STARTED,
+        agent="test-agent",
+        dependencies=[],
+        priority=3,
+        complexity="low",
+    )
+
+    # Act: append the task — must write through to Gist.
+    gist_layer.append_task(plan_id, new_task)
+
+    # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
+    local_dir = gist_layer._local._plan_dir
+    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+        yaml_file.unlink()
+
+    # Assert: Gist-served plan contains the appended task.
+    retrieved = gist_layer.read_plan(plan_id)
+    assert gist_layer.last_read_source == "gist", "Post-delete read must come from Gist"
+    retrieved_ids = {t["id"] for t in retrieved["tasks"]}
+    assert "T3" in retrieved_ids, "Appended task T3 must persist to Gist and be visible on fresh read"
+    assert len(retrieved["tasks"]) == 3, (
+        "All three tasks (T1, T2, T3) must be present after append_task write-through to Gist"
+    )
+
+
+def test_finalize_plan_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """finalize_plan writes through to Gist; fresh read sees state=ready with all tasks.
+
+    Verifies that after appending tasks to a drafting plan and calling finalize_plan(),
+    the post-finalization YAML is uploaded to Gist so a subsequent read_plan() from a
+    fresh environment observes state=ready and contains all appended tasks.
+    Tests the write-through contract for finalize_plan (gist_task_layer.py:891).
+    """
+    # Arrange: create a plan in drafting state (no tasks → state=drafting).
+    plan_data = gist_layer.create_plan(
+        slug="finalize-plan", goal="Verify finalize_plan persistence via Gist", tasks=[], issue=_PLAN_ISSUE
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Append T1 and T2 to the drafting plan (single-writer — sequential calls required).
+    t1 = Task(
+        id="T1",
+        title="First appended task",
+        status=TaskStatus.NOT_STARTED,
+        agent="test-agent",
+        dependencies=[],
+        priority=1,
+        complexity="low",
+    )
+    t2 = Task(
+        id="T2",
+        title="Second appended task",
+        status=TaskStatus.NOT_STARTED,
+        agent="test-agent",
+        dependencies=["T1"],
+        priority=2,
+        complexity="medium",
+    )
+    gist_layer.append_task(plan_id, t1)
+    gist_layer.append_task(plan_id, t2)
+
+    # Act: finalize the plan — transitions state from drafting to ready and writes through to Gist.
+    gist_layer.finalize_plan(plan_id)
+
+    # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
+    local_dir = gist_layer._local._plan_dir
+    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+        yaml_file.unlink()
+
+    # Assert: Gist-served plan reflects finalized state and contains both tasks.
+    retrieved = gist_layer.read_plan(plan_id)
+    assert gist_layer.last_read_source == "gist", "Post-delete read must come from Gist"
+    assert retrieved["state"] == "ready", (
+        "finalize_plan must transition plan from drafting to ready; state must persist to Gist"
+    )
+    retrieved_ids = {t["id"] for t in retrieved["tasks"]}
+    assert retrieved_ids == {"T1", "T2"}, (
+        "Both appended tasks must be visible after finalize_plan write-through to Gist"
+    )
+
+
+def test_append_task_raises_on_gist_write_failure(gist_layer: GistTaskLayer, store: _InMemoryArtifactStore) -> None:
+    """append_task propagates ArtifactWriteError when Gist store fails.
+
+    Verifies that when artifact_client.store() is forced to fail during the
+    write-through triggered by append_task(), GistTaskLayer raises ArtifactWriteError
+    rather than swallowing it silently.  Tests the no-silent-swallow contract for
+    append_task (AC7 analog for gist_task_layer.py:861).
+    """
+    # Arrange: create a plan successfully while the store is healthy.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="append-task-write-failure",
+        goal="Verify ArtifactWriteError propagation from append_task",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable store failure before the append attempt (create succeeded, append must fail).
+    store.force_store_failure = True
+
+    new_task = Task(
+        id="T3",
+        title="Task that triggers Gist write failure",
+        status=TaskStatus.NOT_STARTED,
+        agent="test-agent",
+        dependencies=[],
+        priority=3,
+        complexity="low",
+    )
+
+    # Act + Assert: ArtifactWriteError must propagate (no silent swallow).
+    with pytest.raises(ArtifactWriteError):
+        gist_layer.append_task(plan_id, new_task)
