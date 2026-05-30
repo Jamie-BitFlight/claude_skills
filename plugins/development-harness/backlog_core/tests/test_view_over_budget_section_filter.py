@@ -1233,6 +1233,145 @@ class TestSectionNoneLinePaginationNotDisplacedByIndex:
 
 
 # ---------------------------------------------------------------------------
+# Codex P2 (#2495): the whole-item ``## Sections`` index must not be prepended to
+# a PAGED ``section=None`` response.  For a raw body with many headings the index
+# alone exceeds _VIEW_TOKEN_BUDGET; prepending it to the budgeted page trips the
+# over-budget gate and discards the explicitly-requested page.  A paged request
+# must be delivered inline (page content + page-scoped sections metadata).
+# ---------------------------------------------------------------------------
+
+
+def _many_heading_body(n_headings: int) -> str:
+    """Build an entry-block-free raw body whose ``## Sections`` index is huge.
+
+    Each heading carries a deliberately long descriptive name so the generated
+    ``## Sections`` index (one line per heading) exceeds _VIEW_TOKEN_BUDGET on its
+    own, while each section's prose body is a few tokens — so any small page
+    (e.g. ``limit=2``) is well under budget.  No ``<div><sub>...</sub></div>``
+    entry blocks, forcing the LINE-BASED pagination branch.
+    """
+    return "\n".join(
+        f"## Section {i:03d} with a deliberately long descriptive heading to inflate the index token cost"
+        f"\n\nshort body {i}\n"
+        for i in range(n_headings)
+    )
+
+
+class TestPagedSectionNoneIndexDoesNotTripOverBudget:
+    """Codex P2 (#2495): a paged ``section=None`` page must not be displaced by the index.
+
+    The non-paged ``section=None`` path prepends a whole-item ``## Sections`` index
+    (M1, e6191da).  For a raw body with many headings that index alone exceeds
+    _VIEW_TOKEN_BUDGET.  Pre-fix the index was built on the paged path too and
+    prepended to the post-pagination body, so an explicit small page
+    (``offset``/``limit``) measured index+page > budget, tripped the over-budget
+    gate, and returned the compact directory — dropping the page the caller asked
+    for.  After the fix the index is omitted from paged responses and the page is
+    delivered inline.
+    """
+
+    def test_paged_limit_delivers_page_inline_despite_huge_index(self, mocker: MockerFixture) -> None:
+        """backlog_view(summary=False, limit=2) on a many-heading body returns the page.
+
+        RED (pre-fix, e6191da): the whole-item ``## Sections`` index (built from the
+        un-paginated body) is prepended to the tiny paged body; the index alone
+        exceeds _VIEW_TOKEN_BUDGET so the over-budget gate fires and the caller
+        receives the metadata-only directory (``_over_budget`` True, no ``body``)
+        instead of the requested page.
+
+        After the fix: the index is not built for paged responses, so the page
+        (well under budget) is delivered inline with ``_over_budget`` unset.
+        """
+        from backlog_core import server
+
+        body = _many_heading_body(400)
+
+        # Premise: the generated index ALONE exceeds the budget, but a single small
+        # page is far under it — the exact trap the fix addresses.
+        index_tokens = server._token_count(operations._build_sections_index_from_body(body))
+        assert index_tokens > server._VIEW_TOKEN_BUDGET, (
+            f"premise: the ## Sections index alone must exceed _VIEW_TOKEN_BUDGET; got {index_tokens} tokens. "
+            "If not, the many-heading body no longer reproduces the index-overflow trap."
+        )
+
+        _patch_github_body(mocker, 2495, body)
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, limit=2))
+
+        assert resp.get("_over_budget") is not True, (
+            "an explicit paged request (limit=2) must be delivered inline; backlog_view must NOT prepend "
+            "the unbounded whole-item ## Sections index to the budgeted page and trip the over-budget gate. "
+            "Got keys: " + repr(sorted(resp)) + ".  Codex P2 (#2495)."
+        )
+        body_out = _resp_body(resp)
+        assert "## Section 000" in body_out, (
+            f"the requested first page must carry the real first section content; got {body_out[:80]!r}."
+        )
+        assert "## Sections" not in body_out, (
+            "the whole-item ## Sections index must NOT be prepended to a paged response — it is unbounded "
+            f"and contradicts the paged scope; got a body starting {body_out[:60]!r}.  Codex P2 (#2495)."
+        )
+        # Page-scoped metadata is what the caller asked for and must be present in sync.
+        meta_sections = resp.get("sections")
+        assert isinstance(meta_sections, dict), (
+            f"the paged response 'sections' metadata must be a dict; got {type(meta_sections).__name__}."
+        )
+        assert meta_sections, (
+            "the paged response must carry NON-EMPTY page-scoped 'sections' metadata in sync with the body; "
+            "got an empty dict."
+        )
+        assert "Sections" not in meta_sections, (
+            f"the paged metadata must not carry a spurious 'Sections' key from the synthetic index; "
+            f"got {sorted(meta_sections)}."
+        )
+
+    def test_paged_offset_delivers_page_inline_despite_huge_index(self, mocker: MockerFixture) -> None:
+        """backlog_view(summary=False, offset=4, limit=2) on a many-heading body returns the page.
+
+        Companion offset>0 case: the page lands deeper in the body and must still be
+        delivered inline (not displaced by the unbounded whole-item index).
+        """
+        from backlog_core import server
+
+        body = _many_heading_body(400)
+        _patch_github_body(mocker, 2495, body)
+
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, offset=4, limit=2))
+
+        assert resp.get("_over_budget") is not True, (
+            "an explicit paged request with offset>0 must be delivered inline, not replaced by the "
+            "over-budget directory.  Got keys: " + repr(sorted(resp)) + ".  Codex P2 (#2495)."
+        )
+        body_out = _resp_body(resp)
+        assert body_out, "an offset/limit page must return a non-empty body, not the metadata-only directory."
+        assert "## Sections" not in body_out, (
+            "the unbounded whole-item index must not be prepended to a paged response."
+        )
+
+    def test_unpaged_section_none_still_prepends_index(self, mocker: MockerFixture) -> None:
+        """An UNPAGED ``section=None`` call still prepends the ## Sections index (M1 not regressed).
+
+        The fix scopes the index to the non-paged path only.  A small unpaged body
+        (well under budget) must still receive the prepended index so agents can
+        discover available sections — the M1 behaviour (e6191da) is preserved.
+        """
+        from backlog_core import server
+
+        # Small body so the unpaged response stays under budget and is delivered inline.
+        small_body = "## Alpha\n\naaa\n\n## Beta\n\nbbb\n\n## Gamma\n\nggg\n"
+        _patch_github_body(mocker, 2495, small_body)
+
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+
+        assert resp.get("_over_budget") is not True, "premise: the small unpaged body must be delivered inline."
+        body_out = _resp_body(resp)
+        assert body_out.startswith("## Sections"), (
+            "an UNPAGED section=None response must still prepend the ## Sections index (M1, e6191da); "
+            f"got a body starting {body_out[:60]!r}.  The paged-path fix must not regress the unpaged path."
+        )
+        assert "## Alpha" in body_out, "the unpaged body must still carry the real section content after the index."
+
+
+# ---------------------------------------------------------------------------
 # Codex P2 (#2495): case-insensitive sections=[...] dict filter
 # ---------------------------------------------------------------------------
 

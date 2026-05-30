@@ -3129,6 +3129,19 @@ def _assemble_view_content(
         # displace the real content, and the metadata rebuild would then report a
         # spurious ``Sections`` key with no real section content (#2495 M1 —
         # regression introduced in d7abdee).
+        #
+        # The index is built ONLY for the NON-paged ``section is None`` path (#2495
+        # Codex P2).  On a paged request (``offset``/``limit``) the index describes
+        # the WHOLE un-paginated item — its size is unbounded and grows with the
+        # heading count, so for an item with many headings the index alone can exceed
+        # ``_VIEW_TOKEN_BUDGET``.  Prepending it to the budgeted page body would then
+        # trip the over-budget gate (server.py) and replace the explicitly-requested
+        # page with the compact directory — violating the contract that an
+        # explicitly-narrowed request is delivered.  A paged caller asked for the
+        # page, not the whole-item index; the page content plus the page-scoped
+        # ``result.sections`` metadata are what is delivered, so the index is omitted
+        # for paged responses (it remains available via the unbounded ``section is
+        # None`` call and via ``summary=True``).
         pending_index = ""
         if body:
             if section is not None:
@@ -3158,16 +3171,19 @@ def _assemble_view_content(
                 # once, from the final body).
                 if not paginate:
                     result.sections = _build_sections_metadata(body, show, since, section=None)
-            else:
-                # Build the section index from the FULL body so agents see it
-                # regardless of body source, but DEFER prepending it until after
-                # pagination (#2495 M1) so the index never consumes the page budget.
-                # Prefer live body data over local YAML cache for cache coherence.
-                # The index is display-only; metadata is built from ``body`` (without
-                # it) so no spurious ``Sections`` key is produced.  Skip the metadata
-                # build when pagination will rebuild it from the paginated slice.
-                if not paginate:
-                    result.sections = _build_sections_metadata(body, show, since, section=None)
+            # Build the section index from the FULL body so agents see it
+            # regardless of body source, but DEFER prepending it until after
+            # pagination (#2495 M1) so the index never consumes the page budget.
+            # Prefer live body data over local YAML cache for cache coherence.
+            # The index is display-only; metadata is built from ``body`` (without
+            # it) so no spurious ``Sections`` key is produced.  Both the metadata
+            # build and the index build are skipped under pagination: pagination
+            # rebuilds the metadata from the paginated slice, and the whole-item
+            # index is omitted from paged responses entirely (#2495 Codex P2 — an
+            # unbounded index must not displace the explicitly-requested page via
+            # the over-budget gate).
+            elif not paginate:
+                result.sections = _build_sections_metadata(body, show, since, section=None)
                 pending_index = _build_sections_index_from_body(body)
         elif item and item.sections:
             # YAML fallback: ``_populate_yaml_item_content`` builds the richer
@@ -3190,7 +3206,11 @@ def _assemble_view_content(
             _paginate_body_result(result, result.body, offset, limit)
             result.sections = _build_sections_metadata(result.body, show, since, section=None)
         # Prepend the deferred display-only ``## Sections`` index to the final,
-        # post-pagination body in the ``section is None`` path (#2495 M1).
+        # post-pagination body in the NON-paged ``section is None`` path (#2495 M1).
+        # ``pending_index`` is built only on that path (it is ``""`` whenever
+        # ``paginate`` is True — #2495 Codex P2), so this prepend is a no-op for
+        # paged responses: a paged caller receives the page without the unbounded
+        # whole-item index that would otherwise trip the over-budget gate.
         if pending_index and result.body:
             result.body = pending_index + "\n" + result.body
     else:
