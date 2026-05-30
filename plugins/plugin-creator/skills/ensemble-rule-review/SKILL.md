@@ -132,6 +132,30 @@ principle sets, "modernization / idiomatic / pythonic", "review X for quality", 
 prompt-engineering / skill-quality self-review (with per-pattern examples) — load
 [./references/partitioning-patterns.md](./references/partitioning-patterns.md).
 
+## Operational Use
+
+Two procedures and one reusable contract turn this pattern from concept into action:
+
+- **Convert an existing single-pass skill into the ensemble form** — follow
+  [./references/conversion-workflow.md](./references/conversion-workflow.md). (Also the recipe for
+  standardizing the `multi-perspective-review` prior art below.)
+- **Run an ensemble ad hoc, mid-task, as an orchestrator** — follow
+  [./references/orchestrator-playbook.md](./references/orchestrator-playbook.md): the
+  recognize → decompose → dispatch → reduce loop, the partition knobs, and the
+  corroboration-weighting reducer algorithm.
+- **Reusable worker contract** — copy
+  [./assets/worker-prompt-skeleton.md](./assets/worker-prompt-skeleton.md): the rigid worker
+  prompt and the fixed candidate schema both procedures share.
+
+### Partition the ruleset, not the input
+
+Every worker reviews the SAME input; only its rule slice differs. The denoising comes from
+overlapping rule coverage on shared input — multiple workers independently reaching the same
+finding, which the reducer counts as corroboration. Sharding the input instead (different files
+per worker) buys speed but NOT denoising, because no two workers can corroborate the same
+location. Shard input only as a secondary axis when one worker cannot hold the whole input, and
+keep rule-overlap within each shard.
+
 ## Prior Art and Reference Implementation
 
 The pattern is already running in-repo as a partial implementation:
