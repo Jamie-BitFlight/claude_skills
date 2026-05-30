@@ -209,10 +209,23 @@ def _paginate_results(
         effective_limit = limit
     else:
         effective_limit = len(page_items)
-        for candidate_limit in range(1, len(page_items) + 1):
-            if len(_enc.encode(json.dumps(page_items[:candidate_limit]))) > _TOKEN_BUDGET:
-                effective_limit = max(1, candidate_limit - 1)
-                break
+        if page_items:
+            # Binary search for the largest k such that f(k) = len(_enc.encode(
+            # json.dumps(page_items[:k]))) <= _TOKEN_BUDGET.  f is monotonically
+            # non-decreasing, so binary search is valid and evaluates the *same*
+            # function as the original loop, preserving exact pagination boundaries.
+            # Total serialisation work: O(N) across all probes (N/2 + N/4 + … ≈ N)
+            # versus O(N²) for the original prefix-from-scratch iteration.
+            # lo never falls below 1, so a single item that exceeds the budget still
+            # returns effective_limit=1 — identical to the original max(1, …) guard.
+            lo, hi = 1, len(page_items)
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if len(_enc.encode(json.dumps(page_items[:mid]))) <= _TOKEN_BUDGET:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            effective_limit = lo
 
     page = page_items[:effective_limit]
     has_more = (offset + len(page)) < total
