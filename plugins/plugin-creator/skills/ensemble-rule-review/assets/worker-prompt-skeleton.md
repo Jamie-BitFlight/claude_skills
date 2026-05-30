@@ -52,6 +52,11 @@ Trace every finding to a real located hit. No invented locations or quotes.
 
 ## Dispatch checklist
 
+- Spawn the `plugin-creator:focused-reviewer` agent (lean, haiku, minimal tools) — NOT
+  `general-purpose`, which inherits every skill and MCP tool description and burns tokens on
+  every worker. Fill this skeleton into its prompt as the TARGET / RULE SLICE / GROUP / OUTFILE.
+- If the target is a website or API endpoint, add the ONE specific MCP tool the worker needs to
+  the spawn `tools` list — do not grant all tools.
 - One worker per rule slice; slices overlap so each genuine finding sits in 2+ workers' coverage.
 - Model: cheapest tier (haiku). Effort: low. Run all workers in one parallel batch.
 - Keep each slice small enough that the job is mechanical matching, not inference.

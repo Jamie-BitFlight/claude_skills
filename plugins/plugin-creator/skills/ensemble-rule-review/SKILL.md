@@ -167,6 +167,14 @@ Two procedures and one reusable contract turn this pattern from concept into act
   (descriptive only) — keying on the slug would never corroborate, since workers name rules
   differently.
 
+### The worker agent
+
+Spawn the `plugin-creator:focused-reviewer` agent as each map worker — a lean haiku agent with
+minimal tools (`Read, Grep, Glob, Bash, Write`) and no inherited skills, built to apply one rule
+slice and emit the fixed schema. Do NOT use `general-purpose` workers: they inherit every skill
+and MCP tool description, adding a large constant token cost to every one of the N parallel
+workers. For web/API targets, the spawner adds the one specific MCP tool to the worker's tools.
+
 ### Partition the ruleset, not the input
 
 Every worker reviews the SAME input; only its rule slice differs. The denoising comes from

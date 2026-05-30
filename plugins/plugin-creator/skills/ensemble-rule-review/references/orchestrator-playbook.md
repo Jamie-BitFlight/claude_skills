@@ -86,8 +86,11 @@ dropped). Raising `w` is the mitigation; this is a property of voting ensembles 
    rule lands in ≥ 2 slices.
 4. **Build worker prompts.** Copy `../assets/worker-prompt-skeleton.md` once per slice; fill the
    placeholders; set the identical input scope on all.
-5. **Dispatch (Phase 1 / map).** Launch all workers in one parallel batch, cheapest tier, low
-   effort. Each writes findings in the fixed schema.
+5. **Dispatch (Phase 1 / map).** Spawn the `plugin-creator:focused-reviewer` agent once per
+   slice — it is the lean, haiku, minimal-tool worker built for this. Do NOT use
+   `general-purpose`: it inherits every skill and MCP tool description, costing a constant token
+   overhead on every one of the N parallel workers. Launch all in one parallel batch, low effort.
+   Each writes findings in the fixed schema to its absolute OUTFILE.
 6. **Reduce (Phase 2).** Run the reducer algorithm below.
 7. **Emit.** Ranked, capped, structured output. An empty result is a valid terminal.
 
@@ -139,7 +142,9 @@ weight ≥ 1 and rank; for precision-biased gates, raise it so only corroborated
 Decompose into two role types — keep each worker to ONE type:
 
 - **Detection/classification workers (map).** Apply a rule slice to the shared input, emit
-  fixed-schema findings. High rigidity, cheapest model. The default worker.
+  fixed-schema findings. High rigidity, cheapest model. The default worker — use the
+  `plugin-creator:focused-reviewer` agent, which is exactly this with minimal tools and no
+  inherited skills.
 - **Verifier workers (optional second pass).** Take a single surviving candidate plus the input
   and return one constrained verdict (CONFIRMED / PLAUSIBLE / REFUTED). Use when precision must be
   raised beyond what corroboration weighting alone provides.
