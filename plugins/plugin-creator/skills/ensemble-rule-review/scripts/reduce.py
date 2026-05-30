@@ -41,7 +41,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 FIELD_RE = re.compile(r"^\s*(?:-\s+)?([A-Za-z_]+):\s*(.*)$")
-LOCATION_LINE_RE = re.compile(r"([^/\s]+):(\d+)")
+# Capture the FULL path token (not just the basename) so two different files sharing a
+# basename never collapse into the same key and fabricate a false corroboration.
+LOCATION_LINE_RE = re.compile(r"(\S+):(\d+)")
 SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 BLOCK_START_FIELD = "group"
 # A finding is "corroborated" once at least this many distinct workers report it.
@@ -77,15 +79,21 @@ class Merged:
 
 
 def normalize_location(raw: str) -> str:
-    """Collapse a location to `basename:line` so two workers collide on one line.
+    """Normalize a location to `path:line`, preserving the path to avoid false merges.
+
+    Strips an absolute-path prefix down to the repo-relative path and trims whitespace,
+    but keeps the directory portion: two files with the same basename in different
+    directories (e.g. `src/foo/config.py:10` vs `tests/foo/config.py:10`) must NOT
+    collapse to one key, or unrelated findings would fabricate a false corroboration.
 
     Returns:
-        The normalized `basename:line` string, or the stripped input when no line
-        number is present.
+        The `path:line` string with any leading `/` stripped, or the stripped input
+        when no line number is present.
     """
     match = LOCATION_LINE_RE.search(raw)
     if match:
-        return f"{match.group(1)}:{match.group(2)}"
+        path = match.group(1).lstrip("/")
+        return f"{path}:{match.group(2)}"
     return raw.strip()
 
 

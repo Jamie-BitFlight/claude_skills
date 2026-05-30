@@ -94,9 +94,27 @@ def test_verdict_defaults_to_violation_when_absent() -> None:
     assert all(f.verdict == "VIOLATION" for f in findings)
 
 
-def test_normalize_location_collapses_paths() -> None:
-    assert r.normalize_location("  /abs/path/create_plugin.py:436 ") == "create_plugin.py:436"
-    assert r.normalize_location("create_plugin.py:436") == "create_plugin.py:436"
+def test_normalize_location_strips_abs_prefix_but_keeps_path() -> None:
+    # Absolute prefix stripped to repo-relative, but the directory is PRESERVED.
+    assert r.normalize_location("  /repo/src/foo/config.py:10 ") == "repo/src/foo/config.py:10"
+    assert r.normalize_location("src/foo/config.py:10") == "src/foo/config.py:10"
+
+
+def test_same_basename_different_dirs_do_not_corroborate() -> None:
+    """Two files sharing a basename must NOT collapse into one weight-2 finding."""
+    a = """- group: 1
+  rule: x
+  location: src/foo/config.py:10
+  severity: high
+"""
+    c = """- group: 1
+  rule: x
+  location: tests/foo/config.py:10
+  severity: high
+"""
+    survivors = r.reduce_findings({"A": r.parse_report(a), "C": r.parse_report(c)}, keep_threshold=1)
+    assert len(survivors) == 2
+    assert all(m.weight == 1 for m in survivors)
 
 
 def test_severity_escalates_to_highest() -> None:

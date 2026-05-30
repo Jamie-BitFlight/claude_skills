@@ -28,8 +28,9 @@ ensemble (partition ruleset across overlapping cheap parallel sub-agents → fix
 ---
 
 **Method:** 7 territory finders over the 30-plugin tree plus `.claude/`, identical detection
-checklist plus fixed schema plus 1-5 fit rubric. Per-finder reports in
-`.tmp/scratch/reports/finder-{ab,cd,efg,hl,m,nop,qrs,tz}.md`.
+checklist plus fixed schema plus 1-5 fit rubric. (Per-finder reports were written to a
+gitignored `.tmp/scratch/` scratch directory during the survey; they are working artifacts, not
+committed to the repo.)
 
 **Counts (finder-reported):** a-b 12/6 · c-d 16/8 · e-g 7/5 · h-l 7/4 · m 0/0 ·
 n-p 18/12 · q-s 10/8 · t-z 15/10 → ~85 candidates, ~53 at fit≥4.
@@ -79,7 +80,7 @@ Same "review code against N quality dimensions in one pass" ruleset, duplicated:
 - `development-harness/agents/code-reviewer.md` — 7 universal dims + stack rules — fit5
 - `python-engineering/skills/review/SKILL.md` — 9 dimensions, 36 items — fit5
 - `.claude/templates/code-review-checklist.md` — 15 items, 4 sections — fit4
-- `python3-development/skills/python3-review` — near-duplicate of python-engineering (SKIP: `python3-development` is deprecated — convert the `python-engineering` copy only)
+- `python3-development/skills/python3-review` — near-duplicate of python-engineering (SKIP: convert the `python-engineering` copy only; see meta-finding 1)
 
 Partition: one worker per dimension (correctness / security / perf / error-handling /
 naming / tests / docs), merge by severity plus corroboration.
@@ -200,9 +201,12 @@ list is where a single Sonnet pass silently drops criteria).
 
 1. **`python-engineering` and `python3-development` are near-duplicate plugins** — both
    carry analyze-test-failures, comprehensive-test-review, modernpython, review/python3-review,
-   snakepolish, test-failure-mindset, typer, ty, etc. `python3-development` is DEPRECATED
-   (retained for backward-compat only) — convert the `python-engineering` copies and SKIP
-   `python3-development` entirely.
+   snakepolish, test-failure-mindset, typer, ty, etc. Per repo-owner direction (conversation
+   2026-05-30), `python3-development` is being wound down in favour of `python-engineering` and
+   kept only so existing users do not break — so convert the `python-engineering` copies and SKIP
+   the `python3-development` duplicates. This is owner guidance for this catalog, not a deprecation
+   notice published in the plugin's own manifest or README; verify against the plugin before
+   relying on it elsewhere.
 2. **The framework already exists in-repo** (Tier 0). Standardize from it rather than
    designing from scratch.
 3. **Replication is the corroboration signal at repo scale** — code-review (C1), summarizer
@@ -281,21 +285,23 @@ clusters the first pass missed. Marked NEW (missed by pass 1) or CONFIRMED.
 
 ### python3-development — DO NOT CONVERT (deprecated plugin)
 
-`python3-development` is deprecated and retained only for backward-compat with existing users.
-Do NOT convert any of its skills/agents. The candidates below are recorded for completeness
-only; their live equivalents in `python-engineering` are the conversion targets instead.
+Per repo-owner direction (conversation 2026-05-30), `python3-development` is being wound down in
+favour of `python-engineering` and kept only so existing users do not break. Do NOT convert any of
+its skills/agents; their live equivalents in `python-engineering` are the conversion targets
+instead. (Owner guidance for this catalog — not a deprecation notice in the plugin's own manifest
+or README. The candidates below are recorded for completeness only.)
 
-- quality-gate — 5 sequential gates / 15+ criteria — fit5 — NEW — SKIP (deprecated)
-- type-system-design-patterns — 4-step audit / 12+ per interface — fit5 — NEW — SKIP (deprecated)
-- code-reviewer (agent) — 18-item / 5 categories — fit5 — NEW — SKIP (deprecated)
-- python3-standards — 40+ criteria / 8 domains (shared rule hub) — fit5 — NEW — SKIP (deprecated)
-- architecture-spec-patterns, comprehensive-test-review, stinkysnake, modernpython — fit4 — NEW — SKIP (deprecated)
+- quality-gate — 5 sequential gates / 15+ criteria — fit5 — NEW — SKIP (use python-engineering)
+- type-system-design-patterns — 4-step audit / 12+ per interface — fit5 — NEW — SKIP (use python-engineering)
+- code-reviewer (agent) — 18-item / 5 categories — fit5 — NEW — SKIP (use python-engineering)
+- python3-standards — 40+ criteria / 8 domains (shared rule hub) — fit5 — NEW — SKIP (use python-engineering)
+- architecture-spec-patterns, comprehensive-test-review, stinkysnake, modernpython — fit4 — NEW — SKIP (use python-engineering)
 
 ### Net-new clusters pass 1 missed
 
 1. The whole `python3-development` plugin (`python3-standards` 40+ criteria hub, `quality-gate`,
    distinct 18-item `code-reviewer`, `type-system-design-patterns`) — nearly invisible in pass 1.
-   NOTE: `python3-development` is deprecated — do NOT convert it; recorded here for completeness only.
+   NOTE: per owner direction (meta-finding 1) do NOT convert `python3-development`; recorded for completeness only.
 2. plugin-creator authoring-workflow cluster (`plugin-creator`, `plugin-lifecycle`,
    `skill-creator`, `refactor-skill`, `prompt-optimization`, `subagent-refactoring-methodology`).
 3. plugin-creator CoVe/grading agents (`grader`, `comparator`, `ai-doc-optimizer`,

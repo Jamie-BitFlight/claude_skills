@@ -39,8 +39,12 @@ rule-overlap within each shard.
   no corroboration signal.
 - **Candidates cap per worker** — bound each worker's output (e.g. ≤ K findings) so a confused
   worker cannot flood the reducer.
-- **Keep threshold** — minimum corroboration weight to survive the reducer. Higher = more
-  precision, lower recall. For recall-biased work, keep weight ≥ 1 and rank rather than cut hard.
+- **Keep threshold** — minimum corroboration weight to survive the reducer. The script default is
+  `keep_threshold=1` (recall-biased: keep everything, rank by weight, cut nothing). This default
+  does NOT drop lone-worker findings — it relies on you reading the ranked output. For a
+  **precision-biased gate** (where a lone worker's hallucination must fall away automatically),
+  pass `--keep-threshold 2` (or higher with more overlap) so only corroborated findings survive.
+  Choose the threshold deliberately per run; do not assume the default denoises.
 
 ## Balanced rotating overlap (recommended construction)
 

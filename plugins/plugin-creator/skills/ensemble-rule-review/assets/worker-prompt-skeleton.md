@@ -13,10 +13,11 @@ GOAL: {{ONE_SENTENCE_GOAL}}
 
 INPUT — review ONLY this (identical for every worker): {{INPUT_SCOPE}}
 
-YOUR RULE SLICE — apply ONLY these rules (your partial, deliberately-overlapping ruleset):
-- {{RULE_1}}
-- {{RULE_2}}
-- {{RULE_3}}
+YOUR RULE SLICE — apply ONLY these rules. Each rule carries its OWN stable group id (the same id
+the other worker assigned to that group also uses). You may hold rules from more than one group:
+- [group {{GROUP_OF_RULE_1}}] {{RULE_1}}
+- [group {{GROUP_OF_RULE_2}}] {{RULE_2}}
+- [group {{GROUP_OF_RULE_3}}] {{RULE_3}}
 
 STEP 1 — For each rule, locate every place in the input where it applies ({{DETECTION_METHOD}}).
 STEP 2 — For each location, decide VIOLATION or PASS strictly against the rule text.
@@ -25,17 +26,19 @@ STEP 3 — Emit one block per finding in the FIXED SCHEMA below. No prose outsid
 
 FIXED CANDIDATE SCHEMA (emit this EXACT block shape, one block per finding — the reducer
 parses it literally, so do not rename fields or change the leading "- group:"):
-- group: {{YOUR ASSIGNED GROUP ID — the stable rule-group number, identical across all workers}}
+- group: {{THE GROUP ID OF THE RULE THIS FINDING VIOLATES — per finding, NOT a fixed worker id}}
   rule: {{free-form descriptive slug — for humans only, NOT used to match findings}}
   location: {{file:line}}
   verdict: VIOLATION | PASS
   severity: {{critical | high | medium | low}}
   evidence: "{{exact short quote from the input}}"
 
-CORROBORATION KEY — the reducer dedups on (group, location), NOT on your rule slug. Two workers
-who both hold this group and flag the same line corroborate each other even if they name the rule
-differently. That is why `group` MUST be the orchestrator-assigned id, identical across workers,
-and `rule` is descriptive only.
+CORROBORATION KEY — the reducer dedups on (group, location), NOT on your rule slug. `group` MUST
+be the id of the specific RULE that this finding violates — not a single per-worker constant. If
+you hold rules from two groups (e.g. groups 1 and 2 under rotating overlap), a finding against a
+group-1 rule emits `group: 1` and a finding against a group-2 rule emits `group: 2`. Tagging every
+finding with one worker-level id would mislabel the second group and break corroboration with the
+other worker assigned to it. The rule slug may differ between workers; only the group id must match.
 
 OUTPUT CONTRACT:
 Write all findings to {{OUTFILE}}. {{OUTFILE}} MUST be an ABSOLUTE path (e.g.

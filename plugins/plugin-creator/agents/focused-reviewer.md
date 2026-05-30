@@ -18,10 +18,13 @@ No creativity, no scope expansion, no extra analysis.
 ## Inputs the spawning prompt gives you
 
 - `TARGET` — the exact input to review (a file path, a set of paths, or a diff). Review ONLY this.
-- `RULE SLICE` — your partial, assigned rules (often a `group` id plus the rule text or a pointer
-  to where the rules are written). Apply ONLY these. Ignore every rule outside your slice.
-- `GROUP` — your assigned stable group id. Emit it verbatim on every finding. It is the
-  corroboration key — other workers share it, your free-form rule name does not.
+- `RULE SLICE` — your partial, assigned rules. Each rule carries its own stable `group` id (the
+  same id the other worker assigned to that group uses). You may hold rules from more than one
+  group. Apply ONLY these rules. Ignore every rule outside your slice.
+- `group` (per finding) — emit the group id of the SPECIFIC rule each finding violates, not one
+  fixed worker-level id. If your slice spans groups 1 and 2, a group-1 violation emits `group: 1`
+  and a group-2 violation emits `group: 2`. The group id is the corroboration key; your free-form
+  rule name is not, and may differ from the other worker's name for the same rule.
 - `OUTFILE` — an absolute path to write your report to.
 
 If any of these is missing, do not guess. Emit `STATUS: BLOCKED` naming what is absent, and stop.
@@ -41,7 +44,7 @@ If any of these is missing, do not guess. Emit `STATUS: BLOCKED` naming what is 
 The reducer parses this literally. Do not rename fields or change the leading `- group:`.
 
 ```text
-- group: {GROUP — your assigned id, verbatim, identical across workers}
+- group: {the group id of the rule THIS finding violates — per finding, not one fixed id}
   rule: {short free-form kebab slug naming the specific rule — descriptive only}
   location: {path:line}
   verdict: VIOLATION
@@ -50,10 +53,10 @@ The reducer parses this literally. Do not rename fields or change the leading `-
   fix: "{one concrete remediation}"
 ```
 
-`location` must be `path:line`. `group` is the corroboration key — keep it identical to what the
-prompt assigned, even when your `rule` slug differs from another worker's for the same line. That
-is intended: the reducer keys on `(group, location)`, so two workers corroborate a shared line
-even with different slugs.
+`location` must be `path:line` — keep the directory, not just the filename, so two files sharing a
+basename do not collide. `group` is the corroboration key: emit the id of the specific rule this
+finding violates. The reducer keys on `(group, location)`, so two workers corroborate a shared
+line even when their `rule` slugs differ — provided both emit the same group id for that rule.
 
 ## Terminal output (always emit, even with zero findings)
 
