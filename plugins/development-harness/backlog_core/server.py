@@ -84,7 +84,7 @@ def _token_count(serialised: str) -> int:
 def _view_payload_token_count(full_response: dict[str, object]) -> int:
     """Token-count the delivered ``backlog_view`` payload without double-counting.
 
-    The full-content view returns the section content TWICE: once in
+    The full-content view USUALLY returns the section content TWICE: once in
     ``full_response["body"]`` (the rendered body) and again inside each
     ``full_response["sections"][name]["entries"][i]["content"]`` entry.  Counting
     the serialised payload verbatim therefore measures the section content roughly
@@ -92,12 +92,25 @@ def _view_payload_token_count(full_response: dict[str, object]) -> int:
     ``_VIEW_TOKEN_BUDGET`` can trip the over-budget directory purely from this
     metadata duplication (issue #2495 finding #4).
 
-    The caller reads the content from ``body``; the per-entry ``content`` strings
-    are redundant for sizing.  This helper measures a copy of the payload with
-    those per-entry ``content`` strings blanked, so the gate reflects the size the
-    caller actually pays for the content (once) plus the structural metadata
-    (section names, counts, entry ids).  ``body`` is measured in full, so a body
-    that genuinely exceeds the budget on its own still gates.
+    De-duplication is therefore conditional on the duplication actually existing.
+    The per-entry ``content`` is redundant for sizing ONLY when ``body`` carries
+    that text once — i.e. when ``body`` is non-empty.  On the structured-key drift
+    path (``_filter_view_sections`` matched the structured ``sections`` key but no
+    rendered ``## ``/``### `` body header, so it CLEARED ``body``), the per-entry
+    ``content`` under ``sections`` is the SOLE delivered copy of the content.
+    Blanking it then would under-count the real delivered payload and let a
+    response that genuinely exceeds ``_VIEW_TOKEN_BUDGET`` slip through the gate
+    inline (issue #2495, Codex P2 — the over-budget measurement under-counts when
+    body was cleared).
+
+    This helper therefore blanks the per-entry ``content`` for the measurement
+    copy ONLY when ``body`` is non-empty (the body carries that text once, so the
+    section copy is redundant).  When ``body`` is empty/cleared, the section
+    content is the only delivered copy and is measured in full.  Equivalently: the
+    measurement always reflects the ACTUAL serialised delivered payload — content
+    the caller receives once is counted once, never subtracted away.  ``body`` is
+    always measured in full, so a body that genuinely exceeds the budget on its
+    own still gates.
 
     The returned payload itself is never mutated — only the measurement copy is.
 
@@ -111,6 +124,14 @@ def _view_payload_token_count(full_response: dict[str, object]) -> int:
     if not isinstance(raw_sections, dict) or not raw_sections:
         # No structured sections dict to de-duplicate against — measure verbatim.
         return _token_count(_json.dumps(full_response))
+    body = full_response.get("body")
+    if not (isinstance(body, str) and body):
+        # ``body`` is empty/cleared (e.g. the structured-key drift path): the
+        # per-entry ``content`` under ``sections`` is the SOLE delivered copy, so
+        # it must be counted in full.  Measure the payload verbatim.
+        return _token_count(_json.dumps(full_response))
+    # ``body`` is non-empty and carries the content once; blank the redundant
+    # per-entry ``content`` so it is not double-counted against the budget.
     measured = dict(full_response)
     measured["sections"] = {name: _section_without_entry_content(sec) for name, sec in raw_sections.items()}
     return _token_count(_json.dumps(measured))

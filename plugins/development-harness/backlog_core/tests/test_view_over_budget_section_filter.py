@@ -1385,3 +1385,113 @@ class TestSectionsDictFilterIsCaseInsensitive:
             "a name absent from the dict, body, and metadata in EVERY case must still set "
             "section_filter_miss — the case-folding fix must not suppress genuine misses. Codex P2."
         )
+
+
+# ---------------------------------------------------------------------------
+# Codex P2 (#2495): the over-budget measurement must NOT under-count when the
+# structured-key drift path CLEARED the body, leaving the per-entry section
+# ``content`` as the sole delivered copy of the payload.
+# ---------------------------------------------------------------------------
+
+# A per-entry ``content`` blob large enough that, when carried alone in the
+# structured ``sections`` dict (body cleared), the serialised response exceeds
+# _VIEW_TOKEN_BUDGET (4000 tokens ~= 16k chars).  ~33k chars / ~5.5k tokens.
+_DRIFT_CONTENT = "Lorem ipsum dolor sit amet consectetur adipiscing elit. " * 600
+
+
+def _drift_view_result() -> ViewItemResult:
+    """Build the structured-key drift ``ViewItemResult`` for the under-count repro.
+
+    The structured ``sections`` dict is keyed ``RT-ICA`` (matching a
+    ``sections=['RT-ICA']`` request) and carries a large per-entry ``content``.
+    The rendered body header drifts (``## RT ICA`` — a SPACE where the key uses a
+    HYPHEN), so ``_filter_view_sections`` matches the structured key but finds no
+    exact body header and CLEARS the body (finding #5).  After clearing, the
+    per-entry ``content`` under ``sections`` is the ONLY delivered copy of the
+    content, and the serialised response exceeds _VIEW_TOKEN_BUDGET.
+    """
+    return ViewItemResult(
+        number=2495,
+        title="drift",
+        status="status:groomed",
+        body=f"## RT ICA\n\n{_DRIFT_CONTENT}",
+        sections={
+            "RT-ICA": operations._SectionMetadata(
+                num_entries=1, num_struck=0, entries=[{"id": "e1", "struck": False, "content": _DRIFT_CONTENT}]
+            )
+        },
+    )
+
+
+class TestOverBudgetMeasurementCountsClearedBodySoleContent:
+    """Codex P2 (#2495): a cleared body must not let the sole section copy escape the gate.
+
+    The finding #4 measurement blanks each section's per-entry ``content`` before
+    token-counting on the premise that the content is duplicated in ``body``.  On
+    the structured-key drift path ``_filter_view_sections`` CLEARS ``body``, so
+    that premise fails: the per-entry ``content`` becomes the SOLE delivered copy.
+    Blanking it then under-counts the payload and returns an over-budget response
+    inline, defeating the budget guard.  The measurement must count the section
+    content in full when ``body`` is empty.
+    """
+
+    def test_view_payload_token_count_counts_section_content_when_body_cleared(self) -> None:
+        """``_view_payload_token_count`` must reflect the SOLE section copy when body is empty.
+
+        RED (pre-fix): the helper blanks the per-entry ``content`` unconditionally,
+        so a payload whose serialised form exceeds _VIEW_TOKEN_BUDGET is measured as
+        a tiny structural skeleton well UNDER budget — the under-count.
+        """
+        from backlog_core import server
+
+        result = _drift_view_result()
+        response = result.model_dump()
+        filtered = server._filter_view_sections(response, ["RT-ICA"], result)
+
+        # Premise: the drift path cleared the body so the section content is the sole copy.
+        assert filtered.get("body") == "", (
+            "premise: the structured-key drift path must clear the body (finding #5) so the "
+            f"section content is the sole delivered copy; got body of {len(str(filtered.get('body')))} chars."
+        )
+        verbatim_tokens = server._token_count(server._json.dumps(filtered))
+        assert verbatim_tokens > server._VIEW_TOKEN_BUDGET, (
+            "premise: the serialised drift payload (section content the sole copy) must EXCEED the "
+            f"budget; got {verbatim_tokens} tokens.  If not, the test no longer exercises the under-count."
+        )
+
+        measured = server._view_payload_token_count(filtered)
+
+        assert measured > server._VIEW_TOKEN_BUDGET, (
+            "the over-budget measurement must count the per-entry section content in FULL when the "
+            "body was cleared — it is the sole delivered copy, not a duplicate of the body.  Pre-fix "
+            f"the helper blanked it unconditionally, under-counting to {measured} tokens (<= budget) "
+            "and letting an over-budget payload escape inline.  Codex P2 (#2495)."
+        )
+
+    def test_over_budget_drift_section_returns_directory(self, mocker: MockerFixture) -> None:
+        """backlog_view(sections=['RT-ICA']) on a drift item returns the over-budget directory.
+
+        End-to-end: ``view_item`` yields the structured-key drift result; the body is
+        cleared by ``_filter_view_sections`` and the sole section copy exceeds the
+        budget.  The gate must return the compact over-budget directory, not the
+        over-budget payload inline.
+
+        RED (pre-fix): the under-counting measurement reported the payload under budget,
+        so ``backlog_view`` returned the over-budget content inline with ``_over_budget``
+        unset — defeating the budget guard.
+        """
+        from backlog_core import server
+
+        mocker.patch.object(server.operations, "view_item", side_effect=lambda **_kwargs: _drift_view_result())
+
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=["RT-ICA"]))
+
+        assert resp.get("_over_budget") is True, (
+            "the drift payload (body cleared, sole section copy over budget) must return the compact "
+            "over-budget directory — the measurement must not under-count the sole delivered copy and "
+            "let the over-budget payload through inline.  Got keys: " + repr(sorted(resp)) + ".  Codex P2 (#2495)."
+        )
+        assert resp.get("section_filter_miss") is not True, (
+            "the structured 'RT-ICA' key matched the request, so this is NOT a section_filter_miss — "
+            "only the budget gate fires here."
+        )
