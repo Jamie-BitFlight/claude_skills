@@ -259,7 +259,7 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
 4. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
 5. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
 6. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
-7. **Workspace member**: `plugins/development-harness` is a uv workspace member (`[tool.uv.workspace]`). Its `backlog-core` package is available via `backlog-core = { workspace = true }`.
+7. **No uv workspace**: This repo has no `[tool.uv.workspace]`. Plugin MCP servers are PEP 723 self-resolving scripts — inline `# /// script` deps are the runtime source of truth; root `pyproject.toml` dev-dependencies mirror those deps only so `ty`/`ruff`/IDE resolve imports; no per-plugin `uv.lock`. See [.claude/rules/python-development.md](./.claude/rules/python-development.md).
 8. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
 9. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 10. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").

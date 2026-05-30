@@ -17,7 +17,7 @@ This file contains only project decisions that differ from defaults and routing 
 
 **Backlog is MCP-driven**: Never edit `.claude/backlog/` files directly — use `mcp__plugin_dh_backlog__*` tools. GitHub Issues are the source of truth; `.claude/backlog/` is local cache only.
 
-**Workspace member**: `plugins/development-harness` is a uv workspace member. Its `backlog-core` package resolves via `backlog-core = { workspace = true }` in `pyproject.toml`.
+**No uv workspace**: This repo has no `[tool.uv.workspace]`. Plugin MCP servers are PEP 723 self-resolving scripts — the inline `# /// script` deps are the runtime source of truth; the root `pyproject.toml` dev-dependencies only mirror those deps so `ty`/`ruff`/IDE resolve imports. No per-plugin `uv.lock`. See [.claude/rules/python-development.md](../.claude/rules/python-development.md).
 
 **conftest isolation**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from the root pytest run (conftest name collision). Test it independently: `cd` into the directory and run `uv run pytest`.
 
