@@ -244,7 +244,7 @@ behavior rather than assuming tasks become visible only after finalization. Both
 
 | Backend | Identifier | Purpose |
 |---------|-----------|---------|
-| `LocalYamlTaskProvider` | `local` | Default. Wraps `yaml_reader.py` / `yaml_writer.py` + query layer. Single-machine use only — documents written to `plan_dir/{plan_id}/documents/`. |
+| `LocalYamlTaskProvider` | `local` | Default. Wraps `yaml_reader.py` / `yaml_writer.py` + query layer. **In the MCP server context**, wrapped by `GistTaskLayer` — plans with an issue are Gist-backed and portable. CLI/direct use without the wrapper is single-machine only. |
 | `InMemoryTaskProvider` | `memory` | In-memory test double. No persistence. Use in tests and CI where filesystem access is unavailable. |
 | `GitHubTaskProvider` | `github` | Fully implemented (13 methods). Not selectable via factory — `create_task_backend("github")` raises `NotImplementedError` until #984 lands. Instantiate directly: `GitHubTaskProvider(issue_backend, doc_backend)`. Current `issue_backend` type is `BacklogBackend` (from `backlog_core.backend_protocol`) — stand-in until #984 delivers a standalone `IssueBackend`. `doc_backend` type is the `DocumentBackend` stub in `github_task.py`. |
 | `BeadsTaskProvider` | `beads` | Maps SAM plans to beads epics; tasks to child issues with `--parent` links. Uses `bd` CLI subprocess. Active-task context persisted via `bd remember` under `dh.active-task.<session_id>` keys. |
@@ -357,7 +357,7 @@ How each platform maps to the three SAM primitives:
 
 5. **Separate coordination state from handoff content** -- Work Items and Sub-items handle scheduling, claiming, gating, and tracking (coordination state). Documents handle the actual content agents produce and consume across stages (durable handoff). These are different workloads with different access patterns and must not be collapsed into a single primitive. See "SAM Storage Model" above.
 
-6. **Backend is responsible for durable content storage** -- Documents store a `content_ref` (a backend-opaque identifier, not a filesystem path). The backend implementation resolves `content_ref` to bytes using its own native primitive (e.g., a GitHub Gist ID, a GitLab Snippet ID, a Supabase storage object key). Local filesystem is a valid implementation only for `LocalYamlTaskProvider` in single-machine, non-distributed use. Any backend intended for sandbox, CI, or distributed agent access must store content remotely.
+6. **Backend is responsible for durable content storage** -- Documents store a `content_ref` (a backend-opaque identifier, not a filesystem path). The backend implementation resolves `content_ref` to bytes using its own native primitive (e.g., a GitHub Gist ID, a GitLab Snippet ID, a Supabase storage object key). Local filesystem is a valid implementation only for CLI or direct use of `LocalYamlTaskProvider` without GistTaskLayer. In the MCP server context, `LocalYamlTaskProvider` is wrapped by `GistTaskLayer`, which makes issue-backed plans durable in GitHub Gists and accessible from any environment. Any backend intended for sandbox, CI, or distributed agent access must store content remotely.
 
 ## Implementation Roadmap
 
@@ -709,7 +709,7 @@ class TaskBackend(Protocol):
 
 | Backend | Identifier | Class | Purpose |
 |---------|-----------|-------|---------|
-| `LocalYamlTaskProvider` | `local` | `sam_schema.core.backends.local_yaml` | Default. Wraps existing YAML I/O stack (yaml_reader, yaml_writer, query). Single-machine only. |
+| `LocalYamlTaskProvider` | `local` | `sam_schema.core.backends.local_yaml` | Default. Wraps existing YAML I/O stack (yaml_reader, yaml_writer, query). **In the MCP server context**, wrapped by `GistTaskLayer` (`sam_schema.core.gist_task_layer`) — issue-backed plans write through to Gist and are portable. CLI/direct use without GistTaskLayer is single-machine only. |
 | `GitHubTaskProvider` | `github` | `sam_schema.core.backends.github_task` | Maps plans → GitHub Issues (`sam:plan` label), tasks → sub-issues (`sam:{status}` labels). Constructor: `GitHubTaskProvider(issue_backend: BacklogBackend, doc_backend: DocumentBackend)`. `BacklogBackend` is from `backlog_core.backend_protocol`; `DocumentBackend` is a stub in `github_task.py` pending #984. |
 | `InMemoryTaskProvider` | `memory` | `sam_schema.core.backends.memory` | In-memory test double. No persistence. Use in tests and CI. |
 | `BeadsTaskProvider` | `beads` | `sam_schema.core.backends.beads_task` | Maps plans → beads epics, tasks → child issues with `--parent` links. Context persistence via `bd remember` under `dh.active-task.<session_id>` keys. Artifacts stored as JSON blob in `bd update --metadata dh.artifacts={...}`. |
@@ -742,6 +742,64 @@ The factory function `create_task_backend(name)` in `sam_schema.core.task_config
 #### Migration Guide
 
 Existing users are unaffected. When no `TASKBACKEND` variable and no `taskbackend.toml` file exist, the server selects `local` — identical behavior to before the pluggable architecture was introduced. The `local` backend wraps the existing YAML I/O stack without modifying underlying modules. No configuration changes are required unless switching backends.
+
+#### GistTaskLayer — Gist-Backed Plan Storage (#2509)
+
+`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that the MCP server applies on top of `LocalYamlTaskBackend`. It is NOT a backend identifier — selecting `task.backend: local` in `.dh/config.yaml` activates `GistTaskLayer(LocalYamlTaskBackend)` in the server context automatically. CLI or test code that instantiates `LocalYamlTaskBackend` directly does not receive this wrapping.
+
+**Write-path (mandatory, raises on failure):**
+
+Plans and mutations write through to a GitHub Gist via `ArtifactRegistryClient.store(issue, yaml_content)`, which calls `artifact_register(item_id=issue, artifact_type="task-plan", content=yaml_content)`. If the Gist write fails, `ArtifactWriteError` is raised and propagated as a structured MCP error — no silent success. Plans with `issue=None` skip Gist upload and emit a non-portability warning; all write-path operations on `issue=None` plans complete locally only.
+
+**Read-path (Gist-first with annotated local fallback):**
+
+`read_plan` resolves `plan_id → issue` via `PlanIdIndex`, then fetches YAML from Gist. If the Gist fetch fails or the index has no entry for the plan (pre-fix local-only plans), it falls back to `LocalYamlTaskProvider.read_plan()`. The fallback is annotated in the response (`source="local"`) — it is never silent. `PlanNotFoundError` is raised when both Gist and local miss.
+
+**Asymmetry summary:**
+
+| Operation | On failure |
+|---|---|
+| Gist write (create/mutation) | Raises `ArtifactWriteError` — hard error |
+| Gist read (read_plan) | Falls back to local with `source="local"` annotation |
+| Plan index write (register) | Warning only — content is still in Gist |
+| Plan index read (resolve) | Returns `None` — silent fallback to local read |
+
+**claim_task atomicity decision (ADR-2509-3 resolution — Option 3: Serialized Dispatch):**
+
+The GitHub REST and GraphQL APIs as of 2026-05-30 provide no conditional/atomic mutation primitive for labels. `addLabels`/`removeLabels` are idempotent, not conditional; Gist blob read-modify-write provides no compare-and-swap.
+
+**Chosen mechanism**: Serialized Dispatch. The exactly-once guarantee is enforced by the caller — the `implement-feature` dispatch orchestrator claims one task at a time per dispatch wave, waiting for the claim response before dispatching the next task. Under this pattern, two agents never race on the same task.
+
+**Declared contract deviation**: `GistTaskLayer.claim_task()` does NOT guarantee exactly-once in isolation. Two concurrent callers may both receive `True`. Exactly-once holds only when dispatch is serialized at the orchestrator level. This deviation is documented in the `claim_task` docstring and in `CLAUDE.md`.
+
+Why the other ADR-2509-3 options were rejected:
+
+- **Option 1 (GitHub conditional mutation)**: No such primitive exists in the GitHub API as of 2026-05-30.
+- **Option 2 (external lock)**: Adds operational complexity (Redis or a Gist-based lock file with its own race conditions) with no benefit when Option 3 already serializes.
+- **Option 4 (accept eventual consistency)**: Requires idempotent task outputs, which the `TaskBackend` Protocol does not guarantee.
+
+`claim_task` for `issue=None` plans raises `ConcurrentClaimUnsupportedError` immediately — local-only plans have no GitHub anchor for cross-agent coordination.
+
+After a successful claim, `GistTaskLayer` performs a best-effort Gist write-back so `read_plan` returns consistent task status. Write-back failure logs a `WARNING` and does not roll back the claim.
+
+**PlanIdIndex and `sam.plan_index_issue` configuration:**
+
+`PlanIdIndex` maintains a `plan_id → issue` reverse-map YAML blob stored on a sentinel GitHub issue. Configure it via `.dh/config.yaml`:
+
+```yaml
+sam:
+  plan_index_issue: 2509  # replace with a dedicated 'SAM Plan Registry' issue number
+```
+
+Recommendation: create a dedicated pinned issue labelled "SAM Plan Registry" and use its number. Using a working-feature issue as the sentinel is valid during development but not for long-lived deployments.
+
+What happens when `sam.plan_index_issue` is unset:
+
+- `create_plan` with `issue` set: content uploads to Gist successfully, but index registration raises `PlanIndexConfigError`. The MCP response includes a warning: "Set sam.plan_index_issue in .dh/config.yaml to enable plan_id reverse lookup." The plan is still in Gist and readable via its issue number, but cross-environment `plan_id`-based lookup will fail.
+- `read_plan(plan_id)`: index resolution returns `None` (no exception) → falls back to `LocalYamlTaskProvider.read_plan(plan_id)`. Local file must exist for the read to succeed.
+- `list_plans`: `PlanIdIndex.list_all()` returns an empty list (no exception); only local plans appear.
+
+**Scope note**: `GistTaskLayer` is the fix for #2509 (environment-independent plan storage). Full `GitHubTaskProvider` support (#984, mapping tasks to GitHub sub-issues) remains a separate, out-of-scope initiative.
 
 ### Composition
 
@@ -779,5 +837,8 @@ Backend selection is configured via a config file at server startup. Each MCP se
 - [sam_schema/core/task_backend.py](../sam_schema/core/task_backend.py) -- TaskBackend Protocol definition (13 methods)
 - [sam_schema/core/task_backend_types.py](../sam_schema/core/task_backend_types.py) -- TypedDict shapes: TaskDefinition, TaskData, PlanData, PlanSummary, DocumentHandle, DocumentData
 - [sam_schema/core/task_config.py](../sam_schema/core/task_config.py) -- create_task_backend factory, TaskConfig dataclass, reset_task_config
-- [sam_schema/core/exceptions.py](../sam_schema/core/exceptions.py) -- SAM exception hierarchy (SamError, PlanNotFoundError, PlanExistsError, TaskNotFoundError, TaskValidationError, DocumentNotFoundError)
+- [sam_schema/core/exceptions.py](../sam_schema/core/exceptions.py) -- SAM exception hierarchy: SamError, PlanNotFoundError, PlanExistsError, TaskNotFoundError, TaskValidationError, DocumentNotFoundError, ArtifactWriteError, PlanIndexError, PlanIndexConfigError, ConcurrentClaimUnsupportedError
+- [sam_schema/core/gist_task_layer.py](../sam_schema/core/gist_task_layer.py) -- GistTaskLayer wrapper: write-through create/mutation, Gist-first dual-read, claim_task atomicity decision (ADR-2509-3 Option 3)
+- [sam_schema/core/plan_id_index.py](../sam_schema/core/plan_id_index.py) -- PlanIdIndex: plan_id↔issue reverse-map stored on sentinel GitHub issue; create_plan_id_index factory reads sam.plan_index_issue from .dh/config.yaml
+- [sam_schema/core/artifact_registry_client.py](../sam_schema/core/artifact_registry_client.py) -- ArtifactRegistryClient: thin wrapper over artifact_register/artifact_read for Gist storage
 - [sam_schema/core/backends/](../sam_schema/core/backends/) -- LocalYamlTaskProvider, InMemoryTaskProvider, GitHubTaskProvider implementations

@@ -533,7 +533,7 @@ The backlog MCP server also exposes `profile_load` (agent_profile tool) for load
 
 The SAM MCP server uses a `TaskBackend` Protocol (`sam_schema/core/task_backend.py`) to decouple plan/task operations from storage. The following backends are available:
 
-- `local` (default) — wraps existing YAML I/O stack. Single-machine only.
+- `local` (default) — wraps existing YAML I/O stack. **In the MCP server context**, `local` resolves to `GistTaskLayer(LocalYamlTaskBackend)` — plans with an associated GitHub issue are written through to Gist and are portable across environments (CI, worktrees, fresh checkouts). Plans without an issue (`issue=None`) are local-only and emit a non-portability warning. CLI/direct callers that instantiate `LocalYamlTaskBackend` directly do NOT get GistTaskLayer wrapping and remain single-machine only.
 - `github` — maps plans to GitHub Issues, tasks to sub-issues with `sam:{status}` labels. Requires IssueBackend + DocumentBackend (#984).
 - `memory` — in-memory test double. No persistence.
 - `beads` — maps plans to beads epics, tasks to child issues with `--parent` links. Context persisted via `bd remember`.
@@ -554,6 +554,51 @@ context:
 ```
 
 > **Important**: `backend.name` is the global default and applies to all subsystems that lack a specific override. If you set `backend.name: github` (e.g. to configure the backlog backend), you MUST also add `task.backend: local` and `context.backend: local` — otherwise the SAM server will attempt the GitHub task backend, which is incomplete and raises `NotImplementedError`.
+
+### GistTaskLayer — Write-Through Plan Storage
+
+`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that sits between the MCP server and `LocalYamlTaskBackend`. It is active in the MCP server context only — CLI callers use `LocalYamlTaskBackend` directly.
+
+**Write-through (create and mutations):**
+
+- `create_plan` with `issue` set: local write → Gist content upload via `artifact_client.store(issue, yaml)` → plan index registration. The Gist upload is mandatory and **raises `ArtifactWriteError` on failure** — no silent fallback. A plan index registration failure is a warning (content is still in Gist, but `plan_id` reverse-lookup may not resolve cross-environment).
+- `create_plan` with `issue=None`: local write only. The MCP response includes a non-portability warning. No Gist upload is attempted.
+- All mutations (update_task_status, update_task_fields, update_plan_fields, append_task, finalize_plan): read-modify-write via Gist (Gist-first read → apply mutation → `artifact_client.store()`). Write failure raises `ArtifactWriteError`.
+
+**Dual-read fallback (read_plan and list_plans):**
+
+- `read_plan`: resolves `plan_id → issue` via `PlanIdIndex`, fetches YAML from Gist. Falls back to `LocalYamlTaskProvider.read_plan()` when Gist content is unavailable or the index has no entry for `plan_id` (backward-compatible with pre-fix local-only plans). Source is always annotated in the response (`source="gist"` or `source="local"`). `PlanNotFoundError` is raised when both Gist and local miss.
+- `list_plans`: merges `PlanIdIndex.list_all()` (Gist-registered) with `LocalYamlTaskProvider.list_plans()` and deduplicates.
+
+**claim_task atomicity decision (ADR-2509-3 resolution — Option 3: Serialized Dispatch):**
+
+As of 2026-05-30, the GitHub REST and GraphQL APIs provide no conditional/atomic mutation primitive for labels (`addLabels`/`removeLabels` are idempotent, not conditional). Gist blob read-modify-write has no compare-and-swap. The available options were:
+
+1. GitHub conditional mutation — **rejected**: no such primitive exists in the GitHub API as of implementation date.
+2. External lock (Redis, Gist-based lock file) — **rejected**: adds operational complexity with no benefit when the dispatch pattern already serializes.
+3. Serialized Dispatch (chosen) — the exactly-once guarantee is provided by the caller (the `implement-feature` dispatch orchestrator), not by `claim_task` itself. The dispatch loop claims one task at a time per orchestrator per dispatch wave, and waits for the claim response before dispatching the next task.
+4. Accept eventual consistency — **rejected**: highest-ambiguity option; requires idempotent task outputs, which the `TaskBackend` Protocol does not guarantee.
+
+**Declared contract deviation**: `GistTaskLayer.claim_task()` does NOT provide exactly-once in isolation. If two callers invoke `claim_task` concurrently on the same task, both may return `True`. Exactly-once is guaranteed only when the caller serializes dispatch (the `implement-feature` orchestrator pattern). `claim_task` for `issue=None` plans raises `ConcurrentClaimUnsupportedError` immediately.
+
+After a successful claim, `GistTaskLayer` performs a best-effort Gist write-back so `read_plan` returns consistent task status. Write-back failure logs a WARNING and does not roll back the claim — the local YAML is the authoritative claim record.
+
+**PlanIdIndex configuration (`sam.plan_index_issue`):**
+
+`PlanIdIndex` stores a `plan_id → issue` reverse-map YAML blob on a sentinel GitHub issue configured under `sam.plan_index_issue` in `.dh/config.yaml`:
+
+```yaml
+sam:
+  plan_index_issue: 2509  # replace with a dedicated 'SAM Plan Registry' issue number
+```
+
+Recommendation: create a dedicated pinned issue in the repo labelled "SAM Plan Registry" and use its number here. Using a working-feature issue (like 2509) as the sentinel is valid for development but not recommended for long-lived deployments.
+
+What happens when `sam.plan_index_issue` is unset:
+
+- `create_plan` with `issue` set: plan content uploads to Gist, but index registration raises `PlanIndexConfigError` and the warning "Set sam.plan_index_issue in .dh/config.yaml to enable plan_id reverse lookup." is added to the MCP response. The plan is still in Gist and readable via its issue number, but `plan_id`-based reverse-lookup will fail across environments.
+- `read_plan(plan_id)`: index resolution returns `None` (no exception) → falls back to `LocalYamlTaskProvider.read_plan(plan_id)`. Local file must exist for the read to succeed.
+- `list_plans`: `PlanIdIndex.list_all()` returns an empty list (no exception); only local plans are returned.
 
 ### ArtifactBackend Protocol
 
