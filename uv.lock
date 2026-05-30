@@ -10,14 +10,6 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
-[manifest]
-members = [
-    "backlog-core",
-    "claude-skills",
-    "daily-releases-lib",
-    "experiment-registry",
-]
-
 [[package]]
 name = "aiofile"
 version = "3.9.0"
@@ -241,61 +233,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d3/30/6691fdc63b35f54a5a65e04fa1e59d827f4d4e8f4a39678ba7d3088ce0c8/authlib-1.6.12.tar.gz", hash = "sha256:0656d8482f28fc8221929d5f35b2bde5d13e10555ebc06b4561b0d622e83b1bd", size = 165368, upload-time = "2026-05-04T08:11:31.826Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/51/9b0b5cd4cf683a02db937a6f9bbebcdc9c56558a7bb3763ce7d3512103c3/authlib-1.6.12-py2.py3-none-any.whl", hash = "sha256:e9229ad7fde610b139dd12f5edbe97eab9ee78bfb85691247e767727850b99ab", size = 244473, upload-time = "2026-05-04T08:11:30.354Z" },
-]
-
-[[package]]
-name = "backlog-core"
-version = "0.1.0"
-source = { editable = "plugins/development-harness" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "fastmcp" },
-    { name = "gitpython" },
-    { name = "pydantic" },
-    { name = "pygithub" },
-    { name = "pygments" },
-    { name = "requests" },
-    { name = "ruamel-yaml" },
-    { name = "tiktoken" },
-    { name = "tomlkit" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "fastmcp", extra = ["tasks"] },
-    { name = "hypothesis" },
-    { name = "marko" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=46.0.6" },
-    { name = "fastmcp", specifier = ">=3.2.0" },
-    { name = "gitpython", specifier = ">=3.1.0" },
-    { name = "pydantic", specifier = ">=2.12.3" },
-    { name = "pygithub", specifier = ">=2.8.1" },
-    { name = "pygments", specifier = ">=2.20.0" },
-    { name = "requests", specifier = ">=2.33.0" },
-    { name = "ruamel-yaml", specifier = ">=0.18.0" },
-    { name = "tiktoken", specifier = ">=0.12.0" },
-    { name = "tomlkit", specifier = ">=0.13.0" },
-    { name = "typer", specifier = ">=0.21.2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "fastmcp", extras = ["tasks"], specifier = ">=3.0.2" },
-    { name = "hypothesis", specifier = ">=6.0.0" },
-    { name = "marko", specifier = ">=2.2.2" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=0.26.0" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
 ]
 
 [[package]]
@@ -1120,25 +1057,6 @@ wheels = [
 ]
 
 [[package]]
-name = "daily-releases-lib"
-version = "0.1.0"
-source = { editable = ".claude/skills/daily-releases/scripts/daily_releases_lib" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pygithub" },
-    { name = "rich" },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "pygithub", specifier = ">=2.1.1" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "typer", specifier = ">=0.21.0" },
-]
-
-[[package]]
 name = "dataclasses-json"
 version = "0.6.7"
 source = { registry = "https://pypi.org/simple" }
@@ -1291,35 +1209,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/89/780e11f9588d9e7128a3f87788354c7946a9cbb1401ad38a48c4db9a4f07/execnet-2.1.2.tar.gz", hash = "sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd", size = 166622, upload-time = "2025-11-12T09:56:37.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/84/02fc1827e8cdded4aa65baef11296a9bbe595c474f0d6d758af082d849fd/execnet-2.1.2-py3-none-any.whl", hash = "sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec", size = 40708, upload-time = "2025-11-12T09:56:36.333Z" },
-]
-
-[[package]]
-name = "experiment-registry"
-version = "0.1.0"
-source = { editable = "plugins/scientific-method/mcp/experiment-registry" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "pydantic" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastmcp", specifier = ">=3.0.0" },
-    { name = "pydantic", specifier = ">=2.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
 ]
 
 [[package]]
