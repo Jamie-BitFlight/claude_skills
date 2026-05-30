@@ -86,10 +86,14 @@ dropped). Raising `w` is the mitigation; this is a property of voting ensembles 
    No reasoning yet.
 2. **Enumerate.** List every rule. If the rubric is implicit, make it explicit first
    (see partitioning-patterns).
-3. **Cluster into overlapping slices.** Group rules into 3–7 scenario-bound slices; ensure each
-   rule lands in ≥ 2 slices.
-4. **Build worker prompts.** Copy `../assets/worker-prompt-skeleton.md` once per slice; fill the
-   placeholders; set the identical input scope on all.
+3. **Cluster into groups + plan the assignment.** Write the enumerated rules into a JSON file
+   mapping stable group id → rules (3+ groups), then run
+   `../scripts/plan_ensemble.py RULES.json --report-dir /abs/dir [--window 2]`. It computes the
+   rotating-overlap assignment, verifies uniform redundancy, assigns each worker its groups +
+   absolute OUTFILE, and prints the recommended keep-threshold. Do NOT hand-roll the assignment —
+   the planner exists to prevent the path/group/overlap bookkeeping bugs.
+4. **Build worker prompts.** Copy `../assets/worker-prompt-skeleton.md` once per worker in the
+   plan; fill its groups (with per-group rules), identical input scope, and the planner's OUTFILE.
 5. **Dispatch (Phase 1 / map).** Spawn the `plugin-creator:focused-reviewer` agent once per
    slice — it is the lean, haiku, minimal-tool worker built for this. Do NOT use
    `general-purpose`: it inherits every skill and MCP tool description, costing a constant token

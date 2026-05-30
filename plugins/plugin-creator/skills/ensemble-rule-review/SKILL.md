@@ -161,11 +161,19 @@ Two procedures and one reusable contract turn this pattern from concept into act
 - **Reusable worker contract** — copy
   [./assets/worker-prompt-skeleton.md](./assets/worker-prompt-skeleton.md): the rigid worker
   prompt and the fixed candidate schema both procedures share.
+- **Planner script** — run `./scripts/plan_ensemble.py RULES.json --report-dir /abs/dir` (tested;
+  `./scripts/test_plan_ensemble.py`) to compute the rotating-overlap assignment deterministically.
+  It assigns each worker its groups + an absolute OUTFILE, tags rules per-group, verifies uniform
+  redundancy, and prints the recommended `--keep-threshold` — removing the manual bookkeeping that
+  caused this session's bugs (wrong paths, drifted group ids, ad-hoc overlap, per-worker tagging).
 - **Reducer script** — run `./scripts/reduce.py` (tested; `./scripts/test_reduce.py`) over the
   worker output files to dedup, corroboration-weight on `(group, location)`, drop the tail, and
   rank. Workers emit a stable `group` id (the corroboration key) plus a free-form `rule` slug
   (descriptive only) — keying on the slug would never corroborate, since workers name rules
   differently.
+
+The two scripts are deterministic bookends around the only fuzzy step (the LLM workers' rule
+matching): **plan_ensemble.py → spawn focused-reviewer ×N → reduce.py**.
 
 ### The worker agent
 

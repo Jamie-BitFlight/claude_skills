@@ -29,9 +29,12 @@ ensemble overhead exceeds the return.
    for quality"), make it explicit first using
    [./partitioning-patterns.md](./partitioning-patterns.md).
 
-2. **Cluster into overlapping slices.** Group the rules into 3–7 scenario-bound slices. Ensure
-   each rule appears in at least two slices so genuine findings get corroborated. Prefer the
-   natural boundaries the rubric already names (a framework's categories, a checklist's sections).
+2. **Cluster into groups and plan the assignment.** Group the rules into 3+ stable groups (prefer
+   the natural boundaries the rubric already names — a framework's categories, a checklist's
+   sections), write them to a JSON file (group id → rules), and run
+   `../scripts/plan_ensemble.py RULES.json --report-dir /abs/dir` to produce the balanced
+   rotating-overlap assignment. The planner guarantees each rule lands in exactly `window` workers
+   (uniform redundancy) so corroboration is even across the ruleset.
 
 3. **Define the control header.** Write the one-line header that compiles an effort/scale
    parameter into concrete knobs: worker count, candidates-per-worker cap, verify policy, output
