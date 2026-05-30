@@ -1084,30 +1084,60 @@ def _apply_item_depth(item: dict[str, object], depth: int) -> dict[str, object]:
 _VIEW_ALWAYS_INCLUDE: frozenset[str] = frozenset({"number", "title", "status", "type", "priority"})
 
 
-def _filter_view_sections(response: dict[str, object], sections: list[str]) -> dict[str, object]:
+def _filter_view_sections(
+    response: dict[str, object], sections: list[str], result: _models.ViewItemResult
+) -> dict[str, object]:
     """Filter the backlog_view response to only the requested sections.
 
     Identity fields (number, title, status, type, priority) are always included.
     The ``sections`` dict in the response is filtered to the named keys only.
     All other top-level keys are preserved.
 
+    The plural ``sections=[...]`` path also signals a no-match (issue #2495, m1):
+    when none of the requested names resolve to a structured section key OR a
+    raw-body ``## ``/``### `` header, ``section_filter_miss`` is set to ``True``
+    on BOTH the response dict and *result* so the caller can distinguish "the
+    names were wrong" from "the item is too big" — mirroring how the singular
+    ``section=`` path signals a miss.  Setting it on *result* keeps the signal
+    present when the payload is over budget and the response is rebuilt from
+    *result* via :func:`_build_over_budget_view`.  Following
+    ``.claude/rules/silent-failure-prevention.md``, the branch on the requested
+    names has an explicit no-match fallback rather than returning the body
+    unchanged with no signal.
+
     Args:
-        response: Full serialised ViewItemResult dict.
+        response: Full serialised ViewItemResult dict (mutated in place).
         sections: List of section name strings to include.
+        result: The typed ViewItemResult backing *response*; its
+            ``section_filter_miss`` flag is set on a no-match so the over-budget
+            directory path also surfaces the signal.
 
     Returns:
         Filtered response dict (same object, mutated in place).
     """
     requested: frozenset[str] = frozenset(sections)
     raw_sections = response.get("sections")
+    dict_matched = False
     if isinstance(raw_sections, dict):
-        response["sections"] = {k: v for k, v in raw_sections.items() if k in requested}
+        kept = {k: v for k, v in raw_sections.items() if k in requested}
+        response["sections"] = kept
+        dict_matched = bool(kept)
     # Keep the raw body self-consistent with the section filter so a sections=[...]
     # request returns the requested slice rather than overflowing the view budget
     # on the un-narrowed body (issue #2495 defect a).
     raw_body = response.get("body")
+    body_matched = False
     if isinstance(raw_body, str) and raw_body:
-        response["body"] = operations.narrow_body_to_named_sections(raw_body, sections)
+        narrowed, body_matched = operations.narrow_body_to_named_sections(raw_body, sections)
+        response["body"] = narrowed
+    # No-match fallback (m1): when the caller requested names but none resolved to
+    # a structured section or a body header, surface section_filter_miss so the
+    # caller learns the names were invalid even when an over-budget directory is
+    # returned.  Set on both the response dict and *result* so the over-budget
+    # rebuild via _build_over_budget_view carries the signal too.
+    if sections and not dict_matched and not body_matched:
+        response["section_filter_miss"] = True
+        result.section_filter_miss = True
     return response
 
 
@@ -1857,7 +1887,7 @@ async def backlog_view(
         if not summary:
             # Primitive 3: filter to named sections when requested.
             if sections is not None:
-                full_response = _filter_view_sections(full_response, sections)
+                full_response = _filter_view_sections(full_response, sections, result)
             # Auto-compact: when the response exceeds the token budget return a compact
             # section-directory form so the caller can request only what it needs.
             #

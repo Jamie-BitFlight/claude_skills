@@ -2497,16 +2497,30 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
             (display titles for YAML items, raw header text for bodies).
         section: Filter expression.
 
+    Addressability fallback (issue #2495, M1): the numeric/comma/regex forms are
+    tried first, but when the chosen form resolves to an *empty* set of in-range
+    indices, this function falls back to case-insensitive substring matching
+    before reporting no match.  This keeps a candidate literally named like an
+    index (``"2"``) or like a regex (``"/foo/"``) reachable -- otherwise the
+    leading numeric/regex interpretation would silently consume the expression,
+    miss, and make that candidate permanently unaddressable (a No-Invented-Limits
+    addressability loss).  Only when BOTH the index/regex interpretation AND the
+    substring interpretation resolve nothing is the result empty.
+
     Returns:
         Ordered, de-duplicated list of matching indices into *candidates*.  An
-        empty list means no candidate matched (for numeric/comma forms this
-        also covers "syntactically valid but out of range"); callers decide
-        whether an empty result is a filter miss.
+        empty list means no candidate matched under *either* the index/regex
+        interpretation or the substring fallback; callers decide whether an
+        empty result is a filter miss.
     """
     if not candidates:
         return []
 
     stripped = section.strip()
+
+    def _substring_indices() -> list[int]:
+        lower_filter = stripped.lower()
+        return [i for i, name in enumerate(candidates) if lower_filter in name.lower()]
 
     # --- comma-separated or single numeric index ---
     index_parts = [p.strip() for p in stripped.split(",")]
@@ -2515,16 +2529,21 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
         n = len(candidates)
         # Normalise negative indices (Python-style: -1 = last); drop out-of-range.
         resolved = {(int(p) % n) for p in numeric_parts if -n <= int(p) < n}
-        return sorted(resolved)
+        # Fallback: an out-of-range / unresolved index expression may instead be
+        # the literal name of a candidate (e.g. a header named "## 2").  Try the
+        # substring interpretation before declaring a miss (M1, #2495).
+        return sorted(resolved) if resolved else _substring_indices()
 
     # --- /regex/ pattern ---
     if stripped.startswith("/") and stripped.endswith("/") and len(stripped) > 1:
         compiled = re.compile(stripped[1:-1], re.IGNORECASE)
-        return [i for i, name in enumerate(candidates) if compiled.search(name)]
+        regex_matches = [i for i, name in enumerate(candidates) if compiled.search(name)]
+        # Fallback: a candidate literally named like the delimited expression
+        # ("/foo/") stays reachable when the regex interpretation matches nothing.
+        return regex_matches or _substring_indices()
 
     # --- substring match ---
-    lower_filter = stripped.lower()
-    return [i for i, name in enumerate(candidates) if lower_filter in name.lower()]
+    return _substring_indices()
 
 
 def _filter_sections(item: BacklogItem, section: str) -> dict[str, Section | GroomedData]:
@@ -2864,31 +2883,40 @@ def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) 
     return body
 
 
-def narrow_body_to_named_sections(body: str, names: list[str]) -> str:
+def narrow_body_to_named_sections(body: str, names: list[str]) -> tuple[str, bool]:
     """Return the slices of *body* whose ``## ``/``### `` headers match *names*.
 
     Used to keep the ``body`` field self-consistent with a ``sections=[...]``
     filter: only the slices for the requested section names (exact,
     case-insensitive — matching the ``sections=`` parameter contract) are kept,
-    in document order.  When no header matches, *body* is returned unchanged so
-    the caller can detect the no-match case.
+    in document order.
+
+    Reports whether any header matched (issue #2495, m1).  Returning the match
+    flag alongside the (possibly unchanged) body lets the caller distinguish
+    "names were wrong" from "item too big" instead of silently returning the
+    full body — see ``.claude/rules/silent-failure-prevention.md`` (a transform
+    must report what it changed).
 
     Args:
         body: Full issue body text.
         names: Exact section names to keep (case-insensitive).
 
     Returns:
-        The concatenated matching section slices, or the unchanged *body* when
-        no header matches any requested name.
+        A ``(narrowed_body, matched)`` tuple.  ``matched`` is ``True`` when at
+        least one ``## ``/``### `` header matched a requested name (and the body
+        is the concatenated matching slices in document order); ``False`` when
+        no header matched, in which case *body* is returned unchanged so the
+        caller can surface the no-match signal without losing content.
     """
     wanted = {n.lower() for n in names}
     headers = list(_SECTION_BOUNDARY_RE.finditer(body))
     matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().lower() in wanted]
     if not matched:
-        return body
-    return "".join(
+        return body, False
+    narrowed = "".join(
         body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in matched
     )
+    return narrowed, True
 
 
 def _assemble_view_compact(
