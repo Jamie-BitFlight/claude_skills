@@ -2476,15 +2476,63 @@ def _render_section_index(item: BacklogItem) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
+    """Resolve a *section* filter expression to ordered candidate indices.
+
+    Shared by the YAML structured-sections path (:func:`_filter_sections`) and
+    the raw-GitHub-body path (:func:`_apply_body_section_filter`) so both honour
+    the identical set of section forms advertised by the ``backlog_view`` tool.
+
+    The *section* parameter supports four forms, evaluated in this order:
+
+    - ``"2"`` -- single numeric index (zero-based, negatives Python-style).
+    - ``"0,2,4"`` -- comma-separated numeric indices.
+    - ``"/regex/"`` -- regex pattern delimited by ``/`` (case-insensitive),
+      matched with :func:`re.Pattern.search` against each candidate string.
+    - Any other string -- case-insensitive substring match against each
+      candidate string.
+
+    Args:
+        candidates: Ordered list of section-name strings to match against
+            (display titles for YAML items, raw header text for bodies).
+        section: Filter expression.
+
+    Returns:
+        Ordered, de-duplicated list of matching indices into *candidates*.  An
+        empty list means no candidate matched (for numeric/comma forms this
+        also covers "syntactically valid but out of range"); callers decide
+        whether an empty result is a filter miss.
+    """
+    if not candidates:
+        return []
+
+    stripped = section.strip()
+
+    # --- comma-separated or single numeric index ---
+    index_parts = [p.strip() for p in stripped.split(",")]
+    numeric_parts = [p for p in index_parts if p]
+    if numeric_parts and all(p.lstrip("-").isdigit() for p in numeric_parts):
+        n = len(candidates)
+        # Normalise negative indices (Python-style: -1 = last); drop out-of-range.
+        resolved = {(int(p) % n) for p in numeric_parts if -n <= int(p) < n}
+        return sorted(resolved)
+
+    # --- /regex/ pattern ---
+    if stripped.startswith("/") and stripped.endswith("/") and len(stripped) > 1:
+        compiled = re.compile(stripped[1:-1], re.IGNORECASE)
+        return [i for i, name in enumerate(candidates) if compiled.search(name)]
+
+    # --- substring match ---
+    lower_filter = stripped.lower()
+    return [i for i, name in enumerate(candidates) if lower_filter in name.lower()]
+
+
 def _filter_sections(item: BacklogItem, section: str) -> dict[str, Section | GroomedData]:
     """Return a filtered subset of *item.sections* matching *section*.
 
-    The *section* parameter supports four forms:
-
-    - ``"2"`` -- single numeric index (zero-based).
-    - ``"0,2,4"`` -- comma-separated numeric indices.
-    - ``"/regex/"`` -- regex pattern delimited by ``/``.
-    - Any other string -- case-insensitive substring match against display title.
+    Delegates form detection to :func:`_resolve_section_indices`, matching the
+    same numeric / comma / regex / substring forms as the raw-body filter path.
+    Regex and substring forms match against each section's *display title*.
 
     Args:
         item: BacklogItem whose sections to filter.
@@ -2497,35 +2545,9 @@ def _filter_sections(item: BacklogItem, section: str) -> dict[str, Section | Gro
     if not item.sections:
         return {}
 
-    keys = list(item.sections.keys())
-
-    # --- comma-separated or single numeric index ---
-    stripped = section.strip()
-    index_parts = [p.strip() for p in stripped.split(",")]
-    if all(p.lstrip("-").isdigit() for p in index_parts if p):
-        n = len(keys)
-        indices = {int(p) for p in index_parts if p}
-        # Normalise negative indices (Python-style: -1 = last)
-        resolved = {(i % n) for i in indices if -n <= i < n}
-        return {keys[i]: item.sections[keys[i]] for i in sorted(resolved)}
-
-    # --- /regex/ pattern ---
-    if stripped.startswith("/") and stripped.endswith("/") and len(stripped) > 1:
-        pattern = stripped[1:-1]
-        compiled = re.compile(pattern, re.IGNORECASE)
-        return {
-            k: sec
-            for k, sec in item.sections.items()
-            if compiled.search(_section_display_title(k, sec.date if isinstance(sec, GroomedData) else ""))
-        }
-
-    # --- substring match ---
-    lower_filter = stripped.lower()
-    return {
-        k: sec
-        for k, sec in item.sections.items()
-        if lower_filter in _section_display_title(k, sec.date if isinstance(sec, GroomedData) else "").lower()
-    }
+    items = list(item.sections.items())
+    candidates = [_section_display_title(k, sec.date if isinstance(sec, GroomedData) else "") for k, sec in items]
+    return {items[i][0]: items[i][1] for i in _resolve_section_indices(candidates, section)}
 
 
 def render_sections_as_body(item: BacklogItem, section: str | None = None) -> str:
@@ -2810,31 +2832,63 @@ _SECTION_BOUNDARY_RE = re.compile(r"^#{2,3} (.+?)$", re.MULTILINE)
 
 
 def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) -> str:
-    """Narrow *body* and *result.body* to the requested section.
+    """Narrow *body* and *result.body* to the requested section(s).
 
-    Scans *body* for the first ``## `` or ``### `` header whose name matches
-    *section* (case-insensitive) and slices the body to that section only.
-    If no matching header is found, *body* and *result.body* are left unchanged.
+    Resolves *section* against the ordered list of ``## ``/``### `` headers using
+    :func:`_resolve_section_indices`, so the same numeric index (``"4"``),
+    comma-separated indices (``"0,2"``), regex (``"/impact.*/"``), and
+    substring/name forms advertised by the ``backlog_view`` tool all work on raw
+    GitHub bodies — not only the name form.  The matched header slices are
+    concatenated in document order.  When no form resolves to a header,
+    ``result.section_filter_miss`` is set and the body is left unchanged.
 
     Args:
         result: ViewItemResult to update in-place.
         body: Full issue body text.
-        section: Section name to filter to.
+        section: Section filter expression (index, comma list, regex, or name).
 
     Returns:
         The (possibly narrowed) body slice.
     """
     headers = list(_SECTION_BOUNDARY_RE.finditer(body))
-    for i, hdr in enumerate(headers):
-        if hdr.group(1).strip().lower() == section.lower():
-            start = hdr.start()
-            end = headers[i + 1].start() if i + 1 < len(headers) else len(body)
-            body = body[start:end]
-            break
+    names = [hdr.group(1).strip() for hdr in headers]
+    matched = _resolve_section_indices(names, section)
+    if matched:
+        slices = [
+            body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in matched
+        ]
+        body = "".join(slices)
     else:
         result.section_filter_miss = True
     result.body = body
     return body
+
+
+def narrow_body_to_named_sections(body: str, names: list[str]) -> str:
+    """Return the slices of *body* whose ``## ``/``### `` headers match *names*.
+
+    Used to keep the ``body`` field self-consistent with a ``sections=[...]``
+    filter: only the slices for the requested section names (exact,
+    case-insensitive — matching the ``sections=`` parameter contract) are kept,
+    in document order.  When no header matches, *body* is returned unchanged so
+    the caller can detect the no-match case.
+
+    Args:
+        body: Full issue body text.
+        names: Exact section names to keep (case-insensitive).
+
+    Returns:
+        The concatenated matching section slices, or the unchanged *body* when
+        no header matches any requested name.
+    """
+    wanted = {n.lower() for n in names}
+    headers = list(_SECTION_BOUNDARY_RE.finditer(body))
+    matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().lower() in wanted]
+    if not matched:
+        return body
+    return "".join(
+        body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in matched
+    )
 
 
 def _assemble_view_compact(
@@ -2926,6 +2980,10 @@ def _assemble_view_content(
             body = result.body
         if body and (offset > 0 or limit > 0):
             _paginate_body_result(result, body, offset, limit)
+            # Bound the structured sections dict to the paginated slice so a
+            # paged request cannot overflow the view budget via an un-paged
+            # sections dump (issue #2495 defect a).
+            result.sections = _build_sections_metadata(result.body, show, since, section=section)
     else:
         _assemble_view_compact(result, item, body, section=section)
 

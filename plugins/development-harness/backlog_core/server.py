@@ -1102,6 +1102,12 @@ def _filter_view_sections(response: dict[str, object], sections: list[str]) -> d
     raw_sections = response.get("sections")
     if isinstance(raw_sections, dict):
         response["sections"] = {k: v for k, v in raw_sections.items() if k in requested}
+    # Keep the raw body self-consistent with the section filter so a sections=[...]
+    # request returns the requested slice rather than overflowing the view budget
+    # on the un-narrowed body (issue #2495 defect a).
+    raw_body = response.get("body")
+    if isinstance(raw_body, str) and raw_body:
+        response["body"] = operations.narrow_body_to_named_sections(raw_body, sections)
     return response
 
 
@@ -1854,19 +1860,25 @@ async def backlog_view(
                 full_response = _filter_view_sections(full_response, sections)
             # Auto-compact: when the response exceeds the token budget return a compact
             # section-directory form so the caller can request only what it needs.
-            # This check runs unconditionally for all summary=False calls — the caller's
-            # sections= or section= filter does NOT bypass enforcement.  The contract is:
-            # agents must never receive a response that overflows their context; the tool
-            # is the correct enforcement point.
-            # Heuristic pre-check: if body alone exceeds the chars threshold the full
-            # response is almost certainly over budget — skip serialisation.  The precise
-            # token count is still computed for borderline cases where the body is small
-            # but other fields push the total over the limit.
-            body_chars = len(result.body)
-            if body_chars > _VIEW_BODY_CHARS_THRESHOLD:
-                serialised = _json.dumps(full_response)
-                return _build_over_budget_view(result, len(serialised), selector)
+            #
+            # The gate measures the NARROWED payload (issue #2495 defect a).  When the
+            # caller requested narrowing (section / sections / offset / limit),
+            # view_item and _filter_view_sections have already narrowed both
+            # full_response["body"] and full_response["sections"], so full_response IS
+            # the narrowed slice.  The directory fallback therefore fires only when the
+            # measured payload is still over budget — i.e. an unbounded default call, or
+            # a narrowed slice that itself remains too large.  An explicitly requested
+            # slice/page is never silently replaced by metadata-only ("No Invented
+            # Limits"); it is delivered whenever it fits the budget.
+            #
+            # The body-chars heuristic skips serialisation only when no narrowing was
+            # requested: a narrowing request may carry a large raw body while the
+            # narrowed sections dict is small, so the precise token count of the whole
+            # narrowed payload is the only safe measure in that case.
+            narrowing_requested = section is not None or sections is not None or offset > 0 or limit > 0
             serialised = _json.dumps(full_response)
+            if not narrowing_requested and len(result.body) > _VIEW_BODY_CHARS_THRESHOLD:
+                return _build_over_budget_view(result, len(serialised), selector)
             if _token_count(serialised) > _VIEW_TOKEN_BUDGET:
                 return _build_over_budget_view(result, len(serialised), selector)
             return full_response
