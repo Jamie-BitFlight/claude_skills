@@ -32,7 +32,9 @@ higher probability each individual rule is under-applied.
    INTERSECT. A genuine finding falls inside multiple workers' coverage and is reported more
    than once. A hallucination falls inside one worker's blank-filling and is reported once.
    Overlap converts N cheap opinions into a signal-to-noise instrument. Pure non-overlapping
-   partition gives speed but NOT denoising.
+   partition gives speed but NOT denoising. For the overlap construction, use a balanced rotating
+   assignment (cyclic block design — N groups, N agents, each agent a window of w groups) so every
+   rule gets equal redundancy; see the playbook's "Balanced rotating overlap" section.
 
 3. **Zero-creativity workers.** Each sub-agent gets a rigid, explicit process and a PARTIAL
    rule set — stated methodology, fixed output schema, no interpretation latitude. Shrink each

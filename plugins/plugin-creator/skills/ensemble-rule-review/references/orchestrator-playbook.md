@@ -34,12 +34,47 @@ rule-overlap within each shard.
 ## The knobs
 
 - **Worker count** — typically 3–7. One worker per natural rule cluster.
-- **Overlap degree** — each rule appears in at least 2 workers' slices. More overlap = stronger
-  denoising, higher cost. Zero overlap = speed only, no corroboration signal.
+- **Overlap degree** — use the balanced rotating construction below so every rule gets the same
+  number of looks. More overlap = stronger denoising, higher cost. Zero overlap = speed only,
+  no corroboration signal.
 - **Candidates cap per worker** — bound each worker's output (e.g. ≤ K findings) so a confused
   worker cannot flood the reducer.
 - **Keep threshold** — minimum corroboration weight to survive the reducer. Higher = more
   precision, lower recall. For recall-biased work, keep weight ≥ 1 and rank rather than cut hard.
+
+## Balanced rotating overlap (recommended construction)
+
+Do NOT assign overlap ad hoc. Use a cyclic block design so every rule gets the SAME number of
+independent looks — uniform redundancy makes one keep-threshold mean the same thing for every
+rule.
+
+Split the ruleset into N groups (N >= 3; more groups for a bigger list). Run N agents. Give each
+agent a window of `w` consecutive groups, rotating:
+
+```text
+N=3, w=2:
+  Agent A -> groups [1, 2]
+  Agent B -> groups [2, 3]
+  Agent C -> groups [3, 1]
+
+Coverage: group 1 -> {A, C}   group 2 -> {A, B}   group 3 -> {B, C}
+Every group is seen by exactly w=2 agents.
+```
+
+Properties:
+
+- **Uniform redundancy r = w.** Every true finding is independently reachable by exactly `w`
+  agents, so its expected corroboration weight is `w`; a lone-agent hallucination has weight 1.
+  A threshold of "weight >= 2" separates them identically for every rule — no rule is privileged
+  by accidentally getting more looks than another (the failure mode of ad-hoc overlap).
+- **`w` is the denoise knob.** `w=2` over `N=3` -> keep on any corroboration (>= 2 agents).
+  Scale up (e.g. `N=5, w=3`) -> keep on majority, tolerating one missed look per true finding.
+- **Per-worker scope stays small.** Each agent carries `w/N` of the rules, so the slices remain
+  in the mechanical-matching band even for large rulesets.
+
+Caveat: uniform redundancy protects against *independent* single-agent error, not *correlated*
+misses. If a rule is genuinely hard, all `w` assigned agents can miss it together (weight 0,
+dropped). Raising `w` is the mitigation; this is a property of voting ensembles generally.
 
 ## Procedure: recognize → decompose → dispatch → reduce
 
