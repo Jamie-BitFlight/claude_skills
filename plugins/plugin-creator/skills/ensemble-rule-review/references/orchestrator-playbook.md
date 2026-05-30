@@ -93,34 +93,46 @@ dropped). Raising `w` is the mitigation; this is a property of voting ensembles 
 
 ## The reducer algorithm
 
-```python
-# findings: list of dicts from all workers, each: {rule_id, location, verdict, evidence, severity}
-from collections import defaultdict
+A working, tested implementation ships at `../scripts/reduce.py` (run
+`uv run ../scripts/reduce.py REPORT_DIR --glob 'worker-*.md' [--keep-threshold N]`). The core:
 
+```python
+# findings: list of dicts from all workers, each: {group, location, verdict, evidence, severity}
 def reduce(findings, keep_threshold=1):
     # 1. Keep only violations.
-    violations = [f for f in findings if f["verdict"] == "VIOLATION"]
+    violations = [f for f in findings if f.get("verdict", "VIOLATION") == "VIOLATION"]
 
-    # 2. Dedup + count corroboration: same defect, same place, same rule -> one weighted entry.
-    merged = defaultdict(lambda: {"weight": 0, "evidence": [], "severity": None})
+    # 2. Dedup + count corroboration. KEY ON (group, location) — NEVER the rule slug.
+    #    Workers author their own rule slugs, so keying on rule would never corroborate;
+    #    `group` is the orchestrator-assigned id, identical across workers, so it collides.
+    merged = {}
     for f in violations:
-        key = (normalize(f["rule_id"]), normalize(f["location"]))
-        m = merged[key]
-        m["weight"] += 1                      # +1 per corroborating worker
+        key = (f["group"], normalize(f["location"]))   # group is the stable corroboration key
+        m = merged.setdefault(key, {"agents": set(), "evidence": [], "severity": "low"})
+        m["agents"].add(f["worker_id"])                # weight = number of DISTINCT workers
         m["evidence"].append(f["evidence"])
         m["severity"] = max_sev(m["severity"], f.get("severity"))
 
-    # 3. Drop the low-weight tail; a lone-worker finding has weight 1.
-    survivors = [(k, v) for k, v in merged.items() if v["weight"] >= keep_threshold]
+    # 3. weight = len(agents); drop the low-weight tail (a lone-worker finding has weight 1).
+    survivors = [(k, v) for k, v in merged.items() if len(v["agents"]) >= keep_threshold]
 
     # 4. Rank: corroboration weight first, then severity. Correctness outranks cleanup.
-    survivors.sort(key=lambda kv: (kv[1]["weight"], sev_rank(kv[1]["severity"])), reverse=True)
+    survivors.sort(key=lambda kv: (len(kv[1]["agents"]), sev_rank(kv[1]["severity"])), reverse=True)
     return survivors
 ```
 
-`normalize` collapses trivial differences (whitespace, line drift) so the same finding from two
-workers collides. Tune `keep_threshold`: for recall-biased ad-hoc work, keep weight ≥ 1 and rank;
-for precision-biased gates, raise the threshold so only corroborated findings survive.
+Two contract points the live test proved necessary:
+
+- **Key on `group`, not the rule slug.** In the worked review run, two agents flagged the same
+  line with different slugs (`any-without-justification` vs `any-not-in-boundary-module`). Keying
+  on the slug splits them into two weight-1 findings; keying on `group` corroborates them to
+  weight 2. Keying on the rule slug is the dominant cause of "the ensemble found nothing agreed".
+- **Weight = count of DISTINCT workers**, not raw report count, so one worker emitting a finding
+  twice cannot fake corroboration.
+
+`normalize` collapses trivial location differences (absolute-vs-relative path, whitespace) so the
+same line from two workers collides. Tune `keep_threshold`: for recall-biased ad-hoc work, keep
+weight ≥ 1 and rank; for precision-biased gates, raise it so only corroborated findings survive.
 
 ## Worker task types
 

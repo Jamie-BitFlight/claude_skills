@@ -161,6 +161,11 @@ Two procedures and one reusable contract turn this pattern from concept into act
 - **Reusable worker contract** — copy
   [./assets/worker-prompt-skeleton.md](./assets/worker-prompt-skeleton.md): the rigid worker
   prompt and the fixed candidate schema both procedures share.
+- **Reducer script** — run `./scripts/reduce.py` (tested; `./scripts/test_reduce.py`) over the
+  worker output files to dedup, corroboration-weight on `(group, location)`, drop the tail, and
+  rank. Workers emit a stable `group` id (the corroboration key) plus a free-form `rule` slug
+  (descriptive only) — keying on the slug would never corroborate, since workers name rules
+  differently.
 
 ### Partition the ruleset, not the input
 
