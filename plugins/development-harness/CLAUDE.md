@@ -563,7 +563,7 @@ context:
 
 - `create_plan` with `issue` set: local write → Gist content upload via `artifact_client.store(issue, yaml)` → plan index registration. The Gist upload is mandatory and **raises `ArtifactWriteError` on failure** — no silent fallback. A plan index registration failure is a warning (content is still in Gist, but `plan_id` reverse-lookup may not resolve cross-environment).
 - `create_plan` with `issue=None`: local write only. The MCP response includes a non-portability warning. No Gist upload is attempted.
-- All mutations (update_task_status, update_task_fields, update_plan_fields, append_task, finalize_plan): read-modify-write via Gist (Gist-first read → apply mutation → `artifact_client.store()`). Write failure raises `ArtifactWriteError`.
+- All mutations (update_task_status, update_task_fields, update_plan_fields, append_task, finalize_plan): local-first read-modify-write → Gist write-back via `artifact_client.store()`. Write failure raises `ArtifactWriteError`.
 
 **Dual-read fallback (read_plan and list_plans):**
 

@@ -357,7 +357,8 @@ def _load_yaml_file(path: Path) -> dict[str, object] | None:
     yaml_safe = YAML(typ="safe")
     try:
         data = yaml_safe.load(path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 — ruamel raises many internal exception types
+    except Exception as exc:  # noqa: BLE001 — ruamel raises many internal exception types
+        _log.warning("plan_id_index: failed to parse index blob: %s", exc)
         return None
     if not isinstance(data, dict):
         return None
