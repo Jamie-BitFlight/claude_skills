@@ -1092,11 +1092,9 @@ def _metadata_entry_name(entry: object) -> str:
     Returns:
         The entry's ``name`` as a string, or ``""`` when absent or non-string.
     """
-    if isinstance(entry, dict):
-        for key, value in entry.items():
-            if key == "name" and isinstance(value, str):
-                return value
-    return ""
+    if not isinstance(entry, dict):
+        return ""
+    return next((value for key, value in entry.items() if key == "name" and isinstance(value, str)), "")
 
 
 def _filter_view_sections(
@@ -1964,11 +1962,16 @@ async def backlog_view(
             #
             # Serialisation is unconditional: the precise token count of the whole
             # (possibly narrowed) payload is the single authoritative budget measure.
-            # A prior body-chars heuristic was removed (issue #2495 finding #7) — it
-            # only short-circuited the unbounded default case, which the token-count
-            # check below already covers: a body large enough to trip that heuristic
-            # (~16 000+ chars at ~4 chars/token) serialises to more than
-            # _VIEW_TOKEN_BUDGET tokens, so the precise count fires anyway.
+            # A prior body-chars heuristic (``len(body) > ~16 000`` forcing the
+            # over-budget directory) was removed (issue #2495 finding #7).  That
+            # heuristic was an over-eager approximation: char count is NOT a reliable
+            # proxy for token count.  A large-but-COMPRESSIBLE body (e.g. a long run of
+            # one repeated character: 16 500 chars but only ~2 100 tokens) is well under
+            # _VIEW_TOKEN_BUDGET, yet the char heuristic would have wrongly suppressed it
+            # into the directory.  The token count below is authoritative and may now
+            # correctly deliver such a large-but-compressible body inline (No Invented
+            # Limits) — while still gating bodies whose token count genuinely exceeds the
+            # budget, including incompressible prose that the old heuristic also caught.
             serialised = _json.dumps(full_response)
             if _token_count(serialised) > _VIEW_TOKEN_BUDGET:
                 return _build_over_budget_view(result, len(serialised), selector)

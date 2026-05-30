@@ -815,6 +815,52 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
             "Got keys: " + repr(sorted(resp)) + ".  Finding #7."
         )
 
+    def test_unbounded_large_but_compressible_body_delivered_inline(self, mocker: MockerFixture) -> None:
+        """A large-but-COMPRESSIBLE unbounded body is delivered inline, not as a directory.
+
+        m2 (#2495): the companion test above uses prose filler that trips BOTH the
+        removed char heuristic (>16000 chars) AND the token gate, so it never exercises
+        the boundary where the two diverge.  This test locks the intended NEW behaviour:
+        a body of 20000 identical characters is >16000 chars (the old char heuristic would
+        have forced the over-budget directory) but its token count is far under
+        ``_VIEW_TOKEN_BUDGET`` (a long run of one repeated character compresses to very
+        few tokens).  Because the authoritative gate is now the precise token count of the
+        whole serialised response, the body must be delivered INLINE — proving the char
+        heuristic removal changed behaviour for compressible bodies (No Invented Limits).
+
+        The body is header-free (no ``## ``/``### `` headers) on purpose: a header would
+        make ``_build_sections_metadata`` parse the run into a section entry, duplicating
+        the content inside the serialised ``sections`` dict and pushing the *whole
+        response* over budget even though the body alone is compressible.  A header-free
+        body keeps the section dict empty so the token gate measures the content once.
+        """
+        compressible_body = "a" * 20000
+        _patch_github_body(mocker, 2495, compressible_body)
+        from backlog_core import server
+
+        # Guard the premise: >16000 chars (old heuristic would gate) but the WHOLE serialised
+        # response is under the token budget — measured exactly as the gate measures it.
+        assert len(compressible_body) > 16000, "premise: the body must exceed the old 16000-char heuristic threshold."
+        full_response = server._models.ViewItemResult(number=2495, title="Issue 2495", body=compressible_body)
+        premise_tokens = server._token_count(server._json.dumps(full_response.model_dump()))
+        assert premise_tokens <= server._VIEW_TOKEN_BUDGET, (
+            f"premise: the serialised header-free compressible response must be <= _VIEW_TOKEN_BUDGET "
+            f"tokens; got {premise_tokens}.  If this fails the test no longer exercises the "
+            "heuristic/token divergence boundary (a header would duplicate the run into the sections dict)."
+        )
+
+        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+
+        assert resp.get("_over_budget") is not True, (
+            "a large-but-compressible body (>16000 chars but <= token budget) must be delivered INLINE — "
+            "the removed char heuristic would have wrongly forced the over-budget directory.  "
+            "Got keys: " + repr(sorted(resp)) + ".  m2 (#2495)."
+        )
+        body = _resp_body(resp)
+        assert ("a" * 20000) in body, (
+            "the full compressible body must be delivered inline without truncation (No Invented Limits)."
+        )
+
 
 class TestCommaSectionFormOnRawBody:
     """Finding 8/10 coverage gap: comma index form on raw GitHub bodies."""
@@ -865,3 +911,141 @@ class TestNarrowBodyToNamedSectionsUnit:
             "matched sections must follow document order regardless of request order."
         )
         assert "## Beta" not in narrowed, "the non-requested Beta section must be excluded."
+
+
+# ---------------------------------------------------------------------------
+# M1 (#2495): on the ``section=None`` line-based pagination path the synthetic
+# ``## Sections`` index must NOT consume the page budget, and ``result.sections``
+# must reflect the real sections of the returned page — not a spurious
+# ``Sections`` key.  Regression introduced by commit d7abdee.
+#
+# Per the M1 contract the index MAY still appear in the response body; the
+# requirements being locked are (1) the index must not consume the page budget
+# (real content lands on the page and ``body_total_lines`` reflects the RAW body,
+# not the index-inflated line count) and (2) ``result.sections`` must reflect the
+# real sections on the returned page — never a spurious ``Sections`` key built
+# from the synthetic index.
+# ---------------------------------------------------------------------------
+
+# A header-only, entry-block-FREE 4-section body (plain GitHub-issue prose, no
+# ``<div><sub>…</sub></div>`` blocks) so ``_paginate_body_result`` takes the
+# LINE-BASED branch.  Raw line layout (0-based, 15 lines):
+#   0 '## Alpha' 1 '' 2 'aaa' 3 '' 4 '## Beta' 5 '' 6 'bbb' 7 ''
+#   8 '## Gamma' 9 '' 10 'ggg' 11 '' 12 '## Delta' 13 '' 14 'ddd'
+_HEADER_ONLY_BODY = "## Alpha\n\naaa\n\n## Beta\n\nbbb\n\n## Gamma\n\nggg\n\n## Delta\n\nddd\n"
+_HEADER_ONLY_RAW_LINE_COUNT = len(_HEADER_ONLY_BODY.splitlines())  # 15 raw body lines
+
+
+class TestSectionNoneLinePaginationNotDisplacedByIndex:
+    """M1: the ``## Sections`` index must not displace real content on the page."""
+
+    def test_section_none_limit_returns_real_first_section_not_index(self, mocker: MockerFixture) -> None:
+        """view_item(section=None, limit=3) returns the real first section, not the index.
+
+        RED (pre-fix, d7abdee): the synthetic ``## Sections`` index was prepended to
+        the body BEFORE line-based pagination, so the first 3 lines were the index
+        lines ``## Sections`` / ``[0] Alpha (…)`` / ``[1] Beta (…)``.  ``result.body``
+        held only those index lines (the real ``## Alpha`` / ``aaa`` content was
+        displaced off the page) and the metadata rebuild keyed it ``{'Sections': …}``.
+
+        After the fix: pagination runs on the RAW body, so the first page carries the
+        real Alpha header + content and ``result.sections`` carries the real section
+        name ``Alpha`` — never the synthetic ``Sections`` key.  ``body_total_lines``
+        reflects the RAW 15-line body, proving the index did not inflate the page
+        budget.
+        """
+        _patch_github_body(mocker, 2495, _HEADER_ONLY_BODY)
+        result = operations.view_item(selector="2495", include_content=True, section=None, limit=3)
+
+        assert result.section_filter_miss is False, "section=None is not a narrowing request — must not miss."
+        # (a) The returned page carries the REAL first section content, not (only) the index.
+        assert "## Alpha" in result.body, (
+            f"the first page must contain the real '## Alpha' section header; got {result.body[:80]!r}. "
+            "M1: the synthetic index displaced the real content off the page."
+        )
+        assert "aaa" in result.body, (
+            f"the first page must contain the real first-section content 'aaa'; got {result.body[:80]!r}. "
+            "M1: pre-fix the index lines consumed the whole limit=3 page."
+        )
+        # (b) result.sections reflects the REAL first section, not a spurious 'Sections' key.
+        assert "Sections" not in result.sections, (
+            f"result.sections must not contain a spurious 'Sections' key built from the synthetic "
+            f"index; got {sorted(result.sections)}.  M1 regression."
+        )
+        assert "Alpha" in result.sections, (
+            f"result.sections must carry the real first section name 'Alpha'; got {sorted(result.sections)}."
+        )
+        # (c) The index must not inflate the page budget: totals reflect the RAW body.
+        assert result.body_total_lines == _HEADER_ONLY_RAW_LINE_COUNT, (
+            f"body_total_lines must reflect the RAW {_HEADER_ONLY_RAW_LINE_COUNT}-line body, not the "
+            f"index-inflated count; got {result.body_total_lines}.  M1: the index must not consume the budget."
+        )
+
+    def test_section_none_offset_limit_returns_real_paged_section_not_index(self, mocker: MockerFixture) -> None:
+        """view_item(section=None, offset=6, limit=5) pages real lines, not index lines.
+
+        Separate ``offset>0`` case (the reviewer asked for both a limit and an offset
+        case).  offset=6 skips the first six RAW lines (Alpha + Beta) and the page lands
+        on the Gamma section; limit=5 keeps it short while still reaching the Gamma content.
+
+        RED (pre-fix): the prepended index added lines to the front, so the offset
+        skipped index lines instead of real body lines and the page never reached the
+        real Gamma content (``result.sections`` was the wrong section).  After the fix
+        the offset/limit apply to the RAW body lines, the page carries the real Gamma
+        header + content, ``result.sections == {'Gamma'}``, and ``body_total_lines``
+        reflects the RAW 15-line body.
+        """
+        _patch_github_body(mocker, 2495, _HEADER_ONLY_BODY)
+        result = operations.view_item(selector="2495", include_content=True, section=None, offset=6, limit=5)
+
+        assert result.section_filter_miss is False, "section=None is not a narrowing request — must not miss."
+        assert "## Gamma" in result.body, (
+            f"offset=6/limit=5 on the RAW body must reach the real '## Gamma' section; got {result.body[:80]!r}. "
+            "M1: prepended index lines shifted the offset off the real content."
+        )
+        assert "ggg" in result.body, (
+            f"the paged body must carry the real Gamma content 'ggg'; got {result.body[:80]!r}."
+        )
+        assert "Sections" not in result.sections, (
+            f"result.sections must not carry a spurious 'Sections' key; got {sorted(result.sections)}.  M1 regression."
+        )
+        assert set(result.sections) == {"Gamma"}, (
+            f"result.sections must reflect only the real paged section 'Gamma'; got {sorted(result.sections)}. "
+            "M1: pre-fix the index displaced the page so sections held the wrong section."
+        )
+        assert result.body_total_lines == _HEADER_ONLY_RAW_LINE_COUNT, (
+            f"body_total_lines must reflect the RAW {_HEADER_ONLY_RAW_LINE_COUNT}-line body; "
+            f"got {result.body_total_lines}.  M1: the index must not inflate the line budget."
+        )
+
+    def test_entry_block_body_pagination_unchanged_by_index_deferral(self, mocker: MockerFixture) -> None:
+        """Entry-block bodies still paginate by entry block — the M1 fix is path-scoped.
+
+        The ``## Sections`` index is plain text with no ``<div><sub>…</sub></div>``
+        entry blocks, so ``parse_entries`` ignores it.  This test proves the entry-block
+        pagination geometry is unchanged by the index deferral: a two-entry-block body
+        paged with limit=1 returns exactly the first entry block (the second excluded,
+        ``body_truncated`` True) and ``result.sections`` never carries the synthetic
+        'Sections' key.
+        """
+        entry_body = (
+            "## Log\n\n"
+            "<div><sub>2026-05-01</sub> first entry content</div>\n\n"
+            "<div><sub>2026-05-02</sub> second entry content</div>\n"
+        )
+        _patch_github_body(mocker, 2495, entry_body)
+        result = operations.view_item(selector="2495", include_content=True, section=None, limit=1)
+
+        assert "first entry content" in result.body, (
+            f"entry-block pagination with limit=1 must return the first entry block; got {result.body[:80]!r}."
+        )
+        assert "second entry content" not in result.body, (
+            "entry-block pagination with limit=1 must exclude the second entry block."
+        )
+        assert result.body_truncated is True, "one of two entry blocks shown — body_truncated must be True."
+        assert result.body_total_entries == 2, (
+            f"entry-block totals must reflect the two real entry blocks; got {result.body_total_entries}."
+        )
+        assert "Sections" not in result.sections, (
+            f"the entry-block path must not produce a spurious 'Sections' key; got {sorted(result.sections)}."
+        )

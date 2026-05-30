@@ -3038,6 +3038,14 @@ def _assemble_view_content(
     paginate = offset > 0 or limit > 0
 
     if include_content:
+        # Display-only ``## Sections`` index for the ``section is None`` path.  It is
+        # built from the full body but prepended to the body only AFTER pagination
+        # (below).  It must never enter ``_paginate_body_result``: line-based
+        # pagination would otherwise spend the page budget on the index lines and
+        # displace the real content, and the metadata rebuild would then report a
+        # spurious ``Sections`` key with no real section content (#2495 M1 —
+        # regression introduced in d7abdee).
+        pending_index = ""
         if body:
             if section is not None:
                 # Resolve the section form once: narrow the body to the matched
@@ -3067,16 +3075,16 @@ def _assemble_view_content(
                 if not paginate:
                     result.sections = _build_sections_metadata(body, show, since, section=None)
             else:
-                # Prepend section index so agents see it regardless of body source.
+                # Build the section index from the FULL body so agents see it
+                # regardless of body source, but DEFER prepending it until after
+                # pagination (#2495 M1) so the index never consumes the page budget.
                 # Prefer live body data over local YAML cache for cache coherence.
                 # The index is display-only; metadata is built from ``body`` (without
                 # it) so no spurious ``Sections`` key is produced.  Skip the metadata
                 # build when pagination will rebuild it from the paginated slice.
                 if not paginate:
                     result.sections = _build_sections_metadata(body, show, since, section=None)
-                index = _build_sections_index_from_body(body)
-                if index:
-                    result.body = index + "\n" + body
+                pending_index = _build_sections_index_from_body(body)
         elif item and item.sections:
             # YAML fallback: ``_populate_yaml_item_content`` builds the richer
             # structured-section metadata via ``_build_sections_from_yaml_item``
@@ -3089,10 +3097,18 @@ def _assemble_view_content(
         # to the paginated slice so a paged request cannot overflow the view budget
         # via an un-paged sections dump (#2495 defect a).  This is the single
         # metadata build for the paginated case (finding #9): the per-path builds
-        # above are skipped when ``paginate`` is True.
+        # above are skipped when ``paginate`` is True.  Pagination runs on the RAW
+        # body (no synthetic index prefix): the ``section is None`` index is
+        # prepended afterwards so it never displaces real content and
+        # ``result.sections`` reflects the real sections of the returned page
+        # (#2495 M1).
         if paginate and result.body:
             _paginate_body_result(result, result.body, offset, limit)
             result.sections = _build_sections_metadata(result.body, show, since, section=None)
+        # Prepend the deferred display-only ``## Sections`` index to the final,
+        # post-pagination body in the ``section is None`` path (#2495 M1).
+        if pending_index and result.body:
+            result.body = pending_index + "\n" + result.body
     else:
         _assemble_view_compact(result, item, body, section=section)
 
