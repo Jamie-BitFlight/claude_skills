@@ -2517,6 +2517,8 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
         return []
 
     stripped = section.strip()
+    if not stripped:
+        return []
 
     def _substring_indices() -> list[int]:
         lower_filter = stripped.lower()
@@ -3267,6 +3269,7 @@ def view_item(
         only the matched section(s).
     """
     out = output or Output()
+    section = section or None
     item = find_item(parse_backlog(), selector)
     issue_num = parse_issue_selector(selector)
 
