@@ -17,11 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
-import backlog_core.models as _backlog_models
 import tiktoken
-from backlog_core.artifact_provider import create_artifact_provider
-from backlog_core.artifact_registry import ArtifactRegistry as _ArtifactRegistry
-from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -43,7 +39,7 @@ from sam_schema.core.action_models import (
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import PlanNotFoundError, SamError, TaskNotFoundError
+from sam_schema.core.exceptions import ArtifactWriteError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
@@ -51,7 +47,6 @@ if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
 
 _log = logging.getLogger(__name__)
-_artifact_registry = _ArtifactRegistry()
 
 _PLAN_DIR_SENTINEL = "plan"
 
@@ -83,29 +78,47 @@ except RuntimeError:
 
 
 def _get_backend(plan_dir_str: str) -> TaskBackend:
-    """Return the configured backend, or a LocalYamlTaskProvider for an explicit plan_dir.
+    """Return a GistTaskLayer wrapping the configured local backend.
 
-    When *plan_dir_str* is the default sentinel (``"plan"``), returns the
-    module-level configured backend from :func:`get_task_config`.  When
-    *plan_dir_str* is a concrete filesystem path, creates a
+    When *plan_dir_str* is the default sentinel (``"plan"``), wraps the
+    module-level configured backend in a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`
+    so MCP callers always route through write-through Gist storage.
+
+    When *plan_dir_str* is a concrete filesystem path, creates a
     :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider` for
-    that path to preserve backward compatibility with callers that supply an
-    explicit directory.
+    that path and wraps it in ``GistTaskLayer`` to preserve backward compatibility
+    while still enabling write-through for callers that supply an explicit directory.
+
+    CLI and non-MCP callers that bypass this function continue to use
+    ``LocalYamlTaskProvider`` directly — this wrapper is MCP-server-only.
 
     Args:
         plan_dir_str: The ``plan_dir`` parameter from the MCP tool call.
 
     Returns:
         :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
-        this tool call.
+        this tool call (always a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`).
     """
-    if plan_dir_str == _PLAN_DIR_SENTINEL:
-        return get_task_config().backend
-    # Non-default plan_dir: callers passing a concrete path expect local filesystem
-    # behavior, so create a LocalYamlTaskProvider for that explicit path.
+    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
 
-    return LocalYamlTaskProvider(Path(plan_dir_str))
+    artifact_client = ArtifactRegistryClient()
+    plan_index = create_plan_id_index(artifact_client)
+
+    if plan_dir_str == _PLAN_DIR_SENTINEL:
+        configured = get_task_config().backend
+        # When the configured backend is already a LocalYamlTaskProvider, use it
+        # directly.  When it is another type (e.g. InMemoryTaskProvider for tests),
+        # skip wrapping — GistTaskLayer requires a LocalYamlTaskProvider.
+        if isinstance(configured, LocalYamlTaskProvider):
+            return GistTaskLayer(local_backend=configured, artifact_client=artifact_client, plan_index=plan_index)
+        return configured
+
+    # Non-default plan_dir: create a LocalYamlTaskProvider for that explicit path.
+    local = LocalYamlTaskProvider(Path(plan_dir_str))
+    return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
@@ -175,61 +188,6 @@ def _paginate_results(
         next_offset = offset + len(page)
         result["next_call"] = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
     return result
-
-
-def _try_register_task_plan_artifact(issue_number: int, plan_path: Path) -> None:
-    """Register the newly created plan file as a task-plan artifact.
-
-    Best-effort: logs a warning on any failure but never raises.  Called after
-    ``sam_create`` writes the plan file when the plan has an associated GitHub
-    issue number.
-
-    Args:
-        issue_number: GitHub issue number to register the artifact against.
-        plan_path: Absolute or repo-relative path to the created plan file.
-    """
-    try:
-        repo = _backlog_models.DEFAULT_REPO
-        if not repo:
-            _log.warning("sam_create: skipping artifact registration — DEFAULT_REPO not set")
-            return
-        provider = create_artifact_provider(
-            repo=repo,
-            root_worktree=_backlog_models._REPO_ROOT,  # noqa: SLF001
-        )
-        entry = ArtifactEntry(
-            artifact_type=ArtifactType.TASK_PLAN,
-            artifact_id=str(plan_path),
-            status=ArtifactStatus.CURRENT,
-            agent="sam_create",
-        )
-        manifest = provider.get_manifest(issue_number)
-        updated_manifest = _artifact_registry.register(manifest, entry)
-        provider.set_manifest(issue_number, updated_manifest)
-        _log.info("sam_create: registered task-plan artifact %s for issue #%d", plan_path, issue_number)
-
-        try:
-            content = plan_path.read_text(encoding="utf-8")
-            provider.store_artifact_content(
-                issue_number, artifact_type=ArtifactType.TASK_PLAN.value, path=str(plan_path), content=content
-            )
-            _log.info("sam_create: uploaded task-plan content to GitHub issue #%d", issue_number)
-        except (BacklogError, OSError) as upload_exc:
-            _log.warning(
-                "sam_create: artifact content upload failed for issue #%d (path=%s): %s",
-                issue_number,
-                plan_path,
-                upload_exc,
-                exc_info=True,
-            )
-    except (BacklogError, ValueError, OSError) as exc:
-        _log.warning(
-            "sam_create: artifact registration failed for issue #%d (path=%s): %s",
-            issue_number,
-            plan_path,
-            exc,
-            exc_info=True,
-        )
 
 
 def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_fields: dict[str, Any]) -> Task:
@@ -302,22 +260,57 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     """Create a new plan from a typed list of task definitions.
 
     Returns:
-        Dict with ``plan_id``, ``plan_ref``, and ``task_count`` keys.
-        ``plan_ref`` is computed in the server response as ``#{issue},{plan_id}``
-        when an issue number is present, or just ``plan_id`` otherwise.
-        It is not stored in the Plan model.
+        On success: dict with ``plan_id``, ``plan_ref``, ``task_count``, and optional
+        ``warnings`` keys.  ``plan_ref`` is ``#{issue},{plan_id}`` when an issue is
+        set, or just ``plan_id`` otherwise.
+
+        On Gist write failure: dict with ``error``, ``reason``, ``plan_id``, ``issue``,
+        ``local_path``, and ``hint`` keys (structured error — MCP caller sees ``error``
+        key and knows the plan is not portable).
     """
     backend = _get_backend(plan_dir)
-    plan_data = backend.create_plan(
-        slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
-    )
+    try:
+        plan_data = backend.create_plan(
+            slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
+        )
+    except ArtifactWriteError as exc:
+        # Gist write failed — return structured error (ADR-2509-5).
+        # The plan may exist locally (local_backend wrote it), but it is NOT durable.
+        _log.error("sam_plan create: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
+        return {
+            "error": "sam_plan create failed: artifact write to Gist unsuccessful",
+            "reason": exc.reason,
+            "plan_id": exc.plan_id,
+            "issue": exc.issue,
+            "local_path": None,
+            "hint": ("The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist."),
+        }
+
     plan_id_str = plan_data["plan_id"]
     plan_ref: str | None = (
         (f"#{config.issue},{plan_id_str}" if config.issue is not None else plan_id_str) if plan_id_str else None
     )
     result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"]), "plan_ref": plan_ref}
-    if config.issue is not None and plan_data["source_path"]:
-        _try_register_task_plan_artifact(config.issue, Path(plan_data["source_path"]))
+
+    # Collect warnings: local-only non-portability + any GistTaskLayer index warnings.
+    warnings: list[str] = []
+    if config.issue is None:
+        warnings.append(
+            f"Plan {plan_id_str} has no associated issue — stored locally only. "
+            "This plan is not portable across environments and cannot be retrieved from CI "
+            "or fresh checkouts. Associate a GitHub issue to enable portability."
+        )
+
+    # GistTaskLayer stores index-failure warnings in last_warnings (set after successful
+    # content upload).  Import GistTaskLayer locally to avoid a module-level circular import.
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+
+    if isinstance(backend, GistTaskLayer) and backend.last_warnings:
+        warnings.extend(backend.last_warnings)
+
+    if warnings:
+        result["warnings"] = warnings
+
     return result
 
 

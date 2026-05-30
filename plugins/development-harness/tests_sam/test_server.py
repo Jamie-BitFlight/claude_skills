@@ -896,10 +896,13 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
     """sam_plan(create) with issue returns plan_ref as '#<issue>,P<hex8>' composite identifier.
 
     Tests: plan_ref field in create response — issue-scoped path.
-    How: Create a plan with issue=42; verify plan_ref is "#42,P<hex8>".
+    How: Create a plan with issue=42; mock ArtifactRegistryClient.store and PlanIdIndex.register
+         so the Gist write-through succeeds without a real GitHub connection.
     Why: plan_ref must be globally unique when an issue is associated; UUID IDs prevent collisions.
+         GistTaskLayer wraps the backend and performs mandatory write-through on create with issue set.
     """
     import re
+    from unittest.mock import patch
 
     # Arrange
     p_dir = tmp_path / "plan"
@@ -913,10 +916,15 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
         complexity=Complexity.LOW,
     )
 
-    # Act
-    result = sam_plan(
-        config=CreatePlanConfig(slug="ref-with-issue", goal="Test goal", tasks=[task], issue=42), plan_dir=str(p_dir)
-    )
+    # Act — mock Gist write-through so test does not require a live GitHub connection.
+    with (
+        patch("sam_schema.core.artifact_registry_client.ArtifactRegistryClient.store"),
+        patch("sam_schema.core.plan_id_index.PlanIdIndex.register"),
+    ):
+        result = sam_plan(
+            config=CreatePlanConfig(slug="ref-with-issue", goal="Test goal", tasks=[task], issue=42),
+            plan_dir=str(p_dir),
+        )
 
     # Assert — plan_ref includes issue number and UUID plan_id
     assert "error" not in result
