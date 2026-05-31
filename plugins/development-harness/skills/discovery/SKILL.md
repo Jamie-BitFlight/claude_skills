@@ -27,9 +27,17 @@ mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
 
 2. Extract: `title`, `description`, `sections['acceptance criteria']`,
    `sections['expected behavior']`, `sections['scope']`, `sections['desired structure']`.
-3. Use these as the initial problem statement — skip Step 2 (clarifying questions) if the
-   description is unambiguous and the required sections are non-empty.
-4. Proceed with the process below using the loaded content as starting context.
+3. Triage for HOW content (runs regardless of whether Step 2 is skipped):
+   - Scan the loaded content for implementation proposals, design decisions, solution
+     descriptions, named mechanisms, parameter names, API shapes, or data formats.
+   - Any such content is a design question. Extract each one as a question signal
+     (e.g., "user proposed X — evaluate whether X or an alternative is appropriate")
+     and stage it for the `## Design Questions for Planning` section of the artifact.
+   - Do not carry HOW content into Requirements or Problem Statement.
+4. Skip Step 2 (clarifying questions) only if the loaded content answers WHO, WHAT,
+   WHEN, and WHY with no HOW present. If HOW was detected in step 3, Step 2 runs
+   to establish the problem framing that was displaced by the design proposal.
+5. Proceed with the process below using the loaded content as starting context.
 
 Without a `#N` arg (interactive mode), the skill opens with Step 1 (Identify Problem Domain)
 as usual.
@@ -141,12 +149,20 @@ The content parameter contains the full discovery document using this template:
 
 ### Functional
 
-1. <observable behavior requirement>
+1. <observable behavior requirement — what the system does, not how it is built>
 2. <...>
 
 ### Non-Functional
 
 1. <performance, security, compatibility, reliability>
+2. <...>
+
+## Design Questions for Planning
+
+<!-- Route user-supplied design proposals here, not to Requirements.
+     Each entry is a signal for the architect's research phase, not a commitment. -->
+
+1. <user proposed X — evaluate whether X or an alternative is appropriate>
 2. <...>
 
 ## References
@@ -161,7 +177,8 @@ The content parameter contains the full discovery document using this template:
 
 ## Open Questions
 
-- <anything that remains unresolved — blocks planning if critical>
+- <genuine blockers requiring human decision before planning can proceed>
+- <not design decisions — those go in Design Questions for Planning>
 
 ## User Confirmation
 
@@ -174,7 +191,10 @@ After drafting the discovery document, evaluate whether escalation is needed:
 
 ```mermaid
 flowchart TD
-    Draft([DISCOVERY draft complete]) --> Q1{Unbound constraints?}
+    Draft([DISCOVERY draft complete]) --> QDQ{Design questions<br>in artifact?}
+    QDQ -->|Yes — route to planning research| PlanRoute[Design Questions section populated<br>No human escalation needed]
+    QDQ -->|No| Q1{Unbound constraints?}
+    PlanRoute --> Q1
     Q1 -->|Yes| Escalate[Present to user — cannot proceed without bounds]
     Q1 -->|No| Q2{Domain knowledge gap?}
     Q2 -->|Yes| Escalate
@@ -188,11 +208,17 @@ flowchart TD
     Resolve --> Q1
 ```
 
-Escalation triggers:
+Escalation triggers (human decision required):
 
 - **Unbound constraints** — no clear scope boundary for a requirement
 - **Domain knowledge** — insufficient understanding to assess feasibility
 - **Contradictory requirements** — two requirements conflict
+
+Design questions (route to planning research, NOT human escalation):
+
+- User-supplied design proposals (flag names, parameter shapes, API design, implementation approaches)
+- Recognized architectural trade-offs with multiple valid options
+- Any HOW content extracted from input during triage
 
 ## Success Criteria
 

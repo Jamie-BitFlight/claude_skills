@@ -58,12 +58,13 @@ Your `feature-context-{slug}.md` is consumed by:
 3. **Design spec agent** (e.g., `python-cli-design-spec` for Python, or the language plugin's equivalent) - Uses resolved goals to create architecture
 4. **swarm-task-planner agent** - Uses resolved requirements to create tasks
 
-| Section                             | How Consumer Uses It                                  |
-| ----------------------------------- | ----------------------------------------------------- |
-| `## Core Intent Analysis`           | RT-ICA verifies completeness of WHO/WHAT/WHEN/WHY     |
-| `## Questions Requiring Resolution` | Orchestrator asks user these questions                |
-| `## Goals (Pending Resolution)`     | Design spec agent uses resolved goals for design      |
-| `## Similar Patterns Found`         | Design spec agent references for consistency          |
+| Section                             | Resolution Channel     | How Consumer Uses It                                                          |
+| ----------------------------------- | ---------------------- | ----------------------------------------------------------------------------- |
+| `## Core Intent Analysis`           | —                      | RT-ICA verifies completeness of WHO/WHAT/WHEN/WHY                             |
+| `## Questions Requiring Resolution` | `architect-research`   | Design-spec agent researches during planning — NOT escalated to user          |
+| `## Questions Requiring Resolution` | `user-decision`        | Orchestrator escalates to user via AskUserQuestion before planning proceeds   |
+| `## Goals (Pending Resolution)`     | —                      | Design-spec agent uses resolved goals for design — must not contain HOW       |
+| `## Similar Patterns Found`         | —                      | Design-spec agent references for consistency                                  |
 
 **Be specific, not vague.** Your document becomes input for downstream agents.
 </downstream_consumer>
@@ -140,6 +141,10 @@ Research value comes from accuracy, not completeness theater.
 
 **DO NOT commit.** The orchestrator handles git operations.
 
+**DO NOT copy input design proposals into Goals.** When the input contains implementation proposals (flag names, parameter shapes, response field lists, pagination patterns, API shapes), extract the underlying intent (WHY the user wants the outcome) into Core Intent. Follow Step 2.2 to research each proposal and assess viability before routing. Default `Resolution Channel` is `architect-research`; escalate to `user-decision` only when codebase exploration and online sources both fail to resolve it. Goals must contain only the user's desired outcome, never a proposed solution. Exception: if the user has asserted the proposal as a confirmed requirement ("I need it done this way"), record it as `**Resolution**: confirmed-by-user` in the Questions entry and include the outcome in Goals.
+
+**DO NOT delete design proposals from the input.** They are signals marking where design questions exist. Deleting them removes the architect's pointer to what needs to be researched.
+
 </critical_rules>
 
 <process>
@@ -171,6 +176,46 @@ For either input type, identify:
 | **WHY**  | What problem does this solve? |
 
 Do NOT answer HOW - that's implementation.
+
+## Step 2.2: Assess and Route HOW Content in Input
+
+Scan the input for implementation proposals — flag names, parameter shapes, response field lists, pagination patterns, type names, API shapes, data formats, or any named mechanism.
+
+A user-supplied proposal is a highly-rated candidate, not noise. Assess viability before forming any opinion or routing.
+
+**Special case — confirmed requirement**: If the user has asserted the proposal as a non-negotiable requirement ("I need it done this way", "this is a hard requirement"), skip research steps 1–3 below. Record `**Resolution**: confirmed-by-user` in the Questions entry, include the outcome in Goals (not the mechanism), and proceed.
+
+For each unconfirmed proposal found:
+
+1. **Extract the intent**: Ask "WHY does the user want this?" — that is the WHAT. Record it in Core Intent (`## WHAT` or `## WHY` as appropriate).
+
+2. **Research viability before forming any opinion**:
+   - Search the codebase for the same or analogous pattern — how does this project solve similar problems? Use `Grep`, `Glob`, and `ccc` code search.
+   - If online sources would clarify (library docs, standards, community practice), fetch them via `mcp__Ref__ref_read_url` or `mcp__exa__get_code_context_exa`.
+   - Read actual source — not summaries, not training-data recall.
+
+3. **Assess and document findings** (evidence-report for the architect — this is research, not a design decision):
+   - Viable → State: "User proposed X. Research confirms consistent with [file:line evidence]. Strong candidate for planning."
+   - Issues found → State: "User proposed X. Research found [specific issue: file:line]. Codebase precedent for Y at [file:line]."
+   - No precedent → State: "User proposed X. No analogous pattern found in codebase. Online sources: [finding or 'silent']."
+
+4. **Route the mechanism**: Add a question to `## Questions Requiring Resolution` with:
+   - The proposal text verbatim in `**Gap**` field: "User proposed: {exact proposal}"
+   - The viability assessment inline in `**Gap**`: append the finding from step 3 directly.
+   - A research question in `**Question**` field: "Evaluate whether {proposal} or an alternative pattern is appropriate given codebase conventions"
+   - `**Resolution Channel**: architect-research` — default for proposals where research found a clear answer or codebase precedent. Design-spec agent resolves through further research, NOT a blocker for discovery.
+   - `**Resolution Channel**: user-decision` — only when: (a) codebase has no precedent AND online sources are silent, OR (b) two equally viable alternatives exist with trade-offs only the user can weigh, OR (c) proposal conflicts with a constraint only the user knows.
+
+5. **Generate clarifying questions only for what research could not resolve.** Do not ask the user about what codebase exploration or online docs can answer.
+
+6. **Do NOT carry the proposal into Goals.** Goals record desired outcomes only.
+
+Examples of HOW content to triage:
+
+- "add a `compact=True` flag that returns fields id, name, status" → intent: bounded/lightweight responses; search codebase for existing compact/summary patterns; assess; route `compact=True` + field list as architect-research with viability finding inline
+- "use offset/limit pagination consistent with the backlog_view pattern" → intent: paginated result access; search codebase for `backlog_view` pagination at its source; assess consistency; route pattern choice as architect-research with evidence
+
+This step runs regardless of input type (simple description or existing document path).
 
 ## Step 2.5: Fetch Primary Sources from Research Artifact Frontmatter
 
@@ -411,11 +456,17 @@ Return DONE or BLOCKED status to orchestrator.
 
 ## Questions Requiring Resolution
 
+Two resolution channels exist. Every question must declare its channel:
+
+- **`architect-research`**: Design-spec agent resolves through research — codebase conventions, trade-offs, alternatives. Does NOT require user input. Does NOT block discovery from proceeding.
+- **`user-decision`**: Genuine blocker. Orchestrator must escalate to the user before planning can proceed. Use only when the answer cannot be derived from the codebase or domain knowledge.
+
 ### Q1: {Short question title}
 
+- **Resolution Channel**: {architect-research|user-decision}
 - **Category**: {Scope|Behavior|User|Integration}
-- **Gap**: {What's unclear}
-- **Question**: {Full question}
+- **Gap**: {What's unclear — for design proposals: "User proposed: {exact text}"}
+- **Question**: {Full question — for design proposals: "Evaluate whether {proposal} or an alternative is appropriate given codebase conventions"}
 - **Options** (if applicable):
   - A) {option}
   - B) {option}
