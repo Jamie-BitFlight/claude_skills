@@ -241,10 +241,7 @@ class MarkdownNavigator:
         ]
 
         pd = ProgressiveDisclosure(entries, tool_name="map")
-        # Temporarily adjust the budget via the disclosure config.
-        pd._config.token_budget = effective_budget  # noqa: SLF001
-
-        page_result = pd.page(page)
+        page_result = pd.page(page, budget=effective_budget)
         pagination = page_result.get("pagination", {})
 
         return {
@@ -299,7 +296,11 @@ class MarkdownNavigator:
                 }
                 for cid in section.child_ids
             ]
-            return {**base, "kind": "section_map", "children": children}
+            result: dict = {**base, "kind": "section_map", "children": children}
+            intro = self._paginate_intro_prose(section, page, effective_budget)
+            if intro is not None:
+                result["body"] = intro
+            return result
 
         # Leaf section — return body with pagination.
         body = extract_section_body(self._markdown, section, self._index)
@@ -407,3 +408,37 @@ class MarkdownNavigator:
         scored.sort(key=lambda t: (-t[0], t[1]))
         matches = [entry for _, _, entry in scored[:top_n]]
         return {"matches": matches, "query": query, "count": len(matches)}
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _paginate_intro_prose(self, section: SectionRef, page: int, budget: int) -> dict | None:
+        """Return paginated intro prose for a parent section, or ``None``.
+
+        Extracts the text between the section heading and its first child
+        heading (the intro prose), applies code-block stub replacement, and
+        returns a pagination dict.  Returns ``None`` when the intro region is
+        empty or whitespace-only.
+
+        Args:
+            section: The parent section whose intro prose to extract.
+            page: 1-based page number for the intro prose.
+            budget: Token ceiling per page.
+
+        Returns:
+            Dict with ``content``, ``page``, ``total_pages``, ``has_more``,
+            or ``None`` when there is no intro prose.
+        """
+        raw_intro = extract_section_body(self._markdown, section, self._index)
+        stubbed = _replace_code_blocks_with_stubs(raw_intro, section, self._index)
+        if not stubbed.strip():
+            return None
+        chunks = chunk_text(stubbed, budget=budget)
+        clamped = max(1, min(page, len(chunks)))
+        return {
+            "content": chunks[clamped - 1],
+            "page": clamped,
+            "total_pages": len(chunks),
+            "has_more": clamped < len(chunks),
+        }

@@ -128,16 +128,20 @@ class ProgressiveDisclosure:
         summaries = [{k: item[k] for k in cfg.summary_fields if k in item} for item in self._items]
         return {"index": summaries, "total": len(summaries)}
 
-    def page(self, n: int = 1, size: int | None = None) -> dict[str, Any]:
+    def page(self, n: int = 1, size: int | None = None, budget: int | None = None) -> dict[str, Any]:
         """Return page *n* (1-based) of full items.
 
         When *size* is ``None``, the page size is determined automatically by
         the binary-search token-budget algorithm so the serialised items fit
-        within ``config.token_budget`` tokens.
+        within the effective budget.
 
         Args:
             n: Page number (1-based).  Clamped to the valid range.
             size: Explicit page size.  ``None`` triggers auto-fit.
+            budget: Token ceiling used for auto-fit.  When provided and not
+                ``None``, overrides ``config.token_budget`` for this call only.
+                Has no effect when *size* is also provided (explicit size takes
+                precedence).
 
         Returns:
             Dict with ``items``, ``count``, and ``pagination`` sub-dict
@@ -162,7 +166,7 @@ class ProgressiveDisclosure:
             }
 
         effective_size: int
-        effective_size = max(1, size) if size is not None else self._auto_page_size(self._items)
+        effective_size = max(1, size) if size is not None else self._auto_page_size(self._items, budget=budget)
 
         total_pages = max(1, (total + effective_size - 1) // effective_size)
         clamped_n = max(1, min(n, total_pages))
@@ -266,7 +270,7 @@ class ProgressiveDisclosure:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _auto_page_size(self, items: list[dict[str, Any]]) -> int:
+    def _auto_page_size(self, items: list[dict[str, Any]], budget: int | None = None) -> int:
         """Find the largest k such that items[:k] fits within the token budget.
 
         Uses the same binary-search algorithm as the original
@@ -276,18 +280,20 @@ class ProgressiveDisclosure:
 
         Args:
             items: Full item list to probe.
+            budget: Token ceiling to use.  When ``None``, falls back to
+                ``config.token_budget``.
 
         Returns:
             Largest integer k >= 1 such that
-            ``len(enc.encode(json.dumps(items[:k]))) <= token_budget``.
+            ``len(enc.encode(json.dumps(items[:k]))) <= effective_budget``.
         """
         if not items:
             return 0
-        budget = self._config.token_budget
+        effective_budget = budget if budget is not None else self._config.token_budget
         lo, hi = 1, len(items)
         while lo < hi:
             mid = (lo + hi + 1) // 2
-            if len(self._enc.encode(json.dumps(items[:mid]))) <= budget:
+            if len(self._enc.encode(json.dumps(items[:mid]))) <= effective_budget:
                 lo = mid
             else:
                 hi = mid - 1

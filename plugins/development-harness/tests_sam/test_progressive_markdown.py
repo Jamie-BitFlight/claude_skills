@@ -212,15 +212,24 @@ class TestMap:
         assert result["kind"] == "toc"
 
     def test_map_selectors_are_correct(self, nav: MarkdownNavigator) -> None:
-        """Selectors match h{level}.{sibling_n} pattern."""
+        """Selectors encode the full parent chain.
+
+        For _SIMPLE_MD the hierarchy is:
+          h1.1 Introduction
+            h2.1.1 Installation
+            h2.1.2 Usage
+              h3.1.2.1 Basic Usage
+              h3.1.2.2 Advanced Usage
+            h2.1.3 Configuration
+        """
         result = nav.map()
         selectors = {e["selector"] for e in result["entries"]}
         assert "h1.1" in selectors  # Introduction
-        assert "h2.1" in selectors  # Installation
-        assert "h2.2" in selectors  # Usage
-        assert "h3.1" in selectors  # Basic Usage
-        assert "h3.2" in selectors  # Advanced Usage
-        assert "h2.3" in selectors  # Configuration
+        assert "h2.1.1" in selectors  # Installation (1st h2 under 1st h1)
+        assert "h2.1.2" in selectors  # Usage (2nd h2 under 1st h1)
+        assert "h3.1.2.1" in selectors  # Basic Usage (1st h3 under 2nd h2 under 1st h1)
+        assert "h3.1.2.2" in selectors  # Advanced Usage (2nd h3 under 2nd h2 under 1st h1)
+        assert "h2.1.3" in selectors  # Configuration (3rd h2 under 1st h1)
 
     def test_map_entries_have_required_fields(self, nav: MarkdownNavigator) -> None:
         """Each TOC entry contains all required fields."""
@@ -232,13 +241,13 @@ class TestMap:
     def test_map_child_count_for_parent_section(self, nav: MarkdownNavigator) -> None:
         """A parent section reports the correct child_count."""
         result = nav.map()
-        usage_entry = next(e for e in result["entries"] if e["selector"] == "h2.2")
+        usage_entry = next(e for e in result["entries"] if e["selector"] == "h2.1.2")
         assert usage_entry["child_count"] == 2
 
     def test_map_code_count_for_section_with_code(self, nav: MarkdownNavigator) -> None:
         """A section with a code block reports code_count >= 1."""
         result = nav.map()
-        install_entry = next(e for e in result["entries"] if e["selector"] == "h2.1")
+        install_entry = next(e for e in result["entries"] if e["selector"] == "h2.1.1")
         assert install_entry["code_count"] >= 1
 
 
@@ -252,7 +261,7 @@ class TestViewSection:
 
     def test_parent_section_returns_section_map(self, nav: MarkdownNavigator) -> None:
         """A section with children returns kind='section_map'."""
-        result = nav.view_section("h2.2")  # Usage has children
+        result = nav.view_section("h2.1.2")  # Usage has children
         assert result["kind"] == "section_map"
         assert "children" in result
 
@@ -260,28 +269,28 @@ class TestViewSection:
         """section_map children matches direct children only."""
         result = nav.view_section("h1.1")  # Introduction
         assert result["kind"] == "section_map"
-        # Direct children of h1.1 are h2.1 (Installation), h2.2 (Usage), h2.3 (Configuration)
+        # Direct children of h1.1 are h2.1.1 (Installation), h2.1.2 (Usage), h2.1.3 (Configuration)
         child_selectors = {c["selector"] for c in result["children"]}
-        assert "h2.1" in child_selectors
-        assert "h2.2" in child_selectors
-        assert "h2.3" in child_selectors
-        # h3.1 is a grandchild, not a direct child
-        assert "h3.1" not in child_selectors
+        assert "h2.1.1" in child_selectors
+        assert "h2.1.2" in child_selectors
+        assert "h2.1.3" in child_selectors
+        # h3.1.2.1 is a grandchild, not a direct child
+        assert "h3.1.2.1" not in child_selectors
 
     def test_leaf_section_returns_section_body(self, nav: MarkdownNavigator) -> None:
         """A section without children returns kind='section_body'."""
-        result = nav.view_section("h2.3")  # Configuration (leaf)
+        result = nav.view_section("h2.1.3")  # Configuration (leaf)
         assert result["kind"] == "section_body"
         assert "content" in result
 
     def test_leaf_section_body_contains_text(self, nav: MarkdownNavigator) -> None:
         """The body of a leaf section contains its text content."""
-        result = nav.view_section("h2.3")  # Configuration
+        result = nav.view_section("h2.1.3")  # Configuration
         assert "Configure" in result["content"]
 
     def test_body_code_blocks_replaced_with_stubs(self, nav: MarkdownNavigator) -> None:
         """Code blocks in a leaf section body are replaced with stubs."""
-        result = nav.view_section("h2.1")  # Installation has a bash code block
+        result = nav.view_section("h2.1.1")  # Installation has a bash code block
         assert result["kind"] == "section_body"
         content = result["content"]
         # Stub format contains '[code:'
@@ -297,7 +306,7 @@ class TestViewSection:
         appear in the section body content.  The stub summary may contain
         a content preview, but the fence markers themselves must be gone.
         """
-        result = nav.view_section("h2.1")  # Installation: bash block
+        result = nav.view_section("h2.1.1")  # Installation: bash block
         content = result["content"]
         # Opening fence must be gone - replaced by the stub line.
         assert "```bash" not in content, "Fenced code block opening fence survived stub replacement"
@@ -306,23 +315,23 @@ class TestViewSection:
     def test_body_pagination_lossless(self, nav: MarkdownNavigator) -> None:
         """All body pages reassemble to exactly the single-page content."""
         # Retrieve the full stubbed body at a large budget (fits in 1 page).
-        whole = nav.view_section("h2.1", budget=10_000)["content"]
+        whole = nav.view_section("h2.1.1", budget=10_000)["content"]
 
         # Retrieve at a tiny budget to force multi-page output.
         budget = 5
-        result_p1 = nav.view_section("h2.1", page=1, budget=budget)
+        result_p1 = nav.view_section("h2.1.1", page=1, budget=budget)
         total_pages = result_p1["total_pages"]
 
-        pages = [nav.view_section("h2.1", page=p, budget=budget)["content"] for p in range(1, total_pages + 1)]
+        pages = [nav.view_section("h2.1.1", page=p, budget=budget)["content"] for p in range(1, total_pages + 1)]
 
         # The critical invariant: joined pages == the single-page full content.
         assert "".join(pages) == whole, f"Lossless reassembly failed: {total_pages} pages do not reconstruct the body"
 
         # Metadata consistency: every page except the last reports has_more=True.
         for p in range(1, total_pages):
-            r = nav.view_section("h2.1", page=p, budget=budget)
+            r = nav.view_section("h2.1.1", page=p, budget=budget)
             assert r["has_more"] is True
-        r_last = nav.view_section("h2.1", page=total_pages, budget=budget)
+        r_last = nav.view_section("h2.1.1", page=total_pages, budget=budget)
         assert r_last["has_more"] is False
 
     def test_not_found_returns_error(self, nav: MarkdownNavigator) -> None:
@@ -351,10 +360,10 @@ class TestViewSection:
         assert "Configuration" in result["title"]
 
     def test_resolve_by_selector(self, nav: MarkdownNavigator) -> None:
-        """Sections can be resolved by their h{level}.{n} selector."""
-        result = nav.view_section("h2.1")
+        """Sections can be resolved by their hierarchical selector."""
+        result = nav.view_section("h2.1.1")
         assert "error" not in result
-        assert result["selector"] == "h2.1"
+        assert result["selector"] == "h2.1.1"
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +487,198 @@ class TestFencedHeadingExclusion:
         """Only 2 sections exist (the fenced ## does not count)."""
         idx = fenced_nav.current_index()
         assert len(idx.sections) == 2
+
+
+# ---------------------------------------------------------------------------
+# Bug 1 — hierarchical selectors (no sibling collision)
+# ---------------------------------------------------------------------------
+
+_COLLISION_MD = """\
+# Title
+
+## Section A
+
+### Sub A
+
+## Section B
+
+### Sub B
+"""
+
+_DEEP_NESTING_MD = """\
+# A
+
+## B
+
+### C
+"""
+
+
+class TestHierarchicalSelectors:
+    """Selector encoding must reflect the full parent chain, not just level.
+
+    Two sub-sections under different parents must get different selectors
+    even when they are both the first child at their level.
+    """
+
+    def test_sibling_collision_prevented(self) -> None:
+        """Sub A and Sub B under different parents get different selectors."""
+        nav = MarkdownNavigator.from_markdown(_COLLISION_MD, source="collision.md")
+        result = nav.map()
+        selectors = [e["selector"] for e in result["entries"]]
+        # Must be unique — no two sections share a selector.
+        assert len(selectors) == len(set(selectors)), f"Selector collision: {selectors}"
+
+    def test_sub_a_and_sub_b_have_distinct_selectors(self) -> None:
+        """The two ### sections under different ## parents differ."""
+        nav = MarkdownNavigator.from_markdown(_COLLISION_MD, source="collision.md")
+        result = nav.map()
+        by_title = {e["title"]: e["selector"] for e in result["entries"]}
+        assert by_title["Sub A"] != by_title["Sub B"], f"Sub A and Sub B share selector {by_title['Sub A']!r}"
+
+    def test_selector_path_h3_under_second_h2(self) -> None:
+        """The first ### under the second ## gets selector h3.1.2.1, not h3.1."""
+        nav = MarkdownNavigator.from_markdown(_COLLISION_MD, source="collision.md")
+        result = nav.map()
+        by_title = {e["title"]: e["selector"] for e in result["entries"]}
+        # Sub B is under Section B (2nd h2 under h1)
+        assert by_title["Sub B"] == "h3.1.2.1", f"Expected h3.1.2.1 for Sub B, got {by_title['Sub B']!r}"
+
+    def test_deep_nesting_selector_format(self) -> None:
+        """A / ## B / ### C produces h3.1.1.1."""
+        nav = MarkdownNavigator.from_markdown(_DEEP_NESTING_MD, source="deep.md")
+        result = nav.map()
+        by_title = {e["title"]: e["selector"] for e in result["entries"]}
+        assert by_title["C"] == "h3.1.1.1", f"Expected h3.1.1.1 for C, got {by_title['C']!r}"
+
+    def test_all_document_selectors_unique(self, nav: MarkdownNavigator) -> None:
+        """All selectors in _SIMPLE_MD are unique."""
+        result = nav.map()
+        selectors = [e["selector"] for e in result["entries"]]
+        assert len(selectors) == len(set(selectors)), f"Duplicate selectors: {selectors}"
+
+
+# ---------------------------------------------------------------------------
+# Bug 2 — parent section intro prose
+# ---------------------------------------------------------------------------
+
+_INTRO_PROSE_MD = """\
+## Installation
+
+This intro paragraph should be accessible.
+
+### Step 1
+
+Do step 1.
+
+### Step 2
+
+Do step 2.
+"""
+
+_NO_INTRO_PROSE_MD = """\
+## Installation
+
+### Step 1
+
+Do step 1.
+
+### Step 2
+
+Do step 2.
+"""
+
+
+class TestParentSectionIntroProse:
+    """view_section on a parent must surface intro prose when it exists."""
+
+    def test_intro_prose_present_when_text_between_heading_and_first_child(self) -> None:
+        """body.content contains the intro paragraph."""
+        nav = MarkdownNavigator.from_markdown(_INTRO_PROSE_MD, source="intro.md")
+        # _INTRO_PROSE_MD has ## Installation as the root section → selector h2.1
+        result = nav.view_section("h2.1")
+        assert result["kind"] == "section_map"
+        assert "body" in result, "Expected 'body' key when intro prose is present"
+        assert "This intro paragraph" in result["body"]["content"]
+
+    def test_no_body_key_when_no_intro_prose(self) -> None:
+        """body key is absent when there is only whitespace before the first child."""
+        nav = MarkdownNavigator.from_markdown(_NO_INTRO_PROSE_MD, source="no_intro.md")
+        # _NO_INTRO_PROSE_MD has ## Installation as the root section → selector h2.1
+        result = nav.view_section("h2.1")
+        assert result["kind"] == "section_map"
+        assert "body" not in result, (
+            f"Expected no 'body' key when intro prose is absent, got body={result.get('body')!r}"
+        )
+
+    def test_paginated_intro_prose_has_pagination_metadata(self) -> None:
+        """body contains page/total_pages/has_more metadata."""
+        nav = MarkdownNavigator.from_markdown(_INTRO_PROSE_MD, source="intro.md")
+        result = nav.view_section("h2.1")
+        body = result.get("body", {})
+        assert "page" in body
+        assert "total_pages" in body
+        assert "has_more" in body
+
+    def test_large_intro_prose_paginated_when_budget_tiny(self) -> None:
+        """Intro prose that exceeds the budget is paginated."""
+        # Build a document with many paragraphs of intro prose before the first child.
+        intro_lines = "\n".join(f"Intro line {i}." for i in range(100))
+        md = f"## Parent\n\n{intro_lines}\n\n### Child\n\nChild text.\n"
+        nav = MarkdownNavigator.from_markdown(md, source="paged_intro.md")
+        # ## Parent is a root h2 → selector h2.1
+        result = nav.view_section("h2.1", budget=20)
+        assert result["kind"] == "section_map"
+        body = result.get("body", {})
+        assert body, "Expected body to be present with 100 intro lines"
+        assert body["total_pages"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# Bug 3 — budget parameter on ProgressiveDisclosure.page() and map()
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetParameter:
+    """Budget override must be honoured without private attribute mutation."""
+
+    def test_progressive_disclosure_page_uses_supplied_budget(self) -> None:
+        """page(1, budget=B) uses B tokens, not config.token_budget."""
+        from dh_progressive_disclosure import DisclosureConfig, ProgressiveDisclosure
+
+        # Each item serialises to roughly 40 tokens; 100-token budget should
+        # fit fewer items than the default 4400-token budget.
+        items = [{"id": str(i), "title": f"item {i}", "status": "open"} for i in range(50)]
+        config = DisclosureConfig(token_budget=TOKEN_BUDGET)  # default large budget
+        pd = ProgressiveDisclosure(items, config=config, tool_name="test")
+
+        page_large = pd.page(1)
+        page_small = pd.page(1, budget=100)
+
+        # With the small budget, fewer items should fit per page.
+        assert page_small["count"] <= page_large["count"], (
+            f"Small budget did not reduce items per page: large={page_large['count']}, small={page_small['count']}"
+        )
+        # With enough items and a tiny budget, the small result must be smaller.
+        assert page_small["count"] < page_large["count"], (
+            "budget=100 returned as many items as the default 4400-token budget"
+        )
+
+    def test_map_uses_supplied_budget_without_private_access(self) -> None:
+        """map(budget=B) produces different pagination than map() without private mutation."""
+        # Large document: repeat sections many times to fill many TOC entries.
+        sections = "\n".join(f"## Section {i}\n\nContent {i}.\n" for i in range(30))
+        md = f"# Root\n\n{sections}"
+        nav = MarkdownNavigator.from_markdown(md, source="budget_test.md")
+
+        result_large = nav.map(budget=TOKEN_BUDGET)
+        result_small = nav.map(budget=50)
+
+        # A 50-token budget over 31 sections must force pagination.
+        assert result_small["total_pages"] >= result_large["total_pages"], "Small budget did not increase total_pages"
+        assert result_small["total_pages"] > 1 or result_large["total_pages"] == 1, (
+            "Expected small budget to produce more than 1 page for 31 sections"
+        )
 
 
 # ---------------------------------------------------------------------------

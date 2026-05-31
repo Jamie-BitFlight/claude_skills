@@ -316,55 +316,44 @@ class _LineTracker:
 
 
 # ---------------------------------------------------------------------------
-# Level-based sibling counters
+# Hierarchical selector builder
 # ---------------------------------------------------------------------------
 
 
-class _LevelCounters:
-    """Track 1-based sibling counts per heading level.
+def _build_hierarchical_selector(level: int, sibling_index: int, parent: _SectionBuilder | None) -> str:
+    """Return a selector that encodes the full parent chain for a section.
 
-    When a new heading is encountered at level L, the counter for L is
-    incremented and all counters for levels > L are reset to zero.
-    """
+    The format is ``h{level}.{path}`` where ``path`` is the dot-joined
+    ancestry path from root (level-1) down to the current sibling index.
 
-    def __init__(self) -> None:
-        """Initialise with empty counters."""
-        self._counts: dict[int, int] = {}
+    For a root section (no parent): ``h{level}.{sibling_index}``
+    For a child section: ``h{level}.{parent_path}.{sibling_index}``
+    where ``parent_path`` is the path portion of the parent's selector
+    (i.e. the parent selector minus its ``h{N}.`` prefix).
 
-    def next(self, level: int) -> int:
-        """Return the 1-based sibling index for the next section at *level*.
-
-        Resets all counters for levels deeper than *level*.
-
-        Args:
-            level: Heading level (1-6).
-
-        Returns:
-            1-based sibling position at *level*.
-        """
-        self._counts[level] = self._counts.get(level, 0) + 1
-        for deeper in list(self._counts):
-            if deeper > level:
-                self._counts[deeper] = 0
-        return self._counts[level]
-
-
-# ---------------------------------------------------------------------------
-# Selector builder
-# ---------------------------------------------------------------------------
-
-
-def _build_selector(level: int, sibling_n: int) -> str:
-    """Return the hierarchical selector string for a section.
+    Examples:
+        >>> _build_hierarchical_selector(1, 1, None)
+        'h1.1'
+        >>> parent_h1 = ...  # selector = 'h1.1'
+        >>> _build_hierarchical_selector(2, 1, parent_h1)
+        'h2.1.1'
+        >>> parent_h2 = ...  # selector = 'h2.1.1'
+        >>> _build_hierarchical_selector(3, 1, parent_h2)
+        'h3.1.1.1'
 
     Args:
         level: Heading level (1-6).
-        sibling_n: 1-based sibling position at *level*.
+        sibling_index: 1-based sibling position under the current parent.
+        parent: The immediate parent ``_SectionBuilder``, or ``None`` for roots.
 
     Returns:
-        Selector of the form ``h{level}.{sibling_n}`` (e.g. ``h2.1``).
+        Selector string such as ``h2.1.2`` or ``h3.1.2.1``.
     """
-    return f"h{level}.{sibling_n}"
+    if parent is None:
+        return f"h{level}.{sibling_index}"
+    # Strip the h{N}. prefix from the parent selector to obtain its path.
+    parent_path = parent.selector.split(".", 1)[1]
+    return f"h{level}.{parent_path}.{sibling_index}"
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +384,7 @@ def _code_summary(language: str | None, content: str) -> str:
 
 
 def _process_heading(
-    node: marko.block.Heading, state: _WalkState, tracker: _LineTracker, counters: _LevelCounters
+    node: marko.block.Heading, state: _WalkState, tracker: _LineTracker, sibling_counts: dict[str | None, int]
 ) -> None:
     """Process a single Heading node and update *state*.
 
@@ -403,7 +392,9 @@ def _process_heading(
         node: The heading AST node.
         state: Mutable walk state to update.
         tracker: Line position tracker.
-        counters: Level-based sibling counter.
+        sibling_counts: Mutable dict mapping parent_id (or None for roots)
+            to the count of children already registered under that parent.
+            Updated in place.
     """
     title = _heading_text(node)
     level = node.level
@@ -411,11 +402,17 @@ def _process_heading(
 
     state.close_sections_at_or_below(level, max(0, start_line - 1))
 
+    # Determine parent after closing deeper sections.
+    parent_builder: _SectionBuilder | None = state.open_stack[-1] if state.open_stack else None
+    parent_id: str | None = parent_builder.id if parent_builder is not None else None
+
+    # Increment sibling count under this parent (key = parent_id or None for roots).
+    sibling_counts[parent_id] = sibling_counts.get(parent_id, 0) + 1
+    sibling_index = sibling_counts[parent_id]
+
     sec_id = state.next_section_id()
-    sibling_n = counters.next(level)
-    selector = _build_selector(level, sibling_n)
+    selector = _build_hierarchical_selector(level, sibling_index, parent_builder)
     slug = _make_slug(title)
-    parent_id = state.active_section_id()
 
     builder = _SectionBuilder(
         id=sec_id,
@@ -496,12 +493,13 @@ def parse_markdown(markdown: str, source: str = "inline") -> MarkdownIndex:
     """
     doc = marko.parse(markdown)
     tracker = _LineTracker(markdown)
-    counters = _LevelCounters()
+    # Maps parent_id (or None for root) to the count of children already added.
+    sibling_counts: dict[str | None, int] = {}
     state = _WalkState(total_lines=tracker.total_lines())
 
     for node in doc.children:
         if isinstance(node, marko.block.Heading):
-            _process_heading(node, state, tracker, counters)
+            _process_heading(node, state, tracker, sibling_counts)
         elif isinstance(node, marko.block.FencedCode):
             _process_fenced_code(node, state, tracker)
 
