@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from models import ArtefactIntegrity, StepDefinition, ValidationRule
+
 from validators import (
     CONTENT_VALIDATION_FAILED,
     EMPTY_ARTEFACT,
