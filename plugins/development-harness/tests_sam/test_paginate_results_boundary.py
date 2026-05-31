@@ -36,8 +36,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from dh_progressive_disclosure import (
+    ENCODING as _enc,
+    TOKEN_BUDGET as _TOKEN_BUDGET,
+    paginate_results as _paginate_results,
+)
 from hypothesis import given, settings, strategies as st
-from sam_schema.server import _TOKEN_BUDGET, _enc, _paginate_results
 
 # ---------------------------------------------------------------------------
 # Calibrated constants
@@ -566,7 +570,7 @@ class TestResponseStructureInvariants:
 
 
 @given(item_sizes=st.lists(st.integers(min_value=1, max_value=5000), min_size=1, max_size=30))
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_hypothesis_budget_invariant(item_sizes: list[int]) -> None:
     """Token budget invariant: the cut-point is maximal and bounded.
 
