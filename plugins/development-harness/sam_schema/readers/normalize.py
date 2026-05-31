@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from sam_schema.core.models import STATUS_MAP, Plan, ReadResult, SchemaGap, Task, TaskStatus
+from sam_schema.core.models import STATUS_MAP, AcceptanceCriterion, Plan, ReadResult, SchemaGap, Task, TaskStatus
 from sam_schema.readers.detect import FormatType
 
 if TYPE_CHECKING:
@@ -364,11 +364,12 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
         all_gaps.extend(gaps)
 
     # Resolve acceptance-criteria-structured: accept both kebab-case and snake_case keys.
-    # Each item is a dict from YAML; Pydantic coerces dicts to AcceptanceCriterion via
-    # model_validate when the Plan model is constructed.
-    raw_structured: list[object] = (
+    # Each item arrives as a raw dict from YAML; validate immediately at this boundary
+    # so the Plan constructor receives the correct typed list.
+    raw_ac: list[object] = (
         plan_meta.get("acceptance-criteria-structured") or plan_meta.get("acceptance_criteria_structured") or []
     )
+    raw_structured: list[AcceptanceCriterion] = [AcceptanceCriterion.model_validate(item) for item in raw_ac]
 
     def _coerce_str(value: Any) -> str | None:  # noqa: ANN401
         """Coerce a YAML value to ``str | None``.
