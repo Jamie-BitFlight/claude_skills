@@ -7,6 +7,7 @@
 #   "pygithub>=2.8.1",
 #   "pydantic>=2.12.3",
 #   "marko>=2.0.0",
+#   "markdown-it-py>=3.0.0",
 #   "ruamel.yaml>=0.18.0",
 #   "tiktoken>=0.12.0",
 #   "typer>=0.21.2",

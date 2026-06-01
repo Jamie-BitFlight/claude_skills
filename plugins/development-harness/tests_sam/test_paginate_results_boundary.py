@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from dh_progressive_disclosure import (
+from progressive_markdown.list_navigator import (
     ENCODING as _enc,
     TOKEN_BUDGET as _TOKEN_BUDGET,
     paginate_results as _paginate_results,

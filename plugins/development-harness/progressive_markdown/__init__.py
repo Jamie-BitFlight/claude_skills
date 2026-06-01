@@ -1,22 +1,73 @@
 """Progressive Markdown navigation layer for the development-harness plugin.
 
-Provides token-budget-aware section navigation, code block viewing, and
-search over Markdown documents.
+Provides token-budget-aware section navigation, code block viewing, link
+inventory, and search over Markdown documents.
 
 Typical usage::
 
-    from progressive_markdown import MarkdownNavigator
+    from progressive_markdown import ProgressiveMarkdownNavigator, NavigatorOptions
 
-    nav = MarkdownNavigator.from_markdown(content, source="README.md")
-    toc = nav.map()  # paginated table of contents
-    section = nav.view_section("h2.1")  # view a specific section
-    code = nav.view_code("code_0001")  # view a code block
-    hits = nav.search("authentication")  # search by keyword
+    nav = ProgressiveMarkdownNavigator.from_markdown(content, source="README.md")
+    toc = nav.map()           # paginated document map
+    section = nav.view_section("installation")  # view a specific section
+    code = nav.view_code("code_0001")           # view a code block
+
+List navigator exports (structured data pagination and disclosure)::
+
+    from progressive_markdown.list_navigator import (
+        ENCODING, TOKEN_BUDGET, DisclosureConfig, ProgressiveDisclosure,
+        chunk_text, paginate_results,
+    )
 """
 
 from __future__ import annotations
 
-from .models import CodeBlockRef, MarkdownIndex, SectionRef
-from .navigator import MarkdownNavigator
+from .exceptions import (
+    AmbiguousSectionRefError,
+    CodeBlockNotFoundError,
+    DocumentNotLoadedError,
+    PaginationError,
+    ParserError,
+    ProgressiveMarkdownError,
+    ProviderError,
+    SectionNotFoundError,
+)
+from .models import (
+    CodeBlock,
+    LinkKind,
+    LinkRef,
+    MarkdownDocument,
+    NavigationKind,
+    NavigationResult,
+    NavigatorOptions,
+    Page,
+    SectionNode,
+    SourceSpan,
+)
+from .navigator import ProgressiveMarkdownNavigator
+from .providers import CallableMarkdownContentProvider, MarkdownContentProvider, MCPMarkdownContentProvider
 
-__all__ = ["CodeBlockRef", "MarkdownIndex", "MarkdownNavigator", "SectionRef"]
+__all__ = [
+    "AmbiguousSectionRefError",
+    "CallableMarkdownContentProvider",
+    "CodeBlock",
+    "CodeBlockNotFoundError",
+    "DocumentNotLoadedError",
+    "LinkKind",
+    "LinkRef",
+    "MarkdownContentProvider",
+    "MarkdownDocument",
+    "MCPMarkdownContentProvider",
+    "NavigationKind",
+    "NavigationResult",
+    "NavigatorOptions",
+    "Page",
+    "PaginationError",
+    "ParserError",
+    "ProgressiveMarkdownError",
+    "ProgressiveMarkdownNavigator",
+    "ProviderError",
+    "SectionNode",
+    "SectionNotFoundError",
+    "SourceSpan",
+]
