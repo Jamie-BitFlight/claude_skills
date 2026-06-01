@@ -7,6 +7,7 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
+import difflib as _difflib
 import json as _json
 import logging as _logging
 import os as _os
@@ -1285,7 +1286,54 @@ def _filter_view_sections(
     if sections and not dict_matched and not metadata_matched and not body_matched:
         response["section_filter_miss"] = True
         result.section_filter_miss = True
+        # Collect all known section names for the ADR-3 error response.
+        # ``raw_sections`` and ``raw_metadata`` still reference the original
+        # (pre-filter) objects even though ``response["sections"]`` and
+        # ``response["sections_metadata"]`` have been replaced above.
+        valid_names: list[str] = []
+        if isinstance(raw_sections, dict):
+            valid_names.extend(k for k in raw_sections if isinstance(k, str))
+        if isinstance(raw_metadata, list):
+            for entry in raw_metadata:
+                name = _metadata_entry_name(entry)
+                if name and name not in valid_names:
+                    valid_names.append(name)
+        result.section_filter_valid_names = valid_names
     return response
+
+
+def _build_section_miss_error(
+    filter_expr: str,
+    valid_names: list[str],
+    out: Output,
+) -> dict[str, object]:
+    """Build an ADR-3 error dict for a section-filter miss.
+
+    Returns a dict with ``error``, ``valid_sections``, and ``section_filter_miss``
+    (back-compat flag) but NO ``body`` field, so callers can distinguish an error
+    response from a content response by the absence of ``body``.  Adds a
+    ``suggestion`` key only when difflib finds a close match in ``valid_names``
+    (SequenceMatcher ratio >= 0.6, equivalent to Levenshtein-adjacent proximity).
+
+    Args:
+        filter_expr: The section filter string the caller supplied.
+        valid_names: Known section names at the time of the miss.
+        out: Output accumulator carrying any messages/warnings/errors.
+
+    Returns:
+        Error dict ready to return from ``backlog_view``.
+    """
+    error_dict: dict[str, object] = {
+        "error": f"Section not found: {filter_expr!r}",
+        "valid_sections": valid_names,
+        "section_filter_miss": True,
+        **out.to_dict(),
+    }
+    if valid_names and filter_expr:
+        matches = _difflib.get_close_matches(filter_expr, valid_names, n=1, cutoff=0.6)
+        if matches:
+            error_dict["suggestion"] = f"Did you mean: {matches[0]!r}?"
+    return error_dict
 
 
 def _parse_args() -> argparse.Namespace:
@@ -2042,6 +2090,15 @@ async def backlog_view(
             # Primitive 3: filter to named sections when requested.
             if sections_filter is not None:
                 full_response = _filter_view_sections(full_response, sections_filter, result)
+            # ADR-3: return an explicit error dict on section-filter miss.  Covers both
+            # the singular ``section=`` path (flag set by view_item via
+            # _apply_body_section_filter / _assemble_view_compact) and the plural
+            # ``sections=[...]`` path (flag set by _filter_view_sections above).
+            # The error dict has no ``body`` field, distinguishing it from a content
+            # response.  ``section_filter_miss`` is retained for backward compatibility.
+            if result.section_filter_miss:
+                filter_expr = section if section is not None else ", ".join(sections or [])
+                return _build_section_miss_error(filter_expr, result.section_filter_valid_names, out)
             # Auto-compact: when the response exceeds the token budget return a compact
             # section-directory form so the caller can request only what it needs.
             #

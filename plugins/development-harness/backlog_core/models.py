@@ -1143,6 +1143,7 @@ class ViewItemResult(BaseModel):
     body_remaining_lines: int | None = None
     body_total_lines: int | None = None
     section_filter_miss: bool = False
+    section_filter_valid_names: list[str] = Field(default_factory=list, exclude=True)
     messages: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

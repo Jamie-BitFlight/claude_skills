@@ -3018,6 +3018,7 @@ def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) 
         body = _slice_body_by_header_indices(body, headers, matched)
     else:
         result.section_filter_miss = True
+        result.section_filter_valid_names = names
     result.body = body
     return body
 
@@ -3092,6 +3093,7 @@ def _assemble_view_compact(
             filtered = [s for s in all_sections if str(s.get("name", "")).lower() == section_lower]
             if not filtered:
                 result.section_filter_miss = True
+                result.section_filter_valid_names = [str(s.get("name", "")) for s in all_sections]
             all_sections = filtered
         result.sections_metadata = [
             _models.SectionMeta(
