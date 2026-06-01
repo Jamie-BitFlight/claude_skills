@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 from .models import CodeBlock, MarkdownDocument, SectionNode, SourceSpan
 
 if TYPE_CHECKING:
+    from markdown_it.token import Token
+
     from .parser import ParserResult
 
 __all__ = ["MarkdownIndexer"]
@@ -43,6 +45,23 @@ class _SectionBuilder:
     child_ids: list[str] = field(default_factory=list)
     link_ref_ids: list[str] = field(default_factory=list)
     code_block_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _BuildState:
+    """Mutable accumulator shared across token processing phases."""
+
+    builders: dict[str, _SectionBuilder] = field(default_factory=dict)
+    document_order: list[str] = field(default_factory=list)
+    root_section_ids: list[str] = field(default_factory=list)
+    sections_by_slug: dict[str, list[str]] = field(default_factory=dict)
+    sections_by_selector: dict[str, str] = field(default_factory=dict)
+    sections_by_title: dict[str, list[str]] = field(default_factory=dict)
+    code_blocks: dict[str, CodeBlock] = field(default_factory=dict)
+    open_stack: list[_SectionBuilder] = field(default_factory=list)
+    sibling_counts: dict[str | None, int] = field(default_factory=dict)
+    section_counter: int = 0
+    code_counter: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -136,122 +155,154 @@ class MarkdownIndexer:
         Returns:
             Fully indexed MarkdownDocument.
         """
-        total_lines = len(result.lines)
-        builders: dict[str, _SectionBuilder] = {}
-        document_order: list[str] = []
-        root_section_ids: list[str] = []
-        sections_by_slug: dict[str, list[str]] = {}
-        sections_by_selector: dict[str, str] = {}
-        sections_by_title: dict[str, list[str]] = {}
-        code_blocks: dict[str, CodeBlock] = {}
+        state = _BuildState()
+        self._process_tokens(result.tokens, state)
+        sections = self._finalize_sections(state, len(result.lines))
+        return MarkdownDocument(
+            source=result.source,
+            raw_markdown=result.raw_markdown,
+            lines=result.lines,
+            root_section_ids=state.root_section_ids,
+            sections=sections,
+            sections_by_slug=state.sections_by_slug,
+            sections_by_selector=state.sections_by_selector,
+            sections_by_title=state.sections_by_title,
+            code_blocks=state.code_blocks,
+        )
 
-        # Heading stack: tracks open sections by nesting.
-        open_stack: list[_SectionBuilder] = []
-        # Sibling counts keyed by parent_id (None = root level).
-        sibling_counts: dict[str | None, int] = {}
-        section_counter = 0
-        code_counter = 0
+    def _process_tokens(self, tokens: list[Token], state: _BuildState) -> None:
+        """Walk token stream; dispatch heading and fence tokens to phase methods.
 
-        tokens = result.tokens
-        token_index = 0
-        n_tokens = len(tokens)
-
-        while token_index < n_tokens:
-            token = tokens[token_index]
-
+        Args:
+            tokens: Token list from a ParserResult.
+            state: Mutable build state updated in-place.
+        """
+        for token_index, token in enumerate(tokens):
             if token.type == "heading_open":
-                # Next token is always inline with the heading text.
-                title = ""
-                if token_index + 1 < n_tokens and tokens[token_index + 1].type == "inline":
-                    title = tokens[token_index + 1].content
-                    token_index += 1  # consume the inline token
-
-                level = int(token.tag[1])  # h1..h6 → 1..6
-                heading_start = token.map[0] if token.map else 0
-                heading_end = token.map[1] if token.map else heading_start + 1
-
-                # Close all open sections at the same or deeper level.
-                while open_stack and open_stack[-1].level >= level:
-                    closed = open_stack.pop()
-                    closed.section_end = max(0, heading_start - 1)
-
-                parent = open_stack[-1] if open_stack else None
-                parent_id = parent.section_id if parent else None
-
-                sibling_counts[parent_id] = sibling_counts.get(parent_id, 0) + 1
-                sibling_index = sibling_counts[parent_id]
-
-                section_counter += 1
-                section_id = f"sec_{section_counter:04d}"
-                selector = _build_selector(level, sibling_index, parent)
-                slug = _make_slug(title)
-
-                builder = _SectionBuilder(
-                    section_id=section_id,
-                    selector=selector,
-                    slug=slug,
-                    title=title,
-                    level=level,
-                    heading_start=heading_start,
-                    heading_end=heading_end,
-                    section_end=total_lines - 1,
-                    parent_id=parent_id,
-                )
-                builders[section_id] = builder
-                document_order.append(section_id)
-
-                if parent_id is None:
-                    root_section_ids.append(section_id)
-                else:
-                    builders[parent_id].child_ids.append(section_id)
-
-                sections_by_slug.setdefault(slug, []).append(section_id)
-                sections_by_selector[selector] = section_id
-                sections_by_title.setdefault(title, []).append(section_id)
-                open_stack.append(builder)
-
+                self._process_heading_token(token, tokens, token_index, state)
             elif token.type == "fence":
-                code_counter += 1
-                code_id = f"code_{code_counter:04d}"
-                info = token.info.strip() if token.info else None
-                language = info.split()[0] if info else None
-                content = token.content
-                span_start = token.map[0] if token.map else 0
-                span_end = token.map[1] - 1 if token.map else span_start
+                self._process_fence_token(token, state)
 
-                containing_section: str | None = None
-                if open_stack:
-                    containing_section = open_stack[-1].section_id
-                    open_stack[-1].code_block_ids.append(code_id)
+    def _process_heading_token(
+        self,
+        token: Token,
+        all_tokens: list[Token],
+        token_index: int,
+        state: _BuildState,
+    ) -> None:
+        """Extract and process a heading_open token. Updates state in-place.
 
-                code_block = CodeBlock(
-                    id=code_id,
-                    language=language,
-                    info=info,
-                    content=content,
-                    span=SourceSpan(start_line=span_start, end_line=span_end),
-                    section_id=containing_section,
-                    summary=_code_summary(language, content),
-                )
-                code_blocks[code_id] = code_block
+        Args:
+            token: The ``heading_open`` token.
+            all_tokens: Full token list (used to peek at the following inline token).
+            token_index: Index of *token* in *all_tokens*.
+            state: Mutable build state updated in-place.
+        """
+        title = ""
+        if token_index + 1 < len(all_tokens) and all_tokens[token_index + 1].type == "inline":
+            title = all_tokens[token_index + 1].content
 
-            token_index += 1
+        level = int(token.tag[1])  # h1..h6 → 1..6
+        heading_start = token.map[0] if token.map else 0
+        heading_end = token.map[1] if token.map else heading_start + 1
 
+        # Close all open sections at the same or deeper level.
+        while state.open_stack and state.open_stack[-1].level >= level:
+            closed = state.open_stack.pop()
+            closed.section_end = max(0, heading_start - 1)
+
+        parent = state.open_stack[-1] if state.open_stack else None
+        parent_id = parent.section_id if parent else None
+
+        state.sibling_counts[parent_id] = state.sibling_counts.get(parent_id, 0) + 1
+        sibling_index = state.sibling_counts[parent_id]
+
+        state.section_counter += 1
+        section_id = f"sec_{state.section_counter:04d}"
+        selector = _build_selector(level, sibling_index, parent)
+        slug = _make_slug(title)
+
+        builder = _SectionBuilder(
+            section_id=section_id,
+            selector=selector,
+            slug=slug,
+            title=title,
+            level=level,
+            heading_start=heading_start,
+            heading_end=heading_end,
+            section_end=0,  # placeholder; overwritten by sibling closure or _finalize_sections
+            parent_id=parent_id,
+        )
+        state.builders[section_id] = builder
+        state.document_order.append(section_id)
+
+        if parent_id is None:
+            state.root_section_ids.append(section_id)
+        else:
+            state.builders[parent_id].child_ids.append(section_id)
+
+        state.sections_by_slug.setdefault(slug, []).append(section_id)
+        state.sections_by_selector[selector] = section_id
+        state.sections_by_title.setdefault(title, []).append(section_id)
+        state.open_stack.append(builder)
+
+    def _process_fence_token(self, token: Token, state: _BuildState) -> None:
+        """Extract and process a fence token. Updates state.code_blocks in-place.
+
+        Args:
+            token: The ``fence`` token.
+            state: Mutable build state updated in-place.
+        """
+        state.code_counter += 1
+        code_id = f"code_{state.code_counter:04d}"
+        info = token.info.strip() if token.info else None
+        language = info.split()[0] if info else None
+        content = token.content
+        span_start = token.map[0] if token.map else 0
+        span_end = token.map[1] - 1 if token.map else span_start
+
+        containing_section: str | None = None
+        if state.open_stack:
+            containing_section = state.open_stack[-1].section_id
+            state.open_stack[-1].code_block_ids.append(code_id)
+
+        state.code_blocks[code_id] = CodeBlock(
+            id=code_id,
+            language=language,
+            info=info,
+            content=content,
+            span=SourceSpan(start_line=span_start, end_line=span_end),
+            section_id=containing_section,
+            summary=_code_summary(language, content),
+        )
+
+    def _finalize_sections(
+        self, state: _BuildState, total_lines: int
+    ) -> dict[str, SectionNode]:
+        """Convert _SectionBuilder objects to final SectionNode objects.
+
+        Args:
+            state: Accumulated build state from token processing.
+            total_lines: Total line count of the source document.
+
+        Returns:
+            Mapping from section_id to SectionNode with computed body_span.
+        """
         # Close any remaining open sections.
-        for builder in open_stack:
+        for builder in state.open_stack:
             builder.section_end = total_lines - 1
 
         # Build final SectionNode objects.
         sections: dict[str, SectionNode] = {}
-        for section_id in document_order:
-            b = builders[section_id]
+        for section_id in state.document_order:
+            b = state.builders[section_id]
 
             # Body span: from line after heading to line before first child
             # (or section end when no children).
             body_start = b.heading_end
             if b.child_ids:
                 first_child_id = b.child_ids[0]
-                first_child = builders[first_child_id]
+                first_child = state.builders[first_child_id]
                 body_end = max(body_start, first_child.heading_start - 1)
             else:
                 body_end = b.section_end
@@ -270,14 +321,4 @@ class MarkdownIndexer:
                 code_block_ids=list(b.code_block_ids),
             )
 
-        return MarkdownDocument(
-            source=result.source,
-            raw_markdown=result.raw_markdown,
-            lines=result.lines,
-            root_section_ids=root_section_ids,
-            sections=sections,
-            sections_by_slug=sections_by_slug,
-            sections_by_selector=sections_by_selector,
-            sections_by_title=sections_by_title,
-            code_blocks=code_blocks,
-        )
+        return sections
