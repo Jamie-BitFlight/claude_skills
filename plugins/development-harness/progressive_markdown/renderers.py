@@ -7,8 +7,11 @@ or token budgets.
 
 from __future__ import annotations
 
-from .codeblocks import CodeBlockStubRenderer
-from .models import CodeBlock, MarkdownDocument, SectionNode
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .codeblocks import CodeBlockStubRenderer
+    from .models import CodeBlock, MarkdownDocument, SectionNode
 
 __all__ = [
     "CodeBlockRenderer",

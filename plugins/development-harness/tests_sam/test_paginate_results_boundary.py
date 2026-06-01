@@ -36,12 +36,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from hypothesis import given, settings, strategies as st
 from progressive_markdown.list_navigator import (
     ENCODING as _enc,
     TOKEN_BUDGET as _TOKEN_BUDGET,
     paginate_results as _paginate_results,
 )
-from hypothesis import given, settings, strategies as st
 
 # ---------------------------------------------------------------------------
 # Calibrated constants

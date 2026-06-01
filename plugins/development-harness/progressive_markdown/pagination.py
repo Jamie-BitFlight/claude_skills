@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .models import Page
-from .tokenizer import TokenBudgeter
+
+if TYPE_CHECKING:
+    from .tokenizer import TokenBudgeter
 
 __all__ = ["Paginator"]
 

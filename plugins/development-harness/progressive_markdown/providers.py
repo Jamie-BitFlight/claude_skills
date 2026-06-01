@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .exceptions import ProviderError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = [
     "CallableMarkdownContentProvider",

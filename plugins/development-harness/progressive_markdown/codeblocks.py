@@ -6,7 +6,10 @@ for replacing code block spans with inline stub strings in section body text.
 
 from __future__ import annotations
 
-from .models import CodeBlock, MarkdownDocument
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .models import CodeBlock, MarkdownDocument
 
 __all__ = ["CodeBlockExtractor", "CodeBlockStubRenderer"]
 

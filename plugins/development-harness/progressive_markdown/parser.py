@@ -8,10 +8,14 @@ types live in models.py.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from markdown_it import MarkdownIt
-from markdown_it.token import Token
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from markdown_it.token import Token
 
 __all__ = ["MarkdownItParser", "MarkdownParser", "ParserResult"]
 
@@ -55,7 +59,7 @@ class MarkdownParser(Protocol):
 
 
 class MarkdownItParser:
-    """Default markdown parser using markdown-it-py.
+    r"""Default markdown parser using markdown-it-py.
 
     Args:
         preset: markdown-it-py preset name (e.g. ``"commonmark"``).
