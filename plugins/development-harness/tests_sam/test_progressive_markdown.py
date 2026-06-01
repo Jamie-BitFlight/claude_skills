@@ -256,10 +256,8 @@ class TestNavigationResult:
     def test_current_content_on_empty_result(self) -> None:
         """current_content() returns empty string when no pages."""
         result = NavigationResult(
-            kind=NavigationKind.document_map, title="empty", pages=[], current_page=1, total_pages=1, has_more=False
+            kind=NavigationKind.document_map, title="empty", pages=[], current_page=1, total_pages=1
         )
-        # Manually bypass pages=[] constraint for this edge test.
-        result.pages = []
         assert result.current_content() == ""
 
     def test_model_dump_includes_all_fields(self, nav: ProgressiveMarkdownNavigator) -> None:
@@ -798,9 +796,81 @@ class TestModels:
         assert doc.sections == {}
 
     def test_navigator_options_default_budget(self) -> None:
-        """NavigatorOptions default_budget is 11000 per spec."""
+        """NavigatorOptions default_budget equals _DEFAULT_BUDGET (env-derived)."""
+        from progressive_markdown.models import _DEFAULT_BUDGET
+
         opts = NavigatorOptions()
-        assert opts.default_budget == 11000
+        assert opts.default_budget == _DEFAULT_BUDGET
+
+
+# ---------------------------------------------------------------------------
+# SourceSpan end_line inclusive contract — regression for indexer conversion
+# ---------------------------------------------------------------------------
+#
+# markdown-it-py token.map[1] is exclusive (first line after the token).
+# SourceSpan.end_line is inclusive (last line of the token, 0-based).
+# The indexer converts with ``token.map[1] - 1``.
+# These tests pin that contract so a naive removal of ``- 1`` is caught.
+
+# Document with known line numbers (0-based):
+#   0: # Heading
+#   1: (blank)
+#   2: ```python
+#   3: x = 1
+#   4: ```
+#   5: (blank)
+#   6: Trailing prose.
+_SPAN_CONTRACT_MD = """\
+# Heading
+
+```python
+x = 1
+```
+
+Trailing prose.
+"""
+
+
+class TestSourceSpanInclusiveContract:
+    """SourceSpan.end_line must be the last line of the token (inclusive).
+
+    Regression suite for the token.map[1]-exclusive to end_line-inclusive
+    conversion in the indexer.  A naive removal of ``- 1`` makes the fence
+    span overrun by one line; these tests catch that.
+    """
+
+    @pytest.fixture
+    def span_doc(self) -> MarkdownDocument:
+        """Parse _SPAN_CONTRACT_MD and return the MarkdownDocument."""
+        nav = ProgressiveMarkdownNavigator.from_markdown(_SPAN_CONTRACT_MD, source="span_contract.md")
+        return nav.current_document()
+
+    def test_fence_end_line_is_inclusive(self, span_doc: MarkdownDocument) -> None:
+        """Code block end_line points to the closing fence line (inclusive).
+
+        ``_SPAN_CONTRACT_MD`` has a fence at lines 2-4 (0-based).
+        token.map = [2, 5] (exclusive) → end_line must be 4.
+        If the indexer drops the ``- 1``, end_line would be 5 (wrong).
+        """
+        assert span_doc.code_blocks, "Expected at least one code block"
+        block = next(iter(span_doc.code_blocks.values()))
+        assert block.span is not None
+        assert block.span.start_line == 2, f"fence opens at line 2, got {block.span.start_line}"
+        assert block.span.end_line == 4, f"fence closes at line 4 (inclusive), got {block.span.end_line}"
+
+    def test_heading_span_end_line_is_inclusive(self, span_doc: MarkdownDocument) -> None:
+        """Heading span end_line points to the heading line itself (inclusive).
+
+        ``_SPAN_CONTRACT_MD`` has ``# Heading`` at line 0.
+        heading_open.map = [0, 1] (exclusive) → heading_span.end_line must be 0.
+        If the ``- 1`` were absent, end_line would be 1 (the blank line after).
+        """
+        assert span_doc.sections, "Expected at least one section"
+        sec = next(iter(span_doc.sections.values()))
+        assert sec.heading_span.start_line == 0, f"heading at line 0, got {sec.heading_span.start_line}"
+        assert sec.heading_span.end_line == 0, (
+            f"single-line heading end_line must be 0 (inclusive), got {sec.heading_span.end_line}"
+        )
 
 
 # ---------------------------------------------------------------------------

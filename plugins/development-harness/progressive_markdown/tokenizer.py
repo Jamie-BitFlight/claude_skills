@@ -29,10 +29,7 @@ class TokenBudgeter:
     """
 
     def __init__(
-        self,
-        model: str | None = None,
-        encoding_name: str = "cl100k_base",
-        default_budget: int = 11000,
+        self, model: str | None = None, encoding_name: str = "cl100k_base", default_budget: int = 11000
     ) -> None:
         """Initialise with an optional model name or encoding name.
 
@@ -111,7 +108,20 @@ class TokenBudgeter:
             return ""
         if self.count(text) <= effective:
             return text
+        # Seed the binary search with a heuristic initial probe.
+        # budget * 4: English prose averages ~4 chars/token in cl100k_base,
+        # so this probe lands close to the answer for typical content.
+        # Degrades when chars/token < 4 (CJK ideographs ~1-2, dense code
+        # ~2-3): the probe underestimates, leaving a larger right-side range
+        # for bisection.  Acceptable here because plan documents are
+        # predominantly English prose, so the fast path dominates.
         lo, hi = 0, len(text)
+        est = min(len(text), max(0, effective * 4))
+        if est > 0:
+            if len(self._enc.encode(text[:est])) <= effective:
+                lo = est  # probe fits → answer is at least est
+            else:
+                hi = est - 1  # probe overshoots → answer is below est
         while lo < hi:
             mid = (lo + hi + 1) // 2
             if len(self._enc.encode(text[:mid])) <= effective:
@@ -219,7 +229,20 @@ def _char_bisect_chunks(text: str, budget: int, enc: tiktoken.Encoding) -> list[
         if len(enc.encode(remaining)) <= budget:
             chunks.append(remaining)
             break
+        # Seed the binary search with a heuristic initial probe.
+        # budget * 4: English prose averages ~4 chars/token in cl100k_base,
+        # so this probe lands close to the answer for typical content.
+        # Degrades when chars/token < 4 (CJK ideographs ~1-2, dense code
+        # ~2-3): the probe underestimates, leaving a larger right-side range
+        # for bisection.  Acceptable here because plan documents are
+        # predominantly English prose, so the fast path dominates.
+        # lo must stay >= 1 to guarantee forward progress each iteration.
         lo, hi = 1, len(remaining)
+        est = min(len(remaining), max(1, budget * 4))
+        if len(enc.encode(remaining[:est])) <= budget:
+            lo = est  # probe fits → answer is at least est
+        else:
+            hi = est - 1  # probe overshoots → answer is below est
         while lo < hi:
             mid = (lo + hi + 1) // 2
             if len(enc.encode(remaining[:mid])) <= budget:

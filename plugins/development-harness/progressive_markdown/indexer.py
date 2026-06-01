@@ -2,17 +2,22 @@
 
 Walks the markdown-it-py token stream linearly to extract heading structure,
 code blocks, and build all lookup indexes. Token positions use the map
-attribute which provides [start_line, end_line] in 0-based line numbers
-(end_line is exclusive — it points to the first line after the token).
+attribute which provides ``[start_line, end_line]`` in 0-based line numbers;
+``token.map[1]`` is **exclusive** (first line after the token). Every
+``SourceSpan`` constructed here uses **inclusive** ``end_line``, so all
+conversions apply ``token.map[1] - 1`` to produce the last line of the span.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .models import CodeBlock, MarkdownDocument, SectionNode, SourceSpan
-from .parser import ParserResult
+
+if TYPE_CHECKING:
+    from .parser import ParserResult
 
 __all__ = ["MarkdownIndexer"]
 
@@ -32,8 +37,8 @@ class _SectionBuilder:
     title: str
     level: int
     heading_start: int  # 0-based line of heading_open token
-    heading_end: int    # map[1] of heading_open (body start line)
-    section_end: int    # updated as later headings are encountered
+    heading_end: int  # map[1] of heading_open (body start line)
+    section_end: int  # updated as later headings are encountered
     parent_id: str | None = None
     child_ids: list[str] = field(default_factory=list)
     link_ref_ids: list[str] = field(default_factory=list)
@@ -259,10 +264,7 @@ class MarkdownIndexer:
                 level=b.level,
                 span=SourceSpan(start_line=b.heading_start, end_line=b.section_end),
                 heading_span=SourceSpan(start_line=b.heading_start, end_line=b.heading_end - 1),
-                body_span=SourceSpan(
-                    start_line=body_start,
-                    end_line=max(body_start, body_end),
-                ),
+                body_span=SourceSpan(start_line=body_start, end_line=max(body_start, body_end)),
                 parent_id=b.parent_id,
                 child_ids=list(b.child_ids),
                 code_block_ids=list(b.code_block_ids),

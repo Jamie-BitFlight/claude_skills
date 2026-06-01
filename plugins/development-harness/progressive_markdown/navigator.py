@@ -7,22 +7,10 @@ renderers) behind a single, dependency-injected public interface.
 from __future__ import annotations
 
 from .codeblocks import CodeBlockExtractor, CodeBlockStubRenderer
-from .exceptions import (
-    AmbiguousSectionRefError,
-    CodeBlockNotFoundError,
-    DocumentNotLoadedError,
-    SectionNotFoundError,
-)
+from .exceptions import CodeBlockNotFoundError, DocumentNotLoadedError, SectionNotFoundError
 from .indexer import MarkdownIndexer
 from .links import LinkExtractor
-from .models import (
-    MarkdownDocument,
-    NavigationKind,
-    NavigationResult,
-    NavigatorOptions,
-    Page,
-    SectionNode,
-)
+from .models import MarkdownDocument, NavigationKind, NavigationResult, NavigatorOptions, Page, SectionNode
 from .pagination import Paginator
 from .parser import MarkdownItParser, MarkdownParser
 from .providers import CallableMarkdownContentProvider, MarkdownContentProvider
@@ -100,8 +88,8 @@ class ProgressiveMarkdownNavigator:
         self._document: MarkdownDocument | None = None
 
         # Build parser and indexer.
-        _parser: MarkdownParser = MarkdownItParser(preset=self._options.parser_preset)
-        self._parser = _parser
+        parser: MarkdownParser = MarkdownItParser(preset=self._options.parser_preset)
+        self._parser = parser
         self._indexer = indexer or MarkdownIndexer()
         self._link_extractor = LinkExtractor()
         self._code_extractor = CodeBlockExtractor()
@@ -124,10 +112,7 @@ class ProgressiveMarkdownNavigator:
 
     @classmethod
     def from_markdown(
-        cls,
-        markdown: str,
-        source: str = "inline",
-        options: NavigatorOptions | None = None,
+        cls, markdown: str, source: str = "inline", options: NavigatorOptions | None = None
     ) -> ProgressiveMarkdownNavigator:
         """Construct a navigator and immediately load the given markdown.
 
@@ -224,10 +209,7 @@ class ProgressiveMarkdownNavigator:
         blocks = self._doc_map_renderer.render_blocks(document)
         pages = self._paginator.paginate_blocks(blocks, effective)
         return _build_result(
-            kind=NavigationKind.document_map,
-            title=f"Document Map: {document.source}",
-            pages=pages,
-            requested_page=page,
+            kind=NavigationKind.document_map, title=f"Document Map: {document.source}", pages=pages, requested_page=page
         )
 
     def links(self, page: int = 1, budget: int | None = None) -> NavigationResult:
@@ -248,19 +230,16 @@ class ProgressiveMarkdownNavigator:
         blocks = self._link_renderer.render_blocks(document)
         pages = self._paginator.paginate_blocks(blocks, effective)
         return _build_result(
-            kind=NavigationKind.links,
-            title=f"Links: {document.source}",
-            pages=pages,
-            requested_page=page,
+            kind=NavigationKind.links, title=f"Links: {document.source}", pages=pages, requested_page=page
         )
 
-    def view_section(
-        self,
-        ref: str,
-        page: int = 1,
-        budget: int | None = None,
-    ) -> NavigationResult:
+    def view_section(self, ref: str, page: int = 1, budget: int | None = None) -> NavigationResult:
         """View a section by reference.
+
+        Sections with subsections render as a navigation map; leaf sections
+        render as body content. The rendering mode is auto-selected based on
+        section structure — sections with children use map mode, leaf sections
+        use body mode. No override is available.
 
         When the section has children, returns a section_map showing the
         children TOC and the section's own intro prose (text before the
@@ -281,7 +260,6 @@ class ProgressiveMarkdownNavigator:
         Raises:
             DocumentNotLoadedError: When load() has not been called.
             SectionNotFoundError: When ref cannot be resolved.
-            AmbiguousSectionRefError: When ref matches multiple sections.
         """
         document = self.current_document()
         section = self.resolve_section(ref)
@@ -291,12 +269,7 @@ class ProgressiveMarkdownNavigator:
             return self._view_section_as_map(document, section, ref, page, effective)
         return self._view_section_as_body(document, section, ref, page, effective)
 
-    def view_code(
-        self,
-        code_id: str,
-        page: int = 1,
-        budget: int | None = None,
-    ) -> NavigationResult:
+    def view_code(self, code_id: str, page: int = 1, budget: int | None = None) -> NavigationResult:
         """View a code block by ID.
 
         Args:
@@ -325,11 +298,7 @@ class ProgressiveMarkdownNavigator:
             title=f"Code: {code_id} ({block.language or 'text'})",
             pages=pages,
             requested_page=page,
-            metadata={
-                "id": block.id,
-                "language": block.language,
-                "summary": block.summary,
-            },
+            metadata={"id": block.id, "language": block.language, "summary": block.summary},
         )
 
     def resolve_section(self, ref: str) -> SectionNode:
@@ -350,8 +319,6 @@ class ProgressiveMarkdownNavigator:
         Raises:
             DocumentNotLoadedError: When load() has not been called.
             SectionNotFoundError: When no section matches ref.
-            AmbiguousSectionRefError: When ref matches multiple sections
-                and disambiguation is not possible.
         """
         document = self.current_document()
 
@@ -380,12 +347,7 @@ class ProgressiveMarkdownNavigator:
         msg = f"Section not found: {ref!r}"
         raise SectionNotFoundError(msg)
 
-    def search_sections(
-        self,
-        query: str,
-        page: int = 1,
-        budget: int | None = None,
-    ) -> NavigationResult:
+    def search_sections(self, query: str, page: int = 1, budget: int | None = None) -> NavigationResult:
         """Search sections by keyword match on title and slug.
 
         Scoring: each space-delimited query token that appears as a substring
@@ -433,10 +395,7 @@ class ProgressiveMarkdownNavigator:
         scored.sort(key=lambda t: (-t[0], t[1]))
         matches = [s for _, _, s in scored]
 
-        lines = [
-            f"[{s.selector}] {s.title}  (slug={s.slug})\n"
-            for s in matches
-        ]
+        lines = [f"[{s.selector}] {s.title}  (slug={s.slug})\n" for s in matches]
         text = "".join(lines) if lines else "No results."
         pages = self._paginator.paginate_text(text, effective)
         return _build_result(
@@ -452,12 +411,7 @@ class ProgressiveMarkdownNavigator:
     # ------------------------------------------------------------------
 
     def _view_section_as_map(
-        self,
-        document: MarkdownDocument,
-        section: SectionNode,
-        ref: str,
-        page: int,
-        budget: int,
+        self, document: MarkdownDocument, section: SectionNode, ref: str, page: int, budget: int
     ) -> NavigationResult:
         """Build a section_map result for a parent section.
 
@@ -478,10 +432,7 @@ class ProgressiveMarkdownNavigator:
 
         # Intro prose: body text before the first child section.
         intro_body = self._section_body_renderer.render(document, section)
-        if intro_body.strip():
-            combined = intro_body + "\n" + "".join(map_blocks)
-        else:
-            combined = "".join(map_blocks)
+        combined = intro_body + "\n" + "".join(map_blocks) if intro_body.strip() else "".join(map_blocks)
 
         pages = self._paginator.paginate_text(combined, budget)
         return _build_result(
@@ -498,12 +449,7 @@ class ProgressiveMarkdownNavigator:
         )
 
     def _view_section_as_body(
-        self,
-        document: MarkdownDocument,
-        section: SectionNode,
-        ref: str,
-        page: int,
-        budget: int,
+        self, document: MarkdownDocument, section: SectionNode, ref: str, page: int, budget: int
     ) -> NavigationResult:
         """Build a section_body result for a leaf section.
 
@@ -524,11 +470,7 @@ class ProgressiveMarkdownNavigator:
             title=section.title,
             pages=pages,
             requested_page=page,
-            metadata={
-                "ref": ref,
-                "id": section.id,
-                "selector": section.selector,
-            },
+            metadata={"ref": ref, "id": section.id, "selector": section.selector},
         )
 
 
@@ -538,11 +480,7 @@ class ProgressiveMarkdownNavigator:
 
 
 def _build_result(
-    kind: NavigationKind,
-    title: str,
-    pages: list[Page],
-    requested_page: int,
-    metadata: dict[str, object] | None = None,
+    kind: NavigationKind, title: str, pages: list[Page], requested_page: int, metadata: dict[str, object] | None = None
 ) -> NavigationResult:
     """Construct a NavigationResult from pages and page selection.
 
@@ -561,11 +499,5 @@ def _build_result(
     total = len(pages)
     current = max(1, min(requested_page, total))
     return NavigationResult(
-        kind=kind,
-        title=title,
-        pages=pages,
-        current_page=current,
-        total_pages=total,
-        has_more=current < total,
-        metadata=metadata or {},
+        kind=kind, title=title, pages=pages, current_page=current, total_pages=total, metadata=metadata or {}
     )

@@ -8,15 +8,19 @@ Typical usage::
     from progressive_markdown import ProgressiveMarkdownNavigator, NavigatorOptions
 
     nav = ProgressiveMarkdownNavigator.from_markdown(content, source="README.md")
-    toc = nav.map()           # paginated document map
+    toc = nav.map()  # paginated document map
     section = nav.view_section("installation")  # view a specific section
-    code = nav.view_code("code_0001")           # view a code block
+    code = nav.view_code("code_0001")  # view a code block
 
 List navigator exports (structured data pagination and disclosure)::
 
     from progressive_markdown.list_navigator import (
-        ENCODING, TOKEN_BUDGET, DisclosureConfig, ProgressiveDisclosure,
-        chunk_text, paginate_results,
+        ENCODING,
+        TOKEN_BUDGET,
+        DisclosureConfig,
+        ProgressiveDisclosure,
+        chunk_text,
+        paginate_results,
     )
 """
 
@@ -32,6 +36,7 @@ from .exceptions import (
     ProviderError,
     SectionNotFoundError,
 )
+from .list_navigator import chunk_text, paginate_results
 from .models import (
     CodeBlock,
     LinkKind,
@@ -55,9 +60,9 @@ __all__ = [
     "DocumentNotLoadedError",
     "LinkKind",
     "LinkRef",
+    "MCPMarkdownContentProvider",
     "MarkdownContentProvider",
     "MarkdownDocument",
-    "MCPMarkdownContentProvider",
     "NavigationKind",
     "NavigationResult",
     "NavigatorOptions",
@@ -70,4 +75,6 @@ __all__ = [
     "SectionNode",
     "SectionNotFoundError",
     "SourceSpan",
+    "chunk_text",
+    "paginate_results",
 ]

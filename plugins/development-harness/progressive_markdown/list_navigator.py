@@ -11,7 +11,10 @@ Also exports ``paginate_results`` — a drop-in replacement for the private
 Module-level constants
 ----------------------
 TOKEN_BUDGET : int
-    Token ceiling for the auto-fit binary search (4 400 cl100k_base tokens).
+    Token ceiling for the auto-fit binary search.  Equals
+    ``int(MAX_MCP_OUTPUT_TOKENS) - 500`` when that env var is set, or 9 500
+    when it is absent.  Computed once at import time from
+    ``progressive_markdown.models._DEFAULT_BUDGET``.
 ENCODING : tiktoken.Encoding
     The tiktoken cl100k_base encoding instance used for all token counting.
 """
@@ -25,13 +28,15 @@ from typing import Any
 
 import tiktoken
 
+from .models import _DEFAULT_BUDGET
+
 __all__ = ["ENCODING", "TOKEN_BUDGET", "DisclosureConfig", "ProgressiveDisclosure", "chunk_text", "paginate_results"]
 
 # ---------------------------------------------------------------------------
 # Module-level constants (previously private to sam_schema.server)
 # ---------------------------------------------------------------------------
 
-TOKEN_BUDGET: int = 4_400
+TOKEN_BUDGET: int = _DEFAULT_BUDGET
 ENCODING: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
 
 
@@ -451,7 +456,7 @@ def chunk_text(text: str, budget: int | None = None) -> list[str]:
     Args:
         text: The text to split.  May contain any Unicode content.
         budget: Token ceiling per chunk.  Defaults to ``TOKEN_BUDGET``
-            (4 400 cl100k_base tokens) when ``None``.
+            when ``None``.
 
     Returns:
         A list of one or more strings whose concatenation equals *text*.

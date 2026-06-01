@@ -5,9 +5,19 @@ All models are plain data carriers with no parsing or rendering logic.
 
 from __future__ import annotations
 
-from enum import Enum
+import os
+from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+
+# Derived from MAX_MCP_OUTPUT_TOKENS at import time, leaving 500 tokens of overhead for
+# envelope fields.  When the env var is absent, 9_500 tokens is the fallback ceiling.
+_DEFAULT_BUDGET: int = (
+    int(os.environ["MAX_MCP_OUTPUT_TOKENS"]) - 500 if "MAX_MCP_OUTPUT_TOKENS" in os.environ else 9_500
+)
+
+# Markdown heading levels are defined by the CommonMark spec as 1-6.
+_MAX_HEADING_LEVEL: int = 6
 
 __all__ = [
     "CodeBlock",
@@ -17,8 +27,8 @@ __all__ = [
     "NavigationKind",
     "NavigationResult",
     "NavigatorOptions",
-    "Page",
     "PMBaseModel",
+    "Page",
     "SectionNode",
     "SourceSpan",
 ]
@@ -36,7 +46,7 @@ class PMBaseModel(BaseModel):
     )
 
 
-class LinkKind(str, Enum):
+class LinkKind(StrEnum):
     """Distinguishes the different kinds of markdown links."""
 
     link = "link"
@@ -45,7 +55,7 @@ class LinkKind(str, Enum):
     reference_definition = "reference_definition"
 
 
-class NavigationKind(str, Enum):
+class NavigationKind(StrEnum):
     """Identifies the kind of NavigationResult returned by the navigator."""
 
     document_map = "document_map"
@@ -200,8 +210,8 @@ class SectionNode(PMBaseModel):
         Raises:
             ValueError: When level is outside 1-6.
         """
-        if not (1 <= v <= 6):
-            msg = f"level must be between 1 and 6, got {v}"
+        if not (1 <= v <= _MAX_HEADING_LEVEL):
+            msg = f"level must be between 1 and {_MAX_HEADING_LEVEL}, got {v}"
             raise ValueError(msg)
         return v
 
@@ -318,8 +328,10 @@ class NavigationResult(PMBaseModel):
         pages: Ordered list of content pages.
         current_page: 1-based index of the current page.
         total_pages: Total number of pages.
-        has_more: True when more pages are available after current_page.
         metadata: Arbitrary JSON-serializable metadata for the result.
+
+    Computed:
+        has_more: True when current_page < total_pages.
     """
 
     kind: NavigationKind
@@ -327,8 +339,55 @@ class NavigationResult(PMBaseModel):
     pages: list[Page]
     current_page: int
     total_pages: int
-    has_more: bool
     metadata: dict[str, object] = Field(default_factory=dict)
+
+    @field_validator("current_page")
+    @classmethod
+    def _validate_current_page(cls, v: int) -> int:
+        """Validate current_page >= 1.
+
+        Args:
+            v: Value to validate.
+
+        Returns:
+            The validated value.
+
+        Raises:
+            ValueError: When current_page < 1.
+        """
+        if v < 1:
+            msg = "current_page must be >= 1"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("total_pages")
+    @classmethod
+    def _validate_total_pages(cls, v: int) -> int:
+        """Validate total_pages >= 1.
+
+        Args:
+            v: Value to validate.
+
+        Returns:
+            The validated value.
+
+        Raises:
+            ValueError: When total_pages < 1.
+        """
+        if v < 1:
+            msg = "total_pages must be >= 1"
+            raise ValueError(msg)
+        return v
+
+    @computed_field
+    @property
+    def has_more(self) -> bool:
+        """Return True when more pages follow the current page.
+
+        Returns:
+            True when current_page < total_pages, False otherwise.
+        """
+        return self.current_page < self.total_pages
 
     def current_content(self) -> str:
         """Return the content of the current page.
@@ -338,7 +397,7 @@ class NavigationResult(PMBaseModel):
         """
         if not self.pages:
             return ""
-        idx = max(0, min(self.current_page - 1, len(self.pages) - 1))
+        idx = min(self.current_page - 1, len(self.pages) - 1)
         return self.pages[idx].content
 
 
@@ -354,7 +413,7 @@ class NavigatorOptions(PMBaseModel):
         include_links_in_maps: Whether to include link counts in document maps.
     """
 
-    default_budget: int = 11000
+    default_budget: int = _DEFAULT_BUDGET
     parser_preset: str = "commonmark"
     tiktoken_model: str | None = None
     tiktoken_encoding: str = "cl100k_base"
