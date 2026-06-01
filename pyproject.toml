@@ -103,6 +103,7 @@ invalid-argument-type = "warn"
 invalid-assignment = "warn"
 possibly-unresolved-reference = "warn"
 too-many-positional-arguments = "warn" # runtime-injected modules (e.g. backlog via sys.path in conftest)
+unresolved-import = "warn"             # TDD red-state: test files import classes not yet implemented
 
 [[tool.ty.overrides]]
 # pytest.skip is decorated with @_with_exception which ty 0.0.17 miscounts as a bound
