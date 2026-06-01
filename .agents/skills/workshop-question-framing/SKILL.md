@@ -41,7 +41,7 @@ The user may provide any of the following:
 - Existing opening activity
 - Slides, outline, or agenda
 
-If topic or explanation is missing, ask for it. If audience is missing, make a reasonable assumption and label it as an assumption.
+The topic (or title) is the one required input. If it is missing, ask for it. If the explanation, teaching notes, audience, duration, or other inputs are missing, do not stall: infer a reasonable teaching core from the topic and label each inferred element as an assumption. Ask a follow-up only when the topic itself is too vague to identify a core concept.
 
 ## Method
 

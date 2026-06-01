@@ -1,49 +1,49 @@
-# Curiosity by Design — Source Examples
+# Curiosity by Design — Worked Patterns
 
-Grounding examples for the eight curiosity moves, drawn from *Curiosity by Design: Eight Moves to Start Thinking Before You Teach* by Vicky Brooks (Give Spark, 2026), part of the SEEDS Framework.
+Grounding patterns for the eight curiosity moves. The framework and method — the six-beat sequence and the eight curiosity "moves" — originate with Vicky Brooks' *Curiosity by Design* and the SEEDS Framework.
 
-Load this file when the user wants concrete stimulus-and-question phrasings, a fully worked end-to-end frame, or facilitator language for protecting wrong answers.
+SOURCE: Vicky Brooks, *Curiosity by Design* / SEEDS Framework, Give Spark — [give-spark.com](https://give-spark.com). The phrasings, stimulus ideas, and facilitator language below are original wording written for this skill, not reproductions of the source text.
 
-SOURCE: Vicky Brooks, *Curiosity by Design: Eight Moves to Start Thinking Before You Teach* (Introduction), Give Spark, 2026, [give-spark.com](https://give-spark.com) — [source PDF](https://www.dropbox.com/scl/fi/1dmyi8e3n2bbj5zpsppe1/Curiosity-by-Design-Introduction.pdf?rlkey=pe1nuxdxpb1q2qnj61xa389ft) (accessed 2026-06-01). Examples below are quoted or condensed from pages 3, 8-9, 14, 17-20.
+Load this file when the user wants a concrete stimulus-and-question pattern for each move, a fully worked end-to-end frame, or facilitator language for protecting wrong answers.
 
 ## The method in one example
 
-The same fact, delivered two ways:
+Take any striking fact and notice how it lands two ways.
 
-- Flat: "The human stomach replaces its lining every three to four days." — information lands flat; the brain has nowhere to put it.
-- Curiosity-first: "The acid in your stomach is strong enough to dissolve metal. So why doesn't it dissolve you?" — now the brain has a question and needs the answer. Then teach: the stomach replaces its lining every three to four days, faster than the acid can damage it.
+- Stated flat, as information: a fact is delivered, the brain files it, nothing happens. There is no question to attach it to.
+- Reframed as a gap: pose the puzzle first — set up a tension the fact resolves — and only then deliver the fact. Now the explanation answers something the listener was already chewing on.
 
-Same explanation. Different cognitive state. The fix is sequencing: create the gap first, then explain into a brain already working.
+Same fact, same explanation, different cognitive state. The lever is sequencing: open the gap first, then teach into a brain that is already working.
 
 ## The six beats (what each does)
 
 | Beat | Job | Facilitator stance |
 |------|-----|--------------------|
-| Spark | Open the gap | Provoke with a question, artifact, image, or moment that gives thinking somewhere to go |
+| Spark | Open the gap | Provoke with a question, object, image, or moment that gives thinking somewhere to go |
 | Think | Give time to think | Wait longer than feels comfortable; do not fill the silence |
-| Commit | Put something on the line | Have learners commit a prediction, theory, position, or possibility (public or private) |
+| Commit | Put something on the line | Have learners commit a prediction, theory, position, or possibility (out loud or on paper) |
 | Hold | Resist resolving too soon | Do not explain, confirm, or correct yet; let the uncertainty sit |
 | Teach | Teach into a thinking room | Deliver the explanation now — it resolves something learners already feel |
-| Return | Bring learners back to their first thinking | "What did you predict? What changed? What do you understand now?" Close the loop in the learner's voice |
+| Return | Bring learners back to their first thinking | Ask what they predicted, what changed, what they understand now; close the loop in the learner's voice |
 
-## Stimulus + question library for the eight moves
+## Stimulus + question pattern for the eight moves
 
-Each move pairs a concrete stimulus (something to see, touch, hear, or do) with a question that asks the brain to commit. The stimulus opens the felt experience; the question asks for commitment.
+Each move pairs a concrete stimulus (something to see, touch, hear, or do) with a question that asks the brain to commit. The stimulus opens the felt experience; the question asks for commitment. The examples below are illustrative patterns — swap in any subject.
 
-| Move | Stimulus | Question |
-|------|----------|----------|
-| Prediction | Place a paperclip, a coin, an eraser, and a safety pin on each table. Let learners handle them. | "Which of these will the magnet pick up? Write your prediction." |
-| Mystery | Show a sealed cardboard box. Let learners shake it, weigh it, smell it. Do not open it. | "What do you think is inside? What is your reasoning?" |
-| Contradiction | Drop a heavy log into water — it floats. Drop a small coin — it sinks. | "Most people think heavy things sink. Why might that be wrong?" |
-| Close Observation | Project a black-and-white photograph of an empty room. Stay silent for thirty seconds. | "Who do you think lived here? What in the photo makes you say that?" |
-| Dilemma & Decision | Read a one-paragraph scenario: a child finds a wallet on the way to school. They are already late. | "What would you do? Pick one. Defend it." |
-| Puzzle | Write a number sequence on the board: 2, 4, 8, 16. | "What comes next? What rule are you following?" |
-| Real-Life Connection | Play a recording of a heartbeat for ten seconds. | "Your heart is doing this right now. How is it doing it without you thinking about it?" |
-| Cause and Effect | Have learners run on the spot for sixty seconds, then sit down. | "List everything that has changed in your body. Why?" |
+| Move | Stimulus pattern | Question pattern |
+|------|------------------|------------------|
+| Prediction | Lay out a small set of objects, some that fit the rule and some that don't; let learners handle them. | "Which of these will behave the way we're about to test? Write your prediction first." |
+| Mystery | Present something partly hidden — a closed container, a cropped image, a result with the cause removed. | "What do you think is going on here, and what's your reasoning?" |
+| Contradiction | Stage two outcomes that violate the obvious rule (a heavy thing that floats next to a light thing that sinks). | "Most people expect the opposite. Why might the obvious rule be wrong?" |
+| Close Observation | Show one rich image or artifact and hold silence for thirty seconds before any talk. | "What do you actually notice, and what does it make you think happened?" |
+| Dilemma & Decision | Read a short scenario with two defensible but costly options. | "You have to pick one. Which, and why?" |
+| Puzzle | Show a short pattern or sequence with the rule left implicit. | "What comes next, and what rule are you following?" |
+| Real-Life Connection | Surface something the concept is already doing in the learner's own body or day. | "This is happening to you right now — how is it working?" |
+| Cause and Effect | Produce a visible change, then strip away the explanation of it. | "List what changed. What must have caused it?" |
 
 ## Move selection: choose the thinking first
 
-Do not choose the move first. Decide what thinking learners need, then pick the doorway.
+Decide what thinking learners need, then pick the doorway — not the other way around.
 
 | If learners need to… | Use this move | It creates |
 |----------------------|---------------|------------|
@@ -56,45 +56,45 @@ Do not choose the move first. Decide what thinking learners need, then pick the 
 | Notice something already happening in their own life | Real-Life Connection | Relevance |
 | Reason backward from an outcome | Cause and Effect | Causality |
 
-If unsure, start with Real-Life Connection. It works across subjects and ages and begins inside something already true.
+If unsure, start with Real-Life Connection. It works across subjects and ages and begins inside something already true for the learner.
 
 ## Same lesson, opened differently
 
-Three subject examples showing the shift — same content, opened to start thinking first.
+Three patterns showing the shift — same content, opened to start thinking first instead of explaining first.
 
-- Science / Magnets (Prediction). Instead of "Today we're going to learn about magnets and which materials they attract," try: place a pile of objects on each table (paperclip, coin, eraser, pencil, safety pin) and ask "Which of these will the magnet pick up? Circle your predictions." Every child commits. Test it together. The explanation arrives into a room full of children checking their own answers.
-- Math / Fractions (Contradiction). Instead of "A fraction is equal parts of a whole," try: hold up a picture of a round cake and ask "I want to share this fairly between 4 people, making one straight cut at a time. How many cuts will I need?" Most say 4. The answer is 2. Teach fractions into a room already arguing about cuts versus pieces.
-- English / Descriptive Writing (Close Observation). Instead of "Good descriptive writing uses adjectives and adverbs," try: show a photograph of an abandoned house with no title or context and ask "Look at this for 30 seconds. What do you think is happening here? What makes you say that?" Students are already writing, and they already have something to say.
+- Science / magnetism (Prediction). Rather than announcing the topic and listing which materials are magnetic, put a mix of objects on each table and ask learners to predict which the magnet will lift before anyone tests. The explanation then arrives into a room of people checking their own predictions.
+- Math / fractions (Contradiction). Rather than defining a fraction up front, pose a sharing problem whose obvious answer is wrong — how many straight cuts it takes to split a round cake among four — and let the surprise drive the need for the idea of equal parts.
+- English / descriptive writing (Close Observation). Rather than listing the features of good description, show an evocative, context-free photograph and ask what is happening and what makes them say so. Learners are already generating description before any rule is named.
 
 ## Full worked example — Prediction, end to end
 
-Topic: which materials a magnet attracts (primary science). Carried through all six beats and the output frame.
+Topic: which materials a magnet attracts (primary science). Carried through all six beats.
 
 - Core concept: magnets attract some metals (iron, steel) but not all materials, and not all metals.
-- Learners may currently think: a magnet picks up anything metal, or anything shiny/heavy.
+- Learners may currently think: a magnet picks up anything metal, or anything shiny or heavy.
 - The workshop needs them to understand: magnetism is a property of specific materials, not "metalness" in general.
-- The explanation should land after they have wondered: why the coin (metal) was not picked up but the paperclip and safety pin were.
+- The explanation should land after they have wondered: why a coin (a metal) is not picked up while a paperclip and safety pin are.
 
-Opening spark: "Which of these will the magnet pick up — the paperclip, the coin, the eraser, the pencil, or the safety pin?"
+Spark: ask which of a handful of objects the magnet will lift.
 
-Commitment: "Circle your prediction for each object before we test anything."
+Commit: have each learner record a prediction for every object before any testing.
 
-Hold: "Who circled the coin? Who didn't? What made you decide?" (Do not reveal yet.)
+Hold: surface the split in the room — who predicted the coin would stick, who didn't, and what rule each was using — without revealing the result.
 
-Teach (bridge in): "We're about to test it. What would the result have to be for your rule to be right?" — then test, then explain magnetic materials.
+Teach: test the objects, then explain magnetic materials into the gap the failed coin prediction opened.
 
-Return: "You predicted the coin would stick. It didn't. What was your rule before? What is your rule now? Where else would your old rule have failed?"
+Return: point back to the original prediction — what rule did they hold before, what is their rule now, and where else would the old rule have failed?
 
 ## Facilitator language — protecting the moment of being wrong
 
-The moment after a wrong answer is the most important moment for safety. What you say next decides whether learners conclude that being wrong is survivable.
+The moment after a wrong answer is the most important moment for safety. What you say next decides whether learners conclude that being wrong is survivable. Original phrasings you can adapt:
 
 | Moment | What to say |
 |--------|-------------|
-| A learner answers incorrectly | "That makes complete sense with what we knew before. Let's see what changes it." |
-| Before revealing the answer | "There's no wrong answer at this point. We're all guessing. That's the point." |
-| When many learners are wrong | "Most of us had that, and that's exactly why this lesson matters." |
-| After an incorrect prediction | "Good, that's what I was hoping for. Now we actually need the explanation." |
+| A learner answers incorrectly | "That fits what we knew a minute ago. Let's find out what changes it." |
+| Before revealing the answer | "Nobody can be wrong yet — we're all predicting. That's the whole point." |
+| When many learners are wrong | "Almost everyone landed there, which is exactly why this is worth a lesson." |
+| After an incorrect prediction | "Perfect — now the explanation actually has a job to do." |
 
 ## The decoration test
 
