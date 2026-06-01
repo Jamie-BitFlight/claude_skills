@@ -2,7 +2,7 @@
 name: workshop-question-framing
 description: "Use this skill when reviewing, designing, or improving a workshop, lesson, training session, facilitation plan, talk, or educational explanation. Use it when the user provides a topic, concept, or explanation and wants better framing questions, curiosity hooks, opening prompts, discussion questions, learner reflection prompts, or ways to make participants think before being taught."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 # Workshop Question Framing Skill
 
@@ -82,6 +82,8 @@ Use this mapping:
 | Reason backward from an outcome                   | Cause and Effect      | Causality  |
 
 Default to Real-Life Connection if the best move is unclear.
+
+For a concrete stimulus-and-question phrasing for each of the eight moves, a fully worked end-to-end frame, and facilitator language for protecting wrong answers, load [curiosity-by-design.md](./references/curiosity-by-design.md).
 
 ### Step 3: Generate Question Sets
 
@@ -201,6 +203,8 @@ Do not:
 - Add an opening question that can be removed without changing the workshop
 - Create questions unrelated to the core concept
 
+For ready-to-use facilitator phrasing that protects participants the moment they answer wrong, load [curiosity-by-design.md](./references/curiosity-by-design.md).
+
 ## Output Format
 
 Use this structure every time:
@@ -219,34 +223,27 @@ Move:
 Why this move:
 Gap it opens:
 
-## Opening Spark Questions
-1.
-2.
-3.
-4.
-5.
-
-## Commitment Questions
+## Opening Spark Questions (3 to 5)
 1.
 2.
 3.
 
-## Hold Questions
+## Commitment Questions (2 to 4)
 1.
 2.
-3.
 
-## Teaching Bridge Questions
+## Hold Questions (2 to 4)
 1.
 2.
-3.
 
-## Return Questions
+## Teaching Bridge Questions (2 to 4)
+1.
+2.
+
+## Return Questions (3 to 5)
 1.
 2.
 3.
-4.
-5.
 
 ## Alternative Frames
 
@@ -273,6 +270,45 @@ How to return:
 - How to protect wrong answers:
 - When to reveal the explanation:
 ```
+
+## Worked Example
+
+A filled frame for a primary-science topic, "which materials a magnet attracts," using the Prediction move. It shows what a completed Output Format looks like end to end.
+
+```text
+# Workshop Question Frame
+
+## Extracted Teaching Core
+Core concept: magnets attract some metals (iron, steel) but not all materials, and not all metals.
+Participants may currently think: a magnet picks up anything metal, or anything shiny or heavy.
+The workshop needs them to understand: magnetism is a property of specific materials, not "metalness" in general.
+The explanation should land after they have wondered: why the coin (a metal) was not picked up but the paperclip and safety pin were.
+
+## Recommended Curiosity Move
+Move: Prediction
+Why this move: a concrete, testable claim each participant can commit to before any teaching.
+Gap it opens: the gap between their predicted answer and what the magnet actually does.
+
+## Opening Spark Questions (3 to 5)
+1. Which of these will the magnet pick up: paperclip, coin, eraser, pencil, safety pin?
+2. What is the same about every object you think will stick?
+3. Is there a metal here you think will NOT stick?
+
+## Commitment Questions (2 to 4)
+1. Circle your prediction for each object before we test anything.
+2. What rule are you using to decide?
+
+## Hold Questions (2 to 4)
+1. Who circled the coin? Who didn't? What made you decide?
+2. What result would prove your rule wrong?
+
+## Return Questions (3 to 5)
+1. You predicted the coin would stick. It didn't. What was your rule before?
+2. What is your rule now?
+3. Where else would your old rule have failed?
+```
+
+For three more subject worked examples (magnets, fractions, descriptive writing) and the stimulus-and-question library for every move, load [curiosity-by-design.md](./references/curiosity-by-design.md).
 
 ## Quality Check
 
