@@ -9,7 +9,14 @@ Fixture design follows AAA pattern with full type annotations and pytest-mock
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+# Set TOKEN_BUDGET calibration env var before any test module is imported.
+# test_paginate_results_boundary._assert_calibration() runs at collection time and
+# expects TOKEN_BUDGET = int(MAX_MCP_OUTPUT_TOKENS) - 500 = 4400.
+# os.environ.setdefault preserves any CI override (e.g. MAX_MCP_OUTPUT_TOKENS=10000).
+os.environ.setdefault("MAX_MCP_OUTPUT_TOKENS", "4900")
 from typing import TYPE_CHECKING
 
 import pytest
