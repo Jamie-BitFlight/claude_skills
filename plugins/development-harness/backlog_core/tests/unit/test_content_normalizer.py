@@ -422,13 +422,19 @@ class TestNormalizerIssue2515Fixture:
         data_2515: dict[str, object],
         normalized_2515: list[NormalizedSection],
     ) -> None:
-        """normalize() returns exactly as many sections as the fixture sections dict."""
+        """normalize() returns at least as many sections as unique names in the fixture dict.
+
+        The body ## Sections block may list duplicate section names (e.g. two
+        "Acceptance Criteria" lines).  The normalizer emits one NormalizedSection
+        per [N] line, so len(result) >= len(sections-dict).  The exact order and
+        count are pinned by test_order_matches_body_sections_block.
+        """
         sections = _fixture_sections(data_2515)
         expected = len(sections)
         assert expected > 0, "Precondition: #2515 must have sections."
 
-        assert len(normalized_2515) == expected, (
-            f"All {expected} sections from #2515 must appear; got {len(normalized_2515)}."
+        assert len(normalized_2515) >= expected, (
+            f"At least {expected} sections from #2515 must appear; got {len(normalized_2515)}."
         )
 
     def test_all_elements_are_normalized_sections(
