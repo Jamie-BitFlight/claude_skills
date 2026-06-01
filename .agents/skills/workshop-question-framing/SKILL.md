@@ -41,7 +41,7 @@ The user may provide any of the following:
 - Existing opening activity
 - Slides, outline, or agenda
 
-The topic (or title) is the one required input. If it is missing, ask for it. If the explanation, teaching notes, audience, duration, or other inputs are missing, do not stall: infer a reasonable teaching core from the topic and label each inferred element as an assumption. Ask a follow-up only when the topic itself is too vague to identify a core concept.
+The one thing required is enough material to identify a core concept. That can come from any input above: a topic, title, learning objective, explanation or teaching notes, slides, outline, or an existing opening activity. Extract the teaching core from whatever the user supplies — a review or improvement request that provides only teaching notes or an objective is enough to proceed. Ask a follow-up only when nothing provided is sufficient to identify a core concept. For any other missing input (audience, duration, desired outcome), do not stall: infer a reasonable value and label it as an assumption.
 
 ## Method
 
