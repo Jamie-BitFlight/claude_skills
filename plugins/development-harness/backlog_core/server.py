@@ -33,6 +33,8 @@ from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import IssueNode as _IssueNode, get_config as _get_config
+from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
+from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
 from .models import (
     ArtifactContent,
@@ -1973,6 +1975,36 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
     return compact
 
 
+def _execute_disclosure_or_passthrough(
+    selector: str,
+    req: DisclosureRequest,
+) -> dict[str, object] | None:
+    """Execute a non-PASSTHROUGH progressive disclosure request synchronously.
+
+    Intended for ``asyncio.to_thread``.  The caller guards on
+    ``req.mode != PASSTHROUGH`` before calling — this function does NOT handle
+    PASSTHROUGH (returns None for it as a safety net only).
+
+    ``OrdinalNotFoundError`` is caught and converted to an error dict so the
+    ``to_thread`` caller receives a clean return value with no exception.
+
+    Returns:
+        Serialised response dict for MAP/NAVIGATE/EXTRACT, None for PASSTHROUGH
+        (safety net only), or an error dict when OrdinalNotFoundError is raised.
+    """
+    if req.mode == DisclosureMode.PASSTHROUGH:
+        return None  # safety net — caller should never reach this branch
+    try:
+        response = BacklogViewDisclosureHandler().handle(selector, req)
+        return dataclasses.asdict(response)
+    except OrdinalNotFoundError as exc:
+        return {
+            "error": str(exc),
+            "requested_ordinal": exc.requested,
+            "valid_ordinals": exc.valid_ordinals,
+        }
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="View Backlog Item", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
@@ -2028,6 +2060,54 @@ async def backlog_view(
             )
         ),
     ] = None,
+    map: Annotated[  # noqa: A002 — shadows builtin; matches MCP parameter name exactly
+        bool,
+        Field(
+            description=(
+                "When True, returns a flat ordinal dot-path map of the item's structure. "
+                "Each line shows an ordinal (e.g. '4.0'), section title, estimated token count, "
+                "and a content preview. Response is always under 2,000 tokens regardless of item size. "
+                "Mutually exclusive with navigate. Use this first to discover valid ordinals."
+            )
+        ),
+    ] = False,
+    navigate: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Dot-path ordinal targeting a section or entry (e.g. '4.0', '3.0.1'). "
+                "Format: digits and dots only, matching ^(\\d+\\.)*\\d+$. "
+                "Without head, returns the full content at the ordinal (NAVIGATE mode). "
+                "Combined with head, activates EXTRACT mode for token-bounded pagination. "
+                "Use map=True first to discover valid ordinals."
+            )
+        ),
+    ] = None,
+    head: Annotated[
+        int | None,
+        Field(
+            ge=1,
+            le=25000,
+            description=(
+                "Maximum tokens to return from the targeted ordinal (1-25,000). "
+                "Requires navigate. Returns a token-bounded window with truncated=True and "
+                "a next_call hint when more content remains. "
+                "Note: head activates EXTRACT mode; offset is an entry-block index (different concern)."
+            ),
+        ),
+    ] = None,
+    skip_tokens: Annotated[
+        int,
+        Field(
+            ge=0,
+            description=(
+                "Token offset for pagination continuation (requires head and navigate). "
+                "skip_tokens is a within-content token offset (absolute, cl100k_base). "
+                "Distinct from offset, which is an entry-block index. "
+                "Set from the next_call hint to page through large content windows."
+            ),
+        ),
+    ] = 0,
 ) -> dict:
     """View a single backlog item or GitHub issue in detail.
 
@@ -2042,8 +2122,24 @@ async def backlog_view(
     Use section to filter the response to specific sections by index, title, or regex.
     Use sections=[...] to return only the named sections plus identity fields
     (number, title, status, type, priority).
+    Use map=True to see the item's ordinal structure (always under 2,000 tokens).
+    Use navigate=<ordinal> to fetch the full content at a specific ordinal.
+    Use navigate=<ordinal> + head=N to extract a token-bounded window (EXTRACT mode);
+    iterate using the next_call hint until truncated=False.
 
-    Progressive disclosure pattern:
+    Pagination parameter distinction (architect spec §5.7):
+        offset — entry-block index: skip N entry blocks from the start of the body.
+        skip_tokens — within-content token offset for EXTRACT mode pagination only.
+        These are distinct concerns; do not substitute one for the other.
+
+    Progressive disclosure pattern (new, three-layer):
+        Step 1 — call with map=True to see ordinal structure.
+        Step 2 — call with navigate=<ordinal> to fetch a section or entry.
+        Step 3 — if truncated, page through large content using the next_call hint:
+            backlog_view(selector="...", navigate="4.0", head=4000)
+            backlog_view(selector="...", navigate="4.0", head=4000, skip_tokens=4000)
+
+    Progressive disclosure pattern (legacy, still supported):
         Step 1 — call with summary=True (default) to get sections_index and metadata.
         Step 2 — load only the sections needed:
             backlog_view(selector="...", summary=False, section="Fact-Check")
@@ -2051,13 +2147,39 @@ async def backlog_view(
             backlog_view(selector="...", summary=False, section="/acceptance|plan/")
 
     Returns:
-        When summary=True (default): compact dict with issue_number, title, labels,
-        status, plan_path, sections_index (all sections as [N] Title (count) lines),
-        _summary, _full_chars, and _hint with section-loading syntax.
+        When map=True: dict with map_text (ordinal structure, <2,000 tokens), selector,
+        total_sections, total_est_tokens, and over_budget flag.
+        When navigate=<ordinal> (no head): dict with ordinal, title, content,
+        total_tokens, truncated=False.
+        When navigate=<ordinal> + head=N: dict with ordinal, title, content, total_tokens,
+        returned_tokens, truncated, and next_call hint when truncated=True.
+        When summary=True (default, no disclosure params): compact dict with issue_number,
+        title, labels, status, plan_path, sections_index, _summary, _full_chars, and _hint.
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings.
         On error, dict contains an error key.
     """
+    # ---- Progressive disclosure routing (architect spec §4.6) -----------------
+    # Single early-return gate: MAP/NAVIGATE/EXTRACT → return dict; PASSTHROUGH → fall through.
+    disclosure_result: dict[str, object] | None = None
+    try:
+        disclosure_req = DisclosureRequestParser().parse(
+            map=map,
+            navigate=navigate,
+            head=head,
+            skip_tokens=skip_tokens,
+        )
+        if disclosure_req.mode != DisclosureMode.PASSTHROUGH:
+            disclosure_result = await asyncio.to_thread(
+                _execute_disclosure_or_passthrough, selector, disclosure_req
+            )
+    except DisclosureParamError as exc:
+        disclosure_result = {"error": str(exc), "invalid_params": exc.invalid_params}
+
+    if disclosure_result is not None:
+        return disclosure_result
+    # ---- PASSTHROUGH: falls through to legacy code below -----------------------
+
     out = Output()
     try:
         # MCP tool parameters are always strings; convert numeric show values to int.
