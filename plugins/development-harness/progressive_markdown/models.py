@@ -23,6 +23,7 @@ __all__ = [
     "CodeBlock",
     "LinkKind",
     "LinkRef",
+    "LinkTokenOrigin",
     "MarkdownDocument",
     "NavigationKind",
     "NavigationResult",
@@ -52,6 +53,20 @@ class LinkKind(StrEnum):
     link = "link"
     image = "image"
     autolink = "autolink"
+    reference_definition = "reference_definition"
+
+
+class LinkTokenOrigin(StrEnum):
+    """Identifies the extraction origin for a LinkRef.
+
+    Values correspond to markdown-it-py token types for inline links and
+    images, and to the synthetic label ``reference_definition`` for links
+    sourced from the environment's reference dictionary rather than the
+    token stream.
+    """
+
+    link_open = "link_open"
+    image = "image"
     reference_definition = "reference_definition"
 
 
@@ -131,7 +146,7 @@ class LinkRef(PMBaseModel):
         title: Optional link title attribute.
         kind: Classification of the link type.
         span: Source span within the document, when available.
-        source_token_type: Raw markdown-it token type for the link.
+        source_token_type: Extraction origin (see :class:`LinkTokenOrigin`).
     """
 
     id: str
@@ -140,7 +155,7 @@ class LinkRef(PMBaseModel):
     title: str | None = None
     kind: LinkKind
     span: SourceSpan | None = None
-    source_token_type: str | None = None
+    source_token_type: LinkTokenOrigin | None = None
 
 
 class CodeBlock(PMBaseModel):

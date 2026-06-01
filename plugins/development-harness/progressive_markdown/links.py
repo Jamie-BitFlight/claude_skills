@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from .models import LinkKind, LinkRef, MarkdownDocument, SourceSpan
+from .models import LinkKind, LinkRef, LinkTokenOrigin, MarkdownDocument, SourceSpan
 
 if TYPE_CHECKING:
     from .parser import ParserResult
@@ -23,12 +23,12 @@ def _build_link_ref(
     title: str | None,
     kind: LinkKind,
     span: SourceSpan | None,
-    origin: str,
+    source_token_type: LinkTokenOrigin,
 ) -> LinkRef:
     """Construct a LinkRef from its constituent fields.
 
-    Centralises LinkRef construction so callers pass the token origin as a
-    plain variable, avoiding S106 false-positive hardcoded-password warnings.
+    Centralises LinkRef construction to keep :meth:`LinkExtractor.extract`
+    within the local-variable limit (PLR0914).
 
     Args:
         link_id: Stable unique identifier assigned by the extractor.
@@ -37,7 +37,7 @@ def _build_link_ref(
         title: Optional link title attribute.
         kind: Classification of the link type.
         span: Source span within the document, when available.
-        origin: Raw markdown-it token type (e.g. ``link_open``, ``image``).
+        source_token_type: Extraction origin identifying the parser token type.
 
     Returns:
         A fully constructed LinkRef.
@@ -49,7 +49,7 @@ def _build_link_ref(
         title=title,
         kind=kind,
         span=span,
-        source_token_type=origin,
+        source_token_type=source_token_type,
     )
 
 
@@ -110,7 +110,7 @@ class LinkExtractor:
                         ),
                         kind=LinkKind.link,
                         span=span,
-                        origin="link_open",
+                        source_token_type=LinkTokenOrigin.link_open,
                     )
                     _attach_to_section(document, link_id, span)
 
@@ -128,7 +128,7 @@ class LinkExtractor:
                         ),
                         kind=LinkKind.image,
                         span=span,
-                        origin="image",
+                        source_token_type=LinkTokenOrigin.image,
                     )
                     _attach_to_section(document, link_id, span)
 
@@ -151,7 +151,7 @@ class LinkExtractor:
                 title=ref_data.get("title"),
                 kind=LinkKind.reference_definition,
                 span=ref_span,
-                origin="reference_definition",
+                source_token_type=LinkTokenOrigin.reference_definition,
             )
             _attach_to_section(document, link_id, ref_span)
 
