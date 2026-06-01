@@ -149,6 +149,7 @@ from .exceptions import (
     ProviderError,
     SectionNotFoundError,
 )
+from .indexer import MarkdownIndexer
 from .list_navigator import (
     ENCODING,
     TOKEN_BUDGET,
@@ -170,6 +171,7 @@ from .models import (
     SourceSpan,
 )
 from .navigator import ProgressiveMarkdownNavigator
+from .parser import MarkdownItParser, ParserResult
 from .providers import CallableMarkdownContentProvider, MarkdownContentProvider, MCPMarkdownContentProvider
 
 __all__ = [
@@ -186,12 +188,15 @@ __all__ = [
     "MCPMarkdownContentProvider",
     "MarkdownContentProvider",
     "MarkdownDocument",
+    "MarkdownIndexer",
+    "MarkdownItParser",
     "NavigationKind",
     "NavigationResult",
     "NavigatorOptions",
     "Page",
     "PaginationError",
     "ParserError",
+    "ParserResult",
     "ProgressiveDisclosure",
     "ProgressiveMarkdownError",
     "ProgressiveMarkdownNavigator",
