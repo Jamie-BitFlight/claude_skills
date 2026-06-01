@@ -49,6 +49,7 @@ The topic (or title) is the one required input. If it is missing, ask for it. If
 
 From the user's topic and explanation, identify:
 
+- The audience, and their level or context (if not given, assume one and label it as an assumption)
 - The core concept
 - The thing participants usually misunderstand
 - The belief, habit, assumption, or mental model the workshop is trying to change
@@ -58,6 +59,7 @@ From the user's topic and explanation, identify:
 Write this as:
 
 ```text
+Audience:
 Core concept:
 Participants may currently think:
 The workshop needs them to understand:
@@ -213,6 +215,7 @@ Use this structure every time:
 # Workshop Question Frame
 
 ## Extracted Teaching Core
+Audience:
 Core concept:
 Participants may currently think:
 The workshop needs them to understand:
@@ -279,6 +282,7 @@ A filled frame for a primary-science topic, "which materials a magnet attracts,"
 # Workshop Question Frame
 
 ## Extracted Teaching Core
+Audience: primary-science class, ages 7 to 9 (assumed — not specified in the request).
 Core concept: magnets attract some metals (iron, steel) but not all materials, and not all metals.
 Participants may currently think: a magnet picks up anything metal, or anything shiny or heavy.
 The workshop needs them to understand: magnetism is a property of specific materials, not "metalness" in general.

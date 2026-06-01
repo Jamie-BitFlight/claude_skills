@@ -60,16 +60,17 @@ If unsure, start with Real-Life Connection. It works across subjects and ages an
 
 ## Same lesson, opened differently
 
-Three patterns showing the shift — same content, opened to start thinking first instead of explaining first.
+Three patterns showing the shift — same content, opened to start thinking first instead of explaining first. Each names an assumed audience and the explanation the opening is setting up, so the question set has something to land into.
 
-- Science / magnetism (Prediction). Rather than announcing the topic and listing which materials are magnetic, put a mix of objects on each table and ask learners to predict which the magnet will lift before anyone tests. The explanation then arrives into a room of people checking their own predictions.
-- Math / fractions (Contradiction). Rather than defining a fraction up front, pose a sharing problem whose obvious answer is wrong — how many straight cuts it takes to split a round cake among four — and let the surprise drive the need for the idea of equal parts.
-- English / descriptive writing (Close Observation). Rather than listing the features of good description, show an evocative, context-free photograph and ask what is happening and what makes them say so. Learners are already generating description before any rule is named.
+- Science / magnetism (Prediction). Audience (assumed): primary, ages 7 to 9. Explanation it lands: only some metals (iron, steel) are magnetic — "metal," "shiny," and "heavy" are not the rule. Rather than announcing the topic and listing which materials are magnetic, put a mix of objects on each table and ask learners to predict which the magnet will lift before anyone tests. The explanation then arrives into a room of people checking their own predictions.
+- Math / fractions (Contradiction). Audience (assumed): upper-primary maths, ages 9 to 11. Explanation it lands: a fraction is equal parts of a whole, and the number of pieces is not the number of cuts. Rather than defining a fraction up front, pose a sharing problem whose obvious answer is wrong — how many straight cuts it takes to split a round cake among four — and let the surprise drive the need for the idea of equal parts.
+- English / descriptive writing (Close Observation). Audience (assumed): lower-secondary English, ages 11 to 13. Explanation it lands: concrete sensory detail and inference (show, don't tell) are what make description vivid. Rather than listing the features of good description, show an evocative, context-free photograph and ask what is happening and what makes them say so. Learners are already generating description before any rule is named.
 
 ## Full worked example — Prediction, end to end
 
 Topic: which materials a magnet attracts (primary science). Carried through all six beats.
 
+- Audience (assumed): primary-science class, ages 7 to 9.
 - Core concept: magnets attract some metals (iron, steel) but not all materials, and not all metals.
 - Learners may currently think: a magnet picks up anything metal, or anything shiny or heavy.
 - The workshop needs them to understand: magnetism is a property of specific materials, not "metalness" in general.
