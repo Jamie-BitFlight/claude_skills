@@ -477,8 +477,11 @@ class TestExtractMode:
         assert next_call_raw is not None, (
             "next_call must not be None when truncated=True."
         )
-        assert isinstance(next_call_raw, str) and next_call_raw != "", (
-            f"next_call must be a non-empty str when truncated=True. Got: {next_call_raw!r}"
+        assert isinstance(next_call_raw, str), (
+            f"next_call must be a str when truncated=True. Got: {type(next_call_raw)!r}"
+        )
+        assert next_call_raw != "", (
+            f"next_call must be non-empty when truncated=True. Got: {next_call_raw!r}"
         )
         next_call: str = next_call_raw
         assert "skip_tokens=100" in next_call, (
