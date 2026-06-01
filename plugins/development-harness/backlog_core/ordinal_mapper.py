@@ -338,10 +338,16 @@ class OrdinalPathMapper:
     def valid_ordinals(self) -> list[str]:
         """Return all ordinals from the most recent ``build_map()`` call.
 
+        Triggers a lazy ``build_map()`` call when ``_sections`` is non-empty
+        and the map has not yet been built.  This ensures callers can retrieve
+        valid ordinals without an explicit ``build_map()`` call.
+
         Returns:
             Ordered list of ordinal strings matching ``build_map()`` output.
-            Empty list when ``build_map()`` has not yet been called.
+            Empty list when ``_sections`` is empty (no sections to map).
         """
+        if not self._map_entries and self._sections:
+            self.build_map()
         return [e.ordinal for e in self._map_entries]
 
 

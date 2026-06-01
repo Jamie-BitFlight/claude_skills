@@ -12,9 +12,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from progressive_markdown.list_navigator import ENCODING
+from progressive_markdown.list_navigator import ENCODING, TOKEN_BUDGET
 
-from backlog_core.disclosure_types import BoundedContent, DisclosureMode, DisclosureParamError
+from backlog_core import operations
+from backlog_core.content_normalizer import ItemContentNormalizer
+from backlog_core.disclosure_types import (
+    BoundedContent,
+    BoundedResponse,
+    DisclosureMode,
+    DisclosureParamError,
+    MapResponse,
+    NavigateResponse,
+)
+from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -258,4 +268,243 @@ class TokenBoundedExtractor:
             total_tokens=total_tokens,
             returned_tokens=returned_tokens,
             truncated=truncated,
+        )
+
+
+# ---------------------------------------------------------------------------
+# BacklogViewDisclosureHandler — Phase 3 (T20): orchestration (SRP: orchestrate only)
+# ---------------------------------------------------------------------------
+
+
+class BacklogViewDisclosureHandler:
+    """Orchestrate progressive disclosure modes from un-gated item content.
+
+    **Responsibility boundary**: orchestration only.  This class fetches item
+    content via the un-gated ``operations.view_item()`` path, delegates
+    normalization to ``ItemContentNormalizer``, ordinal mapping to a fresh
+    ``OrdinalPathMapper`` per call (stateful per-item), and token windowing to
+    ``TokenBoundedExtractor``.  It does NOT normalize, map, or token-count
+    directly (SRP/DIP).
+
+    **Mapper per call** (architect spec §4.4): ``OrdinalPathMapper`` is
+    stateful — its ``_resolution_map`` is populated by ``build_map()`` and is
+    specific to a single item's section list.  A fresh mapper instance is
+    constructed on every ``handle()`` call rather than injected, so each call
+    is isolated with no cross-call state leakage.  ``normalizer`` and
+    ``extractor`` are stateless and may be injected or left as defaults.
+
+    **Un-gated path** (ADR-5): The gated ``backlog_view`` tool returns
+    ``body=""`` for over-budget items.  ``operations.view_item()`` is called
+    directly (via the module reference ``backlog_core.operations``) to obtain
+    the full body regardless of token budget.
+
+    **Spy contract**: patch target is ``backlog_core.operations.view_item``
+    (the module attribute).  ``handle()`` calls ``operations.view_item(selector)``
+    via the module, NOT via a direct-import alias, so the spy intercepts the
+    call correctly.
+
+    Example::
+
+        handler = BacklogViewDisclosureHandler()
+        request = DisclosureRequestParser().parse(map=True)
+        result = handler.handle("#2515", request)
+        assert isinstance(result, MapResponse)
+    """
+
+    def __init__(
+        self,
+        normalizer: ItemContentNormalizer | None = None,
+        extractor: TokenBoundedExtractor | None = None,
+    ) -> None:
+        """Initialise handler with optional injected collaborators.
+
+        Args:
+            normalizer: ``ItemContentNormalizer`` instance.  Defaults to a
+                new instance when ``None``.
+            extractor: ``TokenBoundedExtractor`` instance.  Defaults to a
+                new instance when ``None``.
+        """
+        self._normalizer = normalizer if normalizer is not None else ItemContentNormalizer()
+        self._extractor = extractor if extractor is not None else TokenBoundedExtractor()
+
+    def handle(
+        self,
+        selector: str,
+        request: DisclosureRequest,
+    ) -> MapResponse | NavigateResponse | BoundedResponse:
+        """Fetch item content and dispatch to the appropriate disclosure handler.
+
+        Calls ``operations.view_item(selector)`` once (un-gated, full content),
+        normalizes the result, builds the ordinal map, then dispatches by mode.
+
+        Args:
+            selector: Issue selector (e.g. ``"#2515"``) forwarded unchanged
+                to ``operations.view_item()``.
+            request: Validated ``DisclosureRequest`` produced by
+                ``DisclosureRequestParser``.
+
+        Returns:
+            ``MapResponse``, ``NavigateResponse``, or ``BoundedResponse``
+            depending on ``request.mode``.
+
+        Raises:
+            ValueError: When ``request.mode`` is ``PASSTHROUGH`` — the caller
+                must route PASSTHROUGH to the existing code path before calling
+                this handler.
+            OrdinalNotFoundError: When the ``navigate`` ordinal is not present
+                in the item's ordinal map (raised from ``_handle_navigate`` or
+                ``_handle_extract``).
+        """
+        # Un-gated fetch (ADR-5): call via module reference so spy on
+        # ``backlog_core.operations.view_item`` intercepts the call.
+        # ``include_content=True`` is the default — full body and sections.
+        view_result = operations.view_item(selector)
+        sections = self._normalizer.normalize(view_result)
+
+        # Fresh mapper per call — OrdinalPathMapper is stateful per-item.
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+
+        match request.mode:
+            case DisclosureMode.MAP:
+                return self._handle_map(selector, entries, mapper)
+            case DisclosureMode.NAVIGATE:
+                if request.navigate_ordinal is None:  # parser invariant: always set for NAVIGATE
+                    raise ValueError("NAVIGATE mode requires navigate_ordinal.")
+                return self._handle_navigate(request.navigate_ordinal, mapper)
+            case DisclosureMode.EXTRACT:
+                if request.navigate_ordinal is None:  # parser invariant: always set for EXTRACT
+                    raise ValueError("EXTRACT mode requires navigate_ordinal.")
+                if request.head_tokens is None:  # parser invariant: always set for EXTRACT
+                    raise ValueError("EXTRACT mode requires head_tokens.")
+                return self._handle_extract(
+                    selector,
+                    request.navigate_ordinal,
+                    request.head_tokens,
+                    request.skip_tokens,
+                    mapper,
+                )
+            case _:
+                raise ValueError(
+                    f"BacklogViewDisclosureHandler does not handle mode "
+                    f"{request.mode!r}. Route PASSTHROUGH to the existing "
+                    f"code path before calling handle()."
+                )
+
+    def _handle_map(
+        self,
+        selector: str,
+        entries: list[OrdinalEntry],
+        mapper: OrdinalPathMapper,
+    ) -> MapResponse:
+        """Build a structural map response.
+
+        ``MapResponse.total_est_tokens`` sums LEVEL-1 section estimates only
+        (ordinals without a dot).  Level-2 entry lines are excluded to prevent
+        double-counting body text already included in the parent section
+        estimate (architect spec §5.2, #2495 regression guard).
+
+        Args:
+            selector: Item selector echoed into the response.
+            entries: Map entries from ``OrdinalPathMapper.build_map()``.
+            mapper: Mapper used for ``format_map_line()`` formatting.
+
+        Returns:
+            ``MapResponse`` with formatted ``map_text``, ``total_sections``
+            (level-1 count), ``total_est_tokens`` (level-1 sum only), and
+            ``over_budget`` flag.
+        """
+        level1_entries = [e for e in entries if "." not in e.ordinal]
+        total_est_tokens = sum(e.est_tokens for e in level1_entries)
+        map_text = "\n".join(mapper.format_map_line(e) for e in entries)
+        return MapResponse(
+            selector=selector,
+            total_sections=len(level1_entries),
+            total_est_tokens=total_est_tokens,
+            map_text=map_text,
+            over_budget=total_est_tokens > TOKEN_BUDGET,
+        )
+
+    def _handle_navigate(
+        self,
+        ordinal: str,
+        mapper: OrdinalPathMapper,
+    ) -> NavigateResponse:
+        """Resolve an ordinal to full section/entry content.
+
+        Args:
+            ordinal: Validated dot-path ordinal (e.g. ``"4.0"``).
+            mapper: Mapper with a populated resolution map (``build_map()``
+                already called by ``handle()``).
+
+        Returns:
+            ``NavigateResponse`` with full content and ``truncated=False``.
+
+        Raises:
+            OrdinalNotFoundError: When ``ordinal`` is not in the resolution
+                map.  The exception carries ``valid_ordinals`` so callers can
+                recover without a second round-trip.
+        """
+        unit = mapper.resolve(ordinal)
+        return NavigateResponse(
+            ordinal=ordinal,
+            title=unit.title,
+            content=unit.content,
+            total_tokens=unit.total_tokens,
+            truncated=False,
+        )
+
+    def _handle_extract(
+        self,
+        selector: str,
+        ordinal: str,
+        head_tokens: int,
+        skip_tokens: int,
+        mapper: OrdinalPathMapper,
+    ) -> BoundedResponse:
+        """Extract a token-bounded window from a section/entry.
+
+        Builds a ``next_call`` continuation hint when the window is truncated.
+        The hint uses ``skip_tokens=`` (not ``offset=``) per architect spec §5.7.
+        The next skip position is cumulative: ``skip_tokens + bounded.returned_tokens``
+        (absolute token offset into the full content sequence).
+
+        Args:
+            selector: Item selector included in the ``next_call`` hint (in
+                scope here; ``BoundedContent`` carries no selector — ADR-5).
+            ordinal: Validated dot-path ordinal.
+            head_tokens: Token window size from the ``DisclosureRequest``.
+            skip_tokens: Token offset from the ``DisclosureRequest`` (0 for
+                the first window).
+            mapper: Mapper with a populated resolution map.
+
+        Returns:
+            ``BoundedResponse`` with ``next_call`` populated when truncated,
+            ``None`` otherwise.
+
+        Raises:
+            OrdinalNotFoundError: When ``ordinal`` is not in the resolution
+                map.
+        """
+        unit = mapper.resolve(ordinal)
+        bounded = self._extractor.extract(
+            unit.content,
+            head_tokens=head_tokens,
+            skip_tokens=skip_tokens,
+        )
+        next_call: str | None = None
+        if bounded.truncated:
+            next_skip = skip_tokens + bounded.returned_tokens
+            next_call = (
+                f'backlog_view(selector="{selector}", navigate="{ordinal}", '
+                f"head={head_tokens}, skip_tokens={next_skip})"
+            )
+        return BoundedResponse(
+            ordinal=ordinal,
+            title=unit.title,
+            content=bounded.content,
+            total_tokens=bounded.total_tokens,
+            returned_tokens=bounded.returned_tokens,
+            truncated=bounded.truncated,
+            next_call=next_call,
         )
