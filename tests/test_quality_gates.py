@@ -1,6 +1,6 @@
 """Unit tests for sam_schema.core.quality_gates.build_quality_gate_plan.
 
-Tests: Pure function generating YAML for a 6-task quality-gate plan.
+Tests: Pure function generating YAML for a 7-task quality-gate plan.
 Strategy:
 - Parse the YAML output using ruamel.yaml (repo standard — never PyYAML).
 - Roundtrip through the Plan/Task Pydantic models to verify schema validity.
@@ -29,8 +29,9 @@ from sam_schema.core.quality_gates import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_EXPECTED_TASK_IDS = ["T1", "T2", "T3", "T4", "T5", "T6"]
+_EXPECTED_TASK_IDS = ["T0", "T1", "T2", "T3", "T4", "T5", "T6"]
 _EXPECTED_TITLES = [
+    "Multi-Perspective Review",
     "Code Review",
     "Feature Verification",
     "Integration Check",
@@ -39,6 +40,7 @@ _EXPECTED_TITLES = [
     "Context Refinement",
 ]
 _EXPECTED_AGENTS = [
+    "task-worker",
     "code-reviewer",
     "feature-verifier",
     "integration-checker",
@@ -46,7 +48,7 @@ _EXPECTED_AGENTS = [
     "service-docs-maintainer",
     "context-refinement",
 ]
-_EXPECTED_DEPS: list[list[str]] = [[], ["T1"], ["T2"], ["T3"], ["T4"], ["T5"]]
+_EXPECTED_DEPS: list[list[str]] = [[], [], ["T1"], ["T2"], ["T3"], ["T4"], ["T5"]]
 
 
 def _parse_yaml(yaml_string: str) -> dict[str, Any]:
@@ -172,24 +174,24 @@ class TestYamlValidity:
 
 
 class TestTaskCountAndIds:
-    """Tests: Exactly 6 tasks are generated with correct IDs and titles.
+    """Tests: Exactly 7 tasks are generated with correct IDs and titles.
 
     Strategy: Parse YAML and inspect task-level fields.
     Why: Missing tasks would silently skip quality-gate phases.
     """
 
-    def test_generates_six_tasks(self, basic_yaml: str) -> None:
-        """Test that exactly 6 tasks are present in the generated plan.
+    def test_generates_seven_tasks(self, basic_yaml: str) -> None:
+        """Test that exactly 7 tasks are present in the generated plan.
 
         Tests: Task count.
         How: Parse YAML, count tasks list entries.
-        Why: One task per quality-gate phase (phases 1-6). Fewer means phases are missing.
+        Why: One task per quality-gate phase (T0-T6). Fewer means phases are missing.
         """
         # Arrange / Act
         tasks = _tasks_from_yaml(basic_yaml)
 
         # Assert
-        assert len(tasks) == 6
+        assert len(tasks) == 7
 
     @pytest.mark.parametrize(("index", "expected_id"), list(enumerate(_EXPECTED_TASK_IDS)))
     def test_task_ids_are_correct(self, basic_yaml: str, index: int, expected_id: str) -> None:
@@ -233,12 +235,12 @@ class TestDependencyChain:
     or allow all phases to dispatch simultaneously, defeating enforcement.
     """
 
-    def test_t1_has_no_dependencies(self, basic_yaml: str) -> None:
-        """Test that T1 (Code Review) has an empty dependencies list.
+    def test_t0_has_no_dependencies(self, basic_yaml: str) -> None:
+        """Test that T0 (Multi-Perspective Review) has an empty dependencies list.
 
-        Tests: T1 dependency field.
-        How: Parse YAML, check T1 dependencies.
-        Why: T1 must be the entry point; any dependency would block the whole chain.
+        Tests: T0 dependency field.
+        How: Parse YAML, check T0 dependencies.
+        Why: T0 must be an entry point; any dependency would block the whole chain.
         """
         # Arrange / Act
         tasks = _tasks_from_yaml(basic_yaml)
@@ -246,11 +248,11 @@ class TestDependencyChain:
         # Assert
         assert tasks[0]["dependencies"] == []
 
-    @pytest.mark.parametrize(("task_index", "expected_deps"), [(i, _EXPECTED_DEPS[i]) for i in range(1, 6)])
+    @pytest.mark.parametrize(("task_index", "expected_deps"), [(i, _EXPECTED_DEPS[i]) for i in range(2, 7)])
     def test_each_task_depends_on_previous(self, basic_yaml: str, task_index: int, expected_deps: list[str]) -> None:
         """Test that each task T2-T6 depends on exactly the preceding task.
 
-        Tests: Linear dependency chain for tasks at indices 1-5.
+        Tests: Linear dependency chain for tasks at indices 2-6.
         How: Parse YAML, check 'dependencies' field at each index.
         Why: The SAM enforcement model requires each phase to gate on the prior phase.
         """
@@ -267,17 +269,17 @@ class TestDependencyChain:
 
 
 class TestTaskPriority:
-    """Tests: All 6 tasks have priority 1 (CRITICAL).
+    """Tests: All 7 tasks have priority 1 (CRITICAL).
 
     Strategy: Parse YAML, check 'priority' field per task.
     Why: Priority 1 ensures QG phases are dispatched before lower-priority work.
     """
 
-    @pytest.mark.parametrize("task_index", range(6))
+    @pytest.mark.parametrize("task_index", range(7))
     def test_all_tasks_have_priority_one(self, basic_yaml: str, task_index: int) -> None:
         """Test that every QG task has priority=1.
 
-        Tests: Priority field for all 6 tasks.
+        Tests: Priority field for all 7 tasks.
         How: Parse YAML, assert priority == 1 at each index.
         Why: Consistent priority 1 prevents SAM dispatch from deferring any phase.
         """
@@ -410,7 +412,7 @@ class TestImplPlanAddressInBody:
     debugging a blocked phase.
     """
 
-    @pytest.mark.parametrize("task_index", range(6))
+    @pytest.mark.parametrize("task_index", range(7))
     def test_impl_plan_address_in_each_task_body(self, basic_yaml: str, task_index: int) -> None:
         """Test that every task body contains the implementation plan address.
 
@@ -456,11 +458,11 @@ class TestInitialTaskStatus:
     complete would be silently skipped by the dispatch loop.
     """
 
-    @pytest.mark.parametrize("task_index", range(6))
+    @pytest.mark.parametrize("task_index", range(7))
     def test_all_tasks_start_not_started(self, basic_yaml: str, task_index: int) -> None:
         """Test that every task has status 'not-started' in the generated YAML.
 
-        Tests: Initial status field for all 6 tasks.
+        Tests: Initial status field for all 7 tasks.
         How: Parse YAML, assert 'status' == 'not-started' at each index.
         Why: Prevents tasks from being silently skipped on first dispatch.
         """
@@ -549,15 +551,15 @@ class TestPydanticRoundtrip:
         # Arrange / Act / Assert
         assert isinstance(plan_model, Plan)
 
-    def test_plan_has_six_task_instances(self, plan_model: Plan) -> None:
-        """Test that the validated Plan contains 6 Task model instances.
+    def test_plan_has_seven_task_instances(self, plan_model: Plan) -> None:
+        """Test that the validated Plan contains 7 Task model instances.
 
         Tests: tasks list length and element types after Pydantic validation.
         How: Access plan_model.tasks, assert length and element type.
         Why: Ensures Pydantic does not silently drop tasks with unknown fields.
         """
         # Arrange / Act / Assert
-        assert len(plan_model.tasks) == 6
+        assert len(plan_model.tasks) == 7
         assert all(isinstance(t, Task) for t in plan_model.tasks)
 
     def test_plan_tasks_have_not_started_status(self, plan_model: Plan) -> None:
