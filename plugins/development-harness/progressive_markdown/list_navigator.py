@@ -1,8 +1,10 @@
 """Progressive disclosure engine for MCP endpoints that return structured data.
 
 Three operations from one class: index (TOC), page (bounded chunks), select
-(single item), and search (scored matches).  All methods return MCP-friendly
-dicts that can be returned directly from a FastMCP tool.
+(single item), and search (scored matches).  ``page()`` and ``select()``
+return :class:`~progressive_markdown.models.NavigationResult`; ``index()``
+and ``search()`` return MCP-friendly dicts that can be returned directly
+from a FastMCP tool.
 
 Also exports ``paginate_results`` — a drop-in replacement for the private
 ``_paginate_results`` function that was previously embedded in
@@ -28,7 +30,7 @@ from typing import Any
 
 import tiktoken
 
-from .models import _DEFAULT_BUDGET
+from .models import _DEFAULT_BUDGET, NavigationKind, NavigationResult, Page
 
 __all__ = ["ENCODING", "TOKEN_BUDGET", "DisclosureConfig", "ProgressiveDisclosure", "chunk_text", "paginate_results"]
 
@@ -67,6 +69,42 @@ class DisclosureConfig:
 
 
 # ---------------------------------------------------------------------------
+# NavigationResult builder
+# ---------------------------------------------------------------------------
+
+
+def _disclosure_to_result(
+    kind: NavigationKind,
+    title: str,
+    pages: list[Page],
+    requested_page: int,
+    metadata: dict[str, object],
+) -> NavigationResult:
+    """Build a ``NavigationResult`` from disclosure parameters.
+
+    Args:
+        kind: Classification of the result content.
+        title: Human-readable title for the result.
+        pages: Ordered list of content pages (usually one for list operations).
+        requested_page: 1-based index of the current page within *pages*.
+        metadata: Arbitrary JSON-serializable metadata for the result.
+
+    Returns:
+        NavigationResult with all required fields populated.
+    """
+    total_pages = max(1, len(pages))
+    current_page = max(1, min(requested_page, total_pages))
+    return NavigationResult(
+        kind=kind,
+        title=title,
+        pages=pages,
+        current_page=current_page,
+        total_pages=total_pages,
+        metadata=metadata,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Progressive disclosure engine
 # ---------------------------------------------------------------------------
 
@@ -76,13 +114,13 @@ class ProgressiveDisclosure:
 
     Three operations, one class:
 
-    - ``index()``            → TOC: summary fields only, all items, no full bodies
-    - ``page(n, size=None)`` → page N of full items; size=None auto-fits token budget
-    - ``select(item_id)``    → single item by ID field value
-    - ``search(query)``      → scored matches on title and summary fields
+    - ``index()``          → TOC: summary fields only, all items, no full bodies (dict)
+    - ``page(page_num)``   → page N of full items, auto-fit budget (NavigationResult)
+    - ``select(selector)`` → single item by ID field value (NavigationResult)
+    - ``search(query)``    → scored matches on title and summary fields (dict)
 
-    All methods return MCP-friendly dicts that can be handed directly back
-    from a FastMCP tool.
+    ``page()`` and ``select()`` return ``NavigationResult`` (Pydantic model).
+    ``index()`` and ``search()`` return MCP-friendly dicts.
 
     Args:
         items: Full list of dicts to disclose.
@@ -93,10 +131,10 @@ class ProgressiveDisclosure:
     Example::
 
         pd = ProgressiveDisclosure(tasks, DisclosureConfig(id_field="id"))
-        toc = pd.index()  # all items, summary fields only
-        page1 = pd.page(1)  # first page, auto-fit budget
-        item = pd.select("T03")  # one item or None
-        hits = pd.search("auth")  # scored matches
+        toc = pd.index()   # all items, summary fields only (dict)
+        page1 = pd.page(1)  # first page, auto-fit budget (NavigationResult)
+        item = pd.select("T03")  # NavigationResult (found or error)
+        hits = pd.search("auth")  # scored matches (dict)
     """
 
     def __init__(
@@ -133,83 +171,122 @@ class ProgressiveDisclosure:
         summaries = [{k: item[k] for k in cfg.summary_fields if k in item} for item in self._items]
         return {"index": summaries, "total": len(summaries)}
 
-    def page(self, n: int = 1, size: int | None = None, budget: int | None = None) -> dict[str, Any]:
-        """Return page *n* (1-based) of full items.
+    def page(self, page_num: int = 1) -> NavigationResult:
+        """Return page *page_num* (1-based) of full items as a NavigationResult.
 
-        When *size* is ``None``, the page size is determined automatically by
-        the binary-search token-budget algorithm so the serialised items fit
-        within the effective budget.
+        Page size is determined automatically by the binary-search token-budget
+        algorithm so the serialised items fit within ``config.token_budget``.
 
         Args:
-            n: Page number (1-based).  Clamped to the valid range.
-            size: Explicit page size.  ``None`` triggers auto-fit.
-            budget: Token ceiling used for auto-fit.  When provided and not
-                ``None``, overrides ``config.token_budget`` for this call only.
-                Has no effect when *size* is also provided (explicit size takes
-                precedence).
+            page_num: Page number (1-based).  Clamped to the valid range.
 
         Returns:
-            Dict with ``items``, ``count``, and ``pagination`` sub-dict
-            containing ``page``, ``page_size``, ``total_pages``,
-            ``pages_remaining``, ``total``, and ``has_more``.
-            A ``next_call`` hint is appended when ``has_more`` is ``True``.
+            NavigationResult wrapping the page items (kind=document_map, one
+            content page).  Pagination metadata — ``page``, ``page_size``,
+            ``total_pages``, ``total``, ``has_more``, and optionally
+            ``next_call`` — is in ``NavigationResult.metadata``.
         """
         total = len(self._items)
 
         if total == 0:
-            return {
-                "items": [],
-                "count": 0,
-                "pagination": {
-                    "page": 1,
-                    "page_size": 0,
-                    "total_pages": 0,
-                    "pages_remaining": 0,
-                    "total": 0,
-                    "has_more": False,
-                },
-            }
+            empty_content = "No items"
+            token_count = len(self._enc.encode(empty_content))
+            empty_page = Page(
+                content=empty_content,
+                page_number=1,
+                total_pages=1,
+                token_count=token_count,
+                budget=self._config.token_budget,
+            )
+            return _disclosure_to_result(
+                kind=NavigationKind.document_map,
+                title="empty list",
+                pages=[empty_page],
+                requested_page=1,
+                metadata={"total": 0},
+            )
 
-        effective_size: int
-        effective_size = max(1, size) if size is not None else self._auto_page_size(self._items, budget=budget)
-
+        effective_size = self._auto_page_size(self._items)
         total_pages = max(1, (total + effective_size - 1) // effective_size)
-        clamped_n = max(1, min(n, total_pages))
+        clamped_n = max(1, min(page_num, total_pages))
         offset = (clamped_n - 1) * effective_size
         page_slice = self._items[offset : offset + effective_size]
         has_more = (offset + len(page_slice)) < total
-        pages_remaining = total_pages - clamped_n
 
-        result: dict[str, Any] = {
-            "items": page_slice,
-            "count": len(page_slice),
-            "pagination": {
-                "page": clamped_n,
-                "page_size": len(page_slice),
-                "total_pages": total_pages,
-                "pages_remaining": pages_remaining,
-                "total": total,
-                "has_more": has_more,
-            },
+        content = json.dumps(page_slice)
+        token_count = len(self._enc.encode(content))
+        result_page = Page(
+            content=content,
+            page_number=1,
+            total_pages=1,
+            token_count=token_count,
+            budget=self._config.token_budget,
+        )
+        meta: dict[str, object] = {
+            "page": clamped_n,
+            "page_size": len(page_slice),
+            "total_pages": total_pages,
+            "total": total,
+            "has_more": has_more,
         }
         if has_more:
-            result["next_call"] = f"{self._tool_name}(page={clamped_n + 1}, page_size={effective_size})"
-        return result
+            meta["next_call"] = f"{self._tool_name}(page={clamped_n + 1})"
+        return _disclosure_to_result(
+            kind=NavigationKind.document_map,
+            title=f"page {clamped_n} of {total_pages}",
+            pages=[result_page],
+            requested_page=1,
+            metadata=meta,
+        )
 
-    def select(self, item_id: str) -> dict[str, Any] | None:
-        """Return the single item whose id field matches *item_id*.
+    def select(self, selector: str) -> NavigationResult:
+        """Return the single item whose id field matches *selector*.
 
         Args:
-            item_id: Value to match against ``config.id_field``.
+            selector: Value to match against ``config.id_field``.
 
         Returns:
-            The matching item dict, or ``None`` when no match is found.
+            NavigationResult wrapping the matching item (kind=section_body,
+            one page) when found.  When the selector does not match any item,
+            returns a NavigationResult with kind=error — never returns None.
+            Callers migrating from the previous dict return can use
+            ``result.model_dump()`` or check ``result.kind``.
         """
         id_field = self._config.id_field
         for item in self._items:
-            if item.get(id_field) == item_id:
-                return item
-        return None
+            if item.get(id_field) == selector:
+                content = json.dumps(item)
+                token_count = len(self._enc.encode(content))
+                result_page = Page(
+                    content=content,
+                    page_number=1,
+                    total_pages=1,
+                    token_count=token_count,
+                    budget=self._config.token_budget,
+                )
+                return _disclosure_to_result(
+                    kind=NavigationKind.section_body,
+                    title=str(item.get(self._config.title_field, selector)),
+                    pages=[result_page],
+                    requested_page=1,
+                    metadata={"id": selector},
+                )
+        not_found_msg = f"Item '{selector}' not found"
+        token_count = len(self._enc.encode(not_found_msg))
+        error_page = Page(
+            content=not_found_msg,
+            page_number=1,
+            total_pages=1,
+            token_count=token_count,
+            budget=self._config.token_budget,
+        )
+        return _disclosure_to_result(
+            kind=NavigationKind.error,
+            title=f"not found: {selector}",
+            pages=[error_page],
+            requested_page=1,
+            metadata={"id": selector},
+        )
 
     def search(self, query: str, top_n: int = 10) -> dict[str, Any]:
         """Return scored matches on title and summary fields.

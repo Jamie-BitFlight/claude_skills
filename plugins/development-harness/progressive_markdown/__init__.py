@@ -85,12 +85,29 @@ Exceptions
 
 List pagination and disclosure (``list_navigator`` sub-module)
 --------------------------------------------------------------
+``ProgressiveDisclosure``
+    Map, navigate, and extract from any list-of-dict structured data.
+    ``select()`` and ``page()`` return ``NavigationResult``; ``index()``
+    and ``search()`` return MCP-friendly dicts.
+``DisclosureConfig``
+    Field mapping and token-budget configuration dataclass for
+    ``ProgressiveDisclosure``.
 ``chunk_text``
     Splits a text string into token-bounded chunks using cl100k_base encoding.
     Useful for feeding large prose into context windows incrementally.
 ``paginate_results``
-    Paginates a list of structured items using a ``DisclosureConfig``,
+    Paginates a list of structured items using offset/limit pagination,
     producing MCP-ready index and page responses.
+
+Module-level constants
+----------------------
+``TOKEN_BUDGET``
+    Token ceiling for the auto-fit binary search in ``ProgressiveDisclosure``.
+    Derived from ``MAX_MCP_OUTPUT_TOKENS`` env var at import time (default 9 500).
+``ENCODING``
+    The tiktoken cl100k_base encoding instance used for all token counting.
+    Import this singleton rather than creating a new instance to guarantee
+    consistency across modules.
 
 Typical usage — navigator facade::
 
@@ -105,7 +122,9 @@ Typical usage — list pagination and disclosure::
 
     from progressive_markdown.list_navigator import (
         DisclosureConfig,
+        ENCODING,
         ProgressiveDisclosure,
+        TOKEN_BUDGET,
         chunk_text,
         paginate_results,
     )
@@ -113,8 +132,9 @@ Typical usage — list pagination and disclosure::
     config = DisclosureConfig(id_field="id", title_field="title")
     disclosure = ProgressiveDisclosure(items, config=config)
     index_page = disclosure.index()
-    first_page = disclosure.page(page_number=1)
-    text_chunks = chunk_text(large_text, max_tokens=2000)
+    first_page = disclosure.page(1)  # returns NavigationResult
+    item = disclosure.select("T03")  # returns NavigationResult (found or error)
+    text_chunks = chunk_text(large_text, budget=TOKEN_BUDGET)
 """
 
 from __future__ import annotations
@@ -129,7 +149,14 @@ from .exceptions import (
     ProviderError,
     SectionNotFoundError,
 )
-from .list_navigator import chunk_text, paginate_results
+from .list_navigator import (
+    ENCODING,
+    TOKEN_BUDGET,
+    DisclosureConfig,
+    ProgressiveDisclosure,
+    chunk_text,
+    paginate_results,
+)
 from .models import (
     CodeBlock,
     LinkKind,
@@ -146,10 +173,13 @@ from .navigator import ProgressiveMarkdownNavigator
 from .providers import CallableMarkdownContentProvider, MarkdownContentProvider, MCPMarkdownContentProvider
 
 __all__ = [
+    "ENCODING",
+    "TOKEN_BUDGET",
     "AmbiguousSectionRefError",
     "CallableMarkdownContentProvider",
     "CodeBlock",
     "CodeBlockNotFoundError",
+    "DisclosureConfig",
     "DocumentNotLoadedError",
     "LinkKind",
     "LinkRef",
@@ -162,6 +192,7 @@ __all__ = [
     "Page",
     "PaginationError",
     "ParserError",
+    "ProgressiveDisclosure",
     "ProgressiveMarkdownError",
     "ProgressiveMarkdownNavigator",
     "ProviderError",
