@@ -1985,12 +1985,14 @@ def _execute_disclosure_or_passthrough(
     ``req.mode != PASSTHROUGH`` before calling — this function does NOT handle
     PASSTHROUGH (returns None for it as a safety net only).
 
-    ``OrdinalNotFoundError`` is caught and converted to an error dict so the
-    ``to_thread`` caller receives a clean return value with no exception.
+    ``OrdinalNotFoundError`` and ``BacklogError`` are caught and converted to
+    error dicts so the ``to_thread`` caller receives a clean return value with
+    no exception.
 
     Returns:
         Serialised response dict for MAP/NAVIGATE/EXTRACT, None for PASSTHROUGH
-        (safety net only), or an error dict when OrdinalNotFoundError is raised.
+        (safety net only), or an error dict when OrdinalNotFoundError or
+        BacklogError (including ItemNotFoundError) is raised.
     """
     if req.mode == DisclosureMode.PASSTHROUGH:
         return None  # safety net — caller should never reach this branch
@@ -2003,6 +2005,8 @@ def _execute_disclosure_or_passthrough(
             "requested_ordinal": exc.requested,
             "valid_ordinals": exc.valid_ordinals,
         }
+    except BacklogError as exc:
+        return {"error": str(exc)}
 
 
 @mcp.tool(
