@@ -3,7 +3,96 @@
 Provides token-budget-aware section navigation, code block viewing, link
 inventory, and search over Markdown documents.
 
-Typical usage::
+Navigator facade
+----------------
+``ProgressiveMarkdownNavigator``
+    Main facade for navigating a Markdown document with token-budget awareness.
+    Exposes ``map()``, ``view_section()``, ``view_code()``, ``search()``, and
+    ``view_links()``.  Supports eager loading via ``from_markdown()`` and lazy
+    loading via content providers.
+
+Configuration
+-------------
+``NavigatorOptions``
+    Configuration dataclass for ``ProgressiveMarkdownNavigator``.  Controls
+    token budget, default page size, and heading depth limits.
+
+Result types
+------------
+``NavigationResult``
+    Structured result returned by all public ``ProgressiveMarkdownNavigator``
+    methods.  Carries response content, pagination state, and navigation
+    metadata.
+``NavigationKind``
+    StrEnum classifying the type of navigation result (map, section, code,
+    search, links).
+``Page``
+    Paginated slice of a navigation result, with ``current_page``,
+    ``total_pages``, and ``has_more`` fields.
+
+Document model
+--------------
+``MarkdownDocument``
+    Fully-parsed Markdown document: section tree, code block index, link
+    inventory, and total token count.
+``SectionNode``
+    A single section within the document tree.  Carries heading level, slug,
+    selector, source span, and child section IDs.
+``CodeBlock``
+    A fenced code block extracted from the document.  Carries its block ID,
+    language tag, source span, and raw content.
+``LinkRef``
+    A hyperlink reference resolved from the document.  Carries URL, display
+    text, ``LinkKind``, and ``SourceSpan``.
+``LinkKind``
+    Enum distinguishing inline, reference-style, and autolink variants.
+``SourceSpan``
+    A ``(start_line, end_line)`` pair marking where a node originates in
+    the source Markdown.
+
+Content providers
+-----------------
+``MarkdownContentProvider``
+    Protocol for objects that supply Markdown source to the navigator.
+    Implement this protocol to plug in custom content sources.
+``CallableMarkdownContentProvider``
+    Content provider backed by a zero-argument callable.  Useful for lazy
+    loading (e.g., reading a file on demand).
+``MCPMarkdownContentProvider``
+    Content provider that fetches Markdown from an MCP resource URI.
+
+Exceptions
+----------
+``ProgressiveMarkdownError``
+    Base exception for all errors raised by this package.  Catch this type
+    to handle any library error uniformly.
+``AmbiguousSectionRefError``
+    Raised by ``view_section()`` when a slug matches multiple sections.
+    Caller must use a fully-qualified selector to disambiguate.
+``CodeBlockNotFoundError``
+    Raised by ``view_code()`` when the requested block ID does not exist.
+``DocumentNotLoadedError``
+    Raised when a navigation method is called before the document is loaded.
+``PaginationError``
+    Raised when pagination parameters are out of range or inconsistent.
+``ParserError``
+    Raised when the Markdown source cannot be parsed into a document tree.
+``ProviderError``
+    Raised when the content provider fails to supply content.
+``SectionNotFoundError``
+    Raised by ``view_section()`` when the section reference does not resolve
+    to any section in the document.
+
+List pagination and disclosure (``list_navigator`` sub-module)
+--------------------------------------------------------------
+``chunk_text``
+    Splits a text string into token-bounded chunks using cl100k_base encoding.
+    Useful for feeding large prose into context windows incrementally.
+``paginate_results``
+    Paginates a list of structured items using a ``DisclosureConfig``,
+    producing MCP-ready index and page responses.
+
+Typical usage — navigator facade::
 
     from progressive_markdown import ProgressiveMarkdownNavigator, NavigatorOptions
 
@@ -12,16 +101,20 @@ Typical usage::
     section = nav.view_section("installation")  # view a specific section
     code = nav.view_code("code_0001")  # view a code block
 
-List navigator exports (structured data pagination and disclosure)::
+Typical usage — list pagination and disclosure::
 
     from progressive_markdown.list_navigator import (
-        ENCODING,
-        TOKEN_BUDGET,
         DisclosureConfig,
         ProgressiveDisclosure,
         chunk_text,
         paginate_results,
     )
+
+    config = DisclosureConfig(id_field="id", title_field="title")
+    disclosure = ProgressiveDisclosure(items, config=config)
+    index_page = disclosure.index()
+    first_page = disclosure.page(page_number=1)
+    text_chunks = chunk_text(large_text, max_tokens=2000)
 """
 
 from __future__ import annotations
