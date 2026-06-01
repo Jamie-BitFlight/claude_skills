@@ -2055,7 +2055,10 @@ async def backlog_view(
             description=(
                 "When provided, filter the returned sections dict to only the named sections. "
                 "Identity fields (number, title, status, type, priority) are always included. "
-                "Invalid or missing section names are silently omitted — no error is raised. "
+                "A section name not present in the item returns an error dict containing "
+                "``error``, ``section_filter_miss=True``, and ``valid_sections`` listing "
+                "available names; an optional ``suggestion`` key is included when a close "
+                "match exists. The error response has no ``body`` field. "
                 "Default None returns the full response unchanged."
             )
         ),

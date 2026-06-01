@@ -3123,14 +3123,17 @@ async def test_backlog_view_sections_multiple_sections_returns_all_requested():
         assert "impact-radius" not in response["sections"], "Unrequested section 'impact-radius' must be excluded"
 
 
-async def test_backlog_view_sections_invalid_section_name_silently_omitted():
-    """backlog_view sections with an invalid name silently omits it — no error raised.
+async def test_backlog_view_sections_invalid_section_name_returns_error():
+    """backlog_view sections with an unknown name returns an ADR-3 error dict.
 
-    Tests: invalid section name handling — response has no error key, response is valid.
-    How: Request a section name that does not exist on the item. Assert no error key
-         in the response and identity fields are still present.
-    Why: Items have dynamic section names. Callers should not crash when requesting a
-         section that a particular item does not have (e.g., not all items have 'impact-radius').
+    Tests: error-on-miss contract (ADR-3) — a section name not present in the item
+           produces an error response rather than silently omitting the name.
+    How: Request a section name that does not exist on the item. Assert the response
+         contains an ``error`` key, the ``section_filter_miss`` flag is True, and
+         ``valid_sections`` lists the available names. Assert no ``body`` field is
+         returned (distinguishes error from content response).
+    Why: Callers need a clear signal when their section name is wrong so they can
+         correct it rather than silently receiving an empty result.
     """
     op_result = _make_view_result({
         "title": "Auth service",
@@ -3145,8 +3148,10 @@ async def test_backlog_view_sections_invalid_section_name_silently_omitted():
             "backlog_view", {"selector": "#42", "summary": False, "sections": ["nonexistent-section-xyz"]}
         )
 
-    assert "error" not in response, f"Must not return an error for invalid section name, got: {response.get('error')}"
-    assert response["title"] == "Auth service"
+    assert "error" in response, f"Must return an error for unknown section name, got: {response}"
+    assert response["section_filter_miss"] is True, f"section_filter_miss must be True, got: {response}"
+    assert "valid_sections" in response, f"valid_sections must be present, got: {response}"
+    assert "body" not in response, f"body must not be present in error response, got keys: {list(response)}"
 
 
 async def test_backlog_view_sections_always_includes_identity_fields():
