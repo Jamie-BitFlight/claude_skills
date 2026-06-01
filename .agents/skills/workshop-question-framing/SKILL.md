@@ -295,17 +295,46 @@ Gap it opens: the gap between their predicted answer and what the magnet actuall
 3. Is there a metal here you think will NOT stick?
 
 ## Commitment Questions (2 to 4)
-1. Circle your prediction for each object before we test anything.
+1. Which objects did you circle, and which one are you least sure about?
 2. What rule are you using to decide?
 
 ## Hold Questions (2 to 4)
 1. Who circled the coin? Who didn't? What made you decide?
 2. What result would prove your rule wrong?
 
+## Teaching Bridge Questions (2 to 4)
+1. We tested it: the paperclip and safety pin stuck, the coin did not. What do the ones that stuck share that the coin does not?
+2. What would the explanation have to account for to resolve this?
+
 ## Return Questions (3 to 5)
 1. You predicted the coin would stick. It didn't. What was your rule before?
 2. What is your rule now?
 3. Where else would your old rule have failed?
+
+## Alternative Frames
+
+### Option 1
+Move: Contradiction
+Best when: participants are sure every metal is magnetic.
+Opening question: A steel paperclip and a copper coin are both metal. The magnet grabs one and ignores the other. Why?
+Participant commitment: write which metal the magnet grabs, and why.
+What to hold back: do not name which metals are magnetic, or the word ferromagnetic.
+How to return: You believed every metal is magnetic. Which metals actually were? What is your rule now?
+
+### Option 2
+Move: Real-Life Connection
+Best when: you want relevance before the science.
+Opening question: Where at home does something stick to metal on its own, and where does it refuse to? Why those spots and not others?
+Participant commitment: name one place a magnet sticks and one metal place it does not.
+What to hold back: do not explain which materials are magnetic yet.
+How to return: You named the fridge door but not the copper pipe. What made the difference?
+
+## Facilitator Notes
+- Best opening question: "Which of these will the magnet pick up?" with the objects in their hands.
+- What not to explain too early: that only some metals (iron, steel) are magnetic, not metal in general.
+- Likely participant first answers: "all the metal ones," so the coin gets circled.
+- How to protect wrong answers: "That makes complete sense. Most metals feel like they should stick. Let's see what changes it."
+- When to reveal the explanation: after the coin prediction is tested and visibly fails.
 ```
 
 For three more subject worked examples (magnets, fractions, descriptive writing) and the stimulus-and-question library for every move, load [curiosity-by-design.md](./references/curiosity-by-design.md).
