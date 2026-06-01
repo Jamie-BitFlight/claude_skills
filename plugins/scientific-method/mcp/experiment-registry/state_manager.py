@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from models import ArtefactIntegrity, ExperimentState, StepDefinition, StepExtension
-
 from validators import (
     validate_artefact_content,
     validate_file_existence,
