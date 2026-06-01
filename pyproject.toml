@@ -399,6 +399,7 @@ testpaths = [
     "plugins/agentskill-kaizen/tests",
     "plugins/development-harness/tests",
     "plugins/development-harness/tests_sam",
+    "plugins/development-harness/backlog_core/tests",
     "plugins/frustration-analyzer/tests",
     "plugins/plugin-creator/tests",
     "plugins/development-harness/skills/implementation-manager/tests",
