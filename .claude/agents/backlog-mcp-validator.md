@@ -92,9 +92,15 @@ appear. The `type` and `topic` fields are always present in each returned item d
 
 ```text
 Parameters:
-  selector  str  required  GitHub issue URL | "#N" | bare number | title substring
-  offset    int  optional  Skip N lines from body  (default: 0)
-  limit     int  optional  Max lines to return (0 = all)  (default: 0)
+  selector     str      required  GitHub issue URL | "#N" | bare number | title substring
+  offset       int      optional  Skip N lines from body  (default: 0)
+  limit        int      optional  Max lines to return (0 = all)  (default: 0)
+  map          bool     optional  Return structured TOC map of item sections with ordinals
+                                  and token estimates instead of body content  (default: false)
+  navigate     str|null optional  Ordinal to resolve to full section content  (default: null)
+  head         int|null optional  Max tokens to return (1–25000); activates extraction mode
+                                  with skip_tokens= for continuation  (default: null)
+  skip_tokens  int      optional  Token offset for pagination continuation  (default: 0)
 
 Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py view "<selector>" --format json
