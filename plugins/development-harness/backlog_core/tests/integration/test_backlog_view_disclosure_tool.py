@@ -55,6 +55,7 @@ import pytest
 from fastmcp.client import Client
 
 from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedSection
+from backlog_core.models import ItemNotFoundError
 from backlog_core.operations import ViewItemResult
 from backlog_core.ordinal_mapper import OrdinalPathMapper
 from backlog_core.server import mcp
@@ -712,4 +713,85 @@ class TestParamError:
         err_msg = str(data.get("error", "")).lower()
         assert "navigate" in err_msg or "head" in err_msg, (
             f"Error must mention 'navigate' or 'head'. Got: {data.get('error')!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# BacklogError catch in _execute_disclosure_or_passthrough (commit f8c04ec6)
+# ---------------------------------------------------------------------------
+
+
+class TestBacklogErrorInDisclosurePath:
+    """Verify ItemNotFoundError (BacklogError subclass) returns structured dict.
+
+    Regression guard for commit f8c04ec6:
+      ``_execute_disclosure_or_passthrough`` must catch ``BacklogError`` and
+      return ``{"error": str(exc)}`` rather than letting the exception propagate
+      to FastMCP as an unhandled ``ToolError``.
+
+    These tests run unconditionally — no fixture file or real encoding is
+    required because ``operations.view_item`` is replaced by the mock before any
+    item content or tokenization is attempted.
+
+    Spy contract:
+      Patches ``backlog_core.operations.view_item`` via ``side_effect`` so the
+      mock *raises* ``ItemNotFoundError`` instead of returning a value.
+    """
+
+    async def test_item_not_found_returns_error_dict_not_tool_error(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """map=True + non-existent selector returns dict with 'error' key.
+
+        Concretely tests that the ``except BacklogError`` branch in
+        ``_execute_disclosure_or_passthrough`` is hit: if that catch were removed
+        FastMCP would raise ``ToolError`` client-side and ``call_tool`` would
+        propagate an exception rather than returning a result with an 'error' key.
+        """
+        mocker.patch(
+            "backlog_core.operations.view_item",
+            side_effect=ItemNotFoundError("#99999"),
+        )
+
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "backlog_view",
+                {"selector": "#99999", "map": True},
+            )
+
+        data = _extract_response_dict(result)
+        assert "error" in data, (
+            f"BacklogError must produce a structured dict with 'error' key, "
+            f"not an unhandled ToolError. Got keys: {sorted(data.keys())}"
+        )
+
+    async def test_item_not_found_error_message_contains_selector(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """'error' value contains the selector from ItemNotFoundError.
+
+        Confirms the catch path reaches ``str(exc)`` which formats as
+        ``"No item found for: #99999"`` (per ``ItemNotFoundError.__init__``).
+        This distinguishes the BacklogError path from a param-validation error
+        that would return 'error' with different content before view_item is called.
+        """
+        mocker.patch(
+            "backlog_core.operations.view_item",
+            side_effect=ItemNotFoundError("#99999"),
+        )
+
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "backlog_view",
+                {"selector": "#99999", "map": True},
+            )
+
+        data = _extract_response_dict(result)
+        assert "error" in data, "Precondition: response must have 'error' key."
+        assert "#99999" in str(data["error"]), (
+            f"'error' must contain the selector '#99999' from ItemNotFoundError. "
+            f"ItemNotFoundError.__init__ formats as 'No item found for: #99999'. "
+            f"Got: {data['error']!r}"
         )
