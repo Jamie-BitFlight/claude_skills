@@ -7,7 +7,7 @@ renderers) behind a single, dependency-injected public interface.
 from __future__ import annotations
 
 from .codeblocks import CodeBlockExtractor, CodeBlockStubRenderer
-from .exceptions import CodeBlockNotFoundError, DocumentNotLoadedError, SectionNotFoundError
+from .exceptions import AmbiguousSectionRefError, CodeBlockNotFoundError, DocumentNotLoadedError, SectionNotFoundError
 from .indexer import MarkdownIndexer
 from .links import LinkExtractor
 from .models import MarkdownDocument, NavigationKind, NavigationResult, NavigatorOptions, Page, SectionNode
@@ -319,6 +319,7 @@ class ProgressiveMarkdownNavigator:
         Raises:
             DocumentNotLoadedError: When load() has not been called.
             SectionNotFoundError: When no section matches ref.
+            AmbiguousSectionRefError: When the slug matches multiple sections (slug collision).
         """
         document = self.current_document()
 
@@ -335,8 +336,9 @@ class ProgressiveMarkdownNavigator:
             ids = document.sections_by_slug[ref]
             if len(ids) == 1:
                 return document.sections[ids[0]]
-            # Multiple sections share the slug — return first (document order).
-            return document.sections[ids[0]]
+            selectors = [document.sections[sid].selector for sid in ids]
+            msg = f"Ambiguous section reference {ref!r}: {len(ids)} sections share this slug: {', '.join(selectors)}"
+            raise AmbiguousSectionRefError(msg)
 
         # 4. Case-insensitive title substring (first match in document order).
         ref_lower = ref.lower()
