@@ -263,3 +263,138 @@ def test_extract_mode_echoes_navigate_ordinal() -> None:
     req = DisclosureRequestParser().parse(navigate="3.0.0", head=2000)
 
     assert req.navigate_ordinal == "3.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Extended ordinal regex — §4.1 + §7.4 TDD contract (T04, expected RED before T09)
+#
+# Architecture spec new pattern: ^(\d+\.)*(\\d+|code\\.\\d+)$
+# Current pattern:               ^(\\d+\\.)*\\d+$
+#
+# State under the PRE-T09 (current) regex:
+#   RED  — test FAILS  (code-fence accept cases; T09 makes them GREEN)
+#   GREEN — test PASSES (deep numeric / all reject cases; must stay GREEN after T09)
+#
+# These tests are exercised through DisclosureRequestParser.parse() — the public
+# contract boundary — NOT by importing _ORDINAL_PATTERN directly.
+# ---------------------------------------------------------------------------
+
+
+# ── §7.4 named tests ────────────────────────────────────────────────────────
+
+
+def test_navigate_code_fence_ordinal_accepted() -> None:
+    """'4.0.code.0' must be accepted by the extended pattern.
+
+    State: RED under current ^(\\d+\\.)*\\d+$ (rejects 'code' as non-digit terminal).
+    Expected GREEN after T09 extends pattern to ^(\\d+\\.)*(\\d+|code\\.\\d+)$.
+    """
+    req = DisclosureRequestParser().parse(navigate="4.0.code.0")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4.0.code.0"
+
+
+def test_navigate_deep_numeric_ordinal_accepted() -> None:
+    """'4.0.1.2.3' (5-level numeric path) must be accepted.
+
+    State: GREEN under both old and new regex — unlimited numeric depth
+    was already supported by ^(\\d+\\.)*\\d+$. Confirms no regression after T09.
+    """
+    req = DisclosureRequestParser().parse(navigate="4.0.1.2.3")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4.0.1.2.3"
+
+
+def test_navigate_missing_code_index_rejected() -> None:
+    """'4.0.code' (code keyword with no trailing integer) must raise DisclosureParamError.
+
+    State: GREEN under both old and new regex.
+    Old pattern: 'code' is a non-digit terminal — rejected.
+    New pattern: 'code' must be followed by '.\\d+' — still rejected.
+    """
+    with pytest.raises(DisclosureParamError):
+        DisclosureRequestParser().parse(navigate="4.0.code")
+
+
+def test_navigate_alpha_segment_rejected() -> None:
+    """'4.0.foo.0' must raise DisclosureParamError — 'foo' is neither \\d+ nor 'code'.
+
+    State: GREEN under both old and new regex.
+    """
+    with pytest.raises(DisclosureParamError):
+        DisclosureRequestParser().parse(navigate="4.0.foo.0")
+
+
+# ── §4.1 accept matrix — additional cases beyond the §7.4 named tests ───────
+
+
+def test_extended_ordinal_accept_single_digit_four() -> None:
+    """'4' (single non-zero digit) must be accepted — GREEN under old and new regex."""
+    req = DisclosureRequestParser().parse(navigate="4")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4"
+
+
+def test_extended_ordinal_accept_two_levels_explicit() -> None:
+    """'4.0' explicit §4.1 accept contract — GREEN under old and new regex.
+
+    Note: test_ordinal_two_levels_accepted also covers this ordinal; this test
+    explicitly records the §4.1 acceptance contract for the extended-pattern release.
+    """
+    req = DisclosureRequestParser().parse(navigate="4.0")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4.0"
+
+
+def test_extended_ordinal_accept_three_levels_explicit() -> None:
+    """'4.0.1' (3-level numeric) — GREEN under old and new regex."""
+    req = DisclosureRequestParser().parse(navigate="4.0.1")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4.0.1"
+
+
+def test_extended_ordinal_accept_deep_code_fence() -> None:
+    """'4.0.1.code.0' (code fence nested under sub-heading) must be accepted.
+
+    State: RED under current regex; GREEN after T09.
+    """
+    req = DisclosureRequestParser().parse(navigate="4.0.1.code.0")
+
+    assert req.mode == DisclosureMode.NAVIGATE
+    assert req.navigate_ordinal == "4.0.1.code.0"
+
+
+# ── §4.1 reject matrix — additional cases beyond the §7.4 named tests ───────
+
+
+def test_extended_ordinal_reject_bare_code() -> None:
+    """'code.0' (no leading numeric segment) must raise DisclosureParamError.
+
+    State: GREEN under old and new regex.
+    Pattern requires at least one leading \\d+ segment before any terminal.
+    """
+    with pytest.raises(DisclosureParamError):
+        DisclosureRequestParser().parse(navigate="code.0")
+
+
+def test_extended_ordinal_reject_leading_dot() -> None:
+    """'.4' (leading dot) must raise DisclosureParamError.
+
+    State: GREEN under old and new regex — both patterns anchor start with \\d.
+    """
+    with pytest.raises(DisclosureParamError):
+        DisclosureRequestParser().parse(navigate=".4")
+
+
+def test_extended_ordinal_reject_trailing_dot() -> None:
+    """'4.' (trailing dot with empty terminal) must raise DisclosureParamError.
+
+    State: GREEN under old and new regex — both require a non-empty terminal segment.
+    """
+    with pytest.raises(DisclosureParamError):
+        DisclosureRequestParser().parse(navigate="4.")
