@@ -7,6 +7,7 @@ This module is extended across implementation phases:
 - Phase 3 (T17/T18): ``TokenBoundedExtractor`` + ``BacklogViewDisclosureHandler``
   (orchestration, token bounding, response assembly).
 """
+
 from __future__ import annotations
 
 import re
@@ -30,11 +31,14 @@ from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 # Constants
 # ---------------------------------------------------------------------------
 
-_ORDINAL_PATTERN: re.Pattern[str] = re.compile(r"^(\d+\.)*\d+$")
-"""Ordinal dot-path regex from architect spec §7.2.
+_ORDINAL_PATTERN: re.Pattern[str] = re.compile(r"^\d+(\.\d+)*(\.code\.\d+)?$")
+"""Ordinal dot-path regex from architect spec §7.2 (corrected from spec literal — see DN-1).
 
-Accepts: ``"0"``, ``"4.0"``, ``"3.0.0"``.
-Rejects: empty string, path traversal (``../secrets``), alpha chars (``4.0.x``).
+Format: numeric path, optionally ending in one code-fence terminal.
+Accepts: ``"0"``, ``"4.0"``, ``"3.0.0"``, ``"4.0.code.0"``, ``"4.0.1.code.0"``.
+Rejects: empty string, path traversal (``../secrets``), alpha chars (``4.0.x``),
+bare ``code.0`` (no leading numeric segment), ``4.0.code`` (code without index),
+``4.0.foo.0`` (non-code alpha segment).
 """
 
 _HEAD_MIN: int = 1
@@ -122,23 +126,19 @@ class DisclosureRequestParser:
         # ------------------------------------------------------------------
         if map and navigate is not None:
             raise DisclosureParamError(
-                "map and navigate are mutually exclusive — choose one mode.",
-                {"map": map, "navigate": navigate},
+                "map and navigate are mutually exclusive — choose one mode.", {"map": map, "navigate": navigate}
             )
         if map and head is not None:
             raise DisclosureParamError(
-                "map is incompatible with head — map cannot extract a token window.",
-                {"map": map, "head": head},
+                "map is incompatible with head — map cannot extract a token window.", {"map": map, "head": head}
             )
         if head is not None and navigate is None:
             raise DisclosureParamError(
-                "head requires navigate — no target section to apply the token bound to.",
-                {"head": head},
+                "head requires navigate — no target section to apply the token bound to.", {"head": head}
             )
         if skip_tokens != 0 and head is None:
             raise DisclosureParamError(
-                "skip_tokens requires head — a pagination offset is only valid "
-                "when a token window (head) is also set.",
+                "skip_tokens requires head — a pagination offset is only valid when a token window (head) is also set.",
                 {"skip_tokens": skip_tokens},
             )
 
@@ -146,14 +146,10 @@ class DisclosureRequestParser:
         # 2. Range checks — run before ordinal validation
         # ------------------------------------------------------------------
         if skip_tokens < 0:
-            raise DisclosureParamError(
-                f"skip_tokens must be >= 0 (got {skip_tokens}).",
-                {"skip_tokens": skip_tokens},
-            )
+            raise DisclosureParamError(f"skip_tokens must be >= 0 (got {skip_tokens}).", {"skip_tokens": skip_tokens})
         if head is not None and not (_HEAD_MIN <= head <= _HEAD_MAX):
             raise DisclosureParamError(
-                f"head must be between {_HEAD_MIN} and {_HEAD_MAX} (got {head}).",
-                {"head": head},
+                f"head must be between {_HEAD_MIN} and {_HEAD_MAX} (got {head}).", {"head": head}
             )
 
         # ------------------------------------------------------------------
@@ -162,8 +158,8 @@ class DisclosureRequestParser:
         if navigate is not None and not _ORDINAL_PATTERN.fullmatch(navigate):
             raise DisclosureParamError(
                 f"navigate ordinal {navigate!r} is invalid. "
-                r"Expected format matching ^(\d+\.)*\d+$ "
-                '(e.g. "0", "4.0", "3.0.0").',
+                r"Expected format matching ^\d+(\.\d+)*(\.code\.\d+)?$ "
+                '(e.g. "0", "4.0", "3.0.0", "4.0.code.0").',
                 {"navigate": navigate},
             )
 
@@ -172,30 +168,18 @@ class DisclosureRequestParser:
         # ------------------------------------------------------------------
         if map:
             return DisclosureRequest(
-                mode=DisclosureMode.MAP,
-                navigate_ordinal=None,
-                head_tokens=None,
-                skip_tokens=skip_tokens,
+                mode=DisclosureMode.MAP, navigate_ordinal=None, head_tokens=None, skip_tokens=skip_tokens
             )
         if navigate is not None and head is not None:
             return DisclosureRequest(
-                mode=DisclosureMode.EXTRACT,
-                navigate_ordinal=navigate,
-                head_tokens=head,
-                skip_tokens=skip_tokens,
+                mode=DisclosureMode.EXTRACT, navigate_ordinal=navigate, head_tokens=head, skip_tokens=skip_tokens
             )
         if navigate is not None:
             return DisclosureRequest(
-                mode=DisclosureMode.NAVIGATE,
-                navigate_ordinal=navigate,
-                head_tokens=None,
-                skip_tokens=skip_tokens,
+                mode=DisclosureMode.NAVIGATE, navigate_ordinal=navigate, head_tokens=None, skip_tokens=skip_tokens
             )
         return DisclosureRequest(
-            mode=DisclosureMode.PASSTHROUGH,
-            navigate_ordinal=None,
-            head_tokens=None,
-            skip_tokens=skip_tokens,
+            mode=DisclosureMode.PASSTHROUGH, navigate_ordinal=None, head_tokens=None, skip_tokens=skip_tokens
         )
 
 
@@ -222,16 +206,10 @@ class TokenBoundedExtractor:
         result = extractor.extract(content, head_tokens=4000)
         if result.truncated:
             # next window: pass result.returned_tokens as skip_tokens
-            rest = extractor.extract(content, head_tokens=4000,
-                                     skip_tokens=result.returned_tokens)
+            rest = extractor.extract(content, head_tokens=4000, skip_tokens=result.returned_tokens)
     """
 
-    def extract(
-        self,
-        content: str,
-        head_tokens: int,
-        skip_tokens: int = 0,
-    ) -> BoundedContent:
+    def extract(self, content: str, head_tokens: int, skip_tokens: int = 0) -> BoundedContent:
         """Return the token window ``[skip_tokens : skip_tokens + head_tokens]``.
 
         The full content is encoded once with ``cl100k_base``.  The requested slice
@@ -264,10 +242,7 @@ class TokenBoundedExtractor:
         decoded: str = ENCODING.decode(window_tokens)
         truncated: bool = skip_tokens + returned_tokens < total_tokens
         return BoundedContent(
-            content=decoded,
-            total_tokens=total_tokens,
-            returned_tokens=returned_tokens,
-            truncated=truncated,
+            content=decoded, total_tokens=total_tokens, returned_tokens=returned_tokens, truncated=truncated
         )
 
 
@@ -312,9 +287,7 @@ class BacklogViewDisclosureHandler:
     """
 
     def __init__(
-        self,
-        normalizer: ItemContentNormalizer | None = None,
-        extractor: TokenBoundedExtractor | None = None,
+        self, normalizer: ItemContentNormalizer | None = None, extractor: TokenBoundedExtractor | None = None
     ) -> None:
         """Initialise handler with optional injected collaborators.
 
@@ -327,11 +300,7 @@ class BacklogViewDisclosureHandler:
         self._normalizer = normalizer if normalizer is not None else ItemContentNormalizer()
         self._extractor = extractor if extractor is not None else TokenBoundedExtractor()
 
-    def handle(
-        self,
-        selector: str,
-        request: DisclosureRequest,
-    ) -> MapResponse | NavigateResponse | BoundedResponse:
+    def handle(self, selector: str, request: DisclosureRequest) -> MapResponse | NavigateResponse | BoundedResponse:
         """Fetch item content and dispatch to the appropriate disclosure handler.
 
         Calls ``operations.view_item(selector)`` once (un-gated, full content),
@@ -378,11 +347,7 @@ class BacklogViewDisclosureHandler:
                 if request.head_tokens is None:  # parser invariant: always set for EXTRACT
                     raise ValueError("EXTRACT mode requires head_tokens.")
                 return self._handle_extract(
-                    selector,
-                    request.navigate_ordinal,
-                    request.head_tokens,
-                    request.skip_tokens,
-                    mapper,
+                    selector, request.navigate_ordinal, request.head_tokens, request.skip_tokens, mapper
                 )
             case _:
                 raise ValueError(
@@ -391,12 +356,7 @@ class BacklogViewDisclosureHandler:
                     f"code path before calling handle()."
                 )
 
-    def _handle_map(
-        self,
-        selector: str,
-        entries: list[OrdinalEntry],
-        mapper: OrdinalPathMapper,
-    ) -> MapResponse:
+    def _handle_map(self, selector: str, entries: list[OrdinalEntry], mapper: OrdinalPathMapper) -> MapResponse:
         """Build a structural map response.
 
         ``MapResponse.total_est_tokens`` sums LEVEL-1 section estimates only
@@ -425,11 +385,7 @@ class BacklogViewDisclosureHandler:
             over_budget=total_est_tokens > TOKEN_BUDGET,
         )
 
-    def _handle_navigate(
-        self,
-        ordinal: str,
-        mapper: OrdinalPathMapper,
-    ) -> NavigateResponse:
+    def _handle_navigate(self, ordinal: str, mapper: OrdinalPathMapper) -> NavigateResponse:
         """Resolve an ordinal to full section/entry content.
 
         Args:
@@ -447,20 +403,11 @@ class BacklogViewDisclosureHandler:
         """
         unit = mapper.resolve(ordinal)
         return NavigateResponse(
-            ordinal=ordinal,
-            title=unit.title,
-            content=unit.content,
-            total_tokens=unit.total_tokens,
-            truncated=False,
+            ordinal=ordinal, title=unit.title, content=unit.content, total_tokens=unit.total_tokens, truncated=False
         )
 
     def _handle_extract(
-        self,
-        selector: str,
-        ordinal: str,
-        head_tokens: int,
-        skip_tokens: int,
-        mapper: OrdinalPathMapper,
+        self, selector: str, ordinal: str, head_tokens: int, skip_tokens: int, mapper: OrdinalPathMapper
     ) -> BoundedResponse:
         """Extract a token-bounded window from a section/entry.
 
@@ -487,11 +434,7 @@ class BacklogViewDisclosureHandler:
                 map.
         """
         unit = mapper.resolve(ordinal)
-        bounded = self._extractor.extract(
-            unit.content,
-            head_tokens=head_tokens,
-            skip_tokens=skip_tokens,
-        )
+        bounded = self._extractor.extract(unit.content, head_tokens=head_tokens, skip_tokens=skip_tokens)
         next_call: str | None = None
         if bounded.truncated:
             next_skip = skip_tokens + bounded.returned_tokens
