@@ -381,18 +381,30 @@ class OrdinalPathMapper:
             # Level-2 emission gate (architect spec §5.6).
             emit_level2: bool = len(section.entries) > 1 or section_tokens > TOKEN_BUDGET
 
-            if emit_level2:
-                for entry in section.entries:
-                    level2_ordinal = f"{section.index}.{entry.index}"
-                    entry_content = entry.content
-                    entry_title = _extract_entry_title(entry_content)
+            for entry in section.entries:
+                level2_ordinal = f"{section.index}.{entry.index}"
+                entry_content = entry.content
+                entry_title = _extract_entry_title(entry_content)
 
-                    # Analyze subtree before creating the level-2 OrdinalEntry
-                    # so its est_tokens and preview reflect the final content.
-                    final_content, final_tokens, final_preview, sub_ents, sub_idx = self._index_entry_subtree(
-                        level2_ordinal, entry_content
-                    )
+                # Always index the subtree so deep ordinals remain resolvable
+                # even when the level-2 map line is suppressed by the gate.
+                final_content, final_tokens, final_preview, sub_ents, sub_idx = self._index_entry_subtree(
+                    level2_ordinal, entry_content
+                )
 
+                resolution_index[level2_ordinal] = _SubtreeNode(
+                    ordinal=level2_ordinal,
+                    title=entry_title,
+                    content=final_content,
+                    total_tokens=final_tokens,
+                    has_sub_heading_children=any(not node.is_code_block for node in sub_idx.values()),
+                    is_code_block=False,
+                    child_ordinals=[],
+                    code_block_ordinals=[],
+                )
+                resolution_index.update(sub_idx)
+
+                if emit_level2:
                     # Append level-2 entry BEFORE its sub-ordinals (document order).
                     entries.append(
                         OrdinalEntry(
@@ -402,20 +414,7 @@ class OrdinalPathMapper:
                             first_line_preview=final_preview,
                         )
                     )
-                    resolution_index[level2_ordinal] = _SubtreeNode(
-                        ordinal=level2_ordinal,
-                        title=entry_title,
-                        content=final_content,
-                        total_tokens=final_tokens,
-                        has_sub_heading_children=not final_content,
-                        is_code_block=False,
-                        child_ordinals=[],
-                        code_block_ordinals=[],
-                    )
-
-                    # Extend with sub-ordinals collected by _index_entry_subtree.
                     entries.extend(sub_ents)
-                    resolution_index.update(sub_idx)
 
         self._map_entries = entries
         self._resolution_index = resolution_index
@@ -597,11 +596,10 @@ class OrdinalPathMapper:
         # Fences before the first heading have section_id=None and are absent
         # from all SectionNode.code_block_ids.  doc.code_blocks preserves
         # insertion (document) order (Python 3.7+ dicts).
-        direct_fence_ids: list[str] = [
-            cb_id
-            for cb_id in doc.code_blocks
-            if cb_id not in {fence_id for node in doc.sections.values() for fence_id in node.code_block_ids}
-        ]
+        section_fence_ids: frozenset[str] = frozenset(
+            fence_id for node in doc.sections.values() for fence_id in node.code_block_ids
+        )
+        direct_fence_ids: list[str] = [cb_id for cb_id in doc.code_blocks if cb_id not in section_fence_ids]
 
         # §5.4 sub-heading gate: _MIN_ROOT_SECTIONS_FOR_PARENT or more root-level
         # sections activate navigate-on-parent (content="").  Single-heading entries

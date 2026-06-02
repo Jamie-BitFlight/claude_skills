@@ -32,6 +32,10 @@ class _StubEncoder:
         """Return a token list whose length tracks the input length monotonically."""
         return [0] * ((len(text) + 3) // 4)
 
+    def decode(self, tokens: list[int], *_args: object, **_kwargs: object) -> str:
+        """Return a placeholder string proportional to the token count."""
+        return " " * (len(tokens) * 4)
+
 
 def _ensure_cl100k_cached() -> bool:
     """Pre-warm tiktoken's encoding cache so importing ``server`` never downloads.

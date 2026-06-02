@@ -266,14 +266,9 @@ def test_extract_mode_echoes_navigate_ordinal() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Extended ordinal regex — §4.1 + §7.4 TDD contract (T04, expected RED before T09)
+# Extended ordinal regex — §4.1 + §7.4 contract
 #
-# Architecture spec new pattern: ^(\d+\.)*(\\d+|code\\.\\d+)$
-# Current pattern:               ^(\\d+\\.)*\\d+$
-#
-# State under the PRE-T09 (current) regex:
-#   RED  — test FAILS  (code-fence accept cases; T09 makes them GREEN)
-#   GREEN — test PASSES (deep numeric / all reject cases; must stay GREEN after T09)
+# Shipped pattern: ^\d+(\.\d+)*(\.code\.\d+)?$
 #
 # These tests are exercised through DisclosureRequestParser.parse() — the public
 # contract boundary — NOT by importing _ORDINAL_PATTERN directly.

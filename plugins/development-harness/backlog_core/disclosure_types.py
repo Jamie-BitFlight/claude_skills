@@ -91,7 +91,11 @@ class NavigateResponse:
     """tiktoken ``cl100k_base`` count of ``content``."""
 
     truncated: bool
-    """Always ``False`` for navigate-without-head responses."""
+    """``False`` for navigate-without-head responses.
+
+    May be ``True`` for EXTRACT-on-parent (navigate + head) when the
+    ``child_map`` text exceeds the head token budget.
+    """
 
     child_map: str | None = None
     """Formatted listing of direct sub-heading children when this node has

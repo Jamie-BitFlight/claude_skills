@@ -516,7 +516,7 @@ class TestSubHeadingBoundaryExtract:
 
 
 # ---------------------------------------------------------------------------
-# TC-B7: EXTRACT on parent node — child_map bounding (expected RED until T10)
+# TC-B7: EXTRACT on parent node — child_map bounding
 # AC#3: EXTRACT on has_sub_heading_children=True must bound child_map text.
 # ---------------------------------------------------------------------------
 
@@ -526,15 +526,8 @@ class TestExtractOnParentNode:
 
     Authored against architect spec §4.4 (EXTRACT-on-parent bounds child_map).
 
-    **Expected RED until T10** implements EXTRACT-on-parent branching in
-    ``BacklogViewDisclosureHandler._handle_extract()``.  At T10, the handler will
-    check ``unit.has_sub_heading_children`` and bound ``unit.child_map`` instead of
-    ``unit.content``.
-
-    Both tests fail at assertion (not at import or collection) because the mock
-    ``has_sub_heading_children=True`` attribute is not yet inspected by the handler.
-    The current handler always uses ``unit.content``, which is ``""`` for parents
-    (ADR-7), so result.content returns ``""`` and result.truncated is ``False``.
+    The handler checks ``unit.has_sub_heading_children`` and bounds
+    ``unit.child_map`` instead of ``unit.content`` when the target is a parent.
     """
 
     def test_extract_on_parent_bounds_child_map_text_not_content(self) -> None:
