@@ -98,11 +98,15 @@ Parameters:
   map          bool     optional  Return structured TOC map of item sections with ordinals
                                   and token estimates instead of body content  (default: false)
   navigate     str|null optional  Ordinal to resolve to full section content  (default: null)
+                                  Accepts: N, N.M, N.M.K (deep sub-heading), N.M.code.K (code fence)
+                                  Pattern: ^\d+(\.\d+)*(\.code\.\d+)?$
   head         int|null optional  Max tokens to return (1–25000); activates extraction mode
                                   with skip_tokens= for continuation  (default: null)
   skip_tokens  int      optional  Token offset for pagination continuation  (default: 0)
 
 Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
+         When navigate is set: {ordinal, title, content, total_tokens, truncated,
+           child_map: str|null, has_children: bool}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py view "<selector>" --format json
 ```
 
@@ -194,6 +198,71 @@ Parameters:
 Returns: {pulled, messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py pull [--dry-run] [--force]
 ```
+
+---
+
+## Navigate Ordinal Grammar
+
+`backlog_view` with `navigate=<ordinal>` resolves a specific section, sub-heading, or code
+fence from a backlog item body. The ordinal grammar supports unlimited recursive depth and
+code fence addressing.
+
+### Valid Ordinal Forms
+
+| Form | Example | Meaning |
+|---|---|---|
+| `N` | `4` | Section N (level-1) |
+| `N.M` | `4.0` | Entry M within section N (level-2) |
+| `N.M.K` | `4.0.1` | Sub-heading K within entry N.M (level-3+, recursive) |
+| `N.M.code.K` | `4.0.1.code.0` | Code fence K within the direct body of node N.M.K |
+
+Validation pattern (shipped `_ORDINAL_PATTERN`): `^\d+(\.\d+)*(\.code\.\d+)?$`
+
+**Invalid forms** that must be rejected by the MCP layer:
+
+- `code.0` — no leading numeric path
+- `4.0.code` — `code` segment without trailing index
+
+### Navigate Response Shape
+
+When `navigate` is set the response body includes these fields:
+
+```text
+ordinal:      str       — the ordinal that was resolved
+title:        str       — section or heading title
+content:      str       — prose body ("" when has_children is true — ADR-7)
+total_tokens: int       — token count of content
+truncated:    bool      — true if head= truncation was applied
+child_map:    str|null  — formatted listing of direct sub-heading children;
+                          non-null only when has_children is true
+has_children: bool      — true when this node has direct sub-heading children
+```
+
+### Navigate-on-Parent Semantics
+
+When the resolved ordinal addresses a node with sub-heading children (`has_children=true`):
+
+- `content` is `""` (empty string, NOT `null`) — this is correct per ADR-7
+- `child_map` is a non-null string listing direct child ordinals and titles
+- The validator MUST accept `content=""` combined with non-null `child_map` as a valid response
+- The validator MUST NOT flag empty `content` as a failure when `has_children=true`
+
+When the resolved ordinal addresses a leaf node or code fence (`has_children=false`):
+
+- `content` contains the full prose body (leaf) or raw fence body (code fence)
+- `child_map` is `null`
+
+### Code-Fence Miss Error Shape (AC#5)
+
+A request for a non-existent code-fence ordinal (e.g., `4.0.code.99`) returns the **same**
+`OrdinalNotFoundError` error structure as a non-existent numeric ordinal (e.g., `4.0.99`):
+
+```text
+{"error": "Ordinal '...' not found", ...}
+```
+
+The validator MUST NOT flag a code-fence ordinal miss as a different error type. The error
+response shape is identical regardless of whether the missing ordinal is numeric or code-fence.
 
 ---
 
