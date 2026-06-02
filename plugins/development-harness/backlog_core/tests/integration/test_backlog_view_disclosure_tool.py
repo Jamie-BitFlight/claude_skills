@@ -731,7 +731,7 @@ def _find_subheading_entry_ordinal(normalized: list[NormalizedSection]) -> str:
     entries = mapper.build_map()
     for e in entries:
         unit = mapper.resolve(e.ordinal)
-        if "### " in unit.content:
+        if unit.has_sub_heading_children:
             return e.ordinal
     all_ordinals = [e.ordinal for e in entries]
     raise ValueError(f"No entry with '### ' (sub-heading marker) in content found. All ordinals: {all_ordinals}")

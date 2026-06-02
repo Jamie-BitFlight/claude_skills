@@ -721,11 +721,15 @@ class OrdinalPathMapper:
                 node_tokens = 0
                 node_preview = ""
             else:
-                # Leaf or code-only: replace direct-body fences with tokens.
+                # Leaf or code-only: prepend the heading line so agents see the
+                # heading title in context (body_span starts AFTER the heading).
+                heading_line = f"{'#' * node.level} {node.title}"
+                full_body = f"{heading_line}\n{body_text}" if body_text else heading_line
+                # Replace direct-body fences with navigation tokens.
                 if section_fence_ids:
-                    node_content = _replace_code_fences_with_tokens(body_text, fence_ordinals_for_node)
+                    node_content = _replace_code_fences_with_tokens(full_body, fence_ordinals_for_node)
                 else:
-                    node_content = body_text
+                    node_content = full_body
                 node_tokens = len(self._enc.encode(node_content)) if node_content else 0
                 node_preview = _extract_preview(node_content)
 
