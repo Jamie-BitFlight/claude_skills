@@ -1,6 +1,6 @@
 ---
 name: project_backlog_core_disclosure_pipeline
-description: Disclosure pipeline architecture — ordinal_mapper, disclosure_handler, types, CI gap, test coverage gaps for backlog_view progressive disclosure
+description: Disclosure pipeline architecture — ordinal_mapper, disclosure_handler, types, test coverage gaps for backlog_view progressive disclosure
 metadata:
   type: project
 ---
@@ -21,10 +21,7 @@ metadata:
 **Reuse target for sub-heading parsing:**
 - `progressive_markdown/indexer.py::MarkdownIndexer` — recursive heading-tree builder with code-fence extraction. Factory: `ProgressiveMarkdownNavigator.from_markdown(markdown: str)` in `navigator.py` lines 113–131.
 
-**CRITICAL CI GAP**: `backlog_core/tests/` is NOT in any CI testpath.
-- Root `pyproject.toml` testpaths: `plugins/development-harness/tests`, `tests_sam`, `tests_backlog`, `plugins/agentskill-kaizen/tests`, etc. — excludes `backlog_core/tests/`.
-- DH `pyproject.toml` testpaths: `tests`, `tests_sam`, `tests_backlog` — excludes `backlog_core/tests/`.
-- All disclosure pipeline tests (test_ordinal_mapper.py, test_disclosure_handler.py, etc.) are run manually only.
+**NOTE**: `backlog_core/tests/` is included in root `pyproject.toml` testpaths (line 403: `"plugins/development-harness/backlog_core/tests"`). DH's own `pyproject.toml` does NOT include it (`testpaths = ["tests", "tests_sam", "tests_backlog"]`), so running pytest from within `plugins/development-harness/` directly misses these tests — use root pyproject.
 
 **Test coverage gaps as of 2026-06-01:**
 - No level-3 ordinal assertions in `test_ordinal_mapper.py` (fixture groomed_body_doc lines 128–169 already has `### Concerns`, `### RT-ICA` sub-headings in section [4]).

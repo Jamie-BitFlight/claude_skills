@@ -13,7 +13,7 @@ Version-bump refactor in `plugins/plugin-creator/scripts/auto_sync_manifests.py`
 
 **Key gaps that generated follow-ups:**
 - `_read_ref_json` real I/O path (lines 355-368) has zero test coverage — all TestWorkingBehindBase tests monkeypatch it → P1665
-- `explicit` param in `resolve_base()` and `ref` param in `_is_ahead_of_ref()` are dead generalizations; `_update_from_base_ref` inlines the comparison instead of calling `_is_ahead_of_ref` → P1666
+- `explicit` param in `resolve_base()` was a dead generalization (P1666). As of 2026-05-29 source, `resolve_base()` has no `explicit` param — param was already removed or P1666 cleaned it up. `_update_from_base_ref` inlines the comparison instead of calling `_is_ahead_of_ref`.
 - File is 1753 lines / 1252 LOC — HIGH file-size policy violation, pre-existing, out-of-scope → P1667
 
 **Why:** Test-authorship independence: all new `working < base` scenario tests share the same mock — they verify routing but not the real git I/O. The 60% coverage / 271-miss number exposes this.

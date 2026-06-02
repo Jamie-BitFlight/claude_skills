@@ -17,10 +17,11 @@ Do NOT add it to parameter tables. Instead, document the observable behavior:
 
 ### backlog skill — Canonical file paths
 
-- SKILL.md: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/SKILL.md`
-- README.md: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/README.md`
-- ARCHITECTURE.md: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/backlog_core/ARCHITECTURE.md`
-- server.py: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/backlog_core/server.py`
+- SKILL.md: `plugins/development-harness/skills/backlog/SKILL.md`
+- server.py: `plugins/development-harness/backlog_core/server.py`
+- operations.py: `plugins/development-harness/backlog_core/operations.py`
+
+Note: `.claude/skills/backlog/` does NOT exist — the skill lives in the plugin source tree.
 
 ### backlog_pull — dual return shape
 

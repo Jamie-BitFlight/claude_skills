@@ -19,7 +19,7 @@ metadata:
 
 ## New Functions Added (2026-05-29)
 
-- `resolve_base(explicit=None) -> str | None` — ref resolution: origin/main → main → None
+- `resolve_base() -> str | None` — ref resolution: origin/main → main → None (no `explicit` param)
 - `_read_ref_json(ref, filepath) -> object | None` — reads JSON at any ref; delegates to `_read_head_json` for "HEAD"
 - `_is_ahead_of_ref(filepath, version_key_path, ref) -> bool` — parameterised version comparison
 - `_version_already_bumped(filepath, version_key_path)` — alias calling `_is_ahead_of_ref(..., "HEAD")`
