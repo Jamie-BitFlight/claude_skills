@@ -786,7 +786,11 @@ class TestRecursiveSubHeadingOrdinals:
         entries = mapper.build_map()
 
         subtree_4 = {e.ordinal for e in entries if e.ordinal.startswith("4.")}
-        expected = {"4.0", "4.0.code.0", "4.0.0", "4.0.1", "4.0.1.code.0"}
+        # "4.1" is the flat second entry ("Second entry.") in section [4].
+        # It is emitted by the level-2 gate (entry_count=2 > 1) and correctly
+        # starts with "4.".  The §5.1 spec lists the 4.0 sub-structure (5
+        # ordinals); "4.1" is the sibling entry, also in the 4.x set.
+        expected = {"4.0", "4.0.code.0", "4.0.0", "4.0.1", "4.0.1.code.0", "4.1"}
         assert subtree_4 == expected, (
             f"Canonical §5.1 fixture 4.x subtree mismatch.\nExpected: {sorted(expected)}\nGot:      {sorted(subtree_4)}"
         )
