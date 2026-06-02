@@ -346,6 +346,23 @@ class BacklogViewDisclosureHandler:
                     raise ValueError("EXTRACT mode requires navigate_ordinal.")
                 if request.head_tokens is None:  # parser invariant: always set for EXTRACT
                     raise ValueError("EXTRACT mode requires head_tokens.")
+                # §4.4 EXTRACT-on-parent: pre-resolve to detect sub-heading parents.
+                # Parent nodes return NavigateResponse (child_map bounded by head).
+                # Leaf/code nodes delegate to _handle_extract → BoundedResponse.
+                unit = mapper.resolve(request.navigate_ordinal)
+                if unit.has_sub_heading_children:
+                    bounded = self._extractor.extract(
+                        unit.child_map, head_tokens=request.head_tokens, skip_tokens=request.skip_tokens
+                    )
+                    return NavigateResponse(
+                        ordinal=request.navigate_ordinal,
+                        title=unit.title,
+                        content=bounded.content,
+                        total_tokens=bounded.total_tokens,
+                        truncated=bounded.truncated,
+                        child_map=bounded.content,
+                        has_children=True,
+                    )
                 return self._handle_extract(
                     selector, request.navigate_ordinal, request.head_tokens, request.skip_tokens, mapper
                 )
@@ -386,7 +403,11 @@ class BacklogViewDisclosureHandler:
         )
 
     def _handle_navigate(self, ordinal: str, mapper: OrdinalPathMapper) -> NavigateResponse:
-        """Resolve an ordinal to full section/entry content.
+        """Resolve an ordinal to full section/entry content (§4.4 NAVIGATE).
+
+        Implements the navigate-on-parent branch: when the resolved node has
+        sub-heading children (``has_sub_heading_children=True``), returns a
+        child map instead of prose content so agents can drill down.
 
         Args:
             ordinal: Validated dot-path ordinal (e.g. ``"4.0"``).
@@ -394,7 +415,12 @@ class BacklogViewDisclosureHandler:
                 already called by ``handle()``).
 
         Returns:
-            ``NavigateResponse`` with full content and ``truncated=False``.
+            ``NavigateResponse`` with either:
+
+            - ``has_children=True``, ``child_map`` populated, ``content=""``
+              (ADR-7) when the node is a sub-heading parent.
+            - ``has_children=False``, ``content`` set to the full body text or
+              raw fence body, ``child_map=None`` for leaves and code blocks.
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
@@ -402,6 +428,19 @@ class BacklogViewDisclosureHandler:
                 recover without a second round-trip.
         """
         unit = mapper.resolve(ordinal)
+        if unit.has_sub_heading_children:
+            # Parent node: return child map so agents can navigate to children.
+            # content="" per ADR-7 — prose is accessed via individual child ordinals.
+            return NavigateResponse(
+                ordinal=ordinal,
+                title=unit.title,
+                content="",
+                total_tokens=0,
+                truncated=False,
+                child_map=unit.child_map,
+                has_children=True,
+            )
+        # Leaf or code-block node: return full content directly.
         return NavigateResponse(
             ordinal=ordinal, title=unit.title, content=unit.content, total_tokens=unit.total_tokens, truncated=False
         )
@@ -409,12 +448,16 @@ class BacklogViewDisclosureHandler:
     def _handle_extract(
         self, selector: str, ordinal: str, head_tokens: int, skip_tokens: int, mapper: OrdinalPathMapper
     ) -> BoundedResponse:
-        """Extract a token-bounded window from a section/entry.
+        """Extract a token-bounded window from a section/entry (§4.4 EXTRACT).
+
+        For sub-heading parent nodes (``has_sub_heading_children=True``), bounds
+        the ``child_map`` text so agents can page through a large menu.  For
+        leaf and code-block nodes, bounds the ``content`` prose as before.
 
         Builds a ``next_call`` continuation hint when the window is truncated.
         The hint uses ``skip_tokens=`` (not ``offset=``) per architect spec §5.7.
         The next skip position is cumulative: ``skip_tokens + bounded.returned_tokens``
-        (absolute token offset into the full content sequence).
+        (absolute token offset into the full text sequence).
 
         Args:
             selector: Item selector included in the ``next_call`` hint (in
@@ -427,14 +470,17 @@ class BacklogViewDisclosureHandler:
 
         Returns:
             ``BoundedResponse`` with ``next_call`` populated when truncated,
-            ``None`` otherwise.
+            ``None`` otherwise.  When the node is a sub-heading parent,
+            ``content`` holds the bounded ``child_map`` text.
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
                 map.
         """
         unit = mapper.resolve(ordinal)
-        bounded = self._extractor.extract(unit.content, head_tokens=head_tokens, skip_tokens=skip_tokens)
+        # §4.4 EXTRACT-on-parent: bound child_map text, not empty prose (ADR-7).
+        text_to_bound = unit.child_map if unit.has_sub_heading_children else unit.content
+        bounded = self._extractor.extract(text_to_bound, head_tokens=head_tokens, skip_tokens=skip_tokens)
         next_call: str | None = None
         if bounded.truncated:
             next_skip = skip_tokens + bounded.returned_tokens

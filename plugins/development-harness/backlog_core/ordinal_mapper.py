@@ -17,7 +17,7 @@ Does NOT:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from progressive_markdown.indexer import MarkdownIndexer
@@ -84,14 +84,31 @@ class ResolvedUnit:
     Attributes:
         ordinal: The ordinal string that was resolved.
         title: Section or entry heading text.
-        content: Full raw markdown text of the resolved unit.
+        content: Full raw markdown text of the resolved unit.  Empty string
+            when ``has_sub_heading_children`` is ``True`` (ADR-7).
         total_tokens: Exact tiktoken cl100k_base count of ``content`` (ADR-2).
+        has_sub_heading_children: ``True`` iff this node has direct SectionNode
+            children (sub-headings).  Set from ``_SubtreeNode`` during
+            ``resolve()``.  Code-only nodes are ``False`` (ADR-4).
+        is_code_block: ``True`` iff this ordinal addresses a code fence body.
+        child_ordinals: Direct sub-heading child ordinals (document order).
+            Populated from ``_SubtreeNode`` for level-3+ nodes; empty for
+            level-2 parents (see ``_build_child_map`` for discovery logic).
+        code_block_ordinals: Direct-body fence ordinals (document order).
+        child_map: Pre-rendered listing of direct sub-heading children using
+            the same ``format_map_line`` format as MAP responses.  Non-empty
+            only when ``has_sub_heading_children`` is ``True``.
     """
 
     ordinal: str
     title: str
     content: str
     total_tokens: int
+    has_sub_heading_children: bool = False
+    is_code_block: bool = False
+    child_ordinals: list[str] = field(default_factory=list)
+    code_block_ordinals: list[str] = field(default_factory=list)
+    child_map: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -450,8 +467,11 @@ class OrdinalPathMapper:
                 ``"4.0.1"``, ``"4.0.code.0"``).
 
         Returns:
-            ``ResolvedUnit`` with full content and exact cl100k_base token
-            count.
+            ``ResolvedUnit`` with full content and navigate-on-parent fields
+            populated from the internal ``_SubtreeNode``.  When
+            ``has_sub_heading_children`` is ``True``, ``child_map`` contains
+            a pre-rendered listing of direct sub-heading children (same format
+            as MAP responses).
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not present in the map
@@ -461,10 +481,56 @@ class OrdinalPathMapper:
         """
         if ordinal in self._resolution_index:
             node = self._resolution_index[ordinal]
+            child_map = self._build_child_map(ordinal) if node.has_sub_heading_children else ""
             return ResolvedUnit(
-                ordinal=node.ordinal, title=node.title, content=node.content, total_tokens=node.total_tokens
+                ordinal=node.ordinal,
+                title=node.title,
+                content=node.content,
+                total_tokens=node.total_tokens,
+                has_sub_heading_children=node.has_sub_heading_children,
+                is_code_block=node.is_code_block,
+                child_ordinals=node.child_ordinals,
+                code_block_ordinals=node.code_block_ordinals,
+                child_map=child_map,
             )
         raise OrdinalNotFoundError(ordinal, self.valid_ordinals())
+
+    def _build_child_map(self, parent_ordinal: str) -> str:
+        """Render direct sub-heading children of ``parent_ordinal`` as map lines.
+
+        Discovers children by scanning ``_resolution_index`` for ordinals that
+        are exactly one depth level below ``parent_ordinal`` and contain no
+        ``".code."`` segment (sub-heading children only, no code fences).
+
+        Level-2 parent nodes (``N.M``) have ``child_ordinals=[]`` because they
+        are created before ``_index_entry_subtree`` populates sub-ordinals.
+        This method bypasses that gap by discovering children from the index
+        directly rather than relying on ``node.child_ordinals``.
+
+        Args:
+            parent_ordinal: Dot-path ordinal of the parent node (e.g. ``"4.0"``).
+
+        Returns:
+            Newline-joined formatted map lines for direct sub-heading children,
+            in document (numeric) order.  Returns ``""`` when no children are
+            found (safe fallback).
+        """
+        prefix = parent_ordinal + "."
+        target_depth = parent_ordinal.count(".") + 1
+        child_ordinals: list[str] = sorted(
+            (
+                co
+                for co in self._resolution_index
+                if co.startswith(prefix) and co.count(".") == target_depth and ".code." not in co
+            ),
+            key=lambda o: int(o.rsplit(".", 1)[-1]),
+        )
+        lines: list[str] = []
+        for co in child_ordinals:
+            cn = self._resolution_index[co]
+            entry = OrdinalEntry(ordinal=cn.ordinal, title=cn.title, est_tokens=cn.total_tokens, first_line_preview="")
+            lines.append(self.format_map_line(entry))
+        return "\n".join(lines)
 
     def valid_ordinals(self) -> list[str]:
         """Return all ordinals from the most recent ``build_map()`` call.
