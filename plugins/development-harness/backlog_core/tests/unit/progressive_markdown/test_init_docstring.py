@@ -46,11 +46,7 @@ def test_all_exports_appear_in_module_docstring() -> None:
 
     # Act — derive missing names from __all__ at runtime (no hardcoded list)
     docstring: str = progressive_markdown.__doc__
-    missing: list[str] = [
-        name
-        for name in progressive_markdown.__all__
-        if name not in docstring
-    ]
+    missing: list[str] = [name for name in progressive_markdown.__all__ if name not in docstring]
 
     # Assert — report the specific missing names so the failure is actionable
     assert not missing, (

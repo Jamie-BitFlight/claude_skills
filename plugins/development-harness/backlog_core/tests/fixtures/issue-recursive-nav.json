@@ -1,0 +1,22 @@
+{
+  "title": "Recursive Navigation Test",
+  "sections_index": "## Sections\n[0] Analysis (2 entries)\n",
+  "sections": {
+    "Analysis": {
+      "num_entries": 2,
+      "num_struck": 0,
+      "entries": [
+        {
+          "id": "2026-06-01T00:00:00",
+          "struck": false,
+          "content": "Preamble content for entry one.\n\n```python\ndef first_fence():\n    return \"fence body\"\n```\n\n### Sub-heading One\n\nContent for sub-heading one. This is the first child.\n\n### Sub-heading Two\n\nContent for sub-heading two. This is the second child.\n"
+        },
+        {
+          "id": "2026-06-01T00:01:00",
+          "struck": false,
+          "content": "Second entry content. No sub-headings here.\n"
+        }
+      ]
+    }
+  }
+}

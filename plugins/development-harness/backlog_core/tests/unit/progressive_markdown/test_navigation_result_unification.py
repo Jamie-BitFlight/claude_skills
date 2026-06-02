@@ -48,11 +48,7 @@ _ITEMS: list[dict[str, object]] = [
 @pytest.fixture
 def disclosure() -> ProgressiveDisclosure:
     """ProgressiveDisclosure instance over three sample task items."""
-    return ProgressiveDisclosure(
-        _ITEMS,
-        config=DisclosureConfig(id_field="id"),
-        tool_name="test_tool",
-    )
+    return ProgressiveDisclosure(_ITEMS, config=DisclosureConfig(id_field="id"), tool_name="test_tool")
 
 
 # ---------------------------------------------------------------------------
@@ -60,9 +56,7 @@ def disclosure() -> ProgressiveDisclosure:
 # ---------------------------------------------------------------------------
 
 
-def test_select_found_item_returns_navigation_result(
-    disclosure: ProgressiveDisclosure,
-) -> None:
+def test_select_found_item_returns_navigation_result(disclosure: ProgressiveDisclosure) -> None:
     """select() must return NavigationResult when the item is found (architect §4.1.1).
 
     PRE-FIX STATE: FAILS.
@@ -88,9 +82,7 @@ def test_select_found_item_returns_navigation_result(
 # ---------------------------------------------------------------------------
 
 
-def test_select_missing_item_returns_navigation_result_not_none(
-    disclosure: ProgressiveDisclosure,
-) -> None:
+def test_select_missing_item_returns_navigation_result_not_none(disclosure: ProgressiveDisclosure) -> None:
     """select() must return NavigationResult for an unmatched selector — never None.
 
     Architect §4.1.1: ``def select(self, selector: str) -> NavigationResult``
@@ -114,8 +106,7 @@ def test_select_missing_item_returns_navigation_result_not_none(
         "Fix: return NavigationResult (e.g. kind=error) per architect §4.1.1."
     )
     assert isinstance(result, NavigationResult), (
-        f"select() must return NavigationResult for an unmatched selector. "
-        f"Got {type(result).__name__!r}."
+        f"select() must return NavigationResult for an unmatched selector. Got {type(result).__name__!r}."
     )
 
 
@@ -124,9 +115,7 @@ def test_select_missing_item_returns_navigation_result_not_none(
 # ---------------------------------------------------------------------------
 
 
-def test_page_returns_navigation_result(
-    disclosure: ProgressiveDisclosure,
-) -> None:
+def test_page_returns_navigation_result(disclosure: ProgressiveDisclosure) -> None:
     """page() must return NavigationResult (architect §4.1.1).
 
     PRE-FIX STATE: FAILS.
@@ -164,19 +153,10 @@ def test_paginate_results_returns_dict_with_legacy_keys() -> None:
     """
     items = [{"id": f"T{i:02d}", "title": f"Task {i}"} for i in range(5)]
 
-    result = paginate_results(
-        items,
-        offset=0,
-        limit=3,
-        messages=[],
-        warnings=[],
-        errors=[],
-        tool_name="test_tool",
-    )
+    result = paginate_results(items, offset=0, limit=3, messages=[], warnings=[], errors=[], tool_name="test_tool")
 
     assert isinstance(result, dict), (
-        f"paginate_results() must return dict (legacy shim). "
-        f"Got {type(result).__name__!r}."
+        f"paginate_results() must return dict (legacy shim). Got {type(result).__name__!r}."
     )
     # Core legacy keys that callers depend on
     for key in ("items", "count", "pagination", "messages", "warnings", "errors"):
@@ -184,9 +164,7 @@ def test_paginate_results_returns_dict_with_legacy_keys() -> None:
     # Pagination sub-dict shape
     pagination = result["pagination"]
     for sub_key in ("offset", "limit", "total", "has_more"):
-        assert sub_key in pagination, (
-            f"pagination[{sub_key!r}] must be present in paginate_results() output."
-        )
+        assert sub_key in pagination, f"pagination[{sub_key!r}] must be present in paginate_results() output."
     # Verify count reflects the limit
     assert result["count"] == 3
     assert result["pagination"]["total"] == 5
@@ -209,30 +187,16 @@ def test_navigation_result_model_dump_available_for_dict_migration() -> None:
     GREEN pre-fix: NavigationResult already has model_dump() (Pydantic v2 model).
     GREEN post-fix: unchanged.
     """
-    page = Page(
-        content="Task T01 content",
-        page_number=1,
-        total_pages=1,
-        token_count=4,
-        budget=9500,
-    )
+    page = Page(content="Task T01 content", page_number=1, total_pages=1, token_count=4, budget=9500)
     nav_result = NavigationResult(
-        kind=NavigationKind.section_body,
-        title="T01",
-        pages=[page],
-        current_page=1,
-        total_pages=1,
+        kind=NavigationKind.section_body, title="T01", pages=[page], current_page=1, total_pages=1
     )
 
     dumped = nav_result.model_dump()
 
-    assert isinstance(dumped, dict), (
-        "NavigationResult.model_dump() must return dict for dict-migration callers."
-    )
+    assert isinstance(dumped, dict), "NavigationResult.model_dump() must return dict for dict-migration callers."
     # Fields that migration callers need to read back
     for field in ("kind", "title", "pages", "current_page", "total_pages", "has_more"):
-        assert field in dumped, (
-            f"model_dump() must include field {field!r} for complete dict migration."
-        )
+        assert field in dumped, f"model_dump() must include field {field!r} for complete dict migration."
     # Computed field has_more is included in model_dump() (Pydantic v2 @computed_field)
     assert isinstance(dumped["has_more"], bool)

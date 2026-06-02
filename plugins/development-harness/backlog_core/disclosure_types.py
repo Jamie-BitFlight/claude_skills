@@ -6,6 +6,7 @@ Downstream tasks (T13-T16) import from here -- no other module redefines these t
 All response types are frozen dataclasses (not Pydantic models — they are internal
 value objects or MCP response shapes, not ingress validators).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -62,7 +63,17 @@ class MapResponse:
 
 @dataclass(frozen=True, slots=True)
 class NavigateResponse:
-    """Response for ``navigate=ordinal`` without ``head``."""
+    """Response for ``navigate=ordinal`` without ``head``.
+
+    When ``has_children`` is ``True`` the node has sub-heading children and
+    ``child_map`` contains a formatted listing of their ordinals and titles.
+    ``content`` is an empty string in that case — prose is accessed by
+    navigating to individual child ordinals (ADR-7).
+
+    When ``has_children`` is ``False`` the node is a leaf (or a code-only
+    node) and ``content`` carries the full body text or raw fence body.
+    ``child_map`` is ``None``.
+    """
 
     ordinal: str
     """Echoed ordinal string (e.g. ``'4.0'``)."""
@@ -71,13 +82,32 @@ class NavigateResponse:
     """Section or entry heading text."""
 
     content: str
-    """Full section/entry content — may be large."""
+    """Full section/entry content — may be large.
+
+    Empty string (not ``None``) when ``has_children`` is ``True`` (ADR-7).
+    """
 
     total_tokens: int
     """tiktoken ``cl100k_base`` count of ``content``."""
 
     truncated: bool
-    """Always ``False`` for navigate-without-head responses."""
+    """``False`` for navigate-without-head responses.
+
+    May be ``True`` for EXTRACT-on-parent (navigate + head) when the
+    ``child_map`` text exceeds the head token budget.
+    """
+
+    child_map: str | None = None
+    """Formatted listing of direct sub-heading children when this node has
+    sub-heading children; ``None`` for leaf nodes and code-block nodes."""
+
+    has_children: bool = False
+    """``True`` iff this node has sub-heading children (``SectionNode`` children).
+
+    Code-only nodes (prose + fences, no sub-headings) have ``has_children=False``
+    (ADR-4).  When ``True``, callers should display ``child_map`` and navigate
+    to a child ordinal rather than using ``content`` directly.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,10 +182,7 @@ class OrdinalNotFoundError(Exception):
 
     def __init__(self, requested: str, valid_ordinals: list[str]) -> None:
         """Initialize with the missing ordinal and the full list of valid ordinals."""
-        super().__init__(
-            f"Ordinal {requested!r} not found. "
-            f"Valid ordinals: {valid_ordinals}"
-        )
+        super().__init__(f"Ordinal {requested!r} not found. Valid ordinals: {valid_ordinals}")
         self.requested = requested
         self.valid_ordinals = valid_ordinals
 

@@ -50,6 +50,20 @@ Document model
     A ``(start_line, end_line)`` pair marking where a node originates in
     the source Markdown.
 
+Parsing internals
+-----------------
+``MarkdownItParser``
+    Low-level tokenizer wrapper.  Converts raw Markdown source into a
+    ``ParserResult`` token stream consumed by ``MarkdownIndexer``.
+``ParserResult``
+    Dataclass produced by ``MarkdownItParser.parse()``.  Carries the token
+    stream and source metadata; passed directly to ``MarkdownIndexer.build()``.
+``MarkdownIndexer``
+    Builds a ``MarkdownDocument`` from a ``ParserResult``.  Use the two-step
+    sequence ``MarkdownItParser().parse(source, text)`` →
+    ``MarkdownIndexer().build(result)`` when you need a ``MarkdownDocument``
+    without the full navigator facade.
+
 Content providers
 -----------------
 ``MarkdownContentProvider``
@@ -149,6 +163,7 @@ from .exceptions import (
     ProviderError,
     SectionNotFoundError,
 )
+from .indexer import MarkdownIndexer
 from .list_navigator import (
     ENCODING,
     TOKEN_BUDGET,
@@ -170,6 +185,7 @@ from .models import (
     SourceSpan,
 )
 from .navigator import ProgressiveMarkdownNavigator
+from .parser import MarkdownItParser, ParserResult
 from .providers import CallableMarkdownContentProvider, MarkdownContentProvider, MCPMarkdownContentProvider
 
 __all__ = [
@@ -186,12 +202,15 @@ __all__ = [
     "MCPMarkdownContentProvider",
     "MarkdownContentProvider",
     "MarkdownDocument",
+    "MarkdownIndexer",
+    "MarkdownItParser",
     "NavigationKind",
     "NavigationResult",
     "NavigatorOptions",
     "Page",
     "PaginationError",
     "ParserError",
+    "ParserResult",
     "ProgressiveDisclosure",
     "ProgressiveMarkdownError",
     "ProgressiveMarkdownNavigator",

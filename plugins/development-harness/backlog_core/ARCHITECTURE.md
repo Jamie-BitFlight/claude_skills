@@ -488,3 +488,82 @@ Bootstrap receives the project root from `models.get_repo_root()`, which returns
 These are CLI-specific display concerns that don't belong in core logic.
 
 **Imports**: `from .operations import ...`, `from .models import ...`
+
+---
+
+## Module: Progressive Disclosure (ordinal_mapper.py, disclosure_handler.py, disclosure_types.py)
+
+**Responsibility**: Deliver backlog item content progressively. Large items are navigated
+via a token-efficient ordinal map rather than returned in a single call.
+
+Contract reference: `docs/mcp-progressive-disclosure-contract.md`.
+
+### MarkdownIndexer Integration
+
+`OrdinalPathMapper.build_map()` calls `_index_entry_subtree()` for each level-2 entry to
+index sub-headings and code fences into the resolution index.
+
+**Construction sequence** (DN-1 — actual sequence differs from architecture spec §4.1):
+
+```text
+MarkdownItParser().parse("inline", entry_content)  →  MarkdownIndexer().build(result)
+```
+
+`MarkdownIndexer.build()` takes a `ParserResult`, not a raw string.
+`MarkdownItParser` is imported from `progressive_markdown.parser`.
+
+**MarkdownDocument fields** (DN-2 — field names differ from architecture spec §4.1):
+
+- `.sections: dict[str, SectionNode]` — sections by ID (the spec documented `.sections_by_id`)
+- `.code_blocks: dict[str, CodeBlock]` — code blocks by ID (the spec documented `.code_blocks_by_id`)
+- `.root_section_ids: list[str]` — IDs of top-level sections
+
+`SectionNode` fields used: `.child_ids`, `.code_block_ids`, `.body_span`, `.title`, `.level`.
+`CodeBlock` fields used: `.content` (raw fence body, no delimiters), `.language`.
+
+### Ordinal Assignment
+
+| Node type | Ordinal format | Assigned by |
+|---|---|---|
+| Section (level 1) | `N` | `build_map()` |
+| Entry (level 2) | `N.M` | `build_map()` |
+| Sub-heading (level 3+) | `N.M.K[.J...]` | `_collect_section_children()` recursively |
+| Code fence (direct body) | `parent.code.K` | `_emit_direct_fence_ordinals()` |
+
+K and J are 0-based sibling indices. Direct-body fences are code blocks that are not
+contained within any named section (they appear before the first heading in the entry body).
+
+### Navigate-on-Parent Gate
+
+Whether a node returns a child map or prose body differs by depth:
+
+- **Level-2 entry**: `has_sub_heading_children` is `True` iff
+  `len(doc.root_section_ids) >= _MIN_ROOT_SECTIONS_FOR_PARENT` (constant value `2`).
+  Entries with a single top-level heading are treated as leaves and return full content.
+- **Level-3+ sub-heading node**: `has_sub_heading_children` is `True` iff
+  `bool(node.child_ids)` — any child section triggers parent behavior.
+
+Source: `ordinal_mapper.py`, `_MIN_ROOT_SECTIONS_FOR_PARENT` constant and
+`_collect_section_children()`.
+
+### Resolution Index vs Map Text Split (§5.3)
+
+`_ResolutionIndex: dict[str, _SubtreeNode]` is built eagerly to all depths during
+`build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
+
+`MapResponse.map_text` is bounded by `TOKEN_BUDGET` (from
+`progressive_markdown.list_navigator`) and may omit deep ordinals from the rendered listing.
+Deep ordinals remain resolvable via `navigate=`.
+
+### Token Counting
+
+All token counts use the `ENCODING` singleton from `progressive_markdown.list_navigator`
+(ADR-2). No additional tiktoken instantiation occurs in this subsystem.
+
+### Key Files
+
+| File | Responsibility |
+|---|---|
+| `ordinal_mapper.py` | Ordinal assignment, `_ResolutionIndex`, `_SubtreeNode`, fence extraction |
+| `disclosure_handler.py` | Request parsing, navigate-on-parent dispatch, `_ORDINAL_PATTERN` |
+| `disclosure_types.py` | `NavigateResponse`, `MapResponse`, `BoundedResponse`, `OrdinalNotFoundError` |

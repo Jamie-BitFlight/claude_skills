@@ -9,6 +9,7 @@ Does NOT:
 - Fetch items from the backend (``BacklogViewDisclosureHandler``'s responsibility).
 - Build ordinals or map lines (``OrdinalPathMapper``'s responsibility).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -80,7 +81,7 @@ def _parse_section_titles(index_source: str) -> list[str]:
         if not in_block:
             continue
         if line.startswith("[") and "] " in line:
-            after_bracket = line[line.index("] ") + 2:]
+            after_bracket = line[line.index("] ") + 2 :]
             # rsplit on the last " (" strips "( N entries)" while preserving
             # titles like "Groomed (2026-06-01)" that contain "(" themselves.
             title = after_bracket.rsplit(" (", 1)[0]
@@ -108,9 +109,7 @@ def _is_entry_section_metadata(
     return cast("dict[str, object]", section).get("type") != "groomed"
 
 
-def _build_entries(
-    section: SectionEntryMetadata | GroomedSectionMetadata,
-) -> list[NormalizedEntry]:
+def _build_entries(section: SectionEntryMetadata | GroomedSectionMetadata) -> list[NormalizedEntry]:
     """Extract a ``NormalizedEntry`` list from a section metadata value.
 
     Returns an empty list for ``GroomedSectionMetadata`` (no flat entry list),
@@ -127,10 +126,7 @@ def _build_entries(
         return []
     # After TypeGuard narrowing, section is SectionEntryMetadata.
     # section["entries"] is list[SectionEntryDict]; each entry["content"] is str.
-    return [
-        NormalizedEntry(index=i, content=entry["content"])
-        for i, entry in enumerate(section["entries"])
-    ]
+    return [NormalizedEntry(index=i, content=entry["content"]) for i, entry in enumerate(section["entries"])]
 
 
 # ---------------------------------------------------------------------------
@@ -197,18 +193,8 @@ class ItemContentNormalizer:
                 # collapse in sections dict; still emit entry with empty content).
                 out.append(NormalizedSection(index=idx, title=title, entries=[]))
                 continue
-            out.append(
-                NormalizedSection(
-                    index=idx,
-                    title=title,
-                    entries=_build_entries(section_meta),
-                )
-            )
+            out.append(NormalizedSection(index=idx, title=title, entries=_build_entries(section_meta)))
         return out
 
 
-__all__ = [
-    "ItemContentNormalizer",
-    "NormalizedEntry",
-    "NormalizedSection",
-]
+__all__ = ["ItemContentNormalizer", "NormalizedEntry", "NormalizedSection"]

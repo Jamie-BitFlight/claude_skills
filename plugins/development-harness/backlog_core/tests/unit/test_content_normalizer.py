@@ -67,14 +67,8 @@ def _entry_dict(content: str, entry_id: str = "test-id") -> SectionEntryDict:
 
 def _section(contents: list[str]) -> SectionEntryMetadata | GroomedSectionMetadata:
     """Build a SectionEntryMetadata with the given entry contents."""
-    entries: list[SectionEntryDict] = [
-        _entry_dict(c, f"e{i}") for i, c in enumerate(contents)
-    ]
-    return SectionEntryMetadata(
-        num_entries=len(entries),
-        num_struck=0,
-        entries=entries,
-    )
+    entries: list[SectionEntryDict] = [_entry_dict(c, f"e{i}") for i, c in enumerate(contents)]
+    return SectionEntryMetadata(num_entries=len(entries), num_struck=0, entries=entries)
 
 
 def _load_fixture(name: str) -> dict[str, object]:
@@ -111,7 +105,7 @@ def _extract_body_section_order(body: str) -> list[str]:
     for line in body.split("\n"):
         if not (line.startswith("[") and "] " in line):
             continue
-        after_bracket = line[line.index("] ") + 2:]
+        after_bracket = line[line.index("] ") + 2 :]
         # Format: "Title (N entries)" — rsplit on last " (" to handle "(date)" in title.
         title = after_bracket.rsplit(" (", 1)[0]
         titles.append(title)
@@ -147,23 +141,15 @@ class TestNormalizerOrderFromSectionsIndex:
         }
         body = _body_sections_block([("Gamma", 1), ("Alpha", 1), ("Beta", 2)])
 
-        normalized = ItemContentNormalizer().normalize(
-            ViewItemResult(sections=sections, body=body, sections_index="")
-        )
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
 
-        assert len(normalized) == 3, (
-            f"Expected 3 sections; got {len(normalized)}."
-        )
+        assert len(normalized) == 3, f"Expected 3 sections; got {len(normalized)}."
         assert normalized[0].title == "Gamma", (
             f"[0]=Gamma must be first; got {normalized[0].title!r}. "
             "Order MUST follow ## Sections block, not dict.keys()."
         )
-        assert normalized[1].title == "Alpha", (
-            f"[1]=Alpha must be second; got {normalized[1].title!r}."
-        )
-        assert normalized[2].title == "Beta", (
-            f"[2]=Beta must be third; got {normalized[2].title!r}."
-        )
+        assert normalized[1].title == "Alpha", f"[1]=Alpha must be second; got {normalized[1].title!r}."
+        assert normalized[2].title == "Beta", f"[2]=Beta must be third; got {normalized[2].title!r}."
 
     def test_sections_index_field_order_overrides_dict_keys(self) -> None:
         """When sections_index FIELD is populated (summary path), its [N] ordering governs.
@@ -199,14 +185,11 @@ class TestNormalizerOrderFromSectionsIndex:
         }
         body = _body_sections_block([("A", 1), ("B", 1), ("C", 1)])
 
-        normalized = ItemContentNormalizer().normalize(
-            ViewItemResult(sections=sections, body=body, sections_index="")
-        )
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
 
         for pos, section in enumerate(normalized):
             assert section.index == pos, (
-                f"NormalizedSection.index must be {pos}; "
-                f"got {section.index} for {section.title!r}."
+                f"NormalizedSection.index must be {pos}; got {section.index} for {section.title!r}."
             )
 
 
@@ -226,30 +209,20 @@ class TestNormalizerEmptySection:
         """
         sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {
             "Intro": _section(["intro content"]),
-            "Groomed (2026-06-01)": _section([]),   # 0 entries — the empty section
+            "Groomed (2026-06-01)": _section([]),  # 0 entries — the empty section
             "Analysis": _section(["analysis content"]),
         }
-        body = _body_sections_block([
-            ("Intro", 1), ("Groomed (2026-06-01)", 0), ("Analysis", 1)
-        ])
+        body = _body_sections_block([("Intro", 1), ("Groomed (2026-06-01)", 0), ("Analysis", 1)])
 
-        normalized = ItemContentNormalizer().normalize(
-            ViewItemResult(sections=sections, body=body, sections_index="")
-        )
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
 
-        assert len(normalized) == 3, (
-            f"All 3 sections (including empty Groomed) must appear; got {len(normalized)}."
-        )
+        assert len(normalized) == 3, f"All 3 sections (including empty Groomed) must appear; got {len(normalized)}."
         groomed = normalized[1]
         assert groomed.title == "Groomed (2026-06-01)", (
             f"Position 1 must be the empty Groomed section; got {groomed.title!r}."
         )
-        assert groomed.entries == [], (
-            f"Groomed section must have entries=[]; got {groomed.entries!r}."
-        )
-        assert groomed.index == 1, (
-            f"Empty section ordinal must be 1 (position preserved); got {groomed.index}."
-        )
+        assert groomed.entries == [], f"Groomed section must have entries=[]; got {groomed.entries!r}."
+        assert groomed.index == 1, f"Empty section ordinal must be 1 (position preserved); got {groomed.index}."
 
     def test_sections_after_empty_section_have_correct_ordinal(self) -> None:
         """Sections after an empty section keep their correct ordinal — no gap compression."""
@@ -260,16 +233,11 @@ class TestNormalizerEmptySection:
         }
         body = _body_sections_block([("A", 1), ("Empty", 0), ("C", 1)])
 
-        normalized = ItemContentNormalizer().normalize(
-            ViewItemResult(sections=sections, body=body, sections_index="")
-        )
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
 
-        assert normalized[2].title == "C", (
-            f"Third section must be C; got {normalized[2].title!r}."
-        )
+        assert normalized[2].title == "C", f"Third section must be C; got {normalized[2].title!r}."
         assert normalized[2].index == 2, (
-            f"C must have index=2 (no gap due to empty section at 1); "
-            f"got {normalized[2].index}."
+            f"C must have index=2 (no gap due to empty section at 1); got {normalized[2].index}."
         )
 
 
@@ -284,26 +252,18 @@ class TestNormalizedEntryStructure:
     def test_entries_have_correct_index_and_content(self) -> None:
         """NormalizedEntry.index is 0-based within its parent section; content is preserved."""
         sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {
-            "Tasks": _section(["first task", "second task", "third task"]),
+            "Tasks": _section(["first task", "second task", "third task"])
         }
         body = _body_sections_block([("Tasks", 3)])
 
-        normalized = ItemContentNormalizer().normalize(
-            ViewItemResult(sections=sections, body=body, sections_index="")
-        )
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
 
         assert len(normalized) == 1
         tasks_section = normalized[0]
-        assert len(tasks_section.entries) == 3, (
-            f"Tasks section must have 3 entries; got {len(tasks_section.entries)}."
-        )
+        assert len(tasks_section.entries) == 3, f"Tasks section must have 3 entries; got {len(tasks_section.entries)}."
         for i, entry in enumerate(tasks_section.entries):
-            assert isinstance(entry, NormalizedEntry), (
-                f"Entry {i} must be NormalizedEntry; got {type(entry).__name__}."
-            )
-            assert entry.index == i, (
-                f"NormalizedEntry.index must be {i} (0-based within section); got {entry.index}."
-            )
+            assert isinstance(entry, NormalizedEntry), f"Entry {i} must be NormalizedEntry; got {type(entry).__name__}."
+            assert entry.index == i, f"NormalizedEntry.index must be {i} (0-based within section); got {entry.index}."
 
 
 # ---------------------------------------------------------------------------
@@ -318,9 +278,7 @@ class TestNormalizerIssue2521Fixture:
     def data_2521(self) -> dict[str, object]:
         return _load_fixture("issue-2521-full.json")
 
-    def test_returns_one_section_per_fixture_section(
-        self, data_2521: dict[str, object]
-    ) -> None:
+    def test_returns_one_section_per_fixture_section(self, data_2521: dict[str, object]) -> None:
         """normalize() on #2521 returns exactly as many sections as the fixture has."""
         sections = _fixture_sections(data_2521)
         expected = len(sections)
@@ -328,18 +286,12 @@ class TestNormalizerIssue2521Fixture:
         result = ViewItemResult.model_validate(data_2521)
         normalized = ItemContentNormalizer().normalize(result)
 
-        assert len(normalized) == expected, (
-            f"Expected {expected} sections from #2521 fixture; got {len(normalized)}."
-        )
+        assert len(normalized) == expected, f"Expected {expected} sections from #2521 fixture; got {len(normalized)}."
 
-    def test_order_matches_body_sections_block(
-        self, data_2521: dict[str, object]
-    ) -> None:
+    def test_order_matches_body_sections_block(self, data_2521: dict[str, object]) -> None:
         """Normalized section titles match the order in the body ## Sections block."""
         body = str(data_2521.get("body", ""))
-        assert body.startswith("## Sections"), (
-            "Precondition: #2521 body must start with the ## Sections index block."
-        )
+        assert body.startswith("## Sections"), "Precondition: #2521 body must start with the ## Sections index block."
         expected_titles = _extract_body_section_order(body)
         assert expected_titles, "Precondition: extracted title list must be non-empty."
 
@@ -353,31 +305,23 @@ class TestNormalizerIssue2521Fixture:
             f"Got:      {actual_titles}"
         )
 
-    def test_groomed_section_has_empty_entries(
-        self, data_2521: dict[str, object]
-    ) -> None:
+    def test_groomed_section_has_empty_entries(self, data_2521: dict[str, object]) -> None:
         """The Groomed (2026-06-01) section in #2521 appears in output with entries=[]."""
         groomed_title = "Groomed (2026-06-01)"
         sections = _fixture_sections(data_2521)
-        assert groomed_title in sections, (
-            f"Precondition: fixture must contain {groomed_title!r}."
-        )
+        assert groomed_title in sections, f"Precondition: fixture must contain {groomed_title!r}."
         meta = sections[groomed_title]
         assert meta.get("num_entries") == 0, (
-            f"Precondition: Groomed section must have num_entries=0; "
-            f"got {meta.get('num_entries')}."
+            f"Precondition: Groomed section must have num_entries=0; got {meta.get('num_entries')}."
         )
 
         result = ViewItemResult.model_validate(data_2521)
         normalized = ItemContentNormalizer().normalize(result)
 
         groomed_hits = [s for s in normalized if s.title == groomed_title]
-        assert len(groomed_hits) == 1, (
-            f"Exactly one {groomed_title!r} must appear; got {len(groomed_hits)}."
-        )
+        assert len(groomed_hits) == 1, f"Exactly one {groomed_title!r} must appear; got {len(groomed_hits)}."
         assert groomed_hits[0].entries == [], (
-            f"Empty Groomed section must have entries=[]; "
-            f"got {groomed_hits[0].entries!r}."
+            f"Empty Groomed section must have entries=[]; got {groomed_hits[0].entries!r}."
         )
 
 
@@ -404,9 +348,7 @@ class TestNormalizerIssue2515Fixture:
         result = ViewItemResult.model_validate(data_2515)
         return ItemContentNormalizer().normalize(result)
 
-    def test_returns_non_empty_list(
-        self, normalized_2515: list[NormalizedSection]
-    ) -> None:
+    def test_returns_non_empty_list(self, normalized_2515: list[NormalizedSection]) -> None:
         """normalize() on full un-gated #2515 content must return at least one section.
 
         An empty return would indicate the gated-path trap: receiving body='',
@@ -417,11 +359,7 @@ class TestNormalizerIssue2515Fixture:
             "An empty result means the normalizer received the gated-path shape."
         )
 
-    def test_all_sections_present(
-        self,
-        data_2515: dict[str, object],
-        normalized_2515: list[NormalizedSection],
-    ) -> None:
+    def test_all_sections_present(self, data_2515: dict[str, object], normalized_2515: list[NormalizedSection]) -> None:
         """normalize() returns at least as many sections as unique names in the fixture dict.
 
         The body ## Sections block may list duplicate section names (e.g. two
@@ -437,53 +375,37 @@ class TestNormalizerIssue2515Fixture:
             f"At least {expected} sections from #2515 must appear; got {len(normalized_2515)}."
         )
 
-    def test_all_elements_are_normalized_sections(
-        self, normalized_2515: list[NormalizedSection]
-    ) -> None:
+    def test_all_elements_are_normalized_sections(self, normalized_2515: list[NormalizedSection]) -> None:
         """Every element is a properly-typed NormalizedSection with correct field types."""
         for i, section in enumerate(normalized_2515):
             assert isinstance(section, NormalizedSection), (
                 f"Item {i} must be NormalizedSection; got {type(section).__name__}."
             )
             assert isinstance(section.index, int), (
-                f"section.index at position {i} must be int; "
-                f"got {type(section.index).__name__}."
+                f"section.index at position {i} must be int; got {type(section.index).__name__}."
             )
             assert isinstance(section.title, str), (
-                f"section.title at position {i} must be str; "
-                f"got {type(section.title).__name__}."
+                f"section.title at position {i} must be str; got {type(section.title).__name__}."
             )
             assert isinstance(section.entries, list), (
-                f"section.entries at position {i} must be list; "
-                f"got {type(section.entries).__name__}."
+                f"section.entries at position {i} must be list; got {type(section.entries).__name__}."
             )
             for j, entry in enumerate(section.entries):
                 assert isinstance(entry, NormalizedEntry), (
-                    f"Section {section.title!r} entry {j} must be NormalizedEntry; "
-                    f"got {type(entry).__name__}."
+                    f"Section {section.title!r} entry {j} must be NormalizedEntry; got {type(entry).__name__}."
                 )
 
     def test_empty_sections_in_2515_have_no_entries(
-        self,
-        data_2515: dict[str, object],
-        normalized_2515: list[NormalizedSection],
+        self, data_2515: dict[str, object], normalized_2515: list[NormalizedSection]
     ) -> None:
         """Empty sections in #2515 (e.g. Groomed, Research) appear with entries=[]."""
         sections = _fixture_sections(data_2515)
-        empty_titles = [
-            title
-            for title, meta in sections.items()
-            if meta.get("num_entries") == 0
-        ]
-        assert len(empty_titles) > 0, (
-            "Precondition: #2515 must contain at least one section with 0 entries."
-        )
+        empty_titles = [title for title, meta in sections.items() if meta.get("num_entries") == 0]
+        assert len(empty_titles) > 0, "Precondition: #2515 must contain at least one section with 0 entries."
 
         normalized_by_title = {s.title: s for s in normalized_2515}
         for title in empty_titles:
-            assert title in normalized_by_title, (
-                f"Empty section {title!r} must appear in normalized output."
-            )
+            assert title in normalized_by_title, f"Empty section {title!r} must appear in normalized output."
             section = normalized_by_title[title]
             assert section.entries == [], (
                 f"Section {title!r} has 0 entries in fixture; "
@@ -491,15 +413,11 @@ class TestNormalizerIssue2515Fixture:
             )
 
     def test_order_matches_body_sections_block(
-        self,
-        data_2515: dict[str, object],
-        normalized_2515: list[NormalizedSection],
+        self, data_2515: dict[str, object], normalized_2515: list[NormalizedSection]
     ) -> None:
         """Normalized section order matches the ## Sections block in the #2515 body."""
         body = str(data_2515.get("body", ""))
-        assert body.startswith("## Sections"), (
-            "Precondition: #2515 body must start with the ## Sections block."
-        )
+        assert body.startswith("## Sections"), "Precondition: #2515 body must start with the ## Sections block."
         expected_titles = _extract_body_section_order(body)
         assert expected_titles, "Precondition: ## Sections block must list sections."
 

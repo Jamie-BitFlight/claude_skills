@@ -1304,11 +1304,7 @@ def _filter_view_sections(
     return response
 
 
-def _build_section_miss_error(
-    filter_expr: str,
-    valid_names: list[str],
-    out: Output,
-) -> dict[str, object]:
+def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Output) -> dict[str, object]:
     """Build an ADR-3 error dict for a section-filter miss.
 
     Returns a dict with ``error``, ``valid_sections``, and ``section_filter_miss``
@@ -1975,10 +1971,7 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
     return compact
 
 
-def _execute_disclosure_or_passthrough(
-    selector: str,
-    req: DisclosureRequest,
-) -> dict[str, object] | None:
+def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) -> dict[str, object] | None:
     """Execute a non-PASSTHROUGH progressive disclosure request synchronously.
 
     Intended for ``asyncio.to_thread``.  The caller guards on
@@ -2000,11 +1993,7 @@ def _execute_disclosure_or_passthrough(
         response = BacklogViewDisclosureHandler().handle(selector, req)
         return dataclasses.asdict(response)
     except OrdinalNotFoundError as exc:
-        return {
-            "error": str(exc),
-            "requested_ordinal": exc.requested,
-            "valid_ordinals": exc.valid_ordinals,
-        }
+        return {"error": str(exc), "requested_ordinal": exc.requested, "valid_ordinals": exc.valid_ordinals}
     except BacklogError as exc:
         return {"error": str(exc)}
 
@@ -2082,8 +2071,9 @@ async def backlog_view(
         str | None,
         Field(
             description=(
-                "Dot-path ordinal targeting a section or entry (e.g. '4.0', '3.0.1'). "
-                "Format: digits and dots only, matching ^(\\d+\\.)*\\d+$. "
+                "Dot-path ordinal targeting a section, sub-heading, or code fence "
+                "(e.g. '4.0', '3.0.1', '4.0.1', '4.0.code.0'). "
+                r"Format: numeric path, optionally ending in a code-fence terminal, matching ^\d+(\.\d+)*(\.code\.\d+)?$. "
                 "Without head, returns the full content at the ordinal (NAVIGATE mode). "
                 "Combined with head, activates EXTRACT mode for token-bounded pagination. "
                 "Use map=True first to discover valid ordinals."
@@ -2116,7 +2106,7 @@ async def backlog_view(
         ),
     ] = 0,
 ) -> dict:
-    """View a single backlog item or GitHub issue in detail.
+    r"""View a single backlog item or GitHub issue in detail.
 
     Accepts a GitHub issue URL, #N, bare number, or title substring as selector.
     Use offset and limit to paginate long issue bodies.
@@ -2133,6 +2123,10 @@ async def backlog_view(
     Use navigate=<ordinal> to fetch the full content at a specific ordinal.
     Use navigate=<ordinal> + head=N to extract a token-bounded window (EXTRACT mode);
     iterate using the next_call hint until truncated=False.
+    Ordinal format: ^\d+(\.\d+)*(\.code\.\d+)?$. Examples:
+        "4.0"        — section entry (level-2)
+        "4.0.1"      — sub-heading within an entry (level-3+)
+        "4.0.code.0" — first code fence in an entry's direct body
 
     Pagination parameter distinction (architect spec §5.7):
         offset — entry-block index: skip N entry blocks from the start of the body.
@@ -2142,6 +2136,8 @@ async def backlog_view(
     Progressive disclosure pattern (new, three-layer):
         Step 1 — call with map=True to see ordinal structure.
         Step 2 — call with navigate=<ordinal> to fetch a section or entry.
+            navigate="4.0.1" fetches a sub-heading within that entry.
+            navigate="4.0.code.0" fetches the first code fence in that entry.
         Step 3 — if truncated, page through large content using the next_call hint:
             backlog_view(selector="...", navigate="4.0", head=4000)
             backlog_view(selector="...", navigate="4.0", head=4000, skip_tokens=4000)
@@ -2170,16 +2166,9 @@ async def backlog_view(
     # Single early-return gate: MAP/NAVIGATE/EXTRACT → return dict; PASSTHROUGH → fall through.
     disclosure_result: dict[str, object] | None = None
     try:
-        disclosure_req = DisclosureRequestParser().parse(
-            map=map,
-            navigate=navigate,
-            head=head,
-            skip_tokens=skip_tokens,
-        )
+        disclosure_req = DisclosureRequestParser().parse(map=map, navigate=navigate, head=head, skip_tokens=skip_tokens)
         if disclosure_req.mode != DisclosureMode.PASSTHROUGH:
-            disclosure_result = await asyncio.to_thread(
-                _execute_disclosure_or_passthrough, selector, disclosure_req
-            )
+            disclosure_result = await asyncio.to_thread(_execute_disclosure_or_passthrough, selector, disclosure_req)
     except DisclosureParamError as exc:
         disclosure_result = {"error": str(exc), "invalid_params": exc.invalid_params}
 

@@ -6,5 +6,9 @@ task:
 
 context:
   backend: local
+
+sam:
+  plan_index_issue: 2531  # SAM Plan Registry sentinel — do not close or rename
+
 gh:
   repo: Jamie-BitFlight/claude_skills

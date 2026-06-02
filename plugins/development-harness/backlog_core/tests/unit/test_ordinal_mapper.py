@@ -25,6 +25,7 @@ Implementation note for T14:
   Once T14 ships, pytest runs will show these tests passing instead of erroring
   at collection.
 """
+
 from __future__ import annotations
 
 import json
@@ -67,13 +68,10 @@ def _real_cl100k_available() -> bool:
 
 _REAL_CL100K: bool = _real_cl100k_available()
 _skip_without_real_enc = pytest.mark.skipif(
-    not _REAL_CL100K,
-    reason="Requires real cl100k_base encoding (not available offline)",
+    not _REAL_CL100K, reason="Requires real cl100k_base encoding (not available offline)"
 )
 
-ENCODING: tiktoken.Encoding | None = (
-    tiktoken.get_encoding("cl100k_base") if _REAL_CL100K else None
-)
+ENCODING: tiktoken.Encoding | None = tiktoken.get_encoding("cl100k_base") if _REAL_CL100K else None
 
 try:
     from progressive_markdown.list_navigator import TOKEN_BUDGET
@@ -109,11 +107,7 @@ def _make_sections(*specs: tuple[str, list[str]]) -> list[NormalizedSection]:
     for idx, (title, entries) in enumerate(specs):
         out.append(
             NormalizedSection(
-                index=idx,
-                title=title,
-                entries=[
-                    NormalizedEntry(index=i, content=c) for i, c in enumerate(entries)
-                ],
+                index=idx, title=title, entries=[NormalizedEntry(index=i, content=c) for i, c in enumerate(entries)]
             )
         )
     return out
@@ -143,22 +137,10 @@ def groomed_body_doc() -> list[NormalizedSection]:
     deterministic across real and stub encoders.
     """
     return _make_sections(
-        (
-            "Story",
-            ["As a **developer** using Claude Code skills, I want token-efficient MCP access."],
-        ),
-        (
-            "Description",
-            ["The development harness has multiple MCP interfaces returning large data."],
-        ),
-        (
-            "Acceptance Criteria",
-            ["- [ ] Work matches description\n- [ ] Plan complete"],
-        ),
-        (
-            "Context",
-            ["- **Source**: Session observation\n- **Priority**: P1"],
-        ),
+        ("Story", ["As a **developer** using Claude Code skills, I want token-efficient MCP access."]),
+        ("Description", ["The development harness has multiple MCP interfaces returning large data."]),
+        ("Acceptance Criteria", ["- [ ] Work matches description\n- [ ] Plan complete"]),
+        ("Context", ["- **Source**: Session observation\n- **Priority**: P1"]),
         (
             "Groomed (2026-06-01)",
             [
@@ -173,9 +155,7 @@ def groomed_body_doc() -> list[NormalizedSection]:
 def single_entry_doc() -> list[NormalizedSection]:
     """Three sections each with exactly one short entry — all under TOKEN_BUDGET."""
     return _make_sections(
-        ("Alpha", ["Short alpha content."]),
-        ("Beta", ["Short beta content."]),
-        ("Gamma", ["Short gamma content."]),
+        ("Alpha", ["Short alpha content."]), ("Beta", ["Short beta content."]), ("Gamma", ["Short gamma content."])
     )
 
 
@@ -210,51 +190,36 @@ def normalized_2515() -> list[NormalizedSection]:
 class TestOrdinalAssignment:
     """Level-1 ordinals must match the 0-based NormalizedSection index."""
 
-    def test_top_level_sections_get_integer_ordinals(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_top_level_sections_get_integer_ordinals(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """Sections [0] through [4] receive ordinals '0', '1', '2', '3', '4'."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         level1 = [e for e in entries if "." not in e.ordinal]
-        assert len(level1) == 5, (
-            f"Expected 5 level-1 entries for 5 sections; got {len(level1)}."
-        )
+        assert len(level1) == 5, f"Expected 5 level-1 entries for 5 sections; got {len(level1)}."
         for expected_int, entry in enumerate(level1):
             assert entry.ordinal == str(expected_int), (
-                f"Level-1 entry {expected_int}: expected ordinal "
-                f"'{expected_int}'; got {entry.ordinal!r}."
+                f"Level-1 entry {expected_int}: expected ordinal '{expected_int}'; got {entry.ordinal!r}."
             )
 
-    def test_level1_always_present_for_empty_sections(
-        self, empty_section_doc: list[NormalizedSection]
-    ) -> None:
+    def test_level1_always_present_for_empty_sections(self, empty_section_doc: list[NormalizedSection]) -> None:
         """Section with 0 entries still produces a level-1 OrdinalEntry."""
         mapper = OrdinalPathMapper(empty_section_doc)
         entries = mapper.build_map()
 
         level1_ordinals = {e.ordinal for e in entries if "." not in e.ordinal}
-        assert "1" in level1_ordinals, (
-            "Empty section at index 1 must produce level-1 OrdinalEntry with ordinal='1'."
-        )
+        assert "1" in level1_ordinals, "Empty section at index 1 must produce level-1 OrdinalEntry with ordinal='1'."
 
-    def test_ordinal_format_is_digit_dotpath(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_ordinal_format_is_digit_dotpath(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """All ordinals match the contract pattern: ``^(\\d+\\.)*\\d+$``."""
         pattern = re.compile(r"^(\d+\.)*\d+$")
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         for entry in entries:
-            assert pattern.match(entry.ordinal), (
-                f"Ordinal {entry.ordinal!r} does not match '^(\\d+\\.)*\\d+$'."
-            )
+            assert pattern.match(entry.ordinal), f"Ordinal {entry.ordinal!r} does not match '^(\\d+\\.)*\\d+$'."
 
-    def test_groomed_entry_concerns_gets_child_ordinal(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_groomed_entry_concerns_gets_child_ordinal(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """Entry '### Concerns' within section [4] receives ordinal '4.0'.
 
         Section [4] 'Groomed (2026-06-01)' has 2 entries; the first entry starts
@@ -270,24 +235,18 @@ class TestOrdinalAssignment:
             f"All entry titles: {[e.title for e in entries]}"
         )
         assert concerns.ordinal == "4.0", (
-            f"'Concerns' (first entry of section [4]) must have ordinal '4.0'; "
-            f"got {concerns.ordinal!r}."
+            f"'Concerns' (first entry of section [4]) must have ordinal '4.0'; got {concerns.ordinal!r}."
         )
 
-    def test_second_entry_in_section_gets_sequential_ordinal(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_second_entry_in_section_gets_sequential_ordinal(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """Section [4] second entry (RT-ICA) receives ordinal '4.1'."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         entry_4_1 = next((e for e in entries if e.ordinal == "4.1"), None)
-        assert entry_4_1 is not None, (
-            "Expected OrdinalEntry with ordinal='4.1' for section [4] entry 1; not found."
-        )
+        assert entry_4_1 is not None, "Expected OrdinalEntry with ordinal='4.1' for section [4] entry 1; not found."
         assert "RT-ICA" in entry_4_1.title, (
-            f"Second entry of section [4] must have 'RT-ICA' in title; "
-            f"got {entry_4_1.title!r}."
+            f"Second entry of section [4] must have 'RT-ICA' in title; got {entry_4_1.title!r}."
         )
 
 
@@ -299,34 +258,25 @@ class TestOrdinalAssignment:
 class TestLevelTwoEmissionGate:
     """Level-2 lines emitted iff ``entry_count > 1`` OR ``est_tokens > TOKEN_BUDGET``."""
 
-    def test_single_entry_under_budget_emits_level1_only(
-        self, single_entry_doc: list[NormalizedSection]
-    ) -> None:
+    def test_single_entry_under_budget_emits_level1_only(self, single_entry_doc: list[NormalizedSection]) -> None:
         """Single-entry sections with short content emit level-1 ONLY — no level-2."""
         mapper = OrdinalPathMapper(single_entry_doc)
         entries = mapper.build_map()
 
         level2 = [e for e in entries if "." in e.ordinal]
         assert level2 == [], (
-            f"Single-entry under-budget sections must emit no level-2 lines; "
-            f"got {[e.ordinal for e in level2]}."
+            f"Single-entry under-budget sections must emit no level-2 lines; got {[e.ordinal for e in level2]}."
         )
 
-    def test_multiple_entries_emit_level2_regardless_of_size(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_multiple_entries_emit_level2_regardless_of_size(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """Section with entry_count > 1 emits level-2 lines for all entries."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         ordinals = {e.ordinal for e in entries}
         # Section [4] has 2 entries → both "4.0" and "4.1" must appear
-        assert "4.0" in ordinals, (
-            "Section [4] has 2 entries; ordinal '4.0' must be emitted (entry_count > 1 gate)."
-        )
-        assert "4.1" in ordinals, (
-            "Section [4] has 2 entries; ordinal '4.1' must be emitted (entry_count > 1 gate)."
-        )
+        assert "4.0" in ordinals, "Section [4] has 2 entries; ordinal '4.0' must be emitted (entry_count > 1 gate)."
+        assert "4.1" in ordinals, "Section [4] has 2 entries; ordinal '4.1' must be emitted (entry_count > 1 gate)."
 
     @_skip_without_real_enc
     def test_single_entry_over_budget_emits_level2(self) -> None:
@@ -370,17 +320,13 @@ class TestLevelTwoEmissionGate:
             f"must emit level-2 ordinal '1.0'. Got ordinals: {sorted(ordinals)}."
         )
 
-    def test_empty_section_emits_no_level2(
-        self, empty_section_doc: list[NormalizedSection]
-    ) -> None:
+    def test_empty_section_emits_no_level2(self, empty_section_doc: list[NormalizedSection]) -> None:
         """Section with 0 entries emits only a level-1 ordinal; no level-2 children."""
         mapper = OrdinalPathMapper(empty_section_doc)
         entries = mapper.build_map()
 
         children_of_empty = [e.ordinal for e in entries if e.ordinal.startswith("1.")]
-        assert children_of_empty == [], (
-            f"Empty section [1] must emit no level-2 ordinals; got {children_of_empty}."
-        )
+        assert children_of_empty == [], f"Empty section [1] must emit no level-2 ordinals; got {children_of_empty}."
 
 
 # ---------------------------------------------------------------------------
@@ -393,18 +339,9 @@ class TestFormatMapLine:
 
     @staticmethod
     def _entry(
-        *,
-        ordinal: str = "0",
-        title: str = "Title",
-        est_tokens: int = 42,
-        first_line_preview: str = "Preview text.",
+        *, ordinal: str = "0", title: str = "Title", est_tokens: int = 42, first_line_preview: str = "Preview text."
     ) -> OrdinalEntry:
-        return OrdinalEntry(
-            ordinal=ordinal,
-            title=title,
-            est_tokens=est_tokens,
-            first_line_preview=first_line_preview,
-        )
+        return OrdinalEntry(ordinal=ordinal, title=title, est_tokens=est_tokens, first_line_preview=first_line_preview)
 
     def test_format_map_line_contains_required_fields(self) -> None:
         """Line contains ordinal, title, token count, and preview."""
@@ -424,9 +361,7 @@ class TestFormatMapLine:
         line = mapper.format_map_line(entry)
 
         # The preview clause uses '—' as separator; absent when preview is empty
-        assert "—" not in line, (
-            f"Empty first_line_preview must not produce '—' in map line; got {line!r}."
-        )
+        assert "—" not in line, f"Empty first_line_preview must not produce '—' in map line; got {line!r}."
 
     def test_format_map_line_title_capped_at_50_chars(self) -> None:
         """Titles longer than 50 chars are truncated to 50 chars ending with '…'."""
@@ -436,14 +371,9 @@ class TestFormatMapLine:
         line = mapper.format_map_line(entry)
 
         # The 80-char title must NOT appear verbatim
-        assert long_title not in line, (
-            f"80-char title must be truncated in the map line; "
-            f"full title found in: {line!r}"
-        )
+        assert long_title not in line, f"80-char title must be truncated in the map line; full title found in: {line!r}"
         # Truncation must use the single-character ellipsis '…' (U+2026)
-        assert "…" in line, (
-            f"Truncated title must end with '…'; got {line!r}"
-        )
+        assert "…" in line, f"Truncated title must end with '…'; got {line!r}"
 
     def test_format_map_line_preview_capped_at_60_chars(self) -> None:
         """Previews longer than 60 chars are truncated."""
@@ -452,9 +382,7 @@ class TestFormatMapLine:
         mapper = OrdinalPathMapper([])
         line = mapper.format_map_line(entry)
 
-        assert long_preview not in line, (
-            f"100-char preview must be truncated; full preview found in: {line!r}"
-        )
+        assert long_preview not in line, f"100-char preview must be truncated; full preview found in: {line!r}"
 
     def test_format_map_line_empty_section_shows_zero_tokens(self) -> None:
         """Entry with ``est_tokens=0`` produces ``(0t)`` in the map line."""
@@ -462,9 +390,7 @@ class TestFormatMapLine:
         mapper = OrdinalPathMapper([])
         line = mapper.format_map_line(entry)
 
-        assert "(0t)" in line, (
-            f"Zero-token entry must show '(0t)' in map line; got {line!r}"
-        )
+        assert "(0t)" in line, f"Zero-token entry must show '(0t)' in map line; got {line!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -475,28 +401,19 @@ class TestFormatMapLine:
 class TestResolveOrdinal:
     """``resolve()`` returns ``ResolvedUnit`` on hit and raises on miss."""
 
-    def test_resolve_entry_ordinal_returns_content(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_resolve_entry_ordinal_returns_content(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``resolve('4.0')`` returns the first entry of section [4] (Concerns)."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         _ = mapper.build_map()
         resolved = mapper.resolve("4.0")
 
-        assert isinstance(resolved, ResolvedUnit), (
-            f"resolve() must return ResolvedUnit; got {type(resolved).__name__}."
-        )
+        assert isinstance(resolved, ResolvedUnit), f"resolve() must return ResolvedUnit; got {type(resolved).__name__}."
         assert "Pre-existing concerns" in resolved.content, (
-            f"resolve('4.0') content must include 'Pre-existing concerns'; "
-            f"got {resolved.content[:120]!r}."
+            f"resolve('4.0') content must include 'Pre-existing concerns'; got {resolved.content[:120]!r}."
         )
-        assert resolved.total_tokens > 0, (
-            "resolve('4.0') must have total_tokens > 0 for non-empty content."
-        )
+        assert resolved.total_tokens > 0, "resolve('4.0') must have total_tokens > 0 for non-empty content."
 
-    def test_resolve_section_ordinal_returns_resolved_unit(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_resolve_section_ordinal_returns_resolved_unit(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``resolve('4')`` (level-1) returns ``ResolvedUnit`` for the full section."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         _ = mapper.build_map()
@@ -505,17 +422,12 @@ class TestResolveOrdinal:
         assert isinstance(resolved, ResolvedUnit), (
             f"resolve('4') must return ResolvedUnit; got {type(resolved).__name__}."
         )
-        assert resolved.ordinal == "4", (
-            f"ResolvedUnit.ordinal must echo '4'; got {resolved.ordinal!r}."
-        )
+        assert resolved.ordinal == "4", f"ResolvedUnit.ordinal must echo '4'; got {resolved.ordinal!r}."
         assert resolved.title == "Groomed (2026-06-01)", (
-            f"Level-1 section [4] title must be 'Groomed (2026-06-01)'; "
-            f"got {resolved.title!r}."
+            f"Level-1 section [4] title must be 'Groomed (2026-06-01)'; got {resolved.title!r}."
         )
 
-    def test_resolve_empty_section_has_zero_or_empty_content(
-        self, empty_section_doc: list[NormalizedSection]
-    ) -> None:
+    def test_resolve_empty_section_has_zero_or_empty_content(self, empty_section_doc: list[NormalizedSection]) -> None:
         """Resolving a section with 0 entries returns empty content or total_tokens=0."""
         mapper = OrdinalPathMapper(empty_section_doc)
         _ = mapper.build_map()
@@ -526,9 +438,7 @@ class TestResolveOrdinal:
             f"got content={resolved.content!r}, total_tokens={resolved.total_tokens}."
         )
 
-    def test_resolve_miss_raises_ordinal_not_found_error(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_resolve_miss_raises_ordinal_not_found_error(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``resolve()`` raises ``OrdinalNotFoundError`` for an unknown ordinal."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         _ = mapper.build_map()
@@ -561,13 +471,10 @@ class TestResolveOrdinal:
             mapper.resolve("99.99")
 
         assert exc_info.value.requested == "99.99", (
-            f"OrdinalNotFoundError.requested must be '99.99'; "
-            f"got {exc_info.value.requested!r}."
+            f"OrdinalNotFoundError.requested must be '99.99'; got {exc_info.value.requested!r}."
         )
 
-    def test_ordinal_not_found_error_carries_valid_ordinals(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_ordinal_not_found_error_carries_valid_ordinals(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``OrdinalNotFoundError.valid_ordinals`` includes '4.0' (known level-2)."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         _ = mapper.build_map()
@@ -577,13 +484,10 @@ class TestResolveOrdinal:
 
         # "4.0" is a known ordinal from the groomed_body_doc fixture
         assert "4.0" in exc_info.value.valid_ordinals, (
-            f"'4.0' must be in OrdinalNotFoundError.valid_ordinals; "
-            f"got {exc_info.value.valid_ordinals!r}."
+            f"'4.0' must be in OrdinalNotFoundError.valid_ordinals; got {exc_info.value.valid_ordinals!r}."
         )
 
-    def test_valid_ordinals_method_returns_all_map_ordinals(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_valid_ordinals_method_returns_all_map_ordinals(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``valid_ordinals()`` returns the complete set of ordinals from ``build_map()``."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
@@ -606,9 +510,7 @@ class TestEstTokensCl100kBase:
     """``est_tokens`` must equal the exact tiktoken cl100k_base count — not chars//4."""
 
     @_skip_without_real_enc
-    def test_est_tokens_equals_exact_tiktoken_count(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_est_tokens_equals_exact_tiktoken_count(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``est_tokens`` for every ``OrdinalEntry`` matches its tiktoken count.
 
         A ``chars//4`` approximation would fail this because real cl100k_base BPE
@@ -631,9 +533,7 @@ class TestEstTokensCl100kBase:
                 f"chars//4 approximation would give {len(resolved.content) // 4}."
             )
 
-    def test_est_tokens_is_zero_for_empty_section(
-        self, empty_section_doc: list[NormalizedSection]
-    ) -> None:
+    def test_est_tokens_is_zero_for_empty_section(self, empty_section_doc: list[NormalizedSection]) -> None:
         """Empty section (0 entries) produces ``est_tokens=0`` in the map."""
         mapper = OrdinalPathMapper(empty_section_doc)
         entries = mapper.build_map()
@@ -644,21 +544,17 @@ class TestEstTokensCl100kBase:
         )
         assert empty_entry is not None, "Empty section at index 1 must have level-1 entry '1'."
         assert empty_entry.est_tokens == 0, (
-            f"Empty section ordinal '1' must have est_tokens=0; "
-            f"got {empty_entry.est_tokens}."
+            f"Empty section ordinal '1' must have est_tokens=0; got {empty_entry.est_tokens}."
         )
 
-    def test_est_tokens_non_negative_for_all_entries(
-        self, groomed_body_doc: list[NormalizedSection]
-    ) -> None:
+    def test_est_tokens_non_negative_for_all_entries(self, groomed_body_doc: list[NormalizedSection]) -> None:
         """``est_tokens`` must be ≥ 0 for every OrdinalEntry."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         negative = [e for e in entries if e.est_tokens < 0]
         assert negative == [], (
-            f"All est_tokens must be non-negative; "
-            f"found: {[(e.ordinal, e.est_tokens) for e in negative]}."
+            f"All est_tokens must be non-negative; found: {[(e.ordinal, e.est_tokens) for e in negative]}."
         )
 
 
@@ -669,8 +565,7 @@ class TestEstTokensCl100kBase:
 
 _FIXTURE_2515_EXISTS = (_FIXTURES_DIR / "issue-2515-full.json").exists()
 _skip_without_2515 = pytest.mark.skipif(
-    not _FIXTURE_2515_EXISTS,
-    reason="issue-2515-full.json not yet regenerated (T01 prerequisite).",
+    not _FIXTURE_2515_EXISTS, reason="issue-2515-full.json not yet regenerated (T01 prerequisite)."
 )
 
 
@@ -689,9 +584,7 @@ class TestIssue2515RTICADynamic:
 
     @_skip_without_2515
     @_skip_without_real_enc
-    def test_rt_ica_ordinal_derived_dynamically(
-        self, normalized_2515: list[NormalizedSection]
-    ) -> None:
+    def test_rt_ica_ordinal_derived_dynamically(self, normalized_2515: list[NormalizedSection]) -> None:
         """Build map, find RT-ICA entry by title, resolve, assert meaningful token count.
 
         Derivation strategy:
@@ -723,8 +616,7 @@ class TestIssue2515RTICADynamic:
         resolved = mapper.resolve(rt_ica_ordinal)
 
         assert "RT-ICA" in resolved.title, (
-            f"resolve({rt_ica_ordinal!r}).title must contain 'RT-ICA'; "
-            f"got {resolved.title!r}."
+            f"resolve({rt_ica_ordinal!r}).title must contain 'RT-ICA'; got {resolved.title!r}."
         )
         assert resolved.total_tokens > 400, (
             f"RT-ICA entry (ordinal={rt_ica_ordinal!r}) must have meaningful content "
@@ -734,9 +626,7 @@ class TestIssue2515RTICADynamic:
 
     @_skip_without_2515
     @_skip_without_real_enc
-    def test_rt_ica_level2_ordinal_is_in_valid_ordinals(
-        self, normalized_2515: list[NormalizedSection]
-    ) -> None:
+    def test_rt_ica_level2_ordinal_is_in_valid_ordinals(self, normalized_2515: list[NormalizedSection]) -> None:
         """RT-ICA (single-entry, under TOKEN_BUDGET) emits only level-1; level-1 is in valid_ordinals().
 
         Ground truth from T10 phase gate: RT-ICA in #2515 fixture is ~560 tokens — below
@@ -757,8 +647,7 @@ class TestIssue2515RTICADynamic:
         # Level-1 ordinal is derived dynamically and must appear in valid_ordinals()
         rt_ica_level1 = [e for e in entries if "RT-ICA" in e.title and "." not in e.ordinal]
         assert rt_ica_level1, (
-            "Precondition: RT-ICA level-1 entry must be in map. "
-            f"All entries: {[(e.ordinal, e.title) for e in entries]}"
+            f"Precondition: RT-ICA level-1 entry must be in map. All entries: {[(e.ordinal, e.title) for e in entries]}"
         )
         rt_ica_ordinal = rt_ica_level1[0].ordinal
         assert rt_ica_ordinal in mapper.valid_ordinals(), (
@@ -776,9 +665,7 @@ class TestIssue2515MapBudget:
 
     @_skip_without_2515
     @_skip_without_real_enc
-    def test_map_2515_under_2000_tokens(
-        self, normalized_2515: list[NormalizedSection]
-    ) -> None:
+    def test_map_2515_under_2000_tokens(self, normalized_2515: list[NormalizedSection]) -> None:
         """Full map for 53-section #2515 must stay under 2 000 cl100k_base tokens.
 
         Verifies the level-2 emission gate keeps the map compact.  Worst-case bound
@@ -796,3 +683,471 @@ class TestIssue2515MapBudget:
             f"Number of map lines: {len(entries)}. "
             f"Check the level-2 emission gate — too many level-2 lines push over budget."
         )
+
+
+# ---------------------------------------------------------------------------
+# Fixtures for recursive ordinal tests (T03 — TDD red)
+# ---------------------------------------------------------------------------
+
+# Canonical §5.1 entry: intro prose + python fence + Sub-heading A + Sub-heading B with bash fence.
+# Expected 4.x subtree ordinals: {4.0, 4.0.code.0, 4.0.0, 4.0.1, 4.0.1.code.0}.
+_CANONICAL_ENTRY: str = (
+    "Intro prose.\n\n"
+    "```python\ndef foo(): ...\n```\n\n"
+    "### Sub-heading A\n\n"
+    "Body of A.\n\n"
+    "### Sub-heading B\n\n"
+    "```bash\necho hi\n```"
+)
+
+
+@pytest.fixture(scope="module")
+def structured_entry_doc() -> list[NormalizedSection]:
+    """Canonical §5.1 fixture: section [4] with structured entry 4.0 + plain entry 4.1.
+
+    Entry 4.0 body:
+    - Direct body: 'Intro prose.' + python fence → ordinal 4.0.code.0
+    - ### Sub-heading A  → ordinal 4.0.0 (leaf, content 'Body of A.')
+    - ### Sub-heading B  → ordinal 4.0.1 (leaf, content with bash fence token)
+      - bash fence        → ordinal 4.0.1.code.0
+
+    Two entries in section [4] keep the level-2 emission gate deterministic.
+    Entry 4.1 is 'Second entry.' — genuinely flat (no headings, no fences).
+    """
+    return _make_sections(
+        ("Story", ["Content."]),
+        ("Description", ["Content."]),
+        ("Acceptance Criteria", ["Content."]),
+        ("Context", ["Content."]),
+        ("Groomed", [_CANONICAL_ENTRY, "Second entry."]),
+    )
+
+
+@pytest.fixture(scope="module")
+def code_only_entry_doc() -> list[NormalizedSection]:
+    """Section [0] with two entries; entry 0.1 has prose + code fence, NO sub-headings.
+
+    Verifies ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+    Two entries trigger the level-2 gate so entry 0.1 receives its own ordinal.
+    """
+    return _make_sections(("Alpha", ["Other content.", "Prose text.\n\n```python\nprint('hi')\n```"]))
+
+
+@pytest.fixture(scope="module")
+def deeper_nesting_doc() -> list[NormalizedSection]:
+    """Entry 4.0 with Sub-heading A containing Sub-sub-heading A1 (level-4 ordinal).
+
+    Expected:
+    - 4.0.0   → Sub-heading A (has child 4.0.0.0)
+    - 4.0.0.0 → Sub-sub-heading A1 (leaf)
+    - 4.0.1   → Sub-heading B (leaf)
+    """
+    content = "### Sub-heading A\n\n#### Sub-sub-heading A1\n\nDeep content.\n\n### Sub-heading B\n\nShallow content."
+    return _make_sections(
+        ("Story", ["Content."]),
+        ("Description", ["Content."]),
+        ("Acceptance Criteria", ["Content."]),
+        ("Context", ["Content."]),
+        ("Groomed", [content, "Second entry."]),
+    )
+
+
+# ---------------------------------------------------------------------------
+# TC-R1: Recursive sub-heading ordinals (TDD red — T08 implements)
+# ---------------------------------------------------------------------------
+
+
+class TestRecursiveSubHeadingOrdinals:
+    """Level-3+ ordinals emitted for entries whose content contains markdown sub-headings."""
+
+    def test_entry_with_sub_headings_emits_level3_ordinals(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Entry 4.0 with ### headings produces ordinals 4.0.0 and 4.0.1."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "4.0.0" in ordinals, (
+            "Sub-heading A (first child of 4.0) must produce ordinal '4.0.0'. "
+            f"Got prefix-4 ordinals: {sorted(o for o in ordinals if o.startswith('4.'))}"
+        )
+        assert "4.0.1" in ordinals, (
+            "Sub-heading B (second child of 4.0) must produce ordinal '4.0.1'. "
+            f"Got prefix-4 ordinals: {sorted(o for o in ordinals if o.startswith('4.'))}"
+        )
+
+    def test_canonical_section51_exact_ordinal_set(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Canonical §5.1 fixture produces exactly the 5 ordinals specified in the spec.
+
+        The 4.x subtree must equal exactly:
+        {4.0, 4.0.code.0, 4.0.0, 4.0.1, 4.0.1.code.0}.
+        No extra ordinals (e.g. a spurious 4.0.2) and no fewer.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+
+        subtree_4 = {e.ordinal for e in entries if e.ordinal.startswith("4.")}
+        # "4.1" is the flat second entry ("Second entry.") in section [4].
+        # It is emitted by the level-2 gate (entry_count=2 > 1) and correctly
+        # starts with "4.".  The §5.1 spec lists the 4.0 sub-structure (5
+        # ordinals); "4.1" is the sibling entry, also in the 4.x set.
+        expected = {"4.0", "4.0.code.0", "4.0.0", "4.0.1", "4.0.1.code.0", "4.1"}
+        assert subtree_4 == expected, (
+            f"Canonical §5.1 fixture 4.x subtree mismatch.\nExpected: {sorted(expected)}\nGot:      {sorted(subtree_4)}"
+        )
+
+    def test_sub_heading_with_children_emits_level4_ordinals(self, deeper_nesting_doc: list[NormalizedSection]) -> None:
+        """Sub-heading A (4.0.0) containing Sub-sub-heading A1 produces ordinal 4.0.0.0."""
+        mapper = OrdinalPathMapper(deeper_nesting_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "4.0.0" in ordinals, "Sub-heading A must produce ordinal '4.0.0'."
+        assert "4.0.0.0" in ordinals, (
+            "Sub-sub-heading A1 (child of 4.0.0) must produce ordinal '4.0.0.0'. "
+            f"Got prefix-4 ordinals: {sorted(o for o in ordinals if o.startswith('4.'))}"
+        )
+
+    def test_flat_content_produces_no_sub_ordinals(self) -> None:
+        """Entries with no headings and no fences emit no sub-ordinals (ordinal depth > 2).
+
+        Backward-compatibility: flat content short-circuits the subtree indexer and
+        produces the identical ordinal set as the pre-feature implementation.
+        """
+        # Genuinely flat: no markdown headings, no code fences
+        sections = _make_sections(("Alpha", ["flat one", "flat two"]))
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+
+        deep = [e.ordinal for e in entries if e.ordinal.count(".") >= 2]
+        assert deep == [], f"Flat content must produce no sub-ordinals (depth > 2); got: {deep}."
+
+    def test_sub_heading_ordinals_are_0_based_siblings(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Sub-heading sibling indices within each parent are 0-based."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "4.0.0" in ordinals, "First sub-heading must receive sibling index 0 → ordinal '4.0.0'."
+        assert "4.0.1" in ordinals, "Second sub-heading must receive sibling index 1 → ordinal '4.0.1'."
+        assert "4.0.2" not in ordinals, "No third sub-heading in fixture; ordinal '4.0.2' must not be emitted."
+
+    def test_sub_heading_title_matches_heading_text(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """OrdinalEntry.title for a sub-heading matches the markdown heading text verbatim."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+
+        sub_a = next((e for e in entries if e.ordinal == "4.0.0"), None)
+        assert sub_a is not None, "Ordinal '4.0.0' (Sub-heading A) must be in map."
+        assert sub_a.title == "Sub-heading A", (
+            f"OrdinalEntry.title for '4.0.0' must be 'Sub-heading A'; got {sub_a.title!r}."
+        )
+
+        sub_b = next((e for e in entries if e.ordinal == "4.0.1"), None)
+        assert sub_b is not None, "Ordinal '4.0.1' (Sub-heading B) must be in map."
+        assert sub_b.title == "Sub-heading B", (
+            f"OrdinalEntry.title for '4.0.1' must be 'Sub-heading B'; got {sub_b.title!r}."
+        )
+
+
+# ---------------------------------------------------------------------------
+# TC-R2: Code-fence ordinals (TDD red — T08 implements)
+# ---------------------------------------------------------------------------
+
+
+class TestCodeFenceOrdinals:
+    """Code fence ordinals use the N.M.code.K alphanumeric format (ADR-1)."""
+
+    def test_code_fence_in_entry_body_gets_ordinal(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Python fence in entry 4.0 direct body receives ordinal 4.0.code.0."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "4.0.code.0" in ordinals, (
+            "Python fence in entry 4.0 direct body must produce ordinal '4.0.code.0'. "
+            f"Got prefix-4 ordinals: {sorted(o for o in ordinals if o.startswith('4.'))}"
+        )
+
+    def test_multiple_code_fences_in_body_indexed_separately(self) -> None:
+        """Two code fences in the direct body produce N.M.code.0 and N.M.code.1."""
+        content = "Prose.\n\n```python\nfirst fence\n```\n\nMiddle prose.\n\n```bash\nsecond fence\n```"
+        sections = _make_sections(("Alpha", [content, "Second entry."]))
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "0.0.code.0" in ordinals, (
+            "First fence in entry 0.0 must produce ordinal '0.0.code.0'. "
+            f"Prefix-0.0 ordinals: {sorted(o for o in ordinals if o.startswith('0.0'))}"
+        )
+        assert "0.0.code.1" in ordinals, (
+            "Second fence in entry 0.0 must produce ordinal '0.0.code.1'. "
+            f"Prefix-0.0 ordinals: {sorted(o for o in ordinals if o.startswith('0.0'))}"
+        )
+
+    def test_code_fence_under_sub_heading_gets_ordinal(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Bash fence inside Sub-heading B (4.0.1) receives ordinal 4.0.1.code.0."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        assert "4.0.1.code.0" in ordinals, (
+            "Bash fence inside Sub-heading B must produce ordinal '4.0.1.code.0'. "
+            f"Got prefix-4.0.1 ordinals: "
+            f"{sorted(o for o in ordinals if o.startswith('4.0.1'))}"
+        )
+
+    def test_code_fence_in_body_replaced_by_token(self) -> None:
+        """After fence extraction the containing node's first_line_preview shows [code:...] token.
+
+        For an entry whose body begins with a code fence (no prose before it),
+        the fence is replaced by its navigation token. OrdinalEntry.first_line_preview
+        reflects this inline replacement.
+        """
+        # Entry body is only a code fence — preview must be the navigation token
+        content = "```python\ndef example(): ...\n```"
+        sections = _make_sections(("Alpha", [content, "Second entry."]))
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+
+        parent = next((e for e in entries if e.ordinal == "0.0"), None)
+        assert parent is not None, "Ordinal '0.0' must be in map for entry with code fence."
+        assert "[code:" in parent.first_line_preview, (
+            "first_line_preview for entry 0.0 (body = code fence only) must contain "
+            f"'[code:' navigation token; got {parent.first_line_preview!r}."
+        )
+
+    def test_code_fence_title_is_language_or_placeholder(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """OrdinalEntry.title for a code block ordinal is the language tag or 'code block'."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        entries = mapper.build_map()
+
+        python_fence = next((e for e in entries if e.ordinal == "4.0.code.0"), None)
+        assert python_fence is not None, "Ordinal '4.0.code.0' must be in map."
+        assert python_fence.title in ("python", "code block"), (
+            f"Code block title must be language tag or 'code block'; got {python_fence.title!r}."
+        )
+
+        bash_fence = next((e for e in entries if e.ordinal == "4.0.1.code.0"), None)
+        assert bash_fence is not None, "Ordinal '4.0.1.code.0' must be in map."
+        assert bash_fence.title in ("bash", "code block"), (
+            f"Bash fence title must be 'bash' or 'code block'; got {bash_fence.title!r}."
+        )
+
+
+# ---------------------------------------------------------------------------
+# TC-R3: Navigate-on-parent semantics (TDD red — T08 implements)
+# ---------------------------------------------------------------------------
+
+
+class TestNavigateOnParentSemantics:
+    """Navigate-on-parent behavior verified via the resolve() public contract.
+
+    ADR-7: when has_sub_heading_children=True, resolve(ordinal).content == ''.
+    ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+
+    All assertions use resolve() or build_map() — no private attribute access —
+    so T08 cannot invalidate these by renaming internal fields.
+    """
+
+    def test_entry_with_sub_headings_has_sub_heading_children_true(
+        self, structured_entry_doc: list[NormalizedSection]
+    ) -> None:
+        """ADR-7: entry with sub-headings returns content='' from resolve().
+
+        has_sub_heading_children=True is observable as resolve(ordinal).content == ''.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("4.0")
+
+        assert resolved.content == "", (
+            f"ADR-7: resolve('4.0') must return content='' for entry with sub-heading "
+            f"children; got {resolved.content[:80]!r}."
+        )
+
+    def test_entry_with_code_only_has_sub_heading_children_false(
+        self, code_only_entry_doc: list[NormalizedSection]
+    ) -> None:
+        """ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+
+        Entry 0.1 has prose + code fence but no sub-headings. resolve() returns
+        non-empty content (prose with inline fence token) — not an empty child map.
+        """
+        mapper = OrdinalPathMapper(code_only_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("0.1")
+
+        assert resolved.content != "", (
+            "ADR-4: entry with code fence but no sub-headings must return non-empty "
+            "content from resolve(); the fence is extracted inline, not a child map."
+        )
+
+    def test_flat_entry_has_sub_heading_children_false(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Flat entry (no headings, no fences) returns its full content from resolve().
+
+        Entry 4.1 is 'Second entry.' — genuinely flat.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("4.1")
+
+        assert resolved.content != "", "Flat entry 4.1 must return non-empty content from resolve()."
+        assert "Second entry." in resolved.content, (
+            f"resolve('4.1') must contain 'Second entry.'; got {resolved.content!r}."
+        )
+
+    def test_code_block_is_code_block_true_and_leaf(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Code block ordinals are leaf nodes: resolve() returns raw fence body, no [code:] tokens.
+
+        is_code_block=True is observable: resolved content is the raw fence body.
+        has_sub_heading_children=False: resolve() returns non-empty content (not child map).
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("4.0.code.0")
+
+        assert resolved.content != "", "Code block ordinal '4.0.code.0' must return non-empty content (leaf node)."
+        assert "foo" in resolved.content, (
+            f"resolve('4.0.code.0') must return raw python fence body; got {resolved.content!r}."
+        )
+        assert "[code:" not in resolved.content, (
+            "Raw fence body must NOT contain [code:...] navigation tokens inside it."
+        )
+
+    def test_parent_content_is_empty_string(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """ADR-7: resolve() on a sub-heading parent returns content='' (empty string, not None).
+
+        Entry-level prose ('Intro prose.') is not stored at the parent level.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("4.0")
+
+        assert resolved.content == "", (
+            f"ADR-7: resolve('4.0').content must be '' (not the entry prose); got {resolved.content[:80]!r}."
+        )
+        assert resolved.total_tokens == 0, (
+            f"resolve('4.0').total_tokens must be 0 when content=''; got {resolved.total_tokens}."
+        )
+
+    def test_leaf_content_has_inline_tokens(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """Leaf sub-heading with a code fence returns prose with [code:...] token, not fence body.
+
+        Sub-heading B (4.0.1) body has a bash fence. resolve() must return the inline
+        navigation token '[code:4.0.1.code.0]' — the fence body is at ordinal 4.0.1.code.0.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        resolved = mapper.resolve("4.0.1")
+
+        assert "[code:4.0.1.code.0]" in resolved.content, (
+            f"resolve('4.0.1').content must contain '[code:4.0.1.code.0]' token; got {resolved.content!r}."
+        )
+        assert "echo hi" not in resolved.content, (
+            "Raw fence body 'echo hi' must not appear in resolved content; it is replaced by '[code:4.0.1.code.0]'."
+        )
+
+
+# ---------------------------------------------------------------------------
+# TC-R4: Backward compatibility invariant (TDD red — T08 implements)
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardCompatibilityInvariant:
+    """Flat content (no headings, no fences) produces identical ordinals to pre-feature behavior."""
+
+    def test_flat_sections_produce_identical_ordinals_to_prior_contract(self) -> None:
+        """Flat multi-entry section produces exactly the pre-feature ordinal list.
+
+        §5.2 invariant: when every entry's content has empty sections AND empty
+        code_blocks (MarkdownDocument field names — not sections_by_id as spec draft
+        states; actual field name verified from progressive_markdown/models.py),
+        build_map() output is identical to the pre-feature implementation.
+        """
+        # Two flat entries in one section → level-2 gate fires, produces 0, 0.0, 0.1 only
+        sections = _make_sections(("Alpha", ["flat one", "flat two"]))
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+
+        all_ordinals = [e.ordinal for e in entries]
+        expected = ["0", "0.0", "0.1"]
+        assert all_ordinals == expected, (
+            f"Flat multi-entry section must produce exactly {expected}.\nGot: {all_ordinals}"
+        )
+
+    def test_existing_level2_test_fixtures_unaffected(self, groomed_body_doc: list[NormalizedSection]) -> None:
+        """Pre-existing level-1 and level-2 ordinals remain present in groomed_body_doc map.
+
+        Checks ordinal *presence* only — safe even after T08 adds children to entries
+        that start with ### headings (4.0, 4.1).
+        """
+        mapper = OrdinalPathMapper(groomed_body_doc)
+        entries = mapper.build_map()
+        ordinals = {e.ordinal for e in entries}
+
+        for n in range(5):
+            assert str(n) in ordinals, f"Level-1 ordinal '{n}' must remain in groomed_body_doc map after T08."
+        assert "4.0" in ordinals, "Level-2 ordinal '4.0' must remain in groomed_body_doc map."
+        assert "4.1" in ordinals, "Level-2 ordinal '4.1' must remain in groomed_body_doc map."
+
+
+# ---------------------------------------------------------------------------
+# TC-R5: Resolution index completeness (TDD red — T08 implements)
+# ---------------------------------------------------------------------------
+
+
+class TestResolutionIndexCompleteness:
+    """The resolution index is complete to all depths; resolve() succeeds for any valid ordinal."""
+
+    def test_valid_ordinals_includes_all_recursive_ordinals(
+        self, structured_entry_doc: list[NormalizedSection]
+    ) -> None:
+        """valid_ordinals() returns all recursive ordinals from the complete index.
+
+        §5.3: the _ResolutionIndex is always complete regardless of map_text truncation.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+        all_ordinals = set(mapper.valid_ordinals())
+
+        for expected in ("4.0", "4.0.code.0", "4.0.0", "4.0.1", "4.0.1.code.0"):
+            assert expected in all_ordinals, (
+                f"valid_ordinals() must include recursive ordinal '{expected}'. "
+                f"Prefix-4 ordinals: {sorted(o for o in all_ordinals if o.startswith('4.'))}"
+            )
+
+    def test_resolve_deep_ordinal_succeeds_without_map(self, structured_entry_doc: list[NormalizedSection]) -> None:
+        """resolve() on a deep code-block ordinal succeeds independent of map_text rendering.
+
+        §5.3: the _ResolutionIndex is always complete; resolve('4.0.1.code.0') works
+        even if map_text would be truncated at a shallower depth.
+        """
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+
+        resolved = mapper.resolve("4.0.1.code.0")
+        assert isinstance(resolved, ResolvedUnit), "resolve('4.0.1.code.0') must return ResolvedUnit."
+        assert resolved.ordinal == "4.0.1.code.0", (
+            f"ResolvedUnit.ordinal must echo '4.0.1.code.0'; got {resolved.ordinal!r}."
+        )
+        assert "echo hi" in resolved.content, (
+            f"resolve('4.0.1.code.0') content must contain 'echo hi' (raw bash body); got {resolved.content!r}."
+        )
+
+    def test_ordinal_not_found_error_includes_recursive_ordinals(
+        self, structured_entry_doc: list[NormalizedSection]
+    ) -> None:
+        """OrdinalNotFoundError.valid_ordinals lists deep ordinals from the complete index."""
+        mapper = OrdinalPathMapper(structured_entry_doc)
+        mapper.build_map()
+
+        with pytest.raises(OrdinalNotFoundError) as exc_info:
+            mapper.resolve("99.99.99")
+
+        valid = exc_info.value.valid_ordinals
+        for expected in ("4.0.0", "4.0.1", "4.0.code.0"):
+            assert expected in valid, (
+                f"OrdinalNotFoundError.valid_ordinals must include '{expected}'. "
+                f"Prefix-4 ordinals: {sorted(o for o in valid if o.startswith('4.'))}"
+            )

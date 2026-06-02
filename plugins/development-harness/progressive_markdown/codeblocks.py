@@ -31,11 +31,7 @@ class CodeBlockStubRenderer:
     """
 
     def render_stubs(
-        self,
-        body: str,
-        code_block_ids: list[str],
-        body_start_line: int,
-        document: MarkdownDocument,
+        self, body: str, code_block_ids: list[str], body_start_line: int, document: MarkdownDocument
     ) -> str:
         """Replace code blocks in body with stub strings.
 
@@ -123,10 +119,4 @@ def _render_stub(block: CodeBlock) -> str:
     summary_brief = f"{n_lines} lines, starts: {first_line}"
     start = block.span.start_line if block.span else 0
     end = block.span.end_line if block.span else 0
-    return _STUB_TEMPLATE.format(
-        id=block.id,
-        lang=lang,
-        start=start,
-        end=end,
-        summary_brief=summary_brief,
-    )
+    return _STUB_TEMPLATE.format(id=block.id, lang=lang, start=start, end=end, summary_brief=summary_brief)

@@ -52,7 +52,7 @@ try {
   // are treated as double-hyphen prefix. e.g. –auto → --auto, —language → --language.
   // Standalone — and – are also normalised to -- so the delimiter check below catches them.
   rawArgv = rawArgv.map((arg) =>
-    arg.startsWith('—') || arg.startsWith('–') ? '--' + arg.slice(1) : arg,
+    arg.startsWith('—') || arg.startsWith('–') ? `--${arg.slice(1)}` : arg,
   );
 
   // 1. Find freetext delimiter

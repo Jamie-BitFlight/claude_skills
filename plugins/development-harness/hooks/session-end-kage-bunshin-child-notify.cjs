@@ -29,11 +29,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-let input = '';
+// Drain stdin without retaining it — this hook does not inspect event fields,
+// it only waits for the 'end' event to know the payload has fully arrived.
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => {
-  input += chunk;
-});
+process.stdin.resume();
 process.stdin.on('end', () => {
   // SessionEnd hook does not need to inspect event fields — consume stdin and proceed.
 

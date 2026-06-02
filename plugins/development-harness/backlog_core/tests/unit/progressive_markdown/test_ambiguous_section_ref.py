@@ -73,17 +73,13 @@ def test_resolve_section_raises_on_slug_collision() -> None:
     message = str(exc_info.value)
 
     # The message must name the ambiguous slug so the caller knows what was looked up.
-    assert "background" in message, (
-        f"Exception message must mention the ambiguous slug 'background'. "
-        f"Got: {message!r}"
-    )
+    assert "background" in message, f"Exception message must mention the ambiguous slug 'background'. Got: {message!r}"
 
     # The message must list BOTH colliding selectors as disambiguation hints so the
     # caller can switch to an unambiguous selector on retry.
     for selector in colliding_selectors:
         assert selector in message, (
-            f"Expected colliding selector {selector!r} in exception message to help "
-            f"disambiguate. Got: {message!r}"
+            f"Expected colliding selector {selector!r} in exception message to help disambiguate. Got: {message!r}"
         )
 
 
@@ -104,12 +100,7 @@ def test_resolve_section_unique_slug_returns_section_node() -> None:
     result = nav.resolve_section("overview")
 
     assert isinstance(result, SectionNode), (
-        f"resolve_section('overview') must return a SectionNode for a unique slug. "
-        f"Got {type(result).__name__!r}."
+        f"resolve_section('overview') must return a SectionNode for a unique slug. Got {type(result).__name__!r}."
     )
-    assert result.title == "Overview", (
-        f"Resolved section title must be 'Overview'. Got {result.title!r}."
-    )
-    assert result.slug == "overview", (
-        f"Resolved section slug must be 'overview'. Got {result.slug!r}."
-    )
+    assert result.title == "Overview", f"Resolved section title must be 'Overview'. Got {result.title!r}."
+    assert result.slug == "overview", f"Resolved section slug must be 'overview'. Got {result.slug!r}."

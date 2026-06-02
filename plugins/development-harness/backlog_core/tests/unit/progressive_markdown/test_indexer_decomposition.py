@@ -144,8 +144,7 @@ class TestPLRLintGate:
             check=False,
         )
         assert result.returncode == 0, (
-            f"PLR violations remain in indexer.py — T07 refactoring incomplete:\n"
-            f"{result.stdout}"
+            f"PLR violations remain in indexer.py — T07 refactoring incomplete:\n{result.stdout}"
         )
 
 
@@ -217,21 +216,11 @@ class TestSelectorAndSlugGeneration:
 
     def test_sections_by_slug_contains_all_four_slugs(self, document) -> None:
         """sections_by_slug keys match the four expected slugs exactly."""
-        assert set(document.sections_by_slug.keys()) == {
-            "title",
-            "section-a",
-            "sub-a",
-            "section-b",
-        }
+        assert set(document.sections_by_slug.keys()) == {"title", "section-a", "sub-a", "section-b"}
 
     def test_sections_by_selector_contains_all_four_selectors(self, document) -> None:
         """sections_by_selector keys match the four expected selectors exactly."""
-        assert set(document.sections_by_selector.keys()) == {
-            "h1.1",
-            "h2.1.1",
-            "h3.1.1.1",
-            "h2.1.2",
-        }
+        assert set(document.sections_by_selector.keys()) == {"h1.1", "h2.1.1", "h3.1.1.1", "h2.1.2"}
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +239,7 @@ class TestParentChildRelationships:
     def test_h1_children_are_section_a_then_section_b(self, document) -> None:
         """Title's children are Section A and Section B in document order."""
         root_id = document.root_section_ids[0]
-        child_titles = [
-            document.sections[cid].title
-            for cid in document.sections[root_id].child_ids
-        ]
+        child_titles = [document.sections[cid].title for cid in document.sections[root_id].child_ids]
         assert child_titles == ["Section A", "Section B"]
 
     def test_section_a_has_one_child_sub_a(self, document) -> None:

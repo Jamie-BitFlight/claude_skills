@@ -43,13 +43,7 @@ def _build_link_ref(
         A fully constructed LinkRef.
     """
     return LinkRef(
-        id=link_id,
-        text=text,
-        target=target,
-        title=title,
-        kind=kind,
-        span=span,
-        source_token_type=source_token_type,
+        id=link_id, text=text, target=target, title=title, kind=kind, span=span, source_token_type=source_token_type
     )
 
 
@@ -156,11 +150,7 @@ class LinkExtractor:
             _attach_to_section(document, link_id, ref_span)
 
 
-def _attach_to_section(
-    document: MarkdownDocument,
-    link_id: str,
-    span: SourceSpan | None,
-) -> None:
+def _attach_to_section(document: MarkdownDocument, link_id: str, span: SourceSpan | None) -> None:
     """Attach a link to the section containing its span.
 
     Args:
