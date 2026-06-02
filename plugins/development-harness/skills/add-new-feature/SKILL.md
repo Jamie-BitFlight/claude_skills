@@ -462,7 +462,7 @@ into each implementation agent's prompt. Omitting it means implementation agents
 without domain schema context.
 ```
 
-After the agent completes, write the plan path back to the backlog item:
+**ORCHESTRATOR-ONLY** — After the agent completes, the orchestrator MUST call this unconditionally. Do NOT include this in the subagent delegation prompt. Do NOT skip it based on the subagent's self-report:
 
 ```text
 mcp__plugin_dh_backlog__backlog_update(
