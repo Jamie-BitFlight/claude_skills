@@ -50,6 +50,20 @@ Document model
     A ``(start_line, end_line)`` pair marking where a node originates in
     the source Markdown.
 
+Parsing internals
+-----------------
+``MarkdownItParser``
+    Low-level tokenizer wrapper.  Converts raw Markdown source into a
+    ``ParserResult`` token stream consumed by ``MarkdownIndexer``.
+``ParserResult``
+    Dataclass produced by ``MarkdownItParser.parse()``.  Carries the token
+    stream and source metadata; passed directly to ``MarkdownIndexer.build()``.
+``MarkdownIndexer``
+    Builds a ``MarkdownDocument`` from a ``ParserResult``.  Use the two-step
+    sequence ``MarkdownItParser().parse(source, text)`` →
+    ``MarkdownIndexer().build(result)`` when you need a ``MarkdownDocument``
+    without the full navigator facade.
+
 Content providers
 -----------------
 ``MarkdownContentProvider``
