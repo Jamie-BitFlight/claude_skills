@@ -112,7 +112,7 @@ process.stdin.on('end', () => {
     process.exit(0);
   }
 
-  const command = (data.tool_input && data.tool_input.command) || '';
+  const command = data.tool_input?.command || '';
 
   if (!isBlockedWrite(command)) {
     process.stdout.write(JSON.stringify({}));
@@ -120,6 +120,6 @@ process.stdin.on('end', () => {
   }
 
   // Exit 2: blocking error — stderr is shown to Claude as the error message
-  process.stderr.write(BLOCK_REASON + '\n');
+  process.stderr.write(`${BLOCK_REASON}\n`);
   process.exit(2);
 });
