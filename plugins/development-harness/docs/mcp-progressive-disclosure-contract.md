@@ -106,6 +106,28 @@ NavigateResponse:
 
 Read `child_map` to discover child ordinals, then navigate to a specific child.
 
+### EXTRACT-on-parent (with `head=N`)
+
+When `head=N` is added to a navigate call on a parent node, the handler returns a
+`NavigateResponse` where `content` and `child_map` both carry the bounded child listing text
+(not an empty string). This allows paging through a large child map in token windows.
+
+Source: `disclosure_handler.py`, `BacklogViewDisclosureHandler.handle()` EXTRACT branch —
+the `has_sub_heading_children=True` gate (line 353+).
+
+```text
+navigate="4.0" head=200
+
+NavigateResponse:
+  ordinal:       "4.0"
+  title:         "Installation"
+  content:       "4.0.0 | Overview | ~45 tokens\n4.0.1 | Steps | ~120 tokens\n..."
+  total_tokens:  <bounded count>
+  truncated:     <true if child_map exceeds head= budget>
+  has_children:  true
+  child_map:     "4.0.0 | Overview | ~45 tokens\n4.0.1 | Steps | ~120 tokens\n..."
+```
+
 ### Leaf node (`has_children=False`, not a code block)
 
 Full prose with inline `[code:...]` tokens substituted for any fences in the body.

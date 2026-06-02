@@ -230,7 +230,8 @@ When `navigate` is set the response body includes these fields:
 ```text
 ordinal:      str       — the ordinal that was resolved
 title:        str       — section or heading title
-content:      str       — prose body ("" when has_children is true — ADR-7)
+content:      str       — prose body; "" when has_children is true without head= (ADR-7);
+                          bounded child_map text when has_children is true with head= (EXTRACT-on-parent)
 total_tokens: int       — token count of content
 truncated:    bool      — true if head= truncation was applied
 child_map:    str|null  — formatted listing of direct sub-heading children;
@@ -242,9 +243,11 @@ has_children: bool      — true when this node has direct sub-heading children
 
 When the resolved ordinal addresses a node with sub-heading children (`has_children=true`):
 
-- `content` is `""` (empty string, NOT `null`) — this is correct per ADR-7
+- **Without `head=`** (NAVIGATE): `content` is `""` (empty string, NOT `null`) — ADR-7
+- **With `head=N`** (EXTRACT-on-parent): `content` equals the bounded `child_map` text — non-empty when child_map is non-empty; `content` and `child_map` carry identical text
 - `child_map` is a non-null string listing direct child ordinals and titles
-- The validator MUST accept `content=""` combined with non-null `child_map` as a valid response
+- The validator MUST accept `content=""` combined with non-null `child_map` as a valid NAVIGATE-mode response
+- The validator MUST accept non-empty `content` equal to `child_map` when `has_children=true` and `head=N` was used (EXTRACT-on-parent)
 - The validator MUST NOT flag empty `content` as a failure when `has_children=true`
 
 When the resolved ordinal addresses a leaf node or code fence (`has_children=false`):
