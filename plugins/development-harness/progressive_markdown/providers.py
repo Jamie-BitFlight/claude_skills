@@ -9,11 +9,7 @@ from .exceptions import ProviderError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-__all__ = [
-    "CallableMarkdownContentProvider",
-    "MCPMarkdownContentProvider",
-    "MarkdownContentProvider",
-]
+__all__ = ["CallableMarkdownContentProvider", "MCPMarkdownContentProvider", "MarkdownContentProvider"]
 
 
 class MarkdownContentProvider(Protocol):
@@ -43,6 +39,7 @@ class CallableMarkdownContentProvider:
 
         def my_loader(source: str) -> str:
             return Path(source).read_text()
+
 
         provider = CallableMarkdownContentProvider(my_loader)
         markdown = provider.get_markdown("README.md")
@@ -90,6 +87,7 @@ class MCPMarkdownContentProvider:
 
         def mcp_fetch(source: str, **kwargs: object) -> str:
             return mcp_client.call_tool("read_markdown", {"source": source})
+
 
         provider = MCPMarkdownContentProvider(mcp_fetch)
         markdown = provider.get_markdown("docs/README.md")

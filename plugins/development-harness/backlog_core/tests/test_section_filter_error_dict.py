@@ -67,23 +67,19 @@ _FIXTURE_DIR = Path(__file__).parent / "fixtures"
 # Full body text from regenerated #2521 fixture (T10 produced this file).
 # Contains ## section headers for: Sections (index), Story, Description,
 # Acceptance Criteria, Context, Groomed (2026-06-01), Concerns, RT-ICA.
-_ISSUE_2521_BODY: str = json.loads(
-    (_FIXTURE_DIR / "issue-2521-full.json").read_text()
-)["body"]
+_ISSUE_2521_BODY: str = json.loads((_FIXTURE_DIR / "issue-2521-full.json").read_text())["body"]
 
 # Known real content-section names from the #2521 body (excludes the
 # ## Sections index header at the top).
-_KNOWN_SECTIONS_2521: frozenset[str] = frozenset(
-    {
-        "Story",
-        "Description",
-        "Acceptance Criteria",
-        "Context",
-        "Groomed (2026-06-01)",
-        "Concerns",
-        "RT-ICA",
-    }
-)
+_KNOWN_SECTIONS_2521: frozenset[str] = frozenset({
+    "Story",
+    "Description",
+    "Acceptance Criteria",
+    "Context",
+    "Groomed (2026-06-01)",
+    "Concerns",
+    "RT-ICA",
+})
 
 # A filter that cannot match any section by any mechanism:
 #   - not a numeric index
@@ -127,9 +123,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
     in ``_assemble_view_content`` (~3167).
     """
 
-    def test_section_miss_error_dict_has_error_key_include_content_true(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_error_key_include_content_true(self, mocker: MockerFixture) -> None:
         """section= miss response contains an 'error' key.
 
         Arrange: GitHub enrichment injects #2521 body; section='nonexistent_xyz_no_match_8423'
@@ -145,13 +139,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_NONEXISTENT_FILTER,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
 
         # Assert
         assert "error" in resp, (
@@ -160,9 +148,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
             "Before ADR-3 fix: response has section_filter_miss=True but no 'error' key."
         )
 
-    def test_section_miss_error_dict_has_valid_sections_key_include_content_true(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_valid_sections_key_include_content_true(self, mocker: MockerFixture) -> None:
         """section= miss response contains a non-empty 'valid_sections' list.
 
         Arrange: same as above.
@@ -176,26 +162,15 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_NONEXISTENT_FILTER,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
 
         # Assert — key present
         assert "valid_sections" in resp, (
-            f"Response must contain 'valid_sections' key on section= miss. "
-            f"Got keys: {sorted(resp.keys())}."
+            f"Response must contain 'valid_sections' key on section= miss. Got keys: {sorted(resp.keys())}."
         )
         valid_raw: object = resp["valid_sections"]
-        assert isinstance(valid_raw, list), (
-            f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
-        )
-        assert len(valid_raw) > 0, (
-            f"'valid_sections' must be non-empty; got {valid_raw!r}."
-        )
+        assert isinstance(valid_raw, list), f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
+        assert len(valid_raw) > 0, f"'valid_sections' must be non-empty; got {valid_raw!r}."
         # At least one real #2521 section must appear so callers know what to request.
         known_present = [s for s in valid_raw if s in _KNOWN_SECTIONS_2521]
         assert known_present, (
@@ -203,9 +178,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
             f"#2521 sections: {sorted(_KNOWN_SECTIONS_2521)}."
         )
 
-    def test_section_miss_error_dict_no_body_include_content_true(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_no_body_include_content_true(self, mocker: MockerFixture) -> None:
         """section= miss error response does not include a 'body' field.
 
         No content is returned on a miss (ADR-3 selected option 3).
@@ -222,13 +195,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_NONEXISTENT_FILTER,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
 
         # Assert
         assert "body" not in resp, (
@@ -249,9 +216,7 @@ class TestSectionMissErrorDictCompactMode:
     Exercises the ``_assemble_view_compact`` setter at ~3094.
     """
 
-    def test_section_miss_error_dict_has_error_key_compact_mode(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_error_key_compact_mode(self, mocker: MockerFixture) -> None:
         """section= miss in compact mode (include_content=False) has 'error' key.
 
         Arrange: GitHub enrichment injects #2521 body; section=<nonexistent>;
@@ -268,23 +233,15 @@ class TestSectionMissErrorDictCompactMode:
 
         # Act
         resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                include_content=False,
-                section=_NONEXISTENT_FILTER,
-            )
+            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
         )
 
         # Assert
         assert "error" in resp, (
-            f"Compact-mode response must contain 'error' key on section= miss. "
-            f"Got keys: {sorted(resp.keys())}."
+            f"Compact-mode response must contain 'error' key on section= miss. Got keys: {sorted(resp.keys())}."
         )
 
-    def test_section_miss_error_dict_has_valid_sections_key_compact_mode(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_valid_sections_key_compact_mode(self, mocker: MockerFixture) -> None:
         """section= miss in compact mode response includes 'valid_sections'.
 
         RED: fails because the current compact-mode response does not include
@@ -295,30 +252,18 @@ class TestSectionMissErrorDictCompactMode:
 
         # Act
         resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                include_content=False,
-                section=_NONEXISTENT_FILTER,
-            )
+            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
         )
 
         # Assert
         assert "valid_sections" in resp, (
-            f"Compact-mode error response must include 'valid_sections'. "
-            f"Got keys: {sorted(resp.keys())}."
+            f"Compact-mode error response must include 'valid_sections'. Got keys: {sorted(resp.keys())}."
         )
         valid_raw: object = resp["valid_sections"]
-        assert isinstance(valid_raw, list), (
-            f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
-        )
-        assert len(valid_raw) > 0, (
-            f"'valid_sections' must be non-empty; got {valid_raw!r}."
-        )
+        assert isinstance(valid_raw, list), f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
+        assert len(valid_raw) > 0, f"'valid_sections' must be non-empty; got {valid_raw!r}."
 
-    def test_section_miss_error_dict_no_body_compact_mode(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_no_body_compact_mode(self, mocker: MockerFixture) -> None:
         """section= miss in compact mode error response does not include 'body'.
 
         RED: fails because model_dump() always includes 'body' in the response
@@ -329,18 +274,12 @@ class TestSectionMissErrorDictCompactMode:
 
         # Act
         resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                include_content=False,
-                section=_NONEXISTENT_FILTER,
-            )
+            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
         )
 
         # Assert
         assert "body" not in resp, (
-            f"Compact-mode error response must NOT include 'body'. "
-            f"Got body={resp.get('body')!r}."
+            f"Compact-mode error response must NOT include 'body'. Got body={resp.get('body')!r}."
         )
 
 
@@ -352,9 +291,7 @@ class TestSectionMissErrorDictCompactMode:
 class TestSectionsFilterPluralMissErrorDict:
     """sections=[...] miss exercises the ``_filter_view_sections`` server wrapper."""
 
-    def test_section_miss_error_dict_has_error_key_sections_plural(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_error_key_sections_plural(self, mocker: MockerFixture) -> None:
         """sections=[nonexistent] response has 'error' key.
 
         Arrange: GitHub enrichment injects #2521 body;
@@ -372,13 +309,7 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                sections=[_NONEXISTENT_FILTER],
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
 
         # Assert
         assert "error" in resp, (
@@ -387,9 +318,7 @@ class TestSectionsFilterPluralMissErrorDict:
             "Before ADR-3 fix: section_filter_miss=True but no 'error' key."
         )
 
-    def test_section_miss_error_dict_has_valid_sections_key_sections_plural(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_has_valid_sections_key_sections_plural(self, mocker: MockerFixture) -> None:
         """sections=[nonexistent] response has non-empty 'valid_sections' list.
 
         RED: fails because _filter_view_sections does not add 'valid_sections'
@@ -399,35 +328,22 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                sections=[_NONEXISTENT_FILTER],
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
 
         # Assert — key present
         assert "valid_sections" in resp, (
-            f"sections=[] miss response must contain 'valid_sections'. "
-            f"Got keys: {sorted(resp.keys())}."
+            f"sections=[] miss response must contain 'valid_sections'. Got keys: {sorted(resp.keys())}."
         )
         valid_raw: object = resp["valid_sections"]
-        assert isinstance(valid_raw, list), (
-            f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
-        )
-        assert len(valid_raw) > 0, (
-            f"'valid_sections' must be non-empty; got {valid_raw!r}."
-        )
+        assert isinstance(valid_raw, list), f"'valid_sections' must be a list; got {type(valid_raw).__name__}."
+        assert len(valid_raw) > 0, f"'valid_sections' must be non-empty; got {valid_raw!r}."
         known_present = [s for s in valid_raw if s in _KNOWN_SECTIONS_2521]
         assert known_present, (
             f"'valid_sections' {valid_raw!r} must contain at least one known #2521 "
             f"section: {sorted(_KNOWN_SECTIONS_2521)}."
         )
 
-    def test_section_miss_error_dict_no_body_sections_plural(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_no_body_sections_plural(self, mocker: MockerFixture) -> None:
         """sections=[nonexistent] error response does not include 'body'.
 
         RED: fails because _filter_view_sections does not clear the body on a
@@ -439,13 +355,7 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                sections=[_NONEXISTENT_FILTER],
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
 
         # Assert — 'body' must be absent (error dict has no content fields)
         assert "body" not in resp, (
@@ -468,9 +378,7 @@ class TestSectionMissErrorDictSuggestion:
     Present only when a close match exists; omitted for completely random names.
     """
 
-    def test_section_miss_error_dict_near_miss_has_suggestion_key(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_near_miss_has_suggestion_key(self, mocker: MockerFixture) -> None:
         """section='Concernz' (distance 1 from 'Concerns') yields 'suggestion' key.
 
         Arrange: #2521 body (contains '## Concerns');
@@ -486,13 +394,7 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_NEAR_MISS_FILTER,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER))
 
         # Assert
         assert "suggestion" in resp, (
@@ -501,9 +403,7 @@ class TestSectionMissErrorDictSuggestion:
             f"error response.  Got keys: {sorted(resp.keys())}."
         )
 
-    def test_section_miss_error_dict_near_miss_suggestion_references_closest(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_near_miss_suggestion_references_closest(self, mocker: MockerFixture) -> None:
         """Suggestion value for 'Concernz' references the closest valid section 'Concerns'.
 
         RED: fails because the current response has no 'suggestion' key.
@@ -513,23 +413,12 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_NEAR_MISS_FILTER,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER))
 
         # Assert — suggestion present
-        assert "suggestion" in resp, (
-            "'suggestion' key must be present for near-miss filter "
-            f"{_NEAR_MISS_FILTER!r}."
-        )
+        assert "suggestion" in resp, f"'suggestion' key must be present for near-miss filter {_NEAR_MISS_FILTER!r}."
         suggestion: object = resp["suggestion"]
-        assert isinstance(suggestion, str), (
-            f"'suggestion' must be a str; got {type(suggestion).__name__}."
-        )
+        assert isinstance(suggestion, str), f"'suggestion' must be a str; got {type(suggestion).__name__}."
         assert _NEAR_MISS_TARGET in suggestion, (
             f"Suggestion {suggestion!r} must reference the closest valid section "
             f"{_NEAR_MISS_TARGET!r}.  'Concernz' is Levenshtein-distance-1 from "
@@ -537,9 +426,7 @@ class TestSectionMissErrorDictSuggestion:
             f"closest match."
         )
 
-    def test_section_miss_error_dict_near_miss_sections_plural_has_suggestion(
-        self, mocker: MockerFixture
-    ) -> None:
+    def test_section_miss_error_dict_near_miss_sections_plural_has_suggestion(self, mocker: MockerFixture) -> None:
         """sections=['Concernz'] plural miss also yields a 'suggestion' key.
 
         The _filter_view_sections wrapper handles the plural path; it must also
@@ -552,13 +439,7 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                sections=[_NEAR_MISS_FILTER],
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NEAR_MISS_FILTER]))
 
         # Assert
         assert "suggestion" in resp, (
@@ -566,9 +447,7 @@ class TestSectionMissErrorDictSuggestion:
             f"'suggestion' key.  Got keys: {sorted(resp.keys())}."
         )
         suggestion_obj: object = resp["suggestion"]
-        assert isinstance(suggestion_obj, str), (
-            f"'suggestion' must be a str; got {type(suggestion_obj).__name__}."
-        )
+        assert isinstance(suggestion_obj, str), f"'suggestion' must be a str; got {type(suggestion_obj).__name__}."
         assert _NEAR_MISS_TARGET in suggestion_obj, (
             f"Suggestion {suggestion_obj!r} must reference {_NEAR_MISS_TARGET!r}."
         )
@@ -597,32 +476,20 @@ class TestSectionHitRegressionGuard:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                section=_VALID_SECTION,
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_VALID_SECTION))
 
         # Assert — no error
         assert "error" not in resp, (
-            f"Valid section={_VALID_SECTION!r} must NOT produce an error response. "
-            f"Got: {resp.get('error')!r}."
+            f"Valid section={_VALID_SECTION!r} must NOT produce an error response. Got: {resp.get('error')!r}."
         )
         # Assert — body present and non-empty
         body: object = resp.get("body")
         assert isinstance(body, str), (
-            f"Valid section={_VALID_SECTION!r} must return a str 'body'. "
-            f"Got {type(body).__name__}."
+            f"Valid section={_VALID_SECTION!r} must return a str 'body'. Got {type(body).__name__}."
         )
-        assert len(body) > 0, (
-            f"Valid section={_VALID_SECTION!r} must return non-empty 'body'. "
-            f"Got body={body!r}."
-        )
+        assert len(body) > 0, f"Valid section={_VALID_SECTION!r} must return non-empty 'body'. Got body={body!r}."
         assert _VALID_SECTION in body, (
-            f"Returned body must contain the '{_VALID_SECTION}' section content. "
-            f"Body starts with: {body[:100]!r}."
+            f"Returned body must contain the '{_VALID_SECTION}' section content. Body starts with: {body[:100]!r}."
         )
 
     def test_section_hit_plural_no_error(self, mocker: MockerFixture) -> None:
@@ -636,18 +503,11 @@ class TestSectionHitRegressionGuard:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(
-                selector="2521",
-                summary=False,
-                sections=[_VALID_SECTION],
-            )
-        )
+        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_VALID_SECTION]))
 
         # Assert — no error
         assert "error" not in resp, (
-            f"Valid sections=[{_VALID_SECTION!r}] must NOT produce an error response. "
-            f"Got: {resp.get('error')!r}."
+            f"Valid sections=[{_VALID_SECTION!r}] must NOT produce an error response. Got: {resp.get('error')!r}."
         )
         # Assert — section_filter_miss is False for a successful match
         assert resp.get("section_filter_miss") is not True, (

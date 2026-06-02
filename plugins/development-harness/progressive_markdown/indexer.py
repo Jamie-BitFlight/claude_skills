@@ -184,11 +184,7 @@ class MarkdownIndexer:
                 self._process_fence_token(token, state)
 
     def _process_heading_token(
-        self,
-        token: Token,
-        all_tokens: list[Token],
-        token_index: int,
-        state: _BuildState,
+        self, token: Token, all_tokens: list[Token], token_index: int, state: _BuildState
     ) -> None:
         """Extract and process a heading_open token. Updates state in-place.
 
@@ -276,9 +272,7 @@ class MarkdownIndexer:
             summary=_code_summary(language, content),
         )
 
-    def _finalize_sections(
-        self, state: _BuildState, total_lines: int
-    ) -> dict[str, SectionNode]:
+    def _finalize_sections(self, state: _BuildState, total_lines: int) -> dict[str, SectionNode]:
         """Convert _SectionBuilder objects to final SectionNode objects.
 
         Args:

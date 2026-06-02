@@ -96,11 +96,7 @@ class Paginator:
         ]
 
 
-def _chunks_to_pages(
-    chunks: list[str],
-    budget: int,
-    budgeter: TokenBudgeter,
-) -> list[Page]:
+def _chunks_to_pages(chunks: list[str], budget: int, budgeter: TokenBudgeter) -> list[Page]:
     """Convert a list of text chunks into Page objects.
 
     Args:
@@ -114,19 +110,10 @@ def _chunks_to_pages(
     if not chunks:
         return [_make_page("", 1, 1, budget, budgeter)]
     total = len(chunks)
-    return [
-        _make_page(chunk, page_num, total, budget, budgeter)
-        for page_num, chunk in enumerate(chunks, start=1)
-    ]
+    return [_make_page(chunk, page_num, total, budget, budgeter) for page_num, chunk in enumerate(chunks, start=1)]
 
 
-def _make_page(
-    content: str,
-    page_number: int,
-    total_pages: int,
-    budget: int,
-    budgeter: TokenBudgeter,
-) -> Page:
+def _make_page(content: str, page_number: int, total_pages: int, budget: int, budgeter: TokenBudgeter) -> Page:
     """Construct a Page with computed token count.
 
     Args:

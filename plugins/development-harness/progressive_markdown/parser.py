@@ -71,11 +71,7 @@ class MarkdownItParser:
         result = parser.parse("README.md", "# Hello\\n\\nWorld.")
     """
 
-    def __init__(
-        self,
-        preset: str = "commonmark",
-        options_update: Mapping[str, Any] | None = None,
-    ) -> None:
+    def __init__(self, preset: str = "commonmark", options_update: Mapping[str, Any] | None = None) -> None:
         """Initialise with a preset and optional option overrides.
 
         Args:
@@ -97,10 +93,4 @@ class MarkdownItParser:
         env: dict[str, Any] = {}
         tokens = self._md.parse(markdown, env)
         lines = markdown.splitlines()
-        return ParserResult(
-            source=source,
-            raw_markdown=markdown,
-            lines=lines,
-            tokens=tokens,
-            env=env,
-        )
+        return ParserResult(source=source, raw_markdown=markdown, lines=lines, tokens=tokens, env=env)

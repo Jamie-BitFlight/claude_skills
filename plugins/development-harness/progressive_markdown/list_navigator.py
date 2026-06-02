@@ -74,11 +74,7 @@ class DisclosureConfig:
 
 
 def _disclosure_to_result(
-    kind: NavigationKind,
-    title: str,
-    pages: list[Page],
-    requested_page: int,
-    metadata: dict[str, object],
+    kind: NavigationKind, title: str, pages: list[Page], requested_page: int, metadata: dict[str, object]
 ) -> NavigationResult:
     """Build a ``NavigationResult`` from disclosure parameters.
 
@@ -95,12 +91,7 @@ def _disclosure_to_result(
     total_pages = max(1, len(pages))
     current_page = max(1, min(requested_page, total_pages))
     return NavigationResult(
-        kind=kind,
-        title=title,
-        pages=pages,
-        current_page=current_page,
-        total_pages=total_pages,
-        metadata=metadata,
+        kind=kind, title=title, pages=pages, current_page=current_page, total_pages=total_pages, metadata=metadata
     )
 
 
@@ -131,7 +122,7 @@ class ProgressiveDisclosure:
     Example::
 
         pd = ProgressiveDisclosure(tasks, DisclosureConfig(id_field="id"))
-        toc = pd.index()   # all items, summary fields only (dict)
+        toc = pd.index()  # all items, summary fields only (dict)
         page1 = pd.page(1)  # first page, auto-fit budget (NavigationResult)
         item = pd.select("T03")  # NavigationResult (found or error)
         hits = pd.search("auth")  # scored matches (dict)
@@ -216,11 +207,7 @@ class ProgressiveDisclosure:
         content = json.dumps(page_slice)
         token_count = len(self._enc.encode(content))
         result_page = Page(
-            content=content,
-            page_number=1,
-            total_pages=1,
-            token_count=token_count,
-            budget=self._config.token_budget,
+            content=content, page_number=1, total_pages=1, token_count=token_count, budget=self._config.token_budget
         )
         meta: dict[str, object] = {
             "page": clamped_n,

@@ -150,12 +150,7 @@ class SectionBodyRenderer:
         if body_lines and not body.endswith("\n"):
             body += "\n"
 
-        return self._stub_renderer.render_stubs(
-            body,
-            section.code_block_ids,
-            start,
-            document,
-        )
+        return self._stub_renderer.render_stubs(body, section.code_block_ids, start, document)
 
 
 class LinkInventoryRenderer:
