@@ -20,12 +20,18 @@ In an A/B or multi-arm setup this is load-bearing: detail in the shared prompt d
 work the arms are supposed to do, which conflates the prompt variable with the arm variable and makes
 the comparison meaningless.
 
+The same leak appears beyond the prompt. A `SKILL.md`, agent file, or task file that narrates the
+system's implementation — its schema, paths, and component names — instead of giving the executing
+agent CLEAR, CoVe-checkable instructions for its task is leaking too. §2 holds each executor file to
+that standard.
+
 ## 2. Audience test every instruction file
 
 Identify each file's RUNTIME reader, then hold it to that standard:
 
 - Executor files — task prompts, worker/agent prompts, execution skills. Reader does one concrete
-  task. Keep only: procedure, inputs, output contract, constraints. Strip rationale, "why",
+  task. Keep only: procedure, inputs, output contract, constraints, framed as CLEAR, CoVe-checkable
+  instructions for the task — not a description of the system that serves it. Strip rationale, "why",
   architecture explanation, and experimental framing — the executor cannot act on any of it.
 - Design / decision files — the pattern skill and its references. Reader decides whether and how to
   apply the pattern. Rationale, theory, and when-to-use ARE the actionable content here; keep them.
@@ -33,6 +39,9 @@ Identify each file's RUNTIME reader, then hold it to that standard:
 The single test for every sentence: is it a command the reader executes, or knowledge it needs to
 act? If neither, delete it. Explaining the wiper-fluid system to the driver is noise — e.g. telling
 an executing agent where its model is configured, when it cannot change it.
+
+The fix for non-functional prose is deletion, not explanation. Replacing a decorative `(Haiku)` tag
+with a paragraph on where the model is set stacks noise on noise — remove the tag and stop.
 
 ## 3. Single source of truth — no restated or derived values
 
@@ -82,6 +91,18 @@ Run the cheap mechanical pass first; escalate only the judgment checks. This is 
 its own output — the same Detect -> (Design) -> Verify shape, with tier and diversity set per check, not
 fixed. See [./candidate-fit.md](./candidate-fit.md) for the mechanical-vs-judgment split and the parent
 SKILL.md Composition Framework for the fleet knobs.
+
+## 7. Correcting a rule — state it as a knob, and defend the default
+
+When a review finds a parameter stated as a fixed value (a model tier, a worker count, "cheap",
+"homogeneous"), the fix is to restate it as a knob with a "match to X" criterion — not to swap one
+absolute for another. The origin example's setting is one point on the knob, not the axis.
+
+When the correction reframes an over-narrow default, run an adversarial defender of that default
+before shipping the reframe: a reviewer whose only job is to argue the original setting is sometimes
+right. This prevents the reframe over-correcting into the opposite bias — "always cheap/homogeneous"
+becoming "always capable/heterogeneous". The de-bias of this skill used exactly this step: an
+adversarial-defender pass kept the cheap-mechanical path as a real option instead of deleting it.
 
 SOURCE: observed failures while building the SOLID A/B harness for this methodology
 (session 2026-06-03). A shared task prompt carried the output schema, ruleset/corpus/findings paths,

@@ -648,6 +648,10 @@ uv run prek run --files <file>
 
 ---
 
+- Review and Correction Discipline (two gates structural≠content, run-the-review, judgment adjudication, match-action/quiesce): `.claude/rules/review-and-correction-discipline.md`
+
+---
+
 ## GitHub CLI (gh) Usage
 
 <gh_cli_usage>
