@@ -168,7 +168,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: true
-        exclude: 'plugins/development-harness/skills/implementation-manager/.*|plugins/uv/skills/uv/.*'
+        exclude: 'plugins/development-harness/skills/implementation-manager/.*|plugins/uv/skills/uv/.*|examples/solid-review-ab/corpus/.*'
 
       - id: enable-rerere
         name: Enable git rerere (auto-replay conflict resolutions)

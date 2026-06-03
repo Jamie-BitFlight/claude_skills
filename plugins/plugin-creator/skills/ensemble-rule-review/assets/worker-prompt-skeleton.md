@@ -24,8 +24,8 @@ STEP 2 — For each location, decide VIOLATION or PASS strictly against the rule
          Do NOT infer, extrapolate, or judge anything outside your rule slice.
 STEP 3 — Emit one block per finding in the FIXED SCHEMA below. No prose outside the blocks.
 
-FIXED CANDIDATE SCHEMA (emit this EXACT block shape, one block per finding — the reducer
-parses it literally, so do not rename fields or change the leading "- group:"):
+FIXED CANDIDATE SCHEMA (emit this EXACT block shape, one block per finding — do not rename
+fields or change the leading "- group:"):
 - group: {{THE GROUP ID OF THE RULE THIS FINDING VIOLATES — per finding, NOT a fixed worker id}}
   rule: {{free-form descriptive slug — for humans only, NOT used to match findings}}
   location: {{file:line}}
@@ -70,8 +70,11 @@ Trace every finding to a real located hit. No invented locations or quotes.
 
 The reducer script `../scripts/reduce.py` consumes the worker output files and keys corroboration
 on `(group, location)` — never the free-form `rule` slug. Keep `group` identical across all
-workers who hold that group, and write `location` as `file:line`; the reducer normalizes it to
-`basename:line` so two workers collide into one weighted entry. Run it with:
+workers who hold that group, and write `location` as `file:line` using the repo-relative path (not
+just the basename). The reducer strips any leading `/` and trims whitespace but PRESERVES the
+directory portion, so two workers reporting the same `path:line` collide into one weighted entry,
+while same-basename files in different directories (`src/foo/config.py:10` vs
+`tests/foo/config.py:10`) stay distinct and never fabricate a false corroboration. Run it with:
 
 ```bash
 uv run ../scripts/reduce.py {{ABSOLUTE_REPORT_DIR}} --glob 'worker-*.md' [--keep-threshold N]

@@ -1,0 +1,25 @@
+{
+  "S": [
+    "SRP-1: A class or module carries more than one reason to change (multiple unrelated responsibilities / god object).",
+    "SRP-2: A function interleaves multiple levels of abstraction (high-level orchestration mixed with low-level detail in one body).",
+    "SRP-3: A change to one feature forces edits to code that serves an unrelated feature in the same unit."
+  ],
+  "O": [
+    "OCP-1: Behavior is extended by editing existing code via an if/elif or match on a type tag, instead of adding a new subtype/strategy.",
+    "OCP-2: Adding a new variant requires modifying a closed conditional rather than registering a new implementation."
+  ],
+  "L": [
+    "LSP-1: A subclass strengthens a precondition or weakens a postcondition of the base method it overrides.",
+    "LSP-2: An override raises NotImplementedError or changes the base contract (return type or raised exceptions) so the subtype is not substitutable.",
+    "LSP-3: A subclass overrides a method to do nothing or to reject inputs the base accepts."
+  ],
+  "I": [
+    "ISP-1: An interface or abstract base forces implementers to define methods they do not use (fat interface).",
+    "ISP-2: A client depends on a broad interface but calls only a small subset of its methods."
+  ],
+  "D": [
+    "DIP-1: A high-level module directly instantiates a concrete low-level dependency (hard-coded construction, no injection).",
+    "DIP-2: Code depends on a concrete class where it should depend on an abstraction or protocol.",
+    "DIP-3: A policy/business-logic unit imports and calls a specific I/O, database, or network implementation directly."
+  ]
+}

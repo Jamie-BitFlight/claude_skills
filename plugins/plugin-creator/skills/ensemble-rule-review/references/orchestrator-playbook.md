@@ -178,4 +178,10 @@ The orchestrator itself is the **reducer** — mid tier (sonnet), medium effort 
   the pattern exists to avoid.
 - **Reducing before dedup.** Corroboration counting is meaningless until `(rule_id, location)` is
   normalized — dedup first, then weight.
-- **An expensive model as a worker.** Wastes the economics; cheap workers + overlap is the design.
+- **Over-tiered workers when the job is mechanical matching.** Pays for inference that was
+  engineered out of the worker's job; the cost adds nothing because the tier advantage has no work
+  to do. Use the cheapest tier for mechanical slices. Exception — do NOT treat "non-cheapest worker"
+  as the anti-pattern: mid-tier or heterogeneous workers used deliberately to de-correlate
+  shared-model bias are a valid (sometimes required) design choice, per experiment-matrix.md §B. The
+  symmetric failure is under-tiering judgment-heavy slices: corroboration then amplifies shared bias
+  rather than denoising independent lapses.

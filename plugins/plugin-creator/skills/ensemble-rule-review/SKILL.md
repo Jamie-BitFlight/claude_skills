@@ -1,15 +1,18 @@
 ---
 name: ensemble-rule-review
-description: "Design pattern for converting rule-following, checklist, or rubric skills into a fan-out map-reduce ensemble of cheap parallel sub-agents with corroboration-weighted merge. Apply when creating or refactoring a skill or agent that applies 10+ independent criteria in a single pass. Triggers on: 'review against a checklist', 'fan out', 'map reduce review', 'ensemble', 'split the rules', 'apply rubric', or any large ruleset being applied by one agent in one pass. NOT for tight single-pass transforms or rulesets under 5 criteria."
+description: "Design pattern for converting rule-following, checklist, or rubric skills into a fan-out map-reduce ensemble of parallel rigid sub-agents with corroboration-weighted merge; worker model tier and diversity are knobs matched to inference load and stakes, not fixed values. Apply when creating or refactoring a skill or agent that applies 10+ independent criteria in a single pass. Triggers on: 'review against a checklist', 'fan out', 'map reduce review', 'ensemble', 'split the rules', 'apply rubric', or any large ruleset being applied by one agent in one pass. NOT for tight single-pass transforms or rulesets under 5 criteria."
 user-invocable: true
 ---
 
 # Ensemble Rule Review
 
 A skill-design pattern for rule-following work. Instead of one agent holding the whole ruleset
-in a single pass, partition the ruleset across multiple cheap, rigid, parallel sub-agents whose
+in a single pass, partition the ruleset across multiple rigid, parallel sub-agents whose
 coverage deliberately overlaps. Collect findings in a fixed schema, then weight by
-cross-agent corroboration and drop the low-weight tail.
+cross-agent corroboration and drop the low-weight tail. Worker model tier is a knob: the cheapest
+tier is the default for mechanical-matching slices; escalate to a more capable tier or
+heterogeneous families when a slice needs judgment or when de-correlating shared-model bias
+matters more than cost.
 
 ## The Problem It Solves
 
@@ -26,7 +29,11 @@ higher probability each individual rule is under-applied.
 
 1. **Control header.** One line at the top compiles an effort/scale parameter into concrete
    knobs: worker count, candidates per worker, verify policy, output cap. The same skill body
-   scales rigor by the parameter.
+   scales rigor by the parameter. Two further knobs — **worker model tier** and **worker
+   diversity** (homogeneous vs heterogeneous families / temperature / prompt framing) — are
+   selected separately, by error-correlation structure and stakes rather than by the effort
+   parameter, so they do not auto-scale with it. See "Model and Effort Guidance" for their
+   selection criteria.
 
 2. **Deliberate overlap, not just partition.** Worker scenarios are engineered so their goals
    INTERSECT. A genuine finding falls inside multiple workers' coverage and is reported more
@@ -41,9 +48,14 @@ higher probability each individual rule is under-applied.
    worker's job until it is mechanical matching, which is the band where a cheap model is
    reliable.
 
-4. **Cheap/fast model on purpose.** Haiku (or cheapest tier) is unreliable when forced to
-   infer or fill blanks — so the design removes the inference. Cheap and fast is what makes
-   running several workers over the same input affordable.
+4. **Match worker tier to inference load.** The load-bearing invariants are *rigid + partial
+   ruleset + parallel* — they are what make this pattern work, and they hold at any tier. Worker
+   tier is a knob layered on top: the cheapest tier is the default because the design has already
+   removed inference from the worker's job, so a model that is unreliable at open-ended inference
+   is reliable at mechanical matching. Cheapness is an **economics enabler** — it makes running
+   several overlapping workers over the same input affordable — not a core mechanism. Escalate the
+   tier (or go heterogeneous) when a slice still requires judgment or when shared-model error must
+   be de-correlated; the invariants stay fixed, only the tier knob moves.
 
 5. **Fixed candidate schema.** Every worker emits the same shape (e.g., `rule_id, location,
    verdict, evidence`). This contract makes dedup, corroboration counting, and merge possible.
@@ -51,13 +63,30 @@ higher probability each individual rule is under-applied.
 6. **Corroboration weighting + drop the tail (the reducer).** The orchestrator collects all
    findings, deduplicates near-identical ones, raises weight for findings corroborated across
    overlapping workers and sinks lone-worker findings, trashes the low-weight tail, keeps the
-   high-weight set. A single worker's hallucination sinks below the keep threshold.
+   high-weight set. A single worker's *random* hallucination sinks below the keep threshold ONLY
+   when the precision gate is set (`keep_threshold = window`); the default `keep_threshold = 1` is
+   recall-biased — it dedups and ranks but drops nothing. Caveat: the precision gate drops lone
+   findings of ALL kinds, including a true critical that only one worker's slice happened to cover —
+   so exempt `critical`/`high` severity from the tail cut and surface them flagged-but-uncorroborated
+   rather than silently dropping them.
 
 ## Why It Works
 
-More total facts pass through cheap/fast workers; corroboration weighting cancels the noise;
-the surviving set is MORE reliable than one expensive agent, not less. This is bagging /
-majority-vote ensembling applied to LLM rule-checking.
+More total facts pass through cheap/fast workers, and corroboration weighting cancels the noise —
+for ONE of two error sources. Overlapping rule slices denoise *coverage / attention* variance: a
+rule a worker under-applies in one pass is caught by another worker holding an overlapping slice.
+This is bagging / majority-vote ensembling applied to LLM rule-checking, and it is the genuine win.
+
+It does NOT cancel *shared-model bias*. A construct the worker model systematically misreads is
+misread the same way by every worker that shares that model, so corroboration weighting *boosts*
+that shared
+error instead of cancelling it. The variance of an N-worker average floors at the correlated-error
+term ρσ² — the part adding workers cannot average away (the random-forest / correlated-Condorcet
+result). Net: the surviving set is more reliable than one cheap agent on attention errors, and no
+more reliable on systematic ones. The rule partition is a real de-correlation axis, but it varies
+*which rules* each worker checks, not *how* it reasons over the shared input — so to denoise the
+second source it must be paired with diversity on the axes it does NOT vary (worker model family,
+temperature, prompt framing) and a keep threshold calibrated on labelled data.
 
 SOURCE: User-reported result (conversation 2026-05-30, not independently reproduced): a
 scientific-journal review skill — one Sonnet agent holding the full ruleset took 14-18 minutes
@@ -79,20 +108,101 @@ flowchart TD
 
 | Component | Freedom | Reason |
 |-----------|---------|--------|
-| Workers | HIGH rigidity / LOW freedom | Rigid rule list, fixed schema; shrinks job to mechanical matching |
+| Worker process & schema | HIGH rigidity / LOW freedom | Rigid rule list, fixed schema; shrinks job to mechanical matching |
+| Worker model tier & diversity | TUNABLE knob — select by criterion | Cheapest homogeneous tier is the default for mechanical-matching slices; escalate to a more capable tier or heterogeneous families for judgment-heavy / high-stakes / very-large-ruleset slices to de-correlate shared-model error |
 | Reducer + output contract | LOW freedom | Fixed verdict set, fixed schema, hard cap |
 
 ## Model and Effort Guidance
 
-- **Workers:** cheapest tier (haiku), effort low. The job is reduced to mechanical matching
-  and the overlap denoises single-worker errors.
-- **Reducer / orchestrator:** mid tier (sonnet), effort medium. It weights and merges.
-- Do NOT run an expensive model on a job a rigid cheap worker can do.
+Tier and worker diversity are **knobs**, not fixed values. Select them by matching to
+per-rule competence, error-correlation structure, and stakes — the same axis the experiment
+matrix names as THE de-correlation lever ([./references/experiment-matrix.md](./references/experiment-matrix.md),
+"worker model" row) and the fit gate tests as a mandatory converse ([./references/candidate-fit.md](./references/candidate-fit.md),
+Q5 + rubric #5). Set the chosen tier in the worker agent's frontmatter `model:` field — never as
+a prose mandate ([./references/instruction-hygiene.md](./references/instruction-hygiene.md) §3).
+
+- **Workers — cost default (mechanical-matching slices):** cheapest tier, effort low. When the
+  design has shrunk the job to mechanical matching, a homogeneous fleet at the cheapest tier is
+  correct: the rigidity makes it reliable and the overlap denoises single-worker attention errors.
+  This is the right default for most slices. **Don't overpay for mechanical work.**
+- **Workers — escalate (judgment-heavy slices, high-stakes review, very large rulesets):** raise
+  to a more capable tier and/or use heterogeneous model families (and varied temperature / prompt
+  framing) to de-correlate shared-model error. Escalate when a slice cannot be reduced to
+  mechanical matching, when the cost of a shared systematic miss exceeds the cost of stronger
+  workers, or when the ruleset is large enough that even a strong single agent's attention
+  degrades across it. **Don't underpay for judgment work** — a cheap homogeneous fleet on a
+  judgment slice just corroborates the same blind spot.
+- **Reducer / orchestrator:** mid tier, effort medium. It weights and merges; this job needs
+  more inference than a worker slice and is not parallelized N-fold, so the cost case differs.
+- The economics rule is **"match worker tier to inference load,"** not "always cheapest." Running
+  one capable or different-family worker alongside cheap workers is a deliberate de-correlation
+  choice, not waste.
 
 SOURCE: `/plugin-creator:agentskills` — degrees-of-freedom guidance and model selection by
-task cognitive requirement.
+task cognitive requirement. Tier/diversity-as-knob criteria: `./references/experiment-matrix.md`
+(worker-model de-correlation lever) and `./references/candidate-fit.md` (Q5 + rubric #5 diversity gate).
+
+## Composition Framework (tier × diversity × stage)
+
+A compact selection aid: pick a fleet composition by matching the dominant error source and the
+stakes of the slice, not by a blanket cost rule. The flowchart branches on the discriminator
+(error-correlation structure / stakes / cost); the four compositions below are the leaves.
+
+```mermaid
+flowchart TD
+    Start([Configure the worker fleet for a slice]) --> Q1{"Is the slice reducible to<br>mechanical matching after<br>thin slicing?"}
+    Q1 -->|"Yes — mechanical"| Q2{"High stakes OR shared-model<br>systematic miss likely<br>on this construct?"}
+    Q1 -->|"No — needs judgment"| Q3{"Can you inject diversity<br>(heterogeneous families /<br>temperature / framing)?"}
+    Q2 -->|"No — low stakes,<br>cost dominates"| CH["Cheap-homogeneous (DEFAULT)<br>Cheapest tier x N, same family<br>Rigidity + overlap denoise attention errors<br>Right for most slices"]
+    Q2 -->|"Yes — de-correlation matters"| HET["Heterogeneous-capable<br>Different model families and/or<br>varied temperature/framing<br>Breaks shared-model bias the vote<br>cannot otherwise cancel"]
+    Q3 -->|"Yes"| MIX["Mixed-tier fleet<br>Cheap workers on mechanical sub-slices<br>+ one or more capable/different-family<br>workers on the judgment sub-slice<br>Diversity is mandatory here (candidate-fit Q5)"]
+    Q3 -->|"No — cannot inject diversity"| Single["Not an ensemble fit<br>Keep a single capable agent<br>Corroboration would boost shared bias<br>(candidate-fit Q5 -> Stop)"]
+    CH --> Verify{"Need an independent<br>precision check on<br>surviving findings?"}
+    HET --> Verify
+    MIX --> Verify
+    Verify -->|"Yes — false positives costly"| IndV["Add independent different-model verifier<br>One capable worker from a different family<br>than the workers, voting CONFIRMED/PLAUSIBLE/REFUTED<br>per surviving candidate<br>A same-model verifier shares the workers' blind spot"]
+    Verify -->|"No — recall-biased, low stakes"| NoV["No separate verifier<br>Reducer keep-threshold handles precision"]
+```
+
+**Diversity is multi-axis.** Worker diversity is not only model family / temperature / prompt
+framing — it ALSO includes **role / persona / expert-framework diversity** (e.g. distinct advisor
+personas, each carrying a different expert lens, over one unbounded problem). Treat role/persona as
+a first-class diversity axis alongside the model-level axes when de-correlation matters.
+
+**Reduce method follows boundedness.** Bounded / mechanical rule-checking → corroboration-weight +
+drop-tail over a cheap homogeneous swarm (this skill); unbounded / judgment problems → escalate to
+synthesis across diverse lenses (a capable, role-diverse panel), whose reduce step is synthesis, not
+corroboration counting (see [./references/methodology-selection.md](./references/methodology-selection.md)).
+Example: a cheap mechanical codebase-rule swarm (this skill) vs a role-diverse strong advisor panel
+on an open design question (synthesis, not this skill's reducer).
+
+**The four compositions, by selection criterion:**
+
+- **Cheap-homogeneous (the default):** mechanical-matching slice, low stakes, cost dominates.
+  Cheapest tier, one family, N workers. The rigidity plus overlap denoise attention errors; this
+  is correct for most slices.
+- **Heterogeneous-capable:** mechanical or near-mechanical slice where a *shared-model systematic
+  miss* is the dominant risk, or stakes are high. Vary model family / temperature / prompt framing
+  to de-correlate the error the vote cannot otherwise cancel (the floor at ρσ²; see "Why It Works").
+- **Mixed-tier fleet:** the slice has both mechanical and judgment sub-parts. Run cheap workers on
+  the mechanical sub-slices and one or more capable / different-family workers on the judgment
+  sub-slice. Per `candidate-fit.md` Q5, diversity is mandatory once judgment is involved.
+- **Independent different-model verifier (Phase 2 add-on):** when false positives are costly, add
+  one capable verifier from a *different family than the workers* to vote on each surviving
+  candidate. A same-family verifier shares the workers' blind spot and adds little.
+
+Criterion in one line: **mechanical + low-stakes → cheap-homogeneous; shared-bias risk or high
+stakes → heterogeneous; mixed work → mixed-tier; costly false positives → add an independent
+different-model verifier.** Set the chosen tiers via each worker agent's frontmatter `model:`
+field. Full factor sweep: [./references/experiment-matrix.md](./references/experiment-matrix.md).
 
 ## When to Use / When Not to Use
+
+For the full go/no-go decision — candidate signals, the ensemble-denoising-vs-other-flavor
+alignment check, and the fit-killer where corroboration boosts shared-model bias — load
+[./references/candidate-fit.md](./references/candidate-fit.md). To choose among the wider family of
+fan-out methodologies (work-partition, Best-of-N, debate, DAG) when this skill is not the right one,
+load [./references/methodology-selection.md](./references/methodology-selection.md).
 
 **Use when:**
 
@@ -171,6 +281,16 @@ Two procedures and one reusable contract turn this pattern from concept into act
   rank. Workers emit a stable `group` id (the corroboration key) plus a free-form `rule` slug
   (descriptive only) — keying on the slug would never corroborate, since workers name rules
   differently.
+- **Measure whether it actually works** — follow
+  [./references/measuring-success.md](./references/measuring-success.md): the free no-gold-set
+  weight-distribution diagnostic, precision/recall/F1 against a labelled set, and the falsification
+  tests. Never measure by finding count.
+- **Tune weighting, workers, prompts, and output schema** — use the factor matrix and cheapest-first
+  ablation order in [./references/experiment-matrix.md](./references/experiment-matrix.md).
+- **Keep prompts, skills, and agents clean before shipping** — run the pre-ship checklist in
+  [./references/instruction-hygiene.md](./references/instruction-hygiene.md) on every prompt, skill,
+  and agent (and any A/B harness arms) to catch leaked implementation detail and inconsistent
+  instruction sets.
 
 The two scripts are deterministic bookends around the only fuzzy step (the LLM workers' rule
 matching): **plan_ensemble.py → spawn focused-reviewer ×N → reduce.py**.

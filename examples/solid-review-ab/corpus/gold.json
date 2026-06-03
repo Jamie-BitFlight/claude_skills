@@ -1,0 +1,216 @@
+{
+  "corpus/cases/01_srp_god_object.py": [
+    {
+      "group": "S",
+      "rule_id": "SRP-1",
+      "location": "corpus/cases/01_srp_god_object.py:17",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "UserOrderManager — god object handling auth, orders, reporting, and email in one class"
+    },
+    {
+      "group": "S",
+      "rule_id": "SRP-2",
+      "location": "corpus/cases/01_srp_god_object.py:57",
+      "severity": "medium",
+      "kind": "true_violation",
+      "note": "generate_monthly_report — high-level orchestration mixed with low-level CSV serialisation in one function body"
+    },
+    {
+      "group": "S",
+      "rule_id": "SRP-3",
+      "location": "corpus/cases/01_srp_god_object.py:71",
+      "severity": "medium",
+      "kind": "true_violation",
+      "note": "_send_email — changing the email transport forces edits to UserOrderManager, which is unrelated to order management"
+    },
+    {
+      "group": "D",
+      "rule_id": "DIP-1",
+      "location": "corpus/cases/01_srp_god_object.py:102",
+      "severity": "low",
+      "kind": "decoy_false_positive",
+      "note": "DECOY: OrderProcessor constructor accepts an injected store with a convenience default — this is correct DI, not a hard-wired construction"
+    }
+  ],
+  "corpus/cases/02_ocp_type_dispatch.py": [
+    {
+      "group": "O",
+      "rule_id": "OCP-1",
+      "location": "corpus/cases/02_ocp_type_dispatch.py:19",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "compute_area — if/elif on a type tag; adding a new shape requires editing this closed function"
+    },
+    {
+      "group": "O",
+      "rule_id": "OCP-2",
+      "location": "corpus/cases/02_ocp_type_dispatch.py:35",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "Renderer.render_shape — closed if/elif on format string; adding a new format requires editing this function"
+    },
+    {
+      "group": "O",
+      "rule_id": "OCP-1",
+      "location": "corpus/cases/02_ocp_type_dispatch.py:89",
+      "severity": "low",
+      "kind": "decoy_false_positive",
+      "note": "DECOY: create_shape match over a sealed StrEnum — the correct OCP pattern; extension point is register_shape(), not this match"
+    }
+  ],
+  "corpus/cases/03_lsp_precondition.py": [
+    {
+      "group": "L",
+      "rule_id": "LSP-1",
+      "location": "corpus/cases/03_lsp_precondition.py:62",
+      "severity": "high",
+      "kind": "systematic_miss",
+      "note": "SYSTEMATIC MISS: DiscountedAccount.withdraw strengthens the withdraw precondition with a minimum-balance constraint not declared in the base contract — hidden behind legitimate-looking validation"
+    },
+    {
+      "group": "L",
+      "rule_id": "LSP-2",
+      "location": "corpus/cases/03_lsp_precondition.py:87",
+      "severity": "critical",
+      "kind": "true_violation",
+      "note": "SavingsAccount.deposit raises NotImplementedError — changes the base contract; subtype is not substitutable"
+    },
+    {
+      "group": "L",
+      "rule_id": "LSP-3",
+      "location": "corpus/cases/03_lsp_precondition.py:109",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "FrozenAccount.withdraw is a silent no-op returning True — rejects inputs the base accepts and breaks the postcondition"
+    }
+  ],
+  "corpus/cases/04_isp_fat_interface.py": [
+    {
+      "group": "I",
+      "rule_id": "ISP-1",
+      "location": "corpus/cases/04_isp_fat_interface.py:12",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "IWorker fat interface — forces Robot and PartTimeEmployee to define eat/sleep/claim_benefits they cannot meaningfully implement"
+    },
+    {
+      "group": "I",
+      "rule_id": "ISP-2",
+      "location": "corpus/cases/04_isp_fat_interface.py:67",
+      "severity": "medium",
+      "kind": "true_violation",
+      "note": "Scheduler depends on full IWorker interface but only ever calls work()"
+    },
+    {
+      "group": "I",
+      "rule_id": "ISP-1",
+      "location": "corpus/cases/04_isp_fat_interface.py:98",
+      "severity": "low",
+      "kind": "decoy_false_positive",
+      "note": "DECOY: ReportFacade — broad surface but a legitimate Facade; delegates each method to a focused service, no implementer is forced to define unused methods"
+    }
+  ],
+  "corpus/cases/05_dip_hardwired.py": [
+    {
+      "group": "D",
+      "rule_id": "DIP-1",
+      "location": "corpus/cases/05_dip_hardwired.py:27",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "OrderService.__init__ hard-wires SqliteOrderRepository construction — no injection seam"
+    },
+    {
+      "group": "D",
+      "rule_id": "DIP-2",
+      "location": "corpus/cases/05_dip_hardwired.py:46",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "InvoiceGenerator depends directly on PdfPrinter (concrete class) where it should depend on an abstraction"
+    },
+    {
+      "group": "D",
+      "rule_id": "DIP-3",
+      "location": "corpus/cases/05_dip_hardwired.py:66",
+      "severity": "high",
+      "kind": "systematic_miss",
+      "note": "SYSTEMATIC MISS: NotificationService.send_alert calls smtplib directly inside business logic — I/O transport embedded in a policy unit; easy to miss because the smtp call is one line in a multi-line method"
+    }
+  ],
+  "corpus/cases/06_mixed_violations.py": [
+    {
+      "group": "S",
+      "rule_id": "SRP-1",
+      "location": "corpus/cases/06_mixed_violations.py:12",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "ReportManager — handles loading, transformation, persistence, and email dispatch"
+    },
+    {
+      "group": "O",
+      "rule_id": "OCP-1",
+      "location": "corpus/cases/06_mixed_violations.py:28",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "ReportManager.format_report — if/elif on format string; adding a new format requires editing this closed method"
+    },
+    {
+      "group": "D",
+      "rule_id": "DIP-1",
+      "location": "corpus/cases/06_mixed_violations.py:58",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "Pipeline.__init__ hard-wires ReportManager construction — no injection seam"
+    },
+    {
+      "group": "I",
+      "rule_id": "ISP-2",
+      "location": "corpus/cases/06_mixed_violations.py:101",
+      "severity": "medium",
+      "kind": "true_violation",
+      "note": "AuditClient only calls log_event() but depends on the full IEventBus interface"
+    },
+    {
+      "group": "S",
+      "rule_id": "SRP-1",
+      "location": "corpus/cases/06_mixed_violations.py:136",
+      "severity": "low",
+      "kind": "decoy_false_positive",
+      "note": "DECOY: ServiceLocator — composition root wiring three services; no business logic, correct composition boundary, not an SRP violation"
+    }
+  ],
+  "corpus/cases/07_lsp_isp_decoy.py": [
+    {
+      "group": "I",
+      "rule_id": "ISP-1",
+      "location": "corpus/cases/07_lsp_isp_decoy.py:13",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "IDeviceController fat interface — TemperatureSensor cannot write or reboot; Relay has no firmware version"
+    },
+    {
+      "group": "L",
+      "rule_id": "LSP-2",
+      "location": "corpus/cases/07_lsp_isp_decoy.py:57",
+      "severity": "medium",
+      "kind": "systematic_miss",
+      "note": "SYSTEMATIC MISS: Relay.get_firmware_version raises NotImplementedError — changes the base contract on a secondary method cheap models overlook"
+    },
+    {
+      "group": "L",
+      "rule_id": "LSP-2",
+      "location": "corpus/cases/07_lsp_isp_decoy.py:84",
+      "severity": "high",
+      "kind": "true_violation",
+      "note": "XmlSerializer.serialize raises TypeError instead of a serialisation error — changes the exception contract; callers cannot anticipate TypeError from a BaseSerializer"
+    },
+    {
+      "group": "I",
+      "rule_id": "ISP-1",
+      "location": "corpus/cases/07_lsp_isp_decoy.py:103",
+      "severity": "low",
+      "kind": "decoy_false_positive",
+      "note": "DECOY: AbstractReader open/read/close — correctly minimal interface; every implementer uses all three because they model an inseparable resource lifecycle"
+    }
+  ]
+}

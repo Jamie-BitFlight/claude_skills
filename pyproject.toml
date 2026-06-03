@@ -120,6 +120,22 @@ include = [
 invalid-argument-type = "ignore"         # ty 0.0.17 bug: same pytest.skip decorator issue
 too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decorator miscounts self
 
+[[tool.ty.overrides]]
+# SOLID experiment corpus files — intentional violations at known line numbers
+# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
+# Modifying these to satisfy ty would destroy the seeded defects the experiment measures.
+include = ["examples/solid-review-ab/corpus/**"]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+empty-body = "ignore"
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+missing-argument = "ignore"
+too-many-positional-arguments = "ignore"
+unresolved-attribute = "ignore"
+unresolved-import = "ignore"
+
 [tool.ty.rules]
 
 [tool.ty.src]
@@ -127,13 +143,23 @@ too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decor
 # regular files whose content is the target path; linters parse that as Python and fail.
 # All 6 repo symlinks: 5 .md (accessing_online_resources), 1 dir (plugins/uv/skills/uv).
 # Only the dir needs exclusion for Python linting.
-exclude = ["plugins/uv/skills/uv", ".tmp"]
+exclude = [
+    "plugins/uv/skills/uv",
+    ".tmp",
+    # SOLID experiment corpus — intentional violations at known lines (category 2: negative examples)
+    "examples/solid-review-ab/corpus",
+]
 include = ["**/*.py"]
 
 [tool.ruff]
 # Exclude git symlinks - Windows reads target path as file content; linters fail.
 # See [tool.ty.src] exclude for full list. Add new symlinked .py paths here.
-extend-exclude = ["plugins/uv/skills/uv", ".tmp"]
+extend-exclude = [
+    "plugins/uv/skills/uv",
+    ".tmp",
+    # SOLID experiment corpus — intentional violations at known lines (category 2: negative examples)
+    "examples/solid-review-ab/corpus",
+]
 fix = true
 line-length = 120
 src = ["**/scripts", ".github", ".gitlab", "plugins", "tests", "typings"]
@@ -213,6 +239,18 @@ unfixable = ["F401"]
 [tool.ruff.lint.per-file-ignores]
 # Anti-pattern examples: intentionally incorrect code demonstrating what NOT to do
 "**/assets/nested-typer-exceptions/*.py" = ["ANN", "DOC"]
+# Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
+# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
+# Modifying these to satisfy linters would remove the seeded defects the experiment measures.
+"examples/solid-review-ab/corpus/cases/*.py" = [
+    "ANN", # Intentionally missing annotations on violation-seeding helpers
+    "D",   # Docstrings relaxed — focus is on SOLID violations, not docstyle
+    "DOC", # ditto
+    "N",   # Naming violations intentional in some cases
+    "PLR", # Complexity flags from intentional god-object patterns
+    "C90", # Cyclomatic complexity from intentional dispatch violations
+    "SLF", # Private-access patterns seeded intentionally
+]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
 "**/assets/version.py" = ["PLC0415"]
 # BacklogBackend Protocol must expose all 41 operations from gh_client/github_sync/github_branches
@@ -398,6 +436,7 @@ pythonpath = [
     "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
     "./plugins/frustration-analyzer/tests",
+    "./examples/solid-review-ab",
 ]
 testpaths = [
     "plugins/agentskill-kaizen/tests",
@@ -409,6 +448,7 @@ testpaths = [
     "plugins/development-harness/skills/implementation-manager/tests",
     "plugins/summarizer/tests",
     "tests",
+    "examples/solid-review-ab/tests",
 ]
 
 [tool.coverage.run]

@@ -8,6 +8,7 @@ reducer). Also the recipe for standardizing the `multi-perspective-review` prior
 
 - [Preconditions](#preconditions)
 - [Workflow](#workflow)
+- [Fidelity-preserving audit (no instruction loss)](#fidelity-preserving-audit-no-instruction-loss)
 - [Standardizing multi-perspective-review](#standardizing-multi-perspective-review)
 - [Validation gate (feedback loop)](#validation-gate-feedback-loop)
 
@@ -54,6 +55,56 @@ ensemble overhead exceeds the return.
 
 7. **Preserve provenance.** Cite the source skill the ruleset came from, and keep the original
    skill's rule text intact inside the worker slices — conversion must not drop or reword criteria.
+
+## Fidelity-preserving audit (no instruction loss)
+
+When the conversion target is an EXISTING skill, the hard requirement is that no current
+instruction is dropped, reworded into something weaker, or silently merged with another. Step 1
+(enumerate) and step 7 (preserve provenance) of the workflow above carry this; this section is the
+explicit audit that proves it. Run it as a gate before declaring the conversion done.
+
+1. Inventory every instruction. Parse the source skill's markdown into a structured list of
+   discrete criteria — one row per criterion, capturing its exact source text and location. Use a
+   markdown AST parser (`marko`, the repo convention) rather than reading by eye, so no list item,
+   table row, or inline rule is missed. The output is a coverage table seeded with the source rows.
+
+2. Map each criterion to rule id(s) + group. One source criterion may expand into several rules
+   (finer detection); that is fine. NEVER collapse two distinct source criteria into one rule —
+   that drops a distinction the source made. Record the mapping in the coverage table.
+
+3. Preserve text verbatim. The rule text inside each worker slice must be the source criterion's
+   exact wording, or a restatement that quotes the original verbatim alongside it. No summarizing,
+   no paraphrase that narrows scope. A reworded rule is a fidelity loss even when nothing is
+   "missing".
+
+4. Assert full coverage. Every source row maps to at least one rule, and every rule lands in at
+   least one worker. `plan_ensemble.py` guarantees uniform redundancy across workers; this step
+   guarantees completeness of the source-to-rule mapping. Zero unmapped source rows is the pass
+   condition.
+
+5. Round-trip reconstruction. From the union of all worker slices, reconstruct the ruleset and diff
+   it against the source inventory. Any criterion you cannot reconstruct from the slices is a
+   fidelity loss — fix the slicing before proceeding.
+
+6. No-orphan check (reverse direction). Every rule must trace back to a source criterion. A rule
+   with no source row is an invented criterion smuggled in during conversion — scope creep, the
+   other fidelity failure. Remove it or raise it with the user as a deliberate addition.
+
+7. Behavioral spot-check. Run the new ensemble and the original single-pass skill on the same known
+   input. Any finding the original produced that the ensemble misses must trace to a mapped rule
+   (then the rule was lost in slicing — return to step 2). If it traces to no rule, the inventory in
+   step 1 was incomplete. See [./measuring-success.md](./measuring-success.md) for the metric set.
+
+Coverage table template (every source row must end fully mapped):
+
+```text
+| source criterion (exact text) | source location | rule id(s) | group | worker(s) |
+|-------------------------------|-----------------|------------|-------|-----------|
+```
+
+If the source rubric is implicit ("pythonic", "review for quality"), enumerate it explicitly FIRST
+via [./partitioning-patterns.md](./partitioning-patterns.md), then inventory the enumerated rules —
+you cannot audit fidelity against a rubric that was never written down.
 
 ## Standardizing multi-perspective-review
 
