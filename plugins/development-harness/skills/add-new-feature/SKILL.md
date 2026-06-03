@@ -462,13 +462,25 @@ into each implementation agent's prompt. Omitting it means implementation agents
 without domain schema context.
 ```
 
-After the agent completes, write the plan path back to the backlog item:
+Linking the plan to the backlog item is a step of `add-new-feature` itself, run in the same
+context that read this file — not part of the `swarm-task-planner` delegation above. Everything
+sent to that subagent lives inside the fenced delegation prompt block above; this step sits
+outside it. The `swarm-task-planner` never reads this file, so it cannot perform this step — a
+self-report such as "linked to issue #N" is not evidence the link exists. Confirm the link by
+reading state, not by trusting a report:
 
 ```text
+# 1. Read current state — plan_path is null until the link is written
+mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
+
+# 2. If plan_path is null, write the link
 mcp__plugin_dh_backlog__backlog_update(
     selector="{title}",
     plan="P{id}"
 )
+
+# 3. Re-read and confirm plan_path is non-null before proceeding to Phase 5
+mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
 ```
 
 Note: `sam_plan(action='create', issue={issue})` already auto-registers the `task-plan`
@@ -476,9 +488,10 @@ artifact. Do NOT call `artifact_register` for the `task-plan` type — it is red
 would create a duplicate entry.
 
 The `backlog_update(plan=...)` call writes the plan address into the backlog item's `metadata.plan`
-field. This is a backend signal — it records that a plan exists and its address, not a filesystem
-path. `work-backlog-item` uses this to route directly to `implement-feature` on subsequent
-invocations. The SAM MCP resolves `P{id}` to the full plan without filesystem access.
+field, surfaced by `backlog_view(summary=True)` as `plan_path`. This is a backend signal — it
+records that a plan exists and its address, not a filesystem path. `work-backlog-item` reads
+`plan_path` to route directly to `implement-feature` on subsequent invocations. The SAM MCP
+resolves `P{id}` to the full plan without filesystem access.
 
 ---
 
