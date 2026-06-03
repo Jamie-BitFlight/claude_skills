@@ -572,7 +572,7 @@ class TestBdShowListWrapping:
 
     def test_round_trip_register_list_read(self, provider: BeadsArtifactProvider, mock_runner: MagicMock) -> None:
         """Round-trip: store then read returns the original content with list-wrapped show output."""
-        notes_before: list[str] = [None]  # type: ignore[list-item]
+        notes_before: list[str | None] = [None]
 
         def capture_notes_update(argv: list[str]) -> None:
             if "--notes" in argv:

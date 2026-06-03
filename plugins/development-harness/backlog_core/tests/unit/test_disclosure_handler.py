@@ -68,7 +68,7 @@ from backlog_core.disclosure_types import (
     NavigateResponse,
     OrdinalNotFoundError,
 )
-from backlog_core.models import SectionEntryDict, SectionEntryMetadata, ViewItemResult
+from backlog_core.models import GroomedSectionMetadata, SectionEntryDict, SectionEntryMetadata, ViewItemResult
 from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 
 if TYPE_CHECKING:
@@ -202,7 +202,7 @@ def multi_entry_view_result() -> ViewItemResult:
     level-2 lines so the buggy all-entries sum diverges from the correct
     level-1-only sum.
     """
-    sections = {
+    sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {
         "AlphaSection": _section([
             "First entry for alpha. This sentence provides a meaningful token count.",
             "Second entry for alpha. Another distinct sentence with its own tokens.",
