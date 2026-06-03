@@ -2081,7 +2081,7 @@ def _sync_full(
     label_names: list[str] | None,
     out: Output,
     progress_callback: Callable[[int, int | None], None] | None = None,
-) -> tuple[int, int] | None:
+) -> tuple[int, int]:
     """Perform a full two-pass sync (OPEN then CLOSED).
 
     Args:
@@ -2094,14 +2094,13 @@ def _sync_full(
             Receives ``(items_done, items_total)``.
 
     Returns:
-        Tuple of (refreshed_count, reconciled_count), or ``None`` if the open
-        fetch fails (caller should propagate the failure).
+        Tuple of (refreshed_count, reconciled_count).
+
+    Raises:
+        BacklogError: Propagated from ``sync_issues_graphql`` when the open-issue
+            fetch fails — the caller drives OFFLINE/retry handling.
     """
-    try:
-        open_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN", labels=label_names)
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not fetch open issues: {e}")
-        return None
+    open_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN", labels=label_names)
 
     open_issue_numbers: set[int] = set()
     count = 0
@@ -2187,12 +2186,9 @@ def refresh_local_cache_from_github(
             repo_obj, owner, repo_name, label_names, since, out, progress_callback=progress_callback
         )
     else:
-        result = _sync_full(repo_obj, owner, repo_name, label_names, out, progress_callback=progress_callback)
-        if result is None:
-            # _sync_full returns None when the open-issue GraphQL fetch fails (BacklogError).
-            # Raise so the sync engine can classify this as a retryable error.
-            raise BacklogError("Could not fetch open issues from GitHub (see warnings above).")
-        count, reconciled = result
+        count, reconciled = _sync_full(
+            repo_obj, owner, repo_name, label_names, out, progress_callback=progress_callback
+        )
 
     # Persist sync timestamp so the next run can use incremental mode
     last_sync_path.parent.mkdir(parents=True, exist_ok=True)
