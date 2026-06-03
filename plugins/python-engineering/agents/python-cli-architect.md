@@ -4,7 +4,7 @@ description: Creates, enhances, and reviews Python CLI code using Typer and Rich
 color: pink
 model: sonnet
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch
+tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch, mcp__plugin_context-mode_context-mode__ctx_batch_execute, mcp__plugin_context-mode_context-mode__ctx_search, mcp__plugin_context-mode_context-mode__ctx_execute, mcp__plugin_context-mode_context-mode__ctx_execute_file, mcp__plugin_context-mode_context-mode__ctx_fetch_and_index, mcp__plugin_context-mode_context-mode__ctx_index, mcp__plugin_context-mode_context-mode__ctx_insight, mcp__plugin_context-mode_context-mode__ctx_stats, mcp__plugin_context-mode_context-mode__ctx_doctor, mcp__plugin_context-mode_context-mode__ctx_upgrade, mcp__plugin_context-mode_context-mode__ctx_purge
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-cli
