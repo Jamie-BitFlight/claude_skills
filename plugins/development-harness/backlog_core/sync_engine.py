@@ -26,7 +26,10 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
+from github import GithubException
+
 from . import operations
+from .models import BackendUnavailableError
 from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_error
 
 if TYPE_CHECKING:
@@ -148,7 +151,11 @@ async def _attempt_sync(state: SyncState, attempt: int, full_refresh: bool) -> b
             state.status = SyncStatus.IDLE
             _log.info("Background sync cancelled during attempt %d.", attempt + 1)
             raise
-        except (OSError, ValueError, Exception) as exc:  # noqa: BLE001 — classify then re-raise or handle
+        except (BackendUnavailableError, GithubException, OSError, ValueError) as exc:
+            # Catch only the exception types refresh_local_cache_from_github is
+            # documented to raise (the set classify_sync_error handles).  Any other
+            # exception is a programming bug and propagates to the task done-callback
+            # (_log_sync_task_exc), which logs it — never silently masked as OFFLINE.
             state.completed_at = datetime.now(UTC)
             kind = classify_sync_error(exc)
             error_msg = str(exc)

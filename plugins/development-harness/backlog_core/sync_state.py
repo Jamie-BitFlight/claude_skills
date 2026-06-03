@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 from github import GithubException
 
 from .models import BackendUnavailableError
-
-if TYPE_CHECKING:
-    from datetime import datetime
 
 __all__ = ["SyncErrorKind", "SyncState", "SyncStatus", "classify_sync_error", "get_sync_state", "reset_sync_state"]
 
@@ -116,6 +113,24 @@ class SyncState:
             True only when ``status == SyncStatus.RUNNING``.
         """
         return self.status == SyncStatus.RUNNING
+
+    def try_start(self) -> bool:
+        """Atomically claim the sync slot, returning True when claimed.
+
+        Synchronous and await-free: under the single-threaded event loop the
+        check-and-set cannot interleave with another coroutine. Callers use this
+        in place of a separate ``is_running()`` check followed by ``create_task``,
+        which races and can launch duplicate sync workers.
+
+        Returns:
+            True if the slot was claimed (status was not RUNNING); False if a
+            sync is already RUNNING.
+        """
+        if self.status == SyncStatus.RUNNING:
+            return False
+        self.status = SyncStatus.RUNNING
+        self.started_at = datetime.now(UTC)
+        return True
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serialisable representation of the sync state.

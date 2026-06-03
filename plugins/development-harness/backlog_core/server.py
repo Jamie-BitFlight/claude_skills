@@ -1429,6 +1429,24 @@ def _log_sync_task_exc(task: asyncio.Task[None]) -> None:
         _sync_task_log.error("Background sync task raised an unexpected exception: %s", exc, exc_info=exc)
 
 
+# Strong references to in-flight background sync tasks.  The event loop keeps only
+# weak references to tasks, so a fire-and-forget task held solely by a local
+# variable can be garbage-collected mid-run.  Holding the task here until it
+# completes prevents that.  See CPython asyncio.create_task docs.
+_bg_sync_tasks: set[asyncio.Task[None]] = set()
+
+
+def _register_bg_task(task: asyncio.Task[None]) -> None:
+    """Retain a strong reference to *task* and wire its done-callbacks.
+
+    Args:
+        task: The background sync task to track until completion.
+    """
+    _bg_sync_tasks.add(task)
+    task.add_done_callback(_bg_sync_tasks.discard)
+    task.add_done_callback(_log_sync_task_exc)
+
+
 @contextlib.asynccontextmanager
 async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object], None]:
     """FastMCP lifespan: launch the background sync task before serving tools.
@@ -1444,8 +1462,11 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
         Empty lifespan context dict.
     """
     state = get_sync_state()
+    # Claim the slot synchronously at boot so an early sync_now sees RUNNING and
+    # does not launch a second startup sync.
+    state.try_start()
     bg_task = asyncio.create_task(_sync_engine._startup_sync_loop(state))
-    bg_task.add_done_callback(_log_sync_task_exc)
+    _register_bg_task(bg_task)
     try:
         yield {}
     finally:
@@ -1525,22 +1546,28 @@ async def sync_now(
             messages (list[str]): Informational messages about the action taken.
     """
     state = get_sync_state()
-    if state.is_running():
+
+    # Reset terminal states so the new attempt starts fresh.  Done before the
+    # claim so the returned snapshot reflects the fresh RUNNING state, not the
+    # stale OFFLINE/ERROR one.
+    if state.status in {SyncStatus.OFFLINE, SyncStatus.ERROR}:
+        state.offline_reason = ""
+        state.last_error = ""
+        state.retry_count = 0
+
+    # Atomically claim the sync slot.  try_start() sets status=RUNNING synchronously
+    # (no await), closing the check-then-create race that would otherwise let two
+    # concurrent sync_now calls — or a sync_now racing the startup loop — each launch
+    # a duplicate sync worker.
+    if not state.try_start():
         return {
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["A sync is already in progress. Returning current progress."],
         }
 
-    # Reset terminal states so the new attempt starts fresh.
-    if state.status in {SyncStatus.OFFLINE, SyncStatus.ERROR}:
-        state.offline_reason = ""
-        state.last_error = ""
-        state.retry_count = 0
-
-    # Fire-and-forget background task; reference stored to prevent GC before task completes.
     bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
-    bg_sync_task.add_done_callback(_log_sync_task_exc)
+    _register_bg_task(bg_sync_task)
     return {"triggered": True, "sync_state": state.to_dict(), "messages": ["Background sync triggered."]}
 
 
@@ -1927,14 +1954,21 @@ async def backlog_list(
     sync_warnings: list[str] = []
     if sync_state.status != SyncStatus.IDLE:
         last_success_str = sync_state.last_success_at.isoformat() if sync_state.last_success_at is not None else None
+        if sync_state.status == SyncStatus.RUNNING:
+            # A healthy first/in-progress sync is not a failure — do not label it "failed".
+            cache_warning = "backend sync in progress — cache may be incomplete"
+            warning_lead = "Backend sync in progress; cache may be incomplete"
+        else:
+            cache_warning = "serving stale cache — backend sync failed"
+            warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
         sync_state_block = {
             "status": str(sync_state.status),
             "offline_reason": sync_state.offline_reason,
             "last_success_at": last_success_str,
-            "cache_warning": "serving stale cache — backend sync failed",
+            "cache_warning": cache_warning,
         }
         sync_warnings.append(
-            f"Serving stale cache: backend sync {sync_state.status}"
+            warning_lead
             + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
             + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
         )
