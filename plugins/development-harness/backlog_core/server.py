@@ -1435,6 +1435,10 @@ def _log_sync_task_exc(task: asyncio.Task[None]) -> None:
 # completes prevents that.  See CPython asyncio.create_task docs.
 _bg_sync_tasks: set[asyncio.Task[None]] = set()
 
+# Module-level reference to the active startup sync task.  Set by _backlog_lifespan
+# on first entry; prevents FastMCP re-entry (issue #1115) from launching a second task.
+_active_startup_sync_task: asyncio.Task[None] | None = None
+
 
 def _register_bg_task(task: asyncio.Task[None]) -> None:
     """Retain a strong reference to *task* and wire its done-callbacks.
@@ -1445,6 +1449,97 @@ def _register_bg_task(task: asyncio.Task[None]) -> None:
     _bg_sync_tasks.add(task)
     task.add_done_callback(_bg_sync_tasks.discard)
     task.add_done_callback(_log_sync_task_exc)
+
+
+def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> bool | None:
+    """Read ``backlog.startup_sync.enabled`` from one config file.
+
+    Isolates the try/except so the outer loop in
+    ``_read_startup_sync_enabled_from_yaml`` uses a plain
+    ``if result is not None`` check, avoiding the S112 try-except-continue
+    pattern.
+
+    Args:
+        yaml_parser: A ``ruamel.yaml.YAML`` instance.
+        config_path: Path to the YAML config file to read.
+
+    Returns:
+        The configured bool if present, otherwise ``None``.
+    """
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
+
+    if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, _Path) or not config_path.is_file():
+        return None
+    try:
+        raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — ruamel.yaml raises various internal exception types
+        return None
+    if not isinstance(raw, dict):
+        return None
+    backlog_section = raw.get("backlog")
+    if not isinstance(backlog_section, dict):
+        return None
+    startup_sync = backlog_section.get("startup_sync")
+    if not isinstance(startup_sync, dict):
+        return None
+    enabled = startup_sync.get("enabled")
+    return enabled if isinstance(enabled, bool) else None
+
+
+def _read_startup_sync_enabled_from_yaml() -> bool | None:
+    """Read ``backlog.startup_sync.enabled`` from .dh/config.yaml files.
+
+    Returns the configured boolean value or ``None`` when the key is absent
+    in all config files.  Implemented without private dh_config imports to
+    avoid PLC2701 violations.
+
+    Returns:
+        The configured bool, or ``None`` when the key is absent.
+    """
+    try:
+        import contextlib  # noqa: PLC0415
+
+        import dh_paths as _dp  # noqa: PLC0415
+
+        search_paths = []
+        with contextlib.suppress(FileNotFoundError, RuntimeError):
+            project_root = _dp.git_project_root()
+            search_paths.append(_dp.project_dh_dir(project_root) / "config.yaml")
+        search_paths.append(_dp._dh_user_root() / "config.yaml")
+    except ImportError:
+        return None
+
+    try:
+        from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
+
+        yaml = _YAML(typ="safe")
+    except ImportError:
+        return None
+
+    for config_path in search_paths:
+        result = _read_enabled_from_config_file(yaml, config_path)
+        if result is not None:
+            return result
+    return None
+
+
+def _startup_sync_enabled() -> bool:
+    """Return True when the startup sync should run (default: True).
+
+    Reads ``backlog.startup_sync.enabled`` from ``.dh/config.yaml``.
+    Returns ``True`` when the key is absent (opt-out semantics: sync runs
+    unless explicitly disabled).
+
+    Named module-level function so tests can patch via:
+    ``mocker.patch("backlog_core.server._startup_sync_enabled", return_value=False)``.
+
+    Returns:
+        True if startup sync should proceed, False to skip it entirely.
+    """
+    configured = _read_startup_sync_enabled_from_yaml()
+    return True if configured is None else configured
 
 
 @contextlib.asynccontextmanager
@@ -1462,22 +1557,31 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
         Empty lifespan context dict.
     """
     state = get_sync_state()
-    # Claim the slot synchronously at boot so an early sync_now sees RUNNING and
-    # does not launch a second startup sync.
-    state.try_start()
-    bg_task = asyncio.create_task(_sync_engine._startup_sync_loop(state))
-    _register_bg_task(bg_task)
+    # Guard 1 — kill-switch: skip entirely when disabled in config.
+    # Guard 2 — re-entry (FastMCP #1115): try_start() is an atomic check-and-set;
+    #   if RUNNING is already set (second lifespan entry) we skip create_task so
+    #   only one background sync task runs per process lifetime.
+    global _active_startup_sync_task  # noqa: PLW0603
+    if _startup_sync_enabled() and state.try_start():
+        bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
+        _register_bg_task(bg_task)
+        # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
+        # cancels the same task on teardown rather than creating a dangling one.
+        _active_startup_sync_task = bg_task
+    else:
+        bg_task = _active_startup_sync_task
     try:
         yield {}
     finally:
-        bg_task.cancel()
-        # Suppress the expected teardown outcomes only: CancelledError (from the
-        # cancel above), TimeoutError (from wait_for), and any application-level
-        # error from the task — the done-callback (_log_sync_task_exc) already
-        # logged it; re-raising here would surface a clean shutdown as a crash.
-        # KeyboardInterrupt / SystemExit (BaseException) still propagate.
-        with contextlib.suppress(Exception, asyncio.CancelledError):
-            await asyncio.wait_for(bg_task, timeout=5.0)
+        if bg_task is not None:
+            bg_task.cancel()
+            # Suppress the expected teardown outcomes only: CancelledError (from the
+            # cancel above), TimeoutError (from wait_for), and any application-level
+            # error from the task — the done-callback (_log_sync_task_exc) already
+            # logged it; re-raising here would surface a clean shutdown as a crash.
+            # KeyboardInterrupt / SystemExit (BaseException) still propagate.
+            with contextlib.suppress(Exception, asyncio.CancelledError):
+                await asyncio.wait_for(bg_task, timeout=5.0)
 
 
 mcp = FastMCP(

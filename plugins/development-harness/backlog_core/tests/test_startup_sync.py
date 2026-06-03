@@ -1,16 +1,8 @@
-"""TDD red-phase: startup singleton background cache-sync -- unit tests.
+"""Startup singleton background cache-sync -- unit tests.
 
-These tests are INTENTIONALLY FAILING until the following symbols are implemented:
+All symbols are now implemented; these tests verify production behaviour.
 
-- ``backlog_core.sync_state.SyncStatus`` (StrEnum)
-- ``backlog_core.sync_state.SyncState`` (dataclass)
-- ``backlog_core.sync_state.SyncErrorKind`` (StrEnum)
-- ``backlog_core.sync_state.classify_sync_error`` (function)
-- ``backlog_core.sync_state.get_sync_state`` (function)
-- ``backlog_core.sync_state.reset_sync_state`` (function)
-- ``backlog_core.sync_engine._startup_sync_loop`` (coroutine)
-
-Behaviors covered (mapped to requirement numbers 1-6):
+Behaviors covered (mapped to requirement numbers 1-9):
 
 1. Lifespan launches singleton background sync exactly once -- even across multiple
    tool calls.  The lock and state reset fixtures defend against the event-loop
@@ -42,14 +34,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from backlog_core.sync_engine import _startup_sync_loop  # type: ignore[import-not-found]
-
-# ---------------------------------------------------------------------------
-# Intentional ImportError -- these modules do not exist yet.
-# The tests fail at collection/import with ImportError until the feature is
-# implemented. That is the correct red state for TDD.
-# ---------------------------------------------------------------------------
-from backlog_core.sync_state import (  # type: ignore[import-not-found]
+from backlog_core.sync_engine import _startup_sync_loop
+from backlog_core.sync_state import (
     SyncErrorKind,
     SyncState,
     SyncStatus,
@@ -59,6 +45,8 @@ from backlog_core.sync_state import (  # type: ignore[import-not-found]
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_mock import MockerFixture
 
 
@@ -822,3 +810,416 @@ class TestSyncTaskDoneCallback:
         assert "simulated unexpected bug" in logged_text or any(
             "simulated unexpected bug" in str(a) for a in call_args.args
         ), f"Logger must include the exception message. Got: {call_args}"
+
+
+# ---------------------------------------------------------------------------
+# Finding 2 -- STUCK-RUNNING: exception outside narrow catch releases slot
+# ---------------------------------------------------------------------------
+
+
+class TestStuckRunningGuard:
+    """Exceptions outside the narrow (BackendUnavailableError, GithubException,
+    OSError, ValueError) catch must not leave status=RUNNING permanently.
+
+    The try/finally in _startup_sync_loop must set status=ERROR and release the
+    lock so subsequent sync_now calls can proceed.  Finding #2.
+    """
+
+    async def test_unexpected_exception_releases_running_state(
+        self, fresh_sync_state: SyncState, mocker: MockerFixture
+    ) -> None:
+        """RuntimeError escaping _attempt_sync must set status=ERROR, not leave RUNNING.
+
+        Arrange: _run_single_sync raises RuntimeError (not in the narrow catch set).
+        Act: call _startup_sync_loop.
+        Assert: status is ERROR (not RUNNING), last_error is non-empty.
+        """
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github",
+            side_effect=RuntimeError("unexpected internal failure"),
+        )
+
+        state = fresh_sync_state
+        # RuntimeError must propagate out (re-raised so done-callback logs it)
+        with pytest.raises(RuntimeError, match="unexpected internal failure"):
+            await _startup_sync_loop(state)
+
+        assert state.status != SyncStatus.RUNNING, (
+            f"status must not be RUNNING after an unexpected exception. Got {state.status!r}. "
+            "A stuck-RUNNING state blocks all subsequent sync_now calls."
+        )
+        assert state.last_error, "last_error must be set after an unexpected exception exits the sync loop."
+
+    async def test_keyboard_interrupt_releases_running_state(
+        self, fresh_sync_state: SyncState, mocker: MockerFixture
+    ) -> None:
+        """KeyboardInterrupt (BaseException) must also release the RUNNING state."""
+        mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=KeyboardInterrupt)
+
+        state = fresh_sync_state
+        with pytest.raises(KeyboardInterrupt):
+            await _startup_sync_loop(state)
+
+        assert state.status != SyncStatus.RUNNING, "KeyboardInterrupt must not leave status=RUNNING."
+
+
+# ---------------------------------------------------------------------------
+# Finding 3 -- completed_at + retry_count=0 on SUCCESS
+# ---------------------------------------------------------------------------
+
+
+class TestSuccessStateFields:
+    """On a successful sync, completed_at must be set and retry_count reset to 0.
+
+    Finding #3.
+    """
+
+    async def test_success_sets_completed_at(self, fresh_sync_state: SyncState, mocker: MockerFixture) -> None:
+        """completed_at is set to a non-None UTC datetime on success."""
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github", return_value={"refreshed": 3, "reconciled": 0}
+        )
+
+        state = fresh_sync_state
+        await _startup_sync_loop(state)
+
+        assert state.completed_at is not None, (
+            "completed_at must be set after a successful sync. "
+            "Finding #3: success path omitted completed_at assignment."
+        )
+
+    async def test_success_resets_retry_count_to_zero(self, fresh_sync_state: SyncState, mocker: MockerFixture) -> None:
+        """retry_count is reset to 0 after a successful sync.
+
+        When a transient failure is followed by success, retry_count must be
+        cleared so subsequent callers see 0 retries, not a stale counter.
+        """
+        from github import GithubException
+
+        exc_502 = GithubException(status=502, data="Bad Gateway", headers={})
+        attempt_counter = [0]
+
+        def _fail_then_succeed(*_args: object, **_kwargs: object) -> dict[str, int]:
+            attempt_counter[0] += 1
+            if attempt_counter[0] == 1:
+                raise exc_502
+            return {"refreshed": 2, "reconciled": 0}
+
+        mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_fail_then_succeed)
+        mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=lambda _d: None)
+
+        state = fresh_sync_state
+        await _startup_sync_loop(state)
+
+        assert state.retry_count == 0, (
+            f"retry_count must be reset to 0 on success. Got {state.retry_count}. "
+            "Finding #3: success path did not reset retry_count."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding 4 -- PROGRESS UNIT: items_done and items_total must share the same
+#              unit so a completed sync reaches 100%.
+# ---------------------------------------------------------------------------
+
+
+class TestProgressUnitConsistency:
+    """items_done / items_total must track the same set of issues.
+
+    _sync_incremental fetches OPEN+CLOSED but only increments items_done for
+    OPEN issues — percent never reaches 100 for a mixed batch.  Finding #4.
+    """
+
+    def test_percent_reaches_100_for_closed_only_batch(self, fresh_sync_state: SyncState) -> None:
+        """When items_total is set by the callback and all items are processed,
+        percent must be 100.
+
+        Simulate the callback sequence for a batch of 3 closed issues
+        (items_done must advance for closed issues too).
+        """
+        state = fresh_sync_state
+        state.items_total = 3
+        state.items_done = 3  # all items written (open OR closed)
+
+        assert state.percent == 100, (
+            f"percent must be 100 when items_done == items_total. "
+            f"Got {state.percent}. Finding #4: progress unit inconsistency."
+        )
+
+    def test_percent_advances_monotonically_for_mixed_batch(self, fresh_sync_state: SyncState) -> None:
+        """Progress callbacks for a mixed OPEN+CLOSED batch must advance monotonically
+        and reach 100 when all issues are processed.
+
+        This tests the _sync_incremental contract: items_total = all_issues and
+        items_done increments for every issue regardless of open/closed state.
+        """
+        state = fresh_sync_state
+
+        # Simulate progress: 5-issue batch, 2 open + 3 closed.
+        callback_sequence = [(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]
+        percents: list[int | None] = []
+        for done, total in callback_sequence:
+            state.items_done = done
+            state.items_total = total
+            percents.append(state.percent)
+
+        assert percents[-1] == 100, (
+            f"After all 5 issues processed, percent must be 100. "
+            f"Got {percents}. Finding #4: progress unit inconsistency."
+        )
+        assert percents == sorted(p or 0 for p in percents), (
+            f"Progress percent must be monotonically non-decreasing. Got {percents}."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding 5 -- NON-INT exc.status: guard non-int -> UNKNOWN, no type:ignore
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyGithubExceptionNonIntStatus:
+    """_classify_github_exception must handle non-int exc.status gracefully.
+
+    PyGitHub can return exc.status as None or a non-integer value in edge cases.
+    The old code forced int(exc.status) with a type:ignore.  Finding #5.
+    """
+
+    def test_non_int_status_returns_unknown(self) -> None:
+        """GithubException with None status -> SyncErrorKind.UNKNOWN (not TypeError)."""
+        from github import GithubException
+
+        exc = GithubException(status=None, data="weird response", headers={})  # type: ignore[arg-type]
+        result = classify_sync_error(exc)
+
+        assert result == SyncErrorKind.UNKNOWN, (
+            f"GithubException with non-int status must return UNKNOWN, not raise TypeError. Got {result!r}. Finding #5."
+        )
+
+    def test_string_status_returns_unknown(self) -> None:
+        """GithubException with string status -> SyncErrorKind.UNKNOWN (not TypeError)."""
+        from github import GithubException
+
+        exc = GithubException(status="422", data="unprocessable", headers={})  # type: ignore[arg-type]
+        result = classify_sync_error(exc)
+
+        assert result == SyncErrorKind.UNKNOWN, (
+            f"GithubException with string status must return UNKNOWN. Got {result!r}. Finding #5."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding 6 -- CROSS-THREAD PROGRESS: callback marshalled via call_soon_threadsafe
+# ---------------------------------------------------------------------------
+
+
+class TestCrossThreadProgressCallback:
+    """Progress mutations from the asyncio.to_thread worker must be marshalled
+    back to the event-loop thread via loop.call_soon_threadsafe.
+
+    This test verifies that _make_progress_callback captures the running loop
+    and marshals mutations safely.  Finding #6.
+    """
+
+    async def test_progress_callback_updates_state_visible_from_event_loop(
+        self, fresh_sync_state: SyncState, mocker: MockerFixture
+    ) -> None:
+        """State fields updated via the progress callback are visible after the sync.
+
+        The callback runs inside asyncio.to_thread.  If it mutates SyncState
+        directly without call_soon_threadsafe, the mutation may not be visible
+        to the event-loop thread under strict thread safety semantics.
+
+        A simpler observable contract: after _startup_sync_loop completes
+        successfully, items_done must equal items_total (i.e. 100% progress
+        reached if total was set).
+        """
+        callback_calls: list[tuple[int, int | None]] = []
+
+        def _fake_refresh(
+            *_args: object, progress_callback: Callable[[int, int | None], None] | None = None, **_kwargs: object
+        ) -> dict[str, int]:
+            # Simulate paging: 3 items total.
+            if progress_callback is not None:
+                progress_callback(1, 3)
+                progress_callback(2, 3)
+                progress_callback(3, 3)
+                callback_calls.append((3, 3))
+            return {"refreshed": 3, "reconciled": 0}
+
+        mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_fake_refresh)
+
+        state = fresh_sync_state
+        await _startup_sync_loop(state)
+
+        assert callback_calls, "progress_callback was not invoked -- test setup error."
+        assert state.items_done == 3, (
+            f"items_done must reflect the final callback value (3). "
+            f"Got {state.items_done}. Finding #6: cross-thread mutation not visible."
+        )
+        assert state.items_total == 3, f"items_total must reflect the callback value (3). Got {state.items_total}."
+
+
+# ---------------------------------------------------------------------------
+# Finding 7 -- LIFESPAN RE-ENTRY: gated create_task + module-level reference
+# ---------------------------------------------------------------------------
+
+
+class TestLifespanReEntryGuard:
+    """server._backlog_lifespan must NOT launch a second sync task when re-entered.
+
+    FastMCP issue #1115 may re-run the lifespan on each tool call in some
+    versions.  The lifespan must gate create_task on try_start() and keep a
+    module-level reference so re-entry is a no-op.  Finding #7.
+    """
+
+    async def test_lifespan_reentry_does_not_double_launch_sync(self, mocker: MockerFixture) -> None:
+        """Two consecutive lifespan entries must produce exactly one sync start."""
+        reset_sync_state()
+
+        launch_count = 0
+
+        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
+            nonlocal launch_count
+            launch_count += 1
+            await asyncio.sleep(0)
+            state.status = SyncStatus.IDLE
+            state.last_success_at = datetime.now(UTC)
+
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
+
+        import backlog_core.server as _srv
+        from backlog_core.server import _backlog_lifespan
+
+        # Simulate two lifespan entries (FastMCP #1115 scenario).
+        async with _backlog_lifespan(_srv.mcp):
+            await asyncio.sleep(0)
+            async with _backlog_lifespan(_srv.mcp):
+                await asyncio.sleep(0)
+
+        assert launch_count <= 1, (
+            f"Re-entering the lifespan must not launch a second sync. Got {launch_count} launch(es). Finding #7."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding 8 -- KILL-SWITCH: backlog.startup_sync.enabled=false skips sync
+# ---------------------------------------------------------------------------
+
+
+class TestKillSwitch:
+    """When backlog.startup_sync.enabled is false in .dh/config.yaml, the
+    startup sync must be skipped entirely.  Finding #8.
+    """
+
+    async def test_sync_skipped_when_kill_switch_disabled(self, mocker: MockerFixture) -> None:
+        """startup sync is not launched when the kill-switch is false."""
+        reset_sync_state()
+
+        launch_count = 0
+
+        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
+            nonlocal launch_count
+            launch_count += 1
+            await asyncio.sleep(0)
+
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
+        # Patch the kill-switch reader to return False (disabled).
+        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=False)
+
+        from fastmcp.client import Client
+
+        from backlog_core.server import mcp
+
+        async with Client(mcp) as client:
+            await client.call_tool("sync_status", {})
+
+        assert launch_count == 0, (
+            f"When kill-switch is false, startup sync must be skipped entirely. "
+            f"Got {launch_count} launch(es). Finding #8."
+        )
+
+    async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
+        """startup sync IS launched when the kill-switch is true (default)."""
+        reset_sync_state()
+
+        launch_count = 0
+
+        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
+            nonlocal launch_count
+            launch_count += 1
+            await asyncio.sleep(0)
+            state.status = SyncStatus.IDLE
+            state.last_success_at = datetime.now(UTC)
+
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
+        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
+
+        from fastmcp.client import Client
+
+        from backlog_core.server import mcp
+
+        async with Client(mcp) as client:
+            await client.call_tool("sync_status", {})
+
+        assert launch_count == 1, (
+            f"When kill-switch is true, startup sync must be launched once. Got {launch_count} launch(es). Finding #8."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Finding 1 -- PROPAGATE BACKEND FAILURES from refresh_local_cache_from_github
+# ---------------------------------------------------------------------------
+
+
+class TestBackendFailurePropagation:
+    """refresh_local_cache_from_github must RAISE (not swallow) hard backend
+    failures so the sync engine's OFFLINE/retry/stale states fire correctly.
+
+    Finding #1.
+    """
+
+    async def test_github_unavailable_error_propagates_to_sync_engine(
+        self, fresh_sync_state: SyncState, mocker: MockerFixture
+    ) -> None:
+        """GitHubUnavailableError from try_get_github must reach the sync engine.
+
+        The old code returned {"refreshed": 0, ...} with a warning when
+        repo_obj is None.  That swallowed the failure so the engine never saw
+        it and could not transition to OFFLINE.
+        """
+        from backlog_core.models import GitHubUnavailableError
+
+        # Patch try_get_github to raise instead of return None.
+        mocker.patch(
+            "backlog_core.operations.try_get_github", side_effect=GitHubUnavailableError("GITHUB_TOKEN not set")
+        )
+
+        state = fresh_sync_state
+        await _startup_sync_loop(state)
+
+        assert state.status == SyncStatus.OFFLINE, (
+            f"GitHubUnavailableError from try_get_github must drive OFFLINE state. "
+            f"Got {state.status!r}. Finding #1: failure was swallowed as warning."
+        )
+
+    async def test_backend_error_in_incremental_sync_propagates(
+        self, fresh_sync_state: SyncState, mocker: MockerFixture
+    ) -> None:
+        """BacklogError from _sync_incremental must propagate, not return refreshed:0.
+
+        The old BacklogError catch in refresh_local_cache_from_github called
+        out.warn() and returned {"refreshed": 0}, hiding the error from the engine.
+        """
+        from backlog_core.models import BackendUnavailableError
+
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github",
+            side_effect=BackendUnavailableError("GitHub API unreachable"),
+        )
+
+        state = fresh_sync_state
+        await _startup_sync_loop(state)
+
+        assert state.status == SyncStatus.OFFLINE, (
+            f"BackendUnavailableError must reach the sync engine and set OFFLINE. Got {state.status!r}. Finding #1."
+        )

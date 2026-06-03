@@ -35,6 +35,7 @@ from .models import (
     VALID_CLOSE_REASONS,
     ArtifactEntry,
     ArtifactType,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     DuplicateItemError,
@@ -2057,15 +2058,15 @@ def _sync_incremental(
     items_total = len(all_issues)
     if progress_callback is not None:
         progress_callback(0, items_total)
-    for issue_node in all_issues:
+    for items_processed, issue_node in enumerate(all_issues, start=1):
         issue_number = issue_node.get("number", 0)
         if issue_node.get("state", "OPEN") == "OPEN":
             _write_issue_node_to_cache(issue_node, issue_number, out)
             count += 1
-            if progress_callback is not None:
-                progress_callback(count, items_total)
         else:
             reconciled += _reconcile_single_closed_issue(issue_node, issue_number, out, issue_to_item)
+        if progress_callback is not None:
+            progress_callback(items_processed, items_total)
     if count:
         out.info(f"  Refreshed {count} issue(s) from GitHub into local cache.")
     if reconciled:
@@ -2164,8 +2165,9 @@ def refresh_local_cache_from_github(
     out = output or Output()
     repo_obj = try_get_github(repo)
     if repo_obj is None:
-        out.warn("  WARNING: GitHub unavailable — listing from local cache only")
-        return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+        raise BackendUnavailableError(
+            "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."
+        )
 
     owner, repo_name = repo_obj.full_name.split("/", 1)
     label_names: list[str] | None = [label] if label else None
@@ -2181,17 +2183,15 @@ def refresh_local_cache_from_github(
     sync_start = datetime.now(UTC).isoformat()
 
     if since is not None:
-        try:
-            count, reconciled = _sync_incremental(
-                repo_obj, owner, repo_name, label_names, since, out, progress_callback=progress_callback
-            )
-        except BacklogError as e:
-            out.warn(f"  WARNING: Could not fetch issues: {e}")
-            return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+        count, reconciled = _sync_incremental(
+            repo_obj, owner, repo_name, label_names, since, out, progress_callback=progress_callback
+        )
     else:
         result = _sync_full(repo_obj, owner, repo_name, label_names, out, progress_callback=progress_callback)
         if result is None:
-            return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+            # _sync_full returns None when the open-issue GraphQL fetch fails (BacklogError).
+            # Raise so the sync engine can classify this as a retryable error.
+            raise BacklogError("Could not fetch open issues from GitHub (see warnings above).")
         count, reconciled = result
 
     # Persist sync timestamp so the next run can use incremental mode

@@ -1,12 +1,6 @@
-"""TDD red-phase: backlog_list offline/sync-state divergence signal -- unit tests.
+"""backlog_list offline/sync-state divergence signal -- unit tests.
 
-These tests are INTENTIONALLY FAILING until the following is implemented:
-
-- ``backlog_core.sync_state`` module (SyncState, SyncStatus, get_sync_state, reset_sync_state)
-- ``backlog_core.server.backlog_list`` emits a ``sync_state`` block + ``warnings`` when
-  ``SyncState.status != IDLE``
-- The ``count_only=True`` path carries ``sync_state`` and ``warnings`` in the same conditions
-- Healthy zero-match results (IDLE, cache populated) do NOT emit ``sync_state``
+All symbols are now implemented; these tests verify production behaviour.
 
 Behaviors covered (mapped to requirement 5):
 
@@ -38,10 +32,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Intentional ImportError -- these modules do not exist yet.
-# ---------------------------------------------------------------------------
-from backlog_core.sync_state import SyncStatus, get_sync_state, reset_sync_state  # type: ignore[import-not-found]
+from backlog_core.sync_state import SyncStatus, get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

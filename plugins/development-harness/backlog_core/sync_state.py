@@ -200,22 +200,25 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
     """Classify a GithubException by HTTP status and headers.
 
     Args:
-        exc: A PyGitHub exception with a numeric status code.
+        exc: A PyGitHub exception with a numeric HTTP status code.  The PyGitHub
+            library declares ``status`` as ``int`` but may in practice provide
+            ``None`` or a non-integer value (e.g. from a malformed response).
+            A non-int status returns ``SyncErrorKind.UNKNOWN`` rather than raising
+            ``TypeError``.
 
     Returns:
         ``SyncErrorKind`` for the given HTTP response.
     """
-    status: int = exc.status  # type: ignore[assignment]
+    raw_status = exc.status
+    if not isinstance(raw_status, int):
+        return SyncErrorKind.UNKNOWN
+    status: int = raw_status
     if status in {_HTTP_UNAUTHORIZED, _HTTP_NOT_FOUND}:
         return SyncErrorKind.NON_RETRYABLE
     if status == _HTTP_FORBIDDEN:
         headers: dict[str, str] = exc.headers or {}  # type: ignore[assignment]
-        if "Retry-After" in headers:
-            return SyncErrorKind.RETRYABLE
-        return SyncErrorKind.NON_RETRYABLE
-    if status == _HTTP_TOO_MANY_REQUESTS:
-        return SyncErrorKind.RETRYABLE
-    if status >= _HTTP_SERVER_ERROR_THRESHOLD:
+        return SyncErrorKind.RETRYABLE if "Retry-After" in headers else SyncErrorKind.NON_RETRYABLE
+    if status == _HTTP_TOO_MANY_REQUESTS or status >= _HTTP_SERVER_ERROR_THRESHOLD:
         return SyncErrorKind.RETRYABLE
     return SyncErrorKind.UNKNOWN
 

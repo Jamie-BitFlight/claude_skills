@@ -60,18 +60,31 @@ class ProgressCallback(Protocol):
 
 
 def _make_progress_callback(state: SyncState) -> Callable[[int, int | None], None]:
-    """Return a closure that writes progress into *state*.
+    """Return a closure that marshals progress updates back to the event-loop thread.
+
+    ``refresh_local_cache_from_github`` runs inside ``asyncio.to_thread``; the
+    callback it invokes executes on the worker thread.  Direct mutation of
+    ``SyncState`` from the worker thread is not safe under strict thread-safety
+    semantics.  Capturing the running event loop before the thread starts and
+    dispatching mutations via ``loop.call_soon_threadsafe`` ensures visibility.
 
     Args:
         state: The process-singleton SyncState to update.
 
     Returns:
         Callable matching the ProgressCallback protocol.
+
+    Raises:
+        RuntimeError: When called outside a running event loop (programming error).
     """
+    loop = asyncio.get_running_loop()
 
     def _callback(items_done: int, items_total: int | None) -> None:
-        state.items_done = items_done
-        state.items_total = items_total
+        def _apply() -> None:
+            state.items_done = items_done
+            state.items_total = items_total
+
+        loop.call_soon_threadsafe(_apply)
 
     return _callback
 
@@ -96,9 +109,12 @@ async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None
     await asyncio.to_thread(
         operations.refresh_local_cache_from_github, full_refresh=full_refresh, progress_callback=callback
     )
+    now = datetime.now(UTC)
     state.status = SyncStatus.IDLE
-    state.last_success_at = datetime.now(UTC)
+    state.completed_at = now
+    state.last_success_at = now
     state.last_error = ""
+    state.retry_count = 0
     _log.info("Background sync completed successfully.")
 
 
@@ -192,19 +208,29 @@ async def _startup_sync_loop(state: SyncState, full_refresh: bool = False) -> No
         asyncio.CancelledError: Propagated from task cancellation during shutdown.
     """
     attempt = 0
-    while attempt < MAX_RETRIES:
-        done = await _attempt_sync(state, attempt, full_refresh)
-        if done:
-            return
+    try:
+        while attempt < MAX_RETRIES:
+            done = await _attempt_sync(state, attempt, full_refresh)
+            if done:
+                return
 
-        # Retryable — check budget before sleeping.
-        attempt += 1
-        if attempt >= MAX_RETRIES:
+            # Retryable — check budget before sleeping.
+            attempt += 1
+            if attempt >= MAX_RETRIES:
+                state.status = SyncStatus.ERROR
+                _log.error("Sync ERROR: exhausted %d retries. Last error: %s", MAX_RETRIES, state.last_error)
+                return
+
+            delay = _compute_backoff_delay(attempt)
+            _log.info("Retrying in %.0f s (attempt %d/%d).", delay, attempt + 1, MAX_RETRIES)
+            # Sleep outside the lock so other tool calls can proceed during the wait.
+            await asyncio.sleep(delay)
+    except BaseException as exc:
+        # Exceptions outside the narrow (BackendUnavailableError, GithubException,
+        # OSError, ValueError) catch in _attempt_sync — e.g. RuntimeError (bug),
+        # KeyboardInterrupt — must not leave status=RUNNING permanently.
+        # Set ERROR and re-raise so the done-callback (_log_sync_task_exc) still logs it.
+        if state.status == SyncStatus.RUNNING:
             state.status = SyncStatus.ERROR
-            _log.error("Sync ERROR: exhausted %d retries. Last error: %s", MAX_RETRIES, state.last_error)
-            return
-
-        delay = _compute_backoff_delay(attempt)
-        _log.info("Retrying in %.0f s (attempt %d/%d).", delay, attempt + 1, MAX_RETRIES)
-        # Sleep outside the lock so other tool calls can proceed during the wait.
-        await asyncio.sleep(delay)
+            state.last_error = str(exc)
+        raise
