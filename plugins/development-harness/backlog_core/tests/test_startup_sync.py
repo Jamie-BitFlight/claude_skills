@@ -545,6 +545,36 @@ class TestSyncErrorClassification:
         exc = ValueError("repo not configured")
         assert classify_sync_error(exc) == SyncErrorKind.NON_RETRYABLE
 
+    def test_asyncio_timeout_error_is_retryable(self) -> None:
+        """asyncio.TimeoutError -> RETRYABLE.
+
+        In Python 3.11+, asyncio.TimeoutError is a subclass of TimeoutError,
+        which is itself a subclass of OSError.  The OSError branch in
+        classify_sync_error must NOT fire first and return NON_RETRYABLE;
+        the asyncio.TimeoutError branch must be checked before OSError.
+        """
+        exc = TimeoutError()
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE, (
+            "asyncio.TimeoutError must be RETRYABLE (transient network timeout). "
+            "In Python 3.11+ asyncio.TimeoutError subclasses OSError; without an "
+            "explicit asyncio.TimeoutError branch it misfires as NON_RETRYABLE."
+        )
+
+    def test_http_429_github_exception_is_retryable(self) -> None:
+        """HTTP 429 (Too Many Requests / primary rate limit) -> RETRYABLE.
+
+        429 is the primary rate-limit response from GitHub.  Without an explicit
+        429 branch it falls through to UNKNOWN, which the caller treats as
+        NON_RETRYABLE and transitions the server to OFFLINE.
+        """
+        from github import GithubException
+
+        exc = GithubException(status=429, data="Too Many Requests", headers={})
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE, (
+            "HTTP 429 (primary rate limit) must be RETRYABLE. "
+            "Without an explicit 429 branch it falls to UNKNOWN -> OFFLINE."
+        )
+
 
 # ---------------------------------------------------------------------------
 # Behaviour 6 -- sync_status tool returns full state model fields
@@ -736,3 +766,59 @@ class TestSyncStatePercent:
         fresh_sync_state.items_total = 0
         fresh_sync_state.items_done = 0
         assert fresh_sync_state.percent is None
+
+
+# ---------------------------------------------------------------------------
+# Done-callback logging -- sync_now fire-and-forget task
+# ---------------------------------------------------------------------------
+
+
+class TestSyncTaskDoneCallback:
+    """The done-callback on the fire-and-forget sync task must log unexpected exceptions.
+
+    Per .claude/rules/silent-failure-prevention.md: functions that perform side
+    effects must not silently discard exceptions.  The named ``_log_sync_task_exc``
+    callback must call the module logger when the task raises an unexpected error.
+    """
+
+    async def test_unexpected_exception_from_sync_task_is_logged(self, mocker: MockerFixture) -> None:
+        """An unexpected exception escaping the sync task triggers logger.error.
+
+        Arrange: patch _startup_sync_loop to raise a RuntimeError (simulating an
+        unanticipated bug escaping the broad catch in _attempt_sync).
+        Act: enter the server lifespan so the background task is launched.
+        Assert: the module-level logger in server.py receives an error() call
+        containing the exception message.
+        """
+        reset_sync_state()
+
+        async def _boom(state: SyncState) -> None:
+            raise RuntimeError("simulated unexpected bug")
+
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_boom)
+
+        # Patch the logger used by _log_sync_task_exc in server.py.
+        mock_logger = mocker.patch("backlog_core.server._sync_task_log")
+
+        from fastmcp.client import Client
+
+        from backlog_core.server import mcp
+
+        async with Client(mcp) as client:
+            # Yield enough times for the background task to complete and the
+            # done-callback to fire.
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            await client.call_tool("sync_status", {})
+
+        assert mock_logger.error.called, (
+            "The done-callback must call logger.error() when the sync task raises "
+            "an unexpected exception.  Silent discard hides bugs."
+        )
+        # Verify the exception message appears in the log call arguments.
+        call_args = mock_logger.error.call_args
+        logged_text = " ".join(str(a) for a in call_args.args)
+        assert "simulated unexpected bug" in logged_text or any(
+            "simulated unexpected bug" in str(a) for a in call_args.args
+        ), f"Logger must include the exception message. Got: {call_args}"

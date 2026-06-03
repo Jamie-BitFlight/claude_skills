@@ -35,6 +35,7 @@ _HTTP_UNAUTHORIZED = 401
 _HTTP_FORBIDDEN = 403
 _HTTP_NOT_FOUND = 404
 _HTTP_SERVER_ERROR_THRESHOLD = 500
+_HTTP_TOO_MANY_REQUESTS = 429
 
 
 class SyncStatus(StrEnum):
@@ -197,6 +198,8 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
         if "Retry-After" in headers:
             return SyncErrorKind.RETRYABLE
         return SyncErrorKind.NON_RETRYABLE
+    if status == _HTTP_TOO_MANY_REQUESTS:
+        return SyncErrorKind.RETRYABLE
     if status >= _HTTP_SERVER_ERROR_THRESHOLD:
         return SyncErrorKind.RETRYABLE
     return SyncErrorKind.UNKNOWN
@@ -211,7 +214,10 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
     - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
     - ``GithubException`` with status 403 and ``Retry-After`` header — RETRYABLE.
+    - ``GithubException`` with status 429 — RETRYABLE (primary rate limit).
     - ``GithubException`` with status >= 500 — RETRYABLE.
+    - ``asyncio.TimeoutError`` — RETRYABLE (transient network timeout; checked before
+      OSError because Python 3.11+ aliases it to OSError).
     - ``OSError`` — NON_RETRYABLE (filesystem failure; requires operator action).
     - ``ValueError`` — NON_RETRYABLE (config error from ``resolve_repo``).
 
@@ -225,6 +231,8 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         return SyncErrorKind.NON_RETRYABLE
     if isinstance(exc, GithubException):
         return _classify_github_exception(exc)
+    if isinstance(exc, asyncio.TimeoutError):
+        return SyncErrorKind.RETRYABLE
     if isinstance(exc, (OSError, ValueError)):
         return SyncErrorKind.NON_RETRYABLE
     return SyncErrorKind.UNKNOWN

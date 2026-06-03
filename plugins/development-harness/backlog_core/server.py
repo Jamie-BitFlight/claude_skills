@@ -62,6 +62,10 @@ if TYPE_CHECKING:
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 
+# Module-level logger for done-callback exception reporting.
+# Named _sync_task_log so tests can patch backlog_core.server._sync_task_log.
+_sync_task_log = _logging.getLogger(__name__)
+
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
 # Token budget for auto-compacting backlog_view: 4000 tokens (cl100k_base encoding).
@@ -1406,6 +1410,25 @@ def _read_gate_token(gate_token: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _log_sync_task_exc(task: asyncio.Task[None]) -> None:
+    """Done-callback: log any unexpected exception that escapes the sync task.
+
+    An asyncio.CancelledError is expected during server shutdown and is
+    silently ignored.  Any other exception indicates an unanticipated bug
+    that escaped the broad catch in _attempt_sync; it is logged at
+    ERROR level so it is visible in the server logs rather than silently
+    discarded per .claude/rules/silent-failure-prevention.md.
+
+    Args:
+        task: The completed sync background task.
+    """
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        _sync_task_log.error("Background sync task raised an unexpected exception: %s", exc, exc_info=exc)
+
+
 @contextlib.asynccontextmanager
 async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object], None]:
     """FastMCP lifespan: launch the background sync task before serving tools.
@@ -1422,11 +1445,17 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
     """
     state = get_sync_state()
     bg_task = asyncio.create_task(_sync_engine._startup_sync_loop(state))
+    bg_task.add_done_callback(_log_sync_task_exc)
     try:
         yield {}
     finally:
         bg_task.cancel()
-        with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+        # Suppress the expected teardown outcomes only: CancelledError (from the
+        # cancel above), TimeoutError (from wait_for), and any application-level
+        # error from the task — the done-callback (_log_sync_task_exc) already
+        # logged it; re-raising here would surface a clean shutdown as a crash.
+        # KeyboardInterrupt / SystemExit (BaseException) still propagate.
+        with contextlib.suppress(Exception, asyncio.CancelledError):
             await asyncio.wait_for(bg_task, timeout=5.0)
 
 
@@ -1511,7 +1540,7 @@ async def sync_now(
 
     # Fire-and-forget background task; reference stored to prevent GC before task completes.
     bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
-    bg_sync_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    bg_sync_task.add_done_callback(_log_sync_task_exc)
     return {"triggered": True, "sync_state": state.to_dict(), "messages": ["Background sync triggered."]}
 
 
