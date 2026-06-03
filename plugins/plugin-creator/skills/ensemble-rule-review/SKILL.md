@@ -14,6 +14,17 @@ tier is the default for mechanical-matching slices; escalate to a more capable t
 heterogeneous families when a slice needs judgment or when de-correlating shared-model bias
 matters more than cost.
 
+## The Invariant
+
+One move underlies every variant: partition the attention surface across a shared goal. Each agent
+attends to less and therefore attends better; aggregating the results averages out the spikiness of
+any single agent's reliability. Focus and agent attention are the same thing — a finite budget over
+the context that degrades as the surface grows (exactly the failure named below). Everything else is
+a knob on this invariant: what you partition (rule slices, personas, files), how fine each slice is,
+which tier attends to it, how diverse the attenders are, and how you recombine — corroboration for
+bounded / mechanical work, synthesis for unbounded / judgment work. Cheap, homogeneous, rule-sliced
+workers are one common setting of those knobs, not the invariant itself.
+
 ## The Problem It Solves
 
 A single agent holding a large ruleset (10+ criteria) and reviewing non-trivial input:
