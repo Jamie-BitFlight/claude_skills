@@ -1,4 +1,4 @@
-"""Pure scoring engine for the SOLID A/B experiment.
+"""Pure scoring engine for the SOLID judgement system.
 
 All public functions are pure (no LLM calls, no subprocess, no I/O beyond reading
 findings files).  Import and call directly from tests or from the CLI layer.
@@ -24,6 +24,8 @@ reported_keys(text)                                  — parse text -> set[(grou
 score_arm_a(findings_path, pos, decoys)              -> (ArmMetrics, list[str])
 score_arm_a_dir(arm_dir, glob, pos, decoys)          -> (ArmMetrics, list[str])
 score_arm_b(report_dir, pos, decoys[, glob])         -> (ArmMetrics, ArmBExtras, list[str])
+compute_payoff_per_cost(arm_f1, baseline_f1, cost)   -> float | None
+rank_arms(scored_arms)                               -> list[ArmRanking]
 """
 
 from __future__ import annotations
@@ -406,3 +408,115 @@ def score_arm_b(
     )
 
     return metrics, extras, warnings
+
+
+# ---------------------------------------------------------------------------
+# Judgement system — multi-arm ranking
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ArmRanking:
+    """One arm's ranked result in the judgement comparison table.
+
+    Attributes:
+        arm_name: Display label from the manifest.
+        metrics: P/R/F1 and cost/latency for this arm.
+        payoff_per_cost: (F1 gain over baseline) / cost_usd.  None when
+            cost_usd is zero (cannot compute a meaningful ratio).  The
+            baseline arm itself has payoff_per_cost of 0.0 by definition.
+        rank: Position in the sorted ranking (1 = best payoff-per-cost).
+    """
+
+    arm_name: str
+    metrics: ArmMetrics
+    payoff_per_cost: float | None
+    rank: int
+
+
+def compute_payoff_per_cost(arm_f1: float, baseline_f1: float, cost: float) -> float | None:
+    """Compute the payoff-per-cost ratio for one arm relative to a baseline.
+
+    Payoff is defined as the F1 gain over the lowest-cost arm divided by
+    the arm's cost in USD.  Negative payoffs (arm is worse AND pricier) are
+    valid and preserved — they indicate the arm degrades quality at a price.
+
+    Args:
+        arm_f1: The arm's F1 score (0.0-1.0).
+        baseline_f1: F1 of the baseline arm (lowest-cost arm).
+        cost: The arm's cost in USD.
+
+    Returns:
+        (arm_f1 - baseline_f1) / cost when cost > 0, or None when cost == 0.
+        None signals that cost data is unavailable, not that payoff is zero.
+
+    Examples:
+        >>> compute_payoff_per_cost(0.80, 0.50, 0.50)
+        0.6
+        >>> compute_payoff_per_cost(0.50, 0.50, 0.10)
+        0.0
+        >>> compute_payoff_per_cost(0.80, 0.50, 0.0)
+        # returns None — cost unavailable
+    """
+    if not cost:
+        return None
+    return (arm_f1 - baseline_f1) / cost
+
+
+def rank_arms(scored_arms: list[tuple[str, ArmMetrics]]) -> list[ArmRanking]:
+    """Rank N arms by payoff-per-cost, highest first.
+
+    The baseline is the arm with the lowest non-zero cost.  When multiple arms
+    share the lowest cost, the first in manifest order (i.e. the first in the
+    input list) is used as baseline.
+
+    Arms with cost_usd == 0.0 have payoff_per_cost = None and sort last,
+    after all arms with computed payoffs, with their relative order preserved.
+
+    Tiebreak for equal payoff: lexicographic arm_name ascending (stable and
+    deterministic; independent of manifest order for reproducibility).
+
+    Args:
+        scored_arms: List of (arm_name, ArmMetrics) in manifest order.
+            ArmMetrics.cost_usd and ArmMetrics.f1 must be populated.
+
+    Returns:
+        List of ArmRanking sorted by payoff_per_cost descending (best first),
+        with None-payoff arms appended last.  Ranks are 1-based.
+
+    Raises:
+        ValueError: When scored_arms is empty.
+    """
+    if not scored_arms:
+        raise ValueError("scored_arms must not be empty")
+
+    # Determine baseline: arm with the lowest positive cost in manifest order.
+    positive_cost_arms = [(name, m) for name, m in scored_arms if m.cost_usd > 0.0]
+    if positive_cost_arms:
+        _baseline_name, baseline_metrics = min(positive_cost_arms, key=lambda x: x[1].cost_usd)
+        baseline_f1 = baseline_metrics.f1
+    else:
+        baseline_f1 = 0.0
+
+    payoffs: list[ArmRanking] = []
+    no_cost: list[ArmRanking] = []
+
+    for arm_name, metrics in scored_arms:
+        ppc = compute_payoff_per_cost(metrics.f1, baseline_f1, metrics.cost_usd)
+        entry = ArmRanking(arm_name=arm_name, metrics=metrics, payoff_per_cost=ppc, rank=0)
+        if ppc is None:
+            no_cost.append(entry)
+        else:
+            payoffs.append(entry)
+
+    # Sort arms with computed payoffs: highest payoff first; tiebreak by name.
+    payoffs.sort(key=lambda r: (-r.payoff_per_cost, r.arm_name))  # type: ignore[operator]
+
+    ranked: list[ArmRanking] = []
+    for position, entry in enumerate(payoffs + no_cost, start=1):
+        ranked.append(
+            ArmRanking(
+                arm_name=entry.arm_name, metrics=entry.metrics, payoff_per_cost=entry.payoff_per_cost, rank=position
+            )
+        )
+    return ranked

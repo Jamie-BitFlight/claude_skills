@@ -61,6 +61,28 @@ The prompts, skills, and agents are AI-facing prompt-engineering code, subject t
 any other input. Before shipping, run them through a review pass — ideally fresh-eyes (a separate
 agent), because the author is blind to their own decoration and leaks. Apply items 1-4 as the rubric.
 
+## 6. Self-application — review created skills with this methodology
+
+Items 1-4 above (plus the conversion-workflow fidelity audit) are themselves a ruleset of 10+ criteria
+applied to instruction files, so reviewing a skill's rules is itself an ensemble-rule-review candidate.
+When a skill creates or converts another skill, review the new skill's instructions with a MIXED fleet,
+each check routed by its error structure (the candidate-fit fit-killer applied to this checklist):
+
+- Mechanical / greppable checks — restated model tier in prose, schema duplicated across files, derived
+  counts, leaked schema/paths in the task prompt, location-format mismatch. Fan these out across
+  overlapping cheap `focused-reviewer` workers, corroborate on (check, location), drop the tail.
+  Independent attention lapses cancel; this is the bounded half and the cheapest first pass.
+- Judgment checks — does this prose present a parameter as the design vs a default? is this rationale
+  actionable for the file's audience? has a reframe over-corrected into the opposite bias? Route these to
+  a heterogeneous capable panel (different model families / lenses), reduce by synthesis, and put an
+  independent different-model verifier on the survivors. A homogeneous cheap panel would share the
+  misjudgment and corroboration would amplify it.
+
+Run the cheap mechanical pass first; escalate only the judgment checks. This is the methodology reviewing
+its own output — the same Detect -> (Design) -> Verify shape, with tier and diversity set per check, not
+fixed. See [./candidate-fit.md](./candidate-fit.md) for the mechanical-vs-judgment split and the parent
+SKILL.md Composition Framework for the fleet knobs.
+
 SOURCE: observed failures while building the SOLID A/B harness for this methodology
 (session 2026-06-03). A shared task prompt carried the output schema, ruleset/corpus/findings paths,
 the location format, and a "follow skill X" instruction. Executor files carried decorative `(Haiku)`

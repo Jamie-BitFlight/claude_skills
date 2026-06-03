@@ -1,0 +1,70 @@
+# Judgement System Manifest
+#
+# Each entry under `arms` declares one experiment arm.  Adding a new arm
+# requires only a new directory with its own .claude/ setup and a new entry
+# here — no Python code changes.
+#
+# An arm can represent any agent configuration:
+#   - A single high-intelligence model (e.g. Claude Sonnet)
+#   - A heterogeneous ensemble (e.g. N Haiku workers + a reducer)
+#   - An Opus single-agent pass
+#   - Any combination of models and skills
+#
+# Fields:
+#   name      — Human-readable label used in score tables and CLI output.
+#   dir       — Path to the arm root, relative to this file's directory
+#                 (the experiment root).  Must contain
+#                 .claude/skills/review-against-solid-principles/SKILL.md.
+#   enabled   — Set to false to skip this arm without deleting the entry.
+#   arm_type  — REQUIRED. Declares the scoring path for this arm.
+#                 single   : One agent writes findings/findings.md.
+#                 ensemble : Multiple workers write findings/workers/worker-*.md.
+#               This field is validated at manifest load time.  An invalid or
+#               missing value raises an error before any arm is dispatched.
+#               The scorer drives branching off this field — never off the
+#               filesystem — so a failed run that leaves an empty directory
+#               is caught explicitly rather than falling through silently.
+#   models    — List of model entries used for cost accounting.  Each entry:
+#                 id     : Model identifier matching a key in `prices`.
+#                 role   : Descriptive role label (informational).
+#               For single-model arms, provide one entry.
+#               For multi-model arms, list each model that incurs tokens.
+#               NOTE: For ensemble arms the per-model token split is not
+#               available from `claude -p` aggregate output; cost is
+#               computed on the aggregate using the primary model's price.
+#               See runner/cost.py for the attribution stub.
+
+arms:
+  - name: single-high-intelligence-agent
+    dir: single-high-intelligence-agent
+    enabled: true
+    arm_type: single
+    models:
+      - id: claude-sonnet-4-5
+        role: primary
+
+  - name: multi-low-intelligence-focused-agents
+    dir: multi-low-intelligence-focused-agents
+    enabled: true
+    arm_type: ensemble
+    models:
+      - id: claude-haiku-4-5
+        role: primary
+
+# Price table: model id -> cost per 1,000 tokens (USD).
+# SOURCE: Anthropic pricing page (accessed 2026-06-03).
+# https://www.anthropic.com/pricing
+# Update this section when prices change — the scorer uses these values
+# for deterministic cost computation independent of `total_cost_usd`.
+prices:
+  claude-sonnet-4-5:
+    input_per_1k: 0.003
+    output_per_1k: 0.015
+  claude-haiku-4-5:
+    input_per_1k: 0.00025
+    output_per_1k: 0.00125
+  # Add further models here as new arms are created.
+  # Example:
+  # claude-opus-4-5:
+  #   input_per_1k: 0.015
+  #   output_per_1k: 0.075

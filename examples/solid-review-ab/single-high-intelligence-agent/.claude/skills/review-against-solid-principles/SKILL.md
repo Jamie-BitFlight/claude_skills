@@ -1,12 +1,11 @@
 ---
 name: review-against-solid-principles
-description: "Arm A (baseline) of the SOLID A/B experiment. Reviews a target file against the complete SOLID ruleset in a single high-intelligence pass, emitting the fixed candidate schema. Use to produce the single-agent baseline findings to compare against the multi-worker Haiku ensemble."
+description: "Single-pass SOLID review — dispatches one reviewer over the complete ruleset, emitting the fixed candidate schema."
 ---
 
 # Review Against SOLID Principles — Single-Pass Baseline (Arm A)
 
-One agent holds the entire SOLID ruleset and reviews the target in one pass. No partitioning, no
-overlap, no reducer.
+One agent holds the entire SOLID ruleset and reviews the target in one pass.
 
 ## Procedure
 
@@ -23,21 +22,4 @@ Fixed paths (relative to this arm directory, the `claude -p` working directory):
    entire review.
 3. Write the findings to `./findings/findings.md`.
 
-Write each finding `location` as `corpus/cases/<file>:<line>` (experiment-root-relative, never
-an absolute path or arm-directory-relative path).
-
-## Candidate output schema
-
-Emit findings in this exact format — one block per finding, separated by a blank line.
-Fields must appear in this order:
-
-```text
-- group: <S|O|L|I|D>
-  location: <corpus/cases/filename.py>:<line>
-  rule: <free-form descriptive slug>
-  verdict: VIOLATION
-  severity: critical | high | medium | low
-  evidence: "<exact short quote from the reviewed file>"
-```
-
-Emit only `VIOLATION` findings. If no violations are found, emit nothing.
+The `principles-reviewer` agent emits the fixed candidate schema.

@@ -1,8 +1,8 @@
-# A/B Experiment — Single High-Intelligence Agent vs Multi Low-Intelligence Ensemble
+# Judgement System — SOLID Review Experiment
 
-A controlled experiment that tests the `ensemble-rule-review` pattern's central claim against a
-single capable agent, on a SOLID-principles code review with a labelled gold set. It instantiates
-two experiments from the skill's `references/experiment-matrix.md`:
+A controlled experiment that runs the same SOLID-principles code review task across N arbitrary
+agent/model configurations and ranks them by payoff-per-cost.  It instantiates two experiments
+from the skill's `references/experiment-matrix.md`:
 
 - E2 — single-high-intelligence vs multi-low-intelligence on the same input.
 - E1 — corroboration-weighting ablation (the ensemble reduced with `keep_threshold=1` dedup-only
@@ -12,16 +12,48 @@ The point is to replace the skill's n=1 origin anecdote ("14 findings vs 13, ~35
 real precision/recall/F1 — counting findings is explicitly NOT the metric
 (`ensemble-rule-review/references/measuring-success.md`).
 
-## The two arms
+## Arms — manifest-driven, N-arm
+
+Arms are declared in `arms.yaml` at the experiment root.  The seeded arms are:
 
 | Arm | Directory | Reviewer | Mechanism |
 |-----|-----------|----------|-----------|
-| A — single high-intelligence | `single-high-intelligence-agent/` | one Sonnet agent | holds the full SOLID ruleset, one pass, emits the fixed schema |
-| B — multi low-intelligence ensemble | `multi-low-intelligence-focused-agents/` | 5 Haiku workers + deterministic reducer | `plan_ensemble.py` over the 5 SOLID groups (window 2) -> 5 overlapping Haiku workers -> `reduce.py` |
+| single-high-intelligence-agent | `single-high-intelligence-agent/` | one Sonnet agent | holds the full SOLID ruleset, one pass, emits the fixed schema |
+| multi-low-intelligence-focused-agents | `multi-low-intelligence-focused-agents/` | 5 Haiku workers + deterministic reducer | `plan_ensemble.py` over the 5 SOLID groups (window 2) -> 5 overlapping Haiku workers -> `reduce.py` |
 
-Both arms review the SAME corpus and emit the SAME fixed candidate schema, so one scorer parses
-both identically. Arm B reuses the real skill scripts (`plan_ensemble.py`, `reduce.py`) and a Haiku
-worker agent mirroring `plugin-creator:focused-reviewer` — so the experiment also dogfoods the skill.
+Both seeded arms review the SAME corpus and emit the SAME fixed candidate schema, so one scorer
+parses both identically.  The judgement system supports any number of additional arms.
+
+### Adding a new arm
+
+1. Create a new directory at the experiment root (e.g. `opus-single-agent/`).
+2. Add `.claude/skills/review-against-solid-principles/SKILL.md` to configure its model,
+   procedure, and output path.  The arm can be any configuration — a single Opus agent, a
+   heterogeneous ensemble, a different Haiku fan-out width, or any combination of models.
+3. Add an entry to `arms.yaml`:
+
+```yaml
+arms:
+  - name: opus-single-agent
+    dir: opus-single-agent
+    enabled: true
+    arm_type: single   # or "ensemble" for a multi-worker arm
+    models:
+      - id: claude-opus-4-5
+        role: primary
+```
+
+The `arm_type` field is **required** and validated at manifest load time:
+
+- `single` — the arm writes one `findings/findings.md` file (single-agent pass).
+- `ensemble` — the arm writes multiple `findings/workers/worker-*.md` files
+  (fan-out workers + reducer).  If the arm declares `ensemble` but the
+  `workers/` directory is absent at score time, the scorer emits an explicit
+  warning rather than silently falling through to the single-agent path.
+
+4. Add a price entry under `prices:` in `arms.yaml` if the model is not already listed.
+
+No Python code change is required.
 
 ## The ruleset
 
@@ -86,38 +118,58 @@ A `decoy_false_positive` location is a negative: no arm should report `(group, l
 - Precision, Recall, F1 on `(group, normalized-location)` for `true_violation` + `systematic_miss`.
 - False-positive rate, broken out for `decoy_false_positive` locations specifically (the shared-bias
   signal).
-- Per-decoy corroboration weight in arm B (how many workers flagged each decoy) — the E0 diagnostic:
-  if decoys accrue weight >= 2, corroboration is boosting shared error.
-- Latency and token/cost per arm.
-- E1 ablation: arm B scored at `keep_threshold=1` (dedup-only) vs `keep_threshold=2` (corroboration
-  gate); the F1 delta isolates the corroboration weighting's contribution.
+- Per-decoy corroboration weight for ensemble arms (how many workers flagged each decoy) — the E0
+  diagnostic: if decoys accrue weight >= 2, corroboration is boosting shared error.
+- Latency and deterministic cost per arm (computed from `arms.yaml` price table, not `claude -p`'s
+  live `total_cost_usd` which is non-deterministic).
+- E1 ablation for ensemble arms: scored at `keep_threshold=1` (dedup-only) vs `keep_threshold=2`
+  (corroboration gate); the F1 delta isolates the corroboration weighting's contribution.
+- **Payoff-per-cost ranking** across all arms: `(F1 − baseline_F1) / cost_usd` where baseline is
+  the lowest-cost arm.  The ranked table shows the best quality gain per dollar.
 
-Success criteria (from `measuring-success.md`): arm B recall >= arm A, precision not degraded, the
-corroboration gate adds measurable F1 over dedup-only, at lower latency/cost. Report the numbers;
-do not declare success from finding counts.
+### Payoff-per-cost formula
+
+```text
+payoff_per_cost = (arm_F1 − baseline_F1) / arm_cost_usd
+
+baseline = arm with the lowest non-zero cost_usd (manifest order breaks ties)
+cost_usd = (input_tokens / 1000) × input_per_1k
+         + (output_tokens / 1000) × output_per_1k
+```
+
+Token counts are captured from `claude -p`'s `usage.input_tokens` / `usage.output_tokens` fields
+and written to `findings/run-meta.json` by the `run` command.  The price table in `arms.yaml`
+converts tokens to USD deterministically.
+
+- Baseline arm payoff = 0.0 (numerator is zero by definition).
+- Negative payoff = arm is worse AND more expensive than the baseline.
+- `None` payoff = cost data unavailable (no `run-meta.json` or zero tokens recorded).
+
+Success criteria (from `measuring-success.md`): the ensemble arm achieves recall >= the single-agent
+arm, precision is not degraded, and the corroboration gate adds measurable F1 over dedup-only.
+Report the numbers; do not declare success from finding counts.
 
 ## Running
 
 Built to be runnable; not executed yet (dispatching live agents costs tokens). See `runner/` for the
-CLI and its `--help`. Run the planner/reducer checks (deterministic, free) any time; run the live
+CLI and its `--help`. Run the planner/scorer checks (deterministic, free) any time; run the live
 arms when ready.
 
 ```bash
 # Free — inspect the worker plan
 uv run runner/cli.py plan
 
-# Free — score previously written findings against gold
+# Free — score previously written findings against gold (includes payoff-per-cost ranking)
 uv run runner/cli.py score
 
-# Costs tokens — dispatch one arm
-uv run runner/cli.py run-arm-a
-uv run runner/cli.py run-arm-b
+# Costs tokens — dispatch all enabled arms from arms.yaml
+uv run runner/cli.py run
 
 # Costs tokens — full experiment
 uv run runner/cli.py all
 ```
 
-Both arms use the identical runner invocation.  Each arm's
+All arms use the identical runner invocation.  Each arm's
 `.claude/skills/review-against-solid-principles/SKILL.md` controls its internal
 behaviour (model, fan-out, reduce, output path).
 

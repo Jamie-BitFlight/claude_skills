@@ -31,8 +31,22 @@ The preamble unconditionally instructs the agent to read and follow the skill
 file.  This guarantees the skill governs the review regardless of whether
 CLAUDE.md auto-loading or skill auto-load applies in headless mode.
 
-After the arm completes, this module reads ./findings/findings.md from the
-arm directory and records it as the arm output.
+After the arm completes, this module:
+  1. Reads ./findings/findings.md from the arm directory.
+  2. Writes ./findings/run-meta.json with token counts and timing so the
+     score command can compute deterministic costs post-hoc.
+
+run-meta.json schema
+--------------------
+{
+  "input_tokens": <int>,
+  "output_tokens": <int>,
+  "duration_ms": <float>,
+  "total_cost_usd_reported": <float>
+}
+
+total_cost_usd_reported is stored for reconciliation only — the authoritative
+cost figure is computed by runner/cost.py from the manifest price table.
 """
 
 from __future__ import annotations
@@ -66,14 +80,37 @@ class ArmRunResult:
     Attributes:
         findings_paths: Output file paths written by the arm (normally one).
         duration_ms: Total wall-clock time for the arm in milliseconds.
-        cost_usd: Total reported token cost.
+        reported_cost_usd: Token cost as reported by claude -p (non-deterministic;
+            stored for display in the run summary only).  The authoritative cost
+            figure is computed deterministically by scorer from the manifest price
+            table using token counts in run-meta.json.
         errors: Subprocess or parse errors (arm failed; result may be partial).
     """
 
     findings_paths: list[Path] = field(default_factory=list)
     duration_ms: float = 0.0
-    cost_usd: float = 0.0
+    reported_cost_usd: float = 0.0
     errors: list[str] = field(default_factory=list)
+
+
+def _write_run_meta(findings_dir: Path, payload: dict, reported_ms: float, cost_usd: float) -> None:
+    """Write findings/run-meta.json with token counts and timing for post-hoc cost computation.
+
+    Args:
+        findings_dir: Directory to write run-meta.json into (created if absent).
+        payload: Parsed JSON payload from claude -p.
+        reported_ms: Wall-clock duration in milliseconds.
+        cost_usd: Reported cost from claude -p (stored for reconciliation only).
+    """
+    usage = payload.get("usage") or {}
+    meta = {
+        "input_tokens": int(usage.get("input_tokens", 0)),
+        "output_tokens": int(usage.get("output_tokens", 0)),
+        "duration_ms": reported_ms,
+        "total_cost_usd_reported": cost_usd,
+    }
+    findings_dir.mkdir(parents=True, exist_ok=True)
+    (findings_dir / "run-meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
 
 def run_arm(arm_dir: Path) -> ArmRunResult:
@@ -113,8 +150,11 @@ def run_arm(arm_dir: Path) -> ArmRunResult:
     reported_ms: float = float(payload.get("duration_ms", elapsed_ms))
     cost_usd: float = float(payload.get("total_cost_usd", 0.0))
 
-    findings_path = arm_dir / "findings" / "findings.md"
-    result = ArmRunResult(duration_ms=reported_ms, cost_usd=cost_usd)
+    findings_dir = arm_dir / "findings"
+    _write_run_meta(findings_dir, payload, reported_ms, cost_usd)
+
+    findings_path = findings_dir / "findings.md"
+    result = ArmRunResult(duration_ms=reported_ms, reported_cost_usd=cost_usd)
     if findings_path.is_file():
         result.findings_paths.append(findings_path)
     else:
@@ -123,33 +163,3 @@ def run_arm(arm_dir: Path) -> ArmRunResult:
             "Arm may have written output elsewhere or failed silently."
         )
     return result
-
-
-def run_arm_a(arm_dir: Path) -> ArmRunResult:
-    """Dispatch arm A (single-pass Sonnet baseline).
-
-    Thin wrapper over run_arm.  The arm's SKILL.md governs model selection
-    and review procedure.
-
-    Args:
-        arm_dir: Arm A root directory (single-high-intelligence-agent/).
-
-    Returns:
-        ArmRunResult from run_arm.
-    """
-    return run_arm(arm_dir)
-
-
-def run_arm_b(arm_dir: Path) -> ArmRunResult:
-    """Dispatch arm B (multi-worker Haiku ensemble).
-
-    Thin wrapper over run_arm.  The arm's SKILL.md governs model selection,
-    fan-out, reduce step, and output location.
-
-    Args:
-        arm_dir: Arm B root directory (multi-low-intelligence-focused-agents/).
-
-    Returns:
-        ArmRunResult from run_arm.
-    """
-    return run_arm(arm_dir)
