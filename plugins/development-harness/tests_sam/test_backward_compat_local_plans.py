@@ -21,7 +21,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import Task, TaskStatus
+from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 from sam_schema.core.plan_id_index import PlanIdIndex
 
 if TYPE_CHECKING:
@@ -150,8 +150,8 @@ def test_local_plan_full_content_equality(tmp_path: Path) -> None:
             status=TaskStatus.NOT_STARTED,
             agent="python-cli-architect",
             dependencies=[],
-            priority=1,
-            complexity="low",
+            priority=Priority.CRITICAL,
+            complexity=Complexity.LOW,
         ),
         Task(
             id="T2",
@@ -159,8 +159,8 @@ def test_local_plan_full_content_equality(tmp_path: Path) -> None:
             status=TaskStatus.NOT_STARTED,
             agent="python-cli-architect",
             dependencies=["T1"],
-            priority=2,
-            complexity="medium",
+            priority=Priority.HIGH,
+            complexity=Complexity.MEDIUM,
         ),
     ]
     plan_id = _create_local_only_plan(plan_dir, "pre-fix-full-equality", tasks)
@@ -210,10 +210,29 @@ def test_local_plan_with_many_tasks(tmp_path: Path) -> None:
     plan_dir.mkdir()
 
     tasks = [
-        Task(id="T1", title="Task one", status=TaskStatus.NOT_STARTED, agent="agent", dependencies=[], priority=1),
-        Task(id="T2", title="Task two", status=TaskStatus.NOT_STARTED, agent="agent", dependencies=["T1"], priority=2),
         Task(
-            id="T3", title="Task three", status=TaskStatus.NOT_STARTED, agent="agent", dependencies=["T1"], priority=3
+            id="T1",
+            title="Task one",
+            status=TaskStatus.NOT_STARTED,
+            agent="agent",
+            dependencies=[],
+            priority=Priority.CRITICAL,
+        ),
+        Task(
+            id="T2",
+            title="Task two",
+            status=TaskStatus.NOT_STARTED,
+            agent="agent",
+            dependencies=["T1"],
+            priority=Priority.HIGH,
+        ),
+        Task(
+            id="T3",
+            title="Task three",
+            status=TaskStatus.NOT_STARTED,
+            agent="agent",
+            dependencies=["T1"],
+            priority=Priority.MEDIUM,
         ),
         Task(
             id="T4",
@@ -221,9 +240,16 @@ def test_local_plan_with_many_tasks(tmp_path: Path) -> None:
             status=TaskStatus.NOT_STARTED,
             agent="agent",
             dependencies=["T2", "T3"],
-            priority=4,
+            priority=Priority.LOW,
         ),
-        Task(id="T5", title="Task five", status=TaskStatus.NOT_STARTED, agent="agent", dependencies=["T4"], priority=5),
+        Task(
+            id="T5",
+            title="Task five",
+            status=TaskStatus.NOT_STARTED,
+            agent="agent",
+            dependencies=["T4"],
+            priority=Priority.LOWEST,
+        ),
     ]
     plan_id = _create_local_only_plan(plan_dir, "pre-fix-many-tasks", tasks)
 

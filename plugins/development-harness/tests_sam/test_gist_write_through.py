@@ -27,7 +27,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError
 from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import Task, TaskStatus
+from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 from sam_schema.core.plan_id_index import PlanIdIndex, PlanIndexEntry, _serialize_index_yaml
 
 if TYPE_CHECKING:
@@ -111,8 +111,8 @@ def _two_tasks() -> list[Task]:
             status=TaskStatus.NOT_STARTED,
             agent="test-agent",
             dependencies=[],
-            priority=1,
-            complexity="low",
+            priority=Priority.CRITICAL,
+            complexity=Complexity.LOW,
         ),
         Task(
             id="T2",
@@ -120,8 +120,8 @@ def _two_tasks() -> list[Task]:
             status=TaskStatus.NOT_STARTED,
             agent="test-agent",
             dependencies=["T1"],
-            priority=2,
-            complexity="medium",
+            priority=Priority.HIGH,
+            complexity=Complexity.MEDIUM,
         ),
     ]
 
@@ -423,8 +423,8 @@ def test_full_content_equality_roundtrip(gist_layer: GistTaskLayer, store: _InMe
             status=TaskStatus.NOT_STARTED,
             agent="python-cli-architect",
             dependencies=[],
-            priority=1,
-            complexity="low",
+            priority=Priority.CRITICAL,
+            complexity=Complexity.LOW,
         ),
         Task(
             id="T2",
@@ -432,8 +432,8 @@ def test_full_content_equality_roundtrip(gist_layer: GistTaskLayer, store: _InMe
             status=TaskStatus.NOT_STARTED,
             agent="python-cli-architect",
             dependencies=["T1"],
-            priority=2,
-            complexity="high",
+            priority=Priority.HIGH,
+            complexity=Complexity.HIGH,
         ),
         Task(
             id="T3",
@@ -441,8 +441,8 @@ def test_full_content_equality_roundtrip(gist_layer: GistTaskLayer, store: _InMe
             status=TaskStatus.NOT_STARTED,
             agent="python-pytest-architect",
             dependencies=["T1", "T2"],
-            priority=3,
-            complexity="medium",
+            priority=Priority.MEDIUM,
+            complexity=Complexity.MEDIUM,
         ),
     ]
     slug = "roundtrip-equality"
@@ -891,8 +891,8 @@ def test_append_task_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemor
         status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         dependencies=[],
-        priority=3,
-        complexity="low",
+        priority=Priority.MEDIUM,
+        complexity=Complexity.LOW,
     )
 
     # Act: append the task — must write through to Gist.
@@ -934,8 +934,8 @@ def test_finalize_plan_persists_to_gist(gist_layer: GistTaskLayer, store: _InMem
         status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         dependencies=[],
-        priority=1,
-        complexity="low",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
     t2 = Task(
         id="T2",
@@ -943,8 +943,8 @@ def test_finalize_plan_persists_to_gist(gist_layer: GistTaskLayer, store: _InMem
         status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         dependencies=["T1"],
-        priority=2,
-        complexity="medium",
+        priority=Priority.HIGH,
+        complexity=Complexity.MEDIUM,
     )
     gist_layer.append_task(plan_id, t1)
     gist_layer.append_task(plan_id, t2)
@@ -996,8 +996,8 @@ def test_append_task_raises_on_gist_write_failure(gist_layer: GistTaskLayer, sto
         status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         dependencies=[],
-        priority=3,
-        complexity="low",
+        priority=Priority.MEDIUM,
+        complexity=Complexity.LOW,
     )
 
     # Act + Assert: ArtifactWriteError must propagate (no silent swallow).
