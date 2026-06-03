@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Protocol
 from github import GithubException
 
 from . import operations
-from .models import BackendUnavailableError
+from .models import BacklogError
 from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_error
 
 if TYPE_CHECKING:
@@ -167,9 +167,10 @@ async def _attempt_sync(state: SyncState, attempt: int, full_refresh: bool) -> b
             state.status = SyncStatus.IDLE
             _log.info("Background sync cancelled during attempt %d.", attempt + 1)
             raise
-        except (BackendUnavailableError, GithubException, OSError, ValueError) as exc:
-            # Catch only the exception types refresh_local_cache_from_github is
-            # documented to raise (the set classify_sync_error handles).  Any other
+        except (BacklogError, GithubException, OSError, ValueError) as exc:
+            # Catch the exception types refresh_local_cache_from_github is documented to
+            # raise (the set classify_sync_error handles — BacklogError covers its
+            # BackendUnavailableError subclass).  Any other
             # exception is a programming bug and propagates to the task done-callback
             # (_log_sync_task_exc), which logs it — never silently masked as OFFLINE.
             state.completed_at = datetime.now(UTC)
@@ -226,7 +227,7 @@ async def _startup_sync_loop(state: SyncState, full_refresh: bool = False) -> No
             # Sleep outside the lock so other tool calls can proceed during the wait.
             await asyncio.sleep(delay)
     except BaseException as exc:
-        # Exceptions outside the narrow (BackendUnavailableError, GithubException,
+        # Exceptions outside the narrow (BacklogError, GithubException,
         # OSError, ValueError) catch in _attempt_sync — e.g. RuntimeError (bug),
         # KeyboardInterrupt — must not leave status=RUNNING permanently.
         # Set ERROR and re-raise so the done-callback (_log_sync_task_exc) still logs it.

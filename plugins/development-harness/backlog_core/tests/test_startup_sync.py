@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from backlog_core.models import BackendUnavailableError, BacklogError
 from backlog_core.sync_engine import _startup_sync_loop
 from backlog_core.sync_state import (
     SyncErrorKind,
@@ -531,6 +532,25 @@ class TestSyncErrorClassification:
     def test_value_error_is_non_retryable(self) -> None:
         """ValueError (config error from resolve_repo) -> NON_RETRYABLE."""
         exc = ValueError("repo not configured")
+        assert classify_sync_error(exc) == SyncErrorKind.NON_RETRYABLE
+
+    def test_generic_backlog_error_is_retryable(self) -> None:
+        """Generic BacklogError (e.g. GraphQL fetch failure) -> RETRYABLE.
+
+        refresh_local_cache_from_github / _sync_incremental / _sync_full raise
+        BacklogError on transient backend failures; the loop must apply bounded
+        retry rather than entering ERROR immediately.
+        """
+        exc = BacklogError("Could not fetch open issues from GitHub")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
+    def test_backend_unavailable_error_stays_non_retryable(self) -> None:
+        """BackendUnavailableError (a BacklogError subclass) -> NON_RETRYABLE.
+
+        The BackendUnavailableError check must precede the generic BacklogError
+        branch so missing-token / auth failures are not retried.
+        """
+        exc = BackendUnavailableError("GITHUB_TOKEN not set")
         assert classify_sync_error(exc) == SyncErrorKind.NON_RETRYABLE
 
     def test_asyncio_timeout_error_is_retryable(self) -> None:

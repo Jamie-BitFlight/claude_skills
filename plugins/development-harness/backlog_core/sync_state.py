@@ -23,7 +23,7 @@ from enum import StrEnum
 
 from github import GithubException
 
-from .models import BackendUnavailableError
+from .models import BackendUnavailableError, BacklogError
 
 __all__ = ["SyncErrorKind", "SyncState", "SyncStatus", "classify_sync_error", "get_sync_state", "reset_sync_state"]
 
@@ -229,6 +229,7 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     Classification table (from design doc section 5.1):
 
     - ``BackendUnavailableError`` (includes ``GitHubUnavailableError``) — NON_RETRYABLE.
+    - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE.
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
     - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
     - ``GithubException`` with status 403 and ``Retry-After`` header — RETRYABLE.
@@ -247,6 +248,10 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     """
     if isinstance(exc, BackendUnavailableError):
         return SyncErrorKind.NON_RETRYABLE
+    if isinstance(exc, BacklogError):
+        # Generic backend/GraphQL failure (e.g. from sync_issues_graphql) — transient.
+        # Checked after BackendUnavailableError (its subclass) so auth/config stays non-retryable.
+        return SyncErrorKind.RETRYABLE
     if isinstance(exc, GithubException):
         return _classify_github_exception(exc)
     if isinstance(exc, asyncio.TimeoutError):
