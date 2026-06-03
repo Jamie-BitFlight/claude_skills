@@ -251,7 +251,17 @@ unfixable = ["F401"]
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
 "**/backlog_core/operations.py" = ["SLF001"]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
-"**/backlog_core/server.py" = ["RUF029"]
+# SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
+# underscore prefix marks it as a background-task entry point, not a user-facing tool
+# C901/PLR0912/PLR0915/PLR0914 — backlog_list pre-existing complexity; tracked in backlog for extraction
+"**/backlog_core/server.py" = [
+    "RUF029",
+    "SLF001",
+    "C901",
+    "PLR0912",
+    "PLR0915",
+    "PLR0914",
+]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["S607"]
 "**/kage-bunshin/scripts/spawn.py" = ["S607"]
@@ -301,6 +311,7 @@ unfixable = ["F401"]
     "N",        # camelCase in test names acceptable when testing API fields
     "PLC",      # Local imports acceptable in test helpers
     "PLR",      # Testing private methods is valid test pattern
+    "RUF029",   # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
     "S",        # Security checks not needed in tests
     "SLF",      # Private name imports acceptable for testing internals
     "T",        # print() statements are intentional for CI output visibility

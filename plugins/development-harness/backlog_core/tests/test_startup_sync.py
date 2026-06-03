@@ -27,7 +27,7 @@ Behaviors covered (mapped to requirement numbers 1-6):
 6. The ``sync_status`` tool returns the full SyncState model fields.
 
 Test-infra notes (from design doc Risk #2):
-   ``SyncState._lock`` is an ``asyncio.Lock`` created lazily inside ``get_sync_state()``.
+   ``SyncState.lock`` is an ``asyncio.Lock`` created lazily inside ``get_sync_state()``.
    Tests call ``reset_sync_state()`` inside an ``async`` fixture so the lock is always
    created in the running event loop, never at module import time.
 
@@ -236,7 +236,7 @@ class TestInFlightSyncGuard:
         results: list[str] = []
 
         async def _lock_holding_sync(s: SyncState) -> None:
-            async with s._lock:
+            async with s.lock:
                 results.append("acquired")
                 s.status = SyncStatus.RUNNING
                 await asyncio.sleep(0.01)
@@ -245,7 +245,7 @@ class TestInFlightSyncGuard:
 
         async def _observe_lock_state(s: SyncState) -> None:
             """Record whether the lock is held; does not attempt to acquire it."""
-            locked = s._lock.locked()
+            locked = s.lock.locked()
             results.append(f"second_sees_locked={locked}")
             await asyncio.sleep(0)  # yield to make this a genuine coroutine
 
@@ -390,8 +390,10 @@ class TestRetryableErrorBoundedBackoff:
         sleep_calls: list[float] = []
 
         async def _instant_sleep(delay: float) -> None:
+            # NOTE: do NOT call asyncio.sleep(0) here — mocker.patch globally
+            # patches asyncio.sleep, so calling it inside the mock side_effect
+            # causes infinite recursion (test bug fixed per task instructions).
             sleep_calls.append(delay)
-            await asyncio.sleep(0)  # yield to event loop without actually waiting
 
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_instant_sleep)
 
@@ -426,8 +428,9 @@ class TestRetryableErrorBoundedBackoff:
         sleep_delays: list[float] = []
 
         async def _record_sleep(delay: float) -> None:
+            # NOTE: do NOT call asyncio.sleep(0) here — mocker.patch globally
+            # patches asyncio.sleep, so calling it inside the mock causes recursion.
             sleep_delays.append(delay)
-            await asyncio.sleep(0)  # yield to event loop without actually waiting
 
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_record_sleep)
 
@@ -458,7 +461,9 @@ class TestRetryableErrorBoundedBackoff:
         mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_fail_then_succeed)
 
         async def _instant_sleep(delay: float) -> None:
-            await asyncio.sleep(0)  # yield to keep this a genuine coroutine
+            # NOTE: do NOT call asyncio.sleep(0) here — mocker.patch globally
+            # patches asyncio.sleep, so calling it inside the mock causes recursion.
+            pass
 
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_instant_sleep)
 
@@ -659,12 +664,10 @@ class TestSyncStateToDict:
         missing = expected_keys - set(result.keys())
         assert not missing, f"to_dict() is missing fields: {missing}."
 
-    def test_to_dict_excludes_private_lock(self, fresh_sync_state: SyncState) -> None:
-        """to_dict() must not include the internal _lock field."""
+    def test_to_dict_excludes_lock_field(self, fresh_sync_state: SyncState) -> None:
+        """to_dict() must not expose the asyncio.Lock field (not JSON-serialisable)."""
         result = fresh_sync_state.to_dict()
-        assert "_lock" not in result, (
-            "to_dict() must not expose the asyncio.Lock object -- it is not JSON-serialisable."
-        )
+        assert "lock" not in result, "to_dict() must not expose the asyncio.Lock field -- it is not JSON-serialisable."
 
     def test_to_dict_status_is_string(self, fresh_sync_state: SyncState) -> None:
         """to_dict() serialises status as a plain string (not StrEnum instance)."""
