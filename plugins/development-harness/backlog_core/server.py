@@ -17,7 +17,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, cast
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -28,7 +28,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
-from . import models as _models, operations
+from . import models as _models, operations, sync_engine as _sync_engine
 from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
@@ -53,13 +53,18 @@ from .models import (
     RegisterResult,
     init as _init_models,
 )
+from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncGenerator, Callable, Mapping
 
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
+
+# Module-level logger for done-callback exception reporting.
+# Named _sync_task_log so tests can patch backlog_core.server._sync_task_log.
+_sync_task_log = _logging.getLogger(__name__)
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
@@ -1396,6 +1401,189 @@ def _read_gate_token(gate_token: str) -> str | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Lifespan: launch singleton background sync once per server process.
+# FastMCP 3.x already guards against concurrent lifespan re-entry via its
+# internal _lifespan_lock, so we do not need an additional boolean guard here.
+# The lifespan= parameter on FastMCP() must be an async context manager factory
+# (decorated with @asynccontextmanager), NOT a plain async generator.
+# ---------------------------------------------------------------------------
+
+
+def _log_sync_task_exc(task: asyncio.Task[None]) -> None:
+    """Done-callback: log any unexpected exception that escapes the sync task.
+
+    An asyncio.CancelledError is expected during server shutdown and is
+    silently ignored.  Any other exception indicates an unanticipated bug
+    that escaped the broad catch in _attempt_sync; it is logged at
+    ERROR level so it is visible in the server logs rather than silently
+    discarded per .claude/rules/silent-failure-prevention.md.
+
+    Args:
+        task: The completed sync background task.
+    """
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        _sync_task_log.error("Background sync task raised an unexpected exception: %s", exc, exc_info=exc)
+
+
+# Strong references to in-flight background sync tasks.  The event loop keeps only
+# weak references to tasks, so a fire-and-forget task held solely by a local
+# variable can be garbage-collected mid-run.  Holding the task here until it
+# completes prevents that.  See CPython asyncio.create_task docs.
+_bg_sync_tasks: set[asyncio.Task[None]] = set()
+
+# Module-level reference to the active startup sync task.  Set by _backlog_lifespan
+# on first entry; prevents FastMCP re-entry (issue #1115) from launching a second task.
+_active_startup_sync_task: asyncio.Task[None] | None = None
+
+
+def _register_bg_task(task: asyncio.Task[None]) -> None:
+    """Retain a strong reference to *task* and wire its done-callbacks.
+
+    Args:
+        task: The background sync task to track until completion.
+    """
+    _bg_sync_tasks.add(task)
+    task.add_done_callback(_bg_sync_tasks.discard)
+    task.add_done_callback(_log_sync_task_exc)
+
+
+def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> bool | None:
+    """Read ``backlog.startup_sync.enabled`` from one config file.
+
+    Isolates the try/except so the outer loop in
+    ``_read_startup_sync_enabled_from_yaml`` uses a plain
+    ``if result is not None`` check, avoiding the S112 try-except-continue
+    pattern.
+
+    Args:
+        yaml_parser: A ``ruamel.yaml.YAML`` instance.
+        config_path: Path to the YAML config file to read.
+
+    Returns:
+        The configured bool if present, otherwise ``None``.
+    """
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
+
+    if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, _Path) or not config_path.is_file():
+        return None
+    try:
+        raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — ruamel.yaml raises various internal exception types
+        return None
+    if not isinstance(raw, dict):
+        return None
+    backlog_section = raw.get("backlog")
+    if not isinstance(backlog_section, dict):
+        return None
+    startup_sync = backlog_section.get("startup_sync")
+    if not isinstance(startup_sync, dict):
+        return None
+    enabled = startup_sync.get("enabled")
+    return enabled if isinstance(enabled, bool) else None
+
+
+def _read_startup_sync_enabled_from_yaml() -> bool | None:
+    """Read ``backlog.startup_sync.enabled`` from .dh/config.yaml files.
+
+    Returns the configured boolean value or ``None`` when the key is absent
+    in all config files.  Implemented without private dh_config imports to
+    avoid PLC2701 violations.
+
+    Returns:
+        The configured bool, or ``None`` when the key is absent.
+    """
+    try:
+        import contextlib  # noqa: PLC0415
+
+        import dh_paths as _dp  # noqa: PLC0415
+
+        search_paths = []
+        with contextlib.suppress(FileNotFoundError, RuntimeError):
+            project_root = _dp.git_project_root()
+            search_paths.append(_dp.project_dh_dir(project_root) / "config.yaml")
+        search_paths.append(_dp._dh_user_root() / "config.yaml")
+    except ImportError:
+        return None
+
+    try:
+        from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
+
+        yaml = _YAML(typ="safe")
+    except ImportError:
+        return None
+
+    for config_path in search_paths:
+        result = _read_enabled_from_config_file(yaml, config_path)
+        if result is not None:
+            return result
+    return None
+
+
+def _startup_sync_enabled() -> bool:
+    """Return True when the startup sync should run (default: True).
+
+    Reads ``backlog.startup_sync.enabled`` from ``.dh/config.yaml``.
+    Returns ``True`` when the key is absent (opt-out semantics: sync runs
+    unless explicitly disabled).
+
+    Named module-level function so tests can patch via:
+    ``mocker.patch("backlog_core.server._startup_sync_enabled", return_value=False)``.
+
+    Returns:
+        True if startup sync should proceed, False to skip it entirely.
+    """
+    configured = _read_startup_sync_enabled_from_yaml()
+    return True if configured is None else configured
+
+
+@contextlib.asynccontextmanager
+async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object], None]:
+    """FastMCP lifespan: launch the background sync task before serving tools.
+
+    The background sync task starts immediately but does not block server
+    readiness — ``yield`` executes before the sync completes so tool calls
+    can be answered concurrently.
+
+    Args:
+        server: The FastMCP server instance (not used directly).
+
+    Yields:
+        Empty lifespan context dict.
+    """
+    state = get_sync_state()
+    # Guard 1 — kill-switch: skip entirely when disabled in config.
+    # Guard 2 — re-entry (FastMCP #1115): try_start() is an atomic check-and-set;
+    #   if RUNNING is already set (second lifespan entry) we skip create_task so
+    #   only one background sync task runs per process lifetime.
+    global _active_startup_sync_task  # noqa: PLW0603
+    if _startup_sync_enabled() and state.try_start():
+        bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
+        _register_bg_task(bg_task)
+        # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
+        # cancels the same task on teardown rather than creating a dangling one.
+        _active_startup_sync_task = bg_task
+    else:
+        bg_task = _active_startup_sync_task
+    try:
+        yield {}
+    finally:
+        if bg_task is not None:
+            bg_task.cancel()
+            # Suppress the expected teardown outcomes only: CancelledError (from the
+            # cancel above), TimeoutError (from wait_for), and any application-level
+            # error from the task — the done-callback (_log_sync_task_exc) already
+            # logged it; re-raising here would surface a clean shutdown as a crash.
+            # KeyboardInterrupt / SystemExit (BaseException) still propagate.
+            with contextlib.suppress(Exception, asyncio.CancelledError):
+                await asyncio.wait_for(bg_task, timeout=5.0)
+
+
 mcp = FastMCP(
     "backlog",
     instructions=(
@@ -1404,7 +1592,87 @@ mcp = FastMCP(
         "backlog items including add, list, view, update, groom, close, resolve, and sync."
     ),
     version="0.1.0",
+    lifespan=_backlog_lifespan,
 )
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Backlog Sync Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
+async def sync_status() -> dict[str, object]:
+    """Return the current background sync state.
+
+    Returns:
+        Dict with fields:
+            status (str): One of "idle", "running", "offline", "error".
+            started_at (str | None): ISO 8601 UTC timestamp of current/last sync start.
+            completed_at (str | None): ISO 8601 UTC timestamp of last sync completion.
+            last_success_at (str | None): ISO 8601 UTC timestamp of last successful sync.
+            items_done (int): Issues written to cache in the current/last run.
+            items_total (int | None): Total issues expected; None when unknown.
+            percent (int | None): Completion percentage 0-100; None when total unknown.
+            last_error (str): Error message from last failed sync, or empty string.
+            offline_reason (str): Why server entered offline mode, or empty string.
+    """
+    return get_sync_state().to_dict()
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Trigger Backlog Sync",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True,
+    )
+)
+async def sync_now(
+    full_refresh: Annotated[bool, Field(description="Ignore .last_sync timestamp and do a full two-pass sync")] = False,
+) -> dict[str, object]:
+    """Trigger an immediate background sync or return progress of an in-flight sync.
+
+    If a sync is already in progress, returns the current progress without
+    starting a new sync (singleton guarantee).
+
+    If the server is in offline or error mode, clears the state and attempts a
+    fresh sync.
+
+    Args:
+        full_refresh: When True, ignore any cached .last_sync timestamp and
+            perform a full two-pass sync (open then closed issues).
+
+    Returns:
+        Dict with fields:
+            triggered (bool): True if a new sync was started; False if one was already running.
+            sync_state (dict): Current sync state (same fields as sync_status()).
+            messages (list[str]): Informational messages about the action taken.
+    """
+    state = get_sync_state()
+
+    # Reset terminal states so the new attempt starts fresh.  Done before the
+    # claim so the returned snapshot reflects the fresh RUNNING state, not the
+    # stale OFFLINE/ERROR one.
+    if state.status in {SyncStatus.OFFLINE, SyncStatus.ERROR}:
+        state.offline_reason = ""
+        state.last_error = ""
+        state.retry_count = 0
+
+    # Atomically claim the sync slot.  try_start() sets status=RUNNING synchronously
+    # (no await), closing the check-then-create race that would otherwise let two
+    # concurrent sync_now calls — or a sync_now racing the startup loop — each launch
+    # a duplicate sync worker.
+    if not state.try_start():
+        return {
+            "triggered": False,
+            "sync_state": state.to_dict(),
+            "messages": ["A sync is already in progress. Returning current progress."],
+        }
+
+    bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
+    _register_bg_task(bg_sync_task)
+    return {"triggered": True, "sync_state": state.to_dict(), "messages": ["Background sync triggered."]}
 
 
 @mcp.tool(
@@ -1540,6 +1808,127 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
         f"Backend items (--- open / --- total)"
         f"[cache: {cache_open} open / {cache_total} total]"
     )
+
+
+def _extract_item_list(result: Mapping[str, object]) -> list[dict[str, str | bool]]:
+    """Extract the typed item list from a raw operations.list_items result dict.
+
+    ``operations.list_items`` returns ``{"items": [...], ...}`` where each
+    element may be a heterogeneous value.  This function narrows the list to
+    dicts only, matching the ``list[dict[str, str | bool]]`` type expected by
+    downstream filter and search helpers.
+
+    Using ``Mapping[str, object]`` for the parameter (rather than the
+    invariant ``dict[str, object]``) allows callers with more narrowly typed
+    dicts to pass their values without a variance error.
+
+    Args:
+        result: The raw mapping returned by ``operations.list_items``.
+
+    Returns:
+        List of item dicts; empty when the ``items`` key is absent or its
+        value is not a list.
+    """
+    raw = result.get("items", [])
+    if not isinstance(raw, list):
+        return []
+    # isinstance(item, dict) confirms each element is a dict at runtime;
+    # cast is required because ty cannot narrow list[object] elements to the
+    # specific dict[str, str | bool] value type used by backlog item dicts.
+    return [cast("dict[str, str | bool]", item) for item in raw if isinstance(item, dict)]
+
+
+def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] | None, list[str]]:
+    """Build the sync_state payload block and warning strings when the sync is not IDLE.
+
+    Returns ``(None, [])`` when the sync status is IDLE so callers can skip
+    the injection without an extra branch.  The status-aware text is preserved
+    exactly as it was inline: RUNNING maps to a non-failure message; any other
+    non-IDLE status is treated as a stale-cache failure.
+
+    Args:
+        sync_state: The current SyncState object from ``get_sync_state()``.
+
+    Returns:
+        A tuple of (sync_state_block, sync_warnings).  ``sync_state_block`` is
+        ``None`` when ``sync_state.status`` is IDLE; otherwise it is a dict
+        ready to include in a tool response.  ``sync_warnings`` is a list of
+        human-readable warning strings (empty when IDLE).
+    """
+    if sync_state.status == SyncStatus.IDLE:
+        return None, []
+
+    last_success_str: str | None = (
+        sync_state.last_success_at.isoformat() if sync_state.last_success_at is not None else None
+    )
+    if sync_state.status == SyncStatus.RUNNING:
+        cache_warning = "backend sync in progress — cache may be incomplete"
+        warning_lead = "Backend sync in progress; cache may be incomplete"
+    else:
+        cache_warning = "serving stale cache — backend sync failed"
+        warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
+
+    block: dict[str, object] = {
+        "status": str(sync_state.status),
+        "offline_reason": sync_state.offline_reason,
+        "last_success_at": last_success_str,
+        "cache_warning": cache_warning,
+    }
+    warning = (
+        warning_lead
+        + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
+        + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
+    )
+    return block, [warning]
+
+
+def _apply_sync_state_to_response(
+    response: dict[str, object], sync_state_block: dict[str, object] | None, sync_warnings: list[str]
+) -> None:
+    """Merge sync_state block and warnings into a tool response dict in-place.
+
+    No-ops when ``sync_state_block`` is ``None`` (IDLE sync status).
+    When warnings are present they are appended to any existing ``"warnings"``
+    list in ``response``; when the existing value is not a list the sync
+    warnings replace it.
+
+    Args:
+        response: The in-progress response dict to update.
+        sync_state_block: Dict returned by ``_build_sync_state_block``, or
+            ``None`` when the sync is IDLE.
+        sync_warnings: Warning strings returned by ``_build_sync_state_block``.
+    """
+    if sync_state_block is None:
+        return
+    response["sync_state"] = sync_state_block
+    existing = response.get("warnings", [])
+    response["warnings"] = (list(existing) + sync_warnings) if isinstance(existing, list) else sync_warnings
+
+
+def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
+    """Resolve the effective page limit for a ``backlog_list`` response.
+
+    When ``limit > 0`` the caller's explicit value is returned unchanged.
+    When ``limit == 0`` the function auto-paginates: it binary-halves the
+    candidate slice until the serialised JSON fits within ``_LIST_TOKEN_BUDGET``.
+
+    Args:
+        all_items: The full filtered-and-deduplicated item list.
+        offset: The pagination offset (items already skipped).
+        limit: The caller-supplied limit (0 = auto-paginate).
+
+    Returns:
+        Effective item count for the current page.
+    """
+    if limit > 0:
+        return limit
+    candidate = all_items[offset:]
+    effective = len(candidate)
+    while effective > 1:
+        if _token_count(_json.dumps(candidate[:effective])) <= _LIST_TOKEN_BUDGET:
+            break
+        effective = max(1, effective // 2)
+    return effective
 
 
 @mcp.tool(
@@ -1761,10 +2150,7 @@ async def backlog_list(
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
-    raw_items = result.get("items", [])
-    all_items: list[dict[str, str | bool]] = (
-        [x for x in raw_items if isinstance(x, dict)] if isinstance(raw_items, list) else []
-    )
+    all_items: list[dict[str, str | bool]] = _extract_item_list(result)
 
     # Apply cross-field search filter when requested.
     if search is not None:
@@ -1777,31 +2163,27 @@ async def backlog_list(
 
     total = len(all_items)
 
-    # count_only short-circuit: return only the item count without page content.
-    if count_only:
-        return {"count": total}
-
     # ADR-5: cache_open_count reflects the same filter as the items list.
+    # Hoisted above count_only short-circuit so divergence computation always has
+    # the correct cache count regardless of which path returns.
     backend_status.cache_open_count = total
+
+    # Build sync_state block when the background sync is not IDLE.
+    # Emitted on both the full path and the count_only path so callers can
+    # distinguish "offline, cache empty" from "healthy search returned 0".
+    sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
+
+    # count_only short-circuit: return only the item count without page content.
+    # Carries sync_state + warnings when the sync is not IDLE (silent-failure prevention).
+    if count_only:
+        count_resp: dict[str, object] = {"count": total}
+        _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
+        return count_resp
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
 
-    # Determine effective page limit.
-    if limit > 0:
-        # Caller requested an explicit limit — honour it exactly.
-        effective_limit = limit
-    else:
-        # Auto-paginate: binary-search for the largest slice that fits the budget.
-        # Start with all items and halve until the token count fits.
-        candidate = all_items[offset:]
-        effective_limit = len(candidate)
-        while effective_limit > 1:
-            token_count = _token_count(_json.dumps(candidate[:effective_limit]))
-            if token_count <= _LIST_TOKEN_BUDGET:
-                break
-            effective_limit = max(1, effective_limit // 2)
-
+    effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
     has_more = (offset + effective_limit) < total
 
@@ -1811,10 +2193,7 @@ async def backlog_list(
     # Step 2 — apply token-based pagination (match_context=True only)
     # Step 3 — apply depth (may remove body from the already-enriched items)
     # Use a widened list type to accommodate the richer value types added by enrichment.
-    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
     match_pages: dict[str, object] | None = None
-
-    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
     if match_context:
         enriched_items, match_pages = _paginate_match_items(
             _enrich_with_match_context(page_items, search, snippet_context=snippet_context),
@@ -1823,8 +2202,7 @@ async def backlog_list(
             page_token_limit=page_token_limit,
         )
     else:
-        enriched_items = page_items
-        match_pages = None
+        enriched_items: list[dict[str, object]] | list[dict[str, str | bool]] = page_items
 
     if item_depth > 0:
         enriched_items = [_apply_item_depth(dict(it), item_depth) for it in enriched_items]
@@ -1832,16 +2210,16 @@ async def backlog_list(
     # Apply fields projection or default body exclusion.
     enriched_items = _apply_fields_projection(enriched_items, fields=fields, item_depth=item_depth, out=out)
 
-    pagination: dict = {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more}
-    response: dict = {
+    response: dict[str, object] = {
         **result,
         "items": enriched_items,
         "count": len(enriched_items),
         "available_fields": list(_AVAILABLE_FIELDS),
-        "pagination": pagination,
+        "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
         "backend": backend_status.model_dump(),
         **out.to_dict(),
     }
+    _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
     if has_more:
         response["next_call"] = f"backlog_list(offset={offset + effective_limit}, limit={effective_limit})"
     if match_pages is not None:

@@ -35,6 +35,7 @@ from .models import (
     VALID_CLOSE_REASONS,
     ArtifactEntry,
     ArtifactType,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     DuplicateItemError,
@@ -2018,7 +2019,13 @@ def _reconcile_closed_issues(repo_obj: Repository, open_issue_numbers: set[int],
 
 
 def _sync_incremental(
-    repo_obj: Repository, owner: str, repo_name: str, label_names: list[str] | None, since: str, out: Output
+    repo_obj: Repository,
+    owner: str,
+    repo_name: str,
+    label_names: list[str] | None,
+    since: str,
+    out: Output,
+    progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> tuple[int, int]:
     """Perform a single-pass incremental sync for issues updated since *since*.
 
@@ -2029,6 +2036,8 @@ def _sync_incremental(
         label_names: Optional label filter.
         since: ISO 8601 timestamp — only issues updated at or after this time.
         out: Output collector.
+        progress_callback: Optional callable invoked after each issue is written.
+            Receives ``(items_done, items_total)``.
 
     Returns:
         Tuple of (refreshed_count, reconciled_count).
@@ -2046,13 +2055,18 @@ def _sync_incremental(
     issue_to_item = _build_issue_to_item_index(local_items)
     count = 0
     reconciled = 0
-    for issue_node in all_issues:
+    items_total = len(all_issues)
+    if progress_callback is not None:
+        progress_callback(0, items_total)
+    for items_processed, issue_node in enumerate(all_issues, start=1):
         issue_number = issue_node.get("number", 0)
         if issue_node.get("state", "OPEN") == "OPEN":
             _write_issue_node_to_cache(issue_node, issue_number, out)
             count += 1
         else:
             reconciled += _reconcile_single_closed_issue(issue_node, issue_number, out, issue_to_item)
+        if progress_callback is not None:
+            progress_callback(items_processed, items_total)
     if count:
         out.info(f"  Refreshed {count} issue(s) from GitHub into local cache.")
     if reconciled:
@@ -2061,8 +2075,13 @@ def _sync_incremental(
 
 
 def _sync_full(
-    repo_obj: Repository, owner: str, repo_name: str, label_names: list[str] | None, out: Output
-) -> tuple[int, int] | None:
+    repo_obj: Repository,
+    owner: str,
+    repo_name: str,
+    label_names: list[str] | None,
+    out: Output,
+    progress_callback: Callable[[int, int | None], None] | None = None,
+) -> tuple[int, int]:
     """Perform a full two-pass sync (OPEN then CLOSED).
 
     Args:
@@ -2071,24 +2090,30 @@ def _sync_full(
         repo_name: Repository name without owner prefix.
         label_names: Optional label filter.
         out: Output collector.
+        progress_callback: Optional callable invoked after each open issue is written.
+            Receives ``(items_done, items_total)``.
 
     Returns:
-        Tuple of (refreshed_count, reconciled_count), or ``None`` if the open
-        fetch fails (caller should propagate the failure).
+        Tuple of (refreshed_count, reconciled_count).
+
+    Raises:
+        BacklogError: Propagated from ``sync_issues_graphql`` when the open-issue
+            fetch fails — the caller drives OFFLINE/retry handling.
     """
-    try:
-        open_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN", labels=label_names)
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not fetch open issues: {e}")
-        return None
+    open_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN", labels=label_names)
 
     open_issue_numbers: set[int] = set()
     count = 0
+    items_total = len(open_issues)
+    if progress_callback is not None:
+        progress_callback(0, items_total)
     for issue_node in open_issues:
         issue_number = issue_node.get("number", 0)
         _write_issue_node_to_cache(issue_node, issue_number, out)
         open_issue_numbers.add(issue_number)
         count += 1
+        if progress_callback is not None:
+            progress_callback(count, items_total)
     out.info(f"  Refreshed {count} issue(s) from GitHub into local cache.")
 
     reconciled = _reconcile_closed_issues(repo_obj, open_issue_numbers, out)
@@ -2098,7 +2123,11 @@ def _sync_full(
 
 
 def refresh_local_cache_from_github(
-    repo: str = "", label: str | None = None, output: Output | None = None, full_refresh: bool = False
+    repo: str = "",
+    label: str | None = None,
+    output: Output | None = None,
+    full_refresh: bool = False,
+    progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> dict[str, int | list[str]]:
     """Fetch open and recently closed GitHub Issues and update local cache files.
 
@@ -2124,6 +2153,9 @@ def refresh_local_cache_from_github(
         output: Optional ``Output`` accumulator for messages.
         full_refresh: When ``True``, ignore any cached ``.last_sync``
             timestamp and perform a full two-pass fetch.
+        progress_callback: Optional callable invoked after each issue is
+            written to cache.  Receives ``(items_done, items_total)``.
+            Existing callers that omit this parameter are unaffected.
 
     Returns:
         Dict with count of refreshed (open) issues and count of reconciled
@@ -2132,8 +2164,9 @@ def refresh_local_cache_from_github(
     out = output or Output()
     repo_obj = try_get_github(repo)
     if repo_obj is None:
-        out.warn("  WARNING: GitHub unavailable — listing from local cache only")
-        return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+        raise BackendUnavailableError(
+            "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."
+        )
 
     owner, repo_name = repo_obj.full_name.split("/", 1)
     label_names: list[str] | None = [label] if label else None
@@ -2149,16 +2182,13 @@ def refresh_local_cache_from_github(
     sync_start = datetime.now(UTC).isoformat()
 
     if since is not None:
-        try:
-            count, reconciled = _sync_incremental(repo_obj, owner, repo_name, label_names, since, out)
-        except BacklogError as e:
-            out.warn(f"  WARNING: Could not fetch issues: {e}")
-            return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+        count, reconciled = _sync_incremental(
+            repo_obj, owner, repo_name, label_names, since, out, progress_callback=progress_callback
+        )
     else:
-        result = _sync_full(repo_obj, owner, repo_name, label_names, out)
-        if result is None:
-            return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
-        count, reconciled = result
+        count, reconciled = _sync_full(
+            repo_obj, owner, repo_name, label_names, out, progress_callback=progress_callback
+        )
 
     # Persist sync timestamp so the next run can use incremental mode
     last_sync_path.parent.mkdir(parents=True, exist_ok=True)
