@@ -17,7 +17,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, cast
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -53,10 +53,10 @@ from .models import (
     RegisterResult,
     init as _init_models,
 )
-from .sync_state import SyncStatus, get_sync_state
+from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable
+    from collections.abc import AsyncGenerator, Callable, Mapping
 
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
@@ -1706,6 +1706,127 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
     )
 
 
+def _extract_item_list(result: Mapping[str, object]) -> list[dict[str, str | bool]]:
+    """Extract the typed item list from a raw operations.list_items result dict.
+
+    ``operations.list_items`` returns ``{"items": [...], ...}`` where each
+    element may be a heterogeneous value.  This function narrows the list to
+    dicts only, matching the ``list[dict[str, str | bool]]`` type expected by
+    downstream filter and search helpers.
+
+    Using ``Mapping[str, object]`` for the parameter (rather than the
+    invariant ``dict[str, object]``) allows callers with more narrowly typed
+    dicts to pass their values without a variance error.
+
+    Args:
+        result: The raw mapping returned by ``operations.list_items``.
+
+    Returns:
+        List of item dicts; empty when the ``items`` key is absent or its
+        value is not a list.
+    """
+    raw = result.get("items", [])
+    if not isinstance(raw, list):
+        return []
+    # isinstance(item, dict) confirms each element is a dict at runtime;
+    # cast is required because ty cannot narrow list[object] elements to the
+    # specific dict[str, str | bool] value type used by backlog item dicts.
+    return [cast("dict[str, str | bool]", item) for item in raw if isinstance(item, dict)]
+
+
+def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] | None, list[str]]:
+    """Build the sync_state payload block and warning strings when the sync is not IDLE.
+
+    Returns ``(None, [])`` when the sync status is IDLE so callers can skip
+    the injection without an extra branch.  The status-aware text is preserved
+    exactly as it was inline: RUNNING maps to a non-failure message; any other
+    non-IDLE status is treated as a stale-cache failure.
+
+    Args:
+        sync_state: The current SyncState object from ``get_sync_state()``.
+
+    Returns:
+        A tuple of (sync_state_block, sync_warnings).  ``sync_state_block`` is
+        ``None`` when ``sync_state.status`` is IDLE; otherwise it is a dict
+        ready to include in a tool response.  ``sync_warnings`` is a list of
+        human-readable warning strings (empty when IDLE).
+    """
+    if sync_state.status == SyncStatus.IDLE:
+        return None, []
+
+    last_success_str: str | None = (
+        sync_state.last_success_at.isoformat() if sync_state.last_success_at is not None else None
+    )
+    if sync_state.status == SyncStatus.RUNNING:
+        cache_warning = "backend sync in progress — cache may be incomplete"
+        warning_lead = "Backend sync in progress; cache may be incomplete"
+    else:
+        cache_warning = "serving stale cache — backend sync failed"
+        warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
+
+    block: dict[str, object] = {
+        "status": str(sync_state.status),
+        "offline_reason": sync_state.offline_reason,
+        "last_success_at": last_success_str,
+        "cache_warning": cache_warning,
+    }
+    warning = (
+        warning_lead
+        + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
+        + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
+    )
+    return block, [warning]
+
+
+def _apply_sync_state_to_response(
+    response: dict[str, object], sync_state_block: dict[str, object] | None, sync_warnings: list[str]
+) -> None:
+    """Merge sync_state block and warnings into a tool response dict in-place.
+
+    No-ops when ``sync_state_block`` is ``None`` (IDLE sync status).
+    When warnings are present they are appended to any existing ``"warnings"``
+    list in ``response``; when the existing value is not a list the sync
+    warnings replace it.
+
+    Args:
+        response: The in-progress response dict to update.
+        sync_state_block: Dict returned by ``_build_sync_state_block``, or
+            ``None`` when the sync is IDLE.
+        sync_warnings: Warning strings returned by ``_build_sync_state_block``.
+    """
+    if sync_state_block is None:
+        return
+    response["sync_state"] = sync_state_block
+    existing = response.get("warnings", [])
+    response["warnings"] = (list(existing) + sync_warnings) if isinstance(existing, list) else sync_warnings
+
+
+def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
+    """Resolve the effective page limit for a ``backlog_list`` response.
+
+    When ``limit > 0`` the caller's explicit value is returned unchanged.
+    When ``limit == 0`` the function auto-paginates: it binary-halves the
+    candidate slice until the serialised JSON fits within ``_LIST_TOKEN_BUDGET``.
+
+    Args:
+        all_items: The full filtered-and-deduplicated item list.
+        offset: The pagination offset (items already skipped).
+        limit: The caller-supplied limit (0 = auto-paginate).
+
+    Returns:
+        Effective item count for the current page.
+    """
+    if limit > 0:
+        return limit
+    candidate = all_items[offset:]
+    effective = len(candidate)
+    while effective > 1:
+        if _token_count(_json.dumps(candidate[:effective])) <= _LIST_TOKEN_BUDGET:
+            break
+        effective = max(1, effective // 2)
+    return effective
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="List Backlog Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
@@ -1925,10 +2046,7 @@ async def backlog_list(
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
-    raw_items = result.get("items", [])
-    all_items: list[dict[str, str | bool]] = (
-        [x for x in raw_items if isinstance(x, dict)] if isinstance(raw_items, list) else []
-    )
+    all_items: list[dict[str, str | bool]] = _extract_item_list(result)
 
     # Apply cross-field search filter when requested.
     if search is not None:
@@ -1949,57 +2067,19 @@ async def backlog_list(
     # Build sync_state block when the background sync is not IDLE.
     # Emitted on both the full path and the count_only path so callers can
     # distinguish "offline, cache empty" from "healthy search returned 0".
-    sync_state = get_sync_state()
-    sync_state_block: dict[str, object] | None = None
-    sync_warnings: list[str] = []
-    if sync_state.status != SyncStatus.IDLE:
-        last_success_str = sync_state.last_success_at.isoformat() if sync_state.last_success_at is not None else None
-        if sync_state.status == SyncStatus.RUNNING:
-            # A healthy first/in-progress sync is not a failure — do not label it "failed".
-            cache_warning = "backend sync in progress — cache may be incomplete"
-            warning_lead = "Backend sync in progress; cache may be incomplete"
-        else:
-            cache_warning = "serving stale cache — backend sync failed"
-            warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
-        sync_state_block = {
-            "status": str(sync_state.status),
-            "offline_reason": sync_state.offline_reason,
-            "last_success_at": last_success_str,
-            "cache_warning": cache_warning,
-        }
-        sync_warnings.append(
-            warning_lead
-            + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
-            + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
-        )
+    sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
 
     # count_only short-circuit: return only the item count without page content.
     # Carries sync_state + warnings when the sync is not IDLE (silent-failure prevention).
     if count_only:
-        result: dict[str, object] = {"count": total}
-        if sync_state_block is not None:
-            result["sync_state"] = sync_state_block
-            result["warnings"] = sync_warnings
-        return result
+        count_resp: dict[str, object] = {"count": total}
+        _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
+        return count_resp
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
 
-    # Determine effective page limit.
-    if limit > 0:
-        # Caller requested an explicit limit — honour it exactly.
-        effective_limit = limit
-    else:
-        # Auto-paginate: binary-search for the largest slice that fits the budget.
-        # Start with all items and halve until the token count fits.
-        candidate = all_items[offset:]
-        effective_limit = len(candidate)
-        while effective_limit > 1:
-            token_count = _token_count(_json.dumps(candidate[:effective_limit]))
-            if token_count <= _LIST_TOKEN_BUDGET:
-                break
-            effective_limit = max(1, effective_limit // 2)
-
+    effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
     has_more = (offset + effective_limit) < total
 
@@ -2009,10 +2089,7 @@ async def backlog_list(
     # Step 2 — apply token-based pagination (match_context=True only)
     # Step 3 — apply depth (may remove body from the already-enriched items)
     # Use a widened list type to accommodate the richer value types added by enrichment.
-    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
     match_pages: dict[str, object] | None = None
-
-    enriched_items: list[dict[str, object]] | list[dict[str, str | bool]]
     if match_context:
         enriched_items, match_pages = _paginate_match_items(
             _enrich_with_match_context(page_items, search, snippet_context=snippet_context),
@@ -2021,8 +2098,7 @@ async def backlog_list(
             page_token_limit=page_token_limit,
         )
     else:
-        enriched_items = page_items
-        match_pages = None
+        enriched_items: list[dict[str, object]] | list[dict[str, str | bool]] = page_items
 
     if item_depth > 0:
         enriched_items = [_apply_item_depth(dict(it), item_depth) for it in enriched_items]
@@ -2030,24 +2106,16 @@ async def backlog_list(
     # Apply fields projection or default body exclusion.
     enriched_items = _apply_fields_projection(enriched_items, fields=fields, item_depth=item_depth, out=out)
 
-    pagination: dict = {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more}
-    response: dict = {
+    response: dict[str, object] = {
         **result,
         "items": enriched_items,
         "count": len(enriched_items),
         "available_fields": list(_AVAILABLE_FIELDS),
-        "pagination": pagination,
+        "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
         "backend": backend_status.model_dump(),
         **out.to_dict(),
     }
-    if sync_state_block is not None:
-        response["sync_state"] = sync_state_block
-        # Merge sync warnings into the response warnings list (out.to_dict() already included).
-        existing_warnings = response.get("warnings", [])
-        if isinstance(existing_warnings, list):
-            response["warnings"] = list(existing_warnings) + sync_warnings
-        else:
-            response["warnings"] = sync_warnings
+    _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
     if has_more:
         response["next_call"] = f"backlog_list(offset={offset + effective_limit}, limit={effective_limit})"
     if match_pages is not None:
