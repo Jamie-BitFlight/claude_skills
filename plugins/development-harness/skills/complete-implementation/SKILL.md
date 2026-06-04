@@ -183,9 +183,9 @@ flowchart TD
     Done -->|"T1 Code Review"| T1Post["No follow-up extraction<br>(proportional gates do not<br>generate follow-ups)"]
     Done -->|"T2 Test Verification"| T2Post["Check test results in agent output<br>If failures: log but do not block<br>(completion gate handles pass/fail)"]
     Done -->|"T3 Acceptance Check"| T3Post["No post-dispatch action"]
-    Done -->|"T4 Drift Audit"| T4Post{"Drift found in T4 output?<br>No drift = 'No documentation drift detected'<br>or empty ## Findings section.<br>Drift = any file paths or outdated sections listed."}
-    T4Post -->|"No drift"| SkipT5["sam_task(plan='{PQG}', task='T5',<br>config={action=state, status=skipped})"]
-    T4Post -->|"Drift found"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
+    Done -->|"T4 Drift Audit"| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
+    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{PQG}', task='T5',<br>config={action=state, status=skipped})"]
+    T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
     Done -->|"T5 Documentation Update"| T5Post["No post-dispatch action"]
     T1Post --> Continue["Continue loop"]
     T2Post --> Continue
@@ -195,7 +195,7 @@ flowchart TD
     T5Post --> Continue
 ```
 
-**Detecting drift in T4 output**: No drift = "No documentation drift detected" or empty `## Findings`. Drift = any file paths or outdated sections listed. This is the same drift-detection rule the full SAM path applies to its T4 phase.
+**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0` → skip T5. Drift = `Total findings` of 1 or more → dispatch T5. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift. This is the same drift-detection rule the full SAM path applies to its T4 phase.
 
 **Step 5 -- Completion verification gate**:
 
@@ -480,9 +480,9 @@ flowchart TD
     Done{Which task<br>just completed?}
     Done -->|T0 Multi-Perspective Review| T0Post["Any REJECT — trigger Recursive Follow-up Handling<br>(same path as T1 NEEDS_WORK)."]
     Done -->|T1 Code Review| T1Post["Read codebase-analysis artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
-    Done -->|T4 Drift Audit| T4Post{"Drift found in T4 output?<br>No drift = 'No documentation drift detected'<br>or empty ## Findings section.<br>Drift = any file paths or outdated sections listed."}
-    T4Post -->|"No drift"| SkipT5["sam_task(plan='{QG}', task='T5',<br>config={action=state, status=skipped})"]
-    T4Post -->|"Drift found"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
+    Done -->|T4 Drift Audit| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
+    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{QG}', task='T5',<br>config={action=state, status=skipped})"]
+    T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
     Done -->|T6 Context Refinement| T6Post{"DIVERGENCE_REQUIRING_REVIEW block<br>present in T6 agent output?"}
     T6Post -->|"Yes"| StoreDiv["Store divergence block for final output"]
     T6Post -->|"No"| Continue["No phase-specific action — continue loop"]
@@ -494,7 +494,7 @@ flowchart TD
     StoreDiv --> Continue
 ```
 
-**Detecting drift in T4 output**: No drift = "No documentation drift detected" or empty `## Findings`. Drift = any file paths or outdated sections listed.
+**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0`. Drift = `Total findings` of 1 or more. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift.
 
 ---
 
