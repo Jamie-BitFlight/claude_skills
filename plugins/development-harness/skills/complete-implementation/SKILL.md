@@ -160,9 +160,9 @@ mcp__plugin_dh_sam__sam_plan(
                 {"id": "T3", "title": "Acceptance Check",   "agent": "integration-checker","dependencies": ["T2"],"priority": 1, "complexity": "low",
                  "body": "Confirm acceptance criteria for issue #{issue_number} pass end-to-end: {acceptance_criteria}"},
                 {"id": "T4", "title": "Documentation Drift Audit", "agent": "doc-drift-auditor","dependencies": ["T3"],"priority": 1, "complexity": "low",
-                 "body": "Audit documentation for drift introduced by issue #{issue_number}. Files in scope: {modified_files}. Report any docs that are now stale, missing, or contradicted by the change."},
+                 "body": "Audit documentation for drift introduced by issue #{issue_number}. item_id={issue_number} (REQUIRED — register the audit-report artifact against it; block if absent). project_root is the repository root (your current working directory). Files in scope: {modified_files}. Report any docs that are now stale, missing, or contradicted by the change."},
                 {"id": "T5", "title": "Documentation Update", "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low",
-                 "body": "Update documentation to resolve the drift found in T4 for issue #{issue_number}. Files in scope: {modified_files}."}
+                 "body": "Update documentation to resolve the drift found in T4 for issue #{issue_number}. item_id={issue_number} (read the audit-report artifact registered against it). project_root is the repository root (your current working directory). Files in scope: {modified_files}."}
             ]}
 )
 ```
