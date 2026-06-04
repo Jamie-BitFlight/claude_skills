@@ -5,8 +5,8 @@ user-invocable: true
 description: "Use when all tasks for a feature are marked COMPLETE — runs holistic quality gates including code review, feature verification, integration check, documentation drift audit and update, and context refinement. Creates follow-up task files when issues are found."
 compatibility: Python 3.11+
 metadata:
-  version: 2.0.0
-  last_updated: '2026-03-22'
+  version: 2.1.0
+  last_updated: '2026-06-04'
 ---
 
 # Complete Implementation (Quality Gates + Recursion)
@@ -144,7 +144,7 @@ Store as `acceptance_criteria` (string or None). If none found, set to None.
 
 **Step 3 -- Build proportional quality gate plan**:
 
-Create the SAM plan directly with 3 tasks:
+Create the SAM plan directly with 5 tasks. The documentation pass (T4 Documentation Drift Audit + T5 Documentation Update) is included on this direct/issue-only route exactly as it is on the full SAM path — a feature reached through proportional gates is held to the same documentation standard as one reached through a linked plan:
 
 ```text
 mcp__plugin_dh_sam__sam_plan(
@@ -158,7 +158,11 @@ mcp__plugin_dh_sam__sam_plan(
                 {"id": "T2", "title": "Test Verification",  "agent": "feature-verifier","dependencies": ["T1"],"priority": 1, "complexity": "medium",
                  "body": "Verify issue #{issue_number} acceptance criteria are met. Files in scope: {modified_files}"},
                 {"id": "T3", "title": "Acceptance Check",   "agent": "integration-checker","dependencies": ["T2"],"priority": 1, "complexity": "low",
-                 "body": "Confirm acceptance criteria for issue #{issue_number} pass end-to-end: {acceptance_criteria}"}
+                 "body": "Confirm acceptance criteria for issue #{issue_number} pass end-to-end: {acceptance_criteria}"},
+                {"id": "T4", "title": "Documentation Drift Audit", "agent": "doc-drift-auditor","dependencies": ["T3"],"priority": 1, "complexity": "low",
+                 "body": "Audit documentation for drift introduced by issue #{issue_number}. item_id={issue_number} (REQUIRED — register the audit-report artifact against it; block if absent). project_root is the repository root (your current working directory). Files in scope: {modified_files}. Report any docs that are now stale, missing, or contradicted by the change."},
+                {"id": "T5", "title": "Documentation Update", "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low",
+                 "body": "Update documentation to resolve the drift found in T4 for issue #{issue_number}. item_id={issue_number} (read the audit-report artifact registered against it). project_root is the repository root (your current working directory). Files in scope: {modified_files}."}
             ]}
 )
 ```
@@ -167,7 +171,7 @@ The `pqg-` prefix (proportional quality gate) distinguishes from the `qg-` prefi
 
 **Step 4 -- SAM dispatch loop**:
 
-Use the same SAM Dispatch Loop as the existing 7-phase flow (see "SAM Dispatch Loop (Phases T0-T6)" section). The loop operates identically — 3 tasks instead of 7 is the only structural difference.
+Use the same SAM Dispatch Loop as the existing 7-phase flow (see "SAM Dispatch Loop (Phases T0-T6)" section). The loop operates identically — 5 tasks instead of 7 is the only structural difference. The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional, but retains the T4/T5 documentation pass.
 
 **Phase-specific post-dispatch actions for proportional gates**:
 
@@ -179,33 +183,45 @@ flowchart TD
     Done -->|"T1 Code Review"| T1Post["No follow-up extraction<br>(proportional gates do not<br>generate follow-ups)"]
     Done -->|"T2 Test Verification"| T2Post["Check test results in agent output<br>If failures: log but do not block<br>(completion gate handles pass/fail)"]
     Done -->|"T3 Acceptance Check"| T3Post["No post-dispatch action"]
+    Done -->|"T4 Drift Audit"| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
+    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{PQG}', task='T5',<br>config={action=state, status=skipped})"]
+    T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
+    Done -->|"T5 Documentation Update"| T5Post["No post-dispatch action"]
     T1Post --> Continue["Continue loop"]
     T2Post --> Continue
     T3Post --> Continue
+    SkipT5 --> Continue
+    T5Ready --> Continue
+    T5Post --> Continue
 ```
+
+**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0` → skip T5. Drift = `Total findings` of 1 or more → dispatch T5. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift. This is the same drift-detection rule the full SAM path applies to its T4 phase.
 
 **Step 5 -- Completion verification gate**:
 
-After the dispatch loop exits, verify all 3 phases reached terminal status:
+After the dispatch loop exits, verify all 5 phases reached terminal status:
 
 ```text
 mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="{PQG}")
 ```
 
-All 3 tasks must have `status == 'complete'`. No skip whitelist — all 3 tasks are required.
+All 5 tasks must have `status == 'complete'`, with one exception: T5 (Documentation Update) may have `status == 'skipped'` when T4 found no drift. Any other task with `status == 'skipped'` is an unauthorized skip — treat as a failure. This skip whitelist matches the full SAM path's Completion Verification Gate.
 
 The following diagram is the authoritative procedure for Proportional Quality Gates completion verification. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    Status["sam_plan(action=status, plan='{PQG}')"] --> Iter["Iterate over all 3 tasks"]
+    Status["sam_plan(action=status, plan='{PQG}')"] --> Iter["Iterate over all 5 tasks"]
     Iter --> Check{For each task:<br>check status}
     Check -->|"status == 'complete'"| PassTask["Task passes"]
-    Check -->|"any other status"| FailTask["FAIL"]
-    PassTask --> AllPassed{All 3 tasks<br>passed?}
+    Check -->|"status == 'skipped' AND task_id == 'T5'"| PassTask
+    Check -->|"status == 'skipped' AND task_id != 'T5'"| FailUnauth["FAIL — unauthorized skip"]
+    Check -->|"any other status"| FailIncomplete["FAIL — task incomplete or blocked"]
+    PassTask --> AllPassed{All 5 tasks<br>passed?}
     AllPassed -->|Yes| Proceed["Proceed to Step 6"]
     AllPassed -->|No| Stop["STOP — report failures, do NOT apply label"]
-    FailTask --> AllPassed
+    FailUnauth --> AllPassed
+    FailIncomplete --> AllPassed
 ```
 
 On verification failure:
@@ -386,8 +402,10 @@ mcp__plugin_dh_sam__sam_plan(
                 {"id": "T1", "title": "Code Review",              "agent": "code-reviewer",   "dependencies": [],           "priority": 1, "complexity": "medium"},
                 {"id": "T2", "title": "Feature Verification",     "agent": "feature-verifier","dependencies": ["T1"],       "priority": 1, "complexity": "medium"},
                 {"id": "T3", "title": "Integration Check",        "agent": "integration-checker","dependencies": ["T2"],   "priority": 1, "complexity": "medium"},
-                {"id": "T4", "title": "Documentation Drift Audit","agent": "doc-drift-auditor","dependencies": ["T3"],     "priority": 1, "complexity": "low"},
-                {"id": "T5", "title": "Documentation Update",     "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low"},
+                {"id": "T4", "title": "Documentation Drift Audit","agent": "doc-drift-auditor","dependencies": ["T3"],     "priority": 1, "complexity": "low",
+                 "body": "Audit documentation for drift in {slug} (issue #{issue_number}). item_id={issue_number} (REQUIRED — register the audit-report artifact against it; block if absent). project_root is the repository root (your current working directory)."},
+                {"id": "T5", "title": "Documentation Update",     "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low",
+                 "body": "Update documentation to resolve the drift found in T4 for {slug} (issue #{issue_number}). item_id={issue_number} (read the audit-report artifact registered against it). project_root is the repository root (your current working directory)."},
                 {"id": "T6", "title": "Context Refinement",       "agent": "context-refinement","dependencies": ["T5"],    "priority": 1, "complexity": "medium"}
             ]}
 )
@@ -464,9 +482,9 @@ flowchart TD
     Done{Which task<br>just completed?}
     Done -->|T0 Multi-Perspective Review| T0Post["Any REJECT — trigger Recursive Follow-up Handling<br>(same path as T1 NEEDS_WORK)."]
     Done -->|T1 Code Review| T1Post["Read codebase-analysis artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
-    Done -->|T4 Drift Audit| T4Post{"Drift found in T4 output?<br>No drift = 'No documentation drift detected'<br>or empty ## Findings section.<br>Drift = any file paths or outdated sections listed."}
-    T4Post -->|"No drift"| SkipT5["sam_task(plan='{QG}', task='T5',<br>config={action=state, status=skipped})"]
-    T4Post -->|"Drift found"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
+    Done -->|T4 Drift Audit| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
+    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{QG}', task='T5',<br>config={action=state, status=skipped})"]
+    T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
     Done -->|T6 Context Refinement| T6Post{"DIVERGENCE_REQUIRING_REVIEW block<br>present in T6 agent output?"}
     T6Post -->|"Yes"| StoreDiv["Store divergence block for final output"]
     T6Post -->|"No"| Continue["No phase-specific action — continue loop"]
@@ -478,7 +496,7 @@ flowchart TD
     StoreDiv --> Continue
 ```
 
-**Detecting drift in T4 output**: No drift = "No documentation drift detected" or empty `## Findings`. Drift = any file paths or outdated sections listed.
+**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0`. Drift = `Total findings` of 1 or more. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift.
 
 ---
 

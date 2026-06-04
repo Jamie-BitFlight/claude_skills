@@ -560,19 +560,21 @@ flowchart TD
     P6_QG_RESET --> P6_CLAIM
 
     subgraph P6_LOOP [SAM Dispatch Loop]
-        P6_CLAIM["sam_claim + start-task<br>per ready task"] --> P6_T1
+        P6_CLAIM["sam_claim + start-task<br>per ready task"] --> P6_T0
+        P6_CLAIM --> P6_T1
+        P6_T0["T0: multi-perspective-review<br>Deps: none (parallel)<br>Any REJECT → follow-up handling<br>like T1 NEEDS_WORK"]
         P6_T1["T1: code-reviewer<br>Deps: none"]
         P6_T1 -->|complete| P6_T2["T2: feature-verifier<br>Deps: T1"]
         P6_T2 -->|complete| P6_T3["T3: integration-checker<br>Deps: T2"]
         P6_T3 -->|complete| P6_T4["T4: doc-drift-auditor<br>Deps: T3"]
-        P6_T4 --> P6_T4_DRIFT{"T4 output:<br>## Findings section<br>contains drift?"}
-        P6_T4_DRIFT -->|"Drift found"| P6_T5["T5: service-docs-maintainer<br>Deps: T4"]
-        P6_T4_DRIFT -->|"No drift —<br>'No documentation drift detected'<br>or empty findings"| P6_SKIP_T5["sam_state(plan, task='T5',<br>status='skipped')"]
+        P6_T4 --> P6_T4_DRIFT{"T4 ARTIFACTS return:<br>Total findings count > 0?"}
+        P6_T4_DRIFT -->|"1 or more findings —<br>drift"| P6_T5["T5: service-docs-maintainer<br>Deps: T4"]
+        P6_T4_DRIFT -->|"0 findings —<br>no drift"| P6_SKIP_T5["sam_state(plan, task='T5',<br>status='skipped')"]
         P6_T5 --> P6_T6["T6: context-refinement<br>Deps: T5"]
         P6_SKIP_T5 --> P6_T6
     end
 
-    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_status(plan='{QG}')<br>All 6 tasks terminal?"}
+    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_status(plan='{QG}')<br>All 7 tasks terminal?"}
     P6_VERIFY_GATE -->|"All complete/skipped<br>(only T5 may be skipped)"| P6_FOLLOWUP
     P6_VERIFY_GATE -->|"Any non-terminal<br>or unauthorized skip"| P6_BLOCKED(["COMPLETION BLOCKED<br>Report failed tasks<br>To resume: re-run<br>/complete-implementation"])
 
@@ -607,14 +609,15 @@ flowchart TD
 | P6_CONCERNS | `backlog_view` MCP | item selector | `## Concerns` section with unchecked items | unchecked concerns → P6_CONCERNS_VERIFY, no concerns → P6_QG_CREATE |
 | P6_CONCERNS_VERIFY | orchestrator | unchecked concern items | per-concern: verified → backlog item created, not verified → checked off as 'Not confirmed'; `backlog_groom(section='Concerns')` | always → P6_QG_CREATE |
 | P6_QG_CREATE | `sam_list` MCP | `search='qg-{slug}'` | existing QG plan presence check | no plan → P6_QG_BUILD, plan with remaining tasks → P6_QG_RESET, all terminal → P6_VERIFY_GATE |
-| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_create` MCP | slug, issue, impl_plan_address | QG plan YAML (`qg-{slug}`) with 6 tasks | always → P6_LOOP |
+| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_create` MCP | slug, issue, impl_plan_address | QG plan YAML (`qg-{slug}`) with 7 tasks | always → P6_LOOP |
 | P6_QG_RESET | `sam_state` MCP (per task) | BLOCKED task IDs | tasks reset to `not-started` | always → P6_LOOP |
-| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_claim` + `start-task` per ready task | always → P6_T1 (first iteration) |
+| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_claim` + `start-task` per ready task | always → P6_T0 and P6_T1 (both ready, first iteration) |
+| P6_T0 | `dh:multi-perspective-review` (orchestrated) | implementation code, plan artifacts | per-perspective verdicts (APPROVE/REJECT) | any REJECT → follow-up handling (same path as T1 NEEDS_WORK); else complete |
 | P6_T1 | `code-reviewer` agent | implementation code, plan artifacts | code review output | complete → P6_T2 |
 | P6_T2 | `feature-verifier` agent | T1 output, implementation, acceptance criteria | feature verification result | complete → P6_T3 |
 | P6_T3 | `integration-checker` agent | T2 output, integration points | integration check result | complete → P6_T4 |
-| P6_T4 | `doc-drift-auditor` agent | T3 output, documentation files, codebase | drift audit with `## Findings` section | always → P6_T4_DRIFT |
-| P6_T4_DRIFT | orchestrator | T4 `## Findings` section content | drift presence determination | drift found → P6_T5, no drift → P6_SKIP_T5 |
+| P6_T4 | `doc-drift-auditor` agent | T3 output, documentation files, codebase | drift audit; `Total findings: {count}` in ARTIFACTS return; full report in `audit-report` artifact | always → P6_T4_DRIFT |
+| P6_T4_DRIFT | orchestrator | T4 `Total findings` count from ARTIFACTS return | drift presence determination | 1 or more findings → P6_T5, 0 findings → P6_SKIP_T5 |
 | P6_T5 | `service-docs-maintainer` agent | T4 drift findings, documentation files | updated documentation | complete → P6_T6 |
 | P6_SKIP_T5 | `sam_state` MCP | T5 task ID, `status='skipped'` | T5 marked skipped | always → P6_T6 |
 | P6_T6 | `context-refinement` agent | T5 output (or skip), full QG context | refined context artifacts | complete → P6_VERIFY_GATE |
@@ -634,17 +637,17 @@ flowchart TD
 | P6_RESOLVE | `backlog_resolve` MCP | item selector, summary | issue closed, item state → resolved | always → P6_FINAL |
 | P6_FINAL | orchestrator | resolved issue number `#{N}` (from P6_RESOLVE) | final commit, push; Concerns block displayed if active entries present; slug-search routing output | active concerns → Concerns block + slug-search; no concerns or section absent → slug-search only; backend error → ⚠ warning + slug-search |
 
-**Input modes**: The skill accepts either a plan file path (SAM path → 6-task QG) or an issue number (proportional path → 3-task QG when issue has no linked plan).
+**Input modes**: The skill accepts either a plan file path (SAM path → 7-task QG) or an issue number (proportional path → 5-task QG when issue has no linked plan).
 
 **Proportional Quality Gate path** (issue-only, no linked plan):
 
-- 3 tasks: T1 code-reviewer, T2 test verification, T3 acceptance check
+- 5 tasks: T1 code-reviewer, T2 test verification, T3 acceptance check, T4 doc-drift-auditor, T5 service-docs-maintainer
 - Plan created via `build_proportional_quality_gate_plan(slug=f"issue-{N}", ...)` with `pqg-` prefix
-- All 3 tasks required — no skip whitelist
+- T1–T4 required; T5 (documentation update) may be skipped only when T4 finds no drift — same skip whitelist as the SAM path
 - No recursive follow-up handling (explicitly skipped)
 - `status:verified` applied directly via `backlog_update(selector="#{N}", verified=True)`
 
-**T5 skip condition**: After T4 completes, orchestrator inspects T4 output for `## Findings` section. If "No documentation drift detected" or empty findings → skip T5 via `sam_state(status='skipped')`. Otherwise T5 proceeds. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
+**T5 skip condition** (applies to both the SAM and proportional paths): After T4 completes, the orchestrator reads the `Total findings: {count}` line from the `doc-drift-auditor` agent's `ARTIFACTS` return block (the full drift report is registered as the `audit-report` artifact). If `Total findings: 0` → skip T5 via `sam_state(status='skipped')`. If 1 or more → T5 proceeds. If the count line is absent, the orchestrator reads the `audit-report` artifact and treats a non-empty `## Findings by Category` as drift. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
 
 **Recursive follow-up routing** requires BOTH conditions: (1) the follow-up slug matches the parent feature slug (ADR-3), and (2) the follow-up priority is High (ADR-2). **Why:** Slug matching prevents unrelated bugs found during review from hijacking the current feature's quality gates. Priority gating prevents low-priority same-feature follow-ups from delaying completion.
 
