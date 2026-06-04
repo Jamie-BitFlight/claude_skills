@@ -560,7 +560,9 @@ flowchart TD
     P6_QG_RESET --> P6_CLAIM
 
     subgraph P6_LOOP [SAM Dispatch Loop]
-        P6_CLAIM["sam_claim + start-task<br>per ready task"] --> P6_T1
+        P6_CLAIM["sam_claim + start-task<br>per ready task"] --> P6_T0
+        P6_CLAIM --> P6_T1
+        P6_T0["T0: multi-perspective-review<br>Deps: none (parallel)<br>Any REJECT → follow-up handling<br>like T1 NEEDS_WORK"]
         P6_T1["T1: code-reviewer<br>Deps: none"]
         P6_T1 -->|complete| P6_T2["T2: feature-verifier<br>Deps: T1"]
         P6_T2 -->|complete| P6_T3["T3: integration-checker<br>Deps: T2"]
@@ -572,7 +574,7 @@ flowchart TD
         P6_SKIP_T5 --> P6_T6
     end
 
-    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_status(plan='{QG}')<br>All 6 tasks terminal?"}
+    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_status(plan='{QG}')<br>All 7 tasks terminal?"}
     P6_VERIFY_GATE -->|"All complete/skipped<br>(only T5 may be skipped)"| P6_FOLLOWUP
     P6_VERIFY_GATE -->|"Any non-terminal<br>or unauthorized skip"| P6_BLOCKED(["COMPLETION BLOCKED<br>Report failed tasks<br>To resume: re-run<br>/complete-implementation"])
 
@@ -607,9 +609,10 @@ flowchart TD
 | P6_CONCERNS | `backlog_view` MCP | item selector | `## Concerns` section with unchecked items | unchecked concerns → P6_CONCERNS_VERIFY, no concerns → P6_QG_CREATE |
 | P6_CONCERNS_VERIFY | orchestrator | unchecked concern items | per-concern: verified → backlog item created, not verified → checked off as 'Not confirmed'; `backlog_groom(section='Concerns')` | always → P6_QG_CREATE |
 | P6_QG_CREATE | `sam_list` MCP | `search='qg-{slug}'` | existing QG plan presence check | no plan → P6_QG_BUILD, plan with remaining tasks → P6_QG_RESET, all terminal → P6_VERIFY_GATE |
-| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_create` MCP | slug, issue, impl_plan_address | QG plan YAML (`qg-{slug}`) with 6 tasks | always → P6_LOOP |
+| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_create` MCP | slug, issue, impl_plan_address | QG plan YAML (`qg-{slug}`) with 7 tasks | always → P6_LOOP |
 | P6_QG_RESET | `sam_state` MCP (per task) | BLOCKED task IDs | tasks reset to `not-started` | always → P6_LOOP |
-| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_claim` + `start-task` per ready task | always → P6_T1 (first iteration) |
+| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_claim` + `start-task` per ready task | always → P6_T0 and P6_T1 (both ready, first iteration) |
+| P6_T0 | `dh:multi-perspective-review` (orchestrated) | implementation code, plan artifacts | per-perspective verdicts (APPROVE/REJECT) | any REJECT → follow-up handling (same path as T1 NEEDS_WORK); else complete |
 | P6_T1 | `code-reviewer` agent | implementation code, plan artifacts | code review output | complete → P6_T2 |
 | P6_T2 | `feature-verifier` agent | T1 output, implementation, acceptance criteria | feature verification result | complete → P6_T3 |
 | P6_T3 | `integration-checker` agent | T2 output, integration points | integration check result | complete → P6_T4 |
@@ -634,7 +637,7 @@ flowchart TD
 | P6_RESOLVE | `backlog_resolve` MCP | item selector, summary | issue closed, item state → resolved | always → P6_FINAL |
 | P6_FINAL | orchestrator | resolved issue number `#{N}` (from P6_RESOLVE) | final commit, push; Concerns block displayed if active entries present; slug-search routing output | active concerns → Concerns block + slug-search; no concerns or section absent → slug-search only; backend error → ⚠ warning + slug-search |
 
-**Input modes**: The skill accepts either a plan file path (SAM path → 6-task QG) or an issue number (proportional path → 5-task QG when issue has no linked plan).
+**Input modes**: The skill accepts either a plan file path (SAM path → 7-task QG) or an issue number (proportional path → 5-task QG when issue has no linked plan).
 
 **Proportional Quality Gate path** (issue-only, no linked plan):
 
