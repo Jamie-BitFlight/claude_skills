@@ -26,7 +26,7 @@ The `/work-milestone` skill spawns independent `claude -p` (kage-bunshin) sessio
 Current approach (manual worktree):
 
 ```bash
-cd /home/ubuntulinuxqa2/repos/claude_skills
+cd /home/user/repos/claude_skills
 git worktree add .claude/worktrees/feature-auth-v2 from integration-branch
 cd .claude/worktrees/feature-auth-v2
 claude -p --model sonnet --permission-mode auto --output-format json ...

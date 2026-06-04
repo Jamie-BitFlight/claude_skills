@@ -1042,7 +1042,7 @@ Files under `plugins/plugin-creator/` and `.claude-plugin/marketplace.json` exis
 (same content via git). When running commands in Tasks 12–15:
 
 - Use the **worktree** as the working directory for all `git add` / `git commit` operations:
-  `cd /home/ubuntulinuxqa2/repos/claude_skills/.worktrees/scientific-method-plugin`
+  `cd /home/user/repos/claude_skills/.worktrees/scientific-method-plugin`
 - All file paths in the tasks below are relative to that worktree root.
 - The `plugins/plugin-creator/` files referenced in Task 12 exist at
   `.worktrees/scientific-method-plugin/plugins/plugin-creator/` — edit them there.

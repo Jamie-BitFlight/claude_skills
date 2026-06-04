@@ -93,18 +93,18 @@ class TestComputeSlug:
     def test_compute_slug_nested_path_replaces_all_slashes(self) -> None:
         """Verify every slash in the path is replaced with a dash.
 
-        Tests: compute_slug with a real-world project path
-        How: Pass /home/ubuntulinuxqa2/repos/claude_skills and verify result
+        Tests: compute_slug with a multi-component path
+        How: Pass /home/developer/repos/myproject and verify result
         Why: Ensures all separators are converted, not just the first
         """
         # Arrange
-        path = Path("/home/ubuntulinuxqa2/repos/claude_skills")
+        path = Path("/home/developer/repos/myproject")
 
         # Act
         slug = compute_slug(path)
 
         # Assert
-        assert slug == "-home-ubuntulinuxqa2-repos-claude_skills"
+        assert slug == "-home-developer-repos-myproject"
 
     def test_compute_slug_path_with_underscores_preserves_underscores(self) -> None:
         """Verify underscores in path components are preserved unchanged.

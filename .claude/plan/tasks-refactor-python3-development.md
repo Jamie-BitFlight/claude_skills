@@ -849,7 +849,7 @@ Based on analysis of SKILL.md content and the design spec, the five new skills w
 
 **Symlink dependency**:
 
-- `./references/accessing_online_resources.md` is a symlink pointing to `/home/ubuntulinuxqa2/repos/claude_skills/plugins/agent-orchestration/skills/agent-orchestration/references/accessing_online_resources.md`
+- `./references/accessing_online_resources.md` is a symlink pointing to `/home/user/repos/claude_skills/plugins/agent-orchestration/skills/agent-orchestration/references/accessing_online_resources.md`
 - This symlink must be preserved or recreated after migration
 
 ### External Dependencies on This Skill
@@ -940,7 +940,7 @@ description: 'Use when: [trigger conditions]. Provides: [capabilities].'
 **Symlink recreation command**:
 
 ```bash
-ln -sf /home/ubuntulinuxqa2/repos/claude_skills/plugins/agent-orchestration/skills/agent-orchestration/references/accessing_online_resources.md \
+ln -sf /home/user/repos/claude_skills/plugins/agent-orchestration/skills/agent-orchestration/references/accessing_online_resources.md \
   ./plugins/python3-development/skills/python3-project/references/accessing_online_resources.md
 ```
 

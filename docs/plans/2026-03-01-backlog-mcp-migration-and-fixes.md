@@ -42,7 +42,7 @@ def test_append_or_replace_section_subsection_with_backslash():
 **Step 2: Run to verify failure**
 
 ```bash
-cd /home/ubuntulinuxqa2/repos/claude_skills
+cd /home/user/repos/claude_skills
 uv run python -m pytest .claude/skills/backlog/tests/test_parsing.py -k "backslash" -v 2>&1 | tail -20
 ```
 
@@ -362,7 +362,7 @@ git push
 
 ```bash
 grep -n "find_fuzzy_duplicates\|_check_for_duplicates\|force" \
-  /home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/backlog_core/operations.py | head -10
+  /home/user/repos/claude_skills/.claude/skills/backlog/backlog_core/operations.py | head -10
 ```
 
 Expected: `find_fuzzy_duplicates` called in `_check_for_duplicates`, `force` param in `add_item`.
@@ -371,7 +371,7 @@ Expected: `find_fuzzy_duplicates` called in `_check_for_duplicates`, `force` par
 
 ```bash
 grep -n "check_open_prs_for_issue" \
-  /home/ubuntulinuxqa2/repos/claude_skills/.claude/skills/backlog/backlog_core/operations.py | head -5
+  /home/user/repos/claude_skills/.claude/skills/backlog/backlog_core/operations.py | head -5
 ```
 
 Expected: called in `close_item` and `resolve_item`.

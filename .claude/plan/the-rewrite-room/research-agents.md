@@ -877,7 +877,7 @@ Total agents discovered: 57
 
 ## User-Global Agents (~/.claude/agents/)
 
-Agents discovered in /home/ubuntulinuxqa2/.claude/agents/ not previously inventoried. These are user-global (available in all repos) and not part of any plugin.
+Agents discovered in /home/user/.claude/agents/ not previously inventoried. These are user-global (available in all repos) and not part of any plugin.
 
 ---
 
@@ -971,7 +971,7 @@ Agents discovered in /home/ubuntulinuxqa2/.claude/agents/ not previously invento
 
 ## User-Global Skills (~/.claude/skills/)
 
-Skills discovered in /home/ubuntulinuxqa2/.claude/skills/ not previously inventoried.
+Skills discovered in /home/user/.claude/skills/ not previously inventoried.
 
 ---
 

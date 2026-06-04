@@ -224,6 +224,6 @@ All substitution variables, pitfall table, and verified escape evidence:
 
 
 <input>
-!`node /home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs "$ARGUMENTS"`
+!`node "${CLAUDE_PROJECT_DIR}/plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs" "$ARGUMENTS"`
 </input>
 <user_text/>

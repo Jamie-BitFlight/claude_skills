@@ -27,7 +27,7 @@ The plugin consists of five specialized agents, three workflows, five commands, 
 - **rewrite-room-doc-converter** — orchestrates conversion of user-facing docs into skill directories
 
 **Workflow Layer** (`plugins/the-rewrite-room/the-rewrite-room/workflows/`):
-- **audit.md** (line 78: broken reference to non-existent `validate.md` workflow; line 29: hardcoded path `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`)
+- **audit.md** (line 78: broken reference to non-existent `validate.md` workflow; line 29: hardcoded path `/home/user/.claude/agents/doc-freshness-guardian.md`)
 - **optimize.md** (line 95: incorrect script name `validate_frontmatter.py` should be `normalize_frontmatter.py`)
 - **author.md** (lines 115-127: embedded No-Loss Rewrite Rule in delegation prompt that will diverge from canonical source)
 
@@ -37,7 +37,7 @@ The plugin consists of five specialized agents, three workflows, five commands, 
 
 **SKILL.md** (`plugins/the-rewrite-room/skills/the-rewrite-room/SKILL.md`):
 - Line 26: `/rwr:doc-to-skill` command listed in Command Reference table but no backing command file at `commands/rwr/doc-to-skill.md`
-- Line 98, 123: references to `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` (hardcoded absolute path, non-portable)
+- Line 98, 123: references to `/home/user/.claude/agents/doc-freshness-guardian.md` (hardcoded absolute path, non-portable)
 - Line 123: references non-existent script `plugins/plugin-creator/scripts/validate_frontmatter.py` — actual script is `normalize_frontmatter.py`
 
 **Input Resolution Reference** (`plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/input-resolution.md`):
@@ -65,7 +65,7 @@ The plugin consists of five specialized agents, three workflows, five commands, 
 **Dependency Chain 3 (Agent Optimization — AO-01 through AO-04)**:
 - AO-01: Remove duplicated fidelity rules from rewrite-room-author body (lines 69-94)
 - AO-02: Tighten rewrite-room-auditor tool list: remove Write and Edit (frontmatter line 4)
-- AO-03: Replace hardcoded `/home/ubuntulinuxqa2/` paths with `~/.claude/...` notation (3 locations: auditor.md:44, SKILL.md:98, audit.md:29)
+- AO-03: Replace hardcoded `/home/user/` paths with `~/.claude/...` notation (3 locations: auditor.md:44, SKILL.md:98, audit.md:29)
 - AO-04: Qualify bare agent references with namespace annotations (author.md, auditor.md, audit.md)
 - AO-02, AO-03, AO-04 all modify `auditor.md` — **merge into Task 3 to avoid conflicts**
 
@@ -93,7 +93,7 @@ The plugin consists of five specialized agents, three workflows, five commands, 
 **External agents delegated to by workflows**:
 - `development-harness:doc-drift-auditor` — referenced by audit.md
 - `development-harness:service-docs-maintainer` — referenced by audit.md
-- `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` — personal agent, hardcoded path in 3 locations (AO-03)
+- `/home/user/.claude/agents/doc-freshness-guardian.md` — personal agent, hardcoded path in 3 locations (AO-03)
 - `gitlab-docs-expert` — bare reference in author.md table (AO-04)
 - `documentation-expert` — bare reference in author.md table (AO-04)
 - `plugin-creator:contextual-ai-documentation-optimizer` — referenced in SKILL.md and workflows
@@ -129,7 +129,7 @@ The plugin consists of five specialized agents, three workflows, five commands, 
 #### Verification Strategy
 
 Each task includes specific grep/ls verification commands. Summary:
-- **Negative checks**: `grep -r "{pattern}" plugins/the-rewrite-room/` returns zero results (validates removal of: `.clone/worktrees`, `validate_frontmatter`, `validate.md`, `/home/ubuntulinuxqa2/`)
+- **Negative checks**: `grep -r "{pattern}" plugins/the-rewrite-room/` returns zero results (validates removal of: `.clone/worktrees`, `validate_frontmatter`, `validate.md`, `/home/user/`)
 - **Positive checks**: Files exist where created (doc-to-skill.md, status-block-contract.md)
 - **Content checks**: Specific patterns exist in modified files (normalize_frontmatter, ~/.claude/agents/, contract references)
 - **Syntax checks**: Pre-commit validation (`uv run prek run --files`), JSON validity, Mermaid rendering
@@ -298,9 +298,9 @@ flowchart TD
 8. `agents/rewrite-room-auditor.md` frontmatter `tools:` field is `Read, Grep, Glob, Bash, Task` (no Write, no Edit)
 
 ### AO-03: Replace hardcoded absolute paths
-9. All 3 occurrences of `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` replaced with `~/.claude/agents/doc-freshness-guardian.md`
+9. All 3 occurrences of `/home/user/.claude/agents/doc-freshness-guardian.md` replaced with `~/.claude/agents/doc-freshness-guardian.md`
 10. Each occurrence has an adjacent note: "doc-freshness-guardian is a personal agent, not bundled with this plugin"
-11. `grep -r "/home/ubuntulinuxqa2" plugins/the-rewrite-room/` returns zero results
+11. `grep -r "/home/user" plugins/the-rewrite-room/` returns zero results
 
 ### AO-04: Qualify bare agent references
 12. `agents/rewrite-room-author.md` table entries for `gitlab-docs-expert` and `documentation-expert` include source annotation
@@ -329,7 +329,7 @@ flowchart TD
 **Verification Steps**:
 1. `grep -r "validate.md" plugins/the-rewrite-room/` returns zero results
 2. `grep -r "validate_frontmatter" plugins/the-rewrite-room/` returns zero results
-3. `grep -r "/home/ubuntulinuxqa2" plugins/the-rewrite-room/` returns zero results
+3. `grep -r "/home/user" plugins/the-rewrite-room/` returns zero results
 4. `grep "^tools:" plugins/the-rewrite-room/agents/rewrite-room-auditor.md` shows no Write or Edit
 5. `grep "workflows/validate" plugins/the-rewrite-room/` returns zero results
 6. `grep "normalize_frontmatter" plugins/the-rewrite-room/the-rewrite-room/workflows/optimize.md` returns a match
@@ -580,7 +580,7 @@ flowchart TD
 1. Plugin passes `uvx skilllint@latest check ./plugins/the-rewrite-room/` with 0 errors
 2. All internal links within the plugin resolve correctly (no broken references)
 3. Score improved from 76/100 baseline
-4. Zero grep results for any of the removed patterns: `.clone/worktrees`, `validate_frontmatter`, `/home/ubuntulinuxqa2/`, `validate.md`
+4. Zero grep results for any of the removed patterns: `.clone/worktrees`, `validate_frontmatter`, `/home/user/`, `validate.md`
 5. All 5 agent files and 3 workflow files contain `status-block-contract.md` references
 
 **Required Inputs**:
@@ -595,7 +595,7 @@ flowchart TD
 
 **Verification Steps**:
 1. Run `uvx skilllint@latest check ./plugins/the-rewrite-room/` and confirm exit code 0
-2. Run `grep -r "/home/ubuntulinuxqa2" plugins/the-rewrite-room/` and confirm zero results
+2. Run `grep -r "/home/user" plugins/the-rewrite-room/` and confirm zero results
 3. Run `grep -r ".clone/worktrees" plugins/the-rewrite-room/` and confirm zero results
 4. Run `grep -r "validate_frontmatter" plugins/the-rewrite-room/` and confirm zero results
 5. Run `grep -r "validate.md" plugins/the-rewrite-room/` and confirm zero results
@@ -649,7 +649,7 @@ flowchart TD
 - Zero references to `.clone/worktrees/` remain
 - Zero references to `validate_frontmatter.py` remain
 - Zero references to `validate.md` workflow remain
-- Zero hardcoded `/home/ubuntulinuxqa2/` paths remain
+- Zero hardcoded `/home/user/` paths remain
 - All 5 agents listed in hooks.json example
 - STATUS block contract defined in exactly 1 canonical location
 - All agent/workflow files reference canonical contract file

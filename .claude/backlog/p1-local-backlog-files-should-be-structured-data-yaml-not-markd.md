@@ -84,7 +84,7 @@ Decision: APPROVED
 **Evidence**:
 - Fact-Check, CLAIM 1 (REFUTED framing): Files currently use YAML frontmatter (`---` delimited) + markdown body hybrid format
 - Frontmatter metadata IS already structured (Pydantic `BacklogItem` model in `models.py` defines 18+ fields)
-- Sample file confirmed: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/backlog/p0-redesign-work-milestone-from-teamcreate-to-orchestrator-disp.md`
+- Sample file confirmed: `/home/user/repos/claude_skills/.claude/backlog/p0-redesign-work-milestone-from-teamcreate-to-orchestrator-disp.md`
 - Metadata fields: `topic`, `source`, `added`, `priority`, `type`, `status`, `issue`, `last_synced`, `groomed`, `plan`
 - Body sections (markdown): `## RT-ICA`, `## Fact-Check`, `## Groomed`, `## Impact Radius`, etc.
 
@@ -240,7 +240,7 @@ Impact Radius Phase 1 comprehensively inventoried 18+ files:
 
 **Status:** REFUTED
 
-**Evidence:** Sample file `/home/ubuntulinuxqa2/repos/claude_skills/.claude/backlog/p0-redesign-work-milestone-from-teamcreate-to-orchestrator-disp.md` (lines 1-15):
+**Evidence:** Sample file `/home/user/repos/claude_skills/.claude/backlog/p0-redesign-work-milestone-from-teamcreate-to-orchestrator-disp.md` (lines 1-15):
 - Contains YAML frontmatter (delimited by `---`)
 - Metadata object with structured fields: `topic`, `source`, `added`, `priority`, `type`, `status`, `issue`, `last_synced`, `groomed`, `plan`
 - Followed by markdown body sections (lines 16+)

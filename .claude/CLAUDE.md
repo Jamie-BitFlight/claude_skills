@@ -123,7 +123,7 @@ flowchart TD
 - Files: `Read`, `Write`, `Edit` — not `cat`, `sed`, `echo >`
 - Search: `Grep`, `Glob` — not `find`, `ls -R`
 - Python: `Bash(uv run script.py)`
-- Large File Write Strategy: `.claude/rules/large-file-write-strategy.md`
+- Large File Write Strategy: [Large File Write Strategy](./rules/large-file-write-strategy.md)
 
 **Reference notation the user may mention, or when you want to tell the user about a command or agent:**
 
@@ -325,19 +325,19 @@ SOURCE: Experimental validation (2026-02-02). Context-gathering: 4/4 correct. Ex
 
 ---
 
-- Scratch Directory Convention: `.claude/rules/scratch-directory.md`
+- Scratch Directory Convention: [Scratch Directory Convention](./rules/scratch-directory.md)
 
 ---
 
-- Language Conventions: `.claude/rules/language-conventions.md`
+- Language Conventions: [Language Conventions](./rules/language-conventions.md)
 
 ---
 
-- Script Invocation: `.claude/rules/script-invocation.md`
+- Script Invocation: [Script Invocation](./rules/script-invocation.md)
 
 ---
 
-- Interactive Terminal Workarounds: `.claude/rules/interactive-terminal-workarounds.md`
+- Interactive Terminal Workarounds: [Interactive Terminal Workarounds](./rules/interactive-terminal-workarounds.md)
 
 ---
 
@@ -401,31 +401,11 @@ Skip only for trivial single-step requests (typos, one-off questions, immediate 
 
 ### Backlog Operations
 
-<backlog_operations>
-
-**Primary interface (MCP)**: Use `mcp__plugin_dh_backlog__*` tools for all backlog and GitHub issue CRUD.
-GitHub Issues are the source of truth; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache.
-
-**DH state location**: `~/.dh/projects/{slug}/` where `{slug}` is the absolute project path with directory separators replaced by hyphens (leading hyphen is intentional). Example: `/home/ubuntulinuxqa2/repos/claude_skills` → `-home-ubuntulinuxqa2-repos-claude_skills`. Override with `DH_STATE_HOME` env var.
-
-Available tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_sync`, `backlog_close`,
-`backlog_resolve`, `backlog_update`, `backlog_groom`, `backlog_normalize`, `backlog_pull`.
-
-All tools return a dict. Check for `error` key on failure. Success responses include `messages`
-and `warnings` lists.
-
-Do not edit `~/.dh/projects/{slug}/backlog/*.md` files directly or use `gh issue edit` — both bypass sync logic.
-
-Skills `/dh:create-backlog-item` and `/dh:work-backlog-item` invoke these tools. See `/backlog` skill.
-
-**Capability gap fallback**: If the MCP tools or CLI lack the needed operation, invoke
-`/backlog-tools-administrator` to extend both the CLI and MCP server simultaneously.
-
-</backlog_operations>
+For backlog MCP tool reference (tool names, return format, DH state location, sync rules), activate the `/dh:work-backlog-item` or `/backlog` skill.
 
 ---
 
-- Plugin Development Workflows: `.claude/rules/plugin-development.md`
+- Plugin Development Workflows: [Plugin Development Workflows](./rules/plugin-development.md)
 
 **Plugin manifest location**: `plugin.json` is always at `<plugin-root>/.claude-plugin/plugin.json` (or `.cursor-plugin/plugin.json` when developing a Cursor plugin, or both).
 
@@ -452,11 +432,7 @@ Note: `fastmcp discover` does not surface plugin-delivered MCP servers — use `
 
 ---
 
-- SAM Feature Implementation Workflow: `.claude/rules/local-workflow.md`
-
----
-
-- Content Optimization for Skills: `.claude/rules/skill-content-optimization.md`
+- Content Optimization for Skills: [Content Optimization for Skills](./rules/skill-content-optimization.md)
 
 ---
 
@@ -542,7 +518,7 @@ All skill directories must sit directly under `skills/` — one level deep only.
 
 ---
 
-- Skill Documentation Verification: `.claude/rules/skill-documentation-verification.md`
+- Skill Documentation Verification: [Skill Documentation Verification](./rules/skill-documentation-verification.md)
 
 ---
 
@@ -620,35 +596,35 @@ uv run prek run --files <file>
 
 ---
 
-- Linting Exception Conditions: `.claude/rules/linting-exceptions.md`
+- Linting Exception Conditions: [Linting Exception Conditions](./rules/linting-exceptions.md)
 
 ---
 
-- GitHub Actions CI Workflow Modification Protocol: `.claude/rules/ci-workflows.md`
+- GitHub Actions CI Workflow Modification Protocol: [CI Workflow Modification Protocol](./rules/ci-workflows.md)
 
 ---
 
-- YAML and TOML Libraries: `.claude/rules/yaml-toml-libraries.md`
+- YAML and TOML Libraries: [YAML and TOML Libraries](./rules/yaml-toml-libraries.md)
 
 ---
 
-- Markdown AST Parsing: Use `marko` for any task that requires parsing markdown structure (headers, list items, inline code, bold, tables, section extraction). Do NOT write regex parsers for markdown. Reference usage and processing patterns in `../agentskills-linter` (`/home/ubuntulinuxqa2/repos/agentskills-linter`) — `marko` is already a dependency there with established patterns for walking the AST. Add `marko` as a dependency via `uv add marko` if not already present in the target project.
+- Markdown AST Parsing: Use `marko` for any task that requires parsing markdown structure (headers, list items, inline code, bold, tables, section extraction). Do NOT write regex parsers for markdown. Reference usage and processing patterns in `../agentskills-linter` (`/home/user/repos/agentskills-linter`) — `marko` is already a dependency there with established patterns for walking the AST. Add `marko` as a dependency via `uv add marko` if not already present in the target project.
 
 ---
 
-- Silent Failure Prevention: `.claude/rules/silent-failure-prevention.md`
+- Silent Failure Prevention: [Silent Failure Prevention](./rules/silent-failure-prevention.md)
 
 ---
 
-- Agent Output Contracts (explicit terminal output required — no silent exits): `.claude/rules/agent-output-contracts.md`
+- Agent Output Contracts (explicit terminal output required — no silent exits): [Agent Output Contracts](./rules/agent-output-contracts.md)
 
 ---
 
-- Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): `.claude/rules/exception-handling.md`
+- Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): [Exception Handling](./rules/exception-handling.md)
 
 ---
 
-- Review and Correction Discipline (two gates structural≠content, run-the-review, judgment adjudication, match-action/quiesce): `.claude/rules/review-and-correction-discipline.md`
+- Review and Correction Discipline (two gates structural≠content, run-the-review, judgment adjudication, match-action/quiesce): [Review and Correction Discipline](./rules/review-and-correction-discipline.md)
 
 ---
 

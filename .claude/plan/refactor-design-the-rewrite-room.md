@@ -37,7 +37,7 @@ map and parallelization analysis follow.
 | DI-03 | HIGH | DOC_IMPROVE | AR4, DD-03: No-Loss Rewrite Rule embedded in delegation prompt | workflows/author.md:115-127 |
 | AO-01 | MEDIUM | AGENT_OPTIMIZE | DD-02, DD-03: Duplicated fidelity rules in rewrite-room-author body | agents/rewrite-room-author.md |
 | AO-02 | MEDIUM | AGENT_OPTIMIZE | Dim 5: Write/Edit in rewrite-room-auditor tool list exceeds role | agents/rewrite-room-auditor.md |
-| AO-03 | MEDIUM | AGENT_OPTIMIZE | assessment:44+98: Hardcoded absolute paths `/home/ubuntulinuxqa2/` | auditor.md + SKILL.md |
+| AO-03 | MEDIUM | AGENT_OPTIMIZE | assessment:44+98: Hardcoded absolute paths `/home/user/` | auditor.md + SKILL.md |
 | AO-04 | MEDIUM | AGENT_OPTIMIZE | assessment:334: Bare agent references need namespace qualification | author.md + auditor.md |
 
 ---
@@ -380,9 +380,9 @@ tools: Read, Grep, Glob, Bash, Task
 
 **Source:**
 
-- `agents/rewrite-room-auditor.md` line 44: `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`
-- `skills/the-rewrite-room/SKILL.md` line 98: `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`
-- `the-rewrite-room/workflows/audit.md` line 29: `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`
+- `agents/rewrite-room-auditor.md` line 44: `/home/user/.claude/agents/doc-freshness-guardian.md`
+- `skills/the-rewrite-room/SKILL.md` line 98: `/home/user/.claude/agents/doc-freshness-guardian.md`
+- `the-rewrite-room/workflows/audit.md` line 29: `/home/user/.claude/agents/doc-freshness-guardian.md`
 
 **Root cause:** Personal agent `doc-freshness-guardian` is not bundled in the plugin. It lives in the user's global agents directory, which is not portable across installations.
 
@@ -390,7 +390,7 @@ tools: Read, Grep, Glob, Bash, Task
 
 ```text
 # FROM:
-/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md
+/home/user/.claude/agents/doc-freshness-guardian.md
 # TO:
 ~/.claude/agents/doc-freshness-guardian.md
 ```
@@ -404,7 +404,7 @@ It must be present in the user's global agents directory (~/.claude/agents/).
 
 **Agent to execute:** `plugin-creator:contextual-ai-documentation-optimizer`
 
-**Verification:** `grep -r "/home/ubuntulinuxqa2" plugins/the-rewrite-room/` returns zero results.
+**Verification:** `grep -r "/home/user" plugins/the-rewrite-room/` returns zero results.
 
 ---
 

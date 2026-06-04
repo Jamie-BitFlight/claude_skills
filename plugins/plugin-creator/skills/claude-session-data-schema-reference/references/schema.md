@@ -674,7 +674,7 @@ and display without opening individual files.
 have this file — it appears to be generated lazily or on first access.
 
 SOURCE: Direct file inspection 2026-03-25. Schema extracted from
-`-home-ubuntulinuxqa2-repos-centrios-firmware-update-artifacts-generator/sessions-index.json`.
+`-home-user-repos-example-project/sessions-index.json`.
 TypeScript source mapping not yet confirmed.
 
 ---

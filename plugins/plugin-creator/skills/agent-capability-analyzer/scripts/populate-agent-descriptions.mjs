@@ -12,6 +12,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -247,9 +248,9 @@ function resolvePluginAgentPath(pluginDir, agentFile) {
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 
-const USER_AGENTS_DIR = '/home/ubuntulinuxqa2/.claude/agents';
-const PROJECT_AGENTS_DIR = '/home/ubuntulinuxqa2/repos/claude_skills/.claude/agents';
-const PLUGIN_CACHE_DIR = '/home/ubuntulinuxqa2/.claude/plugins/cache';
+const USER_AGENTS_DIR = join(homedir(), '.claude', 'agents');
+const PROJECT_AGENTS_DIR = join(CWD, '.claude', 'agents');
+const PLUGIN_CACHE_DIR = join(homedir(), '.claude', 'plugins', 'cache');
 
 /**
  * Agent entry: { key, filePath }

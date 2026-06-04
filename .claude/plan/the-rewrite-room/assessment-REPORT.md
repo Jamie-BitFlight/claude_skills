@@ -89,7 +89,7 @@
 
 - [WARNING] Lines 54-56: Workflow file paths use non-standard location `plugins/the-rewrite-room/the-rewrite-room/workflows/`. This nested `the-rewrite-room/` directory is unusual; workflow files would be better placed under `skills/the-rewrite-room/references/workflows/` to follow the standard skill directory structure.
 
-- [WARNING] Lines 96-98: Absolute path `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` is hardcoded. This path is not portable across installations.
+- [WARNING] Lines 96-98: Absolute path `/home/user/.claude/agents/doc-freshness-guardian.md` is hardcoded. This path is not portable across installations.
 
 #### Link Validation
 
@@ -206,7 +206,7 @@ All 5 reference files are linked from SKILL.md. No orphans detected.
 
 #### Content Issues
 
-- [WARNING] Line 44: Hardcoded absolute path `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`. This makes the agent non-portable across installations.
+- [WARNING] Line 44: Hardcoded absolute path `/home/user/.claude/agents/doc-freshness-guardian.md`. This makes the agent non-portable across installations.
   - **Fix**: Use a relative path or note that this is a personal agent that must exist on the user's machine.
 - Delegation trigger keywords in description are clear ("audits", "syncs", "tracks doc freshness"). PASS.
 - Output contract present and well-structured. PASS.
@@ -440,7 +440,7 @@ the-rewrite-room/workflows/author.md
 
 - [ ] Create `commands/rwr/doc-to-skill.md` with frontmatter `agent: rewrite-room-doc-converter` to match the Command Reference table in SKILL.md
 - [ ] Fix broken reference to `validate.md` in `the-rewrite-room/workflows/audit.md:78` -- either create the file or remove the Mermaid branch
-- [ ] Replace absolute path `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` in `agents/rewrite-room-auditor.md:44` and `skills/the-rewrite-room/SKILL.md:98` with a note that this is a personal agent dependency
+- [ ] Replace absolute path `/home/user/.claude/agents/doc-freshness-guardian.md` in `agents/rewrite-room-auditor.md:44` and `skills/the-rewrite-room/SKILL.md:98` with a note that this is a personal agent dependency
 
 ### Recommended (Should Fix)
 

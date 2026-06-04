@@ -170,7 +170,7 @@ def verify_sha256_stream(path: Path, expected_hex: str) -> bool:
 
 ## User-Space Install Directories Per Platform
 
-**Verified on this system**: `~/.local/bin` is already in `PATH` (`/home/ubuntulinuxqa2/.local/bin`).
+**Verified on this system**: `~/.local/bin` is already in `PATH` (`/home/user/.local/bin`).
 
 ### Linux and WSL2
 

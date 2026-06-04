@@ -57,6 +57,7 @@ if str(_HARNESS_DIR) not in sys.path:
 
 import typer
 from backlog_core.yaml_io import load_item, load_item_text, save_item
+from dh_paths import compute_slug
 from pydantic import ValidationError
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -66,7 +67,8 @@ from ruamel.yaml import YAML, YAMLError
 if TYPE_CHECKING:
     from backlog_core.models import BacklogItem
 
-_DEFAULT_BACKLOG_DIR = Path.home() / ".dh/projects/-home-ubuntulinuxqa2-repos-claude_skills/backlog"
+_REPO_ROOT = _HARNESS_DIR.parent.parent.resolve()
+_DEFAULT_BACKLOG_DIR = Path.home() / ".dh" / "projects" / compute_slug(_REPO_ROOT) / "backlog"
 
 app = typer.Typer(
     name="migrate_backlog_to_yaml",

@@ -220,7 +220,7 @@ Audit --> A3[doc-freshness-guardian]
 
 | Bare reference | Correct namespace:agent | Source to verify |
 |----------------|------------------------|-----------------|
-| `doc-freshness-guardian` | Cannot be namespaced — this agent lives at `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` (a global user agent, not a plugin agent). See Fix 7 for the path issue. Reference must stay as bare name OR be documented as a global agent dependency. | Fix 7 handles path; Fix 6 documents the dependency explicitly |
+| `doc-freshness-guardian` | Cannot be namespaced — this agent lives at `/home/user/.claude/agents/doc-freshness-guardian.md` (a global user agent, not a plugin agent). See Fix 7 for the path issue. Reference must stay as bare name OR be documented as a global agent dependency. | Fix 7 handles path; Fix 6 documents the dependency explicitly |
 | `gitlab-docs-expert` | Verify which plugin owns this agent, then add `plugin-name:gitlab-docs-expert` | Check `plugins/gitlab-skill/agents/` |
 | `documentation-expert` | Verify which plugin owns this agent, then add `plugin-name:documentation-expert` | Check across plugin agents directories |
 
@@ -232,15 +232,15 @@ Audit --> A3[doc-freshness-guardian]
 
 ### Fix 7: Remove hardcoded absolute paths
 
-**Root cause:** Three file references use `/home/ubuntulinuxqa2/` absolute paths tied to the author's machine. Plugin files must use paths relative to the repo root or reference agents by their plugin namespace.
+**Root cause:** Three file references use `/home/user/` absolute paths tied to the author's machine. Plugin files must use paths relative to the repo root or reference agents by their plugin namespace.
 
 **All hardcoded path locations (3 occurrences):**
 
 | File | Line content |
 |------|-------------|
-| `plugins/the-rewrite-room/skills/the-rewrite-room/SKILL.md` line 98 | `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` |
-| `plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md` line 29 | `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` |
-| `plugins/the-rewrite-room/agents/rewrite-room-auditor.md` line 44 | `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` |
+| `plugins/the-rewrite-room/skills/the-rewrite-room/SKILL.md` line 98 | `/home/user/.claude/agents/doc-freshness-guardian.md` |
+| `plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md` line 29 | `/home/user/.claude/agents/doc-freshness-guardian.md` |
+| `plugins/the-rewrite-room/agents/rewrite-room-auditor.md` line 44 | `/home/user/.claude/agents/doc-freshness-guardian.md` |
 
 **All three reference the same file:** `doc-freshness-guardian.md` — a global user agent.
 
@@ -257,7 +257,7 @@ Option B — Document as external dependency: Add a note in each location: `doc-
 In `rewrite-room-auditor.md` table Path column:
 
 ```text
-/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md
+/home/user/.claude/agents/doc-freshness-guardian.md
 ```
 
 Replace with:

@@ -311,7 +311,7 @@ def test_read_manifest_plan_hybrid_real_file_body_content_non_empty() -> None:
     """
     from sam_schema.core.query import load_plan
 
-    real_file = pathlib.Path("/home/ubuntulinuxqa2/repos/claude_skills/plan/tasks-1-backlog-state-reconciliation.md")
+    real_file = pathlib.Path(__file__).resolve().parents[4] / "plan" / "tasks-1-backlog-state-reconciliation.md"
     if not real_file.exists():
         pytest.skip("Real manifest file not present in this environment")
 

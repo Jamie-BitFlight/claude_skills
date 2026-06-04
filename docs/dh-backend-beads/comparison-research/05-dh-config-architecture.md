@@ -14,11 +14,11 @@ sources:
   - plugins/development-harness/CLAUDE.md
   - plugins/development-harness/docs/backend-providers.md
   - ~/.dh/projects/ (live directory listing)
-  - /home/ubuntulinuxqa2/repos/beads/internal/beads/beads.go (FindBeadsDir, FindDatabasePath)
-  - /home/ubuntulinuxqa2/repos/beads/internal/config/config.go (Initialize, config precedence)
-  - /home/ubuntulinuxqa2/repos/beads/internal/config/yaml_config.go (YamlOnlyKeys, SetYamlConfig)
-  - /home/ubuntulinuxqa2/repos/beads/cmd/bd/config.go (configCmd, configSetCmd)
-  - /home/ubuntulinuxqa2/repos/beads/cmd/bd/init.go (initCmd flags)
+  - /home/user/repos/beads/internal/beads/beads.go (FindBeadsDir, FindDatabasePath)
+  - /home/user/repos/beads/internal/config/config.go (Initialize, config precedence)
+  - /home/user/repos/beads/internal/config/yaml_config.go (YamlOnlyKeys, SetYamlConfig)
+  - /home/user/repos/beads/cmd/bd/config.go (configCmd, configSetCmd)
+  - /home/user/repos/beads/cmd/bd/init.go (initCmd flags)
 ---
 
 ## Summary
@@ -78,15 +78,15 @@ Source: `dh_paths.py:compute_slug()` (lines 260–278).
 Algorithm: replace every `/` in the absolute path string with `-`.
 
 ```text
-/home/ubuntulinuxqa2/repos/claude_skills
-  → -home-ubuntulinuxqa2-repos-claude_skills
+/home/user/repos/claude_skills
+  → -home-user-repos-claude_skills
 ```
 
 The leading `-` is intentional — it distinguishes slugs from ordinary directory names and
 prevents collision with numeric IDs. The live directory confirms this:
 
 ```text
-~/.dh/projects/-home-ubuntulinuxqa2-repos-claude_skills/
+~/.dh/projects/-home-user-repos-claude_skills/
 ```
 
 ### 1.3 DH_STATE_HOME Override
@@ -123,7 +123,7 @@ a linked worktree.
 
 ### 1.5 What Files Exist in `~/.dh/projects/{slug}/`
 
-Observed from live filesystem at `~/.dh/projects/-home-ubuntulinuxqa2-repos-claude_skills/`:
+Observed from live filesystem at `~/.dh/projects/-home-user-repos-claude_skills/`:
 
 ```text
 backlog/          ← per-item YAML + MD files (GitHub Issues local cache)
@@ -569,9 +569,9 @@ and 2 use the existing `BACKLOG_BACKEND` / `backend.toml` mechanism unchanged.
 - `plugins/development-harness/backlog_core/backend_protocol.py` — read 2026-05-14 (1045 lines, complete)
 - `plugins/development-harness/CLAUDE.md` — read 2026-05-14 (full system prompt injection)
 - `plugins/development-harness/docs/backend-providers.md` — read 2026-05-14 (partial; backend config sections)
-- `/home/ubuntulinuxqa2/repos/beads/internal/beads/beads.go` — read 2026-05-14 (FindBeadsDir, FindDatabasePath, FindBeadsDirFrom excerpts)
-- `/home/ubuntulinuxqa2/repos/beads/internal/config/config.go` — read 2026-05-14 (Initialize, 369 lines complete)
-- `/home/ubuntulinuxqa2/repos/beads/internal/config/yaml_config.go` — read 2026-05-14 (YamlOnlyKeys section)
-- `/home/ubuntulinuxqa2/repos/beads/cmd/bd/config.go` — read 2026-05-14 (configCmd, configSetCmd excerpts)
+- `/home/user/repos/beads/internal/beads/beads.go` — read 2026-05-14 (FindBeadsDir, FindDatabasePath, FindBeadsDirFrom excerpts)
+- `/home/user/repos/beads/internal/config/config.go` — read 2026-05-14 (Initialize, 369 lines complete)
+- `/home/user/repos/beads/internal/config/yaml_config.go` — read 2026-05-14 (YamlOnlyKeys section)
+- `/home/user/repos/beads/cmd/bd/config.go` — read 2026-05-14 (configCmd, configSetCmd excerpts)
 - `~/.dh/projects/` live directory listing — observed 2026-05-14
-- `~/.dh/projects/-home-ubuntulinuxqa2-repos-claude_skills/` live directory listing — observed 2026-05-14
+- `~/.dh/projects/-home-user-repos-claude_skills/` live directory listing — observed 2026-05-14

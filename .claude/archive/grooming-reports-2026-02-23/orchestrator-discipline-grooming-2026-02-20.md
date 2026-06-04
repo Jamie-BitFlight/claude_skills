@@ -207,7 +207,7 @@ Note: Entry lacks `id` field. Other entries in marketplace.json also lack `id` â
 Command run: `claude plugin validate plugins/orchestrator-discipline/`
 
 ```text
-Validating plugin manifest: /home/ubuntulinuxqa2/repos/claude_skills/plugins/orchestrator-discipline/.claude-plugin/plugin.json
+Validating plugin manifest: /home/user/repos/claude_skills/plugins/orchestrator-discipline/.claude-plugin/plugin.json
 
 âœ˜ Found 1 error:
 

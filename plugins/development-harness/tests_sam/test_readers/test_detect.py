@@ -172,7 +172,7 @@ def test_detect_format_real_followup_file_does_not_raise() -> None:
     How: Call detect_format on the real plan file.
     Why: Regression guard — the exact file that failed before the fix.
     """
-    real_file = Path("/home/ubuntulinuxqa2/repos/claude_skills/plan/tasks-3-unified-sam-task-schema-followup-1.md")
+    real_file = Path(__file__).resolve().parents[4] / "plan" / "tasks-3-unified-sam-task-schema-followup-1.md"
     if not real_file.exists():
         pytest.skip("Real follow-up file not present in this environment")
     result = detect_format(real_file)

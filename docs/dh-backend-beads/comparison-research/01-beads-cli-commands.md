@@ -3,12 +3,12 @@ title: "Beads (bd) CLI Command Reference"
 date: 2026-05-14
 scope: "Complete reference of every bd subcommand, flags, lifecycle, and feature capabilities. Research target: determining how beads can replace GitHub Issues as a backend for the development-harness backlog tool."
 sources:
-  - /home/ubuntulinuxqa2/repos/beads/docs/CLI_REFERENCE.md
-  - /home/ubuntulinuxqa2/repos/beads/README.md
-  - /home/ubuntulinuxqa2/repos/beads/AGENT_INSTRUCTIONS.md
-  - /home/ubuntulinuxqa2/repos/beads/docs/MOLECULES.md
-  - /home/ubuntulinuxqa2/repos/beads/docs/SYNC_CONCEPTS.md
-  - /home/ubuntulinuxqa2/repos/beads/docs/ADVANCED.md
+  - /home/user/repos/beads/docs/CLI_REFERENCE.md
+  - /home/user/repos/beads/README.md
+  - /home/user/repos/beads/AGENT_INSTRUCTIONS.md
+  - /home/user/repos/beads/docs/MOLECULES.md
+  - /home/user/repos/beads/docs/SYNC_CONCEPTS.md
+  - /home/user/repos/beads/docs/ADVANCED.md
 ---
 
 # Beads (bd) CLI Command Reference

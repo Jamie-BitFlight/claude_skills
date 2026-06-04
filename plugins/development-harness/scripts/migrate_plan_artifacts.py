@@ -7,7 +7,7 @@
 # ///
 """Migrate existing plan artifacts into the GitHub Issue artifact manifest system.
 
-Scans ~/.dh/projects/-home-ubuntulinuxqa2-repos-claude_skills/plan/ for
+Scans ~/.dh/projects/{project-slug}/plan/ for
 artifact files, classifies them by filename pattern, resolves the linked
 GitHub issue number, then registers each artifact via GitHubArtifactProvider.
 
@@ -39,6 +39,7 @@ from backlog_core import models as _models
 from backlog_core.artifact_provider import GitHubArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType
+from dh_paths import compute_slug
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,8 +54,8 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-PROJECT_DIR = "/home/ubuntulinuxqa2/repos/claude_skills"
-DH_STATE_ROOT = Path.home() / ".dh" / "projects" / "-home-ubuntulinuxqa2-repos-claude_skills"
+PROJECT_DIR = str(_PLUGIN_ROOT.parent.parent.resolve())
+DH_STATE_ROOT = Path.home() / ".dh" / "projects" / compute_slug(Path(PROJECT_DIR))
 PLAN_DIR = DH_STATE_ROOT / "plan"
 RESULTS_FILE = Path(tempfile.gettempdir()) / "artifact-migration-results.txt"
 

@@ -3,7 +3,7 @@ title: "Beads Data Model: Complete Reference"
 date: 2026-05-14
 scope: "Full documentation of beads storage format, issue schema, relationships, and GitHub Issues mapping"
 source_type: source_code
-source_path: /home/ubuntulinuxqa2/repos/beads/
+source_path: /home/user/repos/beads/
 summarized_at: 2026-05-14
 method: direct source read
 word_count_source: ~18000 (types.go + schema migrations + storage interfaces)
@@ -491,24 +491,24 @@ Federation uses Dolt remotes for sync. Sovereignty tiers (T1–T4) restrict what
 
 ## Sources
 
-- `/home/ubuntulinuxqa2/repos/beads/internal/types/types.go` — read 2026-05-14, all 1444 lines
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0001_create_issues.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0002_create_dependencies.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0003_create_labels.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0004_create_comments.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0005_create_events.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0006_create_config.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0015_create_federation_peers.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0016_default_config.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0017_create_ready_issues_view.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0020_create_wisps.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0024_create_custom_status_type_tables.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0025_update_ready_issues_view.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0027_add_started_at.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/schema/migrations/0038_drop_hop_columns.up.sql` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/storage.go` — read 2026-05-14 (lines 1–200)
-- `/home/ubuntulinuxqa2/repos/beads/internal/storage/infra_types.go` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/internal/config/config.go` — read 2026-05-14 (lines 1–300)
-- `/home/ubuntulinuxqa2/repos/beads/issues.jsonl` — read 2026-05-14 (first 50 lines; file has 1 issue at time of read)
-- `/home/ubuntulinuxqa2/repos/beads/format/format.go` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/beads/.beads/formulas/beads-release.formula.toml` — read 2026-05-14
+- `/home/user/repos/beads/internal/types/types.go` — read 2026-05-14, all 1444 lines
+- `/home/user/repos/beads/internal/storage/schema/migrations/0001_create_issues.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0002_create_dependencies.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0003_create_labels.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0004_create_comments.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0005_create_events.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0006_create_config.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0015_create_federation_peers.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0016_default_config.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0017_create_ready_issues_view.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0020_create_wisps.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0024_create_custom_status_type_tables.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0025_update_ready_issues_view.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0027_add_started_at.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/schema/migrations/0038_drop_hop_columns.up.sql` — read 2026-05-14
+- `/home/user/repos/beads/internal/storage/storage.go` — read 2026-05-14 (lines 1–200)
+- `/home/user/repos/beads/internal/storage/infra_types.go` — read 2026-05-14
+- `/home/user/repos/beads/internal/config/config.go` — read 2026-05-14 (lines 1–300)
+- `/home/user/repos/beads/issues.jsonl` — read 2026-05-14 (first 50 lines; file has 1 issue at time of read)
+- `/home/user/repos/beads/format/format.go` — read 2026-05-14
+- `/home/user/repos/beads/.beads/formulas/beads-release.formula.toml` — read 2026-05-14

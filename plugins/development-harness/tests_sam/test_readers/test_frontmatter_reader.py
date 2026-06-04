@@ -347,9 +347,7 @@ def test_read_frontmatter_plan_real_followup_file_returns_one_task() -> None:
     How: Call read_frontmatter_plan on the real plan file.
     Why: Regression guard — the exact file that failed before the fix.
     """
-    real_file = pathlib.Path(
-        "/home/ubuntulinuxqa2/repos/claude_skills/plan/tasks-3-unified-sam-task-schema-followup-1.md"
-    )
+    real_file = pathlib.Path(__file__).resolve().parents[4] / "plan" / "tasks-3-unified-sam-task-schema-followup-1.md"
     if not real_file.exists():
         pytest.skip("Real follow-up file not present in this environment")
     _, task_dicts, fmt = read_frontmatter_plan(real_file)

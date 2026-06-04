@@ -424,10 +424,10 @@ None found. Zero SKILL.md files reference `bd`, `beads`, or `BACKLOG_BACKEND`.
 
 ## Sources
 
-- `/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/` — all 43 SKILL.md files, read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/hooks/hooks.json` — read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/hooks/*.cjs` — all 6 Node.js hook files, read 2026-05-14
-- `/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` — lines 1–200 + grep scan, read 2026-05-14
+- `/home/user/repos/claude_skills/plugins/development-harness/skills/` — all 43 SKILL.md files, read 2026-05-14
+- `/home/user/repos/claude_skills/plugins/development-harness/hooks/hooks.json` — read 2026-05-14
+- `/home/user/repos/claude_skills/plugins/development-harness/hooks/*.cjs` — all 6 Node.js hook files, read 2026-05-14
+- `/home/user/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` — lines 1–200 + grep scan, read 2026-05-14
 
 ---
 

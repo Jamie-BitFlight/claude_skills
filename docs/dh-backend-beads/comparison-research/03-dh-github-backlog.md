@@ -1003,7 +1003,7 @@ The `BackendStatus` is included in `backlog_list` responses as the `backend` fie
 | `{repo_root}/research/**/*.md` | Research artifacts |
 
 Slug derivation: absolute project path with `/` replaced by `-` (leading `-` included).
-Example: `/home/ubuntulinuxqa2/repos/claude_skills` → `-home-ubuntulinuxqa2-repos-claude_skills`.
+Example: `/home/user/repos/claude_skills` → `-home-user-repos-claude_skills`.
 
 ---
 

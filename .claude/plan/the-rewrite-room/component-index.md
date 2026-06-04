@@ -99,7 +99,7 @@
 
 ### 7. gitlab-docs-expert (~/.claude/agents)
 
-- **Source**: `/home/ubuntulinuxqa2/.claude/agents/gitlab-docs-expert.md`
+- **Source**: `/home/user/.claude/agents/gitlab-docs-expert.md`
 - **Type**: agent (user-global)
 - **Verified Purpose**: GitLab Flavored Markdown documentation specialist extending documentation-expert with GLFM-specific features. First step is to enable the `gitlab-skill`. Covers audience analysis, documentation planning, content creation, information architecture, style guides, review/maintenance, and GitLab-specific features (Wiki, README optimization, issue/MR workflow integration). Inherits documentation-expert competencies.
 - **Triggers**: "PROACTIVELY for creating clear, consistent, and GitLab-optimized documentation" — creating GitLab Wiki pages, READMEs for GitLab repos, GLFM syntax validation
@@ -114,7 +114,7 @@
 
 ### 8. documentation-expert (~/.claude/agents)
 
-- **Source**: `/home/ubuntulinuxqa2/.claude/agents/documentation-expert.md`
+- **Source**: `/home/user/.claude/agents/documentation-expert.md`
 - **Type**: agent (user-global)
 - **Verified Purpose**: User-facing software documentation specialist (NOT for AI-facing docs — those route to prompt-optimization). Creates user manuals, API docs, tutorials, troubleshooting guides, style guides. Uses context7 MCP for documentation patterns. Model: haiku (cost-efficient, advisory).
 - **Triggers**: "PROACTIVELY for developing clear, consistent, and accessible documentation for various audiences" — user manuals, API docs, tutorials, troubleshooting guides, glossaries. NOT for CLAUDE.md, AGENTS.md, system prompts, agent definitions.
@@ -129,7 +129,7 @@
 
 ### 9. doc-freshness-guardian (~/.claude/agents)
 
-- **Source**: `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md`
+- **Source**: `/home/user/.claude/agents/doc-freshness-guardian.md`
 - **Type**: agent (user-global)
 - **Verified Purpose**: Two-phase documentation freshness management: (1) pre-task — identifies relevant docs, checks freshness indicators, alerts if >90 days stale (green <30d, yellow 30-90d, red >90d); (2) post-task — adds/updates YAML frontmatter freshness headers (last_updated, last_verified, applies_to_version, related_files, update_required_when) after code changes. Implements bidirectional sync and cross-reference validation.
 - **Triggers**: "modifying code that affects docs", "auditing documentation freshness", "implementing doc governance", when documentation has drifted significantly
@@ -144,7 +144,7 @@
 
 ### 10. service-documentation (~/.claude/agents)
 
-- **Source**: `/home/ubuntulinuxqa2/.claude/agents/service-documentation.md`
+- **Source**: `/home/user/.claude/agents/service-documentation.md`
 - **Type**: agent (user-global)
 - **Verified Purpose**: Updates CLAUDE.md files and module documentation (SKILL.md, references/, agent definitions, Python docstrings, config comments) to reflect current implementation during context compaction or task completion. Adapts to super-repo, mono-repo, or single-repo structures. Scope: project-level CLAUDE.md only — NOT global `~/.claude/CLAUDE.md`. Reads task file, reviews code changes, updates CLAUDE.md and module docs, ensures consistency.
 - **Triggers**: "ONLY during context compaction or task completion protocols or if you and the user have identified that existing documentation has drifted from the code significantly" — supply with task file path
@@ -174,7 +174,7 @@
 
 ### 12. doc-drift-auditor (.claude/agents, repo-level)
 
-- **Source**: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/agents/doc-drift-auditor.md`
+- **Source**: `/home/user/repos/claude_skills/.claude/agents/doc-drift-auditor.md`
 - **Type**: agent (project-level)
 - **Verified Purpose**: Repository-level variant of the drift auditor. Audit documentation against implementation using git forensics. Produces `DOCUMENTATION_DRIFT_AUDIT.md`. Frontmatter description: "Verify documentation accuracy against implementation using git forensics and code analysis with file paths, line numbers, and commit SHAs." Operates at repository root scope.
 - **Triggers**: "checking if README matches code", "auditing for documentation-code drift", "finding undocumented features", "locating documented-but-unimplemented features"
@@ -236,7 +236,7 @@
 
 ### 16. cursor-mdc-editor (~/.claude/skills)
 
-- **Source**: `/home/ubuntulinuxqa2/.claude/skills/cursor-mdc-editor/SKILL.md`
+- **Source**: `/home/user/.claude/skills/cursor-mdc-editor/SKILL.md`
 - **Type**: skill (user-global)
 - **Verified Purpose**: Creates and optimizes Cursor IDE `.mdc` rule files using Structured Context Protocol (SCP) and XML-based prompt engineering. Transforms vague guidelines into deterministic, verifiable, imperative rules for Cursor's AI. Validates against 500-line limit, YAML frontmatter correctness, glob pattern accuracy. Three workflows: create new MDC, edit existing MDC for SCP compliance, convert external guidelines to MDC.
 - **Triggers**: "creating new Cursor rules", "improving .mdc files", "converting guidelines to MDC format", "refactoring vague rules", "migrating from .cursorrules"

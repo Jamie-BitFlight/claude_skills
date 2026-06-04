@@ -366,13 +366,13 @@ Experiment 4 is the cheapest starting point — it uses only git history and pro
 ## Measurement Protocol
 
 All queries verified against live session data at
-`~/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/*.jsonl`
+`~/.claude/projects/{your-project-slug}/*.jsonl`
 using the `kaizen-duckdb` MCP `execute_query` tool (2026-03-29).
 
 Replace `PATH` in all queries with the absolute project JSONL glob path.
 Project key encoding: replace all `/` in the absolute project path with `-`.
-Example: `/home/ubuntulinuxqa2/repos/claude_skills` →
-`/home/ubuntulinuxqa2/.claude/projects/-home-ubuntulinuxqa2-repos-claude_skills/*.jsonl`
+Example: `/home/user/repos/myproject` →
+`~/.claude/projects/-home-user-repos-myproject/*.jsonl`
 
 ### Schema notes (verified)
 

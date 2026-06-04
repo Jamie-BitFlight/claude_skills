@@ -22,7 +22,7 @@
 |----------------|--------|----------|
 | `commands/rwr/doc-to-skill.md` missing | RESOLVED | File exists at `plugins/the-rewrite-room/commands/rwr/doc-to-skill.md` (592 bytes) |
 | `the-rewrite-room/workflows/validate.md` dangling reference | RESOLVED | `grep -r "validate\.md"` returns no matches (exit 1) |
-| Hardcoded `/home/ubuntulinuxqa2/` paths | RESOLVED | `grep -r "/home/ubuntulinuxqa2/"` returns no matches (exit 1) |
+| Hardcoded `/home/user/` paths | RESOLVED | `grep -r "/home/user/"` returns no matches (exit 1) |
 
 ## 1. Discovery Summary
 

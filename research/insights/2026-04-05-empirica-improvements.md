@@ -87,7 +87,7 @@ Kaizen's pattern mining output includes a `success_rate` field per pattern, comp
 ## Improvement 4: Auto-curated memory index ranked by confidence
 
 **Source pattern**: "MEMORY.md is automatically maintained at ~200 lines, ranking findings by epistemic confidence. This hot cache prevents context bloat while preserving critical learnings." — Key Features section 4, lines 117-118
-**Local system**: `.claude/CLAUDE.md`, user MEMORY.md at `~/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/memory/MEMORY.md`
+**Local system**: `.claude/CLAUDE.md`, user MEMORY.md at `~/.claude/projects/-home-user-repos-claude-skills/memory/MEMORY.md`
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred — confidence medium: the local MEMORY.md is a manually curated index of memory files organized by topic. Whether auto-curation ranked by confidence would produce better outcomes than the current topic-organized manual approach requires testing. The local system's architecture (separate `.md` files per memory item linked from an index) is fundamentally different from Empirica's single ranked file, and the local approach has the advantage of granular file-level updates without rewriting the entire index.

@@ -296,7 +296,7 @@ Layer 1 formalization requires: language manifest schema, abstract role mapping,
 
 **Amendment**: typescript-pro extends the pattern with type-specific gates (type coverage, strict mode). Plan should note: TypeScript/JavaScript plugins can share project detection (package.json) but differ on typecheck (tsc for TS, N/A for JS).
 
-**Nugget**: typescript-pro has hardcoded path in memory: `/home/ubuntulinuxqa2/repos/claude_skills/.claude/agent-memory/typescript-pro/`. Plan should include backlog item: "Replace hardcoded agent memory paths with {AGENT_MEMORY_DIR} or relative paths" (consistent with development-harness service-docs-maintainer fix).
+**Nugget**: typescript-pro has hardcoded path in memory: `/home/user/repos/claude_skills/.claude/agent-memory/typescript-pro/`. Plan should include backlog item: "Replace hardcoded agent memory paths with {AGENT_MEMORY_DIR} or relative paths" (consistent with development-harness service-docs-maintainer fix).
 
 ---
 

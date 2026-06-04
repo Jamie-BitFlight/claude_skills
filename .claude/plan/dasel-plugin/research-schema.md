@@ -4,7 +4,7 @@ Sources:
 - <https://code.claude.com/docs/en/plugins-reference.md> (fetched 2026-02-19)
 - <https://code.claude.com/docs/en/skills.md> (fetched 2026-02-19)
 - <https://code.claude.com/docs/en/sub-agents.md> (fetched 2026-02-19)
-- Real agent files in `/home/ubuntulinuxqa2/repos/claude_skills/plugins/`
+- Real agent files in `/home/user/repos/claude_skills/plugins/`
 
 ---
 

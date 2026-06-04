@@ -35,7 +35,7 @@ Task 4 (fix broken link + hardcoded paths)  ──── Task 5 (namespace bare 
 - `plugin.json` has `name: "the-rewrite-room"` and 4-entry commands array
 - `hooks/hooks.json` contains `DONE|BLOCKED|FAILED` vocabulary and `timeout: 30000`
 - `commands/rwr/doc-to-skill.md` exists with correct frontmatter
-- No `/home/ubuntulinuxqa2/` strings remain in `workflows/audit.md`, `SKILL.md`, `rewrite-room-auditor.md`
+- No `/home/user/` strings remain in `workflows/audit.md`, `SKILL.md`, `rewrite-room-auditor.md`
 - Broken `validate.md` link replaced with direct script invocation
 **Reflection questions**:
 - Do the plugin.json changes allow the plugin to load?
@@ -176,9 +176,9 @@ The entire hooks.json is valid JSON. The 3 text replacements occur within a sing
 4. In `rewrite-room-author.md` specialist table: `documentation-expert` (bare name, subagent_type field)
 
 **Current Hardcoded Absolute Paths (3 occurrences in 3 files):**
-- `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` in `SKILL.md` line 98
-- `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` in `workflows/audit.md` line 29
-- `/home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md` in `rewrite-room-auditor.md` line 44
+- `/home/user/.claude/agents/doc-freshness-guardian.md` in `SKILL.md` line 98
+- `/home/user/.claude/agents/doc-freshness-guardian.md` in `workflows/audit.md` line 29
+- `/home/user/.claude/agents/doc-freshness-guardian.md` in `rewrite-room-auditor.md` line 44
 
 All three reference the same global user agent (not in any plugin).
 
@@ -218,7 +218,7 @@ grep 'agent:' commands/rwr/doc-to-skill.md  # Should contain: rewrite-room-doc-c
 
 **Grep Verification (lines that must NOT exist):**
 ```bash
-grep '/home/ubuntulinuxqa2/' plugins/the-rewrite-room/**/*.md    # Should return nothing
+grep '/home/user/' plugins/the-rewrite-room/**/*.md    # Should return nothing
 grep 'validate.md' workflows/audit.md                             # Should return nothing
 grep 'COMPLETE\|PARTIAL' hooks/hooks.json                         # Should return nothing
 ```
@@ -370,9 +370,9 @@ uv run prek run --files plugins/the-rewrite-room/commands/rwr/doc-to-skill.md
 
 **Acceptance Criteria**:
 1. `workflows/audit.md` line 78 Mermaid node references `uv run plugins/plugin-creator/scripts/validate_frontmatter.py <file>` instead of the nonexistent `workflows/validate.md`
-2. No string `/home/ubuntulinuxqa2/` exists in `plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md`
-3. No string `/home/ubuntulinuxqa2/` exists in `plugins/the-rewrite-room/skills/the-rewrite-room/SKILL.md`
-4. No string `/home/ubuntulinuxqa2/` exists in `plugins/the-rewrite-room/agents/rewrite-room-auditor.md`
+2. No string `/home/user/` exists in `plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md`
+3. No string `/home/user/` exists in `plugins/the-rewrite-room/skills/the-rewrite-room/SKILL.md`
+4. No string `/home/user/` exists in `plugins/the-rewrite-room/agents/rewrite-room-auditor.md`
 5. All three hardcoded path replacements use `~/.claude/agents/doc-freshness-guardian.md (global user agent -- install separately)` format
 6. The Mermaid diagram in `workflows/audit.md` remains syntactically valid after the link fix
 
@@ -392,7 +392,7 @@ uv run prek run --files plugins/the-rewrite-room/commands/rwr/doc-to-skill.md
 **Reason**: No file overlap with Tasks 1-3. Task 4 modifies workflows/audit.md, SKILL.md, and rewrite-room-auditor.md -- none of which are touched by Tasks 1-3
 
 **Verification Steps**:
-1. Run `grep -r '/home/ubuntulinuxqa2/' plugins/the-rewrite-room/` -- output is empty (no matches)
+1. Run `grep -r '/home/user/' plugins/the-rewrite-room/` -- output is empty (no matches)
 2. Run `grep 'validate.md' plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md` -- output is empty (no matches)
 3. Run `grep -c 'validate_frontmatter.py' plugins/the-rewrite-room/the-rewrite-room/workflows/audit.md` -- output is `>= 1`
 4. Run `grep -c '~/.claude/agents/doc-freshness-guardian.md' plugins/the-rewrite-room/agents/rewrite-room-auditor.md` -- output is `>= 1`

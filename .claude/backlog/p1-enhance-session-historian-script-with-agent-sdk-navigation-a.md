@@ -94,7 +94,7 @@ What is NOT yet indexed or queryable:
 
 <div><sub>2026-03-11T15:50:38Z</sub>
 
-Verified by reading `/home/ubuntulinuxqa2/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/824cd038-8761-4069-820f-fca8bd31a315/subagents/agent-a05e9fe.jsonl` directly (2026-03-11).
+Verified by reading `/home/user/.claude/projects/-home-user-repos-claude-skills/824cd038-8761-4069-820f-fca8bd31a315/subagents/agent-a05e9fe.jsonl` directly (2026-03-11).
 
 Top-level record fields:
 - `type`: "user" | "assistant"
@@ -221,7 +221,7 @@ Irritation signal detection uses a fixed vocabulary of correction phrases (confi
 |------|------|
 | Prior work | `.claude/skills/session-historian/scripts/session_query.py` — base script with JSONL parsing, DuckDB indexing, existing commands |
 | Prior work | `.claude/skills/session-historian/SKILL.md` — skill documentation with JSONL schema reference |
-| Prior work | `/home/ubuntulinuxqa2/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/824cd038-8761-4069-820f-fca8bd31a315/subagents/agent-a05e9fe.jsonl` — representative JSONL file with verified schema (user, assistant, tool_use, tool_result, error records) |
+| Prior work | `/home/user/.claude/projects/-home-user-repos-claude-skills/824cd038-8761-4069-820f-fca8bd31a315/subagents/agent-a05e9fe.jsonl` — representative JSONL file with verified schema (user, assistant, tool_use, tool_result, error records) |
 | Agent | @python3-development:python-cli-architect — Typer/Rich CLI implementation with PEP 723, ruff, type checking |
 | Agent | @python3-development:python-pytest-architect — test coverage for new commands |
 | Agent | @python3-development:python-code-reviewer — post-implementation review |

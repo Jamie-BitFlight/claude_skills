@@ -77,7 +77,7 @@ Resume a session to continue testing the same agent instance. Useful for multi-s
 
 | Agent | Reference Paths to Verify |
 |-------|--------------------------|
-| rewrite-room-auditor | plugins/development-harness/agents/doc-drift-auditor.md, plugins/development-harness/agents/service-docs-maintainer.md, /home/ubuntulinuxqa2/.claude/agents/doc-freshness-guardian.md |
+| rewrite-room-auditor | plugins/development-harness/agents/doc-drift-auditor.md, plugins/development-harness/agents/service-docs-maintainer.md, /home/user/.claude/agents/doc-freshness-guardian.md |
 | rewrite-room-optimizer | plugins/prompt-optimization-claude-45/skills/prompt-optimization-claude-45/SKILL.md, plugins/plugin-creator/agents/contextual-ai-documentation-optimizer.md, plugins/plugin-creator/agents/subagent-refactorer.md |
 | rewrite-room-author | plugins/gitlab-skill/skills/gitlab-skill/references/glfm-syntax.md, plugins/summarizer/skills/summarizer/references/fidelity-rules.md, plugins/summarizer/skills/summarizer/templates/structured.md |
 

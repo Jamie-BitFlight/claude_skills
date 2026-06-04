@@ -8,7 +8,7 @@ SQL patterns for querying Claude Code JSONL transcripts via the MotherDuck MCP s
 
 ## Verified Schema Access Patterns (2026-03-29)
 
-The following findings were verified against live session JSONL at `~/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/*.jsonl`.
+The following findings were verified against live session JSONL at `~/.claude/projects/{your-project-slug}/*.jsonl`.
 
 ### Two read modes — pick the right one
 
@@ -120,7 +120,7 @@ WHERE type = 'user'
   );
 ```
 
-SOURCE: Verified against live JSONL at `~/.claude/projects/-home-ubuntulinuxqa2-repos-claude-skills/` (2026-03-29).
+SOURCE: Verified against live JSONL at `~/.claude/projects/{your-project-slug}/` (2026-03-29).
 
 ---
 
