@@ -36,11 +36,13 @@ If `<user_provided_target>` is not an absolute path, prepend the value of `<PWD>
 
 Verify the resolved absolute path exists. Determine scope (single file, skill directory, or plugin directory).
 
+Recognize these file types: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, agent definition (`.md` in `agents/`), reference file (`.md` in `references/`). Both `CLAUDE.md` and `AGENTS.md` are index files — apply index discipline checks in Phase 2.
+
 ### Phase 2: Measure Baseline
 
 **For all files**:
 
-- Determine file type (CLAUDE.md, SKILL.md, agent definition, reference file)
+- Determine file type (`CLAUDE.md`, `AGENTS.md`, `SKILL.md`, agent definition, reference file)
 - Measure token count: `uvx skilllint@latest check --tokens-only <file>`
 - Record baseline token count
 
@@ -49,7 +51,20 @@ Verify the resolved absolute path exists. Determine scope (single file, skill di
 - Run completeness score evaluation (8-category assessment from /plugin-creator:audit-skill-completeness)
 - Record baseline completeness score (format: X/24)
 
-**Record metrics** for reporting.
+**For CLAUDE.md and AGENTS.md files** — run index discipline audit (6 binary checks):
+
+Score = number passing (0–6). Record as `Index: N/6`.
+
+| Check | Pass condition |
+|-------|---------------|
+| Entry length | All entries ≤ ~150 chars |
+| No procedure steps | No entry contains numbered steps or multi-sentence procedures |
+| Operative-fact hooks | All hooks state the rule/constraint/value directly; no entry contains "Load when" |
+| No inline processes | No substantial process/protocol body appears directly inline |
+| No stale routes | All linked `docs/` files exist at the referenced paths |
+| No missing routes | All `docs/` files have a corresponding router entry |
+
+**Record all metrics** for reporting.
 
 ### Phase 3: Delegate to @ai-doc-optimizer
 
@@ -90,7 +105,13 @@ CONSTRAINTS:
 - For SKILL.md: evaluate against 8 completeness categories, keep description <1024 chars, no YAML multiline indicators
 - For agent files: preserve required frontmatter fields (name, description)
 - For CLAUDE.md: front-load critical instructions, use decision flow diagrams for complex logic
-- For CLAUDE.md: read `${CLAUDE_SKILL_DIR}/references/claude-rules-extraction.md` before analyzing; perform rules extraction phase after optimization analysis, before CoVe
+- For CLAUDE.md and AGENTS.md: read `${CLAUDE_SKILL_DIR}/references/index-discipline.md` before analyzing — this is the index routing reference; CLAUDE.md/AGENTS.md are indexes, not encyclopedias
+- For CLAUDE.md and AGENTS.md: apply the 6-check index audit (entry length ≤150 chars; no procedure steps in entries; operative-fact hooks — no "Load when X", hook states the rule directly; no inline processes/protocols; no stale routes; no missing routes) — each violation is a quality failure at the same level as missing commands or vague instructions
+- For CLAUDE.md and AGENTS.md: when an inline process/protocol is found, produce the two-step atomic output: (a) the `docs/<slug>.md` file with `name/description/metadata.type` frontmatter + full content, (b) the replacement one-line router entry stating the operative fact — use the discriminator flowchart in `index-discipline.md` to choose between `docs/` and `.claude/rules/` extraction
+- For CLAUDE.md and AGENTS.md: use the baseline Index score (N/6) to prioritize — a score below 4/6 means index discipline is the primary optimization target before any other transformation
+- For CLAUDE.md: read `${CLAUDE_SKILL_DIR}/references/claude-rules-extraction.md` before analyzing; perform path-scoped rules extraction phase after optimization analysis, before CoVe — path-scoped content (Python rules, CI yml, TypeScript) goes to `.claude/rules/`, not `docs/`
+- For CLAUDE.md: flag any knowledge claim whose only home is a non-versioned artifact (chat, Google Docs, people's heads) — it is invisible to agents; external URLs with `SOURCE:` citations are the correct form and are not flagged
+- For CLAUDE.md: flag any cross-links not validated by a linter or CI check — mechanical enforcement (linters, freshness checks, cross-link validation) is the only reliable guard against doc drift
 - Signal DONE when optimization complete, BLOCKED when missing required inputs
 
 OUTPUT STRUCTURE:
@@ -104,6 +125,8 @@ OUTPUT STRUCTURE:
 ```
 
 </delegation_template>
+
+SOURCE (three CLAUDE.md-specific constraints above): OpenAI Harness Engineering, "Harness engineering: leveraging Codex in an agent-first world" (<https://openai.com/index/harness-engineering/>, accessed 2026-06-04) — empirically validated failure modes: P1 map-not-manual, P2 docs-as-system-of-record, P4 versioned-local-auditable, P5 mechanical-enforcement. P3 (progressive disclosure) is already enforced by this skill's iterative passes and SK006 extraction threshold.
 
 Routing by concern:
 - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer` (this skill uses this path)
@@ -173,7 +196,12 @@ OUTPUT:
 - Run post-optimization completeness score
 - Calculate delta: `post - baseline` (absolute change)
 
-**Record metrics** for reporting.
+**For CLAUDE.md and AGENTS.md files**:
+
+- Re-run the 6-check index audit on the optimized file
+- Record post-optimization Index score (N/6) and delta
+
+**Record all metrics** for reporting.
 
 ### Phase 7: Present Comprehensive Report
 
@@ -185,10 +213,12 @@ Report to user with structure:
 ### Baseline Metrics
 - Token Count: {N tokens}
 - Completeness Score: {X/24} (SKILL.md only)
+- Index Discipline Score: {N/6} (CLAUDE.md/AGENTS.md only)
 
 ### Post-Optimization Metrics
 - Token Count: {M tokens} ({+/-Y%})
 - Completeness Score: {Z/24} (delta: {+/-D}) (SKILL.md only)
+- Index Discipline Score: {N/6} (delta: {+/-D}) (CLAUDE.md/AGENTS.md only)
 
 ### Changes Applied
 {List of transformations with principle citations from agent report}

@@ -53,18 +53,14 @@ bd close <id>         # Complete work
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+uv run pytest                       # run test suite
+uv run prek run --files <file>      # lint a specific file
+uvx skilllint@latest check <path>   # validate skill/agent frontmatter
 ```
+
+Full session setup (hook installation, uv update) and additional commands are in `.claude/CLAUDE.md`.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
-
-## Conventions & Patterns
-
-_Add your project-specific conventions here_
+Claude Code Marketplace Plugin repository. Each subdirectory under `plugins/` is an independent plugin containing skills, agents, hooks, and/or MCP servers. See `.claude/CLAUDE.md` for full architectural context and conventions.

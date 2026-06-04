@@ -144,12 +144,20 @@ Sections whose rules only apply when working with specific file types, paths, to
 ### Keep in CLAUDE.md
 
 - Identity and core protocol sections
-- Universal rules that apply to all files
+- Universal behavioral rules that apply to all files — **short (≤5 lines, no procedure steps)**
 - Rules about Claude's behavior, communication style, or epistemic stance
-- Rules about git, commits, PRs (these apply regardless of file type)
-- Delegation and orchestration patterns
-- Rules that reference multiple unrelated file types without a clear primary scope
-- Short sections (<5 lines of rules) where extraction adds overhead without benefit
+- Short sections where extraction adds overhead without benefit
+
+**Note**: Longer processes, protocols, and procedures that are not path-scoped belong in
+`docs/<slug>.md` with a one-line router entry, NOT inline in CLAUDE.md. This is the
+index-routing mechanism. See [`./index-discipline.md`](./index-discipline.md) for the
+discriminator flowchart and two-step saving format.
+
+Specifically: rules about git, commits, PRs; delegation and orchestration patterns; and
+sections referencing multiple unrelated file types — these are **not** exempt from extraction
+when they contain substantial procedure content. Apply the discriminator:
+- Short universal constraint (≤5 lines, no steps) → keep inline
+- Substantial process/protocol → `docs/` via index-routing
 
 ---
 
