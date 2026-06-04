@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NotRequired, cast
+from typing import TYPE_CHECKING, Any, NotRequired, TypeGuard
 
 import dh_paths as _dh_paths
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
@@ -488,6 +488,23 @@ class ListItemsResult(TypedDict):
 # _SectionMetadata is the internal alias for the public SectionEntryMetadata type defined in
 # models.py.  Internal operations.py code continues to use the private name unchanged.
 _SectionMetadata = SectionEntryMetadata
+
+
+def _is_section_entry_metadata(value: object) -> TypeGuard[SectionEntryMetadata]:
+    """Return ``True`` when *value* is a :class:`SectionEntryMetadata` TypedDict.
+
+    TypedDict classes are plain ``dict`` at runtime and cannot be used as the
+    second argument to ``isinstance``.  The canonical discriminator documented on
+    :class:`SectionEntryMetadata` is the presence of the ``'entries'`` key, which
+    is absent from :class:`GroomedSectionMetadata`.
+
+    Args:
+        value: Any object to test.
+
+    Returns:
+        ``True`` when *value* is a dict with an ``'entries'`` key.
+    """
+    return isinstance(value, dict) and "entries" in value
 
 
 class ListCommentsResult(TypedDict):
@@ -2729,9 +2746,16 @@ def _build_sections_metadata(
             SectionEntryDict(id=e.id, struck=e.struck, content=e.content) for e in entries
         ]
         if sec_name in sections:
-            # _build_sections_metadata only produces SectionEntryMetadata entries; the union
-            # type on the dict is widened for the return type but the merge path is always entry-block.
-            sections[sec_name] = _merge_section_entries(cast("SectionEntryMetadata", sections[sec_name]), entry_dicts)
+            # Invariant: _build_sections_metadata only inserts _SectionMetadata (SectionEntryMetadata)
+            # values, never GroomedSectionMetadata, so the duplicate-section merge path is always
+            # entry-block.  Enforce this at runtime instead of relying on a silent cast().
+            existing = sections[sec_name]
+            if not _is_section_entry_metadata(existing):
+                raise TypeError(
+                    f"_build_sections_metadata invariant violated: expected SectionEntryMetadata "
+                    f"for section {sec_name!r} but found {type(existing).__name__}"
+                )
+            sections[sec_name] = _merge_section_entries(existing, entry_dicts)
         else:
             active_count = sum(1 for e in entries if not e.struck)
             struck_count = sum(1 for e in entries if e.struck)
@@ -3119,12 +3143,13 @@ def _assemble_view_compact(
     if body:
         all_sections = _build_sections_compact(body)
         if section is not None:
-            section_lower = section.lower()
-            filtered = [s for s in all_sections if str(s.get("name", "")).lower() == section_lower]
-            if not filtered:
+            names = [str(s.get("name", "")) for s in all_sections]
+            matched_indices = _resolve_section_indices(names, section)
+            if not matched_indices:
                 result.section_filter_miss = True
-                result.section_filter_valid_names = [str(s.get("name", "")) for s in all_sections]
-            all_sections = filtered
+                all_sections = []
+            else:
+                all_sections = [all_sections[i] for i in matched_indices]
         result.sections_metadata = [
             _models.SectionMeta(
                 name=str(s.get("name", "")),

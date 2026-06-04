@@ -9,6 +9,7 @@ Test classes:
 - ``TestMalformedRegexDoesNotCrash`` — malformed /regex/ degrades, does not raise
 - ``TestSectionMissEmptiesBodyAndSections`` — miss yields empty body + empty sections
 - ``TestCompactValidNamesNotReportedAsMiss`` — include_content=False + valid names = no miss
+- ``TestCompactNonExactFilterForms`` — numeric/substring/regex forms in compact mode
 - ``TestStructuredKeyDriftStillDelivered`` — dict matches but body header drifts
 
 Test naming: every test contains ``over_budget`` or ``numeric_section`` so
@@ -83,6 +84,22 @@ def _view(mocker: MockerFixture, body: str, section: str) -> ViewItemResult:
     """
     _patch_github_body(mocker, 2495, body)
     return operations.view_item(selector="2495", include_content=True, section=section)
+
+
+def _view_compact(mocker: MockerFixture, body: str, section: str) -> ViewItemResult:
+    """Drive ``operations.view_item`` in compact mode against a controlled raw GitHub body.
+
+    Args:
+        mocker: The pytest-mock fixture for patching the operations layer.
+        body: The controlled body text to inject via the GitHub-enrichment patch.
+        section: The ``section=`` value to pass to ``view_item``.
+
+    Returns:
+        The ``ViewItemResult`` returned by ``operations.view_item`` with
+        ``include_content=False``.
+    """
+    _patch_github_body(mocker, 2495, body)
+    return operations.view_item(selector="2495", include_content=False, section=section)
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +329,108 @@ class TestCompactValidNamesNotReportedAsMiss:
         assert resp.get("section_filter_miss") is True, (
             "an invalid name in compact mode must still report section_filter_miss so the miss "
             "signal is not lost by the finding #4 fix."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Compact-mode section filter: non-exact forms (numeric, substring, regex)
+# must use _resolve_section_indices dispatch, matching include_content=True.
+# ---------------------------------------------------------------------------
+
+
+class TestCompactNonExactFilterForms:
+    """Compact mode (include_content=False) must honour all four filter forms.
+
+    ``_assemble_view_compact`` uses ``_resolve_section_indices`` for section
+    filtering, so numeric index, substring, and regex forms must work
+    identically to the ``include_content=True`` path.  These tests guard the
+    parity between the two paths so Bug 2 cannot regress silently.
+
+    ``SectionMeta`` is a ``TypedDict`` — instances are plain dicts at runtime.
+    Access fields with ``m["name"]``, not attribute syntax.
+
+    ``_SYNC_BODY`` section headers (document order, zero-based):
+      [0] Story  [1] Description  [2] RT-ICA  [3] Issue Classification
+      [4] Issue Triage  [5] Impact Radius
+    """
+
+    def test_numeric_section_compact_numeric_section_filters_metadata(self, mocker: MockerFixture) -> None:
+        """section='2' in compact mode resolves to RT-ICA (index 2).
+
+        Before the fix: ``_assemble_view_compact`` used exact-match only, so
+        ``section='2'`` returned ALL sections_metadata (no filter applied) or
+        a miss flag, because no header is literally named '2'.  After the fix,
+        numeric form resolves to index 2 (RT-ICA) and sections_metadata is
+        narrowed to that one entry.
+        """
+        result = _view_compact(mocker, _SYNC_BODY, "2")
+
+        assert result.section_filter_miss is False, (
+            "section='2' resolves to index 2 (RT-ICA) in compact mode; must not miss."
+        )
+        assert result.sections_metadata != [], "sections_metadata must be non-empty for a resolved numeric section."
+        meta_names = [str(m["name"]) for m in result.sections_metadata]
+        assert meta_names == ["RT-ICA"], (
+            "compact mode: numeric section='2' must narrow sections_metadata to RT-ICA (index 2). "
+            f"Got: {meta_names}. "
+            "Bug 2: numeric filter in compact mode silently returned wrong results before fix."
+        )
+
+    def test_substring_section_compact_numeric_section_filters_metadata_multi_match(
+        self, mocker: MockerFixture
+    ) -> None:
+        """section='Issue' (substring) in compact mode matches two headers.
+
+        'Issue Classification' (index 3) and 'Issue Triage' (index 4) both
+        contain the substring 'Issue'.  sections_metadata must hold exactly
+        those two entries in document order, with no miss flag.
+        """
+        result = _view_compact(mocker, _SYNC_BODY, "Issue")
+
+        assert result.section_filter_miss is False, (
+            "substring 'Issue' matches two headers in compact mode; must not miss."
+        )
+        assert result.sections_metadata != [], "sections_metadata must be non-empty for a resolved substring section."
+        meta_names = [str(m["name"]) for m in result.sections_metadata]
+        assert meta_names == ["Issue Classification", "Issue Triage"], (
+            "compact mode: substring section='Issue' must narrow sections_metadata to both matching "
+            f"headers in document order. Got: {meta_names}. "
+            "Bug 2: substring filter in compact mode silently returned wrong results before fix."
+        )
+
+    def test_regex_section_compact_numeric_section_filters_metadata(self, mocker: MockerFixture) -> None:
+        """section='/Impact.*/' (regex) in compact mode matches Impact Radius.
+
+        The regex form must resolve via ``_resolve_section_indices`` in compact
+        mode, producing a single-entry sections_metadata for Impact Radius.
+        """
+        result = _view_compact(mocker, _SYNC_BODY, "/Impact.*/")
+
+        assert result.section_filter_miss is False, (
+            "regex '/Impact.*/' must match the Impact Radius header in compact mode."
+        )
+        assert result.sections_metadata != [], "sections_metadata must be non-empty for a resolved regex section."
+        meta_names = [str(m["name"]) for m in result.sections_metadata]
+        assert meta_names == ["Impact Radius"], (
+            "compact mode: regex section='/Impact.*/' must narrow sections_metadata to Impact Radius. "
+            f"Got: {meta_names}. "
+            "Bug 2: regex filter in compact mode silently returned wrong results before fix."
+        )
+
+    def test_compact_non_exact_miss_sets_miss_flag(self, mocker: MockerFixture) -> None:
+        """A non-matching filter in compact mode sets section_filter_miss (regression guard).
+
+        Ensures the miss path is not broken by the four-form dispatch: a section
+        expression that resolves to no headers must still produce the miss flag
+        and an empty sections_metadata list.
+        """
+        result = _view_compact(mocker, _SYNC_BODY, "/zzz-nomatch/")
+
+        assert result.section_filter_miss is True, (
+            "compact mode: a non-matching regex filter must set section_filter_miss."
+        )
+        assert result.sections_metadata == [], (
+            f"compact mode: a miss must yield an empty sections_metadata list. Got: {result.sections_metadata!r}."
         )
 
 
