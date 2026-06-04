@@ -215,12 +215,13 @@ flowchart TD
     Iter --> Check{For each task:<br>check status}
     Check -->|"status == 'complete'"| PassTask["Task passes"]
     Check -->|"status == 'skipped' AND task_id == 'T5'"| PassTask
-    Check -->|"status == 'skipped' AND task_id != 'T5'"| FailTask["FAIL — unauthorized skip"]
-    Check -->|"any other status"| FailTask
+    Check -->|"status == 'skipped' AND task_id != 'T5'"| FailUnauth["FAIL — unauthorized skip"]
+    Check -->|"any other status"| FailIncomplete["FAIL — task incomplete or blocked"]
     PassTask --> AllPassed{All 5 tasks<br>passed?}
     AllPassed -->|Yes| Proceed["Proceed to Step 6"]
     AllPassed -->|No| Stop["STOP — report failures, do NOT apply label"]
-    FailTask --> AllPassed
+    FailUnauth --> AllPassed
+    FailIncomplete --> AllPassed
 ```
 
 On verification failure:
