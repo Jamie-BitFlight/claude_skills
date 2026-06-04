@@ -45,11 +45,14 @@ class GitHubBackend:
 
     - ``supports_batch_status_fetch = True`` — GitHub Issues use integer IDs;
       :meth:`batch_fetch_statuses` is fully implemented.
+    - ``supports_batch_issue_update = True`` — :meth:`_update_issues_graphql_batch`
+      is implemented via aliased GraphQL mutations.
     - ``issue_id_type = "integer"`` — GitHub Issues are identified by integer
       issue numbers.
     """
 
     supports_batch_status_fetch: bool = True
+    supports_batch_issue_update: bool = True
     issue_id_type: Literal["integer", "string"] = "integer"
 
     def __init__(self, repo: str = "") -> None:
@@ -157,6 +160,10 @@ class GitHubBackend:
         gh_client._update_issue_graphql(
             repo, issue_node_id, state=state, body=body, title=title, label_ids=label_ids, milestone_id=milestone_id
         )
+
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
+        """Update issue bodies in bulk using aliased GraphQL mutations."""
+        gh_client._update_issues_graphql_batch(repo, updates)
 
     def sync_issues_graphql(
         self,

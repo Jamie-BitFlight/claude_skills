@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from backlog_core.gh_client import _resolve_labels_graphql
+from backlog_core.models import BacklogError
 from github import GithubException
 
 if TYPE_CHECKING:
@@ -223,47 +224,46 @@ class TestResolveLabelsEmptyInput:
 
 
 class TestResolveLabelsException:
-    """_resolve_labels_graphql propagates GithubException from graphql_query."""
+    """_resolve_labels_graphql raises BacklogError when graphql_query fails.
 
-    def test_github_exception_propagates_to_caller(self, mocker: MockerFixture) -> None:
-        """GithubException raised by graphql_query is not swallowed.
+    _graphql_request wraps GithubException into BacklogError before it reaches
+    callers. Tests verify that the BacklogError surface, not the raw GithubException.
+    """
 
-        Tests: Error propagation — auth/network/permission failures surface to caller.
+    def test_github_exception_becomes_backlog_error(self, mocker: MockerFixture) -> None:
+        """GithubException(401) from graphql_query is wrapped into BacklogError.
+
+        Tests: Error propagation — auth failures surface as BacklogError to caller.
         How: Configure graphql_query.side_effect = GithubException(401, "bad creds").
-             Assert pytest.raises catches the same exception.
-        Why: Callers (create_issue_for_item) do not wrap _resolve_labels_graphql
-             in try/except; failures must propagate so the caller's error handling fires.
+             Assert pytest.raises catches BacklogError (the contract exception type).
+        Why: _graphql_request (item 1 of the fix set) wraps GithubException into
+             BacklogError so all callers deal with one exception type.
         """
         # Arrange
         repo = _make_mock_repo(mocker)
         repo.requester.graphql_query.side_effect = GithubException(401, "bad credentials")
 
         # Act / Assert
-        with pytest.raises(GithubException) as exc_info:
+        with pytest.raises(BacklogError):
             _resolve_labels_graphql(repo, "owner", "repo", ["status:open"])
 
-        assert exc_info.value.status == 401
-
-    def test_rate_limit_exception_propagates(self, mocker: MockerFixture) -> None:
-        """Rate-limit GithubException (403) propagates unchanged.
+    def test_rate_limit_exception_becomes_backlog_error(self, mocker: MockerFixture) -> None:
+        """Rate-limit GithubException (403) is wrapped into BacklogError.
 
         Tests: 403 rate-limit error path.
         How: Raise GithubException(403, ...) from graphql_query.
-        Why: Callers need to distinguish rate limits from auth failures; only the
-             original exception carries that information.
+        Why: _graphql_request wraps all GithubException types; 403 is no exception.
         """
         # Arrange
         repo = _make_mock_repo(mocker)
         repo.requester.graphql_query.side_effect = GithubException(403, "rate limit exceeded")
 
         # Act / Assert
-        with pytest.raises(GithubException) as exc_info:
+        with pytest.raises(BacklogError):
             _resolve_labels_graphql(repo, "owner", "repo", ["some-label"])
 
-        assert exc_info.value.status == 403
-
-    def test_network_exception_propagates(self, mocker: MockerFixture) -> None:
-        """GithubException(500, ...) from a network/server error propagates.
+    def test_network_exception_becomes_backlog_error(self, mocker: MockerFixture) -> None:
+        """GithubException(500) from a network/server error becomes BacklogError.
 
         Tests: Server-side error path.
         How: Raise GithubException(500, "internal server error").
@@ -274,7 +274,7 @@ class TestResolveLabelsException:
         repo.requester.graphql_query.side_effect = GithubException(500, "internal server error")
 
         # Act / Assert
-        with pytest.raises(GithubException):
+        with pytest.raises(BacklogError):
             _resolve_labels_graphql(repo, "owner", "repo", ["label-a"])
 
 

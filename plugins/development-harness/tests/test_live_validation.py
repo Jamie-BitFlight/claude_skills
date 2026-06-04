@@ -17,6 +17,10 @@ import uuid
 
 import backlog_core.models as _bc_models
 import pytest
+from backlog_core.backend_protocol import BacklogConfig as _BPBacklogConfig
+from backlog_core.backend_protocol import reset_config as _bp_reset_config
+from backlog_core.backend_protocol import set_config as _bp_set_config
+from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.models import BacklogConfig
 from backlog_core.server import mcp
 
@@ -102,6 +106,15 @@ def live_items(tmp_path_factory, monkeypatch_class):
         _bc_models, "_config", BacklogConfig(repo_root=fake_project_root, backlog_dir=bd, default_repo=resolved_repo)
     )
 
+    # operations.py imports get_config from backend_protocol (a separate singleton from
+    # _bc_models._config). Without patching backend_protocol._active_config, all
+    # operations.py calls (add_item, sync_items, etc.) hit the real ~/.dh backlog with
+    # 800+ issues instead of the test temp directory — causing a 10-minute hang in
+    # backlog_sync (L8) as it fetches the entire real issue list from GitHub.
+    # GitHubBackend() with no repo arg falls through to resolve_repo("") →
+    # models.get_default_repo() → the already-patched _bc_models._config.default_repo.
+    _bp_set_config(_BPBacklogConfig(backend=GitHubBackend()))
+
     test_id = str(uuid.uuid4())[:8]
 
     # Write gate token file so backlog_add passes its gate validation.
@@ -134,6 +147,9 @@ def live_items(tmp_path_factory, monkeypatch_class):
     }
 
     yield ctx
+
+    # Restore backend_protocol singleton so later tests don't inherit the test config.
+    _bp_reset_config()
 
     # Teardown: close all created issues — log failures instead of swallowing silently
     token = os.environ.get("GITHUB_TOKEN", "")
@@ -211,15 +227,19 @@ class TestLiveLifecycle:
         )
 
         assert result["title"] == f"{prefix} Live Test Item"
-        assert isinstance(result["issue_num"], int)
-        assert result["issue_num"] > 0
+        # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
+        assert "item_ref" in result, f"Expected item_ref in result, got: {list(result.keys())}"
+        item_ref: str = result["item_ref"]
+        assert item_ref.startswith("#"), f"Expected item_ref like '#N', got: {item_ref!r}"
+        issue_num = int(item_ref.lstrip("#"))
+        assert issue_num > 0
         assert isinstance(result["file_path"], str)
         assert isinstance(result["messages"], list)
         # Track for cleanup and later tests
-        live_items["issues"].append(result["issue_num"])
+        live_items["issues"].append(issue_num)
         live_items["item_title"] = result["title"]
         live_items["item_filepath"] = result["file_path"]
-        live_items["item_issue_num"] = result["issue_num"]
+        live_items["item_issue_num"] = issue_num
         live_items["l1_ok"] = True
 
     async def test_l2_list_includes_created_item(self, live_items):
@@ -331,8 +351,11 @@ class TestLiveLifecycle:
                 "gate_token": _find_latest_gate_token(),
             },
         )
-        assert isinstance(create_result["issue_num"], int)
-        live_items["issues"].append(create_result["issue_num"])
+        # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
+        assert "item_ref" in create_result, f"Expected item_ref, got: {list(create_result.keys())}"
+        l11_issue_num = int(create_result["item_ref"].lstrip("#"))
+        assert l11_issue_num > 0
+        live_items["issues"].append(l11_issue_num)
 
         # Resolve it
         resolve_result = await _call(

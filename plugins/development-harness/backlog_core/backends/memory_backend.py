@@ -87,10 +87,13 @@ class InMemoryBackend:
 
     - ``supports_batch_status_fetch = True`` — in-memory issues use integer IDs;
       :meth:`batch_fetch_statuses` is fully implemented.
+    - ``supports_batch_issue_update = False`` — no real GraphQL layer; batch
+      mutations are not available.
     - ``issue_id_type = "integer"`` — issues are keyed by integer number.
     """
 
     supports_batch_status_fetch: bool = True
+    supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
 
     def __init__(self) -> None:
@@ -208,6 +211,10 @@ class InMemoryBackend:
         if title is not None:
             issue["title"] = title
         issue["updatedAt"] = _now()
+
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
+        """Raise NotImplementedError — in-memory backend has no GraphQL layer."""
+        raise NotImplementedError("InMemoryBackend does not support batch GraphQL mutations")
 
     def _issue_number_for_node_id(self, node_id: str) -> int:
         """Resolve a node ID string to an issue number."""

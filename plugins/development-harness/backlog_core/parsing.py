@@ -13,7 +13,10 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .backend_protocol import IssueNode
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +62,7 @@ __all__ = [
     "find_fuzzy_duplicates",
     "find_item",
     "infer_type",
+    "issues_to_title_map",
     "items_needing_issues",
     "items_with_issues",
     "loads_frontmatter",
@@ -75,6 +79,32 @@ __all__ = [
     "today",
     "view_result_from_local_item",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Issue title map helper
+# ---------------------------------------------------------------------------
+
+
+def issues_to_title_map(issues: list[IssueNode]) -> dict[str, int]:
+    """Build a ``{normalized_title: issue_number}`` map from a list of issue nodes.
+
+    When duplicates exist, keeps the lowest issue number (the original).
+    Pure function — performs no network I/O.
+
+    Args:
+        issues: List of IssueNode dicts, e.g. from ``sync_issues_graphql``.
+
+    Returns:
+        Dict mapping normalized title strings to their GitHub issue number.
+    """
+    title_to_num: dict[str, int] = {}
+    for issue in issues:
+        key = normalize_issue_title(issue["title"])
+        num = issue["number"]
+        if key not in title_to_num or num < title_to_num[key]:
+            title_to_num[key] = num
+    return title_to_num
 
 
 # ---------------------------------------------------------------------------

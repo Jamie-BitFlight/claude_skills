@@ -138,6 +138,8 @@ class BeadsBackend:
     - ``supports_batch_status_fetch = False`` — beads issue IDs are strings;
       :meth:`batch_fetch_statuses` raises :exc:`NotImplementedError` (ADR-002).
       Callers must check this flag before invoking the method.
+    - ``supports_batch_issue_update = False`` — beads does not expose GraphQL;
+      :meth:`_update_issues_graphql_batch` raises :exc:`NotImplementedError`.
     - ``issue_id_type = "string"`` — beads issues are identified by string
       nanoids (e.g. ``"bd-a3f8"``).  When ``item.issue`` is absent, the item
       title is used as the selector.  The list command skips live batch-status
@@ -153,6 +155,7 @@ class BeadsBackend:
     """
 
     supports_batch_status_fetch: bool = False
+    supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "string"
 
     def __init__(self, runner: BdRunner | None = None) -> None:
@@ -242,6 +245,10 @@ class BeadsBackend:
         label_ids: list[str] | None = None,
         milestone_id: str | None = None,
     ) -> None:
+        """Raise NotImplementedError — beads does not expose GraphQL."""
+        raise NotImplementedError(_ADR_001_NOTE)
+
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
         """Raise NotImplementedError — beads does not expose GraphQL."""
         raise NotImplementedError(_ADR_001_NOTE)
 

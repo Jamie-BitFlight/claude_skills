@@ -68,6 +68,7 @@ from .parsing import (
     extract_sections,
     find_fuzzy_duplicates,
     find_item,
+    issues_to_title_map,
     items_needing_issues,
     items_with_issues,
     loads_frontmatter,
@@ -341,6 +342,16 @@ def _update_issue_graphql(
     get_config().backend._update_issue_graphql(
         repo, issue_node_id, state=state, body=body, title=title, label_ids=label_ids, milestone_id=milestone_id
     )
+
+
+def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]]) -> None:
+    """Update issue bodies in bulk via the active backend.
+
+    Callers must check ``get_config().backend.supports_batch_issue_update``
+    before calling this function.  Backends with ``supports_batch_issue_update
+    = False`` raise :exc:`NotImplementedError`.
+    """
+    get_config().backend._update_issues_graphql_batch(repo, updates)
 
 
 def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
@@ -1042,7 +1053,7 @@ def _ensure_github_issue(item: BacklogItem, filepath: Path, repo: str, output: O
         return None
     try:
         issue_num = create_issue_for_item(repository, item, dry_run=False, output=out)
-    except GithubException as e:
+    except (GithubException, BacklogError) as e:
         out.warn(f"  WARNING: Could not create issue: {e}")
         return None
     else:
@@ -1737,7 +1748,7 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
         return None
     try:
         return create_issue_for_item(repository, item_data, dry_run=False, output=out)
-    except GithubException as e:
+    except (GithubException, BacklogError) as e:
         out.warn(f"  WARNING: Issue creation failed: {e}")
         return None
 
@@ -3417,13 +3428,32 @@ def find_or_create_issue(
 
 
 def sync_create_missing_issues(
-    items: list[BacklogItem], repo: str, dry_run: bool, output: Output | None = None
+    items: list[BacklogItem],
+    repo: str,
+    dry_run: bool,
+    output: Output | None = None,
+    *,
+    repository: Repository | None = None,
+    existing_issues: dict[str, int] | None = None,
 ) -> dict[str, int | bool | list[str]]:
     """Pass 1 of sync: create GitHub issues for all items that lack them.
 
     Before creating any issues, fetches all open issues from GitHub and checks
     for title matches. If an existing open issue matches (after stripping
     conventional-commit prefixes), links to it instead of creating a duplicate.
+
+    Args:
+        items: Full backlog item list.
+        repo: Repository in ``owner/repo`` format.  Ignored when ``repository``
+            is provided.
+        dry_run: When True, log actions without making changes.
+        output: Optional Output collector for status/warning messages.
+        repository: Optional pre-connected Repository object.  When provided,
+            the ``get_github`` call is skipped (item 8 — single connection per
+            ``sync_items`` pass).
+        existing_issues: Optional pre-fetched ``{normalized_title: issue_number}``
+            map.  When provided, the ``fetch_open_issues_by_title`` call is
+            skipped (item 6 — single GraphQL fetch per ``sync_items`` pass).
 
     Returns:
         Dict with count of created/linked issues.
@@ -3436,17 +3466,23 @@ def sync_create_missing_issues(
     out.info(f"Found {len(needed)} item(s) without GitHub issues:")
     for it in needed:
         out.info(f"  - {it.title[:60]}")
-    repository = get_github(repo)
+    if dry_run:
+        for it in needed:
+            out.info(f"  [dry-run] Would create issue: {it.title[:60]}")
+        return {"created": 0, "dry_run": True, **out.to_dict()}
+    if repository is None:
+        repository = get_github(repo)
 
-    # Dedup: fetch existing open issues to prevent duplicate creation.
-    out.info("Fetching open issues for deduplication check...")
-    existing_issues = fetch_open_issues_by_title(repository)
-    out.info(f"  Found {len(existing_issues)} existing open issues.")
+    if existing_issues is None:
+        # Dedup: fetch existing open issues to prevent duplicate creation.
+        out.info("Fetching open issues for deduplication check...")
+        existing_issues = fetch_open_issues_by_title(repository)
+        out.info(f"  Found {len(existing_issues)} existing open issues.")
 
     created = 0
     for item in needed:
         issue_num = find_or_create_issue(item, existing_issues, repository, dry_run, output=out)
-        if not issue_num or dry_run:
+        if issue_num is None or dry_run:
             continue
         created += 1
         # Track newly created/linked issues to prevent intra-batch duplicates.
@@ -3461,12 +3497,116 @@ def sync_create_missing_issues(
     return {"created": created, **out.to_dict()}
 
 
+def _build_groomed_update_list(
+    groomed_items: list[BacklogItem], issue_lookup: dict[int, IssueNode], out: Output
+) -> tuple[list[tuple[str, str]], dict[str, int]]:
+    """Build ``(node_id, body)`` pairs for items that have a resolved GitHub issue.
+
+    Items with invalid issue refs or no matching issue in ``issue_lookup`` emit
+    a warning and are skipped.
+
+    Args:
+        groomed_items: BacklogItems that have a groomed section and a non-empty
+            ``issue`` field.
+        issue_lookup: Mapping from issue number to IssueNode fetched from GitHub.
+        out: Output collector for warning messages.
+
+    Returns:
+        Tuple of (updates, node_id_to_num) where ``updates`` is the list of
+        ``(node_id, body)`` pairs ready to pass to the dispatch helper and
+        ``node_id_to_num`` maps each node ID back to its issue number for logs.
+    """
+    updates: list[tuple[str, str]] = []
+    node_id_to_num: dict[str, int] = {}
+    for item in groomed_items:
+        issue_ref = item.issue
+        issue_num = parse_issue_number(issue_ref)
+        if issue_num is None:
+            out.warn(f"  WARNING: Skipping item with invalid issue ref '{issue_ref}'")
+            continue
+        issue_node = issue_lookup.get(issue_num)
+        if issue_node is None:
+            out.warn(f"  WARNING: Issue #{issue_num} not found in bulk fetch (may be closed)")
+            continue
+        body = render_issue_body(item, original_body=issue_node["body"])
+        node_id = issue_node["id"]
+        updates.append((node_id, body))
+        node_id_to_num[node_id] = issue_num
+    return updates, node_id_to_num
+
+
+def _dispatch_issue_body_updates(
+    repository: Repository, updates: list[tuple[str, str]], node_id_to_num: dict[str, int], out: Output
+) -> int:
+    """Send ``(node_id, body)`` updates to GitHub, returning the count pushed.
+
+    Uses batch mutations when the backend supports them; falls back to
+    per-item updates otherwise.  Per-chunk fallback is already handled inside
+    ``_update_issues_graphql_batch``.
+
+    Args:
+        repository: Authenticated PyGithub Repository.
+        updates: List of ``(node_id, body)`` pairs to apply.
+        node_id_to_num: Mapping from node ID to issue number for log messages.
+        out: Output collector.
+
+    Returns:
+        Number of issues successfully updated.
+    """
+    pushed = 0
+    if get_config().backend.supports_batch_issue_update:
+        try:
+            _update_issues_graphql_batch(repository, updates)
+            pushed = len(updates)
+            for node_id, _body in updates:
+                out.info(f"  Updated issue #{node_id_to_num[node_id]}")
+        except (GithubException, BacklogError) as e:
+            out.warn(f"  WARNING: Batch update failed, falling back to per-item: {e}")
+            for node_id, body in updates:
+                num = node_id_to_num[node_id]
+                try:
+                    _update_issue_graphql(repository, node_id, body=body)
+                    out.info(f"  Updated issue #{num}")
+                    pushed += 1
+                except (GithubException, BacklogError) as item_e:
+                    out.warn(f"  WARNING: Could not update issue #{num}: {item_e}")
+    else:
+        for node_id, body in updates:
+            num = node_id_to_num[node_id]
+            try:
+                _update_issue_graphql(repository, node_id, body=body)
+                out.info(f"  Updated issue #{num}")
+                pushed += 1
+            except (GithubException, BacklogError) as e:
+                out.warn(f"  WARNING: Could not update issue #{num}: {e}")
+    return pushed
+
+
 def sync_push_groomed_content(
-    items: list[BacklogItem], repo: str, dry_run: bool, output: Output | None = None
+    items: list[BacklogItem],
+    repo: str,
+    dry_run: bool,
+    output: Output | None = None,
+    *,
+    repository: Repository | None = None,
+    open_issues: list[IssueNode] | None = None,
 ) -> dict[str, int | bool | list[str]]:
     """Pass 2 of sync: push groomed content to existing GitHub issues.
 
     Skips items with no '## Groomed' section in their body.
+
+    Args:
+        items: Full backlog item list.
+        repo: Repository in ``owner/repo`` format.  Ignored when ``repository``
+            is provided.
+        dry_run: When True, log actions without making changes.
+        output: Optional Output collector for status/warning messages.
+        repository: Optional pre-connected Repository object.  When provided,
+            the ``get_github`` call is skipped (item 8 — single connection per
+            ``sync_items`` pass).
+        open_issues: Optional pre-fetched list of open IssueNode dicts.  When
+            provided, the ``sync_issues_graphql`` call is skipped (item 6 —
+            single GraphQL fetch per ``sync_items`` pass).
 
     Returns:
         Dict with count of pushed items.
@@ -3482,38 +3622,24 @@ def sync_push_groomed_content(
             issue_ref = it.issue
             out.info(f"  [dry-run] Would update issue {issue_ref}: {it.title[:60]}")
         return {"pushed": 0, "dry_run": True, **out.to_dict()}
-    repository = get_github(repo)
+    if repository is None:
+        repository = get_github(repo)
     owner, repo_name = repository.full_name.split("/", 1)
 
     # Bulk-fetch all issue nodes to avoid N+1 GraphQL queries
-    issue_numbers = []
+    issue_numbers: set[int] = set()
     for item in groomed_items:
         num = parse_issue_number(item.issue)
         if num is not None:
-            issue_numbers.append(num)
+            issue_numbers.add(num)
 
-    # Fetch all open issues and build lookup dict
-    all_issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
-    issue_lookup = {node["number"]: node for node in all_issues if node["number"] in issue_numbers}
+    # Use pre-fetched list when provided; otherwise fetch open issues now
+    if open_issues is None:
+        open_issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
+    issue_lookup = {node["number"]: node for node in open_issues if node["number"] in issue_numbers}
 
-    pushed = 0
-    for item in groomed_items:
-        issue_ref = item.issue
-        issue_num = parse_issue_number(issue_ref)
-        if issue_num is None:
-            out.warn(f"  WARNING: Skipping item with invalid issue ref '{issue_ref}'")
-            continue
-        try:
-            if (issue_node := issue_lookup.get(issue_num)) is None:
-                out.warn(f"  WARNING: Issue #{issue_num} not found in bulk fetch (may be closed)")
-                continue
-            body = render_issue_body(item, original_body=issue_node["body"])
-            _update_issue_graphql(repository, issue_node["id"], body=body)
-            out.info(f"  Updated issue #{issue_num}: {item.title[:60]}")
-            pushed += 1
-        except (GithubException, BacklogError) as e:
-            out.warn(f"  WARNING: Could not update issue #{issue_num}: {e}")
-
+    updates, node_id_to_num = _build_groomed_update_list(groomed_items, issue_lookup, out)
+    pushed = _dispatch_issue_body_updates(repository, updates, node_id_to_num, out)
     return {"pushed": pushed, **out.to_dict()}
 
 
@@ -3522,13 +3648,41 @@ def sync_items(
 ) -> dict[str, int | bool | list[str]]:
     """Create GitHub issues for all items missing them, and push groomed content to existing issues.
 
+    Establishes a single GitHub connection and performs a single GraphQL fetch
+    for open issues, then threads both into the two sync passes to avoid
+    redundant network round-trips.
+
     Returns:
         Dict with sync results.
     """
     out = output or Output()
     items = parse_backlog()
-    create_result = sync_create_missing_issues(items, repo, dry_run, output=out)
-    push_result = sync_push_groomed_content(items, repo, dry_run, output=out)
+
+    # Determine whether each pass has actual work to do.
+    needs_create = bool(items_needing_issues(items))
+    needs_push = any("groomed" in it.sections for it in items_with_issues(items))
+
+    # Only perform the shared fetch when BOTH passes need live GitHub access.
+    # If only one pass has work, that pass will use its own internal lazy fetch.
+    # If dry_run is set, no pass requires a live connection.
+    repository: Repository | None = None
+    open_issues: list[IssueNode] | None = None
+    existing_issues: dict[str, int] | None = None
+
+    if (not dry_run) and needs_create and needs_push:
+        repository = get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        out.info("Fetching open issues from GitHub...")
+        open_issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
+        out.info(f"  Found {len(open_issues)} open issues.")
+        existing_issues = issues_to_title_map(open_issues)
+
+    create_result = sync_create_missing_issues(
+        items, repo, dry_run, output=out, repository=repository, existing_issues=existing_issues
+    )
+    push_result = sync_push_groomed_content(
+        items, repo, dry_run, output=out, repository=repository, open_issues=open_issues
+    )
     return {
         "created": create_result.get("created", 0),
         "pushed": push_result.get("pushed", 0),

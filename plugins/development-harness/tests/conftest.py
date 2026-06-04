@@ -200,6 +200,29 @@ def gate_token() -> str:
     return TEST_GATE_TOKEN
 
 
+@pytest.fixture(autouse=True)
+def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Disable the background startup sync loop for all non-e2e tests.
+
+    Patches ``backlog_core.server._startup_sync_enabled`` to return ``False``
+    so that ``_backlog_lifespan`` never calls ``asyncio.create_task`` during
+    in-process MCP test invocations.  Without this fixture every tool call that
+    exercises the MCP server starts a live GitHub sync task, which dominates
+    wall-clock time and causes the CI timeout.
+
+    Skips for tests marked ``@pytest.mark.e2e`` so that live end-to-end tests
+    exercise the real startup path.
+
+    TODO: remove when #2573 lands (permanent backend-level gating in the
+    in-memory and SQLite backends).
+    """
+    if request.node.get_closest_marker("e2e"):
+        return
+    import backlog_core.server as _server
+
+    monkeypatch.setattr(_server, "_startup_sync_enabled", lambda: False)
+
+
 # ---------------------------------------------------------------------------
 # Quality gate fixtures
 # ---------------------------------------------------------------------------

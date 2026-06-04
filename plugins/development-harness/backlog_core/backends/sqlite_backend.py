@@ -127,6 +127,8 @@ class SQLiteBackend:
 
     - ``supports_batch_status_fetch = True`` — SQLite items use integer IDs;
       :meth:`batch_fetch_statuses` is fully implemented.
+    - ``supports_batch_issue_update = False`` — no real GraphQL layer; batch
+      mutations are not available.
     - ``issue_id_type = "integer"`` — items are keyed by integer issue number.
 
     Args:
@@ -135,6 +137,7 @@ class SQLiteBackend:
     """
 
     supports_batch_status_fetch: bool = True
+    supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
 
     def __init__(self, db_path: str = ":memory:") -> None:
@@ -384,6 +387,10 @@ class SQLiteBackend:
             for tag in new_tags:
                 self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (number, tag))
         self._conn.commit()
+
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
+        """Raise NotImplementedError — SQLite backend has no GraphQL layer."""
+        raise NotImplementedError("SQLiteBackend does not support batch GraphQL mutations")
 
     def _issue_number_for_node_id(self, node_id: str) -> int:
         """Resolve a synthetic node ID to an issue number.

@@ -1256,18 +1256,6 @@ class TestApplyStatusInProgress:
         )
         mock_repo = _make_mock_repo(mocker)
         mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
-        # _resolve_label_ids_graphql uses repo.requester.graphql_query directly
-        mock_repo.requester.graphql_query.return_value = (
-            {},
-            {
-                "data": {
-                    "repository": {
-                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
-                        "label1": {"id": "LBL_ip", "name": "status:in-progress"},
-                    }
-                }
-            },
-        )
 
         call_count = 0
 
@@ -1277,7 +1265,15 @@ class TestApplyStatusInProgress:
             if call_count == 1:
                 # First call: _fetch_issue_graphql
                 return make_issue_by_number_response(issue_node)
-            # Second call: _update_issue_graphql
+            if call_count == 2:
+                # Second call: _resolve_label_ids_graphql (routes through _graphql_request)
+                return {
+                    "repository": {
+                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
+                        "label1": {"id": "LBL_ip", "name": "status:in-progress"},
+                    }
+                }
+            # Third call: _update_issue_graphql
             return make_update_issue_response()
 
         mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
@@ -1286,8 +1282,8 @@ class TestApplyStatusInProgress:
         # Act — should not raise
         apply_status_in_progress(item)
 
-        # Assert — _graphql_request was called twice: fetch + update
-        assert call_count == 2
+        # Assert — _graphql_request was called three times: fetch + label-resolve + update
+        assert call_count == 3
 
     def test_skips_update_when_already_in_progress(self, mocker: MockerFixture) -> None:
         """apply_status_in_progress is a no-op when issue already has status:in-progress.
@@ -1477,17 +1473,6 @@ class TestApplyStatusGroomed:
         )
         mock_repo = _make_mock_repo(mocker)
         mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
-        mock_repo.requester.graphql_query.return_value = (
-            {},
-            {
-                "data": {
-                    "repository": {
-                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
-                        "label1": {"id": "LBL_g", "name": "status:groomed"},
-                    }
-                }
-            },
-        )
 
         call_count = 0
 
@@ -1496,6 +1481,14 @@ class TestApplyStatusGroomed:
             call_count += 1
             if call_count == 1:
                 return make_issue_by_number_response(issue_node)
+            if call_count == 2:
+                # _resolve_label_ids_graphql call (routes through _graphql_request)
+                return {
+                    "repository": {
+                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
+                        "label1": {"id": "LBL_g", "name": "status:groomed"},
+                    }
+                }
             return make_update_issue_response()
 
         mock_gql = mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
@@ -1504,10 +1497,10 @@ class TestApplyStatusGroomed:
         # Act
         apply_status_groomed(item)
 
-        # Assert — fetch + update both ran
-        assert call_count == 2
-        # Update call must carry groomed ID but not needs-grooming ID
-        update_call = mock_gql.call_args_list[1]
+        # Assert — fetch + label-resolve + update all ran
+        assert call_count == 3
+        # Update call (index 2) must carry groomed ID but not needs-grooming ID
+        update_call = mock_gql.call_args_list[2]
         variables = update_call.kwargs.get("variables") or (update_call.args[2] if len(update_call.args) > 2 else None)
         assert variables is not None
         label_ids = variables.get("labelIds", [])
@@ -1551,17 +1544,6 @@ class TestApplyStatusGroomed:
         issue_node = make_issue_node(id="MDU6SXNzdWUx", number=5, labels=[make_label_node("priority:p1", "LBL_p1")])
         mock_repo = _make_mock_repo(mocker)
         mocker.patch("backlog_core.gh_client.get_github", return_value=mock_repo)
-        mock_repo.requester.graphql_query.return_value = (
-            {},
-            {
-                "data": {
-                    "repository": {
-                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
-                        "label1": {"id": "LBL_g", "name": "status:groomed"},
-                    }
-                }
-            },
-        )
 
         call_count = 0
 
@@ -1570,6 +1552,14 @@ class TestApplyStatusGroomed:
             call_count += 1
             if call_count == 1:
                 return make_issue_by_number_response(issue_node)
+            if call_count == 2:
+                # _resolve_label_ids_graphql call (routes through _graphql_request)
+                return {
+                    "repository": {
+                        "label0": {"id": "LBL_p1", "name": "priority:p1"},
+                        "label1": {"id": "LBL_g", "name": "status:groomed"},
+                    }
+                }
             return make_update_issue_response()
 
         mocker.patch("backlog_core.gh_client._graphql_request", side_effect=side_effect)
@@ -1579,7 +1569,7 @@ class TestApplyStatusGroomed:
         apply_status_groomed(item)
 
         # Assert — update still ran even without needs-grooming present to remove
-        assert call_count == 2
+        assert call_count == 3
 
     def test_apply_status_groomed_creates_label_if_absent(self, mocker: MockerFixture) -> None:
         """apply_status_groomed creates status:groomed label when it does not exist.

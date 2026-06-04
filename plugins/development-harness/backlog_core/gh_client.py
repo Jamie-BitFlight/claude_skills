@@ -45,7 +45,7 @@ from .parsing import (
     build_sam_task_body,
     build_sam_task_issue_title,
     infer_type,
-    normalize_issue_title,
+    issues_to_title_map,
     parse_sam_task_metadata,
     today,
 )
@@ -619,7 +619,9 @@ def _fetch_issues_graphql(
         page_info = issues_conn.get("pageInfo") or {}
         if not (isinstance(page_info, dict) and page_info.get("hasNextPage")):
             break
-        cursor = str(page_info["endCursor"])
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
 
     return all_issues
 
@@ -774,6 +776,52 @@ def _update_issue_graphql(
     _graphql_request(repo, _UPDATE_ISSUE_MUTATION, variables)
 
 
+_BATCH_CHUNK_SIZE = 25
+
+
+def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]]) -> None:
+    """Update issue bodies in bulk using aliased GraphQL mutations.
+
+    Sends up to ``_BATCH_CHUNK_SIZE`` ``updateIssue`` mutations per request
+    using GraphQL field aliasing to avoid N+1 round-trips.  Variables use the
+    typed ``$id{i}`` / ``$body{i}`` pattern — no string interpolation — so
+    issue node IDs and body content are never embedded in the query string.
+
+    Per-chunk failures fall back to per-item ``_update_issue_graphql`` calls
+    so a single bad payload does not abort the whole batch.
+
+    Args:
+        repo: PyGithub Repository object (provides requester transport).
+        updates: List of ``(issue_node_id, body)`` pairs to apply.
+
+    Raises:
+        BacklogError: On GraphQL transport failure that also causes the per-item
+            fallback to fail for every item in a chunk.
+    """
+    if not updates:
+        return
+
+    for chunk_start in range(0, len(updates), _BATCH_CHUNK_SIZE):
+        chunk = updates[chunk_start : chunk_start + _BATCH_CHUNK_SIZE]
+        # Build typed variable declarations and mutation aliases
+        var_decls = ", ".join(f"$id{i}: ID!, $body{i}: String!" for i in range(len(chunk)))
+        mutations = "\n  ".join(
+            f"u{i}: updateIssue(input: {{id: $id{i}, body: $body{i}}}) {{ issue {{ number }} }}"
+            for i in range(len(chunk))
+        )
+        query = f"mutation BatchUpdate({var_decls}) {{\n  {mutations}\n}}"
+        variables: dict[str, object] = {}
+        for i, (node_id, body) in enumerate(chunk):
+            variables[f"id{i}"] = node_id
+            variables[f"body{i}"] = body
+        try:
+            _graphql_request(repo, query, variables)
+        except BacklogError:
+            # Chunk failed — fall back to per-item updates for this chunk
+            for node_id, body in chunk:
+                _update_issue_graphql(repo, node_id, body=body)
+
+
 def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
     """Add a comment to an issue via GraphQL.
 
@@ -850,7 +898,9 @@ def _fetch_issue_comments_graphql(
         page_info: dict[str, object] = comments_data.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
             break
-        cursor = str(page_info.get("endCursor") or "")
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
     return comments
 
 
@@ -916,7 +966,7 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
 
     Raises:
         ValueError: If a label name contains disallowed characters.
-        GithubException: On auth/network failures.
+        BacklogError: On GraphQL auth/network/permission failures.
     """
     if not label_names:
         return {}
@@ -942,8 +992,9 @@ query ResolveLabelIds($owner: String!, $repo: String!) {{
   }}
 }}
 """
-    _headers, response = repo.requester.graphql_query(query, {"owner": owner, "repo": repo_name})
-    repo_data = (response.get("data") or {}).get("repository") or {}
+    # _graphql_request already returns the inner data dict and raises BacklogError on errors
+    data = _graphql_request(repo, query, {"owner": owner, "repo": repo_name})
+    repo_data = data.get("repository") or {}
     result: dict[str, str] = {}
     for i, name in enumerate(unique_names):
         node = repo_data.get(f"label{i}")
@@ -955,9 +1006,12 @@ query ResolveLabelIds($owner: String!, $repo: String!) {{
 def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, label_names: list[str]) -> list[str]:
     """Resolve label names via a single GraphQL query.
 
-    Returns the subset of label_names that exist in the repository.
-    Raises GithubException for auth/network/permission failures.
-    Missing individual labels are silently omitted (matches current REST behavior).
+    Returns label name strings that exist in the repository.  Uses the same
+    aliased-label query pattern as ``_resolve_label_ids_graphql`` but parses
+    the ``name`` field instead of ``id``, so only the ``name`` field is
+    required on each returned node.
+
+    Missing labels are silently omitted (matches current REST behaviour).
 
     Args:
         repo: PyGithub Repository object (provides requester access for GraphQL).
@@ -969,12 +1023,12 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
         List of label name strings that exist in the repository.
 
     Raises:
-        GithubException: If the GraphQL request fails (auth, network, permissions).
+        ValueError: If a label name contains disallowed characters.
+        BacklogError: If the GraphQL request fails (auth, network, permissions).
     """
     if not label_names:
         return []
 
-    # Deduplicate while preserving order
     seen: set[str] = set()
     unique_names: list[str] = []
     for name in label_names:
@@ -982,29 +1036,27 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
             seen.add(name)
             unique_names.append(name)
 
-    # Validate label names before embedding in query string (security: no injection)
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
             msg = f"Label name contains disallowed characters: {name!r}"
             raise ValueError(msg)
 
-    aliases = "\n".join(_LABEL_ALIAS_TEMPLATE.format(i=i, name=name) for i, name in enumerate(unique_names))
-    query = _LABEL_RESOLUTION_QUERY_TEMPLATE.format(aliases=aliases)
-    variables = {"owner": repo_owner, "repo": repo_name}
-
-    # graphql_query raises GithubException on all errors — never returns an errors dict
-    _headers, data = repo.requester.graphql_query(query, variables)
-
-    repo_node: dict[str, dict[str, str] | None] = data["data"]["repository"]
-    resolved: list[str] = []
-    for i in range(len(unique_names)):
-        alias = f"label{i}"
-        node: dict[str, str] | None = repo_node.get(alias)
-        if node is not None:
-            resolved.append(node["name"])
-        # else: label missing — silently omit (matches current REST get_label() behavior)
-
-    return resolved
+    alias_lines = [f'    label{i}: label(name: "{n}") {{ name }}' for i, n in enumerate(unique_names)]
+    query = f"""
+query ResolveLabelNames($owner: String!, $repo: String!) {{
+  repository(owner: $owner, name: $repo) {{
+{chr(10).join(alias_lines)}
+  }}
+}}
+"""
+    data = _graphql_request(repo, query, {"owner": repo_owner, "repo": repo_name})
+    repo_data = data.get("repository") or {}
+    result: list[str] = []
+    for i, name in enumerate(unique_names):
+        node = repo_data.get(f"label{i}")
+        if isinstance(node, dict) and node.get("name"):
+            result.append(str(node["name"]))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1146,8 +1198,8 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = Github(auth=Auth.Token(token), timeout=10)
         return gh.get_repo(repo)
-    except GithubException:
-        logger.exception("try_get_github: GitHub API error for repo %r", repo)
+    except GithubException as exc:
+        logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
         return None
 
 
@@ -1454,7 +1506,9 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
         output: Optional Output collector for status/warning messages.
 
     Raises:
-        GithubException: On GitHub API failure other than label-not-found (404).
+        GithubException: On GitHub API failure other than label-not-found (404)
+            during label creation.  GraphQL label-update failures emit a warning
+            via ``output`` instead of raising.
     """
     if not item.issue:
         return
@@ -1479,11 +1533,14 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
             name="status:verified", color="0e8a16", description="Quality gates passed via /complete-implementation"
         )
     # Compute desired label set: add verified, remove in-progress
-    desired_names = [n for n in current_names if n != "status:in-progress"] + ["status:verified"]
-    id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-    desired_ids = [id_map[n] for n in desired_names if n in id_map]
-    _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-    out.info("  Status: verified")
+    try:
+        desired_names = [n for n in current_names if n != "status:in-progress"] + ["status:verified"]
+        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
+        desired_ids = [id_map[n] for n in desired_names if n in id_map]
+        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
+        out.info("  Status: verified")
+    except BacklogError as e:
+        out.warn(f"  WARNING: Could not set status: {e}")
 
 
 def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -1502,7 +1559,9 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
         output: Optional Output collector for status/warning messages.
 
     Raises:
-        GithubException: On GitHub API failure other than label-not-found (404).
+        GithubException: On GitHub API failure other than label-not-found (404)
+            during label creation.  GraphQL label-update failures emit a warning
+            via ``output`` instead of raising.
     """
     if not item.issue:
         return
@@ -1527,11 +1586,14 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
             name="status:groomed", color="0075ca", description="Grooming complete — all sections written and approved"
         )
     # Compute desired label set: add groomed, remove needs-grooming
-    desired_names = [n for n in current_names if n != "status:needs-grooming"] + ["status:groomed"]
-    id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-    desired_ids = [id_map[n] for n in desired_names if n in id_map]
-    _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-    out.info("  Status: groomed")
+    try:
+        desired_names = [n for n in current_names if n != "status:needs-grooming"] + ["status:groomed"]
+        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
+        desired_ids = [id_map[n] for n in desired_names if n in id_map]
+        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
+        out.info("  Status: groomed")
+    except BacklogError as e:
+        out.warn(f"  WARNING: Could not set status: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -1539,23 +1601,25 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
 # ---------------------------------------------------------------------------
 
 
-def fetch_open_issues_by_title(repo: Repository) -> dict[str, int]:
+def fetch_open_issues_by_title(repo: Repository, issues: list[IssueNode] | None = None) -> dict[str, int]:
     """Fetch all open issues and return ``{normalized_title: issue_number}`` map.
 
     When duplicates exist, keeps the lowest issue number (the original).
 
+    Args:
+        repo: PyGithub Repository object.
+        issues: Optional pre-fetched list of IssueNode dicts.  When provided,
+            the GraphQL fetch is skipped and the list is used directly.  Pass
+            this from a shared ``sync_issues_graphql`` call to avoid a second
+            round-trip when the caller already holds the issue list.
+
     Returns:
         Dict mapping normalized title strings to their GitHub issue number.
     """
-    owner, repo_name = repo.full_name.split("/", 1)
-    issues = sync_issues_graphql(repo, owner, repo_name, state="OPEN")
-    title_to_num: dict[str, int] = {}
-    for issue in issues:
-        key = normalize_issue_title(issue["title"])
-        num = issue["number"]
-        if key not in title_to_num or num < title_to_num[key]:
-            title_to_num[key] = num
-    return title_to_num
+    if issues is None:
+        owner, repo_name = repo.full_name.split("/", 1)
+        issues = sync_issues_graphql(repo, owner, repo_name, state="OPEN")
+    return issues_to_title_map(issues)
 
 
 # ---------------------------------------------------------------------------
@@ -1587,8 +1651,11 @@ def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = 
     for lb in result.labels:
         if lb.startswith("priority:"):
             result.priority = lb.split(":", 1)[1].upper()
+            break
+    for lb in result.labels:
         if lb.startswith("status:"):
             result.status = lb.split(":", 1)[1]
+            break
     return True
 
 
@@ -1679,7 +1746,7 @@ def _insert_named_section(body: str, section_name: str, content: str, today_str:
         )
         if section_re.search(body):
             new_block = header + content + "\n"
-            return section_re.sub(lambda _: f"\n{new_block}", body)
+            return section_re.sub(lambda _: f"\n{new_block}", body, count=1)
         return body.rstrip() + "\n\n" + header + content + "\n"
 
     sub_header = f"### {section_name.strip()}\n\n"
@@ -1691,7 +1758,7 @@ def _insert_named_section(body: str, section_name: str, content: str, today_str:
     if gm:
         groomed_body = gm.group(2)
         if sub_re.search(groomed_body):
-            new_groomed_body = sub_re.sub(lambda _: f"\n{sub_header}{content}\n", groomed_body)
+            new_groomed_body = sub_re.sub(lambda _: f"\n{sub_header}{content}\n", groomed_body, count=1)
         else:
             new_groomed_body = groomed_body.rstrip() + "\n\n" + sub_header + content + "\n"
         captured = gm.group(1) + new_groomed_body + "\n"
@@ -1803,14 +1870,16 @@ def create_task_issue(
     owner, repo_name = repo.full_name.split("/", 1)
     repo_node_id = _get_repo_node_id(repo)
 
+    label_ids: list[str] = []
     if label_names:
-        id_map = _resolve_label_ids_graphql(repo, owner, repo_name, label_names)
-        for name in label_names:
-            if name not in id_map:
-                out.warn(f"  WARNING: label '{name}' not found, skipping")
-        label_ids = list(id_map.values())
-    else:
-        label_ids = []
+        try:
+            id_map = _resolve_label_ids_graphql(repo, owner, repo_name, label_names)
+            for name in label_names:
+                if name not in id_map:
+                    out.warn(f"  WARNING: label '{name}' not found, skipping")
+            label_ids = list(id_map.values())
+        except BacklogError as e:
+            out.warn(f"  WARNING: Could not resolve labels, creating issue without labels: {e}")
 
     try:
         task_issue = _create_issue_graphql(repo, repo_node_id, title, body, label_ids)

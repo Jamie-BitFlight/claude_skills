@@ -198,6 +198,12 @@ class BacklogBackend(Protocol):
     #: must set this to ``False``.
     supports_batch_status_fetch: bool
 
+    #: ``True`` when :meth:`_update_issues_graphql_batch` is implemented and can
+    #: update multiple issues in a single batched GraphQL call.  Backends without
+    #: real GraphQL (beads, sqlite, memory) raise :exc:`NotImplementedError` and
+    #: must set this to ``False``.
+    supports_batch_issue_update: bool
+
     #: ``"integer"`` for GitHub-style numeric issue IDs; ``"string"`` for
     #: backends that use opaque string IDs (e.g. beads nanoids, Linear slugs).
     #: Concrete backends assign the appropriate string literal directly.
@@ -263,16 +269,17 @@ class BacklogBackend(Protocol):
     def _resolve_labels_graphql(
         self, repo: Repository, repo_owner: str, repo_name: str, label_names: list[str]
     ) -> list[str]:
-        """Resolve label names to backend node IDs.
+        """Resolve label names, returning the subset that exist in the repository.
 
         Args:
             repo: PyGithub Repository.
             repo_owner: Repository owner login.
             repo_name: Repository name.
-            label_names: Human-readable label names.
+            label_names: Human-readable label names to resolve.
 
         Returns:
-            List of node ID strings corresponding to the given names.
+            List of label name strings that exist in the repository.
+            Missing labels are omitted; order matches the input order.
         """
         ...
 
@@ -343,6 +350,24 @@ class BacklogBackend(Protocol):
             title: New title, or None to leave unchanged.
             label_ids: Replacement label node IDs, or None to leave unchanged.
             milestone_id: Replacement milestone node ID, or None to leave unchanged.
+        """
+        ...
+
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
+        """Update issue bodies in bulk using aliased GraphQL mutations.
+
+        Sends up to 25 ``updateIssue`` mutations per request using GraphQL
+        field aliasing to avoid N+1 round-trips.  Backends that do not support
+        real GraphQL must raise :exc:`NotImplementedError` and set
+        :attr:`supports_batch_issue_update` to ``False``.
+
+        Args:
+            repo: PyGithub Repository object (provides requester transport).
+            updates: List of ``(issue_node_id, body)`` pairs to apply.
+
+        Raises:
+            NotImplementedError: When the backend has no real GraphQL layer.
+            BacklogError: On GraphQL transport or partial-error response.
         """
         ...
 
