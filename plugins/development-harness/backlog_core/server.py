@@ -17,7 +17,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, cast
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -1810,6 +1810,10 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
     )
 
 
+def _is_str_bool_dict(v: object) -> TypeGuard[dict[str, str | bool]]:
+    return isinstance(v, dict) and all(isinstance(k, str) and isinstance(val, (str, bool)) for k, val in v.items())
+
+
 def _extract_item_list(result: Mapping[str, object]) -> list[dict[str, str | bool]]:
     """Extract the typed item list from a raw operations.list_items result dict.
 
@@ -1832,10 +1836,7 @@ def _extract_item_list(result: Mapping[str, object]) -> list[dict[str, str | boo
     raw = result.get("items", [])
     if not isinstance(raw, list):
         return []
-    # isinstance(item, dict) confirms each element is a dict at runtime;
-    # cast is required because ty cannot narrow list[object] elements to the
-    # specific dict[str, str | bool] value type used by backlog item dicts.
-    return [cast("dict[str, str | bool]", item) for item in raw if isinstance(item, dict)]
+    return [item for item in raw if _is_str_bool_dict(item)]
 
 
 def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] | None, list[str]]:
