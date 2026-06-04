@@ -3147,6 +3147,7 @@ def _assemble_view_compact(
             matched_indices = _resolve_section_indices(names, section)
             if not matched_indices:
                 result.section_filter_miss = True
+                result.section_filter_valid_names = names
                 all_sections = []
             else:
                 all_sections = [all_sections[i] for i in matched_indices]

@@ -15,7 +15,7 @@ import sys
 import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 import git
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -108,7 +108,10 @@ def get_config() -> BacklogConfig:
                     raise RuntimeError(msg) from exc
                 _log.warning("BacklogConfig auto-initialised from inferred project root: %s", root)
                 init_paths(project_dir=str(root))
-    return cast("BacklogConfig", _config)  # init_paths() always sets _config
+    if _config is None:
+        msg = "BacklogConfig invariant violated: _config is None after init_paths()"
+        raise RuntimeError(msg)
+    return _config
 
 
 def get_repo_root() -> Path:

@@ -13,7 +13,7 @@ Does NOT:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeGuard, cast
+from typing import TYPE_CHECKING, TypeGuard
 
 if TYPE_CHECKING:
     from backlog_core.models import GroomedSectionMetadata, SectionEntryMetadata, ViewItemResult
@@ -104,9 +104,8 @@ def _is_entry_section_metadata(
     - ``SectionEntryMetadata``: no ``type`` key, has ``entries: list[SectionEntryDict]``.
     - ``GroomedSectionMetadata``: ``type == "groomed"``, has ``subsections``, no flat entries.
     """
-    # TypedDict boundary: cast to dict[str, object] to access .get() across the union.
-    # SectionEntryMetadata and GroomedSectionMetadata cannot be narrowed via isinstance.
-    return cast("dict[str, object]", section).get("type") != "groomed"
+    # TypedDicts are plain dicts at runtime; "type" is only present on GroomedSectionMetadata.
+    return "type" not in section
 
 
 def _build_entries(section: SectionEntryMetadata | GroomedSectionMetadata) -> list[NormalizedEntry]:
