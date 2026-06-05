@@ -28,7 +28,7 @@ import sys
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypeAlias, TypeGuard, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeAlias, TypeGuard, runtime_checkable
 
 from github import Auth, Github, GithubException, InputFileContent
 
@@ -59,8 +59,9 @@ import dh_paths as _dh_paths
 
 logger = logging.getLogger(__name__)
 
+from github.AuthenticatedUser import AuthenticatedUser
+
 if TYPE_CHECKING:
-    from github.AuthenticatedUser import AuthenticatedUser
     from github.Gist import Gist
 
 # Re-export so callers that imported these from artifact_provider continue to work.
@@ -735,7 +736,11 @@ class GitHubGistArtifactProvider:
             github.GithubException: On other GitHub API failures.
         """
         gh = _make_github_client()
-        user = cast("AuthenticatedUser", gh.get_user())
+        user_ = gh.get_user()
+        if not isinstance(user_, AuthenticatedUser):
+            msg = "GitHub client returned NamedUser instead of AuthenticatedUser — token may lack user scope"
+            raise BacklogError(msg)
+        user = user_
         try:
             gist = user.create_gist(public=False, files=initial_files, description=f"artifact-manifest-item-{item_id}")
         except GithubException as exc:
