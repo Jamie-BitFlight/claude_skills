@@ -51,7 +51,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeGuard
 
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_models import BeadsIssueRaw, parse_show_issue
@@ -85,6 +85,11 @@ _DH_ARTIFACTS_KEY: str = "dh.artifacts"
 # ---------------------------------------------------------------------------
 
 
+def _is_dict_of_object(v: object) -> TypeGuard[dict[str, object]]:
+    """Return True when v is a dict with string keys."""
+    return isinstance(v, dict) and all(isinstance(k, str) for k in v)
+
+
 def _extract_manifest_from_metadata(metadata: dict[str, object]) -> ArtifactManifest | None:
     """Extract an ``ArtifactManifest`` from a bd metadata dict.
 
@@ -111,10 +116,8 @@ def _extract_manifest_from_metadata(metadata: dict[str, object]) -> ArtifactMani
     """
     # Try nested: metadata["dh"]["artifacts"]
     dh_section_raw = metadata.get("dh")
-    if isinstance(dh_section_raw, dict):
-        # cast: ty cannot infer dict type params from isinstance narrowing on `object`
-        dh_section = cast("dict[str, object]", dh_section_raw)
-        artifacts_raw = dh_section.get("artifacts")
+    if _is_dict_of_object(dh_section_raw):
+        artifacts_raw = dh_section_raw.get("artifacts")
         if artifacts_raw is not None:
             return _parse_manifest_value(artifacts_raw)
 
