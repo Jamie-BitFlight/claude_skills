@@ -2192,9 +2192,8 @@ def refresh_local_cache_from_github(
     out = output or Output()
     repo_obj = try_get_github(repo)
     if repo_obj is None:
-        raise BackendUnavailableError(
-            "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."
-        )
+        msg = "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."
+        raise BackendUnavailableError(msg)
 
     owner, repo_name = repo_obj.full_name.split("/", 1)
     label_names: list[str] | None = [label] if label else None
@@ -2762,10 +2761,11 @@ def _build_sections_metadata(
             # entry-block.  Enforce this at runtime instead of relying on a silent cast().
             existing = sections[sec_name]
             if not _is_section_entry_metadata(existing):
-                raise TypeError(
+                msg = (
                     f"_build_sections_metadata invariant violated: expected SectionEntryMetadata "
                     f"for section {sec_name!r} but found {type(existing).__name__}"
                 )
+                raise TypeError(msg)
             sections[sec_name] = _merge_section_entries(existing, entry_dicts)
         else:
             active_count = sum(1 for e in entries if not e.struck)
@@ -3185,18 +3185,25 @@ def _assemble_view_compact(
 def _sections_from_body_or_yaml(
     body: str, item: BacklogItem | None, show: str | int | None, since: str | None
 ) -> dict[str, SectionEntryMetadata | GroomedSectionMetadata]:
-    """Return section metadata preferring body-parsed IDs, falling back to YAML.
+    """Return section metadata preferring body-parsed structure, falling back to YAML.
 
-    ``_build_sections_metadata`` parses entry-block wrappers
-    (``<div><sub>timestamp</sub>…</div>``) to extract real entry IDs.  When the
-    body contains no such wrappers — e.g. a plain-text GitHub body or a body
-    produced by ``render_sections_as_body`` which drops ``e.id`` — every entry
-    receives the ``"0000-00-00T00:00:00Z"`` zero-timestamp fallback.
+    Priority order:
+    1. Body has entry-block wrappers (``<div><sub>timestamp</sub>…</div>``) —
+       ``_build_sections_metadata`` extracts real entry IDs from the blocks.
+    2. Body has ``##``/``###`` section headers but no entry blocks (plain-text
+       GitHub body) — ``_build_sections_metadata`` parses the headers directly.
+       Entries receive the ``"0000-00-00T00:00:00Z"`` zero-timestamp fallback,
+       but the section names are authoritative: the body is always the primary
+       source of truth for which sections exist.
+    3. No body headers at all, but the local YAML item has structured sections —
+       ``_build_sections_from_yaml_item`` reads entry IDs from the YAML directly.
+    4. Neither source available — return ``{}``.
 
-    This helper avoids that corruption: it only calls ``_build_sections_metadata``
-    when the body actually contains at least one ``ENTRY_RE`` match.  Otherwise it
-    falls back to ``_build_sections_from_yaml_item``, which reads entry IDs
-    directly from the structured ``BacklogItem.sections``.
+    The YAML fallback fires only when the body has no recognisable section
+    structure.  Preferring YAML over a plain-text body with headers was wrong:
+    the YAML item's section names can differ from the live body (e.g. a freshly
+    created item that hasn't been synced), which caused section-filter misses
+    and incorrect ``result.sections`` on paginated plain-text bodies.
 
     Args:
         body: The (possibly paginated) body string to inspect.
@@ -3209,6 +3216,8 @@ def _sections_from_body_or_yaml(
         Section metadata mapping.  Empty dict when neither source is available.
     """
     if ENTRY_RE.search(body):
+        return _build_sections_metadata(body, show, since, section=None)
+    if _SECTION_BOUNDARY_RE.search(body):
         return _build_sections_metadata(body, show, since, section=None)
     if item and item.sections:
         return _build_sections_from_yaml_item(item)
