@@ -55,7 +55,7 @@ from typing import TYPE_CHECKING, Any
 
 from ruamel.yaml import YAML
 
-from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError
+from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError, PlanNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -592,20 +592,29 @@ class GistTaskLayer:
         yaml_content = self._read_local_yaml_for_plan(plan_id)
         content_hash = hashlib.sha256(yaml_content.encode()).hexdigest()
 
-        local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
-        hash_sidecar = local_path.with_suffix(".sha256")
+        # Resolve sidecar path best-effort — _resolve_path should not fail here
+        # since _read_local_yaml_for_plan just succeeded, but guard against races.
+        hash_sidecar: Path | None = None
+        try:
+            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+            hash_sidecar = local_path.with_suffix(".sha256")
+        except PlanNotFoundError:
+            _log.debug(
+                "GistTaskLayer._write_through: path resolution failed for plan %s — skipping hash dedup", plan_id
+            )
 
         # Skip the Gist PATCH when the content is unchanged since last upload.
-        try:
-            if hash_sidecar.read_text().strip() == content_hash:
-                _log.debug(
-                    "GistTaskLayer._write_through: content unchanged for plan %s (issue #%d), skipping Gist PATCH",
-                    plan_id,
-                    issue,
-                )
-                return
-        except OSError:
-            pass  # Sidecar absent or unreadable — upload as normal
+        if hash_sidecar is not None:
+            try:
+                if hash_sidecar.read_text().strip() == content_hash:
+                    _log.debug(
+                        "GistTaskLayer._write_through: content unchanged for plan %s (issue #%d), skipping Gist PATCH",
+                        plan_id,
+                        issue,
+                    )
+                    return
+            except OSError:
+                pass  # Sidecar absent or unreadable — upload as normal
 
         try:
             self._artifact_client.store(issue=issue, content=yaml_content)
@@ -616,8 +625,9 @@ class GistTaskLayer:
             )
             raise
 
-        with contextlib.suppress(OSError):
-            hash_sidecar.write_text(content_hash)
+        if hash_sidecar is not None:
+            with contextlib.suppress(OSError):
+                hash_sidecar.write_text(content_hash)
 
     def update_plan_fields(
         self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
