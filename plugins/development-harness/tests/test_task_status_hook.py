@@ -1172,3 +1172,193 @@ def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
 
     # Assert — update still proceeds (best-effort activity tracking continues)
     mock_update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Change 1 — _call_sam_fastmcp target parameter
+# ---------------------------------------------------------------------------
+
+
+def test_call_sam_fastmcp_explicit_target_passed_to_subprocess(mocker: MockerFixture) -> None:
+    """_call_sam_fastmcp forwards an explicit target to --target in the subprocess arg list.
+
+    The function signature changed from _call_sam_fastmcp(input_data, timeout) to
+    _call_sam_fastmcp(input_data, timeout, target). This test proves the wiring:
+    the value passed as target appears at the position immediately after --target in
+    the subprocess command, not merely somewhere in the arg list.
+    """
+    # Arrange
+    outer = {"content": [{"text": json.dumps({"ok": True})}]}
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_run = mocker.patch("subprocess.run", return_value=response)
+
+    # Act
+    _hook_mod._call_sam_fastmcp({"action": "get"}, timeout=10, target="sam_active_task")
+
+    # Assert — --target is present and its value is the explicit target, not the default
+    mock_run.assert_called_once()
+    cmd: list[str] = mock_run.call_args[0][0]
+    assert "--target" in cmd
+    target_value = cmd[cmd.index("--target") + 1]
+    assert target_value == "sam_active_task"
+
+
+def test_call_sam_fastmcp_default_target_is_sam_task(mocker: MockerFixture) -> None:
+    """_call_sam_fastmcp defaults to target='sam_task' when no target is supplied.
+
+    Verifies the default value is still wired correctly after the signature change,
+    ensuring callers that omit target (e.g. _call_sam_task_state, _call_sam_task_update)
+    continue to route to sam_task.
+    """
+    # Arrange
+    outer = {"content": [{"text": json.dumps({"ok": True})}]}
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_run = mocker.patch("subprocess.run", return_value=response)
+
+    # Act — no target argument; rely on default
+    _hook_mod._call_sam_fastmcp({"action": "read"}, timeout=10)
+
+    # Assert — --target value is the default sam_task
+    mock_run.assert_called_once()
+    cmd: list[str] = mock_run.call_args[0][0]
+    assert "--target" in cmd
+    target_value = cmd[cmd.index("--target") + 1]
+    assert target_value == "sam_task"
+
+
+# ---------------------------------------------------------------------------
+# _call_sam_active_task_get — target wiring
+# ---------------------------------------------------------------------------
+
+
+def test_call_sam_active_task_get_passes_sam_active_task_target(mocker: MockerFixture) -> None:
+    """_call_sam_active_task_get forwards 'sam_active_task' as --target to the subprocess.
+
+    A bug where the wrapper passes 'sam_task' instead would silently route the
+    call to the wrong MCP tool and return (None, None, None) without any error,
+    making it a correctness failure invisible at the call site.
+    """
+    # Arrange — valid active task response so the call succeeds
+    active_task_data = {"active_task": {"task_file_path": "Pf4281187", "task_id": "T1", "parent_issue_number": None}}
+    outer = {"content": [{"text": json.dumps(active_task_data)}]}
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
+
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_run = mocker.patch("subprocess.run", return_value=response)
+
+    # Act
+    _hook_mod._call_sam_active_task_get("test-session-id")
+
+    # Assert — the value immediately after --target must be 'sam_active_task'
+    mock_run.assert_called_once()
+    cmd: list[str] = mock_run.call_args[0][0]
+    assert "--target" in cmd
+    assert cmd[cmd.index("--target") + 1] == "sam_active_task"
+
+
+def test_call_sam_active_task_clear_passes_sam_active_task_target(mocker: MockerFixture) -> None:
+    """_call_sam_active_task_clear forwards 'sam_active_task' as --target to the subprocess.
+
+    A bug where the wrapper passes 'sam_task' instead would route the clear call
+    to the wrong MCP tool, leaving stale active-task context and causing the next
+    SubagentStop to read a ghost task.
+    """
+    # Arrange — clear response; wrapper only checks stdout is not None
+    clear_data = {"cleared": True}
+    outer = {"content": [{"text": json.dumps(clear_data)}]}
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
+
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_run = mocker.patch("subprocess.run", return_value=response)
+
+    # Act
+    _hook_mod._call_sam_active_task_clear("test-session-id")
+
+    # Assert — the value immediately after --target must be 'sam_active_task'
+    mock_run.assert_called_once()
+    cmd: list[str] = mock_run.call_args[0][0]
+    assert "--target" in cmd
+    assert cmd[cmd.index("--target") + 1] == "sam_active_task"
+
+
+# ---------------------------------------------------------------------------
+# Change 2 — _cleanup_active_task_context suppresses FileNotFoundError only
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_active_task_context_propagates_permission_error(mocker: MockerFixture, tmp_path: Path) -> None:
+    """_cleanup_active_task_context lets PermissionError propagate from fallback unlink.
+
+    The old code used suppress(OSError), which swallowed PermissionError (an OSError
+    subclass). The new code uses suppress(FileNotFoundError). PermissionError is NOT
+    a FileNotFoundError, so it must propagate — a filesystem access problem is a real
+    failure that must be observable, not silently discarded.
+    """
+    # Arrange — session_id=None forces the fallback filesystem path (skips MCP clear)
+    fallback_file = tmp_path / "active-task-sess.json"
+    fallback_file.write_text("{}")
+    mocker.patch.object(Path, "unlink", side_effect=PermissionError("read-only filesystem"))
+
+    # Act & Assert — PermissionError must propagate; suppress(FileNotFoundError) does not catch it
+    with pytest.raises(PermissionError):
+        _hook_mod._cleanup_active_task_context(session_id=None, fallback_context_file=fallback_file)
+
+
+def test_cleanup_active_task_context_suppresses_file_not_found(mocker: MockerFixture, tmp_path: Path) -> None:
+    """_cleanup_active_task_context silently ignores FileNotFoundError during fallback unlink.
+
+    FileNotFoundError means the context file was already removed by a concurrent
+    process — this is expected during parallel agent teardown and should not fail.
+    """
+    # Arrange — session_id=None forces the fallback filesystem path
+    fallback_file = tmp_path / "active-task-sess.json"
+    # File does not need to exist; suppress(FileNotFoundError) should absorb the error
+    mocker.patch.object(Path, "unlink", side_effect=FileNotFoundError("already gone"))
+
+    # Act — must not raise; FileNotFoundError is a legitimate concurrent-removal scenario
+    _hook_mod._cleanup_active_task_context(session_id=None, fallback_context_file=fallback_file)
+
+
+# ---------------------------------------------------------------------------
+# Change 3 — read_task_context logs to stderr on malformed JSON
+# ---------------------------------------------------------------------------
+
+
+def test_read_task_context_returns_none_tuple_and_logs_on_malformed_json(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """read_task_context returns (None, None) and emits a [hook]-prefixed stderr message on bad JSON.
+
+    The contract (None, None) is unchanged from the pre-refactor behavior. The new
+    observable behavior is the stderr log: callers need to know the context file is
+    malformed so the failure is not invisible in production. The message must contain
+    the file path so operators can locate and delete the corrupt file.
+    """
+    # Arrange — create a real malformed JSON file at the context path
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    import dh_paths  # dh_paths is a runtime import needed after env setup
+
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    session_id = "sess-bad-json"
+    context_file = context_dir / f"active-task-{session_id}.json"
+    context_file.write_text("{not valid json", encoding="utf-8")
+
+    cwd = tmp_path
+
+    # Act
+    result = _hook_mod.read_task_context(cwd, session_id)
+
+    # Assert — contract: returns (None, None)
+    assert result == (None, None)
+
+    # Assert — stderr contains [hook] prefix and the file path
+    captured = capsys.readouterr()
+    assert "[hook]" in captured.err
+    assert str(context_file) in captured.err
