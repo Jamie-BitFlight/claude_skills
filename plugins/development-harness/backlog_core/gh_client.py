@@ -23,6 +23,7 @@ from typing_extensions import TypedDict
 
 from . import models as _models
 from .backend_protocol import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from .entry_blocks import wrap_entry
 from .models import (
     TYPE_TO_LABEL,
     BackendAvailability,
@@ -996,7 +997,7 @@ query ResolveLabelIds($owner: String!, $repo: String!) {{
     data = _graphql_request(repo, query, {"owner": owner, "repo": repo_name})
     repo_data = data.get("repository") or {}
     result: dict[str, str] = {}
-    for i, name in enumerate(unique_names):
+    for i in range(len(unique_names)):
         node = repo_data.get(f"label{i}")
         if isinstance(node, dict) and node.get("id"):
             result[name] = str(node["id"])
@@ -1052,7 +1053,7 @@ query ResolveLabelNames($owner: String!, $repo: String!) {{
     data = _graphql_request(repo, query, {"owner": repo_owner, "repo": repo_name})
     repo_data = data.get("repository") or {}
     result: list[str] = []
-    for i, name in enumerate(unique_names):
+    for i in range(len(unique_names)):
         node = repo_data.get(f"label{i}")
         if isinstance(node, dict) and node.get("name"):
             result.append(str(node["name"]))
@@ -1739,15 +1740,16 @@ def _insert_named_section(body: str, section_name: str, content: str, today_str:
         Updated body string.
     """
     section_lower = section_name.strip().lower()
+    wrapped = wrap_entry(content)
     if section_lower in {"fact-check", "rt-ica"}:
         header = f"## {section_name.strip()}\n\n"
         section_re = re.compile(
             rf"\n## {re.escape(section_name.strip())}[^\n]*\n([\s\S]*?)(?=\n## |\Z)", re.IGNORECASE | re.MULTILINE
         )
         if section_re.search(body):
-            new_block = header + content + "\n"
+            new_block = header + wrapped + "\n"
             return section_re.sub(lambda _: f"\n{new_block}", body, count=1)
-        return body.rstrip() + "\n\n" + header + content + "\n"
+        return body.rstrip() + "\n\n" + header + wrapped + "\n"
 
     sub_header = f"### {section_name.strip()}\n\n"
     sub_re = re.compile(
@@ -1758,12 +1760,12 @@ def _insert_named_section(body: str, section_name: str, content: str, today_str:
     if gm:
         groomed_body = gm.group(2)
         if sub_re.search(groomed_body):
-            new_groomed_body = sub_re.sub(lambda _: f"\n{sub_header}{content}\n", groomed_body, count=1)
+            new_groomed_body = sub_re.sub(lambda _: f"\n{sub_header}{wrapped}\n", groomed_body, count=1)
         else:
-            new_groomed_body = groomed_body.rstrip() + "\n\n" + sub_header + content + "\n"
+            new_groomed_body = groomed_body.rstrip() + "\n\n" + sub_header + wrapped + "\n"
         captured = gm.group(1) + new_groomed_body + "\n"
         return groomed_block_re.sub(lambda _: captured, body, count=1)
-    return body.rstrip() + f"\n\n## Groomed ({today_str})\n\n{sub_header}{content}\n"
+    return body.rstrip() + f"\n\n## Groomed ({today_str})\n\n{sub_header}{wrapped}\n"
 
 
 def sync_groomed_to_github_issue(
