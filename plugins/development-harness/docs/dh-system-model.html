@@ -1222,7 +1222,7 @@ class SectionParser:
 <!-- ───────────────────────────────────────────── FULL WORKFLOW -->
 <section id="workflow">
   <h2>Full Workflow — Backlog Item Creation to Completion</h2>
-  <p>Every phase shown here is verified against the actual reference files in <code>skills/work-backlog-item/references/workflows/</code> and <code>skills/complete-implementation/references/</code>. Agents, artifacts, storage locations, and gates are cited from source.</p>
+  <p>Every phase shown here is verified against the actual reference files in <a href="../skills/work-backlog-item/references/workflows/"><code>skills/work-backlog-item/references/workflows/</code></a> and <a href="../skills/complete-implementation/references/"><code>skills/complete-implementation/references/</code></a>. Agents, artifacts, storage locations, and gates are cited from source.</p>
 
   <h3>Phase overview</h3>
   <div class="diagram-wrap">
@@ -1234,7 +1234,7 @@ flowchart LR
     A(["/dh:add-new-feature\ndiscovery → plan"])
     I(["/dh:implement-feature\ndispatch loop"])
     CI(["/dh:complete-implementation\nquality gates"])
-    DONE([Item closed\nGitHub Issue closed])
+    DONE([Item closed\nBackend item closed])
 
     C --> G --> W --> A --> I --> CI --> DONE
 
@@ -1276,7 +1276,7 @@ flowchart TD
     W1E["rtica-assessor\nwaits for IA + FC\n→ RT-ICA intermediate"]
     W2["Wave 2 — groomer\nwaits for rtica + classifier\n→ all Groomed subsections"]
     FIN["finalize.md\nRT-ICA Final Pass\nOutput Validation Gate\nbacklog_groom(sections=all, mark_groomed=True)"]
-    DONE2(["Item status: groomed\nAll sections in GitHub body"])
+    DONE2(["Item status: groomed\nAll sections in backend item body"])
 
     IN --> AN
     AN --> W0
@@ -1296,14 +1296,14 @@ flowchart TD
   <table>
     <thead><tr><th>Agent</th><th>Waits for</th><th>Produces</th><th>Stored at</th><th>Consumed by</th></tr></thead>
     <tbody>
-      <tr><td><code>technical-researcher</code></td><td>—</td><td>Research section</td><td>GitHub body via <code>backlog_groom(section='Research')</code></td><td>fact-checker (Wave 1)</td></tr>
-      <tr><td><code>impact-analyst</code></td><td>—</td><td>Impact Radius section</td><td>GitHub body via <code>backlog_groom(section='Impact Radius')</code></td><td>rtica-assessor, alignment-analyst, work/prepare (Step 4.1)</td></tr>
-      <tr><td><code>fact-checker</code></td><td>Research (if available)</td><td>Fact-Check section</td><td>GitHub body via <code>backlog_groom(section='Fact-Check')</code></td><td>rtica-assessor</td></tr>
-      <tr><td><code>classifier</code></td><td>—</td><td>Issue Classification + Root-Cause Analysis</td><td>GitHub body via <code>backlog_groom(section='Issue Classification')</code></td><td>groomer (Wave 2), work/prepare (domain routing)</td></tr>
-      <tr><td><code>alignment-analyst</code></td><td>impact-analyst</td><td>Design Intent Alignment section</td><td>GitHub body via <code>backlog_groom(section='Design Intent Alignment')</code></td><td>groomer context</td></tr>
-      <tr><td><code>rtica-assessor</code></td><td>impact-analyst + fact-checker</td><td>RT-ICA intermediate (replaced by Final Pass)</td><td>GitHub body via <code>backlog_groom(section='RT-ICA')</code></td><td>groomer gate, finalize.md</td></tr>
-      <tr><td><code>groomer</code></td><td>rtica-assessor + classifier</td><td>All Groomed subsections (12 sections)</td><td>GitHub body via <code>backlog_groom(section='...')</code> per subsection</td><td>work/prepare (feature request composition)</td></tr>
-      <tr><td><strong>finalize.md</strong> (orchestrator)</td><td>All Wave 1 + Wave 2</td><td>RT-ICA Final (replaces intermediate) + atomic mark_groomed</td><td>GitHub body; status label <code>status:groomed</code></td><td>work/prepare (RT-ICA gate)</td></tr>
+      <tr><td><code>technical-researcher</code></td><td>—</td><td>Research section</td><td>Backend item body via <code>backlog_groom(section='Research')</code></td><td>fact-checker (Wave 1)</td></tr>
+      <tr><td><code>impact-analyst</code></td><td>—</td><td>Impact Radius section</td><td>Backend item body via <code>backlog_groom(section='Impact Radius')</code></td><td>rtica-assessor, alignment-analyst, work/prepare (Step 4.1)</td></tr>
+      <tr><td><code>fact-checker</code></td><td>Research (if available)</td><td>Fact-Check section</td><td>Backend item body via <code>backlog_groom(section='Fact-Check')</code></td><td>rtica-assessor</td></tr>
+      <tr><td><code>classifier</code></td><td>—</td><td>Issue Classification + Root-Cause Analysis</td><td>Backend item body via <code>backlog_groom(section='Issue Classification')</code></td><td>groomer (Wave 2), work/prepare (domain routing)</td></tr>
+      <tr><td><code>alignment-analyst</code></td><td>impact-analyst</td><td>Design Intent Alignment section</td><td>Backend item body via <code>backlog_groom(section='Design Intent Alignment')</code></td><td>groomer context</td></tr>
+      <tr><td><code>rtica-assessor</code></td><td>impact-analyst + fact-checker</td><td>RT-ICA intermediate (replaced by Final Pass)</td><td>Backend item body via <code>backlog_groom(section='RT-ICA')</code></td><td>groomer gate, finalize.md</td></tr>
+      <tr><td><code>groomer</code></td><td>rtica-assessor + classifier</td><td>All Groomed subsections (12 sections)</td><td>Backend item body via <code>backlog_groom(section='...')</code> per subsection</td><td>work/prepare (feature request composition)</td></tr>
+      <tr><td><strong>finalize.md</strong> (orchestrator)</td><td>All Wave 1 + Wave 2</td><td>RT-ICA Final (replaces intermediate) + atomic mark_groomed</td><td>Backend item body; status label <code>status:groomed</code></td><td>work/prepare (RT-ICA gate)</td></tr>
     </tbody>
   </table>
 
@@ -1407,13 +1407,13 @@ flowchart TD
   <table>
     <thead><tr><th>Gate</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Blocks if</th></tr></thead>
     <tbody>
-      <tr><td>Concerns pre-gate</td><td>GitHub body Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>GitHub body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
+      <tr><td>Concerns pre-gate</td><td>GitHub body Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>Backend item body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
       <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification YAML artifact (PASS/FAIL + criterion diff)</td><td>Gist via <code>artifact_register(type='TN-verification')</code></td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
       <tr><td><code>feature-verifier</code></td><td>feature-context, architect artifacts via <code>artifact_read()</code></td><td>feature-verification artifact (VERIFIED or GAPS_FOUND)</td><td>Gist via <code>artifact_register(type='feature-verification')</code></td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
       <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Gist via <code>artifact_register(type='audit-report')</code></td><td>Never blocks — feeds service-docs-maintainer</td></tr>
       <tr><td><code>service-docs-maintainer</code></td><td>audit-report artifact, implementation files</td><td>Updated documentation files (README, docstrings, examples)</td><td>Repository files (Write tool — committed)</td><td>Never blocks</td></tr>
       <tr><td><code>context-refinement</code></td><td>Task files, architect artifact, feature-context artifact, implementation code</td><td>Post-impl annotations appended to architect + feature-context</td><td>SAM plan artifacts via <code>sam_plan(action='update', append)</code></td><td>BLOCKED if context drift unresolvable</td></tr>
-      <tr><td>Closure</td><td>All gate verdicts</td><td>Status label <code>status:closed</code>; GitHub Issue closed</td><td>GitHub Issue + backlog item metadata</td><td>Any gate with FAIL verdict</td></tr>
+      <tr><td>Closure</td><td>All gate verdicts</td><td>Status label <code>status:closed</code>; backend item closed via <code>backlog_close()</code></td><td>Backlog item metadata (backend-specific)</td><td>Any gate with FAIL verdict</td></tr>
     </tbody>
   </table>
 
