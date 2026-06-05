@@ -3182,6 +3182,39 @@ def _assemble_view_compact(
                 result.sections_index = index
 
 
+def _sections_from_body_or_yaml(
+    body: str, item: BacklogItem | None, show: str | int | None, since: str | None
+) -> dict[str, SectionEntryMetadata | GroomedSectionMetadata]:
+    """Return section metadata preferring body-parsed IDs, falling back to YAML.
+
+    ``_build_sections_metadata`` parses entry-block wrappers
+    (``<div><sub>timestamp</sub>…</div>``) to extract real entry IDs.  When the
+    body contains no such wrappers — e.g. a plain-text GitHub body or a body
+    produced by ``render_sections_as_body`` which drops ``e.id`` — every entry
+    receives the ``"0000-00-00T00:00:00Z"`` zero-timestamp fallback.
+
+    This helper avoids that corruption: it only calls ``_build_sections_metadata``
+    when the body actually contains at least one ``ENTRY_RE`` match.  Otherwise it
+    falls back to ``_build_sections_from_yaml_item``, which reads entry IDs
+    directly from the structured ``BacklogItem.sections``.
+
+    Args:
+        body: The (possibly paginated) body string to inspect.
+        item: Local YAML item whose structured sections carry real entry IDs.
+            May be ``None`` when no local item is available.
+        show: Entry display filter forwarded to ``_build_sections_metadata``.
+        since: ISO date/datetime filter forwarded to ``_build_sections_metadata``.
+
+    Returns:
+        Section metadata mapping.  Empty dict when neither source is available.
+    """
+    if ENTRY_RE.search(body):
+        return _build_sections_metadata(body, show, since, section=None)
+    if item and item.sections:
+        return _build_sections_from_yaml_item(item)
+    return {}
+
+
 def _assemble_view_content(
     result: ViewItemResult,
     item: BacklogItem | None,
@@ -3266,7 +3299,7 @@ def _assemble_view_content(
             # unbounded index must not displace the explicitly-requested page via
             # the over-budget gate).
             elif not paginate:
-                result.sections = _build_sections_metadata(body, show, since, section=None)
+                result.sections = _sections_from_body_or_yaml(body, item, show, since)
                 pending_index = _build_sections_index_from_body(body)
         elif item and item.sections:
             # YAML fallback: ``_populate_yaml_item_content`` builds the richer
@@ -3287,7 +3320,7 @@ def _assemble_view_content(
         # (#2495 M1).
         if paginate and result.body:
             _paginate_body_result(result, result.body, offset, limit)
-            result.sections = _build_sections_metadata(result.body, show, since, section=None)
+            result.sections = _sections_from_body_or_yaml(result.body, item, show, since)
         # Prepend the deferred display-only ``## Sections`` index to the final,
         # post-pagination body in the NON-paged ``section is None`` path (#2495 M1).
         # ``pending_index`` is built only on that path (it is ``""`` whenever
