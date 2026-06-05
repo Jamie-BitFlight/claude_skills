@@ -997,7 +997,7 @@ query ResolveLabelIds($owner: String!, $repo: String!) {{
     data = _graphql_request(repo, query, {"owner": owner, "repo": repo_name})
     repo_data = data.get("repository") or {}
     result: dict[str, str] = {}
-    for i in range(len(unique_names)):
+    for i, name in enumerate(unique_names):
         node = repo_data.get(f"label{i}")
         if isinstance(node, dict) and node.get("id"):
             result[name] = str(node["id"])
