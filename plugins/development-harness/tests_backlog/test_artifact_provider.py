@@ -32,6 +32,7 @@ from backlog_core.artifact_provider import (
 )
 from backlog_core.artifact_registry import ArtifactRegistry, render_manifest_section
 from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType, BacklogError
+from github.AuthenticatedUser import AuthenticatedUser
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -411,7 +412,9 @@ class TestGitHubArtifactProviderSetManifest:
         mock_gh_client = mocker.patch("backlog_core.artifact_provider._make_github_client")
         mock_gist = MagicMock()
         mock_gist.id = "abc123deadbeef"
-        mock_gh_client.return_value.get_user.return_value.create_gist.return_value = mock_gist
+        mock_user = MagicMock(spec=AuthenticatedUser)
+        mock_user.create_gist.return_value = mock_gist
+        mock_gh_client.return_value.get_user.return_value = mock_user
         # graphql_query fixture returns empty body (set in mock_repo fixture)
         manifest = ArtifactManifest(issue_number=965)
         entry = ArtifactEntry(artifact_type=ArtifactType.FEATURE_CONTEXT, artifact_id="plan/feature-context-foo.md")
