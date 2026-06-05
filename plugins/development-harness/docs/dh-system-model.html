@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH System Model — Documents, Relationships, Friction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --canvas:        oklch(99% 0.002 250);
+    --canvas-soft:   oklch(97% 0.005 250);
+    --ink:           oklch(12% 0.01 250);
+    --ink-mid:       oklch(42% 0.01 250);
+    --ink-muted:     oklch(56% 0.01 250);
+    --hairline:      oklch(89% 0.005 250);
+    --hairline-soft: oklch(94% 0.003 250);
+
+    --green-bg:  oklch(89% 0.07 145);
+    --green-ink: oklch(28% 0.12 145);
+    --green-bdr: oklch(68% 0.10 145);
+
+    --amber-bg:  oklch(91% 0.08 90);
+    --amber-ink: oklch(30% 0.10 75);
+    --amber-bdr: oklch(70% 0.08 90);
+
+    --red-bg:  oklch(88% 0.05 18);
+    --red-ink: oklch(28% 0.10 12);
+    --red-bdr: oklch(70% 0.08 18);
+
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    padding: 0 0 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    background: var(--canvas);
+    border-bottom: 2px solid var(--ink);
+    padding: 48px 60px 36px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 16px;
+  }
+
+  header h1 {
+    font-size: clamp(34px, 5vw, 52px);
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  header > p {
+    color: var(--ink-mid);
+    margin-top: 14px;
+    font-size: 1rem;
+    max-width: 660px;
+    line-height: 1.65;
+  }
+
+  .meta {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--hairline-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+  }
+
+  .meta-item {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+  }
+
+  .meta-item strong       { color: var(--ink); font-weight: 500; }
+  .meta-item strong.alert { color: var(--red-ink); }
+
+  nav {
+    background: var(--canvas);
+    border-bottom: 1px solid var(--hairline);
+    padding: 0 60px;
+    display: flex;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  nav a {
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 13px 16px;
+    display: block;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-bottom-color 0.15s;
+  }
+
+  nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  main { padding: 56px 60px; max-width: 1400px; }
+
+  section { margin-bottom: 72px; }
+
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    padding-bottom: 12px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    text-wrap: balance;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-style: normal;
+  }
+
+  .tag.now    { background: var(--amber-bg); color: var(--amber-ink); }
+  .tag.target { background: var(--green-bg); color: var(--green-ink); }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin: 28px 0 12px;
+  }
+
+  p { color: var(--ink-mid); margin-bottom: 12px; max-width: 800px; line-height: 1.65; }
+
+  .diagram-wrap {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 32px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+
+  .diagram-wrap .mermaid { display: flex; justify-content: center; }
+
+  .grid   { display: grid; gap: 12px; margin: 20px 0; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+  .card {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 18px 20px;
+  }
+
+  .card h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+
+  .card p {
+    font-size: 0.8125rem;
+    margin-bottom: 0;
+    line-height: 1.55;
+    max-width: none;
+    color: var(--ink-mid);
+  }
+
+  .card code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    padding: 2px 5px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  .card.info h4 { color: var(--ink); }
+
+  .card.danger { border-color: var(--red-bdr);   background: var(--red-bg); }
+  .card.danger h4   { color: var(--red-ink); }
+  .card.danger p    { color: oklch(32% 0.10 12); }
+  .card.danger code { background: oklch(91% 0.03 18); color: var(--red-ink); border-color: oklch(78% 0.06 18); }
+
+  .card.warn { border-color: var(--amber-bdr); background: var(--amber-bg); }
+  .card.warn h4   { color: var(--amber-ink); }
+  .card.warn p    { color: oklch(34% 0.10 75); }
+  .card.warn code { background: oklch(95% 0.03 90); color: var(--amber-ink); border-color: oklch(78% 0.06 90); }
+
+  .card.ok { border-color: var(--green-bdr); background: var(--green-bg); }
+  .card.ok h4   { color: var(--green-ink); }
+  .card.ok p    { color: oklch(32% 0.12 145); }
+  .card.ok code { background: oklch(92% 0.04 145); color: var(--green-ink); border-color: oklch(74% 0.08 145); }
+
+  .friction-list { list-style: none; margin: 16px 0 0; padding: 0; }
+
+  .friction-list li {
+    display: flex;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline-soft);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    align-items: flex-start;
+  }
+
+  .friction-list li:last-child { border-bottom: none; }
+
+  .friction-list .badge {
+    flex-shrink: 0;
+    min-width: 34px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    margin-top: 2px;
+    padding: 0 5px;
+  }
+
+  .friction-list .badge.danger { background: var(--red-bg);   color: var(--red-ink);   border: 1px solid var(--red-bdr); }
+  .friction-list .badge.warn   { background: var(--amber-bg); color: var(--amber-ink); border: 1px solid var(--amber-bdr); }
+
+  .friction-list .detail { color: var(--ink-mid); flex: 1; min-width: 0; }
+
+  .friction-list .detail strong {
+    color: var(--ink);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 3px;
+    font-size: 0.9375rem;
+  }
+
+  .code {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink);
+    overflow-x: auto;
+    margin: 10px 0;
+    white-space: pre;
+    line-height: 1.65;
+  }
+
+  .write-sites {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  .write-site {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 13px 14px;
+  }
+
+  .write-site .file {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--amber-ink);
+    letter-spacing: 0.03em;
+    margin-bottom: 7px;
+  }
+
+  .write-site .snippet {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    padding: 8px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  .arrow-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-node {
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+
+  .flow-node small {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-muted);
+    margin-top: 2px;
+  }
+
+  .flow-node.bad   { border-color: var(--red-bdr);   background: var(--red-bg);   color: var(--red-ink); }
+  .flow-node.bad   small { color: oklch(45% 0.08 18); }
+  .flow-node.good  { border-color: var(--green-bdr); background: var(--green-bg); color: var(--green-ink); }
+  .flow-node.good  small { color: oklch(44% 0.10 145); }
+  .flow-node.pivot { border-color: var(--amber-bdr); background: var(--amber-bg); color: var(--amber-ink); }
+  .flow-node.pivot small { color: oklch(46% 0.09 75); }
+
+  .flow-arrow {
+    color: var(--ink-muted);
+    font-size: 16px;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .flow-arrow.bad { color: var(--red-ink); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 0.875rem;
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  td {
+    padding: 11px 14px;
+    border: 1px solid var(--hairline-soft);
+    color: var(--ink-mid);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  tbody tr:hover td { background: oklch(96% 0.004 250); }
+
+  td code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    padding: 2px 5px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  td.bad { background: var(--red-bg);   color: var(--red-ink);   border-color: oklch(91% 0.04 18); }
+  td.bad code { background: oklch(91% 0.03 18); color: var(--red-ink); border-color: oklch(82% 0.06 18); }
+  td.ok  { background: var(--green-bg); color: var(--green-ink); border-color: oklch(83% 0.06 145); }
+
+  td strong { color: var(--ink); font-weight: 600; }
+
+  .callout {
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-bdr);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 0.875rem;
+    color: var(--amber-ink);
+    line-height: 1.6;
+  }
+
+  .callout strong { font-weight: 600; }
+
+  .callout.danger { background: var(--red-bg);   border-color: var(--red-bdr);   color: var(--red-ink); }
+  .callout.ok     { background: var(--green-bg); border-color: var(--green-bdr); color: var(--green-ink); }
+
+  @media (max-width: 900px) {
+    header, nav, main { padding-left: 20px; padding-right: 20px; }
+    .grid-2, .grid-3  { grid-template-columns: 1fr; }
+    .flow-node { font-size: 10px; white-space: normal; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Development Harness</div>
+  <h1>DH System Model</h1>
+  <p>Documents, relationships, consumers, providers, and the friction map showing where the current translation chain breaks down between stages.</p>
+  <div class="meta">
+    <span class="meta-item">Generated: <strong>2026-06-05</strong></span>
+    <span class="meta-item">Scope: <strong>backlog_core + sam_schema + artifact layer</strong></span>
+    <span class="meta-item">Independent write sites: <strong class="alert">17</strong></span>
+    <span class="meta-item">Source: <strong>design-brief + code audit</strong></span>
+  </div>
+</header>
+
+<nav>
+  <a href="#documents">Document Types</a>
+  <a href="#relationships">Relationships</a>
+  <a href="#history">Git Timeline</a>
+  <a href="#current-flow">Current Data Flow</a>
+  <a href="#write-sites">Write Sites</a>
+  <a href="#friction">Friction Map</a>
+  <a href="#explorer">Explorer Findings</a>
+  <a href="#design-revision">Design Revision</a>
+  <a href="#audit">Claim Audit</a>
+  <a href="#workflow">Full Workflow</a>
+  <a href="#backends">Backends</a>
+  <a href="#target">Target Architecture</a>
+</nav>
+
+<main>
+
+<section id="documents">
+  <h2>Document Types <span class="tag now">current state</span></h2>
+  <p>Every entity in the system is a document: structured text with metadata and relationships to other documents. These are currently stored, parsed, and rendered by three separate subsystems with no shared layer.</p>
+
+  <div class="grid grid-3">
+    <div class="card info">
+      <h4>BacklogItem</h4>
+      <p>GitHub Issue body (markdown) + frontmatter metadata. The primary unit of work. Contains sections of two kinds: <em>entry sections</em> (tracked items with IDs) and <em>prose sections</em> (freeform text). Sections are currently rendered inconsistently.</p>
+    </div>
+    <div class="card info">
+      <h4>SAM Plan</h4>
+      <p>YAML document listing tasks with dependencies, status, and metadata. Currently stored locally as <code>.yaml</code> files and written through to GitHub Gist. Treated as a separate system from BacklogItem despite being the same concept: structured text + metadata + relationships.</p>
+    </div>
+    <div class="card info">
+      <h4>Task</h4>
+      <p>A child of a SAM Plan. Has status, acceptance criteria, agent assignment, and relationships to sibling tasks. Stored inside the Plan YAML. Currently not a first-class document — cannot be queried or navigated independently.</p>
+    </div>
+    <div class="card info">
+      <h4>Artifact</h4>
+      <p>A registered output of a pipeline stage: feature-context, architect spec, codebase-analysis, T0-baseline, TN-verification. Stored as content in a GitHub Gist file. Referenced via a manifest entry on the associated issue.</p>
+    </div>
+    <div class="card info">
+      <h4>Artifact Manifest</h4>
+      <p>Per-issue index of all registered artifacts. Stored in the GitHub Issue body as a structured section. Parsed and written by <code>ArtifactRegistry</code>. Currently a separate parse path from normal issue body parsing.</p>
+    </div>
+    <div class="card info">
+      <h4>Plan Index</h4>
+      <p>Reverse map: <code>plan_id → issue_number</code>. Stored as a YAML blob on a sentinel GitHub Issue. Needed because SAM plan files use local IDs that are not the GitHub issue number. A translation layer that exists due to the two-system split.</p>
+    </div>
+    <div class="card info">
+      <h4>Dispatch Plan</h4>
+      <p>Wave-based execution plan for a milestone. YAML stored at <code>plan/milestone-{N}-dispatch.yaml</code>. Separate document type, separate storage, separate parse path.</p>
+    </div>
+    <div class="card warn">
+      <h4>Local YAML Cache</h4>
+      <p>Translation of the GitHub Issue body into a local <code>.yaml</code> file. Added for human readability. Now consumed only by AI agents. Creates a permanent sync problem: the YAML can drift from the live GitHub body between syncs. Candidate for elimination.</p>
+    </div>
+  </div>
+</section>
+
+<section id="relationships">
+  <h2>Document Relationships</h2>
+  <p>How documents reference each other across the current three-subsystem split.</p>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph TD
+    BI[BacklogItem<br/>GitHub Issue]
+    SP[SAM Plan<br/>local YAML + Gist]
+    T[Task<br/>inside Plan YAML]
+    A[Artifact<br/>Gist file]
+    AM[Artifact Manifest<br/>Issue body section]
+    PI[Plan Index<br/>sentinel Issue]
+    DP[Dispatch Plan<br/>local YAML]
+    MS[Milestone<br/>GitHub Milestone]
+
+    BI -->|has plan| SP
+    SP -->|contains| T
+    SP -->|registered in| PI
+    SP -->|content stored as| A
+    BI -->|has artifacts| AM
+    AM -->|entry per| A
+    BI -->|belongs to| MS
+    DP -->|references items in| MS
+    T -->|produces| A
+
+    style BI fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style SP fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style T  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style A  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style AM fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style PI fill:#e8d0cc,stroke:#b06060,color:#3a1010
+    style DP fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style MS fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Plan Index exists only because of the two-system split.</strong> If BacklogItem and SAM Plan shared a document layer, the plan would be a section or child of the issue — no reverse-map needed.
+  </div>
+</section>
+
+<section id="current-flow">
+  <h2>Current Data Flow <span class="tag now">as-is</span></h2>
+  <p>How a BacklogItem travels from GitHub to an AI agent and back. Each arrow is a translation step. Every translation step is a place where format can diverge.</p>
+
+  <h3>Read path (GitHub → Agent)</h3>
+  <div class="arrow-flow">
+    <div class="flow-node good">GitHub Issue JSON</div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">parse_issue_body_sync()<br/><small>markdown → BacklogItem</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">write to .yaml file<br/><small>BacklogItem → YAML</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">load .yaml file<br/><small>YAML → BacklogItem</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node pivot">backlog_view()<br/><small>BacklogItem → ViewItemResult</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">_sections_from_body_or_yaml()<br/><small>two-path section read</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node good">Agent sees result</div>
+  </div>
+
+  <h3>Write path (Agent → GitHub)</h3>
+  <div class="arrow-flow">
+    <div class="flow-node good">Agent writes section</div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">one of 17 write sites<br/><small>raw f-string header</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">update .yaml file<br/><small>BacklogItem → YAML</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">render_issue_body()<br/><small>BacklogItem → markdown</small></div>
+    <div class="flow-arrow bad">→</div>
+    <div class="flow-node bad">GitHub REST/GraphQL<br/><small>PUT issue body</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node good">GitHub stores it</div>
+  </div>
+
+  <div class="callout danger">
+    <strong>Translation count: 5 steps on read, 4 steps on write.</strong> Each step can produce a different representation. The YAML file in the middle is the primary source of drift — it is written once and read later, but the GitHub body may have been edited in between.
+  </div>
+
+  <h3>Section rendering — current two formats</h3>
+  <div class="grid grid-2">
+    <div class="card warn">
+      <h4>Entry sections (tracked items)</h4>
+      <div class="code">## Acceptance Criteria
+
+&lt;div&gt;&lt;sub&gt;2026-04-15T09:23:00Z&lt;/sub&gt;
+- criterion one
+&lt;/div&gt;
+
+&lt;div&gt;&lt;sub&gt;2026-04-16T11:00:00Z&lt;/sub&gt;
+- criterion two
+&lt;/div&gt;</div>
+      <p>IDs from timestamps. Supports <code>since</code> filter, struck tracking, deduplication.</p>
+    </div>
+    <div class="card danger">
+      <h4>Prose sections (freeform text)</h4>
+      <div class="code">## Description
+
+Plain text written directly.
+No wrapper. No ID. No timestamp.
+Replaced wholesale on update.</div>
+      <p>No ID. No timestamp. Cannot be filtered, deduplicated, or tracked. Written by 17 independent sites.</p>
+    </div>
+  </div>
+</section>
+
+<section id="write-sites">
+  <h2>Independent Header-Writing Sites <span class="tag now">17 found</span></h2>
+  <p>Every file below writes <code>## Header\n\n</code> directly as an f-string. No shared function. No enforcement. Each is an independent policy decision about format, spacing, and structure. Any of them can be inconsistent with the others.</p>
+
+  <div class="write-sites">
+    <div class="write-site"><div class="file">rendering.py:97</div><div class="snippet">f"## Groomed ({groomed.date})"</div></div>
+    <div class="write-site"><div class="file">rendering.py:100</div><div class="snippet">f"### {key}\n\n{groomed.subsections[key]}"</div></div>
+    <div class="write-site"><div class="file">github_sync.py:186</div><div class="snippet">f"## Description\n\n{item.description}"</div></div>
+    <div class="write-site"><div class="file">github_sync.py:193</div><div class="snippet">f"## {heading}\n\n{_render_section_entries(sec)}"</div></div>
+    <div class="write-site"><div class="file">github_sync.py:207</div><div class="snippet">f"## {heading}\n\n{_render_section_entries(sec)}"</div></div>
+    <div class="write-site"><div class="file">gh_client.py:1356</div><div class="snippet">f"## Resolved\n\n**Summary**: {summary}"</div></div>
+    <div class="write-site"><div class="file">gh_client.py:1745</div><div class="snippet">f"## {section_name.strip()}\n\n"</div></div>
+    <div class="write-site"><div class="file">gh_client.py:1754</div><div class="snippet">f"### {section_name.strip()}\n\n"</div></div>
+    <div class="write-site"><div class="file">parsing.py:656</div><div class="snippet">f"## Story\n\nAs a **{role}**..."</div></div>
+    <div class="write-site"><div class="file">parsing.py:657</div><div class="snippet">f"## Description\n\n{desc}"</div></div>
+    <div class="write-site"><div class="file">parsing.py:662</div><div class="snippet">f"## Files\n\n{files}"</div></div>
+    <div class="write-site"><div class="file">parsing.py:665</div><div class="snippet">f"## Suggested Location\n\n{sl}"</div></div>
+    <div class="write-site"><div class="file">parsing.py:1299</div><div class="snippet">f"## What\n\n{description or '(no description)'}"</div></div>
+    <div class="write-site"><div class="file">parsing.py:1300</div><div class="snippet">f"## Acceptance Criteria\n\n{criteria}"</div></div>
+    <div class="write-site"><div class="file">operations.py:850</div><div class="snippet">rf"### {re.escape(section_name)}[^\n]*\n..."</div></div>
+    <div class="write-site"><div class="file">operations.py:2679</div><div class="snippet">f"## {title}\n\n{content}"</div></div>
+    <div class="write-site"><div class="file">operations.py:4259</div><div class="snippet">rf"### {re.escape(section)}[^\n]*\n..."</div></div>
+  </div>
+</section>
+
+<section id="friction">
+  <h2>Friction Map — Where Translation Breaks Down</h2>
+  <p>Each item below is a place where the current architecture produces incorrect, inconsistent, or unpredictable results. These are root causes, not symptoms.</p>
+
+  <ul class="friction-list">
+    <li>
+      <span class="badge danger">F1</span>
+      <div class="detail">
+        <strong>Zero-timestamp IDs are not unique</strong>
+        When <code>_build_sections_metadata</code> parses a plain-text body (no <code>&lt;div&gt;</code> blocks), it calls <code>parse_entries()</code> in <code>entry_blocks.py:158</code>: <code>entry_id = ts_match.group(1) if ts_match else f"{added_date}T00:00:00Z"</code> where <code>added_date</code> defaults to <code>"0000-00-00"</code>. Every unwrapped entry gets <code>"0000-00-00T00:00:00Z"</code> as its ID. Not unique. Breaks <code>since</code> filtering, deduplication, and struck tracking. Not a parsing limitation — a writer failure that the reader compensated for instead of fixing.
+      </div>
+    </li>
+    <li>
+      <span class="badge danger">F2</span>
+      <div class="detail">
+        <strong>Two rendering formats, no enforcement</strong>
+        Entry sections use <code>&lt;div&gt;&lt;sub&gt;timestamp&lt;/sub&gt;...&lt;/div&gt;</code>. Prose sections use plain <code>## Header\n\ntext</code>. No function enforces which format a section must use. 17 independent write sites each make their own choice.
+      </div>
+    </li>
+    <li>
+      <span class="badge danger">F3</span>
+      <div class="detail">
+        <strong>_sections_from_body_or_yaml: two-path read logic</strong>
+        Exists solely because the writer is inconsistent. If every section had a <code>&lt;div&gt;</code> block, this function reduces to one branch: parse blocks, return result. The subset check and YAML fallback are compensations for F1 and F2, not design.
+      </div>
+    </li>
+    <li>
+      <span class="badge danger">F4</span>
+      <div class="detail">
+        <strong>YAML cache drifts from GitHub body</strong>
+        The local <code>.yaml</code> file is written at sync time. The GitHub Issue body can be edited between syncs. Sections groomed by an agent appear in the live body before the YAML is updated. The reader has to decide which source to trust — there is no ground truth.
+      </div>
+    </li>
+    <li>
+      <span class="badge danger">F5</span>
+      <div class="detail">
+        <strong>YAML was designed for human readers; AI reads it now</strong>
+        The translation GitHub JSON → BacklogItem → YAML → BacklogItem exists because YAML is human-readable. The GitHub JSON response is already a valid cache. The YAML is an extra translation step that adds drift for no agent benefit.
+      </div>
+    </li>
+    <li>
+      <span class="badge warn">F6</span>
+      <div class="detail">
+        <strong>Section name normalization is absent</strong>
+        AI agents write section names freely: <code>## Impact Radius</code>, <code>## impact-radius</code>, <code>## Impact radius</code>. No normalization at ingress. The same logical section exists under different keys in the same item depending on which agent wrote it.
+      </div>
+    </li>
+    <li>
+      <span class="badge warn">F7</span>
+      <div class="detail">
+        <strong>BacklogBackend Protocol leaks raw strings</strong>
+        <code>render_issue_body()</code> is a Protocol method that returns a raw markdown string. This means backends implement their own rendering logic. The Protocol boundary should only carry domain objects — <code>BacklogItem</code> in, <code>BacklogItem</code> out. Rendering belongs to the domain layer.
+      </div>
+    </li>
+    <li>
+      <span class="badge warn">F8</span>
+      <div class="detail">
+        <strong>SAM and backlog are the same concept implemented twice</strong>
+        Both store documents with metadata and relationships. Both need parsers, renderers, and cache strategies. They share no code and cannot reference each other's objects without a translation step. The Plan Index exists only because of this split.
+      </div>
+    </li>
+    <li>
+      <span class="badge warn">F9</span>
+      <div class="detail">
+        <strong>Three artifact systems with independent parse paths</strong>
+        Artifact Manifest is parsed from the Issue body. Plan content is parsed from Gist YAML. Dispatch Plan is parsed from local YAML. Each has its own parser and renderer. An agent navigating the full item → plan → task → artifact graph crosses three separate parse contexts.
+      </div>
+    </li>
+    <li>
+      <span class="badge warn">F10</span>
+      <div class="detail">
+        <strong>Section parsing split across three modules with no shared abstraction</strong>
+        <code>operations.py</code> — section boundary detection, metadata assembly, YAML fallback.<br/>
+        <code>rendering.py</code> — groomed section rendering.<br/>
+        <code>entry_blocks.py</code> — entry block parsing, ID generation, timestamp extraction.<br/>
+        No unified navigator or section layer. Changes to section semantics require coordinated edits across all three. The zero-timestamp bug (<strong>F1</strong>) lives in <code>entry_blocks.py</code> but its consequences are handled in <code>operations.py</code> — two modules aware of the same broken contract.
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section id="backends">
+  <h2>Backends — Consumers and Providers</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Backend</th>
+        <th>Stores</th>
+        <th>Native format</th>
+        <th>Provides to agent</th>
+        <th>Friction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>GitHub Issues</strong><br/><code>github_backend.py</code></td>
+        <td>BacklogItem body + metadata</td>
+        <td>JSON (GraphQL) + markdown body</td>
+        <td>Issue body parsed into BacklogItem</td>
+        <td class="bad">Body is source of truth but YAML cache is used for reads. Drift possible.</td>
+      </tr>
+      <tr>
+        <td><strong>GitHub Gist</strong><br/><code>artifact_provider.py</code></td>
+        <td>Plan YAML, artifact content, manifest</td>
+        <td>Text files inside a Gist</td>
+        <td>YAML parsed into Plan; artifact content as string</td>
+        <td class="bad">Plan stored as YAML in Gist. Content-hash dedup now added. Plan Index needed for reverse lookup.</td>
+      </tr>
+      <tr>
+        <td><strong>SQLite</strong><br/><code>sqlite_backend.py</code></td>
+        <td>BacklogItem fields, body text</td>
+        <td>6-table relational schema</td>
+        <td>Rows assembled into BacklogItem</td>
+        <td>Calls the rendering layer — no independent header-writing. Friction is inherited from the rendering layer's inconsistency.</td>
+      </tr>
+      <tr>
+        <td><strong>Memory</strong><br/><code>memory_backend.py</code></td>
+        <td>BacklogItem in-memory dict</td>
+        <td>Python dict</td>
+        <td>Dict assembled into BacklogItem</td>
+        <td>Calls the rendering layer — no independent header-writing. Friction is inherited from the rendering layer's inconsistency.</td>
+      </tr>
+      <tr>
+        <td><strong>Beads (bd)</strong><br/><code>beads_backend.py</code></td>
+        <td>BacklogItem via bd CLI</td>
+        <td>Dolt DB + JSONL export</td>
+        <td>bd output parsed into BacklogItem</td>
+        <td class="bad">bd is a subprocess boundary. Parsing happens outside the domain model.</td>
+      </tr>
+      <tr>
+        <td><strong>Local YAML</strong><br/><code>~/.dh/projects/*/backlog/*.yaml</code></td>
+        <td>BacklogItem cache</td>
+        <td>YAML</td>
+        <td>YAML deserialized into BacklogItem</td>
+        <td class="bad">Translation artifact. Exists for human readability. Creates drift. Candidate for elimination.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="target">
+  <h2>Target Architecture <span class="tag target">proposed</span></h2>
+  <p>A single Repository pattern with a domain model layer that all backends talk to. The agent never touches a backend. The backend never touches a parser or renderer.</p>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph TD
+    A[AI Agent]
+    DML[Domain Model Layer<br/>BacklogItem - Plan - Task - Artifact<br/>Section - Entry]
+    RP[Repository Protocol<br/>get - save - list - query]
+    P[Parser<br/>one per source format]
+    R[Renderer<br/>one per target format]
+    SN[Section Normalizer<br/>fuzzy name to canonical key]
+    IDG[ID Generator<br/>createdAt plus section plus index]
+
+    GH[GitHub JSON]
+    GIST[GitHub Gist]
+    SQL[SQLite]
+    MEM[Memory]
+    BD[Beads]
+
+    A -->|reads and writes| DML
+    DML -->|enforces| SN
+    DML -->|enforces| IDG
+    DML -->|via| RP
+    RP -->|translate at boundary| P
+    RP -->|translate at boundary| R
+    P --> GH
+    P --> SQL
+    P --> MEM
+    P --> BD
+    R --> GH
+    R --> GIST
+    R --> SQL
+
+    style A   fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style DML fill:#d6edda,stroke:#68aa70,color:#1a3a1e
+    style RP  fill:#d6edda,stroke:#68aa70,color:#1a3a1e
+    style P   fill:#d6edda,stroke:#68aa70,color:#1a3a1e
+    style R   fill:#d6edda,stroke:#68aa70,color:#1a3a1e
+    style SN  fill:#f5e8c6,stroke:#b89040,color:#3a2800
+    style IDG fill:#f5e8c6,stroke:#b89040,color:#3a2800
+    style GH   fill:#fafafa,stroke:#c8ccd8,color:#888ea8
+    style GIST fill:#fafafa,stroke:#c8ccd8,color:#888ea8
+    style SQL  fill:#fafafa,stroke:#c8ccd8,color:#888ea8
+    style MEM  fill:#fafafa,stroke:#c8ccd8,color:#888ea8
+    style BD   fill:#fafafa,stroke:#c8ccd8,color:#888ea8
+    </div>
+  </div>
+
+  <h3>Design constraints</h3>
+
+  <div class="grid grid-2">
+    <div class="card ok">
+      <h4>One wire format for all sections</h4>
+      <p>Every section — entry or prose — uses <code>&lt;div&gt;&lt;sub&gt;{id}&lt;/sub&gt;content&lt;/div&gt;</code>. Prose sections have one entry. The <code>Renderer</code> decides the wire format. Callers call <code>write_section()</code>, never write raw headers.</p>
+    </div>
+    <div class="card ok">
+      <h4>No zero-timestamp IDs</h4>
+      <p>ID = <code>{issue.createdAt}-{section_name}-{position_index}</code> when no explicit timestamp exists. Deterministic, non-colliding, correctly ordered relative to real timestamps. Zero-timestamp fallback is deleted entirely.</p>
+    </div>
+    <div class="card ok">
+      <h4>GitHub JSON as cache, not YAML</h4>
+      <p>Cache the raw GitHub API response. Parse on demand: JSON → BacklogItem. One translation step, not five. YAML local storage eliminated. Drift between cache and source reduced to API response staleness only.</p>
+    </div>
+    <div class="card ok">
+      <h4>Section name normalization at ingress</h4>
+      <p>The Parser normalizes section names to canonical keys before they enter the domain model. <code>## Impact Radius</code>, <code>## impact-radius</code>, <code>## Impact radius</code> all map to <code>impact_radius</code>. The agent sees one key regardless of how it was written.</p>
+    </div>
+    <div class="card ok">
+      <h4>Protocol carries domain objects only</h4>
+      <p><code>repository.get(id) → BacklogItem</code>. <code>repository.save(item: BacklogItem)</code>. No raw strings, no dicts, no markdown at the boundary. <code>render_issue_body()</code> moves out of the Protocol into the Renderer.</p>
+    </div>
+    <div class="card ok">
+      <h4>SAM and backlog share the document layer</h4>
+      <p>Plan is a document. Task is a section of a Plan. BacklogItem is a document. Both use the same Repository, Parser, Renderer, Section Normalizer, and ID Generator. Plan Index eliminated — the plan is a relationship on the BacklogItem.</p>
+    </div>
+  </div>
+
+  <h3>What gets deleted</h3>
+  <ul class="friction-list">
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>_sections_from_body_or_yaml()</strong> — two-path read logic replaced by one-path Parser at ingress</div>
+    </li>
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>_build_sections_from_yaml_item()</strong> — YAML is not a read source in the new model</div>
+    </li>
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>Local YAML cache (~/.dh/.../*.yaml)</strong> — replaced by GitHub JSON response cache</div>
+    </li>
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>Plan Index (sentinel issue reverse-map)</strong> — plan is a relationship on BacklogItem, no separate index needed</div>
+    </li>
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>Zero-timestamp ID generation</strong> — replaced by createdAt-based deterministic IDs</div>
+    </li>
+    <li>
+      <span class="badge danger">DEL</span>
+      <div class="detail"><strong>17 independent f-string header write sites</strong> — replaced by one Renderer with one write_section() call</div>
+    </li>
+  </ul>
+
+  <h3>Open questions for the architecture agent</h3>
+  <div class="grid grid-2">
+    <div class="card warn">
+      <h4>Q1: Does a markdown navigator already exist partially?</h4>
+      <p>Search for any existing section abstraction before designing new one. Audit all header-parsing code for partial implementations that could be unified.</p>
+    </div>
+    <div class="card warn">
+      <h4>Q2: Other format inconsistencies beyond prose vs entry?</h4>
+      <p>Audit all write paths for any section format that bypasses the <code>&lt;div&gt;</code> wrapper. The 17 sites found are a floor, not a ceiling.</p>
+    </div>
+    <div class="card warn">
+      <h4>Q3: Externally edited bodies — normalization policy?</h4>
+      <p>A human or external agent edits a GitHub Issue body directly. It arrives without <code>&lt;div&gt;</code> blocks. The Parser must define a clear policy: normalize on read, reject, or flag?</p>
+    </div>
+    <div class="card warn">
+      <h4>Q4: Migration path for existing items?</h4>
+      <p>Thousands of items exist in the old format. On first read: wrap in <code>&lt;div&gt;</code> using createdAt baseline, write back, return normalized form. One-time migration per item, not a permanent two-path read.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ───────────────────────────────────────────── GIT TIMELINE -->
+<section id="history">
+  <h2>Git Timeline <span class="tag now">how the split happened</span></h2>
+  <p>The two-format split was not a design decision. It was an accident of two commits landing 40 minutes apart on 2026-03-30, followed by legacy format support added the next day. No design document exists for it.</p>
+
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Commit</th><th>What happened</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2026-03-11</td>
+        <td><code>b0d2ae93</code></td>
+        <td>Entry block module created in skill — <code>wrap_entry()</code>, <code>parse_entries()</code>, <code>strike_entry()</code></td>
+        <td>Entry block format established correctly.</td>
+      </tr>
+      <tr>
+        <td>2026-03-18</td>
+        <td><code>0f3c0fb9</code></td>
+        <td>Bundled backlog_core into the plugin</td>
+        <td>Entry block format moved into plugin.</td>
+      </tr>
+      <tr>
+        <td>2026-03-30 12:43</td>
+        <td><code>c5d97502</code></td>
+        <td>GitHub sync adapter created. <code>_render_section_entries()</code> wraps entries in <code>&lt;div&gt;</code> blocks. <code>render_issue_body()</code> writes prose sections as plain <code>## header\n\ntext</code>. <strong>Both decisions in the same commit.</strong></td>
+        <td class="bad">Split created. No document explains the choice. T03 and T04 were 40 minutes apart — not a coordinated design.</td>
+      </tr>
+      <tr>
+        <td>2026-03-31</td>
+        <td><code>c4d33c09</code></td>
+        <td>Legacy <code>.md</code> parser added — extracts plain <code>## Section</code> headers into <code>BacklogItem.sections</code></td>
+        <td class="bad">Prose format normalised as a first-class path. Both formats now live in the domain model.</td>
+      </tr>
+      <tr>
+        <td>2026-06-04</td>
+        <td><code>47558b9a</code></td>
+        <td><a href="../backlog_core/operations.py"><code>_sections_from_body_or_yaml()</code></a> added — two-path read to avoid zero-timestamp IDs when body has no <code>&lt;div&gt;</code> blocks</td>
+        <td class="bad">Symptom treated, not cause. Zero-timestamp avoidance baked in as permanent infrastructure.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ───────────────────────────────────────────── EXPLORER FINDINGS -->
+<section id="explorer">
+  <h2>Explorer Ensemble Findings <span class="tag now">12 domains · verified</span></h2>
+  <p>Results from 12 parallel explorers covering git history, all Python layers, 58 skills, 28 agents, 43 docs, and 93 tests. A second pass read the actual reference files and workflow step sequences. All file:line citations below are verified against source.</p>
+
+  <h3>Zero-timestamp occurs in three places, not one</h3>
+  <div class="grid grid-2">
+    <div class="card danger">
+      <h4><a href="../backlog_core/entry_blocks.py">entry_blocks.py:158</a></h4>
+      <p><code>entry_id = ts_match.group(1) if ts_match else f"{added_date}T00:00:00Z"</code> — default <code>added_date</code> is <code>"0000-00-00"</code> at line 134. Every unwrapped entry gets <code>"0000-00-00T00:00:00Z"</code>.</p>
+    </div>
+    <div class="card danger">
+      <h4><a href="../backlog_core/entry_blocks.py">entry_blocks.py:240</a> and <a href="../backlog_core/parsing.py">parsing.py:1027</a></h4>
+      <p>Same pattern in <code>_rewrite_by_entry_id()</code> and <code>_parse_section_entries()</code>. Three independent sites generating the same broken ID.</p>
+    </div>
+  </div>
+
+  <h3>Partial section abstraction already exists</h3>
+  <div class="grid grid-2">
+    <div class="card info">
+      <h4><a href="../backlog_core/operations.py">_normalize_section_key() — operations.py:911</a></h4>
+      <p>Already normalizes section names for consistent lookups. This is the start of the normalization layer. Expand it rather than build a parallel one.</p>
+    </div>
+    <div class="card info">
+      <h4><a href="../backlog_core/operations.py">_merge_section_entries() — operations.py:2445</a></h4>
+      <p>Handles duplicate section names when the same section appears twice in a body. Another partial abstraction to include in the unified layer.</p>
+    </div>
+  </div>
+
+  <h3>SAM schema has 12+ additional write sites not in the original count</h3>
+  <p>The initial audit covered only <code>backlog_core/</code>. <code>sam_schema/</code> has its own independent write sites. Real total: 30+.</p>
+  <table>
+    <thead><tr><th>File</th><th>Lines</th><th>Pattern</th></tr></thead>
+    <tbody>
+      <tr><td><a href="../sam_schema/core/backends/github_task.py"><code>github_task.py</code></a></td><td>123, 125, 127, 138, 140, 452</td><td><code>f"## Goal\n\n{goal}"</code>, <code>f"## Context\n\n{context}"</code>, etc.</td></tr>
+      <tr><td><a href="../sam_schema/core/backends/local_yaml.py"><code>local_yaml.py</code></a></td><td>534</td><td><code>heading = f"## {section_name}"</code></td></tr>
+      <tr><td><a href="../sam_schema/core/backends/memory.py"><code>sam memory.py</code></a></td><td>482</td><td><code>heading = f"## {section_name}"</code></td></tr>
+      <tr><td><a href="../sam_schema/core/backends/beads.py"><code>sam beads.py</code></a></td><td>911</td><td><code>heading = f"## {section_name}"</code></td></tr>
+      <tr><td><a href="../sam_schema/core/yaml_writer.py"><code>yaml_writer.py</code></a></td><td>603</td><td><code>new_section = f"## {section_name}\n\n{content.rstrip()}\n"</code></td></tr>
+      <tr><td><a href="../sam_schema/core/quality_gates.py"><code>quality_gates.py</code></a></td><td>113, 122</td><td>Quality gate report section headers</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Agent and skill coupling — breaking change risk</h3>
+  <table>
+    <thead><tr><th>Domain</th><th>Finding</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>All 58 skills</strong></td>
+        <td>All assume <code>## Header</code> markdown. None mention <code>&lt;div&gt;</code> blocks. 56/58 verified exhaustively; 2 have no section instructions.</td>
+        <td class="bad">HIGH — changing headers to HTML containers breaks all skills</td>
+      </tr>
+      <tr>
+        <td><strong>Fixed section names</strong></td>
+        <td><a href="../agents/classifier.md">classifier</a>, <a href="../agents/fact-checker.md">fact-checker</a>, <a href="../agents/rtica-assessor.md">rtica-assessor</a> hard-code section names: <em>Issue Classification</em>, <em>Fact-Check</em>, <em>RT-ICA</em>, <em>Impact Radius</em></td>
+        <td class="bad">HIGH — renaming breaks the grooming pipeline</td>
+      </tr>
+      <tr>
+        <td><strong>Grooming contract</strong></td>
+        <td><code>## Groomed (YYYY-MM-DD)</code> → <code>### SectionName</code> is hardcoded across agents, skills, and all backend renderers</td>
+        <td class="bad">CRITICAL — any change to this header format breaks the pipeline</td>
+      </tr>
+      <tr>
+        <td><strong>Documentation navigation</strong></td>
+        <td><a href="mcp-progressive-disclosure-contract.md">mcp-progressive-disclosure-contract.md</a> uses ordinal grammar (4.0, 4.0.1) over <code>##</code>/<code>###</code> headers. No doc mentions <code>&lt;div&gt;</code>.</td>
+        <td class="bad">HIGH — ordinal navigation is built on markdown header structure</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Grooming swarm — actual step sequence from reference files</h3>
+  <p>The grooming workflow has three waves. All writes go directly to the GitHub Issue body via <code>backlog_groom()</code> in real-time — no batch queue until the final atomic commit.</p>
+  <div class="grid grid-3">
+    <div class="card ok">
+      <h4>Wave 0 (optional, sequential)</h4>
+      <p><strong>technical-researcher</strong> — runs for feature/refactor items only. Skipped for bug/fix. Produces: Research section. Output consumed by fact-checker in Wave 1.</p>
+    </div>
+    <div class="card ok">
+      <h4>Wave 1 (parallel with dependencies)</h4>
+      <p><strong>impact-analyst</strong> → Impact Radius<br><strong>fact-checker</strong> → Fact-Check<br><strong>classifier</strong> → Issue Classification<br><strong>alignment-analyst</strong> (after IA) → Design Intent Alignment<br><strong>rtica-assessor</strong> (after IA + FC) → RT-ICA intermediate</p>
+    </div>
+    <div class="card ok">
+      <h4>Wave 2 (after rtica + classifier)</h4>
+      <p><strong>groomer</strong> → all Groomed subsections. Final atomic write: <code>backlog_groom(sections={all}, mark_groomed=True)</code>. RT-ICA intermediate replaced by Final Pass in finalize.md.</p>
+    </div>
+  </div>
+
+  <h3>Grooming-to-planning handoff — what actually transfers</h3>
+  <p>From <a href="../skills/work-backlog-item/references/workflows/work/field-mapping.md">work/field-mapping.md</a>: the groomed sections are assembled into a feature request string at Step 4.1, then passed to <code>dh:add-new-feature</code>. The Impact Radius section is required — planning is blocked without it.</p>
+  <table>
+    <thead><tr><th>Groomed section</th><th>Maps to SAM plan field</th></tr></thead>
+    <tbody>
+      <tr><td>Description</td><td>Plan &gt; Goal</td></tr>
+      <tr><td>Impact Radius</td><td>Plan &gt; Scope &gt; Affected Systems — blocks if missing</td></tr>
+      <tr><td>Acceptance Criteria</td><td>Plan &gt; Success Criteria (direct copy)</td></tr>
+      <tr><td>Issue Classification</td><td>Domain profile routing (architecture/ui/content)</td></tr>
+      <tr><td>RT-ICA (DERIVABLE items)</td><td>Plan &gt; Assumptions to confirm</td></tr>
+      <tr><td>Priority (Effort field)</td><td>Plan &gt; Constraints</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Key redundancies found across stages</h3>
+  <ul class="friction-list">
+    <li>
+      <span class="badge warn">WASTE</span>
+      <div class="detail"><strong>Architect spec re-read 2–3× per task</strong> — task-worker via <code>artifact_read()</code>, contract-verification via file path, forensic-review as fallback. The spec never changes within a plan. Could be cached once at plan start and injected into all task dispatches.</div>
+    </li>
+    <li>
+      <span class="badge warn">WASTE</span>
+      <div class="detail"><strong>Plan context manifest re-read by every task</strong> — each task-worker calls <code>sam_task(action='read').plan.context</code> fresh. Plan-scoped, immutable once created. Could be cached by orchestrator and passed as inherited context.</div>
+    </li>
+    <li>
+      <span class="badge warn">WASTE</span>
+      <div class="detail"><strong>Codebase analysis done 3×</strong> — codebase-analyzer in planning, context-integration for conflict detection, doc-drift-auditor in complete-implementation. Same files, different purposes but overlapping filesystem reads. No staleness contract means it re-runs even when no relevant files changed.</div>
+    </li>
+    <li>
+      <span class="badge warn">ABANDON</span>
+      <div class="detail"><strong>research-note is ephemeral</strong> — technical-researcher synthesizes findings, returns them to caller, never registers as artifact. Lost after the call. Not available to later stages.</div>
+    </li>
+    <li>
+      <span class="badge warn">GAP</span>
+      <div class="detail"><strong>Impact Radius from grooming not consumed by implement-feature</strong> — each task-worker discovers blast radius independently. The groomed Impact Radius section (which took a full parallel swarm to produce) is not read by any task during execution.</div>
+    </li>
+  </ul>
+</section>
+
+<!-- ───────────────────────────────────────────── DESIGN REVISION -->
+<section id="design-revision">
+  <h2>Design Revision <span class="tag now">updated after ensemble + reference reads</span></h2>
+
+  <div class="card warn">
+    <h4>The original brief was wrong on one point</h4>
+    <p>The brief proposed wrapping all sections (including prose) in <code>&lt;div&gt;</code> blocks. The ensemble found this breaks all 58 skills, all 28 agents, all documentation navigation, and the grooming contract. That change is off the table.</p>
+  </div>
+
+  <h3>Revised understanding</h3>
+  <div class="grid grid-2">
+    <div class="card ok">
+      <h4>Entry sections — correct format, not enforced</h4>
+      <p><code>## Header</code> + <code>&lt;div&gt;&lt;sub&gt;timestamp&lt;/sub&gt;content&lt;/div&gt;</code> per entry. The format is right. The problem is 30+ write sites can bypass it and produce plain text. The reader then generates zero-timestamp IDs to compensate.</p>
+      <p><strong>Fix:</strong> Enforce via one writer. Zero-timestamp fallback deleted. <code>createdAt</code> baseline used when timestamp unavailable — <em>but only when the field is actually present</em> (see Audit section: <code>added_date</code> defaults to <code>"0000-00-00"</code>, so this is not always derivable).</p>
+    </div>
+    <div class="card ok">
+      <h4>Prose sections — correct format, intentional</h4>
+      <p><code>## Header</code> + plain text. Description, Groomed subsections, Story, Resolved — freeform text that should not get <code>&lt;div&gt;</code> wrappers. The ecosystem assumes this universally.</p>
+      <p><strong>Fix:</strong> Keep as-is. Centralize the writer to prevent drift.</p>
+    </div>
+  </div>
+
+  <h3>What the unified layer actually is</h3>
+  <p>Not a new wire format. A single enforced write path with two methods, and a single parse path with no fallback:</p>
+  <pre style="background:var(--canvas-soft);border:1px solid var(--hairline);border-radius:6px;padding:16px;font-family:var(--font-mono);font-size:12px;overflow-x:auto;color:var(--ink);margin:12px 0;">class SectionWriter:
+    def write_entry_section(name, entries):
+        # Always: ## name + div blocks. No exceptions.
+
+    def write_prose_section(name, text):
+        # Always: ## name + plain text. No div wrappers.
+
+class SectionParser:
+    def parse(body):
+        # One path: div blocks → entry section.
+        # No blocks → prose section.
+        # No YAML fallback. No zero-timestamp IDs.</pre>
+
+  <h3>Open questions that need answers before any ADR</h3>
+  <div class="grid grid-2">
+    <div class="card warn">
+      <h4>Q1: Which sections are entry vs prose?</h4>
+      <p>A registry is needed. What constitutes an entry section vs a prose section? Where does this registry live? What happens when an agent writes a new section name not in the registry?</p>
+    </div>
+    <div class="card warn">
+      <h4>Q2: Is createdAt always available?</h4>
+      <p><a href="../backlog_core/parsing.py"><code>parsing.py:106</code></a> shows <code>added_date = _fm_str(...) or "0000-00-00"</code> — the field is optional. The proposed <code>createdAt + section + index</code> baseline ID requires resolution of what to do when the field is absent.</p>
+    </div>
+    <div class="card warn">
+      <h4>Q3: Does the YAML cache serve a purpose beyond format?</h4>
+      <p>The YAML cache is used as a performance optimization — <code>_build_sections_from_yaml_item()</code> avoids re-parsing the body. Eliminating it requires a replacement caching strategy, not just format change.</p>
+    </div>
+    <div class="card warn">
+      <h4>Q4: How does SAM share the writer?</h4>
+      <p>SAM schema has 12+ independent write sites. Does <code>sam_schema</code> import from <code>backlog_core</code>? Currently there is no shared section code between them.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────── CLAIM AUDIT -->
+<section id="audit">
+  <h2>Claim Audit <span class="tag now">invented constraints · fallacies · unverified</span></h2>
+  <p>An ensemble of auditors reviewed the design brief and this document for claims that lack evidence, citations that don't match source, and reasoning errors. These must be resolved before any of the proposed changes become ADRs.</p>
+
+  <h3>Invented constraints — mandates without ADR or code evidence</h3>
+  <ul class="friction-list">
+    <li>
+      <span class="badge danger">INV</span>
+      <div class="detail"><strong>"The zero-timestamp fallback must be eliminated entirely"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 1</a>. No ADR cited. The constraint is stronger than the evidence: zero IDs cause problems <em>when mixed with real IDs</em>. Segregation or conversion are alternatives to elimination.</div>
+    </li>
+    <li>
+      <span class="badge danger">INV</span>
+      <div class="detail"><strong>"The GitHub issue createdAt is available on every item"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 2</a>. <a href="../backlog_core/parsing.py"><code>parsing.py:106</code></a> shows <code>added_date = _fm_str(...) or "0000-00-00"</code> — the field is optional and may be absent. The proposed baseline ID strategy breaks when this field is missing.</div>
+    </li>
+    <li>
+      <span class="badge danger">INV</span>
+      <div class="detail"><strong>"All sections use the same wire format"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 3</a>. Desired future state. No enforcement mechanism described. No ADR. The revised design (two formats, both enforced) is a better-evidenced position.</div>
+    </li>
+    <li>
+      <span class="badge danger">INV</span>
+      <div class="detail"><strong>"The YAML cache is downstream, not a source of truth"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 6</a>. Current code at <a href="../backlog_core/operations.py"><code>operations.py:3228</code></a> explicitly uses YAML as source of truth when body headers are a subset of YAML sections. Eliminating it requires a replacement, not just reclassification.</div>
+    </li>
+  </ul>
+
+  <h3>Citation verification — all code file:line references checked</h3>
+  <table>
+    <thead><tr><th>Claim</th><th>Cited location</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td><code>f"{added_date}T00:00:00Z"</code> in parse_entries()</td><td><a href="../backlog_core/entry_blocks.py">entry_blocks.py:158</a></td><td class="ok">VERIFIED — exact match</td></tr>
+      <tr><td><code>_normalize_section_key</code> exists</td><td><a href="../backlog_core/operations.py">operations.py:911</a></td><td class="ok">VERIFIED — exact match</td></tr>
+      <tr><td>Zero-timestamp in _parse_section_entries()</td><td><a href="../backlog_core/parsing.py">parsing.py:1027</a></td><td class="ok">VERIFIED — exact match</td></tr>
+      <tr><td>memory_backend writes <code>## {heading}</code></td><td><a href="../backlog_core/backends/memory_backend.py">memory_backend.py:423</a></td><td class="ok">VERIFIED — exact match</td></tr>
+      <tr><td>sqlite_backend writes <code>## {heading}</code></td><td><a href="../backlog_core/backends/sqlite_backend.py">sqlite_backend.py:811</a></td><td class="ok">VERIFIED — exact match</td></tr>
+      <tr><td>Git split "12 minutes apart"</td><td>git history c5d97502 / 049529d1</td><td class="bad">WRONG — actual gap is 40 minutes 21 seconds (12:43 → 13:23 on 2026-03-30)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Unverified universal claims</h3>
+  <ul class="friction-list">
+    <li>
+      <span class="badge warn">PART</span>
+      <div class="detail"><strong>"All 58 skills assume ## headers"</strong> — 56/58 verified exhaustively. Two skills (create-backlog-item, dh-meta-docs) have no section format instructions. Claim is 96.5% verified, not universal.</div>
+    </li>
+    <li>
+      <span class="badge warn">PART</span>
+      <div class="detail"><strong>"17 independent write sites"</strong> — the count was produced by one grep pass over <code>backlog_core/</code> only. A different search strategy yields different counts. SAM schema adds 12+ more. The count is a floor, not an audit.</div>
+    </li>
+  </ul>
+
+  <h3>Logical fallacies in the design brief</h3>
+  <ul class="friction-list">
+    <li>
+      <span class="badge danger">FAL</span>
+      <div class="detail"><strong>Genetic fallacy</strong> — "YAML was designed for human readability, therefore AI agents should not read it." The origin of a design choice does not determine its current validity. YAML also serves as a performance cache for section reads.</div>
+    </li>
+    <li>
+      <span class="badge danger">FAL</span>
+      <div class="detail"><strong>False dichotomy</strong> — "Two formats exist therefore they must be unified under one format." The evidence shows the formats create complexity. It does not show that unification is the only fix — graduated enforcement or format detection are alternatives.</div>
+    </li>
+    <li>
+      <span class="badge danger">FAL</span>
+      <div class="detail"><strong>Necessity fallacy</strong> — "Two-path read compensates for writer inconsistency, therefore the architecture must replace it, not wrap it." Replacement is one option. The brief rejects all wrapping with no cost-benefit analysis.</div>
+    </li>
+    <li>
+      <span class="badge danger">FAL</span>
+      <div class="detail"><strong>Overgeneralization</strong> — "Zero-timestamp IDs are not unique, therefore they must be eliminated entirely." They cause problems when mixed with real IDs in <code>since</code> filtering. Isolation, conversion, or segregation are valid alternatives to elimination.</div>
+    </li>
+  </ul>
+</section>
+
+<!-- ───────────────────────────────────────────── FULL WORKFLOW -->
+<section id="workflow">
+  <h2>Full Workflow — Backlog Item Creation to Completion</h2>
+  <p>Every phase shown here is verified against the actual reference files in <code>skills/work-backlog-item/references/workflows/</code> and <code>skills/complete-implementation/references/</code>. Agents, artifacts, storage locations, and gates are cited from source.</p>
+
+  <h3>Phase overview</h3>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart LR
+    C(["/dh:work-backlog-item\ncreate"])
+    G(["/dh:work-backlog-item\ngroom"])
+    W(["/dh:work-backlog-item\nwork"])
+    A(["/dh:add-new-feature\ndiscovery → plan"])
+    I(["/dh:implement-feature\ndispatch loop"])
+    CI(["/dh:complete-implementation\nquality gates"])
+    DONE([Item closed\nGitHub Issue closed])
+
+    C --> G --> W --> A --> I --> CI --> DONE
+
+    style C  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style G  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style W  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style A  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style I  fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style CI fill:#f0f2f7,stroke:#c8ccd8,color:#1e2030
+    style DONE fill:#d4edda,stroke:#a3c9a8,color:#1a3a20
+    </div>
+  </div>
+
+  <!-- ── PHASE 1: CREATE ── -->
+  <h3>Phase 1 — Create <code style="font-size:11px;font-weight:400">/dh:work-backlog-item create</code></h3>
+  <p>Source: <a href="../skills/work-backlog-item/references/workflows/create/start.md">create/start.md</a>. Create calls <code>backlog_add()</code> via MCP — the configured backend decides what gets created (GitHub Issue, beads issue, SQLite record, or memory). The <code>item_ref</code> returned is backend-agnostic.</p>
+  <table>
+    <thead><tr><th>Step</th><th>Tool</th><th>Reads</th><th>Writes</th><th>Backend-specific behaviour</th></tr></thead>
+    <tbody>
+      <tr><td>1–3</td><td>Collect + validate fields</td><td>User input, <code>backlog_list(search=...)</code> for duplicate detection</td><td>Field set in memory</td><td>—</td></tr>
+      <tr><td>4</td><td><code>backlog_add(title, priority, description, source, type, gate_token)</code></td><td>Validated field set</td><td>Backend item created; response contains <code>item_ref</code></td><td>GitHub → Issue; beads → bd issue; SQLite → row; memory → dict</td></tr>
+      <tr><td>5–6</td><td>Use returned <code>item_ref</code></td><td><code>item_ref</code> from <code>backlog_add</code> response</td><td>Confirmation shown; <code>item_ref</code> used for all downstream selectors</td><td>Status implicitly <code>needs-grooming</code> at creation</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── PHASE 2: GROOM ── -->
+  <h3>Phase 2 — Groom <code style="font-size:11px;font-weight:400">/dh:work-backlog-item groom</code></h3>
+  <p>Source: <a href="../skills/work-backlog-item/references/workflows/groom/start.md">groom/start.md</a>, <a href="../skills/work-backlog-item/references/workflows/groom/swarm.md">groom/swarm.md</a>, <a href="../skills/work-backlog-item/references/workflows/groom/finalize.md">groom/finalize.md</a></p>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+    IN["intake.md\nbacklog_view(selector, summary=false)\nEligibility check"]
+    AN["analyze.md\nDiscovery gate\nScope sizing\nRT-ICA snapshot written"]
+    W0["Wave 0 — optional, sequential\ntechnical-researcher\nSkipped for bug/fix items"]
+    W1A["impact-analyst\n→ Impact Radius section"]
+    W1B["fact-checker\n→ Fact-Check section"]
+    W1C["classifier\n→ Issue Classification section"]
+    W1D["alignment-analyst\nstarts after impact-analyst\n→ Design Intent Alignment"]
+    W1E["rtica-assessor\nwaits for IA + FC\n→ RT-ICA intermediate"]
+    W2["Wave 2 — groomer\nwaits for rtica + classifier\n→ all Groomed subsections"]
+    FIN["finalize.md\nRT-ICA Final Pass\nOutput Validation Gate\nbacklog_groom(sections=all, mark_groomed=True)"]
+    DONE2(["Item status: groomed\nAll sections in GitHub body"])
+
+    IN --> AN
+    AN --> W0
+    W0 --> W1A & W1B & W1C
+    W1A --> W1D
+    W1A & W1B --> W1E
+    W1E & W1C --> W2
+    W0 & W1A & W1B & W1C & W1D & W1E & W2 --> FIN
+    FIN -->|APPROVED| DONE2
+    FIN -->|BLOCKED| STOP(["Stop — missing conditions\npresented to user"])
+
+    style DONE2 fill:#d4edda,stroke:#a3c9a8,color:#1a3a20
+    style STOP  fill:#fde8e8,stroke:#e8a0a0,color:#5a1a1a
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Agent</th><th>Waits for</th><th>Produces</th><th>Stored at</th><th>Consumed by</th></tr></thead>
+    <tbody>
+      <tr><td><code>technical-researcher</code></td><td>—</td><td>Research section</td><td>GitHub body via <code>backlog_groom(section='Research')</code></td><td>fact-checker (Wave 1)</td></tr>
+      <tr><td><code>impact-analyst</code></td><td>—</td><td>Impact Radius section</td><td>GitHub body via <code>backlog_groom(section='Impact Radius')</code></td><td>rtica-assessor, alignment-analyst, work/prepare (Step 4.1)</td></tr>
+      <tr><td><code>fact-checker</code></td><td>Research (if available)</td><td>Fact-Check section</td><td>GitHub body via <code>backlog_groom(section='Fact-Check')</code></td><td>rtica-assessor</td></tr>
+      <tr><td><code>classifier</code></td><td>—</td><td>Issue Classification + Root-Cause Analysis</td><td>GitHub body via <code>backlog_groom(section='Issue Classification')</code></td><td>groomer (Wave 2), work/prepare (domain routing)</td></tr>
+      <tr><td><code>alignment-analyst</code></td><td>impact-analyst</td><td>Design Intent Alignment section</td><td>GitHub body via <code>backlog_groom(section='Design Intent Alignment')</code></td><td>groomer context</td></tr>
+      <tr><td><code>rtica-assessor</code></td><td>impact-analyst + fact-checker</td><td>RT-ICA intermediate (replaced by Final Pass)</td><td>GitHub body via <code>backlog_groom(section='RT-ICA')</code></td><td>groomer gate, finalize.md</td></tr>
+      <tr><td><code>groomer</code></td><td>rtica-assessor + classifier</td><td>All Groomed subsections (12 sections)</td><td>GitHub body via <code>backlog_groom(section='...')</code> per subsection</td><td>work/prepare (feature request composition)</td></tr>
+      <tr><td><strong>finalize.md</strong> (orchestrator)</td><td>All Wave 1 + Wave 2</td><td>RT-ICA Final (replaces intermediate) + atomic mark_groomed</td><td>GitHub body; status label <code>status:groomed</code></td><td>work/prepare (RT-ICA gate)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── PHASE 3: WORK / PREPARE ── -->
+  <h3>Phase 3 — Prepare &amp; Plan <code style="font-size:11px;font-weight:400">/dh:work-backlog-item work</code></h3>
+  <p>Source: <a href="../skills/work-backlog-item/references/workflows/work/start.md">work/start.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/rt-ica-gate.md">work/rt-ica-gate.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/plan.md">work/plan.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/field-mapping.md">work/field-mapping.md</a></p>
+  <table>
+    <thead><tr><th>Step</th><th>What happens</th><th>Reads from GitHub body</th><th>Writes</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td>2.1</td><td>Already-implemented check</td><td>Impact Radius file list</td><td>—</td><td>BLOCKS if goal already in git log</td></tr>
+      <tr><td>3.1</td><td>Auto-groom check (7-day TTL)</td><td><code>metadata.groomed</code>, <code>metadata.updated_at</code></td><td>Re-invokes groom if stale</td><td>Must be current before proceeding</td></tr>
+      <tr><td>3.2</td><td>RT-ICA gate</td><td><code>sections['RT-ICA']</code> Date header</td><td>Re-runs <code>dh:rt-ica</code> if stale or absent</td><td>BLOCKS if BLOCKED result</td></tr>
+      <tr><td>3.4</td><td>Feasibility assessment (4 criteria)</td><td>Impact Radius count, Priority.Effort, description</td><td>feasibility_result (6-field object, in memory)</td><td>C3: BLOCKS if &gt;20 systems affected</td></tr>
+      <tr><td>4.1</td><td>Compose feature request</td><td>Description, Impact Radius, Acceptance Criteria, Issue Classification, RT-ICA derivable, Priority.Effort, Discovery</td><td>feature_request_string (assembled in memory)</td><td>BLOCKS if Impact Radius missing</td></tr>
+      <tr><td>4.2</td><td>Invoke <code>dh:add-new-feature</code></td><td>feature_request_string</td><td>SAM plan YAML + architect artifact</td><td>—</td></tr>
+      <tr><td>4.3</td><td>Link plan to item</td><td><code>sam_plan(action='list', search=slug)</code></td><td><code>backlog_update(plan='P{id}')</code></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── PHASE 4: ADD-NEW-FEATURE ── -->
+  <h3>Phase 4 — Discovery → Architecture → Plan <code style="font-size:11px;font-weight:400">/dh:add-new-feature</code></h3>
+  <table>
+    <thead><tr><th>Stage</th><th>Agent</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Consumed by</th></tr></thead>
+    <tbody>
+      <tr><td>Discovery</td><td><code>dh:feature-researcher</code></td><td>feature_request_string, codebase (Grep/Read)</td><td><code>feature-context</code> artifact</td><td>Gist via <code>artifact_register(type='feature-context')</code></td><td>swarm-task-planner, context-integration</td></tr>
+      <tr><td>Codebase analysis</td><td><code>dh:codebase-analyzer</code></td><td>Full codebase (Read/Bash/Grep/Glob), git history</td><td><code>codebase-analysis</code> artifacts (patterns, architecture, testing, conventions, concerns)</td><td>Gist via <code>artifact_register()</code></td><td>swarm-task-planner, code-reviewer, integration-checker</td></tr>
+      <tr><td>Architecture</td><td><code>dh:swarm-task-planner</code></td><td>feature-context, codebase-analysis</td><td>SAM plan YAML (<code>P{id}-{slug}.yaml</code>) + architect artifact</td><td>Local <code>~/.dh/projects/{slug}/plan/</code> + Gist write-through</td><td>implement-feature, all task-workers, contract-verification</td></tr>
+      <tr><td>Validation</td><td><code>dh:plan-validator</code></td><td><code>sam_plan(action='read')</code></td><td>Validation result (ephemeral — not persisted)</td><td>—</td><td>Gates plan creation; lost after gate</td></tr>
+      <tr><td>Context manifest</td><td><code>dh:dh-context-gathering</code></td><td>Task file (markdown)</td><td>Context Manifest section embedded in each task file</td><td>Task file on disk</td><td>task-worker (reads at execution time)</td></tr>
+      <tr><td>T0 baseline</td><td><code>dh:t0-baseline-capture</code></td><td><code>acceptance_criteria_structured</code> from plan; runs check_commands via Bash</td><td>T0-baseline YAML artifact</td><td>Gist via <code>artifact_register(type='T0-baseline')</code></td><td>tn-verification-gate (comparison baseline)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── PHASE 5: IMPLEMENT-FEATURE ── -->
+  <h3>Phase 5 — Implement-feature loop <code style="font-size:11px;font-weight:400">/dh:implement-feature</code></h3>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+    START["sam_plan(action='ready')\nGet next task batch"]
+    DISPATCH["Dispatch dh:task-worker\nper ready task (parallel)"]
+    CLAIM["task-worker claims task\nsam_task(action='claim')"]
+    READ["Reads fresh per task:\n• sam_task(action='read') → plan.context\n• artifact_read(architect)\n• artifact_read(feature-context)\n• Context Manifest from task file"]
+    IMPL["Specialist agent implements\n(loaded via profile_load)"]
+    REVIEW["dh:code-reviewer\n→ artifact_register(type='code-review-{task_id}')"]
+    CONTRACT["dh:contract-verification\n→ appends CONTRACT: items\nto Concerns section on issue"]
+    COMPLETE["sam_task(action='state', state='complete')"]
+    MORE{"More ready tasks?"}
+    DONE5(["All tasks COMPLETE\nProceed to complete-implementation"])
+
+    START --> DISPATCH --> CLAIM --> READ --> IMPL --> REVIEW --> CONTRACT --> COMPLETE --> MORE
+    MORE -->|Yes| START
+    MORE -->|No| DONE5
+
+    style DONE5 fill:#d4edda,stroke:#a3c9a8,color:#1a3a20
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Item</th><th>Read once at plan start vs re-read per task</th><th>Optimization opportunity</th></tr></thead>
+    <tbody>
+      <tr><td>Architect spec</td><td class="bad">Re-read per task (task-worker + contract-verification independently)</td><td>Cache once at plan start; inject into all task dispatches</td></tr>
+      <tr><td>Plan context manifest</td><td class="bad">Re-read per task via <code>sam_task(action='read').plan.context</code></td><td>Cache once by orchestrator; pass as inherited context</td></tr>
+      <tr><td>Feature-context artifact</td><td class="ok">Read by task-worker; code-reviewer receives criteria via task object</td><td>Already acceptable</td></tr>
+      <tr><td>Codebase-analysis</td><td class="ok">Read on-demand (optional) by forensic-review and integration-checker</td><td>Already acceptable</td></tr>
+      <tr><td>Code changes (git)</td><td class="ok">Accumulate in worktree; each task sees prior tasks' commits via filesystem</td><td>No action needed</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── PHASE 6: COMPLETE-IMPLEMENTATION ── -->
+  <h3>Phase 6 — Complete-implementation <code style="font-size:11px;font-weight:400">/dh:complete-implementation</code></h3>
+  <p>Source: <a href="../skills/complete-implementation/references/concerns-processing.md">concerns-processing.md</a>, <a href="../skills/complete-implementation/references/final-handoff.md">final-handoff.md</a>, <a href="../skills/complete-implementation/references/migration-fidelity-gate.md">migration-fidelity-gate.md</a></p>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+    PRE["Pre-gate: Process Concerns section\nbacklog_view → read all unchecked items\nVerify each; create backlog items for real ones\nbacklog_groom(section='Concerns', content=updated)"]
+    TN["dh:tn-verification-gate\nRe-runs same check_commands as T0\nCompares against T0-baseline\n→ artifact_register(type='TN-verification')"]
+    TNcheck{"TN verdict?"}
+    FV["dh:feature-verifier\nGoal-backward verification\n→ artifact_register(type='feature-verification')"]
+    DA["dh:doc-drift-auditor\nCompares docs vs implementation\n→ artifact_register(type='audit-report')"]
+    SM["dh:service-docs-maintainer\nReads audit-report\nUpdates README, docstrings, examples"]
+    CR["dh:context-refinement\nReads architect + feature-context\nAnnotates with post-impl discoveries\n→ sam_plan(action='update', append)"]
+    CLOSE["Apply status:verified label\nClose GitHub Issue\nbacklog_close(item_ref)"]
+    REWORK(["BLOCKED — regressions found\nItem remains open"])
+
+    PRE --> TN --> TNcheck
+    TNcheck -->|PASS| FV
+    TNcheck -->|FAIL — regression| REWORK
+    FV --> DA --> SM --> CR --> CLOSE
+
+    style CLOSE  fill:#d4edda,stroke:#a3c9a8,color:#1a3a20
+    style REWORK fill:#fde8e8,stroke:#e8a0a0,color:#5a1a1a
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Gate</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Blocks if</th></tr></thead>
+    <tbody>
+      <tr><td>Concerns pre-gate</td><td>GitHub body Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>GitHub body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
+      <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification YAML artifact (PASS/FAIL + criterion diff)</td><td>Gist via <code>artifact_register(type='TN-verification')</code></td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
+      <tr><td><code>feature-verifier</code></td><td>feature-context, architect artifacts via <code>artifact_read()</code></td><td>feature-verification artifact (VERIFIED or GAPS_FOUND)</td><td>Gist via <code>artifact_register(type='feature-verification')</code></td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
+      <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Gist via <code>artifact_register(type='audit-report')</code></td><td>Never blocks — feeds service-docs-maintainer</td></tr>
+      <tr><td><code>service-docs-maintainer</code></td><td>audit-report artifact, implementation files</td><td>Updated documentation files (README, docstrings, examples)</td><td>Repository files (Write tool — committed)</td><td>Never blocks</td></tr>
+      <tr><td><code>context-refinement</code></td><td>Task files, architect artifact, feature-context artifact, implementation code</td><td>Post-impl annotations appended to architect + feature-context</td><td>SAM plan artifacts via <code>sam_plan(action='update', append)</code></td><td>BLOCKED if context drift unresolvable</td></tr>
+      <tr><td>Closure</td><td>All gate verdicts</td><td>Status label <code>status:closed</code>; GitHub Issue closed</td><td>GitHub Issue + backlog item metadata</td><td>Any gate with FAIL verdict</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── STATE MACHINE ── -->
+  <h3>Item state machine</h3>
+  <p>Source: <a href="../skills/backlog/references/state-machine.md">backlog/references/state-machine.md</a></p>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+stateDiagram-v2
+    [*] --> needs_grooming : create
+    needs_grooming --> groomed : groom completes (RT-ICA APPROVED)
+    needs_grooming --> blocked : RT-ICA BLOCKED
+    blocked --> needs_grooming : user provides missing info
+    groomed --> in_milestone : assigned to milestone
+    groomed --> in_progress : work starts (quick path)
+    in_milestone --> in_progress : work cycle begins
+    in_progress --> done : implementation complete
+    in_progress --> resolved : item superseded / obsolete
+    done --> closed : TN-verification PASS + all gates pass
+    resolved --> closed : backlog_close() called
+    </div>
+  </div>
+
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'neutral',
+    themeVariables: {
+      primaryColor: '#f0f2f7',
+      primaryTextColor: '#1e2030',
+      primaryBorderColor: '#c8ccd8',
+      lineColor: '#888ea8',
+      secondaryColor: '#f0f2f7',
+      tertiaryColor: '#fafafa',
+      background: '#fafafa',
+      mainBkg: '#f0f2f7',
+      nodeBorder: '#c8ccd8',
+      clusterBkg: '#fafafa',
+      titleColor: '#1e2030',
+      edgeLabelBackground: '#fafafa',
+    }
+  });
+</script>
+
+</body>
+</html>
