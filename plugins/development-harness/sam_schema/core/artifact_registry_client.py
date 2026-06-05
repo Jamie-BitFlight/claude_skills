@@ -146,7 +146,9 @@ class ArtifactRegistryClient:
             # for the same plan only refreshes the created_at timestamp — not
             # worth a Gist PATCH on every task state change.
             entry_exists = any(
-                e.artifact_type == entry.artifact_type and e.artifact_id == entry.artifact_id
+                e.artifact_type == entry.artifact_type
+                and e.artifact_id == entry.artifact_id
+                and e.status == entry.status
                 for e in manifest.artifacts
             )
             if not entry_exists:
@@ -254,7 +256,9 @@ class ArtifactRegistryClient:
             )
             manifest = provider.get_manifest(sentinel_issue)
             entry_exists = any(
-                e.artifact_type == entry.artifact_type and e.artifact_id == entry.artifact_id
+                e.artifact_type == entry.artifact_type
+                and e.artifact_id == entry.artifact_id
+                and e.status == entry.status
                 for e in manifest.artifacts
             )
             if not entry_exists:

@@ -46,7 +46,6 @@ T4 scope:
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import logging
 from io import StringIO
@@ -614,7 +613,11 @@ class GistTaskLayer:
                     )
                     return
             except OSError:
-                pass  # Sidecar absent or unreadable — upload as normal
+                _log.debug(
+                    "GistTaskLayer._write_through: sidecar read failed for plan %s — uploading as normal",
+                    plan_id,
+                    exc_info=True,
+                )
 
         try:
             self._artifact_client.store(issue=issue, content=yaml_content)
@@ -626,8 +629,14 @@ class GistTaskLayer:
             raise
 
         if hash_sidecar is not None:
-            with contextlib.suppress(OSError):
+            try:
                 hash_sidecar.write_text(content_hash)
+            except OSError:
+                _log.debug(
+                    "GistTaskLayer._write_through: sidecar write failed for plan %s — dedup skipped next call",
+                    plan_id,
+                    exc_info=True,
+                )
 
     def update_plan_fields(
         self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
