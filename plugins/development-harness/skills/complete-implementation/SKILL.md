@@ -84,7 +84,7 @@ flowchart TD
 When auto-resolving to the SAM path, output:
 
 ```text
-Issue #{issue_number} has linked plan: {plan_path}
+Issue #{issue_number} has linked plan: {plan_address}
 Proceeding with full quality gates.
 ```
 

@@ -470,16 +470,16 @@ self-report such as "linked to issue #N" is not evidence the link exists. Confir
 reading state, not by trusting a report:
 
 ```text
-# 1. Read current state — plan_path is null until the link is written
+# 1. Read current state — plan_address is null until the link is written
 mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
 
-# 2. If plan_path is null, write the link
+# 2. If plan_address is null, write the link
 mcp__plugin_dh_backlog__backlog_update(
     selector="{title}",
     plan="P{id}"
 )
 
-# 3. Re-read and confirm plan_path is non-null before proceeding to Phase 5
+# 3. Re-read and confirm plan_address is non-null before proceeding to Phase 5
 mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
 ```
 
@@ -488,9 +488,9 @@ artifact. Do NOT call `artifact_register` for the `task-plan` type — it is red
 would create a duplicate entry.
 
 The `backlog_update(plan=...)` call writes the plan address into the backlog item's `metadata.plan`
-field, surfaced by `backlog_view(summary=True)` as `plan_path`. This is a backend signal — it
+field, surfaced by `backlog_view(summary=True)` as `plan_address`. This is a backend signal — it
 records that a plan exists and its address, not a filesystem path. `work-backlog-item` reads
-`plan_path` to route directly to `implement-feature` on subsequent invocations. The SAM MCP
+`plan_address` to route directly to `implement-feature` on subsequent invocations. The SAM MCP
 resolves `P{id}` to the full plan without filesystem access.
 
 ---

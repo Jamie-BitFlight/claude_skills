@@ -49,7 +49,7 @@ Expected response key contracts (for T24 implementor):
     truncated=False, child_map=<str>, has_children=True  (ADR-7)
   NAVIGATE miss: error, requested_ordinal, valid_ordinals
   PASSTHROUGH (summary=True, observed 2026-06-01):
-    _full_chars, _hint, _summary, issue_number, labels, plan_path,
+    _full_chars, _hint, _summary, issue_number, labels, plan_address,
     section_filter_miss, sections_index, status, title
 """
 
@@ -106,7 +106,7 @@ _PASSTHROUGH_LEGACY_KEYS: frozenset[str] = frozenset({
     "_summary",
     "issue_number",
     "labels",
-    "plan_path",
+    "plan_address",
     "section_filter_miss",
     "sections_index",
     "status",

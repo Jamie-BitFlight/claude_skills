@@ -972,22 +972,23 @@ async def test_backlog_view_compact_mode_includes_sections_metadata():
 async def test_backlog_view_summary_true_returns_compact_manifest():
     """backlog_view with summary=True (default) returns 5-field routing manifest.
 
-    Tests: summary=True response shape — issue_number, title, labels, status, plan_path.
-    How: Mock operations.view_item to return a full-detail dict with body containing
-         a plan: line, labels list, issue string, and state field.
+    Tests: summary=True response shape — issue_number, title, labels, status, plan_address.
+    How: Mock operations.view_item to return a full-detail dict with plan attribute set,
+         labels list, issue string, and state field.
          Call backlog_view without summary parameter (defaults to True).
          Assert all 5 routing fields plus _summary, _full_chars, _hint are present.
     Why: The summary manifest is the contract for token-efficient routing — agents
          receive just enough metadata to decide whether to fetch the full body.
     """
-    # Arrange
+    # Arrange — plan set on .plan attribute (not body text)
     op_result = _make_view_result({
         "title": "SAM Ready Feature",
         "priority": "P1",
         "issue": "#36",
         "state": "open",
         "labels": ["priority:p1", "sam-ready"],
-        "body": "## Description\nSome content\nplan: plan/P036-sam-ready.yaml\nMore content",
+        "plan": "P036eef31",
+        "body": "## Description\nSome content\nMore content",
         "sections": {},
         "messages": [],
         "warnings": [],
@@ -1002,7 +1003,7 @@ async def test_backlog_view_summary_true_returns_compact_manifest():
     assert response["title"] == "SAM Ready Feature"
     assert response["labels"] == ["priority:p1", "sam-ready"]
     assert response["status"] == "open"
-    assert response["plan_path"] == "plan/P036-sam-ready.yaml"
+    assert response["plan_address"] == "P036eef31"
     assert response["_summary"] is True
     assert isinstance(response["_full_chars"], int)
     assert response["_full_chars"] > 0
@@ -1037,15 +1038,16 @@ async def test_backlog_view_summary_true_hint_contains_selector():
     assert "My Feature Title" in response["_hint"]
 
 
-async def test_backlog_view_summary_true_plan_path_none_when_absent():
-    """backlog_view summary=True sets plan_path=None when no plan: line in body.
+async def test_backlog_view_summary_true_plan_address_none_when_absent():
+    """backlog_view summary=True sets plan_address=None when no plan is linked.
 
-    Tests: plan_path extraction when body has no plan: annotation.
-    How: Mock operations.view_item with body containing no plan: line.
-         Assert plan_path is None in the summary response.
+    Tests: plan_address extraction when ViewItemResult.plan is empty string.
+    How: Mock operations.view_item with plan='' (default — no plan linked).
+         Assert plan_address is None in the summary response.
     Why: Callers must distinguish "has a plan" from "no plan" without parsing body.
+         Empty string result.plan must coerce to None via `result.plan or None`.
     """
-    # Arrange
+    # Arrange — plan attribute unset (defaults to empty string)
     op_result = _make_view_result({
         "title": "No Plan Yet",
         "issue": "#10",
@@ -1061,7 +1063,39 @@ async def test_backlog_view_summary_true_plan_path_none_when_absent():
         response = await _call("backlog_view", {"selector": "#10"})
 
     # Assert
-    assert response["plan_path"] is None
+    assert response["plan_address"] is None
+
+
+async def test_backlog_view_summary_true_plan_address_round_trip():
+    """backlog_view summary=True returns plan_address from result.plan attribute.
+
+    Tests: AC1 + AC2 — round-trip regression for plan_address extraction source.
+    How: Mock operations.view_item to return a ViewItemResult with plan='P023eef31'
+         set directly on the .plan attribute (NOT in body text).
+         Call backlog_view with summary=True.
+         Assert plan_address == 'P023eef31' AND 'plan_path' is not in the response.
+    Why: Prevents regression to the body-regex path. The extraction must read
+         result.plan directly; a Plan: line in body must be ignored.
+    """
+    # Arrange — plan set on .plan attribute, body has NO Plan: line
+    op_result = _make_view_result({
+        "title": "Planned Feature",
+        "issue": "#23",
+        "state": "open",
+        "labels": [],
+        "plan": "P023eef31",
+        "body": "## Description\nNo Plan: line in body.",
+        "messages": [],
+        "warnings": [],
+    })
+
+    # Act
+    with patch("backlog_core.operations.view_item", return_value=op_result):
+        response = await _call("backlog_view", {"selector": "#23"})
+
+    # Assert — plan_address present with correct value, plan_path absent
+    assert response["plan_address"] == "P023eef31"
+    assert "plan_path" not in response
 
 
 async def test_backlog_view_summary_true_closed_issue_status_is_closed():

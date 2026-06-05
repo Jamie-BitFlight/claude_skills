@@ -187,7 +187,7 @@ View a single backlog item or GitHub Issue in detail.
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `selector` | str | required | GitHub issue URL, #N, bare number, or title substring |
-| `summary` | bool | `True` | True=compact manifest (sections_index, plan_path, _hint); False=full response |
+| `summary` | bool | `True` | True=compact manifest (sections_index, plan_address, _hint); False=full response |
 | `include_content` | bool | `True` | False=metadata + section inventory only (no body content) |
 | `offset` | int | `0` | Skip N entry blocks from body start |
 | `limit` | int | `0` | Show at most N entry blocks (0=all) |
@@ -206,7 +206,7 @@ Progressive disclosure pattern:
 3. `backlog_view(selector="...", summary=False, section="0,1,3")` — load by index
 4. `backlog_view(selector="...", summary=False, section="/acceptance|plan/")` — load by regex
 
-Returns when `summary=True`: `{issue_number, title, labels, status, plan_path, sections_index, _summary, _full_chars, _hint}`.
+Returns when `summary=True`: `{issue_number, title, labels, status, plan_address, sections_index, _summary, _full_chars, _hint}`.
 Returns when `summary=False`: `{title, priority, issue, plan, file_path, body, sections, messages, warnings}` or compact `_over_budget` form or `{error}`.
 
 ---

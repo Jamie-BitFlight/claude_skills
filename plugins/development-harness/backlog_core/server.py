@@ -2240,12 +2240,11 @@ def _build_compact_manifest(
         selector: Original selector string for _hint message.
 
     Returns:
-        Compact dict with issue_number, title, labels, status, plan_path,
+        Compact dict with issue_number, title, labels, status, plan_address,
         and size hint for the full response.
     """
     full_chars = len(_json.dumps(full_response))
-    plan_match = _re.search(r"^[Pp]lan:\s*(\S+)", result.body, _re.MULTILINE)
-    plan_path: str | None = plan_match.group(1) if plan_match else None
+    plan_address: str | None = result.plan or None
     issue_number: int | None = result.number
     if issue_number is None:
         num_match = _re.search(r"(\d+)", result.issue)
@@ -2257,7 +2256,7 @@ def _build_compact_manifest(
         "title": result.title,
         "labels": result.labels,
         "status": status,
-        "plan_path": plan_path,
+        "plan_address": plan_address,
         "section_filter_miss": result.section_filter_miss,
         "_summary": True,
         "_full_chars": full_chars,
@@ -2389,7 +2388,7 @@ async def backlog_view(
         Field(
             description=(
                 "When True (default), returns a compact routing manifest with issue_number, title, labels, "
-                "status, plan_path, sections_index (all available sections as [N] Title (count) lines), "
+                "status, plan_address, sections_index (all available sections as [N] Title (count) lines), "
                 "_full_chars, and _hint showing how to load full content or specific sections. "
                 "When False, returns the full response unchanged."
             )
@@ -2536,7 +2535,7 @@ async def backlog_view(
         When navigate=<ordinal> + head=N: dict with ordinal, title, content, total_tokens,
         returned_tokens, truncated, and next_call hint when truncated=True.
         When summary=True (default, no disclosure params): compact dict with issue_number,
-        title, labels, status, plan_path, sections_index, _summary, _full_chars, and _hint.
+        title, labels, status, plan_address, sections_index, _summary, _full_chars, and _hint.
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings.
         On error, dict contains an error key.
