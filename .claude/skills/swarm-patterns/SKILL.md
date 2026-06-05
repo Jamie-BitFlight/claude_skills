@@ -1,6 +1,6 @@
 ---
 name: swarm-patterns
-description: Recipes and patterns for Claude Code multi-agent swarms. Use when building parallel specialist reviews, pipeline workflows, self-organizing swarms, research-then-implement flows, plan approval gates, coordinated refactoring, or any divide-and-conquer orchestration pattern.
+description: Recipes and patterns for Claude Code multi-agent swarms. Use when building parallel specialist reviews, pipeline workflows, self-organizing swarms, research-then-implement flows, plan approval gates, coordinated multi-file refactoring, or any divide-and-conquer orchestration pattern requiring TeamCreate, TaskCreate, SendMessage, or Agent tool coordination.
 ---
 
 # Swarm Patterns

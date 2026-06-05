@@ -1,6 +1,6 @@
 ---
 name: group-items-to-milestone
-description: 'Use when assigning backlog items to a GitHub milestone. Args: {milestone-number} [P0|P1|P2|title-filter]. Uses backlog list to load items, shows items with GitHub Issue status, lets user select which to assign. Creates missing GitHub Issues for selected P0/P1 items, assigns all to the milestone, updates Project V2 Status to Backlog. Use after create-milestone to populate a sprint or release.'
+description: 'Assign backlog items to a GitHub milestone by bridging per-item files to GitHub Issues. Use when populating a sprint or release milestone, after create-milestone, or when a milestone number is specified with optional P0/P1/P2 or title filter. Creates missing GitHub Issues for selected P0/P1 items, assigns all selected items to the milestone, and updates Project V2 Status to Backlog.'
 argument-hint: '{milestone-number} [P0|P1|P2|title-filter]'
 user-invocable: true
 ---

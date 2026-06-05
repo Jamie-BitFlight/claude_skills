@@ -1,6 +1,6 @@
 ---
 name: knowledge-explorer
-description: Manage the research/ knowledge base (KB) of tool and library research entries. Use when browsing KB topics, adding new research entries, updating existing entries with dated revisions, fetching GitHub repo metadata into a draft KB entry, or migrating old-format entries to skill-spec frontmatter. Triggers on tasks like "what do we have on X", "add this to the KB", "update the KB entry for Y", "fetch github info for owner/repo", or "migrate old entries".
+description: Manages the research/ knowledge base of verified tool and library research entries via knowledge-explorer.py. Commands — list (browse by category or SDLC layer), fetch-github (draft entry from GitHub repo), add (validate and route to category dir), update-append (append dated revision), generate-descriptions (repair missing or low-quality descriptions), migrate (convert inline-header entries to frontmatter). Use when browsing KB topics, adding or updating research entries, fetching GitHub repo metadata, generating descriptions in parallel via Haiku subagents, or migrating old-format entries to skill-spec frontmatter.
 ---
 
 # knowledge-explorer

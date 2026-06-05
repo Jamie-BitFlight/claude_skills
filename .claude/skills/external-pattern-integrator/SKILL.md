@@ -1,6 +1,6 @@
 ---
 name: external-pattern-integrator
-description: Integrate patterns from external sources (URLs or files) into local skills, agents, and plugins. Triggers on comparing external agent definitions against local equivalents, extracting best practices from frameworks like GSD or BMAD-METHOD, enhancing local skills with external patterns, or ensuring interoperability with external tool ecosystems.
+description: Integrates patterns from external sources (URLs or local files) into local skills, agents, and plugins. Use when comparing external agent definitions against local equivalents, extracting best practices from frameworks like GSD or BMAD-METHOD, enhancing local skills with external workflow patterns, or adding interoperability with external tool ecosystems. Runs a 3-phase workflow — parallel candidate mapping, contextual enhancement, and validation — with source attribution and backlog tracking for deferred enhancements.
 argument-hint: <url-or-file> [url-or-file...]
 user-invocable: true
 ---

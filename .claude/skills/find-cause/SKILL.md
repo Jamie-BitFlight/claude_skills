@@ -1,6 +1,6 @@
 ---
 name: find-cause
-description: Wrap investigation requests with evidence-chain discipline. Use when the user asks to find out why something happens, look into something, research a root cause, debug an issue, or investigate unexpected behavior. Transforms vague investigation requests into reproducible-proof investigations. Invoke with /find-cause <description of what to investigate>.
+description: Wraps investigation requests with evidence-chain discipline. Use when asked to find out why something happens, research a root cause, debug an issue, or investigate unexpected behavior. Transforms vague investigation requests into reproducible-proof investigations with a 5-step protocol — disambiguate, reproduce, read source, build evidence chain, present findings. Invoke with /find-cause followed by a description of what to investigate.
 argument-hint: <what to investigate>
 ---
 

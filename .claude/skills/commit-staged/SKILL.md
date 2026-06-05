@@ -1,6 +1,6 @@
 ---
 name: commit-staged
-description: Generate descriptive commit messages by analyzing git diffs, very fast and context-pollution safe. Use when the user asks to commit staged changes or needs a conventional-commits message generated from the current diff.
+description: Generates and commits conventional-commits messages by analyzing staged git diffs — fast and fork-context safe. Use when the user asks to commit staged changes, needs a type-scope-description message generated from the current diff, or wants scope selection guidance and pre-commit hook handling.
 argument-hint: '[notes or comments to account for in the commit message]'
 allowed-tools: Bash(git:*), Read, Glob, Grep, Bash(grep:*), Bash(find:*), Bash(fdfind:*), Bash(prek:*), Bash(uv run prek:*), Bash(uv run pre-commit:*), Bash(pre-commit:*)
 model: haiku

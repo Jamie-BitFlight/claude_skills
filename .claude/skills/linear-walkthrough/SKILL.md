@@ -1,6 +1,6 @@
 ---
 name: linear-walkthrough
-description: Produce a structured, end-to-end linear walkthrough of an unfamiliar codebase. Use when onboarding to a new repository, understanding how a system works from entry points through execution paths, or generating navigable codebase documentation. Spawns parallel subagents for discovery, tracing, validation, and synthesis across four phases. Covers architecture, execution flows, deployment, testing, and operations.
+description: Produces a structured, end-to-end linear walkthrough of an unfamiliar codebase by orchestrating parallel subagents across four phases — discovery, tracing, validation, and synthesis. Use when onboarding to a new repository, understanding execution paths from entry points, generating navigable codebase documentation, or needing fact-checked coverage of architecture, deployment, testing, and operations.
 argument-hint: '[target-directory]'
 ---
 

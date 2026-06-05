@@ -1,6 +1,6 @@
 ---
 name: seven-prompt-content-engine
-description: Walk a user from one rough content idea to a finished post, platform-adapted variants, and repurposed follow-on assets using a 7-step sequential prompting workflow. Use when the user wants help turning a half-formed idea, frustration, story, or client situation into publishable content quickly and consistently.
+description: Walks a user from one rough content idea to a finished post, platform-adapted variants, and repurposed follow-on assets using a 7-step sequential prompting workflow. Use when the user wants to turn a half-formed idea, frustration, story, or client situation into publishable content quickly and consistently — covering idea extraction, hook generation, outline, draft, humanizer pass, platform adaptation (LinkedIn, Reddit, X/Twitter, newsletter, Telegram), and repurpose engine.
 ---
 
 # Seven Prompt Content Engine

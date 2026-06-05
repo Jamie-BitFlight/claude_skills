@@ -1,6 +1,6 @@
 ---
 name: session-historian
-description: Look up prior Claude Code sessions when context is lost or forgotten. Use when asked "what did we do before?", "what happened in the last session?", "I forgot what we were working on", "find what I told you about X", or any request to recall past conversation history, prior decisions, experiments, or outcomes. Searches raw JSONL transcripts from ~/.claude/projects/ via DuckDB index. Returns verbatim user messages and summarizes AI actions and sub-agent outcomes. Summaries cached at ~/.claude/kaizen/session-summaries/.
+description: Look up prior Claude Code sessions when context is lost or forgotten. Use when asked what was done before, what happened in the last session, or any request to recall past conversation history, prior decisions, experiments, or outcomes. Indexes and searches raw JSONL transcripts from ~/.claude/projects/ via DuckDB. Returns verbatim user messages, summarizes AI actions and sub-agent outcomes, detects tool errors and user frustration signals, and reports tool usage statistics. Summaries cached at ~/.claude/kaizen/session-summaries/.
 ---
 
 # Session Historian

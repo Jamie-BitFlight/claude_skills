@@ -1,6 +1,6 @@
 ---
 name: swarm-operations
-description: API reference for Claude Code swarm tools -- TeamCreate, SendMessage, TeamDelete, and Agent tool parameters. Use when looking up tool signatures, message schemas, shutdown sequences, error handling, or debugging swarm operations.
+description: API reference for Claude Code multi-agent swarm tools -- TeamCreate, SendMessage, TeamDelete, TaskCreate/Update/List/Get, and Agent tool parameters. Use when looking up tool signatures, message schemas, shutdown sequences, error handling patterns, or debugging swarm operations. Covers direct messages, broadcasts, plan approval flows, graceful shutdown sequences, crashed teammate recovery, and common error causes.
 ---
 
 # Swarm Operations

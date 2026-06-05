@@ -1,6 +1,6 @@
 ---
 name: prepare-walkthrough-presentation
-description: Convert linear-walkthrough output into presentation-ready deck outlines per major codebase component. Use after running /linear-walkthrough to produce onboarding decks, architecture review decks, or operational review decks. Reads walkthrough artifacts (unified walkthrough, per-section files, validation reports, coverage maps, entry points, open questions) and generates structured slide outlines with speaker notes, evidence references, and suggested visuals. Use when you need to create a presentation, prepare a walkthrough deck, or summarize architecture.
+description: Transforms validated /linear-walkthrough artifacts into one presentation-ready deck outline per major codebase component. Use when the user asks to create a presentation, prepare a walkthrough deck, build an onboarding deck, produce an architecture review deck, or summarize a codebase for a technical audience. Requires walkthrough directory output -- reads unified walkthrough, per-section files, validation reports, coverage maps, entry points, and open questions -- then orchestrates four parallel agent phases to produce slide outlines with speaker notes, evidence references, and suggested visuals.
 argument-hint: '[walkthrough-directory]'
 ---
 

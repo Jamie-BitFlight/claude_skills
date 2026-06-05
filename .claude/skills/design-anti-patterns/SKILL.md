@@ -1,6 +1,6 @@
 ---
 name: design-anti-patterns
-description: 'Enforce anti-AI UI design rules based on the Uncodixfy methodology. Use when generating HTML, CSS, React, Vue, Svelte, or any frontend UI code. Prevents "Codex UI" — the generic AI aesthetic of soft gradients, floating panels, oversized rounded corners, glassmorphism, hero sections in dashboards, and decorative copy. Applies constraints from Linear/Raycast/Stripe/GitHub design philosophy: functional, honest, human-designed interfaces. Triggers on: UI generation, dashboard building, frontend component creation, CSS styling, landing page design, or any task producing visual interface code.'
+description: 'Enforce anti-AI UI design rules based on the Uncodixfy methodology. Use when generating HTML, CSS, React, Vue, Svelte, or any frontend UI code. Prevents generic AI aesthetic — soft gradients, glassmorphism, hero sections in dashboards, oversized rounded corners, and decorative copy. Applies constraints from Linear/Raycast/Stripe/GitHub design philosophy for functional, honest, human-designed interfaces. Triggers on UI generation, dashboard building, component creation, CSS styling, landing page design, or any task producing visual interface code.'
 ---
 
 # Design Anti-Patterns (Uncodixfy)

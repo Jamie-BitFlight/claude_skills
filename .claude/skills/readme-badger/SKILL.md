@@ -1,6 +1,6 @@
 ---
 name: readme-badger
-description: Design and select shields.io badges for README files. Use when writing or updating READMEs, choosing badge layouts, selecting badge styles, or adding project health indicators. Covers shields.io URL patterns, Simple Icons logos, layout conventions from popular repos, and badge selection by project type.
+description: Badge design and selection knowledge base for shields.io badges in README files. Use when writing or updating READMEs, choosing badge layouts, selecting badge styles, adding project health indicators, or picking Simple Icons logo slugs. Covers shields.io URL encoding rules, static vs dynamic badge selection, style variants (flat/flat-square/for-the-badge/social/plastic), layout patterns (two-tier/inline/centered), project-type badge sets for Python/JS/Rust/Claude plugins, color reference, non-obvious logo slugs, and common anti-patterns to avoid.
 ---
 
 # readme-badger

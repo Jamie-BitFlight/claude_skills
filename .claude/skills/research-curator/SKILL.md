@@ -1,7 +1,7 @@
 ---
 name: research-curator
-description: 'Manage research entries in ./research/ — create, refresh, and validate. Use when asked to add a tool, "document this", "research this", "refresh this research", "validate research entries", or given a tool URL. Modes: default (single URL), --batch (multiple URLs in parallel), --rerun (refresh stale entries), --validate (structural check and auto-fix).'
-argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all] [--add-frontmatter category/name|all] [--alternatives N]'
+description: 'Orchestrate research entry lifecycle in ./research/ — create, batch-import, refresh stale entries, and validate structure. Use when asked to add a tool, research a URL, document a library, refresh research, validate entries, or given any tool or library URL. Supports --batch (parallel multi-URL), --rerun (refresh one or all entries), and --validate (structural check with auto-fix of error-severity issues).'
+argument-hint: '[url] [--batch url1 url2 ...] [--rerun category/name|all] [--validate category/name|all]'
 ---
 
 <mode_args>$ARGUMENTS</mode_args>
@@ -35,11 +35,7 @@ flowchart TD
     Q2Layer -->|"Yes — layer filter present"| RerunLayer(["Execute Rerun Mode with layer filter applied"])
     Q2Layer -->|"No — no layer filter"| Rerun(["Execute Rerun Mode"])
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
-    Q3 -->|"No — validate flag absent"| Q4{"Does <mode_args/> contain --add-frontmatter?"}
-    Q4 -->|"Yes — add-frontmatter flag present"| Frontmatter(["Execute Frontmatter Mode"])
-    Q4 -->|"No — no flags matched"| VBD{"Vague Brief Detector<br/>Triggers if input has no URL,<br/>URL is homepage with no resource path,<br/>input is generic category word,<br/>or input is verb phrase not a noun"}
-    VBD -->|"No — clear URL with named resource"| Default(["Execute Default Mode — single URL"])
-    VBD -->|"Yes — vague brief detected"| Fallback(["Execute Fallback Mode — N direction cards"])
+    Q3 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
 ```
 
 ---
@@ -102,71 +98,6 @@ Before reporting results to the user after any mode completes, verify:
 
 ---
 
-<fallback_mode>
-
-## Fallback Mode — Vague Brief
-
-Trigger: Vague Brief Detector fires — `<mode_args/>` has no URL, a homepage URL with no resource path, a generic category word (e.g., "AI", "tools", "design"), or a verb phrase (e.g., "research AI tools").
-
-### Workflow
-
-1. **Parse** `--alternatives N` from `<mode_args/>` (default: 3 if flag absent)
-
-2. **Spawn N parallel agents** — each assigned an explicit direction index from 1 to N, each scoped to a different interpretation:
-
-   ```text
-   Agent tool parameters:
-     subagent_type: general-purpose
-     run_in_background: true
-     prompt: "Produce a direction card for the research brief '<mode_args/>'.
-               This is Direction {index} of {N}. Your interpretation: [specific reading]
-               Format exactly:
-               **Direction {index}: [Interpretation Name]**
-               Rationale: [2–3 sentences on why this reading fits '<mode_args/>']
-               Research scope:
-               - [concrete research item 1]
-               - [concrete research item 2]
-               - [concrete research item 3]
-               Keywords: [3–5 comma-separated terms]
-               Canonical URL: [single authoritative URL for this interpretation
-                               e.g. https://docs.python.org/3/ — use WebSearch if needed]"
-   ```
-
-   Differentiation rule: assign each agent a different dimension (tool domain, target audience, use-case level, technology layer). No two agents share the same dimension.
-
-3. **Wait** for all N agents and collect direction cards (index, name, rationale, scope, keywords, canonical URL)
-
-4. **Present cards and wait for selection** via AskUserQuestion:
-
-   ```text
-   Your brief "[brief]" could mean several different things. Here are [N] directions:
-
-   **Direction 1: [Name]**
-   Rationale: …
-   Research scope: …
-   Keywords: …
-   URL: [canonical URL]
-
-   **Direction 2: [Name]**
-   …
-
-   Enter a number (1–[N]) to select a direction, or describe a different angle.
-   ```
-
-5. **Route based on response**:
-   - User enters a number → use the canonical URL from the selected card as `<mode_args/>` and route to Default Mode
-   - If the selected card has no canonical URL → ask user via AskUserQuestion: "What URL should we use for [selected direction]?" then route to Default Mode with that URL
-   - User describes a new direction → treat as a clear brief and route to Default Mode
-
-### Error Handling
-
-- If a parallel agent fails, present the successful cards and note the missing one
-- If fewer than 2 cards are produced, ask the user to be more specific instead of presenting cards
-
-</fallback_mode>
-
----
-
 <default_mode>
 
 ## Default Mode -- Single URL
@@ -186,8 +117,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 3. **Wait** for structured result (status, file path, category, key findings)
 4. **Apply relay rules** -- verify pre-relay checklist before proceeding
-5. **Generate frontmatter** -- if research status is not `failed`, apply the Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md) to the new entry file before any other post-creation steps
-6. **Spawn four tasks concurrently** -- if research status is not `failed`:
+5. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
    ```text
    a. Agent tool parameters:
@@ -205,26 +135,13 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    d. Update ./research/README.md -- add new entry to category table
    ```
 
-7. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
+6. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-8. **Spawn backlink-detector** -- if cross-referencer returned `STATUS: complete`, spawn a sequential backlink pass (skip this step if cross-referencer returned `STATUS: failed`; failures of insight-extractor or utilization-assessor do not block this step):
-
-   ```text
-   Agent tool parameters:
-     agent: .claude/agents/research-backlink-detector.md
-     prompt: "Add backlinks for {file-path-from-agent-result}"
-   ```
-
-9. **Wait for backlink-detector and relay result**:
-
-   - **Backlinks**: relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added."
-   - **Skipped**: if `SKIPPED` is non-empty, relay each `(path, reason)` pair verbatim so dangling links and conflicting descriptions are visible to the user.
-
-10. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+7. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -249,7 +166,7 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each), followed by a sequential `@research-backlink-detector` pass for each entry after cross-referencer completes. See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each). See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
 ### Duplicate Detection
 
@@ -315,15 +232,10 @@ flowchart TD
     RelayCheck2 --> UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
     UpdateDate --> SpawnAnalysis1["Concurrently spawn 3 agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all 3 agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> SpawnBacklinks1["Spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'"]
-    SpawnBacklinks1 --> WaitBacklinks1["Wait for backlink-detector<br>Relay BACKLINKS_ADDED count and ENTRIES_MODIFIED paths"]
-    WaitBacklinks1 --> RelayBacklinks1["Relay BACKLINKS_ADDED count<br>Relay non-empty SKIPPED list verbatim"]
-    RelayBacklinks1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    WaitAnalysis1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn 3 agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> SpawnBacklinksN["For each updated entry in sequence (one at a time):<br>spawn @research-backlink-detector<br>'Add backlinks for ./research/category/name.md'<br>wait for completion before spawning next<br>(sequential to prevent write races on shared cited entries)"]
-    SpawnBacklinksN --> WaitBacklinksN["After all backlink passes complete:<br>Report total BACKLINKS_ADDED count<br>Relay non-empty SKIPPED lists verbatim"]
-    WaitBacklinksN --> PostActions
+    WaitAnalysisN --> PostActions
 ```
 
 ### Single Entry Rerun
@@ -337,11 +249,8 @@ flowchart TD
 
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
-5. **Update frontmatter** — two cases based on entry state after the agent completes:
-   - **Already canonical** (all of `title`, `subtitle`, `category`, `resource_url`, `date_created`, `date_last_reviewed`, `status` present): update only `date_last_reviewed` to today's date directly in the existing frontmatter; do not invoke the full Generation Procedure
-   - **Not yet canonical**: apply the full Generation Procedure from [Frontmatter Generation](./references/frontmatter-generation.md)
-6. Update README with refreshed date
-7. Concurrently spawn three analysis agents:
+5. Update README with refreshed date
+6. Concurrently spawn three analysis agents:
 
    ```text
    - @research-insight-extractor — "Extract improvements from ./research/{category}/{name}.md"
@@ -349,15 +258,7 @@ flowchart TD
    - @research-cross-referencer — "Add cross-references to ./research/{category}/{name}.md"
    ```
 
-8. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
-
-9. Spawn backlink-detector after cross-referencer completes:
-
-   ```text
-   @research-backlink-detector — "Add backlinks for ./research/{category}/{name}.md"
-   ```
-
-10. Wait for backlink-detector; relay `BACKLINKS_ADDED` count and `ENTRIES_MODIFIED` paths. If `BACKLINKS_ADDED: 0`, report "No backlink rows added." If `SKIPPED` is non-empty, relay each `(path, reason)` pair verbatim.
+7. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
 
 ### All Entries Rerun
 
@@ -450,44 +351,6 @@ Validation complete:
 
 ---
 
-<frontmatter_mode>
-
-## Frontmatter Mode
-
-Trigger: `<mode_args/>` contains `--add-frontmatter`.
-
-Generates or upgrades YAML frontmatter on existing research entries to the canonical schema defined in [Frontmatter Generation](./references/frontmatter-generation.md). Use this to backfill entries created before frontmatter generation was part of the workflow, or to normalize entries that have partial or non-canonical frontmatter.
-
-### Target Parsing
-
-Extract the value after `--add-frontmatter`:
-
-- `category/name` — single entry at `./research/category/name.md`
-- `all` — every entry in `./research/` except `README.md` and `./research/insights/**`
-
-### Execution
-
-Follow the Standalone Backfill Procedure in [Frontmatter Generation](./references/frontmatter-generation.md).
-
-### Output
-
-```text
-Frontmatter update complete:
-  Entries processed: N
-  Updated: N (frontmatter added or upgraded to canonical)
-  Skipped: N (already canonical)
-  Failed: N
-
-Updated entries:
-  ./research/category/name.md
-```
-
-List any failures with the exact reason (field could not be extracted, file write error, etc.).
-
-</frontmatter_mode>
-
----
-
 <post_actions>
 
 ## Post-Actions
@@ -495,26 +358,20 @@ List any failures with the exact reason (field could not be extracted, file writ
 Shared by all modes. Execute after any mode completes successfully.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables
-2. **README Reconcile** -- run full index reconciliation before lint to ensure every `research/**/*.md` entry is indexed in `./research/README.md`:
-
-   ```bash
-   uv run ./research/knowledge-explorer.py sync-readme
-   ```
-
-3. **Lint** -- run formatting checks on all modified files:
+2. **Lint** -- run formatting checks on all modified files:
 
    ```bash
    uv run prek run --files ./research/README.md [new-or-modified-files]
    ```
 
-4. **Commit** -- stage and commit all research and insight changes:
+3. **Commit** -- stage and commit all research and insight changes:
 
    ```bash
    git add ./research/
    git commit -m "docs(research): [action] [resource names]"
    ```
 
-5. **Push** -- push to current branch:
+4. **Push** -- push to current branch:
 
    ```bash
    git push -u origin HEAD
@@ -615,13 +472,11 @@ YYYY-MM-DD
 ## Reference Links
 
 - [Entry Template](./references/entry-template.md) -- standard format for all research entries
-- [Frontmatter Generation](./references/frontmatter-generation.md) -- canonical YAML schema, extraction rules for all entry formats, and backfill procedure for `--add-frontmatter` mode
 - [Validation Rules](./references/validation-rules.md) -- checks and severity mapping for `--validate` mode
 - [Batch Mode](./references/batch-mode.md) -- wave spawning workflow for `--batch` mode
 - Agent: `@research-curator` at `.claude/agents/research-curator.md` -- single-entry research executor
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
 - Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
 - Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
-- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- appends reciprocal backlink rows to all entries cited by the target entry; runs as a sequential post-pass after `@research-cross-referencer`
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).

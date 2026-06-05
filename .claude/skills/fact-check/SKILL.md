@@ -1,6 +1,6 @@
 ---
 name: fact-check
-description: Verify claims in backlog items, skill documentation, or plugin content against primary sources using web lookups. Spawns parallel verification agents that MUST use WebFetch/WebSearch/gh — training data recall is explicitly rejected as evidence. Produces VERIFIED/REFUTED/INCONCLUSIVE verdicts with citations. Triggers on "fact check", "verify claims", "check against primary sources", or when backlog items are marked UNVERIFIED.
+description: Verifies claims in backlog items, skill documentation, or plugin content against primary sources using web lookups. Spawns parallel verification agents that must use WebFetch/WebSearch/gh — training data recall is explicitly rejected as evidence. Produces VERIFIED/REFUTED/INCONCLUSIVE verdicts with citations. Use when items are marked UNVERIFIED or when verifying tool API claims, CLI flags, or documented software behavior.
 argument-hint: '[backlog-item-title | plugin-path | --all-unverified]'
 user-invocable: true
 ---

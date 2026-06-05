@@ -1,6 +1,6 @@
 ---
 name: start-milestone
-description: "Begin active work on a GitHub milestone. Args: {milestone-number}. Lists all open issues in the milestone, shows current label state, asks for confirmation, then bulk-transitions status labels from 'status:needs-grooming' to 'status:in-progress' and updates GitHub Projects V2 Status to 'In Progress'. Use after group-items-to-milestone when the team is ready to begin the sprint or release cycle."
+description: "Transitions a GitHub milestone from planning to active execution. Use when the team is ready to begin a sprint or release cycle — bulk-transitions open issue labels from status:needs-grooming to status:in-progress, updates GitHub Projects V2 Status to In Progress, and confirms before applying changes. Requires milestone number as argument. Use after /group-items-to-milestone."
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---

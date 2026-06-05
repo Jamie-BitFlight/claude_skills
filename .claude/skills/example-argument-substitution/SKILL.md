@@ -1,6 +1,6 @@
 ---
 name: example-argument-substitution
-description: Example skill demonstrating the argument substitution pattern — capture the first word, second word, and all words into named XML tags at the top, then reference the tags throughout. Use when you need to test argument substitution behavior, invoke the substitution test harness, or load this file to understand how to capture arguments in skills.
+description: Test harness for Claude Code skill argument substitution — demonstrates capture-block pre-declaration, XML tag referencing, unintentional variable corruption in code blocks, and correct placement of shell examples in reference files. Use when verifying substitution behavior before applying a pattern to other skills, testing how arguments flow from skill invocations, or understanding the pre-declaration and reference file pattern with greet/farewell/inspect actions.
 argument-hint: <action> [target] [--flag]
 user-invocable: true
 ---

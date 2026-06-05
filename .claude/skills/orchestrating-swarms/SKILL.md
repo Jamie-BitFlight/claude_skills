@@ -1,6 +1,6 @@
 ---
 name: orchestrating-swarms
-description: Master multi-agent orchestration using Claude Code's swarm system. Use when coordinating multiple agents, running parallel code reviews, creating pipeline workflows with dependencies, building self-organizing task queues, or any task benefiting from divide-and-conquer patterns. This facade loads specialist skills for primitives, spawning, operations, and patterns.
+description: Facade skill for multi-agent swarm orchestration in Claude Code — routes to specialist skills covering primitives, spawning, operations, and patterns. Use when coordinating multiple agents in parallel, building pipeline workflows with dependencies, running parallel code reviews, creating self-organizing task queues, designing divide-and-conquer workloads, or choosing between TeamCreate and Agent tool approaches. Loads swarm-primitives (team lifecycle and message flow), swarm-spawning (agent types and backends), swarm-operations (tool API and error handling), and swarm-patterns (six orchestration recipes with complete workflows).
 ---
 
 # Claude Code Swarm Orchestration

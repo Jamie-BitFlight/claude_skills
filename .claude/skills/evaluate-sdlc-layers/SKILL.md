@@ -1,6 +1,6 @@
 ---
 name: evaluate-sdlc-layers
-description: Evaluate and iterate on the SDLC Layer Separation Architecture implementation. Runs validation checks (cross-references, doc completeness, layer metadata, integration points), produces a findings report, and supports iterative fixes. Use when validating first-pass implementation, before claiming layer work is complete, or when improving layer docs/schema.
+description: Validate and iterate on the SDLC Layer Separation Architecture implementation across 6 check categories — cross-references, doc completeness, knowledge-explorer layer filters, research entry metadata, integration points, and plan consistency. Produces a structured findings report and optionally applies safe fixes. Use when validating a first-pass implementation, before claiming layer work complete, auditing layer docs or schema, or running --dry-run to preview findings without changes.
 argument-hint: '[--dry-run | --fix]'
 user-invocable: true
 ---

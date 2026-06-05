@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Quick delegation template for sub-agent prompts. Use when assigning work to a sub-agent, before invoking the Agent tool, or when preparing prompts for specialized agents. Provides the WHERE-WHAT-WHY framework. For comprehensive delegation guidance, activate the agent-orchestration how-to-delegate skill.
+description: Delegation prompt template enforcing WHERE-WHAT-WHY structure for sub-agent prompts. Use when assigning work to a sub-agent, before invoking the Agent tool, preparing prompts for specialized agents, or needing the OBSERVATIONS-SUCCESS-CONTEXT format with authoring rules and pre-send checklist. For comprehensive delegation guidance, activate the agent-orchestration how-to-delegate skill.
 user-invocable: true
 ---
 

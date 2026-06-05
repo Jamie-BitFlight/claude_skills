@@ -1,6 +1,6 @@
 ---
 name: create-milestone
-description: "Create a GitHub milestone for the current repository. No args: guided intake (title, due date, description). With 'quick {title}': minimal prompts. Checks for duplicates via backlog MCP. Returns milestone number for use with group-items-to-milestone. Use when starting a new sprint, release, or theme grouping of backlog items."
+description: "Creates a GitHub milestone on the current repository and returns its number for downstream use. Use when starting a new sprint, release, or theme grouping of backlog items. No args triggers guided intake (title, due date, description); 'quick {title}' skips to description only. Checks for duplicates before creating. Returns milestone number for /group-items-to-milestone."
 argument-hint: '[quick {title}]'
 user-invocable: true
 ---

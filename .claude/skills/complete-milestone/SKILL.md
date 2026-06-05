@@ -1,6 +1,6 @@
 ---
 name: complete-milestone
-description: 'Close a completed GitHub milestone. Args: {milestone-number}. Audits open and closed issues, offers to carry forward open items to a new or existing milestone, closes the GitHub milestone, updates Project V2 Status to Done for closed issues, and generates a completion summary. Use when a sprint or release is finished and needs to be officially closed.'
+description: 'Close a completed GitHub milestone and generate a completion summary. Use when a sprint or release is finished and needs to be officially closed. Audits open and closed issues, offers to carry forward open items to a new or existing milestone, closes the milestone, updates Project V2 Status to Done for closed issues, and produces a completion report.'
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---
