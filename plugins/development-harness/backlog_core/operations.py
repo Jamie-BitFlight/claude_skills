@@ -3185,25 +3185,28 @@ def _assemble_view_compact(
 def _sections_from_body_or_yaml(
     body: str, item: BacklogItem | None, show: str | int | None, since: str | None
 ) -> dict[str, SectionEntryMetadata | GroomedSectionMetadata]:
-    """Return section metadata preferring body-parsed structure, falling back to YAML.
+    """Return section metadata preferring body-parsed IDs, falling back to YAML.
 
     Priority order:
     1. Body has entry-block wrappers (``<div><sub>timestamp</sub>…</div>``) —
        ``_build_sections_metadata`` extracts real entry IDs from the blocks.
-    2. Body has ``##``/``###`` section headers but no entry blocks (plain-text
-       GitHub body) — ``_build_sections_metadata`` parses the headers directly.
-       Entries receive the ``"0000-00-00T00:00:00Z"`` zero-timestamp fallback,
-       but the section names are authoritative: the body is always the primary
-       source of truth for which sections exist.
-    3. No body headers at all, but the local YAML item has structured sections —
-       ``_build_sections_from_yaml_item`` reads entry IDs from the YAML directly.
+    2. Body has ``##``/``###`` section headers but no entry blocks:
+       a. If the YAML item's section names cover every header in the body,
+          prefer YAML — it carries real persisted entry IDs.  Zero-timestamp
+          IDs produced by ``_build_sections_metadata`` on a plain-text body
+          would corrupt ``since``-based filtering and discard stored IDs.
+       b. Otherwise (body headers differ from YAML sections, or no YAML item),
+          parse the body directly — the body is the authoritative source for
+          which sections exist when the YAML item is absent or stale.
+    3. No body headers — YAML fallback (``_build_sections_from_yaml_item``).
     4. Neither source available — return ``{}``.
 
-    The YAML fallback fires only when the body has no recognisable section
-    structure.  Preferring YAML over a plain-text body with headers was wrong:
-    the YAML item's section names can differ from the live body (e.g. a freshly
-    created item that hasn't been synced), which caused section-filter misses
-    and incorrect ``result.sections`` on paginated plain-text bodies.
+    The subset check in step 2a resolves the tension between two requirements:
+    (a) GitHub-enriched bodies must not corrupt stored entry IDs by silently
+    replacing them with zero-timestamp fallbacks; and (b) plain-text bodies
+    whose headers differ from the YAML item (e.g. a paginated slice that lands
+    on a section not in the local YAML, or no YAML item at all) must still
+    produce correct ``result.sections`` from the live body content.
 
     Args:
         body: The (possibly paginated) body string to inspect.
@@ -3217,8 +3220,17 @@ def _sections_from_body_or_yaml(
     """
     if ENTRY_RE.search(body):
         return _build_sections_metadata(body, show, since, section=None)
+    # Plain-text body with section headers but no entry blocks.
     if _SECTION_BOUNDARY_RE.search(body):
+        if item and item.sections:
+            body_header_names = {hdr.group(1).strip() for hdr in _SECTION_BOUNDARY_RE.finditer(body)}
+            yaml_section_names = set(item.sections.keys())
+            if body_header_names.issubset(yaml_section_names):
+                # YAML covers all body headers — use it to preserve real entry IDs.
+                return _build_sections_from_yaml_item(item)
+        # Body headers not fully covered by YAML (or no YAML item) — body wins.
         return _build_sections_metadata(body, show, since, section=None)
+    # Body has no section headers — YAML fallback.
     if item and item.sections:
         return _build_sections_from_yaml_item(item)
     return {}
