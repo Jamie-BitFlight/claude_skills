@@ -1034,7 +1034,7 @@ graph TD
   </table>
 
   <h3>Grooming swarm — actual step sequence from reference files</h3>
-  <p>The grooming workflow has three waves. All writes go directly to the GitHub Issue body via <code>backlog_groom()</code> in real-time — no batch queue until the final atomic commit.</p>
+  <p>The grooming workflow has three waves. All writes go directly to the backend item body via <code>backlog_groom()</code> in real-time — no batch queue until the final atomic commit.</p>
   <div class="grid grid-3">
     <div class="card ok">
       <h4>Wave 0 (optional, sequential)</h4>
@@ -1317,7 +1317,7 @@ flowchart TD
   <h3>Phase 3 — Prepare &amp; Plan <code style="font-size:11px;font-weight:400">/dh:work-backlog-item work</code></h3>
   <p>Source: <a href="../skills/work-backlog-item/references/workflows/work/start.md">work/start.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/rt-ica-gate.md">work/rt-ica-gate.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/plan.md">work/plan.md</a>, <a href="../skills/work-backlog-item/references/workflows/work/field-mapping.md">work/field-mapping.md</a></p>
   <table>
-    <thead><tr><th>Step</th><th>What happens</th><th>Reads from GitHub body</th><th>Writes</th><th>Gate</th></tr></thead>
+    <thead><tr><th>Step</th><th>What happens</th><th>Reads from backend item</th><th>Writes</th><th>Gate</th></tr></thead>
     <tbody>
       <tr><td>2.1</td><td>Already-implemented check</td><td>Impact Radius file list</td><td>—</td><td>BLOCKS if goal already in git log</td></tr>
       <tr><td>3.1</td><td>Auto-groom check (7-day TTL)</td><td><code>metadata.groomed</code>, <code>metadata.updated_at</code></td><td>Re-invokes groom if stale</td><td>Must be current before proceeding</td></tr>
@@ -1334,12 +1334,12 @@ flowchart TD
   <table>
     <thead><tr><th>Stage</th><th>Agent</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Consumed by</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td><code>dh:feature-researcher</code></td><td>feature_request_string, codebase (Grep/Read)</td><td><code>feature-context</code> artifact</td><td>Gist via <code>artifact_register(type='feature-context')</code></td><td>swarm-task-planner, context-integration</td></tr>
-      <tr><td>Codebase analysis</td><td><code>dh:codebase-analyzer</code></td><td>Full codebase (Read/Bash/Grep/Glob), git history</td><td><code>codebase-analysis</code> artifacts (patterns, architecture, testing, conventions, concerns)</td><td>Gist via <code>artifact_register()</code></td><td>swarm-task-planner, code-reviewer, integration-checker</td></tr>
+      <tr><td>Discovery</td><td><code>dh:feature-researcher</code></td><td>feature_request_string, codebase (Grep/Read)</td><td><code>feature-context</code> artifact</td><td>Artifact store via <code>artifact_register(type='feature-context')</code></td><td>swarm-task-planner, context-integration</td></tr>
+      <tr><td>Codebase analysis</td><td><code>dh:codebase-analyzer</code></td><td>Full codebase (Read/Bash/Grep/Glob), git history</td><td><code>codebase-analysis</code> artifacts (patterns, architecture, testing, conventions, concerns)</td><td>Artifact store via <code>artifact_register()</code></td><td>swarm-task-planner, code-reviewer, integration-checker</td></tr>
       <tr><td>Architecture</td><td><code>dh:swarm-task-planner</code></td><td>feature-context, codebase-analysis</td><td>SAM plan YAML (<code>P{id}-{slug}.yaml</code>) + architect artifact</td><td>Local <code>~/.dh/projects/{slug}/plan/</code> + Gist write-through</td><td>implement-feature, all task-workers, contract-verification</td></tr>
       <tr><td>Validation</td><td><code>dh:plan-validator</code></td><td><code>sam_plan(action='read')</code></td><td>Validation result (ephemeral — not persisted)</td><td>—</td><td>Gates plan creation; lost after gate</td></tr>
       <tr><td>Context manifest</td><td><code>dh:dh-context-gathering</code></td><td>Task file (markdown)</td><td>Context Manifest section embedded in each task file</td><td>Task file on disk</td><td>task-worker (reads at execution time)</td></tr>
-      <tr><td>T0 baseline</td><td><code>dh:t0-baseline-capture</code></td><td><code>acceptance_criteria_structured</code> from plan; runs check_commands via Bash</td><td>T0-baseline YAML artifact</td><td>Gist via <code>artifact_register(type='T0-baseline')</code></td><td>tn-verification-gate (comparison baseline)</td></tr>
+      <tr><td>T0 baseline</td><td><code>dh:t0-baseline-capture</code></td><td><code>acceptance_criteria_structured</code> from plan; runs check_commands via Bash</td><td>T0-baseline YAML artifact</td><td>Artifact store via <code>artifact_register(type='T0-baseline')</code></td><td>tn-verification-gate (comparison baseline)</td></tr>
     </tbody>
   </table>
 
@@ -1391,7 +1391,7 @@ flowchart TD
     DA["dh:doc-drift-auditor\nCompares docs vs implementation\n→ artifact_register(type='audit-report')"]
     SM["dh:service-docs-maintainer\nReads audit-report\nUpdates README, docstrings, examples"]
     CR["dh:context-refinement\nReads architect + feature-context\nAnnotates with post-impl discoveries\n→ sam_plan(action='update', append)"]
-    CLOSE["Apply status:verified label\nClose GitHub Issue\nbacklog_close(item_ref)"]
+    CLOSE["Apply status:verified label\nClose backend item\nbacklog_close(item_ref)"]
     REWORK(["BLOCKED — regressions found\nItem remains open"])
 
     PRE --> TN --> TNcheck
@@ -1407,10 +1407,10 @@ flowchart TD
   <table>
     <thead><tr><th>Gate</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Blocks if</th></tr></thead>
     <tbody>
-      <tr><td>Concerns pre-gate</td><td>GitHub body Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>Backend item body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
-      <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification YAML artifact (PASS/FAIL + criterion diff)</td><td>Gist via <code>artifact_register(type='TN-verification')</code></td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
-      <tr><td><code>feature-verifier</code></td><td>feature-context, architect artifacts via <code>artifact_read()</code></td><td>feature-verification artifact (VERIFIED or GAPS_FOUND)</td><td>Gist via <code>artifact_register(type='feature-verification')</code></td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
-      <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Gist via <code>artifact_register(type='audit-report')</code></td><td>Never blocks — feeds service-docs-maintainer</td></tr>
+      <tr><td>Concerns pre-gate</td><td>backend item Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>Backend item body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
+      <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification YAML artifact (PASS/FAIL + criterion diff)</td><td>Artifact store via <code>artifact_register(type='TN-verification')</code></td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
+      <tr><td><code>feature-verifier</code></td><td>feature-context, architect artifacts via <code>artifact_read()</code></td><td>feature-verification artifact (VERIFIED or GAPS_FOUND)</td><td>Artifact store via <code>artifact_register(type='feature-verification')</code></td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
+      <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Artifact store via <code>artifact_register(type='audit-report')</code></td><td>Never blocks — feeds service-docs-maintainer</td></tr>
       <tr><td><code>service-docs-maintainer</code></td><td>audit-report artifact, implementation files</td><td>Updated documentation files (README, docstrings, examples)</td><td>Repository files (Write tool — committed)</td><td>Never blocks</td></tr>
       <tr><td><code>context-refinement</code></td><td>Task files, architect artifact, feature-context artifact, implementation code</td><td>Post-impl annotations appended to architect + feature-context</td><td>SAM plan artifacts via <code>sam_plan(action='update', append)</code></td><td>BLOCKED if context drift unresolvable</td></tr>
       <tr><td>Closure</td><td>All gate verdicts</td><td>Status label <code>status:closed</code>; backend item closed via <code>backlog_close()</code></td><td>Backlog item metadata (backend-specific)</td><td>Any gate with FAIL verdict</td></tr>
