@@ -28,7 +28,7 @@ import sys
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypeAlias, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeAlias, TypeGuard, cast, runtime_checkable
 
 from github import Auth, Github, GithubException, InputFileContent
 
@@ -77,6 +77,16 @@ __all__ = [
     "render_manifest_section",
     "replace_manifest_in_body",
 ]
+
+
+def _is_dict_of_object(v: object) -> TypeGuard[dict[str, object]]:
+    """Return True when *v* is a dict with string keys.
+
+    Validates the structure at runtime so the type checker can narrow the type
+    from ``object`` to ``dict[str, object]`` after the guard.  All values are
+    typed as ``object`` (weakest bound) matching external API response shapes.
+    """
+    return isinstance(v, dict) and all(isinstance(k, str) for k in v)
 
 
 class BackendName(StrEnum):
@@ -832,9 +842,8 @@ class LinearArtifactProvider:
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
-                if isinstance(raw_metadata, dict):
-                    metadata = cast("dict[str, object]", raw_metadata)
-                    manifest_json = metadata.get("manifest_json")
+                if _is_dict_of_object(raw_metadata):
+                    manifest_json = raw_metadata.get("manifest_json")
                     if isinstance(manifest_json, str):
                         return ArtifactManifest.model_validate_json(manifest_json)
         return ArtifactManifest(issue_number=item_id)
@@ -924,9 +933,8 @@ class LinearArtifactProvider:
         for node in nodes:
             if node.get("url") == target_url:
                 raw_metadata = node.get("metadata")
-                if isinstance(raw_metadata, dict):
-                    metadata = cast("dict[str, object]", raw_metadata)
-                    content = metadata.get("content")
+                if _is_dict_of_object(raw_metadata):
+                    content = raw_metadata.get("content")
                     if isinstance(content, str):
                         return content
         return None
