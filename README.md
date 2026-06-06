@@ -6,9 +6,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/stargazers"><img src="https://img.shields.io/github/stars/Jamie-BitFlight/claude_skills?style=flat-square&logo=github" alt="GitHub stars"></a>
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/commits/main"><img src="https://img.shields.io/github/last-commit/Jamie-BitFlight/claude_skills?style=flat-square" alt="GitHub last commit"></a>
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Jamie-BitFlight/claude_skills?style=flat-square" alt="License"></a>
+  <a href="https://github.com/Jamie-BitFlight/claude_skills/stargazers"><img src="https://img.shields.io/github/stars/Jamie-BitFlight/claude_skills.svg?style=flat-square&logo=github" alt="GitHub stars"></a>
+  <a href="https://github.com/Jamie-BitFlight/claude_skills/commits/main"><img src="https://img.shields.io/github/last-commit/Jamie-BitFlight/claude_skills.svg?style=flat-square" alt="GitHub last commit"></a>
+  <a href="https://github.com/Jamie-BitFlight/claude_skills/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Jamie-BitFlight/claude_skills.svg?style=flat-square" alt="License"></a>
   <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/uv-package_manager-DE5FE9?style=flat-square&logo=uv&logoColor=white" alt="uv"></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-enabled-6B4FBB?style=flat-square" alt="MCP enabled"></a>
@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://github.com/bitflight-devops/skilllint"><img src="https://img.shields.io/badge/Plugins_validated_with-skilllint-22C55E?style=for-the-badge&logo=python&logoColor=white" alt="Plugins validated with skilllint"></a>
-  <a href="https://pypi.org/project/skilllint/"><img src="https://img.shields.io/pypi/v/skilllint?style=for-the-badge&label=skilllint&color=3775A9&logo=pypi&logoColor=white" alt="skilllint on PyPI"></a>
+  <a href="https://pypi.org/project/skilllint/"><img src="https://img.shields.io/pypi/v/skilllint.svg?style=for-the-badge&label=skilllint&color=3775A9&logo=pypi&logoColor=white" alt="skilllint on PyPI"></a>
 </p>
 
 # Claude Skills Collection
