@@ -1,14 +1,10 @@
 # FastMCP Advanced Features Reference
 
-Background tasks, server-side elicitation, and advanced execution patterns — use this when building tools that run for seconds or minutes, require multi-turn user interaction, or need fine-grained execution control.
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+Background tasks, server-side elicitation, and advanced execution patterns — use this when building tools that run for seconds or minutes, require multi-turn user interaction, or need fine-grained execution control. [1]
 
 ---
 
-## Background Tasks
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+## Background Tasks [1]
 
 CONSTRAINT: Background tasks require the `tasks` optional extra. Install with:
 
@@ -32,9 +28,7 @@ async def slow_computation(duration: int) -> str:
     return f"Completed in {duration} seconds"
 ```
 
-CONSTRAINT: Background tasks require async functions. Using `task=True` with a sync function raises `ValueError` at registration time.
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+CONSTRAINT: Background tasks require async functions. Using `task=True` with a sync function raises `ValueError` at registration time. [1]
 
 PATTERN: Enable background tasks globally for all server components:
 
@@ -42,9 +36,7 @@ PATTERN: Enable background tasks globally for all server components:
 mcp = FastMCP("MyServer", tasks=True)
 ```
 
-CONSTRAINT: If any synchronous tools exist on a server with `tasks=True`, those must explicitly set `task=False` to avoid errors.
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+CONSTRAINT: If any synchronous tools exist on a server with `tasks=True`, those must explicitly set `task=False` to avoid errors. [1]
 
 ### Progress Reporting
 
@@ -74,9 +66,7 @@ Progress API:
 - `await progress.increment(amount=1)` — increment progress counter
 - `await progress.set_message(text)` — update the status message
 
-RULE: Progress works in both immediate and background execution modes — use the same code regardless of how the client invokes the function.
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+RULE: Progress works in both immediate and background execution modes — use the same code regardless of how the client invokes the function. [1]
 
 ### Task Backends
 
@@ -103,13 +93,11 @@ export FASTMCP_DOCKET_CONCURRENCY=20
 fastmcp tasks worker server.py
 ```
 
-CONSTRAINT: Task-enabled components must be defined at server startup. Components added dynamically after the server starts are not available for background execution.
-
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
+CONSTRAINT: Task-enabled components must be defined at server startup. Components added dynamically after the server starts are not available for background execution. [1]
 
 ### Advanced Docket Dependencies
 
-PATTERN: Access Docket instance and worker metadata from within tasks:
+PATTERN: Access Docket instance and worker metadata from within tasks: [1]
 
 ```python
 from docket import Docket, Worker
@@ -130,13 +118,9 @@ async def my_task(
     return "Done"
 ```
 
-SOURCE: <https://gofastmcp.com/servers/tasks> (accessed 2026-03-05)
-
 ---
 
-## Server-Side Elicitation
-
-SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
+## Server-Side Elicitation [2]
 
 PATTERN: Use `ctx.elicit()` to request structured input from users mid-execution. The tool pauses until the client provides a response.
 
@@ -171,13 +155,11 @@ Elicitation result actions:
 
 - `accept` — user provided valid input; data in `result.data`
 - `decline` — user chose not to provide information
-- `cancel` — user cancelled the entire operation
-
-SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
+- `cancel` — user cancelled the entire operation [2]
 
 ### Pattern Matching
 
-PATTERN: Use typed result classes for pattern matching:
+PATTERN: Use typed result classes for pattern matching: [2]
 
 ```python
 from fastmcp.server.elicitation import (
@@ -199,11 +181,9 @@ async def pattern_example(ctx: Context) -> str:
             return "Operation cancelled"
 ```
 
-SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
-
 ### Multi-Turn Elicitation
 
-PATTERN: Make multiple `ctx.elicit()` calls to gather information progressively:
+PATTERN: Make multiple `ctx.elicit()` calls to gather information progressively: [2]
 
 ```python
 @mcp.tool
@@ -226,8 +206,6 @@ async def plan_meeting(ctx: Context) -> str:
     urgent = priority_result.data == "yes"
     return f"Meeting '{title_result.data}' for {duration_result.data} minutes (Urgent: {urgent})"
 ```
-
-SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
 
 ### Elicitation Response Types
 
@@ -328,9 +306,7 @@ else:
     raise ValueError("Action rejected")
 ```
 
-CONSTRAINT: Elicitation requires the client to implement an elicitation handler. If the client does not support elicitation, calls to `ctx.elicit()` raise an error. See [./client-sdk.md](./client-sdk.md) for client-side elicitation handler implementation.
-
-SOURCE: <https://gofastmcp.com/servers/elicitation> (accessed 2026-03-05)
+CONSTRAINT: Elicitation requires the client to implement an elicitation handler. If the client does not support elicitation, calls to `ctx.elicit()` raise an error. See [./client-sdk.md](./client-sdk.md) for client-side elicitation handler implementation. [2]
 
 ---
 
@@ -345,15 +321,11 @@ Install: `pip install "fastmcp[apps]"`
 PATTERN: `@mcp.tool(app=True)` decorator or `-> PrefabApp` return type annotation.
 
 For full documentation — component reference, `ToolResult` dual-audience pattern, `fastmcp dev apps`
-previewing, and coexistence with custom HTML apps — see [./apps.md](./apps.md).
-
-SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17)
+previewing, and coexistence with custom HTML apps — see [./apps.md](./apps.md). [3]
 
 ---
 
-## Google GenAI Sampling Handler
-
-SOURCE: `https://gofastmcp.com/clients/sampling` (accessed 2026-03-17)
+## Google GenAI Sampling Handler [4]
 
 PATTERN: Use `GoogleGenAISamplingHandler` for server-initiated LLM calls via the Google GenAI (Gemini) API — an alternative to the Anthropic and OpenAI handlers:
 
@@ -381,7 +353,7 @@ All three built-in sampling handlers (OpenAI, Anthropic, Google GenAI) share the
 | Anthropic | `fastmcp.client.sampling.handlers.anthropic.AnthropicSamplingHandler` | `fastmcp[anthropic]` |
 | Google GenAI | `fastmcp.client.sampling.handlers.google_genai.GoogleGenAISamplingHandler` | `fastmcp[gemini]` |
 
-SOURCE: `https://gofastmcp.com/clients/sampling` (accessed 2026-03-17)
+[4]
 
 ---
 
@@ -393,9 +365,7 @@ server composition scope — see [./middleware.md](./middleware.md).
 
 ---
 
-## Dependency Injection
-
-SOURCE: <https://gofastmcp.com/servers/dependency-injection> (accessed 2026-03-17)
+## Dependency Injection [5]
 
 PATTERN: Declare what you need as parameter defaults — FastMCP resolves values automatically at runtime. Dependency parameters are excluded from the MCP schema; clients never see them as callable parameters.
 
@@ -664,6 +634,12 @@ RULE: FastMCP's dependency injection is powered by the `uncalled-for` library (p
 
 PATTERN: Core DI features (`Depends()`, `CurrentContext()`) work without installing `fastmcp[tasks]`. Background task dependencies (`CurrentDocket()`, `CurrentWorker()`, `Progress()`) require `fastmcp[tasks]`.
 
-The underlying library [uncalled-for](https://github.com/chrisguidry/uncalled-for) is also available as a standalone package for use outside FastMCP. For advanced patterns — `TaskArgument()`, custom `Dependency` subclasses — see the [Docket dependency documentation](https://chrisguidry.github.io/docket/dependencies/).
+The underlying library [uncalled-for](https://github.com/chrisguidry/uncalled-for) is also available as a standalone package for use outside FastMCP. For advanced patterns — `TaskArgument()`, custom `Dependency` subclasses — see the [Docket dependency documentation](https://chrisguidry.github.io/docket/dependencies/). [5]
 
-SOURCE: <https://gofastmcp.com/servers/dependency-injection> (accessed 2026-03-17)
+## References
+
+1. [FastMCP Tasks](https://gofastmcp.com/servers/tasks) (accessed 2026-03-05)
+2. [FastMCP Elicitation](https://gofastmcp.com/servers/elicitation) (accessed 2026-03-05)
+3. [FastMCP Prefab](https://gofastmcp.com/apps/prefab) (accessed 2026-03-17)
+4. `https://gofastmcp.com/clients/sampling` (accessed 2026-03-17)
+5. [FastMCP Dependency Injection](https://gofastmcp.com/servers/dependency-injection) (accessed 2026-03-17)

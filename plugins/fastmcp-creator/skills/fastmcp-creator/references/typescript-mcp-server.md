@@ -1,4 +1,4 @@
-# TypeScript MCP Server Implementation Guide
+# TypeScript MCP Server Implementation Guide [1]
 
 Complete guide for implementing MCP servers using the MCP TypeScript SDK, covering project structure, server setup, tool registration, Zod validation, error handling, and production deployment.
 
@@ -693,3 +693,7 @@ Follow these guidelines to create type-safe, maintainable MCP servers in TypeScr
 - [MCP Protocol Specification](https://spec.modelcontextprotocol.io/) (accessed 2026-02-22)
 - [FastMCP Official Documentation](https://gofastmcp.com/) (accessed 2026-02-22)
 - [Zod Schema Validation Library](https://github.com/colinhacks/zod) (accessed 2026-02-22)
+
+## References
+
+1. [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) (accessed 2026-06-07)

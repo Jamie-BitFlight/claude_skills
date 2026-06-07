@@ -1,10 +1,6 @@
 # FastMCP v3 Migration Reference
 
-Breaking changes and migration steps for upgrading to FastMCP v3 — covers v2 to v3 changes, migration from the bundled MCP SDK FastMCP, and migration from the low-level `mcp.server.Server` class.
-
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk> (accessed 2026-03-05)
+Breaking changes and migration steps for upgrading to FastMCP v3 — covers v2 to v3 changes, migration from the bundled MCP SDK FastMCP, and migration from the low-level `mcp.server.Server` class. [1] [2] [3]
 
 ---
 
@@ -25,9 +21,7 @@ dependencies = ["fastmcp>=3.0.0,<4"]
 
 ---
 
-## FastMCP v2 to v3 — Breaking Changes
-
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2>
+## FastMCP v2 to v3 — Breaking Changes [4]
 
 ### 1. Decorator Syntax — Parentheses Removed
 
@@ -252,9 +246,7 @@ git remote set-url origin https://github.com/PrefectHQ/fastmcp.git
 
 ---
 
-## v2 Deprecations (Still Work, Emit Warnings)
-
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2> — "Deprecated Features" section
+## v2 Deprecations (Still Work, Emit Warnings) [5]
 
 Update these when convenient — they still work in v3 but will be removed in a future release.
 
@@ -318,9 +310,7 @@ proxy = create_proxy("http://example.com/mcp")
 
 ---
 
-## Migrating from MCP SDK FastMCP (v1 Bundled)
-
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk>
+## Migrating from MCP SDK FastMCP (v1 Bundled) [6]
 
 If your server starts with `from mcp.server.fastmcp import FastMCP`, you are using FastMCP 1.0 bundled in the `mcp` package.
 
@@ -367,9 +357,7 @@ FastMCP equivalents (prefer these when available):
 
 ---
 
-## Migrating from Low-Level `mcp.server.Server`
-
-SOURCE: <https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk>
+## Migrating from Low-Level `mcp.server.Server` [7]
 
 The `Server` class requires manual handler registration, hand-written JSON Schema, and transport boilerplate. FastMCP replaces all of it with decorator-based registration.
 
@@ -522,9 +510,7 @@ async def process(ctx: Context) -> str:
 
 ---
 
-## Migrating to fastmcp-slim (v3.3.0+)
-
-SOURCE: <https://gofastmcp.com/clients/client-only-package.md> (accessed 2026-05-23)
+## Migrating to fastmcp-slim (v3.3.0+) [8]
 
 Client-only consumers (scripts or services that call MCP servers but don't host one) can reduce their dependency footprint by switching to `fastmcp-slim`:
 
@@ -543,3 +529,14 @@ from fastmcp import Client  # works with both fastmcp and fastmcp-slim
 ```
 
 Choose extras based on your LLM provider: `fastmcp-slim[client,openai]`, `fastmcp-slim[client,anthropic]`, `fastmcp-slim[client,gemini]`.
+
+## References
+
+1. [FastMCP From Fastmcp 2](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2) (accessed 2026-03-05)
+2. [FastMCP From Mcp Sdk](https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk) (accessed 2026-03-05)
+3. [FastMCP From Low Level Sdk](https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk) (accessed 2026-03-05)
+4. [FastMCP From Fastmcp 2](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2)
+5. [FastMCP From Fastmcp 2](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2) — "Deprecated Features" section
+6. [FastMCP From Mcp Sdk](https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk)
+7. [FastMCP From Low Level Sdk](https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk)
+8. [FastMCP Client Only Package](https://gofastmcp.com/clients/client-only-package.md) (accessed 2026-05-23)

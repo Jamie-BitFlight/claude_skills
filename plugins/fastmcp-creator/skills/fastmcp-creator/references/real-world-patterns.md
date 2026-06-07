@@ -1,19 +1,12 @@
 # FastMCP v3 Real-World Patterns
 
-Production-proven patterns for structuring, composing, and deploying FastMCP v3 servers — covers server composition, transport bridging, development workflows, CLI integration, and community examples.
-
-SOURCE: <https://gofastmcp.com/patterns/contrib> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/patterns/cli> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/community/showcase> (accessed 2026-03-05)
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — GitHub usage research (accessed 2026-03-05)
+Production-proven patterns for structuring, composing, and deploying FastMCP v3 servers — covers server composition, transport bridging, development workflows, CLI integration, and community examples. [1] [2] [3] [4]
 
 ---
 
 ## Server Composition with mount() and Namespaces
 
-PATTERN: Build specialized sub-servers and compose them into a main server using `mount()` with namespaces. This is the primary way large codebases organize FastMCP tools.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Build specialized sub-servers and compose them into a main server using `mount()` with namespaces. This is the primary way large codebases organize FastMCP tools. [5]
 
 ```python
 from fastmcp import FastMCP
@@ -48,9 +41,7 @@ RULE: Use `namespace=` parameter (not the deprecated `prefix=`). See `./migratio
 
 ## ProxyProvider — Transport Bridging
 
-PATTERN: Use `create_proxy()` to wrap a remote HTTP MCP server behind a local stdio server. Common in enterprise environments where clients only support stdio but servers run over HTTP.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Use `create_proxy()` to wrap a remote HTTP MCP server behind a local stdio server. Common in enterprise environments where clients only support stdio but servers run over HTTP. [5]
 
 ```python
 from fastmcp.server import create_proxy
@@ -68,9 +59,7 @@ CONSTRAINT: `FastMCP.as_proxy()` is deprecated in v3 — use `from fastmcp.serve
 
 ## FileSystemProvider — Hot-Reload Development Pattern
 
-PATTERN: Use `FileSystemProvider` with `reload=True` during development for hot-reload without server restart. Disable reload in production.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Use `FileSystemProvider` with `reload=True` during development for hot-reload without server restart. Disable reload in production. [5]
 
 ```python
 from fastmcp import FastMCP
@@ -98,9 +87,7 @@ mcp.add_provider(docs_provider)
 
 ## SkillsProvider — Exposing Skills as MCP Resources
 
-PATTERN: Use `ClaudeSkillsProvider()` to expose `~/.claude/skills/` as MCP resources with `skill://` URIs. Enables sharing skills across Claude/Cursor sessions via an MCP server.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Use `ClaudeSkillsProvider()` to expose `~/.claude/skills/` as MCP resources with `skill://` URIs. Enables sharing skills across Claude/Cursor sessions via an MCP server. [5]
 
 ```python
 from fastmcp import FastMCP
@@ -119,9 +106,7 @@ if __name__ == "__main__":
 
 ## Background Tasks — Long-Running Operations
 
-PATTERN: Use `task=True` for tools that need to run asynchronously in the background. Requires the `fastmcp[tasks]` optional dependency.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Use `task=True` for tools that need to run asynchronously in the background. Requires the `fastmcp[tasks]` optional dependency. [5]
 
 ```bash
 pip install "fastmcp[tasks]"
@@ -148,9 +133,7 @@ CONSTRAINT: Without `fastmcp[tasks]` installed, `task=True` raises an import err
 
 ## Visibility and Per-Session Feature Gating
 
-PATTERN: Use `ctx.enable_components(tags={"premium"})` to unlock features per session. Combine with `require_scopes` for auth-based access control.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Use `ctx.enable_components(tags={"premium"})` to unlock features per session. Combine with `require_scopes` for auth-based access control. [5]
 
 ```python
 from fastmcp import FastMCP, Context
@@ -179,9 +162,7 @@ def admin_action() -> str:
 
 ## Prefect Horizon — Managed Deployment
 
-PATTERN: Deploy FastMCP servers to Prefect Horizon via GitHub integration. Free for personal use, no server management required.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: Deploy FastMCP servers to Prefect Horizon via GitHub integration. Free for personal use, no server management required. [5]
 
 The deployment workflow:
 
@@ -199,9 +180,7 @@ CONSTRAINT: No `.mcpb` packaging in v3 official docs. The Prefect Horizon deploy
 
 ---
 
-## CLI-First Patterns
-
-SOURCE: <https://gofastmcp.com/patterns/cli>
+## CLI-First Patterns [6]
 
 The `fastmcp` CLI enables scripting and automation around MCP servers.
 
@@ -278,9 +257,7 @@ fastmcp install stdio server.py --copy
 
 ---
 
-## Contrib Modules
-
-SOURCE: <https://gofastmcp.com/patterns/contrib>
+## Contrib Modules [7]
 
 FastMCP includes a `contrib` package for community-contributed modules that extend functionality beyond the core library.
 
@@ -301,9 +278,7 @@ To contribute a module:
 
 ---
 
-## Community Showcase
-
-SOURCE: <https://gofastmcp.com/community/showcase>
+## Community Showcase [8]
 
 Community projects and learning resources:
 
@@ -322,9 +297,7 @@ https://github.com/PrefectHQ/fastmcp/discussions
 
 ## Large Server Architecture Patterns
 
-PATTERN: For servers with many tools, group by domain using sub-servers and mount with namespaces. This keeps each domain independently testable.
-
-SOURCE: `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+PATTERN: For servers with many tools, group by domain using sub-servers and mount with namespaces. This keeps each domain independently testable. [5]
 
 ```python
 from fastmcp import FastMCP
@@ -358,3 +331,14 @@ async def test_auth_domain():
         result = await client.call_tool("login", {"username": "u", "password": "p"})
         assert "token" in result.data
 ```
+
+## References
+
+1. [FastMCP Contrib](https://gofastmcp.com/patterns/contrib) (accessed 2026-03-05)
+2. [FastMCP Cli](https://gofastmcp.com/patterns/cli) (accessed 2026-03-05)
+3. [FastMCP Showcase](https://gofastmcp.com/community/showcase) (accessed 2026-03-05)
+4. `plan/feature-context-fastmcp-creator-v3-overhaul.md` — GitHub usage research (accessed 2026-03-05)
+5. `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
+6. [FastMCP Cli](https://gofastmcp.com/patterns/cli)
+7. [FastMCP Contrib](https://gofastmcp.com/patterns/contrib)
+8. [FastMCP Showcase](https://gofastmcp.com/community/showcase)

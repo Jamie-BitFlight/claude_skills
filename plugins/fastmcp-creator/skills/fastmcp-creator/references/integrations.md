@@ -1,22 +1,10 @@
 # FastMCP v3 Integrations Reference
 
-How to connect FastMCP servers to external clients and frameworks — covers Anthropic API, OpenAI Responses API, Gemini SDK, FastAPI mounting, and Claude Code installation.
-
-SOURCE: <https://gofastmcp.com/integrations/anthropic> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/integrations/openai> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/integrations/gemini> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/integrations/fastapi> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/integrations/claude-code> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/patterns/cli> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17) — PropelAuth integration (v3.1)
-SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — Prefab Apps (v3.1)
-SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17) — Google GenAI sampling handler (v3.1)
+How to connect FastMCP servers to external clients and frameworks — covers Anthropic API, OpenAI Responses API, Gemini SDK, FastAPI mounting, and Claude Code installation. [1] [2] [3] [4] [5] [6] [7] [8] [9]
 
 ---
 
-## Anthropic Messages API
-
-SOURCE: <https://gofastmcp.com/integrations/anthropic>
+## Anthropic Messages API [10]
 
 The Anthropic Messages API supports MCP servers as remote tool sources via the `mcp_servers` parameter.
 
@@ -82,9 +70,7 @@ mcp = FastMCP(name="My Server", auth=auth)
 
 ---
 
-## OpenAI Responses API
-
-SOURCE: <https://gofastmcp.com/integrations/openai>
+## OpenAI Responses API [11]
 
 OpenAI's Responses API (NOT Completions or Assistants API) supports MCP servers as remote tool sources.
 
@@ -137,9 +123,7 @@ resp = client.responses.create(
 
 ---
 
-## Google Gemini SDK
-
-SOURCE: <https://gofastmcp.com/integrations/gemini>
+## Google Gemini SDK [12]
 
 Gemini's MCP integration requires a FastMCP `Client` session. Pass `mcp_client.session` directly to the Gemini SDK tools configuration.
 
@@ -184,9 +168,7 @@ mcp_client = Client(
 
 ---
 
-## FastAPI Integration
-
-SOURCE: <https://gofastmcp.com/integrations/fastapi>
+## FastAPI Integration [13]
 
 FastAPI integration supports two directions:
 
@@ -284,9 +266,7 @@ combined_app = FastAPI(
 
 ---
 
-## Claude Code Installation
-
-SOURCE: <https://gofastmcp.com/integrations/claude-code>
+## Claude Code Installation [14]
 
 ### Automatic Installation via CLI
 
@@ -340,15 +320,11 @@ RULE: Create a Backend Integration in the PropelAuth dashboard first. See
 
 For `PropelAuthProvider` constructor parameters, environment variables, introspection caching
 configuration, and `get_access_token()` usage in tools, see
-[./auth.md — PropelAuth Provider](./auth.md).
-
-SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17)
+[./auth.md — PropelAuth Provider](./auth.md). [15]
 
 ---
 
-## Prefab Apps — Interactive Tool UIs
-
-SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17) — v3.1.0
+## Prefab Apps — Interactive Tool UIs [16]
 
 Prefab is a declarative UI framework for building interactive MCP tool UIs in pure Python — no HTML or JavaScript required. Tools return Prefab components; FastMCP handles renderer registration and protocol wiring.
 
@@ -401,15 +377,11 @@ Alternative to the Anthropic and OpenAI sampling handlers, using Google's Gemini
 Install: `pip install "fastmcp[gemini]"`
 
 For `GoogleGenAISamplingHandler` usage and comparison with other handlers, see
-[./advanced.md — Google GenAI Sampling Handler](./advanced.md).
-
-SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-17)
+[./advanced.md — Google GenAI Sampling Handler](./advanced.md). [17]
 
 ---
 
-## FastMCP CLI — Cross-Integration Tool
-
-SOURCE: <https://gofastmcp.com/patterns/cli>
+## FastMCP CLI — Cross-Integration Tool [18]
 
 The `fastmcp` CLI bridges FastMCP servers with any MCP client:
 
@@ -437,3 +409,24 @@ fastmcp run server.py --reload
 ```
 
 PATTERN: Use `fastmcp list` and `fastmcp call` to give LLM clients without native MCP support access to MCP tools via shell commands.
+
+## References
+
+1. [FastMCP Anthropic](https://gofastmcp.com/integrations/anthropic) (accessed 2026-03-05)
+2. [FastMCP Openai](https://gofastmcp.com/integrations/openai) (accessed 2026-03-05)
+3. [FastMCP Gemini](https://gofastmcp.com/integrations/gemini) (accessed 2026-03-05)
+4. [FastMCP Fastapi](https://gofastmcp.com/integrations/fastapi) (accessed 2026-03-05)
+5. [FastMCP Claude Code](https://gofastmcp.com/integrations/claude-code) (accessed 2026-03-05)
+6. [FastMCP Cli](https://gofastmcp.com/patterns/cli) (accessed 2026-03-05)
+7. [FastMCP Propelauth](https://gofastmcp.com/integrations/propelauth) (accessed 2026-03-17) — PropelAuth integration (v3.1)
+8. [FastMCP Prefab](https://gofastmcp.com/apps/prefab) (accessed 2026-03-17) — Prefab Apps (v3.1)
+9. [FastMCP Sampling](https://gofastmcp.com/clients/sampling) (accessed 2026-03-17) — Google GenAI sampling handler (v3.1)
+10. [FastMCP Anthropic](https://gofastmcp.com/integrations/anthropic)
+11. [FastMCP Openai](https://gofastmcp.com/integrations/openai)
+12. [FastMCP Gemini](https://gofastmcp.com/integrations/gemini)
+13. [FastMCP Fastapi](https://gofastmcp.com/integrations/fastapi)
+14. [FastMCP Claude Code](https://gofastmcp.com/integrations/claude-code)
+15. [FastMCP Propelauth](https://gofastmcp.com/integrations/propelauth) (accessed 2026-03-17)
+16. [FastMCP Prefab](https://gofastmcp.com/apps/prefab) (accessed 2026-03-17) — v3.1.0
+17. [FastMCP Sampling](https://gofastmcp.com/clients/sampling) (accessed 2026-03-17)
+18. [FastMCP Cli](https://gofastmcp.com/patterns/cli)

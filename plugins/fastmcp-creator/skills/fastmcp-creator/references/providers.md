@@ -1,8 +1,6 @@
 # FastMCP v3 Providers Reference
 
-How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories.
-
-SOURCE: <https://gofastmcp.com/servers/providers/overview>, `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
+How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories. [1]
 
 ---
 
@@ -268,9 +266,7 @@ Custom `route_maps` are checked first; FastMCP's default catch-all (`all routes 
 - Name overrides via `mcp_names` map `operationId` → desired name (still slugified and truncated)
 - `mcp_component_fn` modifies components in-place; its return value is ignored
 - When the provider owns the `httpx.AsyncClient` (i.e., `client` was not passed), it is closed on server shutdown via `lifespan()`
-- Output validation uses the response schema from the OpenAPI spec; set `validate_output=False` to accept any JSON response structure
-
-SOURCE: <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/provider.py>, <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/__init__.py>, <https://gofastmcp.com/integrations/openapi> (accessed 2026-03-17)
+- Output validation uses the response schema from the OpenAPI spec; set `validate_output=False` to accept any JSON response structure [2]
 
 ---
 
@@ -441,3 +437,8 @@ mcp.add_provider(DatabaseProvider(db_url))
 - Transforms applied to providers: [./transforms.md](./transforms.md)
 - Server core and decorators: [./server-core.md](./server-core.md)
 - Authentication integration: [./auth.md](./auth.md)
+
+## References
+
+1. [FastMCP Overview](https://gofastmcp.com/servers/providers/overview), `local.mdx`, `mounting.mdx`, `proxy.mdx`, `filesystem.mdx`, `skills.mdx`, `custom.mdx` (accessed 2026-03-05)
+2. [Provider.Py](https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/provider.py), [__Init__.Py](https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/providers/openapi/__init__.py), [FastMCP Openapi](https://gofastmcp.com/integrations/openapi) (accessed 2026-03-17)

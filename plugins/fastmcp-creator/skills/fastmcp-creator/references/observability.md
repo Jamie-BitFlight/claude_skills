@@ -27,6 +27,8 @@ Or configure programmatically using standard OpenTelemetry SDK setup before impo
 - **Production**: OTLP exporters to Logfire, Jaeger, Tempo, Datadog, or New Relic
 - **Sampling**: Tune sampling in the OpenTelemetry SDK to reduce trace volume without removing FastMCP instrumentation
 
-FastMCP does not add OpenTelemetry as a required dependency — install it alongside FastMCP when needed.
+FastMCP does not add OpenTelemetry as a required dependency — install it alongside FastMCP when needed. [1]
 
-SOURCE: <https://gofastmcp.com/servers/telemetry.md> (accessed 2026-05-23)
+## References
+
+1. [FastMCP Telemetry](https://gofastmcp.com/servers/telemetry.md) (accessed 2026-05-23)

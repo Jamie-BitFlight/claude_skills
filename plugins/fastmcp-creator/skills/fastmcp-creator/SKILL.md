@@ -99,12 +99,11 @@ flowchart TD
 
 ---
 
-## Quick-Start Examples
+## Quick-Start Examples [1] [2] [3]
 
 ### Minimal server
 
 ```python
-# SOURCE: servers/server.mdx + servers/tools.mdx (accessed 2026-03-05)
 from fastmcp import FastMCP
 
 mcp = FastMCP("my-server")
@@ -121,7 +120,6 @@ if __name__ == "__main__":
 ### Server composition
 
 ```python
-# SOURCE: servers/providers/mounting.mdx (accessed 2026-03-05)
 from fastmcp import FastMCP
 
 weather = FastMCP("weather")
@@ -134,7 +132,6 @@ main.mount(weather, namespace="weather")
 ### Background task
 
 ```python
-# SOURCE: servers/tasks.mdx — requires fastmcp[tasks] extra (accessed 2026-03-05)
 from fastmcp import FastMCP
 
 mcp = FastMCP("task-server")
@@ -185,9 +182,7 @@ The following features were added in FastMCP 3.1.0 and require `fastmcp>=3.1.0`:
 - **`FASTMCP_TRANSPORT`** env var — default transport selection without CLI flag
 - **`http_client` parameter** — connection pooling for token verifiers
 - **`include_unversioned`** option in VersionFilter
-- **`Tool.from_tool()`** — immediate transformation at registration time
-
-SOURCE: <https://github.com/jlowin/fastmcp> releases v3.1.0, v3.1.1 (accessed 2026-05-23)
+- **`Tool.from_tool()`** — immediate transformation at registration time [4]
 
 ### FastMCP 3.2 — Available (released 2026-03-30)
 
@@ -200,18 +195,14 @@ The following features were added in FastMCP 3.2 and require `fastmcp>=3.2.0`:
 - **`run_in_thread=False`** on `@mcp.tool()` — opt sync tools out of the default threadpool dispatch for thread-affine libraries
 - **`ssl verify` parameter** on `Client` — SSL certificate configuration for development with self-signed certs
 - **`client_log_level` parameter** on `Client` — control client-side log verbosity
-- **`ResponseCachingMiddleware` token-partitioning security fix** (v3.2.2) — cache now partitioned by access token; upgrade required for deployments with multiple users
-
-SOURCE: <https://github.com/jlowin/fastmcp> releases v3.2.x (accessed 2026-05-23)
+- **`ResponseCachingMiddleware` token-partitioning security fix** (v3.2.2) — cache now partitioned by access token; upgrade required for deployments with multiple users [5]
 
 ### FastMCP 3.3 — Available (released 2026-05-15)
 
 The following features were added in FastMCP 3.3 and require `fastmcp>=3.3.0`:
 
 - **fastmcp-slim** — client-only distribution; install `fastmcp-slim[client]` for consumers who only need the FastMCP client without the full server framework; import namespace is identical (`from fastmcp import Client`)
-- **Storage backends** — persistent cache and OAuth state storage backends
-
-SOURCE: <https://github.com/jlowin/fastmcp> releases v3.3.x (accessed 2026-05-23)
+- **Storage backends** — persistent cache and OAuth state storage backends [6]
 
 ---
 
@@ -252,3 +243,12 @@ Preserved references (not overwritten):
   `Skill(skill: "python3-development:python3-development")`
 - For evaluating MCP server quality: [./references/evaluation-guide.md](./references/evaluation-guide.md)
 - For Claude Code MCP config (`.mcp.json`): [./references/claude-code-mcp-integration.md](./references/claude-code-mcp-integration.md)
+
+## References
+
+1. servers/server.mdx + servers/tools.mdx (accessed 2026-03-05)
+2. servers/providers/mounting.mdx (accessed 2026-03-05)
+3. servers/tasks.mdx — requires fastmcp[tasks] extra (accessed 2026-03-05)
+4. [Fastmcp](https://github.com/jlowin/fastmcp) releases v3.1.0, v3.1.1 (accessed 2026-05-23)
+5. [Fastmcp](https://github.com/jlowin/fastmcp) releases v3.2.x (accessed 2026-05-23)
+6. [Fastmcp](https://github.com/jlowin/fastmcp) releases v3.3.x (accessed 2026-05-23)

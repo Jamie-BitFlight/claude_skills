@@ -3,7 +3,7 @@ name: fastmcp-client-cli
 description: Query and invoke tools on MCP servers using fastmcp list and fastmcp call. Use when you need to discover what tools a server offers, call tools, or integrate MCP servers into workflows.
 ---
 
-# FastMCP CLI: List and Call
+# FastMCP CLI: List and Call [1]
 
 Use `fastmcp list` and `fastmcp call` to interact with any MCP server from the command line.
 
@@ -112,3 +112,7 @@ fastmcp call weather get_forecast city=London
 ```
 
 If you call a nonexistent tool, FastMCP suggests close matches.
+
+## References
+
+1. [FastMCP CLI Client](https://gofastmcp.com/cli/client) (accessed 2026-06-07)

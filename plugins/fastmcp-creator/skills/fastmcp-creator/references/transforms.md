@@ -1,8 +1,6 @@
 # FastMCP v3 Transforms Reference
 
-How transforms modify components as they flow from providers to clients. Covers all five built-in transforms and custom transform authoring.
-
-SOURCE: <https://gofastmcp.com/servers/transforms/transforms>, `namespace.mdx`, `tool-transformation.mdx`, `resources-as-tools.mdx`, `prompts-as-tools.mdx`, `tool-search.mdx`, `code-mode.mdx`, <https://gofastmcp.com/servers/authorization> (visibility/Enabled), <https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/transforms/search/base.py> (search_result_serializer) (accessed 2026-03-17)
+How transforms modify components as they flow from providers to clients. Covers all five built-in transforms and custom transform authoring. [1]
 
 ---
 
@@ -223,7 +221,6 @@ def get_user_data(user_id: str, query: str) -> str:
     """Fetch data for a specific user."""
     return f"Data for user {user_id}: {query}"
 
-
 def create_user_tool(user_id: str) -> Tool:
     """Factory that creates a user-specific version of get_user_data."""
     return Tool.from_tool(
@@ -235,7 +232,6 @@ def create_user_tool(user_id: str) -> Tool:
         },
     )
 
-
 mcp = FastMCP("User Server")
 current_user_id = "user-123"  # from auth context
 mcp.add_tool(create_user_tool(current_user_id))
@@ -243,9 +239,7 @@ mcp.add_tool(create_user_tool(current_user_id))
 # Clients see "get_my_data(query: str)" — user_id is injected automatically
 ```
 
-PATTERN: Use this for multi-tenant servers where each connection gets tools pre-configured with identity, or for wrapping generic tools with environment-specific defaults.
-
-SOURCE: [https://gofastmcp.com/servers/transforms/tool-transformation](https://gofastmcp.com/servers/transforms/tool-transformation) (accessed 2026-03-17)
+PATTERN: Use this for multi-tenant servers where each connection gets tools pre-configured with identity, or for wrapping generic tools with environment-specific defaults. [2]
 
 ---
 
@@ -391,7 +385,7 @@ mount.add_transform(ToolTransform({...}))
 mcp.add_transform(Namespace("v1"))
 ```
 
-PATTERN: Pass transforms directly to the `FastMCP` constructor via the `transforms=` keyword argument (v3.1.0+). This is equivalent to calling `add_transform()` for each entry after construction.
+PATTERN: Pass transforms directly to the `FastMCP` constructor via the `transforms=` keyword argument (v3.1.0+). This is equivalent to calling `add_transform()` for each entry after construction. [3]
 
 ```python
 from fastmcp import FastMCP
@@ -399,8 +393,6 @@ from fastmcp.server.transforms.search import BM25SearchTransform
 
 mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
 ```
-
-SOURCE: [https://gofastmcp.com/servers/transforms](https://gofastmcp.com/servers/transforms) (accessed 2026-03-17)
 
 ### Transform Order
 
@@ -481,9 +473,7 @@ class PrefixTransform(Transform):
 
 ## Tool Search Transforms (v3.1.0)
 
-When a server exposes hundreds or thousands of tools, sending the full catalog to an LLM wastes tokens and degrades tool selection accuracy. Search transforms solve this by replacing the tool listing with a search interface — the LLM discovers tools on demand instead of receiving everything upfront.
-
-SOURCE: [https://gofastmcp.com/servers/transforms/tool-search](https://gofastmcp.com/servers/transforms/tool-search) (accessed 2026-03-17)
+When a server exposes hundreds or thousands of tools, sending the full catalog to an LLM wastes tokens and degrades tool selection accuracy. Search transforms solve this by replacing the tool listing with a search interface — the LLM discovers tools on demand instead of receiving everything upfront. [4]
 
 ### How It Works
 
@@ -634,9 +624,7 @@ CodeMode is an experimental transform that replaces your tool catalog with meta-
 
 CONSTRAINT: This feature is experimental. The core interface is stable, but discovery tool parameters may evolve.
 
-Requires: `pip install "fastmcp[code-mode]"`
-
-SOURCE: [https://gofastmcp.com/servers/transforms/code-mode](https://gofastmcp.com/servers/transforms/code-mode) (accessed 2026-03-17)
+Requires: `pip install "fastmcp[code-mode]"` [5]
 
 ### Getting Started
 
@@ -871,3 +859,11 @@ code_mode = CodeMode(
 - Provider configuration: [./providers.md](./providers.md)
 - Server core setup: [./server-core.md](./server-core.md)
 - Scope-based auth (restricts visibility by scope): [./auth.md](./auth.md)
+
+## References
+
+1. [FastMCP Transforms](https://gofastmcp.com/servers/transforms/transforms), `namespace.mdx`, `tool-transformation.mdx`, `resources-as-tools.mdx`, `prompts-as-tools.mdx`, `tool-search.mdx`, `code-mode.mdx`, [FastMCP Authorization](https://gofastmcp.com/servers/authorization) (visibility/Enabled), [Base.Py](https://github.com/PrefectHQ/fastmcp/blob/main/src/fastmcp/server/transforms/search/base.py) (search_result_serializer) (accessed 2026-03-17)
+2. [https://gofastmcp.com/servers/transforms/tool-transformation](https://gofastmcp.com/servers/transforms/tool-transformation) (accessed 2026-03-17)
+3. [https://gofastmcp.com/servers/transforms](https://gofastmcp.com/servers/transforms) (accessed 2026-03-17)
+4. [https://gofastmcp.com/servers/transforms/tool-search](https://gofastmcp.com/servers/transforms/tool-search) (accessed 2026-03-17)
+5. [https://gofastmcp.com/servers/transforms/code-mode](https://gofastmcp.com/servers/transforms/code-mode) (accessed 2026-03-17)

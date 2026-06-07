@@ -2,9 +2,7 @@
 
 How Claude Code discovers, configures, and connects to MCP servers — the deployment target for every server you build with this skill.
 
-**Why read this**: Your MCP server doesn't exist in isolation. It runs inside Claude Code, where configuration scoping, transport selection, permission rules, agent-scoped servers, tool disambiguation, and output limits determine whether your server works seamlessly or breaks silently. Understanding the host environment prevents the #1 class of MCP server bugs: "works in testing, fails in production."
-
-SOURCE: [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp.md) (accessed 2026-03-01)
+**Why read this**: Your MCP server doesn't exist in isolation. It runs inside Claude Code, where configuration scoping, transport selection, permission rules, agent-scoped servers, tool disambiguation, and output limits determine whether your server works seamlessly or breaks silently. Understanding the host environment prevents the #1 class of MCP server bugs: "works in testing, fails in production." [1]
 
 ---
 
@@ -245,3 +243,7 @@ When building an MCP server that will run in Claude Code:
 - [ ] If bundling in a plugin, use `${CLAUDE_PLUGIN_ROOT}` for paths
 - [ ] If agent-scoped, verify the `cwd` resolves correctly relative to project root
 - [ ] Handle `list_changed` notifications if tools are dynamic
+
+## References
+
+1. [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp.md) (accessed 2026-03-01)
