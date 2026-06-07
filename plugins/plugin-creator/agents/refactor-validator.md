@@ -161,3 +161,7 @@ If issues are found:
 2. Document workarounds for acceptable issues
 3. Update task file with validation results
 4. Recommend next iteration if major issues exist
+
+**If applying fixes based on validation findings:**
+- Collect all findings and group them by target file path.
+- Apply all fixes for each file in a single Edit operation to reduce context consumption and Edit tool calls. Do not apply fixes one finding at a time.

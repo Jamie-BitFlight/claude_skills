@@ -801,6 +801,11 @@ VERDICT: [COMPLETE / NOT COMPLETE - reason]
 3. Official docs verification found no schema violations
 4. All factual claims in skills cite sources
 
+**If validation findings require fixes:**
+- Collect all findings from the parallel review agents.
+- Group the findings by the target file path.
+- Apply all fixes for each file in a single Edit operation (one pass per file, NOT one pass per finding) to reduce context consumption.
+
 </final_checkpoint>
 
 ---
