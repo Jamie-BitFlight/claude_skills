@@ -20,6 +20,7 @@ mcp = FastMCP(
     version="1.0.0",
 )
 ```
+[3]
 
 PATTERN: Common constructor parameters:
 
@@ -66,6 +67,7 @@ from fastmcp.server.transforms.search import BM25SearchTransform
 
 mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
 ```
+[3]
 
 Server-level transforms apply to all components from all providers and run after provider-level transforms. This is distinct from provider-level transforms, which apply only to components from that specific provider. [2]
 
@@ -78,6 +80,7 @@ from key_value.aio.stores.redis import RedisStore
 
 mcp = FastMCP("distributed-app", session_state_store=RedisStore(...))
 ```
+[3]
 
 Any backend compatible with the [py-key-value-aio](https://github.com/strawgate/py-key-value) `AsyncKeyValue` protocol works. Supported backends include Redis, DynamoDB, and MongoDB.
 
@@ -101,6 +104,7 @@ def add(a: int, b: int) -> int:
     """Adds two integer numbers together."""
     return a + b
 ```
+[3]
 
 FastMCP automatically:
 
@@ -123,6 +127,7 @@ def search_products(query: str, category: str | None = None) -> list[dict]:
     """Internal docstring (ignored when description is provided above)."""
     return [{"id": 1, "name": "Product A"}]
 ```
+[3]
 
 CONSTRAINT: `*args` and `**kwargs` are not supported. FastMCP requires a complete parameter schema.
 
@@ -154,6 +159,7 @@ async def search(query: str, ctx: Context = CurrentContext()) -> list[dict]:
     all_results = run_search(query)
     return [r for r in all_results if user_can_see(user_id, r)]
 ```
+[3]
 
 PATTERN: Use `ctx.get_state()` to build per-session personalization that accumulates across calls. [4]
 
@@ -167,8 +173,9 @@ async def set_user_preference(key: str, value: str, ctx: Context) -> str:
 @mcp.tool
 async def get_user_preference(key: str, ctx: Context) -> str | None:
     """Retrieve a user preference for this session."""
-    return await ctx.get_state(f"pref:{key}") [3]
+    return await ctx.get_state(f"pref:{key}")
 ```
+[3]
 
 ### run_in_thread=False (v3.2.0+)
 
@@ -180,6 +187,7 @@ def my_thread_affine_tool() -> str:
     # runs on the event loop thread, not a pool thread
     ...
 ```
+[3]
 
 Use `run_in_thread=False` only for thread-affine code. For ordinary sync tools, the default threadpool dispatch is correct.
 
@@ -199,6 +207,7 @@ async def fetch_data(url: str) -> str:
     # async I/O operations preferred for efficiency
     return f"Data from {url}"
 ```
+[3]
 
 ---
 
@@ -219,6 +228,7 @@ def get_config() -> str:
     import json
     return json.dumps({"theme": "dark", "version": "1.2.0"})
 ```
+[3]
 
 PATTERN: Resources are lazy — the function runs only when a client requests `resources/read`.
 
@@ -232,6 +242,7 @@ def get_user_profile(user_id: int) -> dict:
     """Retrieves a user profile by ID."""
     return {"id": user_id, "name": f"User {user_id}", "status": "active"}
 ```
+[3]
 
 PATTERN: Wildcard parameter `{param*}` captures multiple path segments (slashes included).
 
@@ -241,6 +252,7 @@ def get_path_content(filepath: str) -> str:
     """Read content at a nested file path."""
     return f"Content at: {filepath}"
 ```
+[3]
 
 ### Resource Return Types
 
@@ -258,6 +270,7 @@ def get_users() -> ResourceResult:
         meta={"total": 1}
     )
 ```
+[3]
 
 CONSTRAINT: `enabled=False` on `@mcp.resource` is deprecated in v3.0.0. Use `mcp.disable()` instead.
 
@@ -288,6 +301,7 @@ def generate_code_request(language: str, task: str) -> list[Message]:
         Message("I'll help you write that function.", role="assistant"),
     ]
 ```
+[3]
 
 ### Prompt with Custom Metadata
 
@@ -300,6 +314,7 @@ def generate_code_request(language: str, task: str) -> list[Message]:
 def data_analysis_prompt(data_uri: str, analysis_type: str = "summary") -> str:
     return f"Please perform a '{analysis_type}' analysis on the data at {data_uri}."
 ```
+[3]
 
 CONSTRAINT: `*args` and `**kwargs` are not supported as prompt parameters.
 
@@ -320,6 +335,7 @@ async def process_file(file_uri: str, ctx: Context) -> str:
     await ctx.info(f"Processing {file_uri}")
     return f"Processed: {file_uri}"
 ```
+[3]
 
 RULE: Context methods are async — functions that call them usually need `async def`.
 
@@ -342,6 +358,7 @@ async def analyze_data(data: list[float], ctx: Context) -> dict:
     await ctx.info(f"Analysis complete, average: {result}")
     return {"average": result}
 ```
+[3]
 
 Log level methods: `ctx.debug()`, `ctx.info()`, `ctx.warning()`, `ctx.error()`
 
@@ -357,6 +374,7 @@ async def long_operation(items: list[str], ctx: Context) -> list[str]:
         await ctx.report_progress(progress=i + 1, total=len(items))
     return results
 ```
+[3]
 
 ### Resource and Prompt Access via Context
 
@@ -377,6 +395,7 @@ async def list_available(ctx: Context) -> dict:
         "prompts": [p.name for p in prompts],
     }
 ```
+[3]
 
 ### Session State (v3.0.0+)
 
@@ -395,6 +414,7 @@ async def get_counter(ctx: Context) -> int:
     """Get the current counter value."""
     return await ctx.get_state("counter") or 0
 ```
+[3]
 
 Session state method signatures:
 
@@ -415,6 +435,7 @@ async def request_info(ctx: Context) -> dict:
         "client_id": ctx.client_id or "unknown",
     }
 ```
+[3]
 
 Available properties: `ctx.request_id`, `ctx.client_id`, `ctx.session_id`, `ctx.transport`
 
@@ -446,6 +467,7 @@ async def query_data(query: str, ctx: Context) -> list:
     db = ctx.lifespan_context["db"]
     return await db.execute(query)
 ```
+[3]
 
 PATTERN: Compose multiple lifespans with the `|` operator.
 
@@ -465,6 +487,7 @@ async def db_lifespan(server):
 
 mcp = FastMCP("MyServer", lifespan=config_lifespan | db_lifespan)
 ```
+[3]
 
 ---
 
@@ -487,6 +510,7 @@ if __name__ == "__main__":
     # HTTP transport — for web services
     # mcp.run(transport="http", host="127.0.0.1", port=9000)
 ```
+[3]
 
 Supported transports: `"stdio"` (default), `"http"` (Streamable HTTP), `"sse"` (legacy, deprecated)
 
@@ -500,6 +524,7 @@ from starlette.responses import PlainTextResponse
 async def health_check(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
 ```
+[3]
 
 ---
 
@@ -521,6 +546,7 @@ mcp = FastMCP(include_tags={"public"})          # Only expose "public" component
 mcp = FastMCP(exclude_tags={"internal"})         # Hide "internal" components
 mcp = FastMCP(include_tags={"admin"}, exclude_tags={"deprecated"})
 ```
+[3]
 
 RULE: Exclude tags always take priority over include tags.
 
@@ -554,6 +580,7 @@ api_v1.add_transform(VersionFilter(version_lt="2.0"))
 api_v2 = FastMCP("API v2", providers=[components])
 api_v2.add_transform(VersionFilter(version_gte="2.0"))
 ```
+[3]
 
 RULE: For any given component name, either version all implementations or version none. Mixing versioned and unversioned components with the same name raises a `ValueError` at registration time.
 
@@ -570,6 +597,7 @@ PATTERN: Use `include_unversioned=False` to produce a strictly versioned API sur
 api_v2 = FastMCP("API v2", providers=[components])
 api_v2.add_transform(VersionFilter(version_gte="2.0", include_unversioned=False))
 ```
+[3]
 
 CONSTRAINT: By default (`include_unversioned=True`), unversioned components pass through all `VersionFilter` instances unaffected. This prevents accidentally hiding existing components when adding version filtering to a mixed codebase. Set `include_unversioned=False` explicitly when you want a clean versioned-only surface. [5]
 
@@ -589,6 +617,7 @@ mcp.disable(keys={"tool:my_tool", "resource:data://secret"})
 # Allowlist: only enable components with specific tags
 mcp.enable(tags={"public"}, only=True)
 ```
+[3]
 
 CONSTRAINT: Disabled components do not appear in list responses and cannot be called.
 

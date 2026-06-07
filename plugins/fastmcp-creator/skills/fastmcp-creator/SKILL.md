@@ -97,9 +97,9 @@ flowchart TD
     Q1 -->|Client calling protected server| CA["Client auth — BearerAuth / CIMDAuth / OAuthAuth<br>Source: clients/auth/*.mdx"]
 ```
 
---- [2] [3]
+---
 
-## Quick-Start Examples [1]
+## Quick-Start Examples [1] [2] [3]
 
 ### Minimal server
 

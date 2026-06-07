@@ -223,10 +223,10 @@ async def test_status_tool():
         assert result.data == {"status": "ok", "checked_at": IsStr()}
 ```
 
-Install both libraries as development dependencies: [13]
+Install both libraries as development dependencies: [11] [12] [13]
 
 ```bash
-uv add --dev inline-snapshot dirty-equals [11] [12]
+uv add --dev inline-snapshot dirty-equals
 ```
 
 ---

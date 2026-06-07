@@ -386,8 +386,10 @@ async with Client(
         headers={"X-API-Key": "<your-token>"},
     ),
 ) as client:
-    await client.ping() [5]
+    await client.ping()
 ```
+
+[5]
 
 ### OAuth Authentication
 
@@ -439,7 +441,7 @@ encrypted_storage = FernetEncryptionWrapper(
     fernet=Fernet(os.environ["OAUTH_STORAGE_ENCRYPTION_KEY"])
 )
 
-oauth = OAuth(token_storage=encrypted_storage) [6]
+oauth = OAuth(token_storage=encrypted_storage)
 ```
 
 ### CIMD Authentication
