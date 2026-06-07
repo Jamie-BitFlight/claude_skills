@@ -1,8 +1,6 @@
 # FastMCP v3 Authentication and Authorization Reference
 
-How to authenticate requests to FastMCP HTTP servers and authorize access at the component level.
-
-SOURCE: <https://gofastmcp.com/servers/auth/authentication>, `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, <https://gofastmcp.com/servers/authorization> (accessed 2026-03-05)
+How to authenticate requests to FastMCP HTTP servers and authorize access at the component level. [1]
 
 ---
 
@@ -243,9 +241,7 @@ mcp = FastMCP(name="My Server", auth=auth)
 
 ### `verify_id_token` Option for OIDCProxy
 
-PATTERN: Some providers (e.g., certain Azure AD configurations) issue opaque access tokens but standard JWT id_tokens. Use `verify_id_token=True` to verify identity via the id_token while using the access_token for upstream API calls.
-
-SOURCE: <https://gofastmcp.com/changelog> (accessed 2026-03-17)
+PATTERN: Some providers (e.g., certain Azure AD configurations) issue opaque access tokens but standard JWT id_tokens. Use `verify_id_token=True` to verify identity via the id_token while using the access_token for upstream API calls. [2]
 
 ```python
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
@@ -283,9 +279,7 @@ PATTERN: `RemoteAuthProvider` extends `JWTVerifier` with OAuth discovery metadat
 
 ## MultiAuth (Multiple Token Sources)
 
-CONSTRAINT: Requires FastMCP v3.1+.
-
-SOURCE: <https://gofastmcp.com/servers/auth/multi-auth> (accessed 2026-03-17)
+CONSTRAINT: Requires FastMCP v3.1+. [3]
 
 `MultiAuth` composes an optional OAuth server with one or more `TokenVerifier` instances. When a request arrives, `MultiAuth` tries each source in order and accepts the first successful verification.
 
@@ -363,9 +357,7 @@ CONSTRAINT: Without a `server`, no OAuth routes or metadata are served. Appropri
 
 ## PropelAuth Provider
 
-CONSTRAINT: Requires FastMCP v3.1+.
-
-SOURCE: <https://gofastmcp.com/integrations/propelauth> (accessed 2026-03-17)
+CONSTRAINT: Requires FastMCP v3.1+. [4]
 
 `PropelAuthProvider` is a `RemoteAuthProvider` using PropelAuth's OAuth and token introspection. PropelAuth handles user login, consent management, and Dynamic Client Registration; the FastMCP server validates tokens via introspection.
 
@@ -448,9 +440,7 @@ def whoami() -> dict:
 
 ---
 
-## KeycloakAuthProvider (v3.2.0+)
-
-SOURCE: <https://gofastmcp.com/integrations/keycloak.md> (accessed 2026-05-23)
+## KeycloakAuthProvider (v3.2.0+) [5]
 
 Secure a FastMCP server with Keycloak OAuth. Provides a Docker-based local Keycloak setup with a pre-configured `fastmcp` realm (Dynamic Client Registration enabled, test user included).
 
@@ -471,9 +461,7 @@ Integration guide with cross-platform start scripts and test user at: <https://g
 
 ---
 
-## ResponseCachingMiddleware — Security Fix (v3.2.2+)
-
-SOURCE: <https://github.com/jlowin/fastmcp/releases> (accessed 2026-05-23)
+## ResponseCachingMiddleware — Security Fix (v3.2.2+) [6]
 
 `ResponseCachingMiddleware` partitions its cache by access token as of v3.2.2. Prior to this fix, different users could see each other's cached responses. Upgrade required for any deployment using `ResponseCachingMiddleware` with multiple users.
 
@@ -684,9 +672,7 @@ mcp = FastMCP(name="Production API", auth=verifier)
 
 ### Connection Pooling for Token Verifiers (`http_client` parameter)
 
-CONSTRAINT: Requires FastMCP v3.1.0+.
-
-SOURCE: <https://gofastmcp.com/servers/auth/token-verification> (accessed 2026-03-17)
+CONSTRAINT: Requires FastMCP v3.1.0+. [7]
 
 All token verifiers that make HTTP calls (`JWTVerifier` with JWKS, `IntrospectionTokenVerifier`, and the convenience providers `GitHubProvider`, `GoogleProvider`, `DiscordProvider`, `WorkOSProvider`, `AzureProvider`) accept an optional `http_client` parameter.
 
@@ -798,3 +784,13 @@ from fastmcp.server.middleware import AuthMiddleware
 - Server instantiation with `auth=`: [./server-core.md](./server-core.md)
 - Tag-based visibility without auth: [./transforms.md](./transforms.md)
 - Claude Code MCP transport and auth setup: [./claude-code-mcp-integration.md](./claude-code-mcp-integration.md)
+
+## References
+
+1. [FastMCP Authentication](https://gofastmcp.com/servers/auth/authentication), `full-oauth-server.mdx`, `oauth-proxy.mdx`, `oidc-proxy.mdx`, `remote-oauth.mdx`, `token-verification.mdx`, [FastMCP Authorization](https://gofastmcp.com/servers/authorization) (accessed 2026-03-05)
+2. [FastMCP Changelog](https://gofastmcp.com/changelog) (accessed 2026-03-17)
+3. [FastMCP Multi Auth](https://gofastmcp.com/servers/auth/multi-auth) (accessed 2026-03-17)
+4. [FastMCP Propelauth](https://gofastmcp.com/integrations/propelauth) (accessed 2026-03-17)
+5. [FastMCP Keycloak](https://gofastmcp.com/integrations/keycloak.md) (accessed 2026-05-23)
+6. [Releases](https://github.com/jlowin/fastmcp/releases) (accessed 2026-05-23)
+7. [FastMCP Token Verification](https://gofastmcp.com/servers/auth/token-verification) (accessed 2026-03-17)

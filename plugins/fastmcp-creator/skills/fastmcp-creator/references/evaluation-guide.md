@@ -1,4 +1,4 @@
-# MCP Server Evaluation Guide
+# MCP Server Evaluation Guide [1]
 
 Complete guide for creating comprehensive evaluations to test whether LLMs can effectively use your MCP server to answer realistic, complex questions.
 
@@ -412,3 +412,7 @@ Evaluation creation is critical for MCP server quality. Follow these guidelines 
 - [FastMCP GitHub Repository (PrefectHQ/fastmcp)](https://github.com/prefecthq/fastmcp) (accessed 2026-02-22)
 - [FastMCP Official Documentation](https://gofastmcp.com/) (accessed 2026-02-22)
 - [MCP Protocol Specification](https://spec.modelcontextprotocol.io/) (accessed 2026-02-22)
+
+## References
+
+1. [Model Context Protocol Documentation](https://modelcontextprotocol.io/docs) (accessed 2026-06-07)

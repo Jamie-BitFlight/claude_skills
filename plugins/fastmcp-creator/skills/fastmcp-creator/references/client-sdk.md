@@ -1,14 +1,10 @@
 # FastMCP Client SDK Reference
 
-Programmatic client for connecting to MCP servers — use this when building test harnesses, deterministic integrations, or agentic systems that call FastMCP tools programmatically.
-
-SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
+Programmatic client for connecting to MCP servers — use this when building test harnesses, deterministic integrations, or agentic systems that call FastMCP tools programmatically. [1]
 
 ---
 
-## CLI Client Commands
-
-SOURCE: <https://gofastmcp.com/cli/client> (accessed 2026-03-17)
+## CLI Client Commands [2]
 
 The FastMCP CLI can act as an MCP client — connecting to any server (local or remote) to list tools, call them, and discover configured servers. Useful for development, debugging, scripting, and giving shell-capable LLM agents MCP access.
 
@@ -137,7 +133,7 @@ fastmcp call cursor:weather get_forecast city=London
 
 ### Authentication (CLI)
 
-For HTTP targets, the CLI enables OAuth authentication by default. Pass `--auth none` to skip for local dev servers, or pass a bearer token directly:
+For HTTP targets, the CLI enables OAuth authentication by default. Pass `--auth none` to skip for local dev servers, or pass a bearer token directly: [3]
 
 ```bash
 # Skip auth entirely
@@ -147,13 +143,11 @@ fastmcp call http://localhost:8000/mcp my_tool --auth none
 fastmcp list http://localhost:8000/mcp --auth "Bearer sk-..."
 ```
 
-SOURCE: <https://gofastmcp.com/cli/overview> (accessed 2026-03-17)
-
 ---
 
 ## Creating a Client
 
-RULE: Always use `async with client:` for connection lifecycle management. Client operations require an active connection context.
+RULE: Always use `async with client:` for connection lifecycle management. Client operations require an active connection context. [1]
 
 ```python
 from fastmcp import Client, FastMCP
@@ -176,13 +170,9 @@ async def main():
         print(result)
 ```
 
-SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
-
 ---
 
-## Transport Selection
-
-SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
+## Transport Selection [4]
 
 ### In-Memory Transport
 
@@ -203,9 +193,7 @@ async with client:
     result = await client.call_tool("greet", {"name": "World"})
 ```
 
-CONSTRAINT: Unlike STDIO transports, in-memory servers share the same memory space and environment variables as your client code.
-
-SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
+CONSTRAINT: Unlike STDIO transports, in-memory servers share the same memory space and environment variables as your client code. [4]
 
 ### STDIO Transport
 
@@ -237,13 +225,11 @@ transport = StdioTransport(command="python", args=["server.py"], env=env)
 client = Client(transport)
 ```
 
-PATTERN: Session persistence — STDIO transports keep the subprocess alive across multiple `async with` blocks by default (`keep_alive=True`). Disable for complete isolation:
+PATTERN: Session persistence — STDIO transports keep the subprocess alive across multiple `async with` blocks by default (`keep_alive=True`). Disable for complete isolation: [4]
 
 ```python
 transport = StdioTransport(command="python", args=["server.py"], keep_alive=False)
 ```
-
-SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
 
 ### HTTP Transport
 
@@ -263,9 +249,7 @@ transport = StreamableHttpTransport(
 client = Client(transport)
 ```
 
-CONSTRAINT: SSE transport (`SSETransport`) is maintained for backward compatibility only. Use `StreamableHttpTransport` for all new projects.
-
-SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
+CONSTRAINT: SSE transport (`SSETransport`) is maintained for backward compatibility only. Use `StreamableHttpTransport` for all new projects. [4]
 
 ### Multi-Server Configuration
 
@@ -309,15 +293,11 @@ config = {
 }
 ```
 
-CONSTRAINT: `MCPConfigTransport` (multi-server config) maintains session persistence across tool calls — each server connection is reused within a single `async with client:` block. This is the correct behavior for multi-tool workflows; do NOT create a new client per tool call when using config-based multi-server setups.
-
-SOURCE: <https://gofastmcp.com/clients/transports> (accessed 2026-03-05)
+CONSTRAINT: `MCPConfigTransport` (multi-server config) maintains session persistence across tool calls — each server connection is reused within a single `async with client:` block. This is the correct behavior for multi-tool workflows; do NOT create a new client per tool call when using config-based multi-server setups. [4]
 
 ---
 
-## Client Operations
-
-SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
+## Client Operations [1]
 
 ### Tools
 
@@ -348,7 +328,7 @@ async with client:
 
 ### Connection Lifecycle
 
-PATTERN: Access server metadata after initialization:
+PATTERN: Access server metadata after initialization: [1]
 
 ```python
 from fastmcp import Client, FastMCP
@@ -361,15 +341,11 @@ async with Client(mcp) as client:
     print(f"Capabilities: {client.initialize_result.capabilities.tools}")
 ```
 
-SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
-
 ---
 
-## Authentication
+## Authentication [5]
 
 ### Bearer Token Auth
-
-SOURCE: <https://gofastmcp.com/clients/auth/bearer> (accessed 2026-03-05)
 
 CONSTRAINT: Bearer token authentication applies only to HTTP-based transports.
 
@@ -398,7 +374,7 @@ async with Client(
     await client.ping()
 ```
 
-PATTERN: Custom headers for non-standard token schemes:
+PATTERN: Custom headers for non-standard token schemes: [6]
 
 ```python
 from fastmcp import Client
@@ -410,14 +386,10 @@ async with Client(
         headers={"X-API-Key": "<your-token>"},
     ),
 ) as client:
-    await client.ping()
+    await client.ping() [5]
 ```
 
-SOURCE: <https://gofastmcp.com/clients/auth/bearer> (accessed 2026-03-05)
-
 ### OAuth Authentication
-
-SOURCE: <https://gofastmcp.com/clients/auth/oauth> (accessed 2026-03-05)
 
 CONSTRAINT: OAuth authentication applies only to HTTP-based transports and requires user browser interaction.
 
@@ -453,7 +425,7 @@ oauth = OAuth(
 )
 ```
 
-PATTERN: Persistent encrypted token storage (required for production — default is in-memory):
+PATTERN: Persistent encrypted token storage (required for production — default is in-memory): [7]
 
 ```python
 from fastmcp.client.auth import OAuth
@@ -467,14 +439,10 @@ encrypted_storage = FernetEncryptionWrapper(
     fernet=Fernet(os.environ["OAUTH_STORAGE_ENCRYPTION_KEY"])
 )
 
-oauth = OAuth(token_storage=encrypted_storage)
+oauth = OAuth(token_storage=encrypted_storage) [6]
 ```
 
-SOURCE: <https://gofastmcp.com/clients/auth/oauth> (accessed 2026-03-05)
-
 ### CIMD Authentication
-
-SOURCE: <https://gofastmcp.com/clients/auth/cimd> (accessed 2026-03-05)
 
 PATTERN: Available in FastMCP 3.0.0+. CIMD (Client ID Metadata Documents) provides domain-verified client identity. Host a JSON document at an HTTPS URL — that URL becomes your `client_id`.
 
@@ -502,19 +470,15 @@ fastmcp auth cimd create \
 
 CONSTRAINT: CIMD documents must be hosted at a publicly accessible HTTPS URL with a non-root path. The `client_id` in the document must exactly match the hosting URL.
 
-PATTERN: Validate your hosted document before connecting clients:
+PATTERN: Validate your hosted document before connecting clients: [7]
 
 ```bash
 fastmcp auth cimd validate https://myapp.example.com/oauth/client.json
 ```
 
-SOURCE: <https://gofastmcp.com/clients/auth/cimd> (accessed 2026-03-05)
-
 ---
 
-## Sampling
-
-SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-05)
+## Sampling [8]
 
 PATTERN: Implement a `sampling_handler` to respond to server-initiated LLM completion requests. The server delegates AI reasoning to the client.
 
@@ -560,15 +524,11 @@ client = Client(
 )
 ```
 
-RULE: When you provide a `sampling_handler`, FastMCP automatically advertises full sampling capabilities (including tool support) to the server.
-
-SOURCE: <https://gofastmcp.com/clients/sampling> (accessed 2026-03-05)
+RULE: When you provide a `sampling_handler`, FastMCP automatically advertises full sampling capabilities (including tool support) to the server. [8]
 
 ---
 
-## Elicitation
-
-SOURCE: <https://gofastmcp.com/clients/elicitation> (accessed 2026-03-05)
+## Elicitation [9]
 
 PATTERN: Implement an `elicitation_handler` to respond to server requests for structured user input during tool execution.
 
@@ -615,15 +575,11 @@ async def elicitation_handler(message, response_type, params, context):
     )
 ```
 
-RULE: Action types — `accept` (include data in `content`), `decline` (omit `content`), `cancel` (omit `content`, abort operation).
-
-SOURCE: <https://gofastmcp.com/clients/elicitation> (accessed 2026-03-05)
+RULE: Action types — `accept` (include data in `content`), `decline` (omit `content`), `cancel` (omit `content`, abort operation). [9]
 
 ---
 
-## fastmcp-slim — Client-Only Package (v3.3.0+)
-
-SOURCE: <https://gofastmcp.com/clients/client-only-package.md> (accessed 2026-05-23)
+## fastmcp-slim — Client-Only Package (v3.3.0+) [10]
 
 For consumers who only need the FastMCP client without the full server framework:
 
@@ -634,7 +590,7 @@ pip install "fastmcp-slim[client,anthropic]"
 pip install "fastmcp-slim[client,gemini]"
 ```
 
-The import namespace is identical to the full package — no code changes required:
+The import namespace is identical to the full package — no code changes required: [11]
 
 ```python
 from fastmcp import Client
@@ -644,8 +600,6 @@ async with Client("https://example.com/mcp") as client:
 ```
 
 ## ssl verify Parameter (v3.2.x+)
-
-SOURCE: <https://github.com/jlowin/fastmcp/releases> PR #3487, PR #3491 (accessed 2026-05-23)
 
 The `Client` constructor accepts a `verify` parameter for SSL certificate configuration (useful in development with self-signed certs):
 
@@ -666,7 +620,7 @@ client = Client("https://example.com/mcp", client_log_level=logging.DEBUG)
 
 ## Callback Handler Summary
 
-PATTERN: Provide multiple handlers at client construction time:
+PATTERN: Provide multiple handlers at client construction time: [1]
 
 ```python
 client = Client(
@@ -679,4 +633,16 @@ client = Client(
 )
 ```
 
-SOURCE: <https://gofastmcp.com/clients/client> (accessed 2026-03-05)
+## References
+
+1. [FastMCP Client](https://gofastmcp.com/clients/client) (accessed 2026-03-05)
+2. [FastMCP Client](https://gofastmcp.com/cli/client) (accessed 2026-03-17)
+3. [FastMCP Overview](https://gofastmcp.com/cli/overview) (accessed 2026-03-17)
+4. [FastMCP Transports](https://gofastmcp.com/clients/transports) (accessed 2026-03-05)
+5. [FastMCP Bearer](https://gofastmcp.com/clients/auth/bearer) (accessed 2026-03-05)
+6. [FastMCP Oauth](https://gofastmcp.com/clients/auth/oauth) (accessed 2026-03-05)
+7. [FastMCP Cimd](https://gofastmcp.com/clients/auth/cimd) (accessed 2026-03-05)
+8. [FastMCP Sampling](https://gofastmcp.com/clients/sampling) (accessed 2026-03-05)
+9. [FastMCP Elicitation](https://gofastmcp.com/clients/elicitation) (accessed 2026-03-05)
+10. [FastMCP Client Only Package](https://gofastmcp.com/clients/client-only-package.md) (accessed 2026-05-23)
+11. [Releases](https://github.com/jlowin/fastmcp/releases) PR #3487, PR #3491 (accessed 2026-05-23)

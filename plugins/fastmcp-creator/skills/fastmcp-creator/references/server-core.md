@@ -1,8 +1,6 @@
 # FastMCP v3 Server Core Reference
 
-How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle.
-
-SOURCE: <https://gofastmcp.com/servers/server>, <https://gofastmcp.com/servers/tools>, <https://gofastmcp.com/servers/resources>, <https://gofastmcp.com/servers/prompts>, <https://gofastmcp.com/servers/context>, <https://gofastmcp.com/servers/lifespan>, <https://gofastmcp.com/servers/logging> (accessed 2026-03-05); <https://gofastmcp.com/servers/versioning> (accessed 2026-03-17, v3.1 features)
+How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle. [1]
 
 ---
 
@@ -69,9 +67,7 @@ from fastmcp.server.transforms.search import BM25SearchTransform
 mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
 ```
 
-Server-level transforms apply to all components from all providers and run after provider-level transforms. This is distinct from provider-level transforms, which apply only to components from that specific provider.
-
-SOURCE: <https://gofastmcp.com/servers/server> (accessed 2026-03-17)
+Server-level transforms apply to all components from all providers and run after provider-level transforms. This is distinct from provider-level transforms, which apply only to components from that specific provider. [2]
 
 ### `session_state_store` Parameter (v3.0.0+)
 
@@ -85,9 +81,7 @@ mcp = FastMCP("distributed-app", session_state_store=RedisStore(...))
 
 Any backend compatible with the [py-key-value-aio](https://github.com/strawgate/py-key-value) `AsyncKeyValue` protocol works. Supported backends include Redis, DynamoDB, and MongoDB.
 
-CONSTRAINT: State set during `on_initialize` middleware persists to subsequent tool calls when using the same session object (STDIO, SSE, single-server HTTP). For distributed HTTP deployments, state is isolated by the `mcp-session-id` header.
-
-SOURCE: <https://gofastmcp.com/servers/context> (accessed 2026-03-17)
+CONSTRAINT: State set during `on_initialize` middleware persists to subsequent tool calls when using the same session object (STDIO, SSE, single-server HTTP). For distributed HTTP deployments, state is isolated by the `mcp-session-id` header. [3]
 
 ---
 
@@ -161,7 +155,7 @@ async def search(query: str, ctx: Context = CurrentContext()) -> list[dict]:
     return [r for r in all_results if user_can_see(user_id, r)]
 ```
 
-PATTERN: Use `ctx.get_state()` to build per-session personalization that accumulates across calls.
+PATTERN: Use `ctx.get_state()` to build per-session personalization that accumulates across calls. [4]
 
 ```python
 @mcp.tool
@@ -173,14 +167,10 @@ async def set_user_preference(key: str, value: str, ctx: Context) -> str:
 @mcp.tool
 async def get_user_preference(key: str, ctx: Context) -> str | None:
     """Retrieve a user preference for this session."""
-    return await ctx.get_state(f"pref:{key}")
+    return await ctx.get_state(f"pref:{key}") [3]
 ```
 
-SOURCE: <https://gofastmcp.com/servers/context> (accessed 2026-03-17)
-
 ### run_in_thread=False (v3.2.0+)
-
-SOURCE: <https://gofastmcp.com/servers/tools.md> (accessed 2026-05-23)
 
 Synchronous tools run in a threadpool by default to avoid blocking the event loop. If your tool holds thread-local state or is bound to a specific thread (UI frameworks like Windows COM, some database drivers), opt out:
 
@@ -581,9 +571,7 @@ api_v2 = FastMCP("API v2", providers=[components])
 api_v2.add_transform(VersionFilter(version_gte="2.0", include_unversioned=False))
 ```
 
-CONSTRAINT: By default (`include_unversioned=True`), unversioned components pass through all `VersionFilter` instances unaffected. This prevents accidentally hiding existing components when adding version filtering to a mixed codebase. Set `include_unversioned=False` explicitly when you want a clean versioned-only surface.
-
-SOURCE: <https://gofastmcp.com/servers/versioning> (accessed 2026-03-17)
+CONSTRAINT: By default (`include_unversioned=True`), unversioned components pass through all `VersionFilter` instances unaffected. This prevents accidentally hiding existing components when adding version filtering to a mixed codebase. Set `include_unversioned=False` explicitly when you want a clean versioned-only surface. [5]
 
 ---
 
@@ -612,3 +600,11 @@ CONSTRAINT: Disabled components do not appear in list responses and cannot be ca
 - Transforms: [./transforms.md](./transforms.md)
 - Authentication and authorization: [./auth.md](./auth.md)
 - Claude Code MCP integration: [./claude-code-mcp-integration.md](./claude-code-mcp-integration.md)
+
+## References
+
+1. [FastMCP Server](https://gofastmcp.com/servers/server), [FastMCP Tools](https://gofastmcp.com/servers/tools), [FastMCP Resources](https://gofastmcp.com/servers/resources), [FastMCP Prompts](https://gofastmcp.com/servers/prompts), [FastMCP Context](https://gofastmcp.com/servers/context), [FastMCP Lifespan](https://gofastmcp.com/servers/lifespan), [FastMCP Logging](https://gofastmcp.com/servers/logging) (accessed 2026-03-05); [FastMCP Versioning](https://gofastmcp.com/servers/versioning) (accessed 2026-03-17, v3.1 features)
+2. [FastMCP Server](https://gofastmcp.com/servers/server) (accessed 2026-03-17)
+3. [FastMCP Context](https://gofastmcp.com/servers/context) (accessed 2026-03-17)
+4. [FastMCP Tools](https://gofastmcp.com/servers/tools.md) (accessed 2026-05-23)
+5. [FastMCP Versioning](https://gofastmcp.com/servers/versioning) (accessed 2026-03-17)

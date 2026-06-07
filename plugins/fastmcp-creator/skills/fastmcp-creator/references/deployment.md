@@ -1,8 +1,6 @@
 # FastMCP Deployment Reference
 
-How to run, configure, and deploy FastMCP servers — covers transport selection, CLI usage, HTTP deployment, `fastmcp.json` project configuration, horizontal scaling, and managed hosting via Prefect Horizon.
-
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
+How to run, configure, and deploy FastMCP servers — covers transport selection, CLI usage, HTTP deployment, `fastmcp.json` project configuration, horizontal scaling, and managed hosting via Prefect Horizon. [1]
 
 ---
 
@@ -25,9 +23,7 @@ if __name__ == "__main__":
 
 CONSTRAINT: STDIO is correct for local development, Claude Desktop integration, command-line tools, and single-user applications. HTTP transport is required when you need network access or multiple concurrent clients.
 
-CONSTRAINT: SSE transport (`transport="sse"`) exists only for backward compatibility. Use HTTP transport for all new projects.
-
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
+CONSTRAINT: SSE transport (`transport="sse"`) exists only for backward compatibility. Use HTTP transport for all new projects. [1]
 
 ### HTTP Transport
 
@@ -38,7 +34,7 @@ if __name__ == "__main__":
 
 Server is accessible at `http://localhost:8000/mcp`.
 
-PATTERN: Use `run_async()` inside async contexts — `run()` creates its own event loop and cannot be called from inside an async function:
+PATTERN: Use `run_async()` inside async contexts — `run()` creates its own event loop and cannot be called from inside an async function: [1]
 
 ```python
 import asyncio
@@ -53,13 +49,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
-
 ---
 
-## FastMCP CLI
-
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
+## FastMCP CLI [1]
 
 PATTERN: Run a server without modifying source — the CLI automatically finds instances named `mcp`, `server`, or `app`:
 
@@ -95,9 +87,7 @@ fastmcp run server.py --reload --reload-dir ./src --reload-dir ./lib
 fastmcp run server.py --reload --transport http --port 8080
 ```
 
-CONSTRAINT: Auto-reload uses stateless mode. For HTTP transport, some bidirectional features like elicitation are not available during reload mode. SSE transport does not support auto-reload.
-
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
+CONSTRAINT: Auto-reload uses stateless mode. For HTTP transport, some bidirectional features like elicitation are not available during reload mode. SSE transport does not support auto-reload. [1]
 
 ---
 
@@ -121,15 +111,11 @@ async def status(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy", "service": "mcp-server"})
 ```
 
-CONSTRAINT: Custom routes are served by the same web server as the MCP endpoint. The MCP endpoint is at `/mcp/`; custom routes are at the root domain.
-
-SOURCE: <https://gofastmcp.com/deployment/running-server> (accessed 2026-03-05)
+CONSTRAINT: Custom routes are served by the same web server as the MCP endpoint. The MCP endpoint is at `/mcp/`; custom routes are at the root domain. [1]
 
 ---
 
-## HTTP Deployment
-
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
+## HTTP Deployment [2]
 
 ### Direct HTTP Server
 
@@ -206,9 +192,7 @@ app = mcp.http_app(middleware=middleware)
 
 CONSTRAINT: `expose_headers=["mcp-session-id"]` is required for browser-based MCP clients. Without it, JavaScript cannot read the session ID from responses, causing session management to fail.
 
-CONSTRAINT: Most MCP clients (Claude Code, Cursor, ChatGPT) do NOT need CORS configuration — they connect server-to-server, not from a browser. Only enable CORS for browser-based debugging tools like MCP Inspector.
-
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
+CONSTRAINT: Most MCP clients (Claude Code, Cursor, ChatGPT) do NOT need CORS configuration — they connect server-to-server, not from a browser. Only enable CORS for browser-based debugging tools like MCP Inspector. [2]
 
 ### Mounting in Web Frameworks
 
@@ -253,9 +237,7 @@ api.mount("/mcp", mcp_app)
 # MCP endpoint: http://localhost:8000/mcp
 ```
 
-CONSTRAINT: Always pass the lifespan from `mcp.http_app()` to the enclosing application. Without it, the session manager does not initialize and requests fail.
-
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
+CONSTRAINT: Always pass the lifespan from `mcp.http_app()` to the enclosing application. Without it, the session manager does not initialize and requests fail. [2]
 
 ### Horizontal Scaling
 
@@ -276,9 +258,7 @@ mcp.run(transport="http", stateless_http=True)
 FASTMCP_STATELESS_HTTP=true uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-CONSTRAINT: Stateless mode eliminates server-side sessions. Stateful MCP features (elicitation, sampling) are not available in stateless mode.
-
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
+CONSTRAINT: Stateless mode eliminates server-side sessions. Stateful MCP features (elicitation, sampling) are not available in stateless mode. [2]
 
 ### SSE Polling for Long-Running Operations
 
@@ -306,7 +286,7 @@ app = mcp.http_app(
 )
 ```
 
-PATTERN: Redis-backed event store for distributed deployments:
+PATTERN: Redis-backed event store for distributed deployments: [2]
 
 ```python
 from fastmcp.server.event_store import EventStore
@@ -322,13 +302,9 @@ event_store = EventStore(
 app = mcp.http_app(event_store=event_store)
 ```
 
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-05)
-
 ---
 
-## `fastmcp.json` Project Configuration
-
-SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
+## `fastmcp.json` Project Configuration [3]
 
 RULE: `fastmcp.json` is the canonical way to configure FastMCP projects — prefer it over CLI arguments for reproducible deployments. Available in v2.12.0+.
 
@@ -403,15 +379,11 @@ Deployment configuration fields:
 - `log_level` — `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"` (default `"INFO"`)
 - `env` — environment variables; supports `${VAR_NAME}` interpolation
 - `cwd` — working directory for the server process
-- `args` — command-line arguments passed after `--` to the server
-
-SOURCE: <https://gofastmcp.com/deployment/server-configuration> (accessed 2026-03-05)
+- `args` — command-line arguments passed after `--` to the server [3]
 
 ---
 
-## nginx Reverse Proxy
-
-SOURCE: <https://gofastmcp.com/deployment/http> (accessed 2026-03-17)
+## nginx Reverse Proxy [4]
 
 In production, run your FastMCP server behind nginx for TLS termination, domain routing, and security.
 
@@ -522,9 +494,7 @@ CONSTRAINT: The trailing `/` on both `location /api/` and `proxy_pass http://127
 
 ---
 
-## `FASTMCP_TRANSPORT` Environment Variable
-
-SOURCE: <https://gofastmcp.com/more/settings> (accessed 2026-03-17)
+## `FASTMCP_TRANSPORT` Environment Variable [5]
 
 PATTERN: Set `FASTMCP_TRANSPORT` to select the default transport without passing `--transport` on every CLI invocation:
 
@@ -549,9 +519,7 @@ FASTMCP_TRANSPORT=http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=9000 fastmcp run server
 
 ---
 
-## `fastmcp run` — Module Mode (`-m` / `--module`)
-
-SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+## `fastmcp run` — Module Mode (`-m` / `--module`) [6]
 
 PATTERN: Run a FastMCP server packaged as a Python module using `-m`/`--module` — equivalent to `python -m my_package.server`:
 
@@ -578,9 +546,7 @@ fastmcp dev inspector -m my_package.server
 
 ---
 
-## `fastmcp project prepare` — Pre-Building uv Environments
-
-SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+## `fastmcp project prepare` — Pre-Building uv Environments [6]
 
 PATTERN: Pre-build a uv environment from a `fastmcp.json` file to separate slow dependency resolution from fast server startup:
 
@@ -598,9 +564,7 @@ CONSTRAINT: This is particularly useful in production and CI/CD where you want d
 
 ---
 
-## `--reload` — Development Auto-Reload
-
-SOURCE: <https://gofastmcp.com/cli/running> (accessed 2026-03-17)
+## `--reload` — Development Auto-Reload [6]
 
 PATTERN: Auto-reload watches for file changes and restarts the server automatically (available in FastMCP 3.0.0+):
 
@@ -620,9 +584,7 @@ CONSTRAINT: `--reload` also works with module mode (`-m`) and the Inspector (`fa
 
 ---
 
-## Prefect Horizon — Managed Deployment
-
-SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)
+## Prefect Horizon — Managed Deployment [7]
 
 PATTERN: [Prefect Horizon](https://horizon.prefect.io) is the fastest path from a FastMCP server to a production URL with built-in OAuth authentication. Free personal tier available.
 
@@ -656,15 +618,11 @@ Horizon features:
 - **ChatMCP** — conversational testing interface optimized for rapid iteration
 - **Agents** — compose multiple MCP servers into a unified chat interface
 - **Gateway** — role-based access control and audit logs at the tool level
-- **Registry** — catalog of servers across your organization
-
-SOURCE: <https://gofastmcp.com/deployment/prefect-horizon> (accessed 2026-03-05)
+- **Registry** — catalog of servers across your organization [7]
 
 ---
 
-## fastmcp dev apps (v3.2.0+)
-
-SOURCE: <https://gofastmcp.com/apps/development.md> (accessed 2026-05-23)
+## fastmcp dev apps (v3.2.0+) [8]
 
 Browser preview for app tools without an MCP host. Starts your server and a local dev UI side by side:
 
@@ -675,3 +633,14 @@ fastmcp dev apps server.py
 Pick a tool from the UI, fill in its arguments, and the rendered Prefab result opens in a new tab. Includes an MCP message inspector panel showing the raw protocol exchange.
 
 Use this during development to verify app tool output before connecting a full MCP client.
+
+## References
+
+1. [FastMCP Running Server](https://gofastmcp.com/deployment/running-server) (accessed 2026-03-05)
+2. [FastMCP Http](https://gofastmcp.com/deployment/http) (accessed 2026-03-05)
+3. [FastMCP Server Configuration](https://gofastmcp.com/deployment/server-configuration) (accessed 2026-03-05)
+4. [FastMCP Http](https://gofastmcp.com/deployment/http) (accessed 2026-03-17)
+5. [FastMCP Settings](https://gofastmcp.com/more/settings) (accessed 2026-03-17)
+6. [FastMCP Running](https://gofastmcp.com/cli/running) (accessed 2026-03-17)
+7. [FastMCP Prefect Horizon](https://gofastmcp.com/deployment/prefect-horizon) (accessed 2026-03-05)
+8. [FastMCP Development](https://gofastmcp.com/apps/development.md) (accessed 2026-05-23)

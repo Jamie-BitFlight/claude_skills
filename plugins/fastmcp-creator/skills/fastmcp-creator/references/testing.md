@@ -1,11 +1,6 @@
 # FastMCP v3 Testing Reference
 
-How to test FastMCP v3 servers using in-memory transport and pytest — covers fixtures, assertions, mocking, and network transport testing.
-
-SOURCE: <https://gofastmcp.com/servers/testing> (accessed 2026-03-17) — dedicated testing page (v3.1)
-SOURCE: <https://gofastmcp.com/patterns/testing> (accessed 2026-03-05)
-SOURCE: <https://gofastmcp.com/development/tests> (accessed 2026-03-05)
-SOURCE: `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` (extended pytest patterns)
+How to test FastMCP v3 servers using in-memory transport and pytest — covers fixtures, assertions, mocking, and network transport testing. [1] [2] [3] [4]
 
 ---
 
@@ -13,9 +8,7 @@ SOURCE: `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` (extended
 
 RULE: Use `Client(mcp)` (in-memory transport) for all unit tests. Do NOT use HTTP transport unless testing network-specific behavior.
 
-The in-memory transport runs the real MCP protocol implementation without network overhead. Pass your server instance directly to the client — no deployment, no subprocess, no network. Everything runs in the same Python process with full debugger support.
-
-SOURCE: <https://gofastmcp.com/development/tests> — "In-Memory Testing" section
+The in-memory transport runs the real MCP protocol implementation without network overhead. Pass your server instance directly to the client — no deployment, no subprocess, no network. Everything runs in the same Python process with full debugger support. [5]
 
 ```python
 from fastmcp import FastMCP
@@ -38,9 +31,7 @@ async def test_greet_tool():
 
 ## pytest Configuration
 
-RULE: Set `asyncio_mode = "auto"` in `pyproject.toml`. This eliminates `@pytest.mark.asyncio` decorators on every async test.
-
-SOURCE: <https://gofastmcp.com/patterns/testing> — "Prerequisites" section
+RULE: Set `asyncio_mode = "auto"` in `pyproject.toml`. This eliminates `@pytest.mark.asyncio` decorators on every async test. [6]
 
 ```toml
 [tool.pytest.ini_options]
@@ -61,9 +52,7 @@ CONSTRAINT: Do NOT add `@pytest.mark.asyncio` to individual test functions when 
 
 ## Fixtures Pattern
 
-RULE: Use pytest fixtures to create reusable server configurations. Do NOT open FastMCP clients inside fixtures — this creates hard-to-diagnose event loop issues. Create the server in the fixture and open the client inside each test.
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Using Fixtures" section
+RULE: Use pytest fixtures to create reusable server configurations. Do NOT open FastMCP clients inside fixtures — this creates hard-to-diagnose event loop issues. Create the server in the fixture and open the client inside each test. [7]
 
 ```python
 import pytest
@@ -105,9 +94,7 @@ async def test_list_tools(main_mcp_client: Client[FastMCPTransport]):
 
 ---
 
-## Assertion Patterns — Tools, Resources, Prompts
-
-SOURCE: <https://gofastmcp.com/patterns/testing> — "Testing with Pytest Fixtures" section
+## Assertion Patterns — Tools, Resources, Prompts [8]
 
 ```python
 from fastmcp import FastMCP
@@ -150,9 +137,7 @@ async def test_prompt_get():
 
 ## Parameterized Tests
 
-Use `@pytest.mark.parametrize` for variations of the same behavior. Use separate tests for different behaviors.
-
-SOURCE: <https://gofastmcp.com/patterns/testing> — "Using the pytest parametrize decorator" section
+Use `@pytest.mark.parametrize` for variations of the same behavior. Use separate tests for different behaviors. [9]
 
 ```python
 import pytest
@@ -189,9 +174,7 @@ async def test_add(x: int, y: int, expected: int, mcp_client):
 
 ## Inline Snapshots for Complex Structures
 
-Use `inline-snapshot` for testing JSON schemas and complex data structures.
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Inline Snapshots" section
+Use `inline-snapshot` for testing JSON schemas and complex data structures. [10]
 
 ```python
 from inline_snapshot import snapshot
@@ -240,21 +223,15 @@ async def test_status_tool():
         assert result.data == {"status": "ok", "checked_at": IsStr()}
 ```
 
-Install both libraries as development dependencies:
+Install both libraries as development dependencies: [13]
 
 ```bash
-uv add --dev inline-snapshot dirty-equals
+uv add --dev inline-snapshot dirty-equals [11] [12]
 ```
-
-SOURCE: <https://gofastmcp.com/servers/testing> (accessed 2026-03-17) — "Testing with Pytest Fixtures" section
-SOURCE: <https://github.com/15r10nk/inline-snapshot> (accessed 2026-03-17)
-SOURCE: <https://github.com/samuelcolvin/dirty-equals> (accessed 2026-03-17)
 
 ---
 
-## Mocking External Dependencies
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Mocking External Dependencies" section
+## Mocking External Dependencies [14]
 
 ```python
 from unittest.mock import AsyncMock
@@ -285,9 +262,7 @@ RULE: Mock at the boundary — mock external services (databases, HTTP APIs), no
 
 ---
 
-## Error Testing
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Self-Contained Setup" section
+## Error Testing [15]
 
 ```python
 import pytest
@@ -313,9 +288,7 @@ async def test_tool_raises_on_invalid_input():
 
 ## Network Transport Testing (Advanced)
 
-Use in-process network testing when you must test actual HTTP transport behavior.
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Testing Network Transports" section
+Use in-process network testing when you must test actual HTTP transport behavior. [16]
 
 ```python
 import pytest
@@ -365,9 +338,7 @@ Mark subprocess tests with `@pytest.mark.client_process` to isolate them in CI.
 
 ---
 
-## Test Naming and Single-Behavior Rule
-
-SOURCE: <https://gofastmcp.com/development/tests> — "Single Behavior Per Test" section
+## Test Naming and Single-Behavior Rule [17]
 
 RULE: Each test verifies exactly one behavior. When it fails, the name tells you what broke.
 
@@ -389,9 +360,7 @@ async def test_tool():
 
 ---
 
-## Running Tests
-
-SOURCE: `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md`
+## Running Tests [18]
 
 ```bash
 uv run pytest -n auto               # run all tests in parallel
@@ -407,3 +376,24 @@ uv run pytest --cov=fastmcp         # run with coverage
 ## Extended Pytest Patterns
 
 For comprehensive pytest patterns including fixtures, parameterization, mocking, and async patterns beyond FastMCP-specific testing, activate the `/fastmcp-python-tests` skill.
+
+## References
+
+1. [FastMCP Testing](https://gofastmcp.com/servers/testing) (accessed 2026-03-17) — dedicated testing page (v3.1)
+2. [FastMCP Testing](https://gofastmcp.com/patterns/testing) (accessed 2026-03-05)
+3. [FastMCP Tests](https://gofastmcp.com/development/tests) (accessed 2026-03-05)
+4. `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` (extended pytest patterns)
+5. [FastMCP Tests](https://gofastmcp.com/development/tests) — "In-Memory Testing" section
+6. [FastMCP Testing](https://gofastmcp.com/patterns/testing) — "Prerequisites" section
+7. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Using Fixtures" section
+8. [FastMCP Testing](https://gofastmcp.com/patterns/testing) — "Testing with Pytest Fixtures" section
+9. [FastMCP Testing](https://gofastmcp.com/patterns/testing) — "Using the pytest parametrize decorator" section
+10. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Inline Snapshots" section
+11. [FastMCP Testing](https://gofastmcp.com/servers/testing) (accessed 2026-03-17) — "Testing with Pytest Fixtures" section
+12. [Inline Snapshot](https://github.com/15r10nk/inline-snapshot) (accessed 2026-03-17)
+13. [Dirty Equals](https://github.com/samuelcolvin/dirty-equals) (accessed 2026-03-17)
+14. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Mocking External Dependencies" section
+15. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Self-Contained Setup" section
+16. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Testing Network Transports" section
+17. [FastMCP Tests](https://gofastmcp.com/development/tests) — "Single Behavior Per Test" section
+18. `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md`

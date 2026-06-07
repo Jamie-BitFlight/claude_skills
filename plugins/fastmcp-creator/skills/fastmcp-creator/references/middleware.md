@@ -1,8 +1,6 @@
-<!-- Extracted from advanced.md to reduce file size. Canonical middleware reference. -->
+<!-- Extracted from advanced.md to reduce file size. Canonical middleware reference. --> [1]
 
 ## Middleware
-
-SOURCE: <https://gofastmcp.com/servers/middleware> (accessed 2026-03-17)
 
 CONSTRAINT: Middleware is a FastMCP-specific concept — it is not part of the MCP protocol specification. Available since FastMCP 2.9.0.
 
@@ -436,14 +434,15 @@ from fastmcp.server.middleware import PingMiddleware
 mcp.add_middleware(PingMiddleware(interval_ms=5000))
 ```
 
-Keeps long-lived connections alive with periodic pings. Has no effect on stateless connections.
-
-SOURCE: <https://gofastmcp.com/servers/middleware> (accessed 2026-03-17)
+Keeps long-lived connections alive with periodic pings. Has no effect on stateless connections. [1]
 
 ---
 
-## ResponseCachingMiddleware — Security Fix (v3.2.2+)
-
-SOURCE: <https://github.com/jlowin/fastmcp/releases> (accessed 2026-05-23)
+## ResponseCachingMiddleware — Security Fix (v3.2.2+) [2]
 
 `ResponseCachingMiddleware` partitions its cache by access token as of v3.2.2. Prior to this fix, different users could see each other's cached responses. Upgrade required for any deployment using `ResponseCachingMiddleware` with multiple users.
+
+## References
+
+1. [FastMCP Middleware](https://gofastmcp.com/servers/middleware) (accessed 2026-03-17)
+2. [Releases](https://github.com/jlowin/fastmcp/releases) (accessed 2026-05-23)

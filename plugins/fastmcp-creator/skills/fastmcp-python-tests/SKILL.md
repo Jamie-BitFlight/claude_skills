@@ -3,7 +3,7 @@ name: fastmcp-python-tests
 description: Write and evaluate effective Python tests using pytest. Use when writing tests, reviewing test code, debugging test failures, or improving test coverage. Covers test design, fixtures, parameterization, mocking, and async testing.
 ---
 
-# Writing Effective Python Tests
+# Writing Effective Python Tests [1]
 
 ## Core Principles
 
@@ -220,3 +220,7 @@ Before submitting tests:
 - [ ] Using in-memory transport (not HTTP) unless testing networking
 - [ ] Parameterization for variations of same behavior
 - [ ] Separate tests for different behaviors
+
+## References
+
+1. [FastMCP Testing](https://gofastmcp.com/servers/testing) (accessed 2026-06-07)

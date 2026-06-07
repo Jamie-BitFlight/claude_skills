@@ -3,8 +3,7 @@
 Interactive UI extension for MCP tools — use this when a tool needs to return a rendered iframe instead of plain text or JSON.
 
 > **WARNING: FastMCP 3.1 Python-native app framework (unreleased).** The Python-native framework described in `apps/overview.mdx` — which generates UIs without writing HTML or JavaScript — is NOT available in FastMCP 3.0. Do NOT generate code using that framework. Only the low-level HTML/JS API documented below is available in stable FastMCP 3.0.
->
-> SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
+> [1]
 
 ---
 
@@ -18,9 +17,7 @@ Available in FastMCP 3.0:
 - `ui://` resources — automatically served with MIME type `text/html;profile=mcp-app`
 - `ResourceCSP` and `ResourcePermissions` — iframe security and sandbox controls
 
-CONSTRAINT: The low-level API requires you to write HTML yourself and wire up host communication via the `@modelcontextprotocol/ext-apps` JavaScript SDK.
-
-SOURCE: <https://gofastmcp.com/apps/overview> (accessed 2026-03-05)
+CONSTRAINT: The low-level API requires you to write HTML yourself and wire up host communication via the `@modelcontextprotocol/ext-apps` JavaScript SDK. [1]
 
 ---
 
@@ -31,7 +28,7 @@ An MCP App has two parts:
 1. A **tool** that does the computation and returns data
 2. A **`ui://` resource** containing the HTML that renders that data
 
-The tool declares which resource to use via `AppConfig`. When the host calls the tool, it also fetches the linked resource, renders it in a sandboxed iframe, and pushes the tool result into the app via `postMessage`. The app can also call tools back, enabling interactive workflows.
+The tool declares which resource to use via `AppConfig`. When the host calls the tool, it also fetches the linked resource, renders it in a sandboxed iframe, and pushes the tool result into the app via `postMessage`. The app can also call tools back, enabling interactive workflows. [2]
 
 ```python
 import json
@@ -51,8 +48,6 @@ def generate_chart(data: list[float]) -> str:
 def chart_view() -> str:
     return "<html>...</html>"
 ```
-
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
 
 ---
 
@@ -96,9 +91,7 @@ def refresh_data() -> str:
     return fetch_latest()
 ```
 
-CONSTRAINT: On **resources**, `resource_uri` and `visibility` must NOT be set — the resource is the UI. Use `AppConfig` on resources only for `csp`, `permissions`, and display settings.
-
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
+CONSTRAINT: On **resources**, `resource_uri` and `visibility` must NOT be set — the resource is the UI. Use `AppConfig` on resources only for `csp`, `permissions`, and display settings. [2]
 
 ---
 
@@ -138,9 +131,7 @@ JavaScript SDK methods available on the `App` object:
 - `app.ontoolresult` — callback receiving tool results pushed by the host
 - `app.callServerTool({name, arguments})` — call a server tool from within the app
 - `app.onhostcontextchanged` — callback for host context changes
-- `app.getHostContext()` — get current host context
-
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
+- `app.getHostContext()` — get current host context [2]
 
 ---
 
@@ -195,15 +186,13 @@ def my_view() -> str:
     return "<html>...</html>"
 ```
 
-CONSTRAINT: Hosts may or may not grant requested permissions. Use JavaScript feature detection as a fallback.
-
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
+CONSTRAINT: Hosts may or may not grant requested permissions. Use JavaScript feature detection as a fallback. [2]
 
 ---
 
 ## Checking Client Support
 
-PATTERN: Check at runtime whether the host supports the Apps extension before returning UI-optimized content:
+PATTERN: Check at runtime whether the host supports the Apps extension before returning UI-optimized content: [2]
 
 ```python
 from fastmcp import Context
@@ -217,13 +206,11 @@ async def my_tool(ctx: Context) -> str:
         return plain_text_response()
 ```
 
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
-
 ---
 
 ## Complete Example: QR Code Server
 
-Requires `qrcode[pil]`. Based on the official MCP Apps example.
+Requires `qrcode[pil]`. Based on the official MCP Apps example. [2]
 
 ```python
 import base64
@@ -240,7 +227,6 @@ mcp = FastMCP("QR Code Server")
 
 VIEW_URI = "ui://qr-server/view.html"
 
-
 @mcp.tool(app=AppConfig(resource_uri=VIEW_URI))
 def generate_qr(text: str = "https://gofastmcp.com") -> ToolResult:
     """Generate a QR code from text."""
@@ -256,7 +242,6 @@ def generate_qr(text: str = "https://gofastmcp.com") -> ToolResult:
     return ToolResult(
         content=[types.ImageContent(type="image", data=b64, mimeType="image/png")]
     )
-
 
 @mcp.resource(
     VIEW_URI,
@@ -300,13 +285,9 @@ def view() -> str:
 </html>"""
 ```
 
-SOURCE: <https://gofastmcp.com/apps/low-level> (accessed 2026-03-05)
-
 ---
 
-## FastMCPApp (v3.2.0+)
-
-SOURCE: <https://gofastmcp.com/apps/fastmcp-app.md> (accessed 2026-05-23)
+## FastMCPApp (v3.2.0+) [3]
 
 `FastMCPApp` is a provider class for building interactive applications inside MCP. It separates the tools the LLM sees (`@app.ui()`) from the backend tools the UI calls (`@app.tool()`), manages visibility automatically, and gives tool references stable identifiers that survive namespace transforms and server composition.
 
@@ -337,9 +318,7 @@ mcp.mount(app)
 
 ---
 
-## Generative UI (v3.2.0+)
-
-SOURCE: <https://gofastmcp.com/apps/generative.md> (accessed 2026-05-23)
+## Generative UI (v3.2.0+) [4]
 
 With Generative UI, the LLM writes Prefab Python code at runtime instead of calling a pre-built tool with a fixed shape. The model writes UI code tailored to the current data and request. The user watches the UI stream in as the model generates it.
 
@@ -350,8 +329,7 @@ The MCP Apps protocol creates the renderer iframe in parallel with the tool call
 ## Prefab Apps (FastMCP 3.1, Experimental)
 
 > **EXPERIMENTAL — FastMCP 3.1+.** Prefab is in active early development; its API changes frequently. Pin `prefab-ui` to a specific version. Not recommended for production.
->
-> SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17)
+> [5]
 
 [Prefab UI](https://prefab.prefect.io) is a declarative UI framework for Python. You describe your interface using Python components and return it from a tool — FastMCP registers the renderer, wires the protocol metadata, and delivers the component tree to the host. No HTML or JavaScript required.
 
@@ -381,7 +359,6 @@ from prefab_ui.app import PrefabApp
 from fastmcp import FastMCP
 
 mcp = FastMCP("Dashboard")
-
 
 @mcp.tool(app=True)
 def revenue_chart(year: int) -> PrefabApp:
@@ -416,7 +393,6 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("Status")
 
-
 @mcp.tool(app=True)
 def status_badge() -> Column:
     """Show system status."""
@@ -435,7 +411,6 @@ from prefab_ui.app import PrefabApp
 from fastmcp import FastMCP
 
 mcp = FastMCP("Demo")
-
 
 @mcp.tool(app=True)
 def toggle_demo() -> PrefabApp:
@@ -457,7 +432,6 @@ from fastmcp import FastMCP
 from fastmcp.tools import ToolResult
 
 mcp = FastMCP("Sales")
-
 
 @mcp.tool(app=True)
 def sales_overview(year: int) -> ToolResult:
@@ -497,7 +471,7 @@ No configuration is required beyond `app=True`.
 
 ### Coexistence with Custom HTML Apps
 
-Prefab tools and custom HTML tools coexist in the same server. Prefab tools share a single renderer; custom tools point to their own:
+Prefab tools and custom HTML tools coexist in the same server. Prefab tools share a single renderer; custom tools point to their own: [5]
 
 ```python
 from fastmcp.server.apps import AppConfig
@@ -511,4 +485,11 @@ def map_view() -> str:
     ...
 ```
 
-SOURCE: <https://gofastmcp.com/apps/prefab> (accessed 2026-03-17)
+
+## References
+
+1. [FastMCP Overview](https://gofastmcp.com/apps/overview) (accessed 2026-03-05)
+2. [FastMCP Low Level](https://gofastmcp.com/apps/low-level) (accessed 2026-03-05)
+3. [FastMCP Fastmcp App](https://gofastmcp.com/apps/fastmcp-app.md) (accessed 2026-05-23)
+4. [FastMCP Generative](https://gofastmcp.com/apps/generative.md) (accessed 2026-05-23)
+5. [FastMCP Prefab](https://gofastmcp.com/apps/prefab) (accessed 2026-03-17)
