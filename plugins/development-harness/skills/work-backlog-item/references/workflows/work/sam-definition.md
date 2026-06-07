@@ -126,6 +126,64 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
 
 ---
 
+## Human Escalation Criteria
+
+**Core Escalation Paradigms to Integrate:**
+- **BMAD-METHOD Ground Truth:** Agents treat the human as the ultimate ground truth when external deterministic validation is unavailable.
+- **GSD Deviation Rules:** Differentiate between acceptable execution-time deviations (Rules 1-3: agent attempts repair) and unacceptable structural deviations (Rule 4: agent blocks & asks).
+- **Ralph Thrashing Detection:** Enforce strict iteration loop limits to catch agent loops and force escalation.
+- **Gastown Structured Escalation:** When blocking, agents must output a structured payload: *Trigger / What is Known / What is Missing / Decision Options*.
+- **ARL Constraint Analysis:** Escalate on *Unbound Constraints* (ambiguous requirements) and *High Risk* changes lacking domain precedent.
+
+### Per-Agent Escalation Criteria
+
+**1. Discovery Agent (S1)**
+-   **Attempt Repair:** Extract implicit context via codebase scanning (e.g., inferring language/frameworks).
+-   **Block & Ask:**
+    -   Unbound constraints identified in the user request (e.g., undefined business logic).
+    -   Missing "tribal/insider" domain knowledge with no existing codebase precedent.
+-   **Fail:** Codebase is empty, unreadable, or fundamentally incompatible with the agent's tooling.
+
+**2. Planning Agent (S2)**
+-   **Attempt Repair:** Use RT-ICA (Reverse Thinking - Information Completeness Assessment) to derive assumptions for partial gaps.
+-   **Block & Ask:** RT-ICA evaluates required prerequisites as definitively `MISSING` (cannot be derived or safely assumed).
+-   **Fail:** Unable to construct a valid Directed Acyclic Graph (DAG) for the plan due to circular dependencies.
+
+**3. Context Integration Agent (S3)**
+-   **Attempt Repair:** Automatically adjust integration points if minor file shifts or renames are detected.
+-   **Block & Ask:** Hard contradiction detected between the S2 Plan and the actual codebase state (e.g., target API was completely deprecated).
+
+**4. Task Decomposition Agent (S4)**
+-   **Attempt Repair:** Isolate unbound constraints to specific tasks so bound tasks can proceed autonomously.
+-   **Block & Ask:**
+    -   Task complexity is assessed as HIGH *and* introduces NOVEL architecture (no prior patterns to emulate).
+    -   Irreversible changes with broad scope are required.
+
+**5. Execution Agent (S5)**
+-   **Attempt Repair:**
+    -   Apply GSD Rules 1-3 for local, reversible implementation deviations.
+    -   Self-correct using deterministic backpressure from linters/compilers.
+-   **Block & Ask:**
+    -   Hits GSD Rule 4 (change requires altering an external API contract, modifying database schemas, or changing dependencies outside the task scope).
+-   **Fail:** Persistent syntax/compilation errors after the internal retry limit, or missing secret credentials.
+
+**6. Forensic Review Agent (S6)**
+-   **Attempt Repair:** Route `NEEDS_WORK` verdict back to S5 with a specific failure report and reproduction steps.
+-   **Block & Ask:** Thrashing detected (3 consecutive `NEEDS_WORK` iterations on the same task).
+
+**7. Final Verification Agent (S7)**
+-   **Attempt Repair:** Route `NOT_CERTIFIED` verdict back to S4 with a gap report mapping original requirements to missing implementations.
+-   **Block & Ask:** Architecture drift detected (2 consecutive `NOT_CERTIFIED` loops across the entire feature scope).
+
+**Required Format for all "Block & Ask" Triggers:**
+Agents must halt execution and emit a standard Gastown-style escalation artifact:
+1. **Stage & Trigger:** (e.g., S5 - GSD Rule 4 Deviation).
+2. **Context (Bound Constraints):** What the agent knows and has completed.
+3. **Blocker (Unbound Constraints):** Specifically what is missing or risky.
+4. **Options:** 2-3 concrete paths for the human to choose to unblock the pipeline.
+
+---
+
 ## Source
 
 ### Canonical SAM (external repo)
