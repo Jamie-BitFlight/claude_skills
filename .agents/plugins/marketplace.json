@@ -1,0 +1,368 @@
+{
+  "name": "jamie-bitflight-skills",
+  "interface": {
+    "displayName": "Jamie BitFlight Skills"
+  },
+  "plugins": [
+    {
+      "name": "agent-orchestration",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-orchestration"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agentskill-kaizen",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agentskill-kaizen"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "bash-development",
+      "source": {
+        "source": "local",
+        "path": "./plugins/bash-development"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "brainstorming-skill",
+      "source": {
+        "source": "local",
+        "path": "./plugins/brainstorming-skill"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "clang-format-configuration",
+      "source": {
+        "source": "local",
+        "path": "./plugins/clang-format"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "commitlint",
+      "source": {
+        "source": "local",
+        "path": "./plugins/commitlint"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "conventional-commits",
+      "source": {
+        "source": "local",
+        "path": "./plugins/conventional-commits"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dasel",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dasel"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dh",
+      "source": {
+        "source": "local",
+        "path": "./plugins/development-harness"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "dot-dash",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dot-dash"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "fastmcp-creator",
+      "source": {
+        "source": "local",
+        "path": "./plugins/fastmcp-creator"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "frustration-analyzer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/frustration-analyzer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "gitlab-skill",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gitlab-skill"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "holistic-linting",
+      "source": {
+        "source": "local",
+        "path": "./plugins/holistic-linting"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "litellm",
+      "source": {
+        "source": "local",
+        "path": "./plugins/litellm"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "llamafile",
+      "source": {
+        "source": "local",
+        "path": "./plugins/llamafile"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "orchestrator-discipline",
+      "source": {
+        "source": "local",
+        "path": "./plugins/orchestrator-discipline"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "perl-development",
+      "source": {
+        "source": "local",
+        "path": "./plugins/perl-development"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "plugin-creator",
+      "source": {
+        "source": "local",
+        "path": "./plugins/plugin-creator"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "process-siren",
+      "source": {
+        "source": "local",
+        "path": "./plugins/process-siren"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "python-engineering",
+      "source": {
+        "source": "local",
+        "path": "./plugins/python-engineering"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "python3-development",
+      "source": {
+        "source": "local",
+        "path": "./plugins/python3-development"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "rtfp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/rtfp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "rwr",
+      "source": {
+        "source": "local",
+        "path": "./plugins/the-rewrite-room"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "scientific-method",
+      "source": {
+        "source": "local",
+        "path": "./plugins/scientific-method"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "summarizer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/summarizer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "twelve-factor-app",
+      "source": {
+        "source": "local",
+        "path": "./plugins/twelve-factor-app"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "uv",
+      "source": {
+        "source": "local",
+        "path": "./plugins/uv"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "verification-gate",
+      "source": {
+        "source": "local",
+        "path": "./plugins/verification-gate"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "xdg-base-directory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/xdg-base-directory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "agentskill-kaizen",
+  "version": "0.7.18",
+  "description": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling opportunities, and user frustration signals for continuous improvement",
+  "author": {
+    "name": "Jamie Nelson",
+    "url": "https://github.com/Jamie-BitFlight"
+  },
+  "license": "MIT",
+  "keywords": [
+    "kaizen",
+    "transcript-analysis",
+    "process-mining",
+    "anti-pattern-detection",
+    "continuous-improvement",
+    "agent-optimization"
+  ],
+  "skills": "./skills/"
+}

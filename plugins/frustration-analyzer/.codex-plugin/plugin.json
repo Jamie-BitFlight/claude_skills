@@ -1,0 +1,18 @@
+{
+  "name": "frustration-analyzer",
+  "version": "0.2.27",
+  "description": "Read The Fucking Prompt — finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
+  "author": {
+    "name": "Jamie-BitFlight"
+  },
+  "license": "MIT",
+  "keywords": [
+    "transcripts",
+    "frustration",
+    "rage-receipt",
+    "duckdb",
+    "session-analysis",
+    "png"
+  ],
+  "skills": "./skills/"
+}

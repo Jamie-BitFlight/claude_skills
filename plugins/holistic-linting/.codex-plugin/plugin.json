@@ -1,0 +1,20 @@
+{
+  "name": "holistic-linting",
+  "version": "2.4.35",
+  "description": "This skill should be used when the model needs to ensure code quality through comprehensive linting and formatting. It provides automatic linting workflows for orchestrators (format → lint → resolve via concurrent agents) and sub-agents (lint touched files before task completion). Prevents claiming \"production ready\" code without verification. Includes linting rules knowledge base for ruff, mypy, and bandit, plus the linting-root-cause-resolver agent for systematic issue resolution.",
+  "author": {
+    "name": "Jamie Nelson",
+    "url": "https://github.com/bitflight-devops"
+  },
+  "keywords": [
+    "linting",
+    "code-quality",
+    "ruff",
+    "mypy",
+    "bandit",
+    "python",
+    "formatting",
+    "type-checking"
+  ],
+  "skills": "./skills/"
+}

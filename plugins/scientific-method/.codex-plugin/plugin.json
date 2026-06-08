@@ -1,0 +1,10 @@
+{
+  "name": "scientific-method",
+  "version": "1.4.20",
+  "description": "Use when debugging, investigating root causes, designing experiments, or performing scientific analysis — enforces hypothesis-driven reasoning, evidence-first observation, causality validation, and structured output templates. Use when facing unknowns, repeated failures, or complex investigations requiring rigorous methodology.",
+  "author": {
+    "name": "Jamie Nelson",
+    "url": "https://github.com/bitflight-devops"
+  },
+  "skills": "./skills/"
+}

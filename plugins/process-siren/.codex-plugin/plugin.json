@@ -1,0 +1,17 @@
+{
+  "name": "process-siren",
+  "version": "3.0.0",
+  "description": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
+  "author": {
+    "name": "Jamie Nelson",
+    "url": "https://github.com/bitflight-devops"
+  },
+  "keywords": [
+    "mermaid",
+    "process",
+    "workflow",
+    "diagram",
+    "flowchart"
+  ],
+  "skills": "./skills/"
+}

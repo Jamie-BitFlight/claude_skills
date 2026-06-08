@@ -1,0 +1,10 @@
+{
+  "name": "twelve-factor-app",
+  "version": "1.0.1",
+  "description": "Reference guide for the Twelve-Factor App methodology — 15 principles (12 original + 3 modern extensions) for building portable, resilient, cloud-native applications. Use when evaluating architecture, reviewing codebases for methodology compliance, or advising on configuration, scaling, observability, security, and deployment patterns.",
+  "author": {
+    "name": "Jamie Nelson",
+    "url": "https://github.com/bitflight-devops"
+  },
+  "skills": "./skills/"
+}

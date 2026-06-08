@@ -1,0 +1,9 @@
+{
+  "name": "dot-dash",
+  "version": "0.7.3",
+  "description": "Live multi-session dashboard for Claude Code — real-time visibility and control over every Claude Code session from a browser",
+  "author": {
+    "name": "Jamie-BitFlight"
+  },
+  "skills": "./skills/"
+}
