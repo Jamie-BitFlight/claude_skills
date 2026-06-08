@@ -96,7 +96,7 @@ repos:
         name: Biome check
         entry: biome check --write
         language: node
-        additional_dependencies: ["@biomejs/biome@2.4.8"]
+        additional_dependencies: ["@biomejs/biome@2.4.16"]
         types_or: [javascript, jsx, ts, tsx, json, css]
         pass_filenames: true
 
