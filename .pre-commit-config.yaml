@@ -87,13 +87,16 @@ repos:
         args: [--fix]
       - id: ruff-format
         name: Format Python with ruff
-  # JavaScript/TypeScript formatting and linting with Biome (via npx — no install required)
+  # JavaScript/TypeScript formatting and linting with Biome
+  # language: node + additional_dependencies lets prek install biome into its own
+  # isolated cache before running — avoids ETXTBSY race when batches run in parallel.
   - repo: local
     hooks:
       - id: biome-check
         name: Biome check
-        entry: npx --yes @biomejs/biome@2.4.8 check --write
-        language: system
+        entry: biome check --write
+        language: node
+        additional_dependencies: ["@biomejs/biome@2.4.8"]
         types_or: [javascript, jsx, ts, tsx, json, css]
         pass_filenames: true
 
