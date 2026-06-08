@@ -2,7 +2,7 @@
 name: workflow-extractor
 description: Single-purpose agent for extracting structured data from DH workflow source files — skill SKILL.md files, Mermaid flowcharts, reference markdown files. Reads files, extracts verbatim node/edge/step/artifact/actor data into JSON, writes to a specified output path. Use for all workflow-mapping passes (L0 forks, L1 traces, G1-G8 gap layers, verification checks). Minimal toolset — no MCP, no Bash, no web access. Haiku model for mechanical extraction.
 model: haiku
-tools: Read, Grep, Glob, Write
+tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
 # Workflow Extractor
