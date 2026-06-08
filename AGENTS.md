@@ -89,7 +89,6 @@ claude_skills/
 ├── pyproject.toml              # Python config (linting, type checking, test config)
 ├── .pre-commit-config.yaml     # prek hook configuration
 ├── .mcp.json                   # MCP server definitions
-├── package.json                # Node.js config (biome, hooks)
 └── biome.json                  # JS/TS formatter config
 ```
 
