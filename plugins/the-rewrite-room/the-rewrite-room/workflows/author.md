@@ -16,6 +16,8 @@ flowchart TD
 
 ## Step 2 — Route by Subtype
 
+Before any authoring or rewriting task, read `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md` and apply it to generated prose.
+
 ### Summarization routing
 
 Read `plugins/summarizer/skills/summarizer/references/fidelity-rules.md` BEFORE spawning any summarizer agent.
@@ -100,7 +102,8 @@ Agent(
   prompt="<task description>
 
 Target: <file or wiki page path>
-Audience: <who will read this>"
+Audience: <who will read this>
+Style rules: Apply plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md to all newly written prose. Preserve direct quotes verbatim."
 )
 ```
 
@@ -114,7 +117,8 @@ Agent(
 Target: <file path>
 Audience: <who will read this>
 
-Content preservation rules: see [../references/status-block-contract.md](../references/status-block-contract.md) — No-Loss Rewrite Rule section."
+Content preservation rules: see [../references/status-block-contract.md](../references/status-block-contract.md) — No-Loss Rewrite Rule section.
+Style rules: Apply plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md to all newly written prose. Preserve direct quotes verbatim."
 )
 ```
 

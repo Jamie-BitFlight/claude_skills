@@ -8,6 +8,19 @@ allowed-tools: Read, Grep, Glob, Bash, Task, Write, Edit
 
 Routes documentation, authoring, and optimization tasks to the correct specialist agents. Does not rewrite source agents or skills — orchestrates them. Governs authoring, docs, prompts, and summaries — not product code.
 
+## Non-Negotiable Writing Standard
+
+Any prose that this plugin authors, rewrites, or materially restructures MUST follow the anti-slop rules in `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md`.
+
+Apply that reference to:
+
+- user-facing docs produced via `/rwr:author`
+- AI-facing prompts and skill prose improved via `/rwr:optimize`
+- citation-driven writing produced via `/rwr:cite`
+- generated skill prose produced via `/rwr:doc-to-skill`
+
+Exception: preserve source wording inside direct quotes and do not distort extractive summaries just to satisfy house style.
+
 ## Quick Start
 
 ```text
@@ -145,3 +158,4 @@ Routing by concern (plugin-creator optimization suite):
 - `plugins/summarizer/skills/summarizer/references/fidelity-rules.md` — summarizer fidelity rules
 - `plugins/gitlab-skill/skills/gitlab-skill/references/glfm-syntax.md` — GLFM syntax reference
 - `plugins/plugin-creator/skills/prompt-optimization/SKILL.md` — prompt optimization principles
+- `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md` — mandatory anti-slop prose rules for authored or rewritten content

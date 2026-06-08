@@ -8,6 +8,7 @@ Orchestrator: Claude (reads this workflow and executes steps)
 Before ANY optimization task, load the knowledge reference:
 
 Read `plugins/plugin-creator/skills/prompt-optimization/SKILL.md`
+Read `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md`
 
 Key principle to carry forward: positive framing over prohibitions (models attend to key nouns — "NEVER use X" still activates "use X"). The optimizer will fix prohibition patterns.
 
@@ -55,7 +56,8 @@ Agent(
 File: <path>
 
 Target audience: AI-facing
-Constraints: [any specific constraints from user]"
+Constraints: [any specific constraints from user]
+Writing rules: Keep rewritten prose direct, actor-led, and free of filler per plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md."
 )
 ```
 
@@ -69,7 +71,8 @@ Agent(
 Agent file: <path>
 
 Target model: [sonnet/opus if specified, default sonnet]
-Specific issues: [if any identified]"
+Specific issues: [if any identified]
+Writing rules: Keep rewritten prose direct, actor-led, and free of filler per plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md."
 )
 ```
 

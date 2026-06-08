@@ -65,11 +65,15 @@ Note: `--file` flag confirmed correct (argparse line 128-130 of validate_glfm.py
 | GLFM syntax rules | plugins/gitlab-skill/skills/gitlab-skill/references/glfm-syntax.md | Before any GLFM task — alert types MUST be lowercase ([!note], [!tip], etc.), collapsibles on single line, no markdown in summary tags |
 | Fidelity rules | plugins/summarizer/skills/summarizer/references/fidelity-rules.md | Before ANY summarization task — read before summarize, no re-summarization chains, exact counts, confidence in YAML frontmatter |
 | Structured template | plugins/summarizer/skills/summarizer/templates/structured.md | Before summarization to understand exact YAML frontmatter fields required (word_count_source, compression_ratio, confidence_notes) |
+| Stop-slop rules | plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md | Before any authoring or rewriting task — apply to prose you generate unless preserving a quoted source or extractive summary |
 
 ## Content Rules
 
 - No-Loss Rewrite Rule — see [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md)
 - Summarization Fidelity Rules — see [plugins/summarizer/skills/summarizer/references/fidelity-rules.md](../../summarizer/skills/summarizer/references/fidelity-rules.md)
+- Stop-slop rules are mandatory for authored or rewritten prose — see [../the-rewrite-room/references/stop-slop-rules.md](../the-rewrite-room/references/stop-slop-rules.md)
+- Do not add em dashes, throat-clearing openers, binary-contrast scaffolds, vague declaratives, or passive phrasing that hides the actor
+- Preserve source wording inside direct quotes and do not stylize extractive summaries away from the source
 
 ## Output Contract
 

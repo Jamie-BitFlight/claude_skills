@@ -75,6 +75,7 @@ WRITE using Source-First logic:
 - Embed hyperlinked citations using markdown: `[keyword or phrase](URL)`
 - Direct quotes are verbatim with blockquote formatting
 - Adapt tone and depth to the content context (blog = accessible, research = rigorous, social = concise)
+- Read and apply [../the-rewrite-room/references/stop-slop-rules.md](../the-rewrite-room/references/stop-slop-rules.md) to all non-quoted prose
 
 ### Step 5: Assemble Output
 
@@ -97,6 +98,7 @@ PRODUCE the content with these sections:
 - Include access date on every citation
 - Format all links as working markdown hyperlinks
 - Distinguish between direct quotes, paraphrased claims, and editorial commentary
+- Keep editorial prose direct and specific: no em dashes, no filler openers, no binary-contrast scaffolds, no vague importance claims without the concrete reason
 
 **You MUST NOT:**
 
@@ -104,6 +106,7 @@ PRODUCE the content with these sections:
 - Use "studies show", "experts say", or similar generic phrases when the source provides specific attribution
 - Contradict the source website's data with external claims
 - Omit the Cited From section
+- Rewrite or "improve" quoted source language to match house style
 
 </quality>
 

@@ -13,6 +13,8 @@ argument-hint: <docs_path> <output_plugin> [output_skill]
 
 Converts human-readable documentation in any text or binary format into a Claude Code skill directory. Supports Markdown, PDF, DOCX, PPTX, XLSX, AsciiDoc, RST, HTML, Jupyter notebooks, man pages, config files, and plain text. Uses the MCP `file-reader` server for binary document formats. The output is consumed by Claude, not humans — every word must serve AI comprehension, not user readability.
 
+Generated prose in `SKILL.md` and `references/*.md` MUST follow `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md`: direct claims, active voice, named actors, concrete specifics, no em dashes, no filler scaffolding.
+
 ## Inputs
 
 - `<docs_path/>` — GitHub URL (e.g. `https://github.com/astral-sh/ty`) or local directory path containing documentation
