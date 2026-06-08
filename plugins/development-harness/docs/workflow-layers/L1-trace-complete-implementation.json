@@ -1,1 +1,844 @@
-{"traces":[{"from_fork":"complete-implementation.q1","branch_condition":"Yes — starts with 'plan/' OR contains '.yaml' OR contains '/'","path":["Input","Q1:Yes","FILE PATH format → proceed to 'Resolve Plan Address' (existing flow, unchanged)"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Plan Address","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q1","branch_condition":"No","path":["Input","Q1:No","Q2"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.q2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q2","branch_condition":"Yes — starts with '#'","path":["Q2:Yes","Strip '#' → issue_number","proceed to 'Resolve Issue'"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Issue","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q2","branch_condition":"No","path":["Q2:No","Q3"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.q3","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q3","branch_condition":"Yes — matches ^[0-9]+$","path":["Q3:Yes","issue_number = input","proceed to 'Resolve Issue'"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Issue","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q3","branch_condition":"No","path":["Q3:No","Q4"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.q4","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q4","branch_condition":"Yes — contains '/issues/'","path":["Q4:Yes","Extract number from URL path","proceed to 'Resolve Issue'"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Issue","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q4","branch_condition":"No","path":["Q4:No","Q5"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.q5","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q5","branch_condition":"Yes — beads ID e.g. bd-a3f8","path":["Q5:Yes","issue_id = input str","Resolve Issue"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Issue","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.q5","branch_condition":"No","path":["Q5:No","ERROR: unrecognized format. Expected: path, #N, number, URL, beads ID."],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.plan","branch_condition":"Yes — plan field present and non-empty","path":["Resolve Issue","plan:Yes","Extract plan file path from plan field","proceed to 'Resolve Plan Address' (existing 7-phase flow)"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Resolve Plan Address → Pre-Phase 1: TN Verification Check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.plan","branch_condition":"No — plan field absent","path":["Resolve Issue","plan:No","proceed to 'Proportional Quality Gates'"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Proportional Quality Gates","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.exists","branch_condition":"No — artifact absent","path":["TN Verification Check","exists:No","No structured criteria — proceed to Phase 1"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Pre-Phase 1a: Migration Fidelity Sign-Off","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.exists","branch_condition":"Yes — TN artifact exists","path":["TN Verification Check","exists:Yes","Scan all per-criterion records for status: regressed","anyregressed?"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.anyregressed","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.anyregressed","branch_condition":"No — no regressions","path":["anyregressed:No","proceed to Phase 1"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Pre-Phase 1a: Migration Fidelity Sign-Off","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.anyregressed","branch_condition":"Yes — criterion regressed","path":["anyregressed:Yes","STOP — report regressions and block completion"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.signal","branch_condition":"No signal found","path":["D1","D2","D3","Signal:No","Skip gate — proceed to Artifact Discovery"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"completes_workflow","terminal_target":"Pre-Phase: Artifact Discovery","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.signal","branch_condition":"Signal found — gate activates","path":["D1","D2","D3","Signal:Yes","Fid1"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid1","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid1","branch_condition":"Confirmed","path":["Fid1:Confirmed","Fid2"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid2","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid1","branch_condition":"Unconfirmed","path":["Fid1:Unconfirmed","Record: Fidelity check on real data — unconfirmed","Fid2"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid2","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid2","branch_condition":"Confirmed","path":["Fid2:Confirmed","Fid3"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid3","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid2","branch_condition":"Unconfirmed","path":["Fid2:Unconfirmed","Record: Content completeness verified — unconfirmed","Fid3"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid3","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid3","branch_condition":"Confirmed","path":["Fid3:Confirmed","Fid4"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid4","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid3","branch_condition":"Unconfirmed","path":["Fid3:Unconfirmed","Record: Constrained field values enumerated — unconfirmed","Fid4"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.fid4","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid4","branch_condition":"Confirmed","path":["Fid4:Confirmed","AllConfirmed"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.allconfirmed","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.fid4","branch_condition":"Unconfirmed","path":["Fid4:Unconfirmed","Record: Deletion deferred or confirmed — unconfirmed","AllConfirmed"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.allconfirmed","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.allconfirmed","branch_condition":"No — all four confirmed","path":["AllConfirmed:No unconfirmed","Proceed to Artifact Discovery"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"completes_workflow","terminal_target":"Pre-Phase: Artifact Discovery","source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.allconfirmed","branch_condition":"Yes — unconfirmed items remain","path":["AllConfirmed:unconfirmed","COMPLETION BLOCKED — Migration Fidelity Gate","On-Block Output — list unconfirmed items","Do NOT build QG plan, dispatch T1, or apply SAM state until resolved"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"],"terminal_type":"STOP","terminal_target":null,"source_file":"plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"},{"from_fork":"complete-implementation.hassection","branch_condition":"No — section absent or all items checked","path":["Fetch backlog item","HasSection:No","Proceed to Quality Gate Plan Creation"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"completes_workflow","terminal_target":"Quality Gate Plan Creation","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.hassection","branch_condition":"Yes — unchecked items exist","path":["Fetch backlog item","HasSection:Yes","For each unchecked concern item","Verify"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.real","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.real","branch_condition":"Yes — verified","path":["real:Yes","Check off '- [x]'","backlog_add(description=concern, source='Quality vigilance concern')","MoreConcerns?"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.moreconcerns","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.real","branch_condition":"No — not confirmed","path":["real:No","Check off '- [x] Not confirmed — {reason}'","MoreConcerns?"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.moreconcerns","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.moreconcerns","branch_condition":"Yes","path":["MoreConcerns:Yes","For each unchecked concern item"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.real","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.moreconcerns","branch_condition":"No — all processed","path":["MoreConcerns:No","backlog_groom(selector='#{issue}', section='Concerns', content='{updated checklist}')","Proceed to Quality Gate Plan Creation"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"],"terminal_type":"completes_workflow","terminal_target":"Quality Gate Plan Creation","source_file":"plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"},{"from_fork":"complete-implementation.found","branch_condition":"No — QG plan not found","path":["sam_plan(action=list, search='qg-{slug}')","Found:No","sam_plan(action=create) tasks list from phase mapping table","Enter SAM Dispatch Loop"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"SAM Dispatch Loop (Phases T0-T6)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.found","branch_condition":"Yes — QG plan exists","path":["sam_plan(action=list, search='qg-{slug}')","Found:Yes","Check all tasks terminal?"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.check-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-2","branch_condition":"Yes — COMPLETE or SKIPPED","path":["check-2:Yes","Skip to Completion Verification Gate"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Completion Verification Gate","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-2","branch_condition":"No — tasks remain","path":["check-2:No","Reset BLOCKED tasks to NOT_STARTED","resume SAM dispatch loop"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"SAM Dispatch Loop (Phases T0-T6)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done-2","branch_condition":"T0 Multi-Perspective Review","path":["T0 complete","done-2:T0","Any REJECT — trigger Recursive Follow-up Handling (same path as T1 NEEDS_WORK)"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done-2","branch_condition":"T1 Code Review","path":["T1 complete","done-2:T1","Read codebase-analysis artifact","Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done-2","branch_condition":"T4 Drift Audit","path":["T4 complete","done-2:T4","T4Post — read Total findings count"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.t4post-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done-2","branch_condition":"T6 Context Refinement","path":["T6 complete","done-2:T6","T6Post — check for DIVERGENCE_REQUIRING_REVIEW"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.t6post","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done-2","branch_condition":"T2, T3, T5","path":["T2/T3/T5 complete","done-2:T2/T3/T5","No phase-specific action — continue loop"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t4post-2","branch_condition":"0 findings — no drift","path":["T4Post:0","sam_task(plan='{QG}', task='T5', config={action=state, status=skipped})","continue loop"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t4post-2","branch_condition":"1 or more findings — drift","path":["T4Post:1+","T5 remains NOT_STARTED — will be dispatched on next loop iteration"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t6post","branch_condition":"Yes — DIVERGENCE_REQUIRING_REVIEW block present","path":["T6Post:Yes","Store divergence block for final output"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t6post","branch_condition":"No","path":["T6Post:No","No phase-specific action — continue loop"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-3","branch_condition":"status == 'complete'","path":["check-3:complete","Task passes"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-3","branch_condition":"status == 'skipped' AND task_id == 'T5'","path":["check-3:skipped+T5","Task passes"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-3","branch_condition":"status == 'skipped' AND task_id != 'T5'","path":["check-3:skipped+notT5","FAIL — unauthorized skip"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-3","branch_condition":"status == 'not-started' OR 'in-progress'","path":["check-3:not-started/in-progress","FAIL — incomplete phase"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check-3","branch_condition":"status == 'blocked'","path":["check-3:blocked","FAIL — blocked phase"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed-2","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.allpassed-2","branch_condition":"Yes — all tasks passed","path":["allpassed-2:Yes","Proceed to Recursive Follow-up Handling"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.allpassed-2","branch_condition":"No — failures present","path":["allpassed-2:No","STOP — report failures, do NOT apply label"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done","branch_condition":"T1 Code Review","path":["T1 complete (PQG)","done:T1","No follow-up extraction (proportional gates do not generate follow-ups)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done","branch_condition":"T2 Test Verification","path":["T2 complete (PQG)","done:T2","Check test results in agent output","If failures: log but do not block (completion gate handles pass/fail)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done","branch_condition":"T3 Acceptance Check","path":["T3 complete (PQG)","done:T3","No post-dispatch action"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done","branch_condition":"T4 Drift Audit","path":["T4 complete (PQG)","done:T4","T4Post — read Total findings count from ARTIFACTS return block"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.t4post","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.done","branch_condition":"T5 Documentation Update","path":["T5 complete (PQG)","done:T5","No post-dispatch action"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t4post","branch_condition":"0 findings — no drift","path":["T4Post (PQG):0","sam_task(plan='{PQG}', task='T5', config={action=state, status=skipped})","continue loop"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.t4post","branch_condition":"1 or more findings — drift","path":["T4Post (PQG):1+","T5 remains NOT_STARTED — will be dispatched on next loop iteration"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"SAM Dispatch Loop — ready check (PQG)","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check","branch_condition":"status == 'complete'","path":["check (PQG):complete","Task passes"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check","branch_condition":"status == 'skipped' AND task_id == 'T5'","path":["check (PQG):skipped+T5","Task passes"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check","branch_condition":"status == 'skipped' AND task_id != 'T5'","path":["check (PQG):skipped+notT5","FAIL — unauthorized skip"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.check","branch_condition":"any other status","path":["check (PQG):other","FAIL — task incomplete or blocked"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"complete-implementation.allpassed","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.allpassed","branch_condition":"Yes — all 5 tasks passed","path":["allpassed (PQG):Yes","Proceed to Step 6"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":"Apply status:verified Label → Resolve the Issue → Final Step: Commit and Push → Team Shutdown → Final Handoff Output","source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.allpassed","branch_condition":"No — failures present","path":["allpassed (PQG):No","STOP — report failures, do NOT apply label"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"plugins/development-harness/skills/complete-implementation/SKILL.md"},{"from_fork":"complete-implementation.r1","branch_condition":"One or more matches","path":["Derive slug","Strategy 1 — backlog_list(title='{slug}')","R1:matches","Use Strategy 1 result","Step 4: Link or Create"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.r1","branch_condition":"Zero results","path":["Derive slug","Strategy 1 — backlog_list(title='{slug}')","R1:zero","Strategy 2 — backlog_list(topic='{slug}')"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.r2","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.r2","branch_condition":"One or more matches","path":["Strategy 2 — backlog_list(topic='{slug}')","R2:matches","Use Strategy 2 result","Step 4: Link or Create"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.r2","branch_condition":"Zero results","path":["Strategy 2 — backlog_list(topic='{slug}')","R2:zero","No match found — proceed to Step 4 (create new item)"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.scopeexists","branch_condition":"No — section absent","path":["sam_plan(action='read', plan='{plan_id}')","ScopeExists:No","Emit WARNING: No ## Scope section — Defaulting to in-scope","IN-SCOPE — proceed to Step 4"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.scopeexists","branch_condition":"Yes — ## Scope present","path":["sam_plan(action='read', plan='{plan_id}')","ScopeExists:Yes","ScopeValue?"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"loops_back","terminal_target":"complete-implementation.scopevalue","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.scopevalue","branch_condition":"'out-of-scope'","path":["ScopeValue:out-of-scope","OUT-OF-SCOPE — route to backlog via backlog_add","Continue to next follow-up"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"loops_back","terminal_target":"Step 2 — next follow-up","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"},{"from_fork":"complete-implementation.scopevalue","branch_condition":"Any other value (e.g. 'in-scope')","path":["ScopeValue:in-scope","IN-SCOPE — proceed to Step 4"],"crosses_into_files":["plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"],"terminal_type":"hands_off_to_file","terminal_target":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md","source_file":"plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"}]}
+{
+  "traces": [
+    {
+      "from_fork": "complete-implementation.q1",
+      "branch_condition": "Yes — starts with 'plan/' OR contains '.yaml' OR contains '/'",
+      "path": [
+        "Input",
+        "Q1:Yes",
+        "FILE PATH format → proceed to 'Resolve Plan Address' (existing flow, unchanged)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Plan Address",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q1",
+      "branch_condition": "No",
+      "path": ["Input", "Q1:No", "Q2"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.q2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q2",
+      "branch_condition": "Yes — starts with '#'",
+      "path": ["Q2:Yes", "Strip '#' → issue_number", "proceed to 'Resolve Issue'"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Issue",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q2",
+      "branch_condition": "No",
+      "path": ["Q2:No", "Q3"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.q3",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q3",
+      "branch_condition": "Yes — matches ^[0-9]+$",
+      "path": ["Q3:Yes", "issue_number = input", "proceed to 'Resolve Issue'"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Issue",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q3",
+      "branch_condition": "No",
+      "path": ["Q3:No", "Q4"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.q4",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q4",
+      "branch_condition": "Yes — contains '/issues/'",
+      "path": ["Q4:Yes", "Extract number from URL path", "proceed to 'Resolve Issue'"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Issue",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q4",
+      "branch_condition": "No",
+      "path": ["Q4:No", "Q5"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.q5",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q5",
+      "branch_condition": "Yes — beads ID e.g. bd-a3f8",
+      "path": ["Q5:Yes", "issue_id = input str", "Resolve Issue"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Issue",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.q5",
+      "branch_condition": "No",
+      "path": ["Q5:No", "ERROR: unrecognized format. Expected: path, #N, number, URL, beads ID."],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.plan",
+      "branch_condition": "Yes — plan field present and non-empty",
+      "path": [
+        "Resolve Issue",
+        "plan:Yes",
+        "Extract plan file path from plan field",
+        "proceed to 'Resolve Plan Address' (existing 7-phase flow)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Resolve Plan Address → Pre-Phase 1: TN Verification Check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.plan",
+      "branch_condition": "No — plan field absent",
+      "path": ["Resolve Issue", "plan:No", "proceed to 'Proportional Quality Gates'"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Proportional Quality Gates",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.exists",
+      "branch_condition": "No — artifact absent",
+      "path": ["TN Verification Check", "exists:No", "No structured criteria — proceed to Phase 1"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Pre-Phase 1a: Migration Fidelity Sign-Off",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.exists",
+      "branch_condition": "Yes — TN artifact exists",
+      "path": [
+        "TN Verification Check",
+        "exists:Yes",
+        "Scan all per-criterion records for status: regressed",
+        "anyregressed?"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.anyregressed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.anyregressed",
+      "branch_condition": "No — no regressions",
+      "path": ["anyregressed:No", "proceed to Phase 1"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Pre-Phase 1a: Migration Fidelity Sign-Off",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.anyregressed",
+      "branch_condition": "Yes — criterion regressed",
+      "path": ["anyregressed:Yes", "STOP — report regressions and block completion"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.signal",
+      "branch_condition": "No signal found",
+      "path": ["D1", "D2", "D3", "Signal:No", "Skip gate — proceed to Artifact Discovery"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Pre-Phase: Artifact Discovery",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.signal",
+      "branch_condition": "Signal found — gate activates",
+      "path": ["D1", "D2", "D3", "Signal:Yes", "Fid1"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid1",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid1",
+      "branch_condition": "Confirmed",
+      "path": ["Fid1:Confirmed", "Fid2"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid1",
+      "branch_condition": "Unconfirmed",
+      "path": ["Fid1:Unconfirmed", "Record: Fidelity check on real data — unconfirmed", "Fid2"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid2",
+      "branch_condition": "Confirmed",
+      "path": ["Fid2:Confirmed", "Fid3"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid3",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid2",
+      "branch_condition": "Unconfirmed",
+      "path": ["Fid2:Unconfirmed", "Record: Content completeness verified — unconfirmed", "Fid3"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid3",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid3",
+      "branch_condition": "Confirmed",
+      "path": ["Fid3:Confirmed", "Fid4"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid4",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid3",
+      "branch_condition": "Unconfirmed",
+      "path": [
+        "Fid3:Unconfirmed",
+        "Record: Constrained field values enumerated — unconfirmed",
+        "Fid4"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.fid4",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid4",
+      "branch_condition": "Confirmed",
+      "path": ["Fid4:Confirmed", "AllConfirmed"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allconfirmed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.fid4",
+      "branch_condition": "Unconfirmed",
+      "path": [
+        "Fid4:Unconfirmed",
+        "Record: Deletion deferred or confirmed — unconfirmed",
+        "AllConfirmed"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allconfirmed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.allconfirmed",
+      "branch_condition": "No — all four confirmed",
+      "path": ["AllConfirmed:No unconfirmed", "Proceed to Artifact Discovery"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Pre-Phase: Artifact Discovery",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.allconfirmed",
+      "branch_condition": "Yes — unconfirmed items remain",
+      "path": [
+        "AllConfirmed:unconfirmed",
+        "COMPLETION BLOCKED — Migration Fidelity Gate",
+        "On-Block Output — list unconfirmed items",
+        "Do NOT build QG plan, dispatch T1, or apply SAM state until resolved"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+      ],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md"
+    },
+    {
+      "from_fork": "complete-implementation.hassection",
+      "branch_condition": "No — section absent or all items checked",
+      "path": ["Fetch backlog item", "HasSection:No", "Proceed to Quality Gate Plan Creation"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Quality Gate Plan Creation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.hassection",
+      "branch_condition": "Yes — unchecked items exist",
+      "path": ["Fetch backlog item", "HasSection:Yes", "For each unchecked concern item", "Verify"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.real",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.real",
+      "branch_condition": "Yes — verified",
+      "path": [
+        "real:Yes",
+        "Check off '- [x]'",
+        "backlog_add(description=concern, source='Quality vigilance concern')",
+        "MoreConcerns?"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.moreconcerns",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.real",
+      "branch_condition": "No — not confirmed",
+      "path": ["real:No", "Check off '- [x] Not confirmed — {reason}'", "MoreConcerns?"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.moreconcerns",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.moreconcerns",
+      "branch_condition": "Yes",
+      "path": ["MoreConcerns:Yes", "For each unchecked concern item"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.real",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.moreconcerns",
+      "branch_condition": "No — all processed",
+      "path": [
+        "MoreConcerns:No",
+        "backlog_groom(selector='#{issue}', section='Concerns', content='{updated checklist}')",
+        "Proceed to Quality Gate Plan Creation"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+      ],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Quality Gate Plan Creation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/concerns-processing.md"
+    },
+    {
+      "from_fork": "complete-implementation.found",
+      "branch_condition": "No — QG plan not found",
+      "path": [
+        "sam_plan(action=list, search='qg-{slug}')",
+        "Found:No",
+        "sam_plan(action=create) tasks list from phase mapping table",
+        "Enter SAM Dispatch Loop"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "SAM Dispatch Loop (Phases T0-T6)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.found",
+      "branch_condition": "Yes — QG plan exists",
+      "path": [
+        "sam_plan(action=list, search='qg-{slug}')",
+        "Found:Yes",
+        "Check all tasks terminal?"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.check-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-2",
+      "branch_condition": "Yes — COMPLETE or SKIPPED",
+      "path": ["check-2:Yes", "Skip to Completion Verification Gate"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Completion Verification Gate",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-2",
+      "branch_condition": "No — tasks remain",
+      "path": ["check-2:No", "Reset BLOCKED tasks to NOT_STARTED", "resume SAM dispatch loop"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "SAM Dispatch Loop (Phases T0-T6)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done-2",
+      "branch_condition": "T0 Multi-Perspective Review",
+      "path": [
+        "T0 complete",
+        "done-2:T0",
+        "Any REJECT — trigger Recursive Follow-up Handling (same path as T1 NEEDS_WORK)"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done-2",
+      "branch_condition": "T1 Code Review",
+      "path": [
+        "T1 complete",
+        "done-2:T1",
+        "Read codebase-analysis artifact",
+        "Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done-2",
+      "branch_condition": "T4 Drift Audit",
+      "path": ["T4 complete", "done-2:T4", "T4Post — read Total findings count"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.t4post-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done-2",
+      "branch_condition": "T6 Context Refinement",
+      "path": ["T6 complete", "done-2:T6", "T6Post — check for DIVERGENCE_REQUIRING_REVIEW"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.t6post",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done-2",
+      "branch_condition": "T2, T3, T5",
+      "path": ["T2/T3/T5 complete", "done-2:T2/T3/T5", "No phase-specific action — continue loop"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t4post-2",
+      "branch_condition": "0 findings — no drift",
+      "path": [
+        "T4Post:0",
+        "sam_task(plan='{QG}', task='T5', config={action=state, status=skipped})",
+        "continue loop"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t4post-2",
+      "branch_condition": "1 or more findings — drift",
+      "path": ["T4Post:1+", "T5 remains NOT_STARTED — will be dispatched on next loop iteration"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t6post",
+      "branch_condition": "Yes — DIVERGENCE_REQUIRING_REVIEW block present",
+      "path": ["T6Post:Yes", "Store divergence block for final output"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t6post",
+      "branch_condition": "No",
+      "path": ["T6Post:No", "No phase-specific action — continue loop"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-3",
+      "branch_condition": "status == 'complete'",
+      "path": ["check-3:complete", "Task passes"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-3",
+      "branch_condition": "status == 'skipped' AND task_id == 'T5'",
+      "path": ["check-3:skipped+T5", "Task passes"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-3",
+      "branch_condition": "status == 'skipped' AND task_id != 'T5'",
+      "path": ["check-3:skipped+notT5", "FAIL — unauthorized skip"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-3",
+      "branch_condition": "status == 'not-started' OR 'in-progress'",
+      "path": ["check-3:not-started/in-progress", "FAIL — incomplete phase"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check-3",
+      "branch_condition": "status == 'blocked'",
+      "path": ["check-3:blocked", "FAIL — blocked phase"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed-2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.allpassed-2",
+      "branch_condition": "Yes — all tasks passed",
+      "path": ["allpassed-2:Yes", "Proceed to Recursive Follow-up Handling"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.allpassed-2",
+      "branch_condition": "No — failures present",
+      "path": ["allpassed-2:No", "STOP — report failures, do NOT apply label"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done",
+      "branch_condition": "T1 Code Review",
+      "path": [
+        "T1 complete (PQG)",
+        "done:T1",
+        "No follow-up extraction (proportional gates do not generate follow-ups)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done",
+      "branch_condition": "T2 Test Verification",
+      "path": [
+        "T2 complete (PQG)",
+        "done:T2",
+        "Check test results in agent output",
+        "If failures: log but do not block (completion gate handles pass/fail)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done",
+      "branch_condition": "T3 Acceptance Check",
+      "path": ["T3 complete (PQG)", "done:T3", "No post-dispatch action"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done",
+      "branch_condition": "T4 Drift Audit",
+      "path": [
+        "T4 complete (PQG)",
+        "done:T4",
+        "T4Post — read Total findings count from ARTIFACTS return block"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.t4post",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.done",
+      "branch_condition": "T5 Documentation Update",
+      "path": ["T5 complete (PQG)", "done:T5", "No post-dispatch action"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t4post",
+      "branch_condition": "0 findings — no drift",
+      "path": [
+        "T4Post (PQG):0",
+        "sam_task(plan='{PQG}', task='T5', config={action=state, status=skipped})",
+        "continue loop"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.t4post",
+      "branch_condition": "1 or more findings — drift",
+      "path": [
+        "T4Post (PQG):1+",
+        "T5 remains NOT_STARTED — will be dispatched on next loop iteration"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "SAM Dispatch Loop — ready check (PQG)",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check",
+      "branch_condition": "status == 'complete'",
+      "path": ["check (PQG):complete", "Task passes"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check",
+      "branch_condition": "status == 'skipped' AND task_id == 'T5'",
+      "path": ["check (PQG):skipped+T5", "Task passes"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check",
+      "branch_condition": "status == 'skipped' AND task_id != 'T5'",
+      "path": ["check (PQG):skipped+notT5", "FAIL — unauthorized skip"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.check",
+      "branch_condition": "any other status",
+      "path": ["check (PQG):other", "FAIL — task incomplete or blocked"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.allpassed",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.allpassed",
+      "branch_condition": "Yes — all 5 tasks passed",
+      "path": ["allpassed (PQG):Yes", "Proceed to Step 6"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": "Apply status:verified Label → Resolve the Issue → Final Step: Commit and Push → Team Shutdown → Final Handoff Output",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.allpassed",
+      "branch_condition": "No — failures present",
+      "path": ["allpassed (PQG):No", "STOP — report failures, do NOT apply label"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md"
+    },
+    {
+      "from_fork": "complete-implementation.r1",
+      "branch_condition": "One or more matches",
+      "path": [
+        "Derive slug",
+        "Strategy 1 — backlog_list(title='{slug}')",
+        "R1:matches",
+        "Use Strategy 1 result",
+        "Step 4: Link or Create"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.r1",
+      "branch_condition": "Zero results",
+      "path": [
+        "Derive slug",
+        "Strategy 1 — backlog_list(title='{slug}')",
+        "R1:zero",
+        "Strategy 2 — backlog_list(topic='{slug}')"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.r2",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.r2",
+      "branch_condition": "One or more matches",
+      "path": [
+        "Strategy 2 — backlog_list(topic='{slug}')",
+        "R2:matches",
+        "Use Strategy 2 result",
+        "Step 4: Link or Create"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.r2",
+      "branch_condition": "Zero results",
+      "path": [
+        "Strategy 2 — backlog_list(topic='{slug}')",
+        "R2:zero",
+        "No match found — proceed to Step 4 (create new item)"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.scopeexists",
+      "branch_condition": "No — section absent",
+      "path": [
+        "sam_plan(action='read', plan='{plan_id}')",
+        "ScopeExists:No",
+        "Emit WARNING: No ## Scope section — Defaulting to in-scope",
+        "IN-SCOPE — proceed to Step 4"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.scopeexists",
+      "branch_condition": "Yes — ## Scope present",
+      "path": ["sam_plan(action='read', plan='{plan_id}')", "ScopeExists:Yes", "ScopeValue?"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "complete-implementation.scopevalue",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.scopevalue",
+      "branch_condition": "'out-of-scope'",
+      "path": [
+        "ScopeValue:out-of-scope",
+        "OUT-OF-SCOPE — route to backlog via backlog_add",
+        "Continue to next follow-up"
+      ],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "Step 2 — next follow-up",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    },
+    {
+      "from_fork": "complete-implementation.scopevalue",
+      "branch_condition": "Any other value (e.g. 'in-scope')",
+      "path": ["ScopeValue:in-scope", "IN-SCOPE — proceed to Step 4"],
+      "crosses_into_files": [
+        "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+      ],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
+    }
+  ]
+}

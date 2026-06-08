@@ -1,1 +1,1326 @@
-{"traces":[{"from_fork":"work-backlog-item.exitcheck","branch_condition":"non-zero — script failed","path":["Parse","ExitCheck","STOP — return parser error to user"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.exitcheck","branch_condition":"0 — script succeeded","path":["Parse","ExitCheck","JsonCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.jsoncheck","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.jsoncheck","branch_condition":"No — malformed stdout","path":["JsonCheck","STOP — return JSON parse error to user"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.jsoncheck","branch_condition":"Yes — output parsed","path":["JsonCheck","ErrField"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.errfield","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.errfield","branch_condition":"Yes — error present","path":["ErrField","STOP — return error value to user"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.errfield","branch_condition":"No — clean payload","path":["ErrField","KeyCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.keycheck","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.keycheck","branch_condition":"Yes — required key absent","path":["KeyCheck","STOP — return missing key error to user"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.keycheck","branch_condition":"No — all required keys present","path":["KeyCheck","ModeSet"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.modeset","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.modeset","branch_condition":"No — mode absent","path":["ModeSet","Set mode = interactive","RouteCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.routecheck","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.modeset","branch_condition":"Yes — mode explicit","path":["ModeSet","Use mode value from JSON interactive or auto","RouteCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.routecheck","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.routecheck","branch_condition":"create","path":["RouteCheck","CreateItemRef"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.createitemref","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.routecheck","branch_condition":"groom","path":["RouteCheck","GroomItemRef"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.groomitemref","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.routecheck","branch_condition":"work","path":["RouteCheck","WorkItemRef"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.workitemref","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.createitemref","branch_condition":"Yes — existing ref from input<br>or GitHub issue URL","path":["CreateItemRef","STOP — item already exists, creation not needed"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.createitemref","branch_condition":"No — no existing ref","path":["CreateItemRef","Read scope.md","references/workflows/create/scope.md","references/workflows/create/start.md","Step 1 Collect fields","Step 2 Validate inputs","Step 3 Duplicate detection","Step 4 Write via MCP (backlog_add)","Step 5 Use item_ref from response","Step 6 Confirm write","CreatedDone"],"crosses_into_files":["references/workflows/create/scope.md","references/workflows/create/start.md"],"terminal_type":"loops_back","terminal_target":"work-backlog-item.createdone","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.createdone","branch_condition":"No — creation failed","path":["CreatedDone","STOP — report creation failure"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.createdone","branch_condition":"Yes — item created","path":["CreatedDone","STOP — creation complete"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.groomitemref","branch_condition":"No","path":["GroomItemRef","Run create workflow first","references/workflows/create/start.md","Workflow: Create Backlog Item","Step 1–6","CreatedDone"],"crosses_into_files":["references/workflows/create/start.md"],"terminal_type":"loops_back","terminal_target":"work-backlog-item.createdone","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.groomitemref","branch_condition":"Yes","path":["GroomItemRef","Run groom workflow","references/workflows/groom/start.md"],"crosses_into_files":["references/workflows/groom/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workitemref","branch_condition":"No","path":["WorkItemRef","Run create workflow first","references/workflows/create/start.md","Workflow: Create Backlog Item","CreatedDone"],"crosses_into_files":["references/workflows/create/start.md"],"terminal_type":"loops_back","terminal_target":"work-backlog-item.createdone","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workitemref","branch_condition":"Yes","path":["WorkItemRef","WorkGroomCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.workgroomcheck","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workgroomcheck","branch_condition":"No — grooming incomplete","path":["WorkGroomCheck","Run groom workflow","references/workflows/groom/start.md"],"crosses_into_files":["references/workflows/groom/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workgroomcheck","branch_condition":"Yes — grooming confirmed complete","path":["WorkGroomCheck","WorkGate"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.workgate","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workgate","branch_condition":"Yes — gate blocked","path":["WorkGate","STOP — report blocking reason and missing prerequisites"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.workgate","branch_condition":"No — gate clear","path":["WorkGate","Run work workflow","references/workflows/work/start.md"],"crosses_into_files":["references/workflows/work/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"empty or absent","path":["RouteCheck mode value","Load references/workflows/work/interactive-browser.md","Step 1.1 — interactive browser","backlog_list (open items)","Present list to user","AskUserQuestion: select item","STOP — user selects or cancels"],"crosses_into_files":["references/workflows/work/interactive-browser.md"],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"hash-N or bare number or GitHub issue URL","path":["RouteCheck mode value","Step 1.2 — issue-first path","title source: issue number extracted from input","continues to locate.md Step 1.2"],"crosses_into_files":["references/workflows/work/locate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/locate.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"--auto","path":["RouteCheck mode value","mode is auto","title source: item_ref joined if empty: auto-select first open P0/P1 item","continues to work/start.md AUTO MODE CHECKLIST"],"crosses_into_files":["references/workflows/work/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"--quick","path":["RouteCheck mode value","Load references/workflows/quick/start.md"],"crosses_into_files":["references/workflows/quick/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/quick/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"progress","path":["RouteCheck mode value","Load references/workflows/progress/start.md"],"crosses_into_files":["references/workflows/progress/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/progress/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"resume","path":["RouteCheck mode value","Load references/workflows/resume/start.md"],"crosses_into_files":["references/workflows/resume/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/resume/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"close","path":["RouteCheck mode value","Load references/workflows/close/start.md"],"crosses_into_files":["references/workflows/close/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/close/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"resolve","path":["RouteCheck mode value","Load references/workflows/close/start.md"],"crosses_into_files":["references/workflows/close/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/close/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"setup-github","path":["RouteCheck mode value","Load references/workflows/setup-github/start.md"],"crosses_into_files":["references/workflows/setup-github/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/setup-github/start.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.q1","branch_condition":"any other string — title substring","path":["RouteCheck mode value","Step 1.3 — interactive mode","title source: full invocation args as substring","continues to locate.md Step 1.3"],"crosses_into_files":["references/workflows/work/locate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/locate.md","source_file":"skills/work-backlog-item/SKILL.md"},{"from_fork":"work-backlog-item.iresult","branch_condition":"SKIP","path":["iresult (intake result)","Report reason","finally.md","Sync local cache if needed","Report terminal outcome","Return control to caller"],"crosses_into_files":["references/workflows/groom/finally.md"],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.iresult","branch_condition":"DRIFT","path":["iresult (intake result)","groom-drift.md","Routing: item has plan field?","Mode A or Mode B","Report findings","finally.md"],"crosses_into_files":["references/workflows/groom/groom-drift.md","references/workflows/groom/finally.md"],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.iresult","branch_condition":"PROCEED","path":["iresult (intake result)","analyze.md","Discovery Gate","RT-ICA Initial Snapshot","Scope Sizing"],"crosses_into_files":["references/workflows/groom/analyze.md"],"terminal_type":"loops_back","terminal_target":"work-backlog-item.aresult","source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.aresult","branch_condition":"STOP","path":["aresult (analyze result)","error.md","Agent Failure / Workflow Block / System Error","Report error","STOP"],"crosses_into_files":["references/workflows/groom/error.md"],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.aresult","branch_condition":"CONTINUE","path":["aresult (analyze result)","swarm.md","Issue Classification","Spawn parallel agents","Finalize"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"loops_back","terminal_target":"work-backlog-item.fresult","source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.fresult","branch_condition":"Groomed","path":["fresult (finalize result)","Grooming complete","finally.md","Sync local cache if needed","Report terminal outcome","Return control to caller"],"crosses_into_files":["references/workflows/groom/finally.md"],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.fresult","branch_condition":"BLOCKED","path":["fresult (finalize result)","error.md","Workflow Block","backlog_update(status='blocked')","Report","STOP"],"crosses_into_files":["references/workflows/groom/error.md"],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/start.md"},{"from_fork":"work-backlog-item.q1-2","branch_condition":"defect / bug fix","path":["Scope Sizing Q1","Q2 (AVAILABLE count)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.q2","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q1-2","branch_condition":"procedural / missing-guardrail","path":["Scope Sizing Q1","Q3 (DERIVABLE + MISSING count)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.q3","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q1-2","branch_condition":"unbounded-design / new plugin","path":["Scope Sizing Q1","FULL — 6 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q1-2","branch_condition":"recurring-pattern","path":["Scope Sizing Q1","STANDARD — 5 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q2","branch_condition":"All AVAILABLE","path":["Q2","MINIMAL — 2 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q2","branch_condition":"Some DERIVABLE","path":["Q2","NARROW — 3 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q2","branch_condition":"Any MISSING","path":["Q2","STANDARD — 5 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q3","branch_condition":"Mostly AVAILABLE","path":["Q3","NARROW — 3 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q3","branch_condition":"Mixed","path":["Q3","STANDARD — 5 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.q3","branch_condition":"Mostly DERIVABLE/MISSING","path":["Q3","FULL — 6 agents","Outputs -> swarm.md"],"crosses_into_files":["references/workflows/groom/swarm.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/swarm.md","source_file":"skills/work-backlog-item/references/workflows/groom/analyze.md"},{"from_fork":"work-backlog-item.fd","branch_condition":"Yes — APPROVED","path":["fd (RT-ICA conditions resolved?)","Proceed to output validation","check (Output Validation Gate)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.fd","branch_condition":"No — MISSING conditions remain","path":["fd","Batch all MISSING conditions","Present to user","recheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.recheck","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.recheck","branch_condition":"Yes — APPROVED","path":["recheck","Proceed to output validation","check"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.recheck","branch_condition":"No","path":["recheck","Present batch to user","backlog_update(status='blocked')","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.check","branch_condition":"Yes","path":["check","Scan for prohibited patterns","Write groomed content via backlog_groom","mark_groomed=True","Terminal States: Groomed"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.check","branch_condition":"No","path":["check","Build list of missing section names","Diagnostic Gate (q)","a1 (Attempt count)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.q","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.q","branch_condition":"Absent from sections_index<br>AND agent reported STATUS: DONE","path":["Diagnostic Gate","Cause: agent used wrong section name","Action: re-run agent with corrected section name","a1"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.a1","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.q","branch_condition":"Present in sections_index<br>but shows 0 entries","path":["Diagnostic Gate","Cause: agent write format did not create entry blocks","Action: re-run agent with explicit content format requirement","a1"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.a1","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.q","branch_condition":"Absent AND agent did NOT<br>report STATUS: DONE","path":["Diagnostic Gate","Cause: agent terminated before write","Action: re-run agent with scoped prompt","a1"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.a1","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.q","branch_condition":"Absent AND section was not<br>in orchestrator groomer prompt","path":["Diagnostic Gate","Cause: orchestrator prompt omission","Action: add section to prompt; re-run groomer","a1"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.a1","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.a1","branch_condition":"1st","path":["a1","Spawn groomer: 'Write ONLY these missing sections'","re-check -> check"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.a1","branch_condition":"2nd","path":["a1","Spawn groomer again same targeted prompt","re-check -> check"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check","source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.a1","branch_condition":"3rd","path":["a1","backlog_update(status='blocked')","Report: grooming incomplete after 3 attempts","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/finalize.md"},{"from_fork":"work-backlog-item.q2-2","branch_condition":"YES","path":["Q2 same problem class 2+ times","recurring-pattern — 6-sigma RCA","Groomer prompt -> finalize.md"],"crosses_into_files":["references/workflows/groom/finalize.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/finalize.md","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q2-2","branch_condition":"NO","path":["Q2","Q3 (traceable failure?)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.q3-2","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q3-2","branch_condition":"YES","path":["Q3","defect — 5-whys RCA","Invoke Skill(skill='find-cause')","Groomer prompt -> finalize.md"],"crosses_into_files":["references/workflows/groom/finalize.md"],"terminal_type":"hands_off_to_skill","terminal_target":"find-cause","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q3-2","branch_condition":"NO","path":["Q3","Q4 (gate missed?)"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.q4","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q4","branch_condition":"YES","path":["Q4","missing-guardrail — no analysis","Groomer prompt -> finalize.md"],"crosses_into_files":["references/workflows/groom/finalize.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/finalize.md","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q4","branch_condition":"NO","path":["Q4","unbounded-design — design-framing","Groomer prompt -> finalize.md"],"crosses_into_files":["references/workflows/groom/finalize.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/finalize.md","source_file":"skills/work-backlog-item/references/workflows/groom/swarm.md"},{"from_fork":"work-backlog-item.q-2","branch_condition":"Yes — plan field set","path":["Routing","Mode A: Plan Drift","Check plan file freshness","Report drift findings","Terminal: report findings to user, stop"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/groom-drift.md"},{"from_fork":"work-backlog-item.q-2","branch_condition":"No — no plan","path":["Routing","Mode B: Grooming Drift","Compare groomed sections against current codebase","Report drift findings","Terminal: report findings to user, stop"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/groom/groom-drift.md"},{"from_fork":"work-backlog-item.createlist","branch_condition":"interactive (default)","path":["CreateList","INTERACTIVE MODE CHECKLIST","Read scope.md","Locate (locate.md)","Validate (validate.md)","Prepare (prepare.md)","Plan (plan.md)","Present summary to user (post-planning.md)","Commit"],"crosses_into_files":["references/workflows/work/scope.md","references/workflows/work/locate.md","references/workflows/work/validate.md","references/workflows/work/prepare.md","references/workflows/work/plan.md","references/workflows/work/post-planning.md"],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/start.md"},{"from_fork":"work-backlog-item.createlist","branch_condition":"auto","path":["CreateList","AUTO MODE CHECKLIST","Read scope.md","Locate (locate.md)","Validate (validate.md)","Prepare (prepare.md)","Plan (plan.md)","Invoke implement-feature (dh:implement-feature)","Invoke complete-implementation (dh:complete-implementation)","Verify issue resolved","Commit"],"crosses_into_files":["references/workflows/work/scope.md","references/workflows/work/locate.md","references/workflows/work/validate.md","references/workflows/work/prepare.md","references/workflows/work/plan.md"],"terminal_type":"hands_off_to_skill","terminal_target":"dh:implement-feature -> dh:complete-implementation","source_file":"skills/work-backlog-item/references/workflows/work/start.md"},{"from_fork":"work-backlog-item.hasissue","branch_condition":"No","path":["Step 2.5 Discovery Gate","No issue","Skip discovery gate","Proceed to Step 3.1"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.hasissue","branch_condition":"Yes — issue #{N}","path":["Step 2.5 Discovery Gate","Item has issue","TypeCheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.typecheck","source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.typecheck","branch_condition":"Yes — fix/bug type","path":["TypeCheck","Skip discovery gate","Proceed to Step 3.1"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.typecheck","branch_condition":"No — feature/refactor/other","path":["TypeCheck","artifact_list(item_id={N}, artifact_type='feature-context')","hasdiscovery"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.hasdiscovery","source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.hasdiscovery","branch_condition":"Yes","path":["hasdiscovery","Discovery exists","Proceed to Step 3.1"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.hasdiscovery","branch_condition":"No","path":["hasdiscovery","Invoke: Skill(skill='dh:discovery')","discoveryconfirmed"],"crosses_into_files":[],"terminal_type":"hands_off_to_skill","terminal_target":"dh:discovery","source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.discoveryconfirmed","branch_condition":"Yes — artifact registered","path":["discoveryconfirmed","Step 3.1 — Auto-Groom"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.discoveryconfirmed","branch_condition":"No — retry once","path":["discoveryconfirmed","Re-invoke: Skill(skill='dh:discovery') (max 1 retry)","retryconfirmed"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.retryconfirmed","source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.retryconfirmed","branch_condition":"Yes","path":["retryconfirmed","Step 3.1 — Auto-Groom"],"crosses_into_files":[],"terminal_type":"completes_workflow","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.retryconfirmed","branch_condition":"No — still 0 after retry","path":["retryconfirmed","STOP — report to user: dh:discovery completed but no feature-context artifact registered"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/validate.md"},{"from_fork":"work-backlog-item.irpresent","branch_condition":"Yes","path":["irpresent","HasFiles"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.hasfiles","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.irpresent","branch_condition":"No — absent or empty","path":["irpresent","Try sections['resources']","HasFiles"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.hasfiles","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.hasfiles","branch_condition":"No files in either section","path":["HasFiles","Skip staleness check","rt-ica-gate.md"],"crosses_into_files":["references/workflows/work/rt-ica-gate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/rt-ica-gate.md","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.hasfiles","branch_condition":"Files found","path":["HasFiles","Phase 1: git log --oneline --after=groomed_date --diff-filter=AMRD -- {impact_radius_files}","anycommits"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.anycommits","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.anycommits","branch_condition":"Zero commits","path":["anycommits","Use cached groom content","rt-ica-gate.md"],"crosses_into_files":["references/workflows/work/rt-ica-gate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/rt-ica-gate.md","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.anycommits","branch_condition":"1+ commits","path":["anycommits","Phase 2: Spawn drift-assessment agent","Input: item description + ACs + git diff","classification"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.classification","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.classification","branch_condition":"FUNCTIONAL_DRIFT","path":["classification","Write 'staleness context' section via backlog_groom","Invoke: groom-backlog-item","groom workflow start.md"],"crosses_into_files":["references/workflows/groom/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/start.md","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.classification","branch_condition":"SUPERSEDED","path":["classification","backlog_close(reason='superseded', comment='{commit refs}')","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.classification","branch_condition":"COSMETIC_ONLY","path":["classification","Use cached groom content","rt-ica-gate.md"],"crosses_into_files":["references/workflows/work/rt-ica-gate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/rt-ica-gate.md","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.classification","branch_condition":"Ambiguous output","path":["classification","Write 'staleness context' section via backlog_groom","Invoke: groom-backlog-item","groom workflow start.md"],"crosses_into_files":["references/workflows/groom/start.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/groom/start.md","source_file":"skills/work-backlog-item/references/workflows/work/groom-check.md"},{"from_fork":"work-backlog-item.absent","branch_condition":"No","path":["absent (RT-ICA key check)","Run dh:rt-ica — section absent"],"crosses_into_files":[],"terminal_type":"hands_off_to_skill","terminal_target":"dh:rt-ica","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.absent","branch_condition":"Yes","path":["absent","Extract date using regex 'Date: YYYY-MM-DD'","datefound"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.datefound","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.datefound","branch_condition":"No — date not found","path":["datefound","Run dh:rt-ica — section absent"],"crosses_into_files":[],"terminal_type":"hands_off_to_skill","terminal_target":"dh:rt-ica","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.datefound","branch_condition":"Yes — date D extracted","path":["datefound","Check1"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check1","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.check1","branch_condition":"Yes","path":["Check1","Run dh:rt-ica — stale"],"crosses_into_files":[],"terminal_type":"hands_off_to_skill","terminal_target":"dh:rt-ica","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.check1","branch_condition":"No — within 7 days","path":["Check1","Check2"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.check2","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.check2","branch_condition":"updated_at greater than D","path":["Check2","Run dh:rt-ica — item updated after RT-ICA"],"crosses_into_files":[],"terminal_type":"hands_off_to_skill","terminal_target":"dh:rt-ica","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.check2","branch_condition":"updated_at less than or equal to D OR field absent","path":["Check2","RT-ICA is fresh — use cached result","Continue to feasibility-gate.md"],"crosses_into_files":["references/workflows/work/feasibility-gate.md"],"terminal_type":"hands_off_to_file","terminal_target":"references/workflows/work/feasibility-gate.md","source_file":"skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"},{"from_fork":"work-backlog-item.c1","branch_condition":"Paths resolve","path":["C1 Technical feasibility","C2"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.c2","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c1","branch_condition":"suggested_location missing AND no alternative identifiable","path":["C1","BLOCKED: technical path unclear","Required: add suggested_location or re-groom","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c2","branch_condition":"Effort present AND proportionate","path":["C2","Criterion 3 — Blast radius check","patterncheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.patterncheck","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c2","branch_condition":"Effort field absent","path":["C2","WARN: effort not estimated — proceed with warning logged","Criterion 3 — Blast radius check","patterncheck"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.patterncheck","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c2","branch_condition":"Effort=FULL for P2 or Ideas item","path":["C2","BLOCKED: effort/priority mismatch","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.patterncheck","branch_condition":"No pattern: fields present","path":["patterncheck","Use manual row count (backward-compatible path)","compare"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.compare","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.patterncheck","branch_condition":"Yes — pattern: field found","path":["patterncheck","Run: rg -l '<pattern>' | wc -l","Capture as live_count","compare"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.compare","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.compare","branch_condition":"Yes — count diverged","path":["compare","Emit STALE_GROOM warning","Require re-grooming before proceeding","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.compare","branch_condition":"No — counts within threshold","path":["compare","Use live_count as blast radius value","c3decision"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.c3decision","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c3decision","branch_condition":"0 to 10 systems","path":["c3decision","C4"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.c4","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c3decision","branch_condition":"11 to 20 systems","path":["c3decision","WARN: high blast radius — proceed with warning logged","C4"],"crosses_into_files":[],"terminal_type":"loops_back","terminal_target":"work-backlog-item.c4","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c3decision","branch_condition":"Over 20 systems","path":["c3decision","BLOCKED: blast radius exceeds safe threshold","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c4","branch_condition":"No prior failure refs, scope appropriate","path":["C4","FEASIBILITY: PASS","Proceed to Step 4.1 — Compose Feature Request","plan.md -> Invoke SAM Planning (dh:add-new-feature)"],"crosses_into_files":["references/workflows/work/plan.md"],"terminal_type":"hands_off_to_skill","terminal_target":"dh:add-new-feature","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c4","branch_condition":"Prior failure reference found","path":["C4","WARN: prior attempt referenced — include in feature request","FEASIBILITY: PASS","plan.md -> Invoke SAM Planning (dh:add-new-feature)"],"crosses_into_files":["references/workflows/work/plan.md"],"terminal_type":"hands_off_to_skill","terminal_target":"dh:add-new-feature","source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"},{"from_fork":"work-backlog-item.c4","branch_condition":"Impact Radius = 1 file total AND task count >= 4","path":["C4","BLOCKED: potential over-engineering","offer --quick path","STOP"],"crosses_into_files":[],"terminal_type":"STOP","terminal_target":null,"source_file":"skills/work-backlog-item/references/workflows/work/feasibility-gate.md"}]}
+{
+  "traces": [
+    {
+      "from_fork": "work-backlog-item.exitcheck",
+      "branch_condition": "non-zero — script failed",
+      "path": ["Parse", "ExitCheck", "STOP — return parser error to user"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.exitcheck",
+      "branch_condition": "0 — script succeeded",
+      "path": ["Parse", "ExitCheck", "JsonCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.jsoncheck",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.jsoncheck",
+      "branch_condition": "No — malformed stdout",
+      "path": ["JsonCheck", "STOP — return JSON parse error to user"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.jsoncheck",
+      "branch_condition": "Yes — output parsed",
+      "path": ["JsonCheck", "ErrField"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.errfield",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.errfield",
+      "branch_condition": "Yes — error present",
+      "path": ["ErrField", "STOP — return error value to user"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.errfield",
+      "branch_condition": "No — clean payload",
+      "path": ["ErrField", "KeyCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.keycheck",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.keycheck",
+      "branch_condition": "Yes — required key absent",
+      "path": ["KeyCheck", "STOP — return missing key error to user"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.keycheck",
+      "branch_condition": "No — all required keys present",
+      "path": ["KeyCheck", "ModeSet"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.modeset",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.modeset",
+      "branch_condition": "No — mode absent",
+      "path": ["ModeSet", "Set mode = interactive", "RouteCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.routecheck",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.modeset",
+      "branch_condition": "Yes — mode explicit",
+      "path": ["ModeSet", "Use mode value from JSON interactive or auto", "RouteCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.routecheck",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.routecheck",
+      "branch_condition": "create",
+      "path": ["RouteCheck", "CreateItemRef"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.createitemref",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.routecheck",
+      "branch_condition": "groom",
+      "path": ["RouteCheck", "GroomItemRef"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.groomitemref",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.routecheck",
+      "branch_condition": "work",
+      "path": ["RouteCheck", "WorkItemRef"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.workitemref",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createitemref",
+      "branch_condition": "Yes — existing ref from input<br>or GitHub issue URL",
+      "path": ["CreateItemRef", "STOP — item already exists, creation not needed"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createitemref",
+      "branch_condition": "No — no existing ref",
+      "path": [
+        "CreateItemRef",
+        "Read scope.md",
+        "references/workflows/create/scope.md",
+        "references/workflows/create/start.md",
+        "Step 1 Collect fields",
+        "Step 2 Validate inputs",
+        "Step 3 Duplicate detection",
+        "Step 4 Write via MCP (backlog_add)",
+        "Step 5 Use item_ref from response",
+        "Step 6 Confirm write",
+        "CreatedDone"
+      ],
+      "crosses_into_files": [
+        "references/workflows/create/scope.md",
+        "references/workflows/create/start.md"
+      ],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.createdone",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createdone",
+      "branch_condition": "No — creation failed",
+      "path": ["CreatedDone", "STOP — report creation failure"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createdone",
+      "branch_condition": "Yes — item created",
+      "path": ["CreatedDone", "STOP — creation complete"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.groomitemref",
+      "branch_condition": "No",
+      "path": [
+        "GroomItemRef",
+        "Run create workflow first",
+        "references/workflows/create/start.md",
+        "Workflow: Create Backlog Item",
+        "Step 1–6",
+        "CreatedDone"
+      ],
+      "crosses_into_files": ["references/workflows/create/start.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.createdone",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.groomitemref",
+      "branch_condition": "Yes",
+      "path": ["GroomItemRef", "Run groom workflow", "references/workflows/groom/start.md"],
+      "crosses_into_files": ["references/workflows/groom/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workitemref",
+      "branch_condition": "No",
+      "path": [
+        "WorkItemRef",
+        "Run create workflow first",
+        "references/workflows/create/start.md",
+        "Workflow: Create Backlog Item",
+        "CreatedDone"
+      ],
+      "crosses_into_files": ["references/workflows/create/start.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.createdone",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workitemref",
+      "branch_condition": "Yes",
+      "path": ["WorkItemRef", "WorkGroomCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.workgroomcheck",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workgroomcheck",
+      "branch_condition": "No — grooming incomplete",
+      "path": ["WorkGroomCheck", "Run groom workflow", "references/workflows/groom/start.md"],
+      "crosses_into_files": ["references/workflows/groom/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workgroomcheck",
+      "branch_condition": "Yes — grooming confirmed complete",
+      "path": ["WorkGroomCheck", "WorkGate"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.workgate",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workgate",
+      "branch_condition": "Yes — gate blocked",
+      "path": ["WorkGate", "STOP — report blocking reason and missing prerequisites"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.workgate",
+      "branch_condition": "No — gate clear",
+      "path": ["WorkGate", "Run work workflow", "references/workflows/work/start.md"],
+      "crosses_into_files": ["references/workflows/work/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "empty or absent",
+      "path": [
+        "RouteCheck mode value",
+        "Load references/workflows/work/interactive-browser.md",
+        "Step 1.1 — interactive browser",
+        "backlog_list (open items)",
+        "Present list to user",
+        "AskUserQuestion: select item",
+        "STOP — user selects or cancels"
+      ],
+      "crosses_into_files": ["references/workflows/work/interactive-browser.md"],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "hash-N or bare number or GitHub issue URL",
+      "path": [
+        "RouteCheck mode value",
+        "Step 1.2 — issue-first path",
+        "title source: issue number extracted from input",
+        "continues to locate.md Step 1.2"
+      ],
+      "crosses_into_files": ["references/workflows/work/locate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/locate.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "--auto",
+      "path": [
+        "RouteCheck mode value",
+        "mode is auto",
+        "title source: item_ref joined if empty: auto-select first open P0/P1 item",
+        "continues to work/start.md AUTO MODE CHECKLIST"
+      ],
+      "crosses_into_files": ["references/workflows/work/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "--quick",
+      "path": ["RouteCheck mode value", "Load references/workflows/quick/start.md"],
+      "crosses_into_files": ["references/workflows/quick/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/quick/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "progress",
+      "path": ["RouteCheck mode value", "Load references/workflows/progress/start.md"],
+      "crosses_into_files": ["references/workflows/progress/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/progress/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "resume",
+      "path": ["RouteCheck mode value", "Load references/workflows/resume/start.md"],
+      "crosses_into_files": ["references/workflows/resume/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/resume/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "close",
+      "path": ["RouteCheck mode value", "Load references/workflows/close/start.md"],
+      "crosses_into_files": ["references/workflows/close/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/close/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "resolve",
+      "path": ["RouteCheck mode value", "Load references/workflows/close/start.md"],
+      "crosses_into_files": ["references/workflows/close/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/close/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "setup-github",
+      "path": ["RouteCheck mode value", "Load references/workflows/setup-github/start.md"],
+      "crosses_into_files": ["references/workflows/setup-github/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/setup-github/start.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1",
+      "branch_condition": "any other string — title substring",
+      "path": [
+        "RouteCheck mode value",
+        "Step 1.3 — interactive mode",
+        "title source: full invocation args as substring",
+        "continues to locate.md Step 1.3"
+      ],
+      "crosses_into_files": ["references/workflows/work/locate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/locate.md",
+      "source_file": "skills/work-backlog-item/SKILL.md"
+    },
+    {
+      "from_fork": "work-backlog-item.iresult",
+      "branch_condition": "SKIP",
+      "path": [
+        "iresult (intake result)",
+        "Report reason",
+        "finally.md",
+        "Sync local cache if needed",
+        "Report terminal outcome",
+        "Return control to caller"
+      ],
+      "crosses_into_files": ["references/workflows/groom/finally.md"],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.iresult",
+      "branch_condition": "DRIFT",
+      "path": [
+        "iresult (intake result)",
+        "groom-drift.md",
+        "Routing: item has plan field?",
+        "Mode A or Mode B",
+        "Report findings",
+        "finally.md"
+      ],
+      "crosses_into_files": [
+        "references/workflows/groom/groom-drift.md",
+        "references/workflows/groom/finally.md"
+      ],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.iresult",
+      "branch_condition": "PROCEED",
+      "path": [
+        "iresult (intake result)",
+        "analyze.md",
+        "Discovery Gate",
+        "RT-ICA Initial Snapshot",
+        "Scope Sizing"
+      ],
+      "crosses_into_files": ["references/workflows/groom/analyze.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.aresult",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.aresult",
+      "branch_condition": "STOP",
+      "path": [
+        "aresult (analyze result)",
+        "error.md",
+        "Agent Failure / Workflow Block / System Error",
+        "Report error",
+        "STOP"
+      ],
+      "crosses_into_files": ["references/workflows/groom/error.md"],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.aresult",
+      "branch_condition": "CONTINUE",
+      "path": [
+        "aresult (analyze result)",
+        "swarm.md",
+        "Issue Classification",
+        "Spawn parallel agents",
+        "Finalize"
+      ],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.fresult",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.fresult",
+      "branch_condition": "Groomed",
+      "path": [
+        "fresult (finalize result)",
+        "Grooming complete",
+        "finally.md",
+        "Sync local cache if needed",
+        "Report terminal outcome",
+        "Return control to caller"
+      ],
+      "crosses_into_files": ["references/workflows/groom/finally.md"],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.fresult",
+      "branch_condition": "BLOCKED",
+      "path": [
+        "fresult (finalize result)",
+        "error.md",
+        "Workflow Block",
+        "backlog_update(status='blocked')",
+        "Report",
+        "STOP"
+      ],
+      "crosses_into_files": ["references/workflows/groom/error.md"],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1-2",
+      "branch_condition": "defect / bug fix",
+      "path": ["Scope Sizing Q1", "Q2 (AVAILABLE count)"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.q2",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1-2",
+      "branch_condition": "procedural / missing-guardrail",
+      "path": ["Scope Sizing Q1", "Q3 (DERIVABLE + MISSING count)"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.q3",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1-2",
+      "branch_condition": "unbounded-design / new plugin",
+      "path": ["Scope Sizing Q1", "FULL — 6 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q1-2",
+      "branch_condition": "recurring-pattern",
+      "path": ["Scope Sizing Q1", "STANDARD — 5 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q2",
+      "branch_condition": "All AVAILABLE",
+      "path": ["Q2", "MINIMAL — 2 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q2",
+      "branch_condition": "Some DERIVABLE",
+      "path": ["Q2", "NARROW — 3 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q2",
+      "branch_condition": "Any MISSING",
+      "path": ["Q2", "STANDARD — 5 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q3",
+      "branch_condition": "Mostly AVAILABLE",
+      "path": ["Q3", "NARROW — 3 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q3",
+      "branch_condition": "Mixed",
+      "path": ["Q3", "STANDARD — 5 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q3",
+      "branch_condition": "Mostly DERIVABLE/MISSING",
+      "path": ["Q3", "FULL — 6 agents", "Outputs -> swarm.md"],
+      "crosses_into_files": ["references/workflows/groom/swarm.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/swarm.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md"
+    },
+    {
+      "from_fork": "work-backlog-item.fd",
+      "branch_condition": "Yes — APPROVED",
+      "path": [
+        "fd (RT-ICA conditions resolved?)",
+        "Proceed to output validation",
+        "check (Output Validation Gate)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.fd",
+      "branch_condition": "No — MISSING conditions remain",
+      "path": ["fd", "Batch all MISSING conditions", "Present to user", "recheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.recheck",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.recheck",
+      "branch_condition": "Yes — APPROVED",
+      "path": ["recheck", "Proceed to output validation", "check"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.recheck",
+      "branch_condition": "No",
+      "path": ["recheck", "Present batch to user", "backlog_update(status='blocked')", "STOP"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check",
+      "branch_condition": "Yes",
+      "path": [
+        "check",
+        "Scan for prohibited patterns",
+        "Write groomed content via backlog_groom",
+        "mark_groomed=True",
+        "Terminal States: Groomed"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check",
+      "branch_condition": "No",
+      "path": [
+        "check",
+        "Build list of missing section names",
+        "Diagnostic Gate (q)",
+        "a1 (Attempt count)"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.q",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q",
+      "branch_condition": "Absent from sections_index<br>AND agent reported STATUS: DONE",
+      "path": [
+        "Diagnostic Gate",
+        "Cause: agent used wrong section name",
+        "Action: re-run agent with corrected section name",
+        "a1"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.a1",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q",
+      "branch_condition": "Present in sections_index<br>but shows 0 entries",
+      "path": [
+        "Diagnostic Gate",
+        "Cause: agent write format did not create entry blocks",
+        "Action: re-run agent with explicit content format requirement",
+        "a1"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.a1",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q",
+      "branch_condition": "Absent AND agent did NOT<br>report STATUS: DONE",
+      "path": [
+        "Diagnostic Gate",
+        "Cause: agent terminated before write",
+        "Action: re-run agent with scoped prompt",
+        "a1"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.a1",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q",
+      "branch_condition": "Absent AND section was not<br>in orchestrator groomer prompt",
+      "path": [
+        "Diagnostic Gate",
+        "Cause: orchestrator prompt omission",
+        "Action: add section to prompt; re-run groomer",
+        "a1"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.a1",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.a1",
+      "branch_condition": "1st",
+      "path": ["a1", "Spawn groomer: 'Write ONLY these missing sections'", "re-check -> check"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.a1",
+      "branch_condition": "2nd",
+      "path": ["a1", "Spawn groomer again same targeted prompt", "re-check -> check"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.a1",
+      "branch_condition": "3rd",
+      "path": [
+        "a1",
+        "backlog_update(status='blocked')",
+        "Report: grooming incomplete after 3 attempts",
+        "STOP"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q2-2",
+      "branch_condition": "YES",
+      "path": [
+        "Q2 same problem class 2+ times",
+        "recurring-pattern — 6-sigma RCA",
+        "Groomer prompt -> finalize.md"
+      ],
+      "crosses_into_files": ["references/workflows/groom/finalize.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/finalize.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q2-2",
+      "branch_condition": "NO",
+      "path": ["Q2", "Q3 (traceable failure?)"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.q3-2",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q3-2",
+      "branch_condition": "YES",
+      "path": [
+        "Q3",
+        "defect — 5-whys RCA",
+        "Invoke Skill(skill='find-cause')",
+        "Groomer prompt -> finalize.md"
+      ],
+      "crosses_into_files": ["references/workflows/groom/finalize.md"],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "find-cause",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q3-2",
+      "branch_condition": "NO",
+      "path": ["Q3", "Q4 (gate missed?)"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.q4",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q4",
+      "branch_condition": "YES",
+      "path": ["Q4", "missing-guardrail — no analysis", "Groomer prompt -> finalize.md"],
+      "crosses_into_files": ["references/workflows/groom/finalize.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/finalize.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q4",
+      "branch_condition": "NO",
+      "path": ["Q4", "unbounded-design — design-framing", "Groomer prompt -> finalize.md"],
+      "crosses_into_files": ["references/workflows/groom/finalize.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/finalize.md",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q-2",
+      "branch_condition": "Yes — plan field set",
+      "path": [
+        "Routing",
+        "Mode A: Plan Drift",
+        "Check plan file freshness",
+        "Report drift findings",
+        "Terminal: report findings to user, stop"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/groom-drift.md"
+    },
+    {
+      "from_fork": "work-backlog-item.q-2",
+      "branch_condition": "No — no plan",
+      "path": [
+        "Routing",
+        "Mode B: Grooming Drift",
+        "Compare groomed sections against current codebase",
+        "Report drift findings",
+        "Terminal: report findings to user, stop"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/groom/groom-drift.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createlist",
+      "branch_condition": "interactive (default)",
+      "path": [
+        "CreateList",
+        "INTERACTIVE MODE CHECKLIST",
+        "Read scope.md",
+        "Locate (locate.md)",
+        "Validate (validate.md)",
+        "Prepare (prepare.md)",
+        "Plan (plan.md)",
+        "Present summary to user (post-planning.md)",
+        "Commit"
+      ],
+      "crosses_into_files": [
+        "references/workflows/work/scope.md",
+        "references/workflows/work/locate.md",
+        "references/workflows/work/validate.md",
+        "references/workflows/work/prepare.md",
+        "references/workflows/work/plan.md",
+        "references/workflows/work/post-planning.md"
+      ],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.createlist",
+      "branch_condition": "auto",
+      "path": [
+        "CreateList",
+        "AUTO MODE CHECKLIST",
+        "Read scope.md",
+        "Locate (locate.md)",
+        "Validate (validate.md)",
+        "Prepare (prepare.md)",
+        "Plan (plan.md)",
+        "Invoke implement-feature (dh:implement-feature)",
+        "Invoke complete-implementation (dh:complete-implementation)",
+        "Verify issue resolved",
+        "Commit"
+      ],
+      "crosses_into_files": [
+        "references/workflows/work/scope.md",
+        "references/workflows/work/locate.md",
+        "references/workflows/work/validate.md",
+        "references/workflows/work/prepare.md",
+        "references/workflows/work/plan.md"
+      ],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:implement-feature -> dh:complete-implementation",
+      "source_file": "skills/work-backlog-item/references/workflows/work/start.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasissue",
+      "branch_condition": "No",
+      "path": ["Step 2.5 Discovery Gate", "No issue", "Skip discovery gate", "Proceed to Step 3.1"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasissue",
+      "branch_condition": "Yes — issue #{N}",
+      "path": ["Step 2.5 Discovery Gate", "Item has issue", "TypeCheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.typecheck",
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.typecheck",
+      "branch_condition": "Yes — fix/bug type",
+      "path": ["TypeCheck", "Skip discovery gate", "Proceed to Step 3.1"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.typecheck",
+      "branch_condition": "No — feature/refactor/other",
+      "path": [
+        "TypeCheck",
+        "artifact_list(item_id={N}, artifact_type='feature-context')",
+        "hasdiscovery"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.hasdiscovery",
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasdiscovery",
+      "branch_condition": "Yes",
+      "path": ["hasdiscovery", "Discovery exists", "Proceed to Step 3.1"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasdiscovery",
+      "branch_condition": "No",
+      "path": ["hasdiscovery", "Invoke: Skill(skill='dh:discovery')", "discoveryconfirmed"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:discovery",
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.discoveryconfirmed",
+      "branch_condition": "Yes — artifact registered",
+      "path": ["discoveryconfirmed", "Step 3.1 — Auto-Groom"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.discoveryconfirmed",
+      "branch_condition": "No — retry once",
+      "path": [
+        "discoveryconfirmed",
+        "Re-invoke: Skill(skill='dh:discovery') (max 1 retry)",
+        "retryconfirmed"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.retryconfirmed",
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.retryconfirmed",
+      "branch_condition": "Yes",
+      "path": ["retryconfirmed", "Step 3.1 — Auto-Groom"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.retryconfirmed",
+      "branch_condition": "No — still 0 after retry",
+      "path": [
+        "retryconfirmed",
+        "STOP — report to user: dh:discovery completed but no feature-context artifact registered"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.irpresent",
+      "branch_condition": "Yes",
+      "path": ["irpresent", "HasFiles"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.hasfiles",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.irpresent",
+      "branch_condition": "No — absent or empty",
+      "path": ["irpresent", "Try sections['resources']", "HasFiles"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.hasfiles",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasfiles",
+      "branch_condition": "No files in either section",
+      "path": ["HasFiles", "Skip staleness check", "rt-ica-gate.md"],
+      "crosses_into_files": ["references/workflows/work/rt-ica-gate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/rt-ica-gate.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.hasfiles",
+      "branch_condition": "Files found",
+      "path": [
+        "HasFiles",
+        "Phase 1: git log --oneline --after=groomed_date --diff-filter=AMRD -- {impact_radius_files}",
+        "anycommits"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.anycommits",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.anycommits",
+      "branch_condition": "Zero commits",
+      "path": ["anycommits", "Use cached groom content", "rt-ica-gate.md"],
+      "crosses_into_files": ["references/workflows/work/rt-ica-gate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/rt-ica-gate.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.anycommits",
+      "branch_condition": "1+ commits",
+      "path": [
+        "anycommits",
+        "Phase 2: Spawn drift-assessment agent",
+        "Input: item description + ACs + git diff",
+        "classification"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.classification",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.classification",
+      "branch_condition": "FUNCTIONAL_DRIFT",
+      "path": [
+        "classification",
+        "Write 'staleness context' section via backlog_groom",
+        "Invoke: groom-backlog-item",
+        "groom workflow start.md"
+      ],
+      "crosses_into_files": ["references/workflows/groom/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/start.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.classification",
+      "branch_condition": "SUPERSEDED",
+      "path": [
+        "classification",
+        "backlog_close(reason='superseded', comment='{commit refs}')",
+        "STOP"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.classification",
+      "branch_condition": "COSMETIC_ONLY",
+      "path": ["classification", "Use cached groom content", "rt-ica-gate.md"],
+      "crosses_into_files": ["references/workflows/work/rt-ica-gate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/rt-ica-gate.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.classification",
+      "branch_condition": "Ambiguous output",
+      "path": [
+        "classification",
+        "Write 'staleness context' section via backlog_groom",
+        "Invoke: groom-backlog-item",
+        "groom workflow start.md"
+      ],
+      "crosses_into_files": ["references/workflows/groom/start.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/groom/start.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md"
+    },
+    {
+      "from_fork": "work-backlog-item.absent",
+      "branch_condition": "No",
+      "path": ["absent (RT-ICA key check)", "Run dh:rt-ica — section absent"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:rt-ica",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.absent",
+      "branch_condition": "Yes",
+      "path": ["absent", "Extract date using regex 'Date: YYYY-MM-DD'", "datefound"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.datefound",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.datefound",
+      "branch_condition": "No — date not found",
+      "path": ["datefound", "Run dh:rt-ica — section absent"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:rt-ica",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.datefound",
+      "branch_condition": "Yes — date D extracted",
+      "path": ["datefound", "Check1"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check1",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check1",
+      "branch_condition": "Yes",
+      "path": ["Check1", "Run dh:rt-ica — stale"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:rt-ica",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check1",
+      "branch_condition": "No — within 7 days",
+      "path": ["Check1", "Check2"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.check2",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check2",
+      "branch_condition": "updated_at greater than D",
+      "path": ["Check2", "Run dh:rt-ica — item updated after RT-ICA"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:rt-ica",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.check2",
+      "branch_condition": "updated_at less than or equal to D OR field absent",
+      "path": ["Check2", "RT-ICA is fresh — use cached result", "Continue to feasibility-gate.md"],
+      "crosses_into_files": ["references/workflows/work/feasibility-gate.md"],
+      "terminal_type": "hands_off_to_file",
+      "terminal_target": "references/workflows/work/feasibility-gate.md",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c1",
+      "branch_condition": "Paths resolve",
+      "path": ["C1 Technical feasibility", "C2"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.c2",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c1",
+      "branch_condition": "suggested_location missing AND no alternative identifiable",
+      "path": [
+        "C1",
+        "BLOCKED: technical path unclear",
+        "Required: add suggested_location or re-groom",
+        "STOP"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c2",
+      "branch_condition": "Effort present AND proportionate",
+      "path": ["C2", "Criterion 3 — Blast radius check", "patterncheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.patterncheck",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c2",
+      "branch_condition": "Effort field absent",
+      "path": [
+        "C2",
+        "WARN: effort not estimated — proceed with warning logged",
+        "Criterion 3 — Blast radius check",
+        "patterncheck"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.patterncheck",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c2",
+      "branch_condition": "Effort=FULL for P2 or Ideas item",
+      "path": ["C2", "BLOCKED: effort/priority mismatch", "STOP"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.patterncheck",
+      "branch_condition": "No pattern: fields present",
+      "path": ["patterncheck", "Use manual row count (backward-compatible path)", "compare"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.compare",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.patterncheck",
+      "branch_condition": "Yes — pattern: field found",
+      "path": [
+        "patterncheck",
+        "Run: rg -l '<pattern>' | wc -l",
+        "Capture as live_count",
+        "compare"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.compare",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.compare",
+      "branch_condition": "Yes — count diverged",
+      "path": [
+        "compare",
+        "Emit STALE_GROOM warning",
+        "Require re-grooming before proceeding",
+        "STOP"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.compare",
+      "branch_condition": "No — counts within threshold",
+      "path": ["compare", "Use live_count as blast radius value", "c3decision"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.c3decision",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c3decision",
+      "branch_condition": "0 to 10 systems",
+      "path": ["c3decision", "C4"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.c4",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c3decision",
+      "branch_condition": "11 to 20 systems",
+      "path": ["c3decision", "WARN: high blast radius — proceed with warning logged", "C4"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-backlog-item.c4",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c3decision",
+      "branch_condition": "Over 20 systems",
+      "path": ["c3decision", "BLOCKED: blast radius exceeds safe threshold", "STOP"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c4",
+      "branch_condition": "No prior failure refs, scope appropriate",
+      "path": [
+        "C4",
+        "FEASIBILITY: PASS",
+        "Proceed to Step 4.1 — Compose Feature Request",
+        "plan.md -> Invoke SAM Planning (dh:add-new-feature)"
+      ],
+      "crosses_into_files": ["references/workflows/work/plan.md"],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:add-new-feature",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c4",
+      "branch_condition": "Prior failure reference found",
+      "path": [
+        "C4",
+        "WARN: prior attempt referenced — include in feature request",
+        "FEASIBILITY: PASS",
+        "plan.md -> Invoke SAM Planning (dh:add-new-feature)"
+      ],
+      "crosses_into_files": ["references/workflows/work/plan.md"],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "dh:add-new-feature",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    },
+    {
+      "from_fork": "work-backlog-item.c4",
+      "branch_condition": "Impact Radius = 1 file total AND task count >= 4",
+      "path": ["C4", "BLOCKED: potential over-engineering", "offer --quick path", "STOP"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md"
+    }
+  ]
+}

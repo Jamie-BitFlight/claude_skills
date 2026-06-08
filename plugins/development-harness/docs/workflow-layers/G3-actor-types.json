@@ -1,1 +1,616 @@
-{"actor_classifications":[{"id":"G3.implement-feature.query-plan-status","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Query status via sam_plan(action=status)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\")","agent_name":null},{"id":"G3.implement-feature.query-ready-tasks","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Query ready tasks via sam_plan(action=ready) or backlog_get_ready_sam_tasks","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"P{N}\")","agent_name":null},{"id":"G3.implement-feature.dispatch-per-task-single-agent","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Dispatch task via single Agent call (per_task mode)","actor_type":"agent-structured-task","evidence":"Skill(skill=\"start-task\", args=\"{plan_address} --task {task_id}\")","agent_name":"dh:task-worker"},{"id":"G3.implement-feature.dispatch-team-create","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"TeamCreate for parallel dispatch (full_auto/checkpoint mode)","actor_type":"orchestrator-raw","evidence":"TeamCreate(team_name: \"impl-{slug}\")","agent_name":null},{"id":"G3.implement-feature.dispatch-teammate-task-worker","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Spawn dh:task-worker teammate with Skill(start-task) prompt","actor_type":"agent-structured-task","evidence":"Always dispatch dh:task-worker as the subagent_type ... Launch dh:task-worker with a prompt that invokes `start-task`: Skill(skill=\"start-task\", args=\"{plan_address} --task {task_id}\")","agent_name":"dh:task-worker"},{"id":"G3.implement-feature.append-concerns","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Append concerns to backlog item via backlog_groom","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_groom(selector=\"#{issue}\", section=\"Concerns\", content=\"...\", append=True)","agent_name":null},{"id":"G3.implement-feature.contract-verification","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Dispatch contract-verification agent (step 4a)","actor_type":"agent-raw-prompt","evidence":"attempt contract verification against the architect spec ... If the contract-verification agent returns a <concerns> block","agent_name":"dh:contract-verification"},{"id":"G3.implement-feature.shutdown-teammate","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Send shutdown request to completed teammate (step 4b)","actor_type":"orchestrator-raw","evidence":"SendMessage(to=\"{teammate_name}\", message={\"type\": \"shutdown_request\"})","agent_name":null},{"id":"G3.implement-feature.commit","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Orchestrator commits after batch completes","actor_type":"orchestrator-raw","evidence":"git add -A && git commit -m \"<type>(task-batch): {plan_address} — {task_ids}\"","agent_name":null},{"id":"G3.implement-feature.check-remaining","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Progress Loop","action_label":"Check plan status after batch completion (step 5)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\")","agent_name":null},{"id":"G3.implement-feature.health-check-transcript-analyst","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Agent Health Check (While Waiting)","action_label":"Spawn transcript-analyst for session health summary","actor_type":"agent-raw-prompt","evidence":"Task is session health summary subagent_type='agentskill-kaizen:transcript-analyst' Context: agent name or teammate ID to check, JSONL dir ~/.claude/projects/{project-slug}/*.jsonl Report: last turn timestamp, last tool call, verdict of crashed / idle / active","agent_name":"agentskill-kaizen:transcript-analyst"},{"id":"G3.implement-feature.health-check-confirm-task-state","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Agent Health Check (While Waiting)","action_label":"Confirm task state via sam_task(action=read) after crash verdict","actor_type":"orchestrator-raw","evidence":"Confirm task state via mcp__plugin_dh_sam__sam_task(plan, task, config={action:read}) Verify task is still CLAIMED","agent_name":null},{"id":"G3.implement-feature.bookend-t0-dispatch","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Bookend Task Ordering","action_label":"Dispatch T0 (t0-baseline-capture) via normal ready-task loop","actor_type":"agent-structured-task","evidence":"T0 has priority: 1 and dependencies: [], so it is the first ready task and dispatches before any implementation task. T0 runs agent t0-baseline-capture.","agent_name":"t0-baseline-capture"},{"id":"G3.implement-feature.bookend-tn-dispatch","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Bookend Task Ordering","action_label":"Dispatch TN (tn-verification-gate) via normal ready-task loop","actor_type":"agent-structured-task","evidence":"TN has dependencies: [all non-bookend task IDs], so it becomes ready only after all implementation tasks complete. TN runs agent tn-verification-gate.","agent_name":"tn-verification-gate"},{"id":"G3.implement-feature.bookend-artifact-register-instruction","skill":"implement-feature","source_file":"implement-feature/SKILL.md:Bookend Artifact Registration","action_label":"Include artifact_register instructions in bookend delegation prompt","actor_type":"orchestrator-raw","evidence":"include artifact_register instructions in each bookend task's delegation prompt so the bookend artifacts are registered in the issue's artifact manifest","agent_name":null},{"id":"G3.complete-implementation.pre-artifact-list","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Pre-Phase: Artifact Discovery","action_label":"Discover artifacts via artifact_list","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__artifact_list(item_id=N)","agent_name":null},{"id":"G3.complete-implementation.pre-tn-check","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Pre-Phase 1: TN Verification Check","action_label":"Read TN verification artifact via artifact_read","actor_type":"orchestrator-raw","evidence":"artifact_read(item_id={N}, artifact_type=\"TN-verification\")","agent_name":null},{"id":"G3.complete-implementation.pre-process-concerns","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Pre-Phase 1b: Process Accumulated Concerns","action_label":"Process accumulated concerns from backlog item","actor_type":"orchestrator-raw","evidence":"Execute the full follow-up routing procedure defined in ./references/recursive-follow-up-handling.md ... backlog_view / artifact_read","agent_name":null},{"id":"G3.complete-implementation.qg-plan-check","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 1","action_label":"Check for existing QG plan via sam_plan(action=list)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"list\", \"search\": \"qg-{slug}\"})","agent_name":null},{"id":"G3.complete-implementation.qg-plan-create","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 2","action_label":"Create QG plan via sam_plan(action=create) with phase task list","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"create\"} ... tasks list from phase mapping table)","agent_name":null},{"id":"G3.complete-implementation.qg-plan-reset-blocked","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 3","action_label":"Reset BLOCKED QG tasks to not-started on re-run via sam_state","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_state(plan=\"{QG}\", task=\"{task_id}\", status=\"not-started\")","agent_name":null},{"id":"G3.complete-implementation.team-setup","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:SAM Dispatch Loop:Team Setup","action_label":"Check/create impl team via TeamCreate(team_name=impl-{slug})","actor_type":"orchestrator-raw","evidence":"If no team exists, create one: TeamCreate(team_name=\"impl-{slug}\")","agent_name":null},{"id":"G3.complete-implementation.dispatch-loop-ready","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop","action_label":"Get next ready QG task via sam_plan(action=ready)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"{QG}\")","agent_name":null},{"id":"G3.complete-implementation.dispatch-qg-phase-start-task","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop","action_label":"Dispatch each QG phase agent via Skill(start-task) — T0 through T6","actor_type":"agent-structured-task","evidence":"Skill(skill=\"start-task\", args=\"{QG} --task {task_id}\")","agent_name":"dh:task-worker (phases T0-T6 per phase mapping: multi-perspective-review, code-reviewer, feature-verifier, integration-checker, doc-drift-auditor, service-docs-maintainer, context-refinement)"},{"id":"G3.complete-implementation.post-t4-skip-t5","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop","action_label":"Skip T5 when T4 reports 0 drift findings via sam_task state update","actor_type":"orchestrator-raw","evidence":"sam_task(plan='{PQG}', task='T5', config={action=state, status=skipped})","agent_name":null},{"id":"G3.complete-implementation.completion-verification","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Completion Verification Gate","action_label":"Verify all QG tasks completed via sam_plan(action=status)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"{PQG}\")","agent_name":null},{"id":"G3.complete-implementation.surface-divergence","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Post-Phase-6: Surface Divergence Findings","action_label":"Read codebase-analysis artifact and route divergence findings","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type=\"codebase-analysis\")","agent_name":null},{"id":"G3.complete-implementation.fix-loop-dispatch","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Constants:Step 1: Detect Follow-up Files","action_label":"Dispatch fix-loop tasks via subagent_type=dh:task-worker when T1 returns NEEDS-WORK/FAIL","actor_type":"agent-raw-prompt","evidence":"sam_plan(action='create', slug=\"fix-{slug}-blocking-N\") one task per entry (agent: dh:task-worker); dispatch via subagent_type=\"dh:task-worker\"","agent_name":"dh:task-worker"},{"id":"G3.complete-implementation.apply-verified-label","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Apply status:verified Label","action_label":"Apply status:verified label via backlog_update","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_update(selector=\"#{issue_number}\", verified=True)","agent_name":null},{"id":"G3.complete-implementation.resolve-issue","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Resolve the Issue","action_label":"Resolve backlog item via backlog_resolve","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_resolve(selector=\"<selector>\", summary=\"Implementation complete — AC verified PASS\")","agent_name":null},{"id":"G3.complete-implementation.final-commit","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Final Step: Commit and Push Remaining Changes","action_label":"Final commit with Fixes #N trailer","actor_type":"orchestrator-raw","evidence":"git add -A && git commit -m ... Fixes #{issue_number}","agent_name":null},{"id":"G3.complete-implementation.team-shutdown","skill":"complete-implementation","source_file":"complete-implementation/SKILL.md:Team Shutdown","action_label":"Shut down all team members via SendMessage(shutdown_request)","actor_type":"orchestrator-raw","evidence":"read team config and shut down ALL members immediately ... SendMessage(to=..., message={type: shutdown_request})","agent_name":null},{"id":"G3.add-new-feature.pre-artifact-discovery","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Artifact Discovery (Pre-Phase)","action_label":"Discover prior artifacts via artifact_list and artifact_read","actor_type":"orchestrator-raw","evidence":"artifact_read(item_id={issue}, artifact_type=\"research\") ... artifact_list(item_id={issue})","agent_name":null},{"id":"G3.add-new-feature.phase1-feature-researcher","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 1: Discovery (@dh:feature-researcher)","action_label":"Dispatch feature-researcher with inline delegation prompt","actor_type":"agent-raw-prompt","evidence":"Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Produce feature-context-{slug}.md content with WHAT/WHY analysis","agent_name":"dh:feature-researcher"},{"id":"G3.add-new-feature.phase1-verify-artifact","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 1: Discovery","action_label":"Verify feature-context artifact registered via artifact_list","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type=\"feature-context\")","agent_name":null},{"id":"G3.add-new-feature.phase2-codebase-analyzer","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 2: Codebase Analysis (@dh:codebase-analyzer)","action_label":"Dispatch codebase-analyzer with inline delegation prompt","actor_type":"agent-raw-prompt","evidence":"Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Produce codebase analysis for each focus area","agent_name":"dh:codebase-analyzer"},{"id":"G3.add-new-feature.phase2-verify-artifact","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 2: Codebase Analysis","action_label":"Verify codebase-analysis artifact registered via artifact_list","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type=\"codebase-analysis\")","agent_name":null},{"id":"G3.add-new-feature.phase3-domain-scan","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 3:Domain Signal Detection:Step 1","action_label":"Scan project root for language markers to resolve design-spec role","actor_type":"orchestrator-raw","evidence":"Scan project root for language markers ... Search Python language manifest ... Resolve design-spec role from manifest","agent_name":null},{"id":"G3.add-new-feature.phase3-setup-skill-discovery","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 3:Wizard Invocation Protocol","action_label":"Invoke setup-skill-discovery wizard when .dh/skill_discovery.yaml absent","actor_type":"agent-raw-prompt","evidence":"Invoke wizard: Skill(skill='dh:setup-skill-discovery', args='--auto')","agent_name":"dh:setup-skill-discovery"},{"id":"G3.add-new-feature.phase3-architect-dispatch","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 3: Architecture Spec","action_label":"Dispatch design-spec agent (dh:task-worker) with architecture delegation prompt","actor_type":"agent-raw-prompt","evidence":"Dispatch: subagent_type=\"dh:task-worker\". Build the delegation prompt from the template below. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... design the implementation approach — interfaces, data models, module boundaries, and call flows","agent_name":"dh:task-worker"},{"id":"G3.add-new-feature.phase4-swarm-task-planner","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 4: Task Decomposition (@dh:swarm-task-planner)","action_label":"Dispatch swarm-task-planner with task decomposition delegation prompt","actor_type":"agent-raw-prompt","evidence":"Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Decompose #{issue}: \"{title}\" into executable tasks.","agent_name":"dh:swarm-task-planner"},{"id":"G3.add-new-feature.phase4-link-plan","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 4: Task Decomposition","action_label":"Link plan to backlog item via backlog_update (orchestrator step, not swarm-task-planner)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_update(selector=\"{title}\", plan=\"P{id}\") ... Linking the plan to the backlog item is a step of add-new-feature itself, run in the same context that read this file — not part of the swarm-task-planner delegation above","agent_name":null},{"id":"G3.add-new-feature.phase5-plan-validator","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 5: Plan Validation Gate (@dh:plan-validator)","action_label":"Dispatch plan-validator with validation delegation prompt","actor_type":"agent-raw-prompt","evidence":"Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. ... Validate plan P{N} for #{issue}: \"{title}\". Check: AC coverage, dependency DAG, agent assignments, verification steps, impact radius coverage. Return READY or BLOCKED with specific gaps.","agent_name":"dh:plan-validator"},{"id":"G3.add-new-feature.phase6-context-gathering","skill":"add-new-feature","source_file":"add-new-feature/SKILL.md:Phase 6: Context Manifest (@dh:dh-context-gathering)","action_label":"Dispatch dh-context-gathering agent with delegation prompt","actor_type":"agent-raw-prompt","evidence":"Phase 6: Context Manifest (@dh:dh-context-gathering) ... delegation prompt template with backlog_view and plan reads","agent_name":"dh:dh-context-gathering"},{"id":"G3.work-backlog-item.locate-interactive-browser","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Locate:Step 1.1","action_label":"Step 1.1: Interactive browser — backlog_list to present item choices","actor_type":"orchestrator-raw","evidence":"Step 2.1: Interactive browser (no arguments only)","agent_name":null},{"id":"G3.work-backlog-item.locate-issue-first","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Locate:Step 1.2","action_label":"Step 1.2: Issue-first path — backlog_view to load item by #N or URL","actor_type":"orchestrator-raw","evidence":"Step 2.2: Issue-first path (#N, bare number, or GitHub URL)","agent_name":null},{"id":"G3.work-backlog-item.locate-route-existing-plan","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist","action_label":"If item already has Plan field: invoke implement-feature and stop","actor_type":"orchestrator-raw","evidence":"If item already has a Plan field: invoke Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") and stop","agent_name":null},{"id":"G3.work-backlog-item.validate-already-implemented","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Validate:Step 2.1","action_label":"Step 2.1: Already-implemented check","actor_type":"orchestrator-raw","evidence":"Step 3.1: Already-implemented check","agent_name":null},{"id":"G3.work-backlog-item.validate-github-sync","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Issue Sync (Steps 2.2-2.4)","action_label":"Steps 2.2–2.4: GitHub issue link check, create linked issue, set in-progress label","actor_type":"orchestrator-raw","evidence":"Step 3.2–3.4: GitHub issue sync, creation, in-progress label","agent_name":null},{"id":"G3.work-backlog-item.validate-discovery-gate","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Validate:Step 2.5","action_label":"Step 2.5: Discovery gate — STOP if discovery artifact absent for feature/refactor items","actor_type":"orchestrator-raw","evidence":"Step 3.5: Discovery gate (feature/refactor items only). If discovery gate STOP: report and stop","agent_name":null},{"id":"G3.work-backlog-item.prepare-auto-groom","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Prepare:Step 3.1","action_label":"Step 3.1: Auto-groom if needed (invoke groom workflow via backlog_groom / swarm)","actor_type":"orchestrator-raw","evidence":"Step 4.1: Auto-groom (if needed)","agent_name":null},{"id":"G3.work-backlog-item.prepare-rt-ica-gate","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Prepare:Step 3.2","action_label":"Step 3.2: RT-ICA gate — evaluate completeness, BLOCKED stops workflow","actor_type":"orchestrator-raw","evidence":"Step 4.2: RT-ICA gate — if BLOCKED, stop and present MISSING conditions","agent_name":null},{"id":"G3.work-backlog-item.prepare-feasibility-gate","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Prepare:Step 3.4","action_label":"Step 3.4: Feasibility gate — BLOCKED stops workflow","actor_type":"orchestrator-raw","evidence":"Step 4.4: Feasibility gate — if BLOCKED, stop","agent_name":null},{"id":"G3.work-backlog-item.plan-invoke-add-new-feature","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Plan:Step 4.2","action_label":"Step 5.2: Invoke SAM planning via Skill(dh:add-new-feature) with feature_request args","actor_type":"agent-raw-prompt","evidence":"Skill(skill: \"dh:add-new-feature\", args: \"{feature_request}\")","agent_name":"dh:add-new-feature"},{"id":"G3.work-backlog-item.plan-update-backlog","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Work:Plan:Step 4.3","action_label":"Step 5.3: Update backlog item with plan reference via backlog_update","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_update(selector=\"{title}\", plan=\"P{id}\")","agent_name":null},{"id":"G3.work-backlog-item.auto-invoke-implement-feature","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist (auto mode)","action_label":"Step 6 (auto mode): Invoke implement-feature without stopping for user input","actor_type":"orchestrator-raw","evidence":"Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") — do not stop for user input","agent_name":null},{"id":"G3.work-backlog-item.auto-invoke-complete-implementation","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist (auto mode)","action_label":"Step 7 (auto mode): Invoke complete-implementation without stopping for user input","actor_type":"orchestrator-raw","evidence":"Skill(skill: \"dh:complete-implementation\", args: \"{plan_address}\") — do not stop for user input","agent_name":null},{"id":"G3.work-backlog-item.groom-swarm-team-create","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Groom:Swarm:Team mode (preferred)","action_label":"Groom swarm: TeamCreate for parallel groom specialist agents","actor_type":"orchestrator-raw","evidence":"Team mode (preferred) ... TeamCreate","agent_name":null},{"id":"G3.work-backlog-item.groom-swarm-groomer","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Groom:Swarm:Groomer prompt","action_label":"Dispatch backlog-item-groomer with inline groomer prompt","actor_type":"agent-raw-prompt","evidence":"Groomer agent: subagent_type=\"dh:backlog-item-groomer\", model=sonnet. Input to groomer: item title, description, source, priority, plan address, RT-ICA assessment, Fact-Check verdicts, Issue Classification, Root-Cause Analysis, Impact Radius, Research section","agent_name":"dh:backlog-item-groomer"},{"id":"G3.work-backlog-item.groom-finalize-write","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Groom:Finalize:Write Groomed Content","action_label":"Write groomed content via batch backlog_update with atomic status transition","actor_type":"orchestrator-raw","evidence":"Preferred: batch write with atomic status transition","agent_name":null},{"id":"G3.work-backlog-item.close-resolve-backlog-resolve","skill":"work-backlog-item","source_file":"work-backlog-item/SKILL.md:Close/Resolve Procedure:Step 5.7","action_label":"Step 5.7: Invoke backlog_resolve to close or resolve item","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_backlog__backlog_resolve(selector=\"<selector>\")","agent_name":null},{"id":"G3.start-task.read-task-assignment","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 1: Read task assignment via sam_task(action=read)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_task(plan=\"P{N}\", task=\"T{M}\", config={\"action\": \"read\"})","agent_name":null},{"id":"G3.start-task.discover-artifacts","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 1a: Discover plan artifacts via artifact_list when issue number known","actor_type":"orchestrator-raw","evidence":"If the TaskAssignment JSON contains a parent_issue_number ... artifact_list(item_id=...)","agent_name":null},{"id":"G3.start-task.load-task-skills","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 2a: Load task-level skills via Skill(skill=name) for each name in task.skills","actor_type":"orchestrator-raw","evidence":"For each skill name, invoke: Skill(skill=\"{skill-name}\")","agent_name":null},{"id":"G3.start-task.claim-task","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 3: Claim task via sam_task(action=claim)","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_task(plan=\"P{N}\", task=\"T{M}\", config={\"action\": \"claim\"})","agent_name":null},{"id":"G3.start-task.register-active-task","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 4: Register active-task context via sam_active_task","actor_type":"orchestrator-raw","evidence":"mcp__plugin_dh_sam__sam_active_task(config={\"action\": ...}) — required for hook-driven updates","agent_name":null},{"id":"G3.start-task.implement","skill":"start-task","source_file":"start-task/SKILL.md:Starting a Task","action_label":"Step 5: Implement against acceptance criteria using Write/Edit/Bash tools","actor_type":"orchestrator-raw","evidence":"implement against acceptance criteria ... The agent (task-worker running start-task) directly writes code/files using Write, Edit, Bash tools","agent_name":null},{"id":"G3.start-task.hook-marks-complete","skill":"start-task","source_file":"start-task/SKILL.md:frontmatter hooks","action_label":"PostToolUse hook: task_status_hook.py marks task complete automatically on SubagentStop","actor_type":"orchestrator-raw","evidence":"hooks: PostToolUse: - matcher: Write|Edit|Bash hooks: - type: command command: uv run --script \"${CLAUDE_PLUGIN_ROOT}/skills/implementation-manager/scripts/task_status_hook.py\"","agent_name":null}]}
+{
+  "actor_classifications": [
+    {
+      "id": "G3.implement-feature.query-plan-status",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Query status via sam_plan(action=status)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.query-ready-tasks",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Query ready tasks via sam_plan(action=ready) or backlog_get_ready_sam_tasks",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"P{N}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.dispatch-per-task-single-agent",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Dispatch task via single Agent call (per_task mode)",
+      "actor_type": "agent-structured-task",
+      "evidence": "Skill(skill=\"start-task\", args=\"{plan_address} --task {task_id}\")",
+      "agent_name": "dh:task-worker"
+    },
+    {
+      "id": "G3.implement-feature.dispatch-team-create",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "TeamCreate for parallel dispatch (full_auto/checkpoint mode)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "TeamCreate(team_name: \"impl-{slug}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.dispatch-teammate-task-worker",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Spawn dh:task-worker teammate with Skill(start-task) prompt",
+      "actor_type": "agent-structured-task",
+      "evidence": "Always dispatch dh:task-worker as the subagent_type ... Launch dh:task-worker with a prompt that invokes `start-task`: Skill(skill=\"start-task\", args=\"{plan_address} --task {task_id}\")",
+      "agent_name": "dh:task-worker"
+    },
+    {
+      "id": "G3.implement-feature.append-concerns",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Append concerns to backlog item via backlog_groom",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_groom(selector=\"#{issue}\", section=\"Concerns\", content=\"...\", append=True)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.contract-verification",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Dispatch contract-verification agent (step 4a)",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "attempt contract verification against the architect spec ... If the contract-verification agent returns a <concerns> block",
+      "agent_name": "dh:contract-verification"
+    },
+    {
+      "id": "G3.implement-feature.shutdown-teammate",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Send shutdown request to completed teammate (step 4b)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "SendMessage(to=\"{teammate_name}\", message={\"type\": \"shutdown_request\"})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.commit",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Orchestrator commits after batch completes",
+      "actor_type": "orchestrator-raw",
+      "evidence": "git add -A && git commit -m \"<type>(task-batch): {plan_address} — {task_ids}\"",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.check-remaining",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "action_label": "Check plan status after batch completion (step 5)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.health-check-transcript-analyst",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Agent Health Check (While Waiting)",
+      "action_label": "Spawn transcript-analyst for session health summary",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Task is session health summary subagent_type='agentskill-kaizen:transcript-analyst' Context: agent name or teammate ID to check, JSONL dir ~/.claude/projects/{project-slug}/*.jsonl Report: last turn timestamp, last tool call, verdict of crashed / idle / active",
+      "agent_name": "agentskill-kaizen:transcript-analyst"
+    },
+    {
+      "id": "G3.implement-feature.health-check-confirm-task-state",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Agent Health Check (While Waiting)",
+      "action_label": "Confirm task state via sam_task(action=read) after crash verdict",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Confirm task state via mcp__plugin_dh_sam__sam_task(plan, task, config={action:read}) Verify task is still CLAIMED",
+      "agent_name": null
+    },
+    {
+      "id": "G3.implement-feature.bookend-t0-dispatch",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Bookend Task Ordering",
+      "action_label": "Dispatch T0 (t0-baseline-capture) via normal ready-task loop",
+      "actor_type": "agent-structured-task",
+      "evidence": "T0 has priority: 1 and dependencies: [], so it is the first ready task and dispatches before any implementation task. T0 runs agent t0-baseline-capture.",
+      "agent_name": "t0-baseline-capture"
+    },
+    {
+      "id": "G3.implement-feature.bookend-tn-dispatch",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Bookend Task Ordering",
+      "action_label": "Dispatch TN (tn-verification-gate) via normal ready-task loop",
+      "actor_type": "agent-structured-task",
+      "evidence": "TN has dependencies: [all non-bookend task IDs], so it becomes ready only after all implementation tasks complete. TN runs agent tn-verification-gate.",
+      "agent_name": "tn-verification-gate"
+    },
+    {
+      "id": "G3.implement-feature.bookend-artifact-register-instruction",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Bookend Artifact Registration",
+      "action_label": "Include artifact_register instructions in bookend delegation prompt",
+      "actor_type": "orchestrator-raw",
+      "evidence": "include artifact_register instructions in each bookend task's delegation prompt so the bookend artifacts are registered in the issue's artifact manifest",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.pre-artifact-list",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Pre-Phase: Artifact Discovery",
+      "action_label": "Discover artifacts via artifact_list",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__artifact_list(item_id=N)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.pre-tn-check",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Pre-Phase 1: TN Verification Check",
+      "action_label": "Read TN verification artifact via artifact_read",
+      "actor_type": "orchestrator-raw",
+      "evidence": "artifact_read(item_id={N}, artifact_type=\"TN-verification\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.pre-process-concerns",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Pre-Phase 1b: Process Accumulated Concerns",
+      "action_label": "Process accumulated concerns from backlog item",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Execute the full follow-up routing procedure defined in ./references/recursive-follow-up-handling.md ... backlog_view / artifact_read",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.qg-plan-check",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 1",
+      "action_label": "Check for existing QG plan via sam_plan(action=list)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"list\", \"search\": \"qg-{slug}\"})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.qg-plan-create",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 2",
+      "action_label": "Create QG plan via sam_plan(action=create) with phase task list",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"create\"} ... tasks list from phase mapping table)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.qg-plan-reset-blocked",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 3",
+      "action_label": "Reset BLOCKED QG tasks to not-started on re-run via sam_state",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_state(plan=\"{QG}\", task=\"{task_id}\", status=\"not-started\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.team-setup",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop:Team Setup",
+      "action_label": "Check/create impl team via TeamCreate(team_name=impl-{slug})",
+      "actor_type": "orchestrator-raw",
+      "evidence": "If no team exists, create one: TeamCreate(team_name=\"impl-{slug}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.dispatch-loop-ready",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop",
+      "action_label": "Get next ready QG task via sam_plan(action=ready)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"{QG}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.dispatch-qg-phase-start-task",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop",
+      "action_label": "Dispatch each QG phase agent via Skill(start-task) — T0 through T6",
+      "actor_type": "agent-structured-task",
+      "evidence": "Skill(skill=\"start-task\", args=\"{QG} --task {task_id}\")",
+      "agent_name": "dh:task-worker (phases T0-T6 per phase mapping: multi-perspective-review, code-reviewer, feature-verifier, integration-checker, doc-drift-auditor, service-docs-maintainer, context-refinement)"
+    },
+    {
+      "id": "G3.complete-implementation.post-t4-skip-t5",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop",
+      "action_label": "Skip T5 when T4 reports 0 drift findings via sam_task state update",
+      "actor_type": "orchestrator-raw",
+      "evidence": "sam_task(plan='{PQG}', task='T5', config={action=state, status=skipped})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.completion-verification",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Completion Verification Gate",
+      "action_label": "Verify all QG tasks completed via sam_plan(action=status)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"{PQG}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.surface-divergence",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Post-Phase-6: Surface Divergence Findings",
+      "action_label": "Read codebase-analysis artifact and route divergence findings",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type=\"codebase-analysis\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.fix-loop-dispatch",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Constants:Step 1: Detect Follow-up Files",
+      "action_label": "Dispatch fix-loop tasks via subagent_type=dh:task-worker when T1 returns NEEDS-WORK/FAIL",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "sam_plan(action='create', slug=\"fix-{slug}-blocking-N\") one task per entry (agent: dh:task-worker); dispatch via subagent_type=\"dh:task-worker\"",
+      "agent_name": "dh:task-worker"
+    },
+    {
+      "id": "G3.complete-implementation.apply-verified-label",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Apply status:verified Label",
+      "action_label": "Apply status:verified label via backlog_update",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_update(selector=\"#{issue_number}\", verified=True)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.resolve-issue",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Resolve the Issue",
+      "action_label": "Resolve backlog item via backlog_resolve",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_resolve(selector=\"<selector>\", summary=\"Implementation complete — AC verified PASS\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.final-commit",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Final Step: Commit and Push Remaining Changes",
+      "action_label": "Final commit with Fixes #N trailer",
+      "actor_type": "orchestrator-raw",
+      "evidence": "git add -A && git commit -m ... Fixes #{issue_number}",
+      "agent_name": null
+    },
+    {
+      "id": "G3.complete-implementation.team-shutdown",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Team Shutdown",
+      "action_label": "Shut down all team members via SendMessage(shutdown_request)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "read team config and shut down ALL members immediately ... SendMessage(to=..., message={type: shutdown_request})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.pre-artifact-discovery",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Artifact Discovery (Pre-Phase)",
+      "action_label": "Discover prior artifacts via artifact_list and artifact_read",
+      "actor_type": "orchestrator-raw",
+      "evidence": "artifact_read(item_id={issue}, artifact_type=\"research\") ... artifact_list(item_id={issue})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.phase1-feature-researcher",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 1: Discovery (@dh:feature-researcher)",
+      "action_label": "Dispatch feature-researcher with inline delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Produce feature-context-{slug}.md content with WHAT/WHY analysis",
+      "agent_name": "dh:feature-researcher"
+    },
+    {
+      "id": "G3.add-new-feature.phase1-verify-artifact",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 1: Discovery",
+      "action_label": "Verify feature-context artifact registered via artifact_list",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type=\"feature-context\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.phase2-codebase-analyzer",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 2: Codebase Analysis (@dh:codebase-analyzer)",
+      "action_label": "Dispatch codebase-analyzer with inline delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Produce codebase analysis for each focus area",
+      "agent_name": "dh:codebase-analyzer"
+    },
+    {
+      "id": "G3.add-new-feature.phase2-verify-artifact",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 2: Codebase Analysis",
+      "action_label": "Verify codebase-analysis artifact registered via artifact_list",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type=\"codebase-analysis\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.phase3-domain-scan",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 3:Domain Signal Detection:Step 1",
+      "action_label": "Scan project root for language markers to resolve design-spec role",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Scan project root for language markers ... Search Python language manifest ... Resolve design-spec role from manifest",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.phase3-setup-skill-discovery",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 3:Wizard Invocation Protocol",
+      "action_label": "Invoke setup-skill-discovery wizard when .dh/skill_discovery.yaml absent",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Invoke wizard: Skill(skill='dh:setup-skill-discovery', args='--auto')",
+      "agent_name": "dh:setup-skill-discovery"
+    },
+    {
+      "id": "G3.add-new-feature.phase3-architect-dispatch",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 3: Architecture Spec",
+      "action_label": "Dispatch design-spec agent (dh:task-worker) with architecture delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Dispatch: subagent_type=\"dh:task-worker\". Build the delegation prompt from the template below. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... design the implementation approach — interfaces, data models, module boundaries, and call flows",
+      "agent_name": "dh:task-worker"
+    },
+    {
+      "id": "G3.add-new-feature.phase4-swarm-task-planner",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 4: Task Decomposition (@dh:swarm-task-planner)",
+      "action_label": "Dispatch swarm-task-planner with task decomposition delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. Read the details about the milestone and plan you are a part of at backlog_view(selector=\"#{issue}\"). ... Decompose #{issue}: \"{title}\" into executable tasks.",
+      "agent_name": "dh:swarm-task-planner"
+    },
+    {
+      "id": "G3.add-new-feature.phase4-link-plan",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 4: Task Decomposition",
+      "action_label": "Link plan to backlog item via backlog_update (orchestrator step, not swarm-task-planner)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_update(selector=\"{title}\", plan=\"P{id}\") ... Linking the plan to the backlog item is a step of add-new-feature itself, run in the same context that read this file — not part of the swarm-task-planner delegation above",
+      "agent_name": null
+    },
+    {
+      "id": "G3.add-new-feature.phase5-plan-validator",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 5: Plan Validation Gate (@dh:plan-validator)",
+      "action_label": "Dispatch plan-validator with validation delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Delegation prompt template: You are part of a team that is currently working on the {work_type} {feature_name}. ... Validate plan P{N} for #{issue}: \"{title}\". Check: AC coverage, dependency DAG, agent assignments, verification steps, impact radius coverage. Return READY or BLOCKED with specific gaps.",
+      "agent_name": "dh:plan-validator"
+    },
+    {
+      "id": "G3.add-new-feature.phase6-context-gathering",
+      "skill": "add-new-feature",
+      "source_file": "add-new-feature/SKILL.md:Phase 6: Context Manifest (@dh:dh-context-gathering)",
+      "action_label": "Dispatch dh-context-gathering agent with delegation prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Phase 6: Context Manifest (@dh:dh-context-gathering) ... delegation prompt template with backlog_view and plan reads",
+      "agent_name": "dh:dh-context-gathering"
+    },
+    {
+      "id": "G3.work-backlog-item.locate-interactive-browser",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Locate:Step 1.1",
+      "action_label": "Step 1.1: Interactive browser — backlog_list to present item choices",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 2.1: Interactive browser (no arguments only)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.locate-issue-first",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Locate:Step 1.2",
+      "action_label": "Step 1.2: Issue-first path — backlog_view to load item by #N or URL",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 2.2: Issue-first path (#N, bare number, or GitHub URL)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.locate-route-existing-plan",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist",
+      "action_label": "If item already has Plan field: invoke implement-feature and stop",
+      "actor_type": "orchestrator-raw",
+      "evidence": "If item already has a Plan field: invoke Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") and stop",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.validate-already-implemented",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Validate:Step 2.1",
+      "action_label": "Step 2.1: Already-implemented check",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 3.1: Already-implemented check",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.validate-github-sync",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Issue Sync (Steps 2.2-2.4)",
+      "action_label": "Steps 2.2–2.4: GitHub issue link check, create linked issue, set in-progress label",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 3.2–3.4: GitHub issue sync, creation, in-progress label",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.validate-discovery-gate",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Validate:Step 2.5",
+      "action_label": "Step 2.5: Discovery gate — STOP if discovery artifact absent for feature/refactor items",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 3.5: Discovery gate (feature/refactor items only). If discovery gate STOP: report and stop",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.prepare-auto-groom",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Prepare:Step 3.1",
+      "action_label": "Step 3.1: Auto-groom if needed (invoke groom workflow via backlog_groom / swarm)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 4.1: Auto-groom (if needed)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.prepare-rt-ica-gate",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Prepare:Step 3.2",
+      "action_label": "Step 3.2: RT-ICA gate — evaluate completeness, BLOCKED stops workflow",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 4.2: RT-ICA gate — if BLOCKED, stop and present MISSING conditions",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.prepare-feasibility-gate",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Prepare:Step 3.4",
+      "action_label": "Step 3.4: Feasibility gate — BLOCKED stops workflow",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Step 4.4: Feasibility gate — if BLOCKED, stop",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.plan-invoke-add-new-feature",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Plan:Step 4.2",
+      "action_label": "Step 5.2: Invoke SAM planning via Skill(dh:add-new-feature) with feature_request args",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Skill(skill: \"dh:add-new-feature\", args: \"{feature_request}\")",
+      "agent_name": "dh:add-new-feature"
+    },
+    {
+      "id": "G3.work-backlog-item.plan-update-backlog",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Work:Plan:Step 4.3",
+      "action_label": "Step 5.3: Update backlog item with plan reference via backlog_update",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_update(selector=\"{title}\", plan=\"P{id}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.auto-invoke-implement-feature",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist (auto mode)",
+      "action_label": "Step 6 (auto mode): Invoke implement-feature without stopping for user input",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") — do not stop for user input",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.auto-invoke-complete-implementation",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Workflow:Work Backlog Item:Checklist (auto mode)",
+      "action_label": "Step 7 (auto mode): Invoke complete-implementation without stopping for user input",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Skill(skill: \"dh:complete-implementation\", args: \"{plan_address}\") — do not stop for user input",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.groom-swarm-team-create",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Groom:Swarm:Team mode (preferred)",
+      "action_label": "Groom swarm: TeamCreate for parallel groom specialist agents",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Team mode (preferred) ... TeamCreate",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.groom-swarm-groomer",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Groom:Swarm:Groomer prompt",
+      "action_label": "Dispatch backlog-item-groomer with inline groomer prompt",
+      "actor_type": "agent-raw-prompt",
+      "evidence": "Groomer agent: subagent_type=\"dh:backlog-item-groomer\", model=sonnet. Input to groomer: item title, description, source, priority, plan address, RT-ICA assessment, Fact-Check verdicts, Issue Classification, Root-Cause Analysis, Impact Radius, Research section",
+      "agent_name": "dh:backlog-item-groomer"
+    },
+    {
+      "id": "G3.work-backlog-item.groom-finalize-write",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Groom:Finalize:Write Groomed Content",
+      "action_label": "Write groomed content via batch backlog_update with atomic status transition",
+      "actor_type": "orchestrator-raw",
+      "evidence": "Preferred: batch write with atomic status transition",
+      "agent_name": null
+    },
+    {
+      "id": "G3.work-backlog-item.close-resolve-backlog-resolve",
+      "skill": "work-backlog-item",
+      "source_file": "work-backlog-item/SKILL.md:Close/Resolve Procedure:Step 5.7",
+      "action_label": "Step 5.7: Invoke backlog_resolve to close or resolve item",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_backlog__backlog_resolve(selector=\"<selector>\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.read-task-assignment",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 1: Read task assignment via sam_task(action=read)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_task(plan=\"P{N}\", task=\"T{M}\", config={\"action\": \"read\"})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.discover-artifacts",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 1a: Discover plan artifacts via artifact_list when issue number known",
+      "actor_type": "orchestrator-raw",
+      "evidence": "If the TaskAssignment JSON contains a parent_issue_number ... artifact_list(item_id=...)",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.load-task-skills",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 2a: Load task-level skills via Skill(skill=name) for each name in task.skills",
+      "actor_type": "orchestrator-raw",
+      "evidence": "For each skill name, invoke: Skill(skill=\"{skill-name}\")",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.claim-task",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 3: Claim task via sam_task(action=claim)",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_task(plan=\"P{N}\", task=\"T{M}\", config={\"action\": \"claim\"})",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.register-active-task",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 4: Register active-task context via sam_active_task",
+      "actor_type": "orchestrator-raw",
+      "evidence": "mcp__plugin_dh_sam__sam_active_task(config={\"action\": ...}) — required for hook-driven updates",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.implement",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:Starting a Task",
+      "action_label": "Step 5: Implement against acceptance criteria using Write/Edit/Bash tools",
+      "actor_type": "orchestrator-raw",
+      "evidence": "implement against acceptance criteria ... The agent (task-worker running start-task) directly writes code/files using Write, Edit, Bash tools",
+      "agent_name": null
+    },
+    {
+      "id": "G3.start-task.hook-marks-complete",
+      "skill": "start-task",
+      "source_file": "start-task/SKILL.md:frontmatter hooks",
+      "action_label": "PostToolUse hook: task_status_hook.py marks task complete automatically on SubagentStop",
+      "actor_type": "orchestrator-raw",
+      "evidence": "hooks: PostToolUse: - matcher: Write|Edit|Bash hooks: - type: command command: uv run --script \"${CLAUDE_PLUGIN_ROOT}/skills/implementation-manager/scripts/task_status_hook.py\"",
+      "agent_name": null
+    }
+  ]
+}

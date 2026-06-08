@@ -1,1 +1,884 @@
-{"backend_routing":[{"id":"G8.create.backlog_list-duplicate","skill":"create","source_file":"create/start.md:Step 3: Duplicate detection","step_label":"Call: mcp__plugin_dh_backlog__backlog_list(search=\"{concept1} OR {concept2} OR {concept3}\", match_context=true)","mcp_tool":"mcp__plugin_dh_backlog__backlog_list","call_params":"search=\"{concept1} OR {concept2} OR {concept3}\", match_context=true","routes_to_protocol_method":"list_items","per_backend":{"github":"GraphQL listIssues with label/state filters","sqlite":"SELECT items with WHERE clause on title/body","memory":"dict filter over in-memory items","beads":"bd list with search filter"},"backend_agnostic":true},{"id":"G8.create.backlog_add","skill":"create","source_file":"create/start.md:Step 4: Write via MCP","step_label":"mcp__plugin_dh_backlog__backlog_add(title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>')","mcp_tool":"mcp__plugin_dh_backlog__backlog_add","call_params":"title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>'","routes_to_protocol_method":"create_issue_for_item","per_backend":{"github":"API create issue","sqlite":"INSERT into items table","memory":"dict insert","beads":"bd create"},"backend_agnostic":true},{"id":"G8.groom.backlog_view-intake-load","skill":"groom","source_file":"groom/intake.md:Load Item","step_label":"Verify <item_ref/> exists via mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=true)","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector='{item_ref}', summary=true","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.groom.backlog_list_merged_prs-intake-check-a","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check A","step_label":"mcp__plugin_dh_backlog__backlog_list_merged_prs(search='{title keywords}')","mcp_tool":"mcp__plugin_dh_backlog__backlog_list_merged_prs","call_params":"search='{title keywords}'","routes_to_protocol_method":"list_merged_prs","per_backend":{"github":"GraphQL search merged PRs","sqlite":"SELECT merged PRs","memory":"dict filter on merged PRs","beads":"bd list --merged"},"backend_agnostic":true},{"id":"G8.groom.backlog_resolve-intake-check-a","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check A","step_label":"mcp__plugin_dh_backlog__backlog_resolve(selector='{item_ref}', summary='Completed via PR #{pr} / commit {sha}')","mcp_tool":"mcp__plugin_dh_backlog__backlog_resolve","call_params":"selector='{item_ref}', summary='Completed via PR #{pr} / commit {sha}'","routes_to_protocol_method":"close_github_issue","per_backend":{"github":"GraphQL updateIssue state=CLOSED + comment","sqlite":"UPDATE status='closed'","memory":"dict state='CLOSED'","beads":"bd close"},"backend_agnostic":true},{"id":"G8.groom.backlog_comment_issue-intake-check-a","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check A","step_label":"mcp__plugin_dh_backlog__backlog_comment_issue(issue_number={issue_number}, body='Completed via {evidence}')","mcp_tool":"mcp__plugin_dh_backlog__backlog_comment_issue","call_params":"issue_number={issue_number}, body='Completed via {evidence}'","routes_to_protocol_method":"add_comment","per_backend":{"github":"GraphQL addComment on issue","sqlite":"INSERT into comments table","memory":"dict append to comments list","beads":"bd comment"},"backend_agnostic":true},{"id":"G8.groom.backlog_view-intake-check-d","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check D","step_label":"mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=true)","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector='{item_ref}', summary=true","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.groom.backlog_resolve-intake-check-d","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check D","step_label":"backlog_resolve(selector='{item_ref}', summary='...')","mcp_tool":"mcp__plugin_dh_backlog__backlog_resolve","call_params":"selector='{item_ref}', summary='...'","routes_to_protocol_method":"close_github_issue","per_backend":{"github":"GraphQL updateIssue state=CLOSED + comment","sqlite":"UPDATE status='closed'","memory":"dict state='CLOSED'","beads":"bd close"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-check-b-location","skill":"groom","source_file":"groom/intake.md:Validate: Pre-Groom Checks — Check B","step_label":"backlog_groom(selector='{item_ref}', section='Suggested Location', content='{substitute}')","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector='{item_ref}', section='Suggested Location', content='{substitute}'","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.artifact_list-discovery-gate","skill":"groom","source_file":"groom/analyze.md:Discovery Gate — step 1","step_label":"mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')","mcp_tool":"mcp__plugin_dh_backlog__artifact_list","call_params":"item_id={issue_number}, artifact_type='feature-context'","routes_to_protocol_method":"get_manifest","per_backend":{"github":"Gist.edit() — read path","sqlite":"SELECT from artifact_manifest","memory":"dict lookup","beads":"bd update --set-metadata read path"},"backend_agnostic":true},{"id":"G8.groom.artifact_read-discovery-gate","skill":"groom","source_file":"groom/analyze.md:Discovery Gate — step 2","step_label":"mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type='feature-context')","mcp_tool":"mcp__plugin_dh_backlog__artifact_read","call_params":"item_id={issue_number}, artifact_type='feature-context'","routes_to_protocol_method":"read_artifact_content_from_remote","per_backend":{"github":"Gist.edit() — read content","sqlite":"SELECT artifact content","memory":"dict content lookup","beads":"bd update --set-metadata read path"},"backend_agnostic":true},{"id":"G8.groom.backlog_view-discovery-gate-rich-check","skill":"groom","source_file":"groom/analyze.md:Discovery Gate — step 3","step_label":"mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector='{item_ref}', summary=false","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.groom.artifact_register-discovery-gate-synthesize","skill":"groom","source_file":"groom/analyze.md:Discovery Gate — step 3 (synthesize)","step_label":"mcp__plugin_dh_backlog__artifact_register(item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='...')","mcp_tool":"mcp__plugin_dh_backlog__artifact_register","call_params":"item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='# ARTIFACT:DISCOVERY\\n...'","routes_to_protocol_method":"set_manifest + store_artifact_content","per_backend":{"github":"Gist.edit()","sqlite":"INSERT into artifact_manifest + store content","memory":"dict insert","beads":"bd update --set-metadata"},"backend_agnostic":true},{"id":"G8.groom.artifact_list-discovery-gate-verify","skill":"groom","source_file":"groom/analyze.md:Discovery Gate — step 5","step_label":"mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context') [post-discovery verify]","mcp_tool":"mcp__plugin_dh_backlog__artifact_list","call_params":"item_id={issue_number}, artifact_type='feature-context'","routes_to_protocol_method":"get_manifest","per_backend":{"github":"Gist.edit() — read path","sqlite":"SELECT from artifact_manifest","memory":"dict lookup","beads":"bd update --set-metadata read path"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-finalize-batch","skill":"groom","source_file":"groom/finalize.md:Write Groomed Content — batch write","step_label":"mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', sections={\"RT-ICA\":\"...\",\"Reproducibility\":\"...\", ...}, mark_groomed=True)","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector='{item_ref}', sections={\"RT-ICA\":\"{rt_ica_final_content}\",\"Reproducibility\":\"{reproducibility section text}\",\"Priority\":\"{priority section text}\",\"Acceptance Criteria\":\"{acceptance criteria text}\",\"Files\":\"{files section text}\",\"Resources\":\"{resources section text}\",\"Dependencies\":\"{dependencies section text}\",\"Effort\":\"{effort section text}\"}, mark_groomed=True","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.backlog_view-finalize-verify-rt-ica","skill":"groom","source_file":"groom/finalize.md:Write Groomed Content — verify RT-ICA","step_label":"mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false) [verify RT-ICA persisted]","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector='{item_ref}', summary=false","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-finalize-rt-ica-retry","skill":"groom","source_file":"groom/finalize.md:Write Groomed Content — RT-ICA retry write","step_label":"mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}'","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-finalize-mark-groomed-retry","skill":"groom","source_file":"groom/finalize.md:Write Groomed Content — mark_groomed_skipped retry","step_label":"mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True) [retry when mark_groomed_skipped]","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector='{item_ref}', mark_groomed=True","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-finalize-incremental","skill":"groom","source_file":"groom/finalize.md:Write Groomed Content — incremental section updates","step_label":"mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='{section_name}', content='{content}') [one per section]","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector='{item_ref}', section='{section_name}', content='{content}'","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.backlog_pull-finally","skill":"groom","source_file":"groom/finally.md:Steps — step 1","step_label":"call backlog_pull(selector=<item_ref>) to refresh that single item","mcp_tool":"mcp__plugin_dh_backlog__backlog_pull","call_params":"selector=<item_ref>","routes_to_protocol_method":"pull_single_item","per_backend":{"github":"GraphQL fetch + local cache refresh","sqlite":"SELECT + cache refresh","memory":"dict re-fetch","beads":"bd show + cache update"},"backend_agnostic":true},{"id":"G8.groom.backlog_groom-staleness-functional-drift","skill":"groom","source_file":"work/groom-check.md:Phase 2 actions by token — FUNCTIONAL_DRIFT","step_label":"mcp__plugin_dh_backlog__backlog_groom(selector=\"{title}\", section=\"staleness context\", content=\"Staleness detected {today}: ...\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_groom","call_params":"selector=\"{title}\", section=\"staleness context\", content=\"Staleness detected {today}: functional commits since {groomed_date}.\\n\\n{diff summary}\\n\\nCommits:\\n{list of qualifying commit one-liners}\"","routes_to_protocol_method":"sync_groomed_to_github_issue","per_backend":{"github":"GraphQL updateIssue body","sqlite":"UPDATE items SET body","memory":"dict mutation","beads":"NotImplementedError"},"backend_agnostic":true},{"id":"G8.groom.backlog_close-staleness-superseded","skill":"groom","source_file":"work/groom-check.md:Phase 2 actions by token — SUPERSEDED","step_label":"mcp__plugin_dh_backlog__backlog_close(selector=\"{title}\", reason=\"superseded\", comment=\"Goal already implemented by commits since groom date: {commit sha list}\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_close","call_params":"selector=\"{title}\", reason=\"superseded\", comment=\"Goal already implemented by commits since groom date: {commit sha list}\"","routes_to_protocol_method":"close_github_issue","per_backend":{"github":"GraphQL updateIssue state=CLOSED + comment","sqlite":"UPDATE status='closed'","memory":"dict state='CLOSED'","beads":"bd close"},"backend_agnostic":true},{"id":"G8.work.backlog_view-locate-issue-first","skill":"work","source_file":"work/locate.md:Step 1.2 Issue-First Path","step_label":"Call the mcp__plugin_dh_backlog__backlog_view tool with selector=\"<mode/>\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector=\"<mode/>\"","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.work.backlog_list-interactive-browser","skill":"work","source_file":"work/interactive-browser.md:Step 1.1 — step 1","step_label":"Call the mcp__plugin_dh_backlog__backlog_list tool.","mcp_tool":"mcp__plugin_dh_backlog__backlog_list","call_params":"(no params — full list)","routes_to_protocol_method":"list_items","per_backend":{"github":"GraphQL listIssues","sqlite":"SELECT items","memory":"dict list all","beads":"bd list"},"backend_agnostic":true},{"id":"G8.work.backlog_view-interactive-browser-groomed","skill":"work","source_file":"work/interactive-browser.md:Step 1.1 — step 2","step_label":"call backlog_view(selector=\"{title or #N}\", summary=false)","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector=\"{title or #N}\", summary=false","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.work.backlog_list-find-item-strategy2","skill":"work","source_file":"work/find-item.md:Strategy 2 — Filter-First","step_label":"Call backlog_list(type=type_hint, topic=topic_hint)","mcp_tool":"mcp__plugin_dh_backlog__backlog_list","call_params":"type=type_hint, topic=topic_hint","routes_to_protocol_method":"list_items","per_backend":{"github":"GraphQL listIssues with label filters","sqlite":"SELECT items with type/topic filters","memory":"dict filter","beads":"bd list --type --topic"},"backend_agnostic":true},{"id":"G8.work.backlog_update-github-sync-create-issue","skill":"work","source_file":"work/github-sync.md:Step 2.3 Create Linked Issue","step_label":"Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector=\"{title}\"","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue / createIssue if missing","sqlite":"UPDATE items","memory":"dict mutation","beads":"bd update"},"backend_agnostic":true},{"id":"G8.work.backlog_update-github-sync-set-in-progress","skill":"work","source_file":"work/github-sync.md:Step 2.4 Set In-Progress","step_label":"MCP: backlog_update(selector=\"{title}\", status=\"in-progress\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector=\"{title}\", status=\"in-progress\"","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue labels (add status:in-progress)","sqlite":"UPDATE items SET status='in-progress'","memory":"dict status mutation","beads":"bd update --status in-progress"},"backend_agnostic":true},{"id":"G8.work.backlog_list_issues-milestone-bulk-in-progress","skill":"work","source_file":"work/github-sync.md:Step 2.4 Set In-Progress — bulk milestone","step_label":"backlog_list_issues(milestone=\"{milestone_title}\") [to enumerate milestone issues for bulk status update]","mcp_tool":"mcp__plugin_dh_backlog__backlog_list_issues","call_params":"milestone=\"{milestone_title}\"","routes_to_protocol_method":"list_issues","per_backend":{"github":"GraphQL listIssues filtered by milestone","sqlite":"SELECT items WHERE milestone=N","memory":"dict filter by milestone","beads":"bd list --milestone"},"backend_agnostic":true},{"id":"G8.work.artifact_list-discovery-gate","skill":"work","source_file":"work/validate.md:Step 2.5 Discovery Gate","step_label":"artifact_list(item_id={N}, artifact_type='feature-context')","mcp_tool":"mcp__plugin_dh_backlog__artifact_list","call_params":"item_id={N}, artifact_type='feature-context'","routes_to_protocol_method":"get_manifest","per_backend":{"github":"Gist.edit() — read path","sqlite":"SELECT from artifact_manifest","memory":"dict lookup","beads":"bd update --set-metadata read path"},"backend_agnostic":true},{"id":"G8.work.artifact_list-discovery-gate-verify","skill":"work","source_file":"work/validate.md:Step 2.5 Discovery Gate — verify","step_label":"Call artifact_list(item_id={N}, artifact_type='feature-context') [post dh:discovery verify]","mcp_tool":"mcp__plugin_dh_backlog__artifact_list","call_params":"item_id={N}, artifact_type='feature-context'","routes_to_protocol_method":"get_manifest","per_backend":{"github":"Gist.edit() — read path","sqlite":"SELECT from artifact_manifest","memory":"dict lookup","beads":"bd update --set-metadata read path"},"backend_agnostic":true},{"id":"G8.work.sam_plan-plan-phase-create","skill":"work","source_file":"work/plan.md:Step 4.2 Invoke SAM Planning (via dh:add-new-feature)","step_label":"sam_plan(action='create', slug, goal, tasks=[...], issue) [invoked internally by dh:add-new-feature]","mcp_tool":"mcp__plugin_dh_sam__sam_plan","call_params":"config={\"action\":\"create\",\"slug\":\"{slug}\",\"goal\":\"{goal}\",\"tasks\":[...],\"issue\":\"{issue}\"}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.work.sam_plan-plan-phase-list-search","skill":"work","source_file":"work/plan.md:Step 4.3.1 Search for Plan","step_label":"Call mcp__plugin_dh_sam__sam_plan(config={\"action\": \"list\", \"search\": \"{slug}\"})","mcp_tool":"mcp__plugin_dh_sam__sam_plan","call_params":"config={\"action\":\"list\",\"search\":\"{slug}\"}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.work.backlog_update-plan-reference","skill":"work","source_file":"work/plan.md:Step 4.3.1 — Update after plan found","step_label":"Call mcp__plugin_dh_backlog__backlog_update selector={title} plan=P{id}","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector={title}, plan=P{id}","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue body (plan field)","sqlite":"UPDATE items SET plan=P{id}","memory":"dict plan field mutation","beads":"bd update --set plan"},"backend_agnostic":true},{"id":"G8.work.backlog_update-rt-ica-blocked","skill":"work","source_file":"work/start.md:Error Routing — RT-ICA BLOCKED","step_label":"backlog_update(selector='<item_ref/>', status='blocked')","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector='<item_ref/>', status='blocked'","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue labels (add status:blocked)","sqlite":"UPDATE items SET status='blocked'","memory":"dict status mutation","beads":"bd update --status blocked"},"backend_agnostic":true},{"id":"G8.close.backlog_view-find-item","skill":"close","source_file":"close/start.md:Step 5.2 Find Item","step_label":"Call the mcp__plugin_dh_backlog__backlog_view tool with selector=\"<item_ref/>\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector=\"<item_ref/>\"","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.close.backlog_close-dismiss","skill":"close","source_file":"close/start.md:Step 5.3 Close path — dismiss","step_label":"Call the mcp__plugin_dh_backlog__backlog_close tool with selector=\"{title}\" or \"#{N}\", reason=\"{selected reason}\", reference=\"{reference}\", comment=\"{comment}\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_close","call_params":"selector=\"{title}\" or \"#{N}\", reason=\"{selected reason}\", reference=\"{reference}\" (if provided), comment=\"{comment}\" (if provided)","routes_to_protocol_method":"close_github_issue","per_backend":{"github":"GraphQL updateIssue state=CLOSED + comment","sqlite":"UPDATE status='closed'","memory":"dict state='CLOSED'","beads":"bd close"},"backend_agnostic":true},{"id":"G8.close.backlog_update-pr-pending","skill":"close","source_file":"close/start.md:Step 5.7 — Open PR found path","step_label":"Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\" and status=\"in-progress\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector=\"{title}\", status=\"in-progress\"","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue labels (add status:in-progress)","sqlite":"UPDATE items SET status='in-progress'","memory":"dict status mutation","beads":"bd update --status in-progress"},"backend_agnostic":true},{"id":"G8.close.backlog_resolve-resolve-path","skill":"close","source_file":"close/start.md:Step 5.7 — Invoke backlog resolve","step_label":"Call the mcp__plugin_dh_backlog__backlog_resolve tool with selector, summary, plan, method, notes, follow_ups, findings","mcp_tool":"mcp__plugin_dh_backlog__backlog_resolve","call_params":"selector=\"{title}\" or \"#{N}\", summary=\"{summary}\", plan=\"{plan_address}\" (if present), method=\"{method}\" (if provided), notes=\"{notes}\" (if provided), follow_ups=\"{follow_ups}\" (if provided), findings=\"{findings}\" (if provided)","routes_to_protocol_method":"close_github_issue","per_backend":{"github":"GraphQL updateIssue state=CLOSED + comment","sqlite":"UPDATE status='closed'","memory":"dict state='CLOSED'","beads":"bd close"},"backend_agnostic":true},{"id":"G8.quick.sam_active_task-get","skill":"quick","source_file":"quick/start.md:Step 2a Discover active work","step_label":"Call mcp__plugin_dh_sam__sam_active_task(config={\"action\": \"get\"})","mcp_tool":"mcp__plugin_dh_sam__sam_active_task","call_params":"config={\"action\":\"get\"}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.quick.backlog_list-in-progress","skill":"quick","source_file":"quick/start.md:Step 2a Discover active work","step_label":"Call mcp__plugin_dh_backlog__backlog_list(status=\"in-progress\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_list","call_params":"status=\"in-progress\"","routes_to_protocol_method":"list_items","per_backend":{"github":"GraphQL listIssues with status:in-progress label","sqlite":"SELECT items WHERE status='in-progress'","memory":"dict filter by status","beads":"bd list --status in-progress"},"backend_agnostic":true},{"id":"G8.quick.backlog_view-active-plan-lookup","skill":"quick","source_file":"quick/start.md:Step 2b — read active item plan field","step_label":"backlog_view(selector=\"{first in_progress_items title}\", summary=false) — read item's plan field as active_plan_id","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector=\"{first in_progress_items title}\", summary=false","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.quick.sam_plan-append-task","skill":"quick","source_file":"quick/start.md:Step 2b — append to active plan","step_label":"mcp__plugin_dh_sam__sam_plan(config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{...}})","mcp_tool":"mcp__plugin_dh_sam__sam_plan","call_params":"config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{\"id\":\"T{next_available_id}\",\"title\":\"{title}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1}}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.quick.sam_plan-create","skill":"quick","source_file":"quick/start.md:Step 5 Create quick plan","step_label":"mcp__plugin_dh_sam__sam_plan(config={\"action\":\"create\",\"slug\":\"quick-{slug}\",\"goal\":\"{goal}\",\"tasks\":[{\"id\":\"T1\",\"title\":\"{description}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1,\"complexity\":\"low\"}]})","mcp_tool":"mcp__plugin_dh_sam__sam_plan","call_params":"config={\"action\":\"create\",\"slug\":\"quick-{slug}\",\"goal\":\"{goal from description or acceptance_criteria}\",\"tasks\":[{\"id\":\"T1\",\"title\":\"{description}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1,\"complexity\":\"low\"}]}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.quick.backlog_update-plan-slug","skill":"quick","source_file":"quick/start.md:Step 6 Record plan slug","step_label":"Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\" and plan=\"quick-{slug}\"","mcp_tool":"mcp__plugin_dh_backlog__backlog_update","call_params":"selector=\"{title}\", plan=\"quick-{slug}\"","routes_to_protocol_method":"update_item","per_backend":{"github":"GraphQL updateIssue body (plan field)","sqlite":"UPDATE items SET plan='quick-{slug}'","memory":"dict plan field mutation","beads":"bd update --set plan"},"backend_agnostic":true},{"id":"G8.progress.backlog_list-overview","skill":"progress","source_file":"progress/start.md:Step 1","step_label":"Call backlog_list() to retrieve all open items","mcp_tool":"mcp__plugin_dh_backlog__backlog_list","call_params":"(no params — full list)","routes_to_protocol_method":"list_items","per_backend":{"github":"GraphQL listIssues","sqlite":"SELECT items","memory":"dict list all","beads":"bd list"},"backend_agnostic":true},{"id":"G8.progress.backlog_get_soonest_milestone","skill":"progress","source_file":"progress/start.md:Step 2","step_label":"Use MCP: backlog_get_soonest_milestone()","mcp_tool":"mcp__plugin_dh_backlog__backlog_get_soonest_milestone","call_params":"(no params)","routes_to_protocol_method":"get_soonest_milestone","per_backend":{"github":"GraphQL listMilestones ordered by dueOn","sqlite":"SELECT milestones ORDER BY due_on","memory":"dict milestone lookup","beads":"bd milestone list --soonest"},"backend_agnostic":true},{"id":"G8.resume.backlog_view-get-plan","skill":"resume","source_file":"resume/start.md:Step 2","step_label":"Call backlog_view(selector=\"{title or #N}\", summary=false)","mcp_tool":"mcp__plugin_dh_backlog__backlog_view","call_params":"selector=\"{title or #N}\", summary=false","routes_to_protocol_method":"view_enrich_from_github","per_backend":{"github":"GraphQL fetch issue by number/title","sqlite":"SELECT from items","memory":"dict lookup","beads":"bd show"},"backend_agnostic":true},{"id":"G8.resume.sam_plan-read","skill":"resume","source_file":"resume/start.md:Step 3","step_label":"Read the plan via mcp__plugin_dh_sam__sam_plan(config={\"action\": \"read\"}) using the plan ID extracted from the item's plan field","mcp_tool":"mcp__plugin_dh_sam__sam_plan","call_params":"config={\"action\":\"read\",\"plan\":\"{plan_id_from_item}\"}","routes_to_protocol_method":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","per_backend":{"github":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","sqlite":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","memory":"SAM backends: local/github/memory/beads — see docs/backend-providers.md","beads":"SAM backends: local/github/memory/beads — see docs/backend-providers.md"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_sync","skill":"setup-github","source_file":"setup-github/start.md:Step 1","step_label":"MCP: backlog_sync()","mcp_tool":"mcp__plugin_dh_backlog__backlog_sync","call_params":"(no params)","routes_to_protocol_method":"sync_all","per_backend":{"github":"GraphQL sync labels + issues to local cache","sqlite":"Full sync sweep","memory":"dict rebuild from GitHub","beads":"bd sync"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_list_labels","skill":"setup-github","source_file":"setup-github/start.md:Step 1 — verify labels","step_label":"MCP: backlog_list_labels()","mcp_tool":"mcp__plugin_dh_backlog__backlog_list_labels","call_params":"(no params)","routes_to_protocol_method":"list_labels","per_backend":{"github":"GraphQL listLabels","sqlite":"SELECT labels","memory":"dict label list","beads":"bd label list"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_list_milestones","skill":"setup-github","source_file":"setup-github/start.md:Step 2","step_label":"MCP: backlog_list_milestones()","mcp_tool":"mcp__plugin_dh_backlog__backlog_list_milestones","call_params":"(no params)","routes_to_protocol_method":"list_milestones","per_backend":{"github":"GraphQL listMilestones","sqlite":"SELECT milestones","memory":"dict milestone list","beads":"bd milestone list"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_create_milestone","skill":"setup-github","source_file":"setup-github/start.md:Step 2 — create first milestone","step_label":"MCP: backlog_create_milestone(title=\"v1.0 — Skills Foundation\", description=\"Initial stable milestone for {REPO} skills and plugins\", due_on=\"2026-03-31T00:00:00Z\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_create_milestone","call_params":"title=\"v1.0 — Skills Foundation\", description=\"Initial stable milestone for {REPO} skills and plugins\", due_on=\"2026-03-31T00:00:00Z\"","routes_to_protocol_method":"create_milestone","per_backend":{"github":"GraphQL createMilestone","sqlite":"INSERT into milestones","memory":"dict insert milestone","beads":"bd milestone create"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_list_projects","skill":"setup-github","source_file":"setup-github/start.md:Step 3","step_label":"MCP: backlog_list_projects()","mcp_tool":"mcp__plugin_dh_backlog__backlog_list_projects","call_params":"(no params)","routes_to_protocol_method":"list_projects","per_backend":{"github":"GraphQL listProjects","sqlite":"SELECT projects","memory":"dict project list","beads":"bd project list"},"backend_agnostic":true},{"id":"G8.setup-github.backlog_create_project","skill":"setup-github","source_file":"setup-github/start.md:Step 3 — create project","step_label":"MCP: backlog_create_project(title=\"{REPO} Backlog\")","mcp_tool":"mcp__plugin_dh_backlog__backlog_create_project","call_params":"title=\"{REPO} Backlog\"","routes_to_protocol_method":"create_project","per_backend":{"github":"GraphQL createProjectV2","sqlite":"INSERT into projects","memory":"dict insert project","beads":"bd project create"},"backend_agnostic":true}]}
+{
+  "backend_routing": [
+    {
+      "id": "G8.create.backlog_list-duplicate",
+      "skill": "create",
+      "source_file": "create/start.md:Step 3: Duplicate detection",
+      "step_label": "Call: mcp__plugin_dh_backlog__backlog_list(search=\"{concept1} OR {concept2} OR {concept3}\", match_context=true)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list",
+      "call_params": "search=\"{concept1} OR {concept2} OR {concept3}\", match_context=true",
+      "routes_to_protocol_method": "list_items",
+      "per_backend": {
+        "github": "GraphQL listIssues with label/state filters",
+        "sqlite": "SELECT items with WHERE clause on title/body",
+        "memory": "dict filter over in-memory items",
+        "beads": "bd list with search filter"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.create.backlog_add",
+      "skill": "create",
+      "source_file": "create/start.md:Step 4: Write via MCP",
+      "step_label": "mcp__plugin_dh_backlog__backlog_add(title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_add",
+      "call_params": "title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>'",
+      "routes_to_protocol_method": "create_issue_for_item",
+      "per_backend": {
+        "github": "API create issue",
+        "sqlite": "INSERT into items table",
+        "memory": "dict insert",
+        "beads": "bd create"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_view-intake-load",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Load Item",
+      "step_label": "Verify <item_ref/> exists via mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=true)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector='{item_ref}', summary=true",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_list_merged_prs-intake-check-a",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check A",
+      "step_label": "mcp__plugin_dh_backlog__backlog_list_merged_prs(search='{title keywords}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_merged_prs",
+      "call_params": "search='{title keywords}'",
+      "routes_to_protocol_method": "list_merged_prs",
+      "per_backend": {
+        "github": "GraphQL search merged PRs",
+        "sqlite": "SELECT merged PRs",
+        "memory": "dict filter on merged PRs",
+        "beads": "bd list --merged"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_resolve-intake-check-a",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check A",
+      "step_label": "mcp__plugin_dh_backlog__backlog_resolve(selector='{item_ref}', summary='Completed via PR #{pr} / commit {sha}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_resolve",
+      "call_params": "selector='{item_ref}', summary='Completed via PR #{pr} / commit {sha}'",
+      "routes_to_protocol_method": "close_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue state=CLOSED + comment",
+        "sqlite": "UPDATE status='closed'",
+        "memory": "dict state='CLOSED'",
+        "beads": "bd close"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_comment_issue-intake-check-a",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check A",
+      "step_label": "mcp__plugin_dh_backlog__backlog_comment_issue(issue_number={issue_number}, body='Completed via {evidence}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_comment_issue",
+      "call_params": "issue_number={issue_number}, body='Completed via {evidence}'",
+      "routes_to_protocol_method": "add_comment",
+      "per_backend": {
+        "github": "GraphQL addComment on issue",
+        "sqlite": "INSERT into comments table",
+        "memory": "dict append to comments list",
+        "beads": "bd comment"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_view-intake-check-d",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check D",
+      "step_label": "mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=true)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector='{item_ref}', summary=true",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_resolve-intake-check-d",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check D",
+      "step_label": "backlog_resolve(selector='{item_ref}', summary='...')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_resolve",
+      "call_params": "selector='{item_ref}', summary='...'",
+      "routes_to_protocol_method": "close_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue state=CLOSED + comment",
+        "sqlite": "UPDATE status='closed'",
+        "memory": "dict state='CLOSED'",
+        "beads": "bd close"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-check-b-location",
+      "skill": "groom",
+      "source_file": "groom/intake.md:Validate: Pre-Groom Checks — Check B",
+      "step_label": "backlog_groom(selector='{item_ref}', section='Suggested Location', content='{substitute}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector='{item_ref}', section='Suggested Location', content='{substitute}'",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.artifact_list-discovery-gate",
+      "skill": "groom",
+      "source_file": "groom/analyze.md:Discovery Gate — step 1",
+      "step_label": "mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
+      "call_params": "item_id={issue_number}, artifact_type='feature-context'",
+      "routes_to_protocol_method": "get_manifest",
+      "per_backend": {
+        "github": "Gist.edit() — read path",
+        "sqlite": "SELECT from artifact_manifest",
+        "memory": "dict lookup",
+        "beads": "bd update --set-metadata read path"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.artifact_read-discovery-gate",
+      "skill": "groom",
+      "source_file": "groom/analyze.md:Discovery Gate — step 2",
+      "step_label": "mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type='feature-context')",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_read",
+      "call_params": "item_id={issue_number}, artifact_type='feature-context'",
+      "routes_to_protocol_method": "read_artifact_content_from_remote",
+      "per_backend": {
+        "github": "Gist.edit() — read content",
+        "sqlite": "SELECT artifact content",
+        "memory": "dict content lookup",
+        "beads": "bd update --set-metadata read path"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_view-discovery-gate-rich-check",
+      "skill": "groom",
+      "source_file": "groom/analyze.md:Discovery Gate — step 3",
+      "step_label": "mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector='{item_ref}', summary=false",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.artifact_register-discovery-gate-synthesize",
+      "skill": "groom",
+      "source_file": "groom/analyze.md:Discovery Gate — step 3 (synthesize)",
+      "step_label": "mcp__plugin_dh_backlog__artifact_register(item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='...')",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_register",
+      "call_params": "item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='# ARTIFACT:DISCOVERY\\n...'",
+      "routes_to_protocol_method": "set_manifest + store_artifact_content",
+      "per_backend": {
+        "github": "Gist.edit()",
+        "sqlite": "INSERT into artifact_manifest + store content",
+        "memory": "dict insert",
+        "beads": "bd update --set-metadata"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.artifact_list-discovery-gate-verify",
+      "skill": "groom",
+      "source_file": "groom/analyze.md:Discovery Gate — step 5",
+      "step_label": "mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context') [post-discovery verify]",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
+      "call_params": "item_id={issue_number}, artifact_type='feature-context'",
+      "routes_to_protocol_method": "get_manifest",
+      "per_backend": {
+        "github": "Gist.edit() — read path",
+        "sqlite": "SELECT from artifact_manifest",
+        "memory": "dict lookup",
+        "beads": "bd update --set-metadata read path"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-finalize-batch",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Write Groomed Content — batch write",
+      "step_label": "mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', sections={\"RT-ICA\":\"...\",\"Reproducibility\":\"...\", ...}, mark_groomed=True)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector='{item_ref}', sections={\"RT-ICA\":\"{rt_ica_final_content}\",\"Reproducibility\":\"{reproducibility section text}\",\"Priority\":\"{priority section text}\",\"Acceptance Criteria\":\"{acceptance criteria text}\",\"Files\":\"{files section text}\",\"Resources\":\"{resources section text}\",\"Dependencies\":\"{dependencies section text}\",\"Effort\":\"{effort section text}\"}, mark_groomed=True",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_view-finalize-verify-rt-ica",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Write Groomed Content — verify RT-ICA",
+      "step_label": "mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false) [verify RT-ICA persisted]",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector='{item_ref}', summary=false",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-finalize-rt-ica-retry",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Write Groomed Content — RT-ICA retry write",
+      "step_label": "mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}'",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-finalize-mark-groomed-retry",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Write Groomed Content — mark_groomed_skipped retry",
+      "step_label": "mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True) [retry when mark_groomed_skipped]",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector='{item_ref}', mark_groomed=True",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-finalize-incremental",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Write Groomed Content — incremental section updates",
+      "step_label": "mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='{section_name}', content='{content}') [one per section]",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector='{item_ref}', section='{section_name}', content='{content}'",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_pull-finally",
+      "skill": "groom",
+      "source_file": "groom/finally.md:Steps — step 1",
+      "step_label": "call backlog_pull(selector=<item_ref>) to refresh that single item",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_pull",
+      "call_params": "selector=<item_ref>",
+      "routes_to_protocol_method": "pull_single_item",
+      "per_backend": {
+        "github": "GraphQL fetch + local cache refresh",
+        "sqlite": "SELECT + cache refresh",
+        "memory": "dict re-fetch",
+        "beads": "bd show + cache update"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_groom-staleness-functional-drift",
+      "skill": "groom",
+      "source_file": "work/groom-check.md:Phase 2 actions by token — FUNCTIONAL_DRIFT",
+      "step_label": "mcp__plugin_dh_backlog__backlog_groom(selector=\"{title}\", section=\"staleness context\", content=\"Staleness detected {today}: ...\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_groom",
+      "call_params": "selector=\"{title}\", section=\"staleness context\", content=\"Staleness detected {today}: functional commits since {groomed_date}.\\n\\n{diff summary}\\n\\nCommits:\\n{list of qualifying commit one-liners}\"",
+      "routes_to_protocol_method": "sync_groomed_to_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue body",
+        "sqlite": "UPDATE items SET body",
+        "memory": "dict mutation",
+        "beads": "NotImplementedError"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.groom.backlog_close-staleness-superseded",
+      "skill": "groom",
+      "source_file": "work/groom-check.md:Phase 2 actions by token — SUPERSEDED",
+      "step_label": "mcp__plugin_dh_backlog__backlog_close(selector=\"{title}\", reason=\"superseded\", comment=\"Goal already implemented by commits since groom date: {commit sha list}\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_close",
+      "call_params": "selector=\"{title}\", reason=\"superseded\", comment=\"Goal already implemented by commits since groom date: {commit sha list}\"",
+      "routes_to_protocol_method": "close_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue state=CLOSED + comment",
+        "sqlite": "UPDATE status='closed'",
+        "memory": "dict state='CLOSED'",
+        "beads": "bd close"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_view-locate-issue-first",
+      "skill": "work",
+      "source_file": "work/locate.md:Step 1.2 Issue-First Path",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_view tool with selector=\"<mode/>\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector=\"<mode/>\"",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_list-interactive-browser",
+      "skill": "work",
+      "source_file": "work/interactive-browser.md:Step 1.1 — step 1",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_list tool.",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list",
+      "call_params": "(no params — full list)",
+      "routes_to_protocol_method": "list_items",
+      "per_backend": {
+        "github": "GraphQL listIssues",
+        "sqlite": "SELECT items",
+        "memory": "dict list all",
+        "beads": "bd list"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_view-interactive-browser-groomed",
+      "skill": "work",
+      "source_file": "work/interactive-browser.md:Step 1.1 — step 2",
+      "step_label": "call backlog_view(selector=\"{title or #N}\", summary=false)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector=\"{title or #N}\", summary=false",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_list-find-item-strategy2",
+      "skill": "work",
+      "source_file": "work/find-item.md:Strategy 2 — Filter-First",
+      "step_label": "Call backlog_list(type=type_hint, topic=topic_hint)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list",
+      "call_params": "type=type_hint, topic=topic_hint",
+      "routes_to_protocol_method": "list_items",
+      "per_backend": {
+        "github": "GraphQL listIssues with label filters",
+        "sqlite": "SELECT items with type/topic filters",
+        "memory": "dict filter",
+        "beads": "bd list --type --topic"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_update-github-sync-create-issue",
+      "skill": "work",
+      "source_file": "work/github-sync.md:Step 2.3 Create Linked Issue",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector=\"{title}\"",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue / createIssue if missing",
+        "sqlite": "UPDATE items",
+        "memory": "dict mutation",
+        "beads": "bd update"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_update-github-sync-set-in-progress",
+      "skill": "work",
+      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress",
+      "step_label": "MCP: backlog_update(selector=\"{title}\", status=\"in-progress\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector=\"{title}\", status=\"in-progress\"",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue labels (add status:in-progress)",
+        "sqlite": "UPDATE items SET status='in-progress'",
+        "memory": "dict status mutation",
+        "beads": "bd update --status in-progress"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_list_issues-milestone-bulk-in-progress",
+      "skill": "work",
+      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress — bulk milestone",
+      "step_label": "backlog_list_issues(milestone=\"{milestone_title}\") [to enumerate milestone issues for bulk status update]",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_issues",
+      "call_params": "milestone=\"{milestone_title}\"",
+      "routes_to_protocol_method": "list_issues",
+      "per_backend": {
+        "github": "GraphQL listIssues filtered by milestone",
+        "sqlite": "SELECT items WHERE milestone=N",
+        "memory": "dict filter by milestone",
+        "beads": "bd list --milestone"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.artifact_list-discovery-gate",
+      "skill": "work",
+      "source_file": "work/validate.md:Step 2.5 Discovery Gate",
+      "step_label": "artifact_list(item_id={N}, artifact_type='feature-context')",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
+      "call_params": "item_id={N}, artifact_type='feature-context'",
+      "routes_to_protocol_method": "get_manifest",
+      "per_backend": {
+        "github": "Gist.edit() — read path",
+        "sqlite": "SELECT from artifact_manifest",
+        "memory": "dict lookup",
+        "beads": "bd update --set-metadata read path"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.artifact_list-discovery-gate-verify",
+      "skill": "work",
+      "source_file": "work/validate.md:Step 2.5 Discovery Gate — verify",
+      "step_label": "Call artifact_list(item_id={N}, artifact_type='feature-context') [post dh:discovery verify]",
+      "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
+      "call_params": "item_id={N}, artifact_type='feature-context'",
+      "routes_to_protocol_method": "get_manifest",
+      "per_backend": {
+        "github": "Gist.edit() — read path",
+        "sqlite": "SELECT from artifact_manifest",
+        "memory": "dict lookup",
+        "beads": "bd update --set-metadata read path"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.sam_plan-plan-phase-create",
+      "skill": "work",
+      "source_file": "work/plan.md:Step 4.2 Invoke SAM Planning (via dh:add-new-feature)",
+      "step_label": "sam_plan(action='create', slug, goal, tasks=[...], issue) [invoked internally by dh:add-new-feature]",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
+      "call_params": "config={\"action\":\"create\",\"slug\":\"{slug}\",\"goal\":\"{goal}\",\"tasks\":[...],\"issue\":\"{issue}\"}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.sam_plan-plan-phase-list-search",
+      "skill": "work",
+      "source_file": "work/plan.md:Step 4.3.1 Search for Plan",
+      "step_label": "Call mcp__plugin_dh_sam__sam_plan(config={\"action\": \"list\", \"search\": \"{slug}\"})",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
+      "call_params": "config={\"action\":\"list\",\"search\":\"{slug}\"}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_update-plan-reference",
+      "skill": "work",
+      "source_file": "work/plan.md:Step 4.3.1 — Update after plan found",
+      "step_label": "Call mcp__plugin_dh_backlog__backlog_update selector={title} plan=P{id}",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector={title}, plan=P{id}",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue body (plan field)",
+        "sqlite": "UPDATE items SET plan=P{id}",
+        "memory": "dict plan field mutation",
+        "beads": "bd update --set plan"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.work.backlog_update-rt-ica-blocked",
+      "skill": "work",
+      "source_file": "work/start.md:Error Routing — RT-ICA BLOCKED",
+      "step_label": "backlog_update(selector='<item_ref/>', status='blocked')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector='<item_ref/>', status='blocked'",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue labels (add status:blocked)",
+        "sqlite": "UPDATE items SET status='blocked'",
+        "memory": "dict status mutation",
+        "beads": "bd update --status blocked"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.close.backlog_view-find-item",
+      "skill": "close",
+      "source_file": "close/start.md:Step 5.2 Find Item",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_view tool with selector=\"<item_ref/>\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector=\"<item_ref/>\"",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.close.backlog_close-dismiss",
+      "skill": "close",
+      "source_file": "close/start.md:Step 5.3 Close path — dismiss",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_close tool with selector=\"{title}\" or \"#{N}\", reason=\"{selected reason}\", reference=\"{reference}\", comment=\"{comment}\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_close",
+      "call_params": "selector=\"{title}\" or \"#{N}\", reason=\"{selected reason}\", reference=\"{reference}\" (if provided), comment=\"{comment}\" (if provided)",
+      "routes_to_protocol_method": "close_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue state=CLOSED + comment",
+        "sqlite": "UPDATE status='closed'",
+        "memory": "dict state='CLOSED'",
+        "beads": "bd close"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.close.backlog_update-pr-pending",
+      "skill": "close",
+      "source_file": "close/start.md:Step 5.7 — Open PR found path",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\" and status=\"in-progress\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector=\"{title}\", status=\"in-progress\"",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue labels (add status:in-progress)",
+        "sqlite": "UPDATE items SET status='in-progress'",
+        "memory": "dict status mutation",
+        "beads": "bd update --status in-progress"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.close.backlog_resolve-resolve-path",
+      "skill": "close",
+      "source_file": "close/start.md:Step 5.7 — Invoke backlog resolve",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_resolve tool with selector, summary, plan, method, notes, follow_ups, findings",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_resolve",
+      "call_params": "selector=\"{title}\" or \"#{N}\", summary=\"{summary}\", plan=\"{plan_address}\" (if present), method=\"{method}\" (if provided), notes=\"{notes}\" (if provided), follow_ups=\"{follow_ups}\" (if provided), findings=\"{findings}\" (if provided)",
+      "routes_to_protocol_method": "close_github_issue",
+      "per_backend": {
+        "github": "GraphQL updateIssue state=CLOSED + comment",
+        "sqlite": "UPDATE status='closed'",
+        "memory": "dict state='CLOSED'",
+        "beads": "bd close"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.sam_active_task-get",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 2a Discover active work",
+      "step_label": "Call mcp__plugin_dh_sam__sam_active_task(config={\"action\": \"get\"})",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_active_task",
+      "call_params": "config={\"action\":\"get\"}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.backlog_list-in-progress",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 2a Discover active work",
+      "step_label": "Call mcp__plugin_dh_backlog__backlog_list(status=\"in-progress\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list",
+      "call_params": "status=\"in-progress\"",
+      "routes_to_protocol_method": "list_items",
+      "per_backend": {
+        "github": "GraphQL listIssues with status:in-progress label",
+        "sqlite": "SELECT items WHERE status='in-progress'",
+        "memory": "dict filter by status",
+        "beads": "bd list --status in-progress"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.backlog_view-active-plan-lookup",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 2b — read active item plan field",
+      "step_label": "backlog_view(selector=\"{first in_progress_items title}\", summary=false) — read item's plan field as active_plan_id",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector=\"{first in_progress_items title}\", summary=false",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.sam_plan-append-task",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 2b — append to active plan",
+      "step_label": "mcp__plugin_dh_sam__sam_plan(config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{...}})",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
+      "call_params": "config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{\"id\":\"T{next_available_id}\",\"title\":\"{title}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1}}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.sam_plan-create",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 5 Create quick plan",
+      "step_label": "mcp__plugin_dh_sam__sam_plan(config={\"action\":\"create\",\"slug\":\"quick-{slug}\",\"goal\":\"{goal}\",\"tasks\":[{\"id\":\"T1\",\"title\":\"{description}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1,\"complexity\":\"low\"}]})",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
+      "call_params": "config={\"action\":\"create\",\"slug\":\"quick-{slug}\",\"goal\":\"{goal from description or acceptance_criteria}\",\"tasks\":[{\"id\":\"T1\",\"title\":\"{description}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1,\"complexity\":\"low\"}]}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.quick.backlog_update-plan-slug",
+      "skill": "quick",
+      "source_file": "quick/start.md:Step 6 Record plan slug",
+      "step_label": "Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\" and plan=\"quick-{slug}\"",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector=\"{title}\", plan=\"quick-{slug}\"",
+      "routes_to_protocol_method": "update_item",
+      "per_backend": {
+        "github": "GraphQL updateIssue body (plan field)",
+        "sqlite": "UPDATE items SET plan='quick-{slug}'",
+        "memory": "dict plan field mutation",
+        "beads": "bd update --set plan"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.progress.backlog_list-overview",
+      "skill": "progress",
+      "source_file": "progress/start.md:Step 1",
+      "step_label": "Call backlog_list() to retrieve all open items",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list",
+      "call_params": "(no params — full list)",
+      "routes_to_protocol_method": "list_items",
+      "per_backend": {
+        "github": "GraphQL listIssues",
+        "sqlite": "SELECT items",
+        "memory": "dict list all",
+        "beads": "bd list"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.progress.backlog_get_soonest_milestone",
+      "skill": "progress",
+      "source_file": "progress/start.md:Step 2",
+      "step_label": "Use MCP: backlog_get_soonest_milestone()",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_get_soonest_milestone",
+      "call_params": "(no params)",
+      "routes_to_protocol_method": "get_soonest_milestone",
+      "per_backend": {
+        "github": "GraphQL listMilestones ordered by dueOn",
+        "sqlite": "SELECT milestones ORDER BY due_on",
+        "memory": "dict milestone lookup",
+        "beads": "bd milestone list --soonest"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.resume.backlog_view-get-plan",
+      "skill": "resume",
+      "source_file": "resume/start.md:Step 2",
+      "step_label": "Call backlog_view(selector=\"{title or #N}\", summary=false)",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_view",
+      "call_params": "selector=\"{title or #N}\", summary=false",
+      "routes_to_protocol_method": "view_enrich_from_github",
+      "per_backend": {
+        "github": "GraphQL fetch issue by number/title",
+        "sqlite": "SELECT from items",
+        "memory": "dict lookup",
+        "beads": "bd show"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.resume.sam_plan-read",
+      "skill": "resume",
+      "source_file": "resume/start.md:Step 3",
+      "step_label": "Read the plan via mcp__plugin_dh_sam__sam_plan(config={\"action\": \"read\"}) using the plan ID extracted from the item's plan field",
+      "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
+      "call_params": "config={\"action\":\"read\",\"plan\":\"{plan_id_from_item}\"}",
+      "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+      "per_backend": {
+        "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "sqlite": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "memory": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
+        "beads": "SAM backends: local/github/memory/beads — see docs/backend-providers.md"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_sync",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 1",
+      "step_label": "MCP: backlog_sync()",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_sync",
+      "call_params": "(no params)",
+      "routes_to_protocol_method": "sync_all",
+      "per_backend": {
+        "github": "GraphQL sync labels + issues to local cache",
+        "sqlite": "Full sync sweep",
+        "memory": "dict rebuild from GitHub",
+        "beads": "bd sync"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_list_labels",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 1 — verify labels",
+      "step_label": "MCP: backlog_list_labels()",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_labels",
+      "call_params": "(no params)",
+      "routes_to_protocol_method": "list_labels",
+      "per_backend": {
+        "github": "GraphQL listLabels",
+        "sqlite": "SELECT labels",
+        "memory": "dict label list",
+        "beads": "bd label list"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_list_milestones",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 2",
+      "step_label": "MCP: backlog_list_milestones()",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_milestones",
+      "call_params": "(no params)",
+      "routes_to_protocol_method": "list_milestones",
+      "per_backend": {
+        "github": "GraphQL listMilestones",
+        "sqlite": "SELECT milestones",
+        "memory": "dict milestone list",
+        "beads": "bd milestone list"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_create_milestone",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 2 — create first milestone",
+      "step_label": "MCP: backlog_create_milestone(title=\"v1.0 — Skills Foundation\", description=\"Initial stable milestone for {REPO} skills and plugins\", due_on=\"2026-03-31T00:00:00Z\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_create_milestone",
+      "call_params": "title=\"v1.0 — Skills Foundation\", description=\"Initial stable milestone for {REPO} skills and plugins\", due_on=\"2026-03-31T00:00:00Z\"",
+      "routes_to_protocol_method": "create_milestone",
+      "per_backend": {
+        "github": "GraphQL createMilestone",
+        "sqlite": "INSERT into milestones",
+        "memory": "dict insert milestone",
+        "beads": "bd milestone create"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_list_projects",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 3",
+      "step_label": "MCP: backlog_list_projects()",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_projects",
+      "call_params": "(no params)",
+      "routes_to_protocol_method": "list_projects",
+      "per_backend": {
+        "github": "GraphQL listProjects",
+        "sqlite": "SELECT projects",
+        "memory": "dict project list",
+        "beads": "bd project list"
+      },
+      "backend_agnostic": true
+    },
+    {
+      "id": "G8.setup-github.backlog_create_project",
+      "skill": "setup-github",
+      "source_file": "setup-github/start.md:Step 3 — create project",
+      "step_label": "MCP: backlog_create_project(title=\"{REPO} Backlog\")",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_create_project",
+      "call_params": "title=\"{REPO} Backlog\"",
+      "routes_to_protocol_method": "create_project",
+      "per_backend": {
+        "github": "GraphQL createProjectV2",
+        "sqlite": "INSERT into projects",
+        "memory": "dict insert project",
+        "beads": "bd project create"
+      },
+      "backend_agnostic": true
+    }
+  ]
+}
