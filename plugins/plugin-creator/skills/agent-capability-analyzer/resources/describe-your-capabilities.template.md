@@ -36,6 +36,6 @@ After completing all sections, run this exact command (replace `CAPABILITIES_HER
 node $CLAUDE_PLUGIN_ROOT/scripts/update-agent-map.mjs --name "AGENT_ID_HERE" --capabilities 'CAPABILITIES_HERE'
 ```
 
-Confirm success by reporting: `Updated agent-map.db`
+Confirm success by reporting: `Updated agent-map.sqlite`
 
 If the Bash tool is unavailable, return only the tagged content so the orchestrator can write it.

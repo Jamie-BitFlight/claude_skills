@@ -16,11 +16,6 @@ default_stages:
   - pre-commit
 
 repos:
-  - repo: https://github.com/mxr/sync-pre-commit-deps
-    rev: v0.0.3
-    hooks:
-      - id: sync-pre-commit-deps
-
   # prek now correctly passes commit message file path (issue #1194 fixed)
   - repo: local
     hooks:
@@ -93,10 +88,17 @@ repos:
       - id: ruff-format
         name: Format Python with ruff
   # JavaScript/TypeScript formatting and linting with Biome
-  - repo: https://github.com/biomejs/pre-commit
-    rev: v2.4.8
+  # language: node + additional_dependencies lets prek install biome into its own
+  # isolated cache before running — avoids ETXTBSY race when batches run in parallel.
+  - repo: local
     hooks:
       - id: biome-check
+        name: Biome check
+        entry: biome check --write
+        language: node
+        additional_dependencies: ["@biomejs/biome@2.4.16"]
+        types_or: [javascript, jsx, ts, tsx, json, css]
+        pass_filenames: true
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.0

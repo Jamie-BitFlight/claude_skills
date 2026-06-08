@@ -14,8 +14,7 @@ edge cases.
 3. [Two-step saving process](#two-step-saving-process)
 4. [Router entry format](#router-entry-format)
 5. [Index discipline rules](#index-discipline-rules)
-6. [Index audit checks (binary pass/fail)](#index-audit-checks-binary-passfall)
-7. [Good vs bad router entries](#good-vs-bad-router-entries)
+6. [Index audit checks (binary pass/fail)](#index-audit-checks-binary-passfail)
 
 ---
 

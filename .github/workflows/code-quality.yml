@@ -209,39 +209,6 @@ jobs:
         run: uv run -q pytest
 
   # =============================================================================
-  # JavaScript/TypeScript: test suite
-  # No tests defined yet — job passes when no test script exists in package.json,
-  # and automatically becomes blocking once `npm test` is wired up.
-  # =============================================================================
-  test-node:
-    name: JS/TS / Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          package-manager-cache: false
-
-      - name: Install dependencies
-        run: npm install --ignore-scripts
-
-      - name: Run tests
-        run: |
-          if node -e "const p = require('./package.json'); process.exit(p.scripts && p.scripts.test ? 0 : 1)" 2>/dev/null; then
-            npm test
-          else
-            echo "No test script defined in package.json — skipping"
-          fi
-
-  # =============================================================================
   # Python: Cross-backend protocol compliance tests
   # Matrix runs InMemoryBackend and SQLiteBackend via pytest parametrization.
   # GitHubBackend tests are skipped (require BACKLOG_CROSS_BACKEND_GITHUB=1
@@ -317,7 +284,6 @@ jobs:
       - manifest-sync
       - file-hygiene
       - test-python
-      - test-node
       - test-cross-backend
     runs-on: ubuntu-latest
     steps:

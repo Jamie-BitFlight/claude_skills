@@ -144,6 +144,22 @@ def test_resolve_plan_address_collision_error_message_suggests_disambiguation(pl
     assert "Disambiguate" in str(exc_info.value) or "disambiguate" in str(exc_info.value).lower()
 
 
+def test_resolve_plan_address_sha256_sidecar_not_a_collision(plan_dir: Path) -> None:
+    # Regression test: a .sha256 hash sidecar written by GistTaskLayer._write_through
+    # next to the .yaml plan file must NOT be treated as a second matching plan,
+    # which would cause AddressingError for all-decimal UUID hex plan IDs (e.g. P17643163).
+    # Arrange — plan file and its hash sidecar coexist
+    (plan_dir / "P17643163-finalize-plan.yaml").touch()
+    (plan_dir / "P17643163-finalize-plan.sha256").write_text("abc123hash")
+
+    # Act — must resolve without raising AddressingError
+    path = resolve_plan_address("P17643163", plan_dir)
+
+    # Assert — resolves to the .yaml file, not the sidecar
+    assert path.name == "P17643163-finalize-plan.yaml"
+    assert path.suffix == ".yaml"
+
+
 # ---------------------------------------------------------------------------
 # resolve_plan_address — slug resolution
 # ---------------------------------------------------------------------------

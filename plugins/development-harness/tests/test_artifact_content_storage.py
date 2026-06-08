@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from github.AuthenticatedUser import AuthenticatedUser
+
 # Ensure graphql_factories is importable regardless of pytest invocation path.
 _tests_dir = Path(__file__).parent
 if str(_tests_dir) not in sys.path:
@@ -264,7 +266,9 @@ def test_store_artifact_content_creates_new_gist_when_none_exists(tmp_path: Path
     mock_gist = MagicMock()
     mock_gist.id = "abc123deadbeef00"
     mock_gh_client = MagicMock()
-    mock_gh_client.get_user.return_value.create_gist.return_value = mock_gist
+    mock_user = MagicMock(spec=AuthenticatedUser)
+    mock_user.create_gist.return_value = mock_gist
+    mock_gh_client.get_user.return_value = mock_user
 
     responses = [
         make_issue_by_number_response(issue_node),  # _fetch_issue_graphql

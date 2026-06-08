@@ -46,6 +46,7 @@ T4 scope:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from io import StringIO
 from pathlib import Path
@@ -53,7 +54,7 @@ from typing import TYPE_CHECKING, Any
 
 from ruamel.yaml import YAML
 
-from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError
+from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError, PlanNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -573,6 +574,12 @@ class GistTaskLayer:
         ``artifact_client.store()``.  Raises ``ArtifactWriteError`` on any
         failure — no silent fallback.
 
+        Content-hash deduplication: uploads are skipped when the YAML content
+        is identical to the last successfully uploaded version, tracked via a
+        ``.sha256`` sidecar file next to the local YAML.  Sidecar read/write
+        failures are non-fatal; the upload proceeds when the sidecar is absent
+        or unreadable.
+
         Args:
             plan_id: Plan identifier whose YAML to upload.
             issue: GitHub issue number keying the Gist artifact.
@@ -582,6 +589,36 @@ class GistTaskLayer:
                 the Gist upload fails.
         """
         yaml_content = self._read_local_yaml_for_plan(plan_id)
+        content_hash = hashlib.sha256(yaml_content.encode()).hexdigest()
+
+        # Resolve sidecar path best-effort — _resolve_path should not fail here
+        # since _read_local_yaml_for_plan just succeeded, but guard against races.
+        hash_sidecar: Path | None = None
+        try:
+            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+            hash_sidecar = local_path.with_suffix(".sha256")
+        except PlanNotFoundError:
+            _log.debug(
+                "GistTaskLayer._write_through: path resolution failed for plan %s — skipping hash dedup", plan_id
+            )
+
+        # Skip the Gist PATCH when the content is unchanged since last upload.
+        if hash_sidecar is not None:
+            try:
+                if hash_sidecar.read_text().strip() == content_hash:
+                    _log.debug(
+                        "GistTaskLayer._write_through: content unchanged for plan %s (issue #%d), skipping Gist PATCH",
+                        plan_id,
+                        issue,
+                    )
+                    return
+            except OSError:
+                _log.debug(
+                    "GistTaskLayer._write_through: sidecar read failed for plan %s — uploading as normal",
+                    plan_id,
+                    exc_info=True,
+                )
+
         try:
             self._artifact_client.store(issue=issue, content=yaml_content)
             _log.info("GistTaskLayer._write_through: uploaded plan %s YAML to Gist (issue #%d)", plan_id, issue)
@@ -590,6 +627,16 @@ class GistTaskLayer:
                 "GistTaskLayer._write_through: Gist upload failed for plan %s (issue #%d) — raising", plan_id, issue
             )
             raise
+
+        if hash_sidecar is not None:
+            try:
+                hash_sidecar.write_text(content_hash)
+            except OSError:
+                _log.debug(
+                    "GistTaskLayer._write_through: sidecar write failed for plan %s — dedup skipped next call",
+                    plan_id,
+                    exc_info=True,
+                )
 
     def update_plan_fields(
         self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None

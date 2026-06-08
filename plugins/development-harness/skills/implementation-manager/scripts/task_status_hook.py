@@ -302,8 +302,8 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
         task_id = context_data.get("task_id")
         if task_file and task_id:
             return task_file, task_id
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as exc:
+        print(f"[hook] read_task_context: malformed JSON in {context_file}: {exc}", file=sys.stderr)
 
     return None, None
 
@@ -325,45 +325,15 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
         is the raw string value from the MCP response (plan address or path).
         All ``None`` when the call fails or active task is not set.
     """
-    uv = shutil.which("uv")
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
-        return None, None, None
-
     resolved = session_id or "_default"
-    input_data = json.dumps({"config": {"action": "get"}, "session_id": resolved})
-    env = os.environ.copy()
-    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
-    env["FASTMCP_LOG_ENABLED"] = "false"
-
-    try:
-        result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                "sam_active_task",
-                "--input-json",
-                input_data,
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-        return None, None, None
-
-    if result.returncode != 0:
+    stdout = _call_sam_fastmcp(
+        {"config": {"action": "get"}, "session_id": resolved}, timeout=timeout, target="sam_active_task"
+    )
+    if stdout is None:
         return None, None, None
 
     try:
-        outer = json.loads(result.stdout)
+        outer = json.loads(stdout)
         text = outer["content"][0]["text"]
         data: dict[str, Any] = json.loads(text)
         active = data.get("active_task")
@@ -393,41 +363,11 @@ def _call_sam_active_task_clear(session_id: str, timeout: int = 10) -> bool:
     Returns:
         ``True`` if the active task was successfully cleared, ``False`` otherwise.
     """
-    uv = shutil.which("uv")
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
-        return False
-
     resolved = session_id or "_default"
-    input_data = json.dumps({"config": {"action": "clear"}, "session_id": resolved})
-    env = os.environ.copy()
-    env["FASTMCP_SHOW_SERVER_BANNER"] = "false"
-    env["FASTMCP_LOG_ENABLED"] = "false"
-
-    try:
-        result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                "sam_active_task",
-                "--input-json",
-                input_data,
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-        return False
-    else:
-        return result.returncode == 0
+    stdout = _call_sam_fastmcp(
+        {"config": {"action": "clear"}, "session_id": resolved}, timeout=timeout, target="sam_active_task"
+    )
+    return stdout is not None
 
 
 def _get_uv_executable() -> str | None:
@@ -439,7 +379,7 @@ def _get_uv_executable() -> str | None:
     return shutil.which("uv")
 
 
-def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15) -> str | None:
+def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15, target: str = "sam_task") -> str | None:
     """Execute a fastmcp call against the SAM server and return raw stdout.
 
     Handles uv resolution, environment setup, subprocess execution, and
@@ -449,6 +389,8 @@ def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15) -> str | No
     Args:
         input_data: Dict to serialise as the ``--input-json`` argument.
         timeout: Subprocess timeout in seconds.
+        target: MCP tool name to invoke on the SAM server (e.g. ``"sam_task"``
+            or ``"sam_active_task"``). Defaults to ``"sam_task"``.
 
     Returns:
         Raw stdout string on success, None on any failure (uv missing,
@@ -469,7 +411,7 @@ def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15) -> str | No
                 "--command",
                 f"uv run --script {_SAM_RUN_SERVER_PATH}",
                 "--target",
-                "sam_task",
+                target,
                 "--input-json",
                 json.dumps(input_data),
                 "--json",
@@ -485,7 +427,7 @@ def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15) -> str | No
 
     if result.returncode != 0:
         if result.stderr:
-            print(f"[hook] fastmcp sam_task failed: {result.stderr.strip()}", file=sys.stderr)
+            print(f"[hook] fastmcp {target} failed: {result.stderr.strip()}", file=sys.stderr)
         return None
 
     return result.stdout
@@ -619,7 +561,7 @@ def _cleanup_active_task_context(session_id: str | None, fallback_context_file: 
         mcp_cleared = _call_sam_active_task_clear(session_id)
 
     if not mcp_cleared and fallback_context_file is not None:
-        with contextlib.suppress(OSError):
+        with contextlib.suppress(FileNotFoundError):
             fallback_context_file.unlink()
 
 

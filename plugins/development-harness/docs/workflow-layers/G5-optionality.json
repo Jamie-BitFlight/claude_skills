@@ -1,0 +1,494 @@
+{
+  "optionality": [
+    {
+      "id": "G5.work-backlog-item.parser-run",
+      "skill": "work-backlog-item",
+      "source_file": "SKILL.md:Arguments",
+      "step_label": "Run parser script node scripts/parser/parse.mjs with ARGUMENTS",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.work-backlog-item.interactive-browser",
+      "skill": "work-backlog-item",
+      "source_file": "SKILL.md:Routing",
+      "step_label": "Load references/workflows/work/interactive-browser.md Step 1.1 — interactive browser",
+      "optionality": "conditional",
+      "skip_condition": "mode value is empty or absent",
+      "skip_trigger": "mode present (any value other than empty/absent)",
+      "what_happens_instead": "Route to the matched mode handler (issue-first, --auto, --quick, progress, resume, close, resolve, setup-github, or title substring)"
+    },
+    {
+      "id": "G5.work-backlog-item.quick-route",
+      "skill": "work-backlog-item",
+      "source_file": "SKILL.md:Routing",
+      "step_label": "Load references/workflows/quick/start.md title source: item_ref joined",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "mode is not --quick",
+      "skip_trigger": "--quick flag absent",
+      "what_happens_instead": "Route to the matched mode handler"
+    },
+    {
+      "id": "G5.work-backlog-item.plan-field-stop",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/start.md:Checklist",
+      "step_label": "If item already has a Plan field: invoke Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") and stop",
+      "optionality": "conditional",
+      "skip_condition": "item already has a Plan field",
+      "skip_trigger": "Plan field present and non-empty on the backlog item",
+      "what_happens_instead": "Invoke dh:implement-feature with the existing plan_address and stop"
+    },
+    {
+      "id": "G5.work-backlog-item.discovery-gate",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/start.md:Checklist Step 3.5",
+      "step_label": "Step 3.5: Discovery gate (feature/refactor items only)",
+      "optionality": "conditional",
+      "skip_condition": "item type is fix or bug (not feature or refactor)",
+      "skip_trigger": "item labels include type:fix or type:bug",
+      "what_happens_instead": "Step 3.5 skipped; continue to Step 4"
+    },
+    {
+      "id": "G5.work-backlog-item.rt-ica-gate",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/start.md:Checklist Step 4.2",
+      "step_label": "Step 4.2: RT-ICA gate — if BLOCKED, stop and present MISSING conditions",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.work-backlog-item.auto-mode-ask-user",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/auto-mode.md:Auto Mode Rules",
+      "step_label": "AskUserQuestion calls at every interactive decision point",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "When <mode/> is `auto`, the following substitutions apply at every interactive decision point.",
+      "skip_trigger": "--auto flag (mode=auto)",
+      "what_happens_instead": "Log [AUTO] Decision: {chosen option} — reason: {evidence}, proceed with agent-derived values"
+    },
+    {
+      "id": "G5.work-backlog-item.auto-github-issue-offer",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/auto-mode.md:Auto Mode Rules",
+      "step_label": "Step 2.2: offer GitHub issue for P0/P1",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "Log `[AUTO] Skipping GitHub issue offer`, continue without issue",
+      "skip_trigger": "--auto flag (mode=auto)",
+      "what_happens_instead": "Continue without creating GitHub issue"
+    },
+    {
+      "id": "G5.work-backlog-item.auto-milestone-assignment",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/auto-mode.md:Auto Mode Rules",
+      "step_label": "Step 2.2: ask milestone assignment",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "Log `[AUTO] Skipping milestone assignment`, skip",
+      "skip_trigger": "--auto flag (mode=auto)",
+      "what_happens_instead": "Milestone assignment skipped"
+    },
+    {
+      "id": "G5.work-backlog-item.auto-implement-chain",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/start.md:Auto mode checklist steps 6-7",
+      "step_label": "Invoke implement-feature / Invoke complete-implementation — do not stop for user input",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "interactive mode ends at 'Present summary to user'; auto mode continues through steps 6-8",
+      "skip_trigger": "mode=interactive (--auto absent)",
+      "what_happens_instead": "Present summary to user and stop (interactive mode checklist ends at step 6)"
+    },
+    {
+      "id": "G5.work-backlog-item.quick-skip-grooming",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/quick/start.md:Quick Mode (Step Q)",
+      "step_label": "Skips grooming, RT-ICA, and SAM planning",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "Trigger: <mode/> is `--quick`. Skips grooming, RT-ICA, and SAM planning.",
+      "skip_trigger": "--quick flag",
+      "what_happens_instead": "Minimal backlog item created inline; fix appended to active plan or logged as standalone task"
+    },
+    {
+      "id": "G5.work-backlog-item.quick-plan-integration",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/quick/start.md:Quick Mode Step 2a",
+      "step_label": "Plan Integration Path (all relevance checks passed)",
+      "optionality": "conditional",
+      "skip_condition": "skip steps 3–7 only if all three relevance checks pass",
+      "skip_trigger": "Active in-progress item found; scope/subject/file overlap confirmed; fix required to complete active work",
+      "what_happens_instead": "Append fix as new task on the active plan; stop — do not continue to step 3"
+    },
+    {
+      "id": "G5.work-backlog-item.language-stack-profile",
+      "skill": "work-backlog-item",
+      "source_file": "SKILL.md:Arguments",
+      "step_label": "--language <lang> selects language plugin (default: python); --stack <profile> selects stack profile",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "when --language or --stack flag is absent, default python profile is used",
+      "skip_trigger": "--language or --stack flag absent",
+      "what_happens_instead": "Default python language profile applied"
+    },
+    {
+      "id": "G5.work-backlog-item.staleness-superseded-stop",
+      "skill": "work-backlog-item",
+      "source_file": "references/workflows/work/auto-mode.md:Auto Mode Rules",
+      "step_label": "Step 3.1: Phase 2 agent returns `SUPERSEDED`",
+      "optionality": "conditional",
+      "skip_condition": "Log `[AUTO] STALENESS: SUPERSEDED — {commit refs}`. Call `backlog_close(reason='superseded', comment='{commits}')`. Stop — do not proceed to planning.",
+      "skip_trigger": "Staleness agent returns SUPERSEDED",
+      "what_happens_instead": "Close item as superseded; stop — entire planning pipeline skipped"
+    },
+    {
+      "id": "G5.discovery.self-init-load-backlog",
+      "skill": "discovery",
+      "source_file": "SKILL.md:Self-Initialization from Backlog Item",
+      "step_label": "Load backlog item via #N argument and skip Step 2 clarifying questions if content answers WHO, WHAT, WHY, and WHEN",
+      "optionality": "conditional",
+      "skip_condition": "Skip Step 2 (clarifying questions) only if the loaded content answers WHO, WHAT, WHY, and WHEN",
+      "skip_trigger": "#N argument passed AND loaded content answers all four dimensions",
+      "what_happens_instead": "Proceed directly to Step 3 (Gather References) without asking clarifying questions"
+    },
+    {
+      "id": "G5.discovery.clarifying-questions",
+      "skill": "discovery",
+      "source_file": "SKILL.md:Process Step 2",
+      "step_label": "Step 2 — Ask Clarifying Questions",
+      "optionality": "conditional",
+      "skip_condition": "Skip Step 2 (clarifying questions) only if the loaded content answers WHO, WHAT, WHY, and WHEN",
+      "skip_trigger": "Self-initialization from backlog item AND content covers all four dimensions",
+      "what_happens_instead": "Skip directly to Step 3"
+    },
+    {
+      "id": "G5.discovery.human-confirmation-gate",
+      "skill": "discovery",
+      "source_file": "SKILL.md:Process",
+      "step_label": "User confirms discovery captures intent? (Human Touchpoint Gate)",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "AutoMode active? Yes — treat as confirmed",
+      "skip_trigger": "AUTO_MODE active",
+      "what_happens_instead": "Treat as confirmed without user interaction; ARTIFACT:DISCOVERY complete"
+    },
+    {
+      "id": "G5.discovery.design-questions-escalation",
+      "skill": "discovery",
+      "source_file": "SKILL.md:Human Touchpoint Gate",
+      "step_label": "Escalation needed — Human touchpoint — unbound constraints or domain knowledge gap",
+      "optionality": "conditional",
+      "skip_condition": "only triggered when there are unbound constraints or domain knowledge gaps",
+      "skip_trigger": "No unbound constraints and no domain knowledge gaps",
+      "what_happens_instead": "Proceed to ARTIFACT:DISCOVERY complete without escalation"
+    },
+    {
+      "id": "G5.discovery.artifact-register",
+      "skill": "discovery",
+      "source_file": "SKILL.md:Output",
+      "step_label": "artifact_register(artifact_type=\"feature-context\", ...)",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.groom-backlog-item.delegate",
+      "skill": "groom-backlog-item",
+      "source_file": "SKILL.md",
+      "step_label": "Invoke /dh:work-backlog-item groom $ARGUMENTS and follow its instructions",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.groom.discovery-gate-skip",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/analyze.md:Discovery Gate",
+      "step_label": "Skip this gate entirely if any of these are true",
+      "optionality": "conditional",
+      "skip_condition": "Skip this gate entirely if any of these are true: Item has no `issue_number` (no backend issue linked); Item labels include `type:fix` or `type:bug`",
+      "skip_trigger": "item has no issue_number OR labels include type:fix or type:bug",
+      "what_happens_instead": "Skip to RT-ICA snapshot"
+    },
+    {
+      "id": "G5.groom.discovery-synthesize",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/analyze.md:Discovery Gate step 3",
+      "step_label": "Synthesize a feature-context artifact directly from those sections instead of invoking discovery",
+      "optionality": "conditional",
+      "skip_condition": "If all three of the following are non-empty: `acceptance criteria`, `expected behavior`, `desired structure` (or `scope` as equivalent)",
+      "skip_trigger": "All three sections non-empty (acceptance criteria, expected behavior, desired structure/scope)",
+      "what_happens_instead": "Synthesize feature-context artifact from existing sections; skip dh:discovery invocation"
+    },
+    {
+      "id": "G5.groom.wave0-research",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/swarm.md:Wave 0",
+      "step_label": "Wave 0 (pre-swarm research — runs before spawning any teammate): Invoke the `technical-researcher` agent",
+      "optionality": "conditional",
+      "skip_condition": "Skip Wave 0 when: Item type is `type:bug` or `type:fix` — fact-checker covers the primary research need; Item has no identifiable technology, library, or internal module to research; Item description is a pure administrative or labelling task with no research questions",
+      "skip_trigger": "type:bug or type:fix label; OR no identifiable technology/library/module; OR pure administrative/labelling task",
+      "what_happens_instead": "Proceed to Wave 1 without research prior context"
+    },
+    {
+      "id": "G5.groom.wave0-blocked-fallthrough",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/swarm.md:Wave 0",
+      "step_label": "If `technical-researcher` returns `STATUS: BLOCKED` (all four angles returned only gaps): proceed to Wave 1 without research prior context",
+      "optionality": "conditional",
+      "skip_condition": "If `technical-researcher` returns `STATUS: BLOCKED` (all four angles returned only gaps): proceed to Wave 1 without research prior context — do not halt the groom.",
+      "skip_trigger": "technical-researcher returns STATUS: BLOCKED",
+      "what_happens_instead": "Proceed to Wave 1 without research prior context"
+    },
+    {
+      "id": "G5.groom.wave2-rt-ica-blocked-stop",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/swarm.md:Wave 2",
+      "step_label": "If RT-ICA BLOCKED, stop and present MISSING conditions. Do not proceed to Wave 3.",
+      "optionality": "conditional",
+      "skip_condition": "RT-ICA BLOCKED result from Wave 2 rtica-assessor",
+      "skip_trigger": "rtica-assessor returns BLOCKED status",
+      "what_happens_instead": "Stop and present MISSING conditions; Wave 3 (groomer) is not run"
+    },
+    {
+      "id": "G5.groom.root-cause-analysis",
+      "skill": "groom-backlog-item",
+      "source_file": "references/workflows/groom/swarm.md:Issue Classification",
+      "step_label": "Root-Cause Analysis — only for `defect` or `recurring-pattern`",
+      "optionality": "conditional",
+      "skip_condition": "Root-Cause Analysis — only for `defect` or `recurring-pattern`",
+      "skip_trigger": "issue classification is not defect or recurring-pattern",
+      "what_happens_instead": "Root-cause analysis step omitted"
+    },
+    {
+      "id": "G5.implement-feature.resolve-task-file",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Resolve Task File",
+      "step_label": "Resolve Task File",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.implement-feature.skill-loading-instructions",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop step 3",
+      "step_label": "If `skills` is non-empty, include skill-loading instructions in the delegation prompt",
+      "optionality": "conditional",
+      "skip_condition": "If `skills` is empty or missing, do not add skill-loading instructions (backward compatible).",
+      "skip_trigger": "task skills field is empty or missing",
+      "what_happens_instead": "Delegation prompt sent without skill-loading instructions"
+    },
+    {
+      "id": "G5.implement-feature.per-task-confirmation-gate",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop",
+      "step_label": "Per-task Confirmation Gate (active when `autonomy_mode == \"per_task\"` only)",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "Skip this gate when `autonomy_mode` is `\"full_auto\"` or `\"checkpoint\"`.",
+      "skip_trigger": "autonomy_mode == full_auto OR autonomy_mode == checkpoint",
+      "what_happens_instead": "Dispatch next task immediately without user confirmation"
+    },
+    {
+      "id": "G5.implement-feature.wave-completion-gate",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop step 5a",
+      "step_label": "Wave-Completion Confirmation Gate (active when `autonomy_mode == \"checkpoint\"` only)",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "Skip this gate when `autonomy_mode` is `\"full_auto\"` or `\"per_task\"`.",
+      "skip_trigger": "autonomy_mode == full_auto OR autonomy_mode == per_task",
+      "what_happens_instead": "Proceed to next batch without wave-level user confirmation"
+    },
+    {
+      "id": "G5.implement-feature.parallel-dispatch",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop step 3",
+      "step_label": "When multiple tasks are simultaneously ready, dispatch them in parallel using `TeamCreate`",
+      "optionality": "conditional",
+      "skip_condition": "when only one task is ready, a single Agent call is acceptable",
+      "skip_trigger": "ready task count == 1",
+      "what_happens_instead": "Single Agent call dispatched instead of TeamCreate"
+    },
+    {
+      "id": "G5.implement-feature.contract-verification-step4a",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop step 4a",
+      "step_label": "Step 4a: contract-verification (architect spec check)",
+      "optionality": "conditional",
+      "skip_condition": "If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely.",
+      "skip_trigger": "artifact_read fails or returns no content",
+      "what_happens_instead": "Skip step 4a entirely; proceed to step 4b"
+    },
+    {
+      "id": "G5.implement-feature.teammate-shutdown-4b",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Progress Loop step 4b",
+      "step_label": "Step 4b: Shut down the completed teammate (SendMessage shutdown_request)",
+      "optionality": "conditional",
+      "skip_condition": "Skip when: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.",
+      "skip_trigger": "agent dispatched via Agent call (not TeamCreate)",
+      "what_happens_instead": "No shutdown message sent; subagent terminates automatically"
+    },
+    {
+      "id": "G5.implement-feature.per-task-commit",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Commit Ownership",
+      "step_label": "Commit after step 4b, before dispatching the next task (per_task mode)",
+      "optionality": "skippable-by-flag",
+      "skip_condition": "full_auto and checkpoint modes: Do NOT commit after each individual step 4b — other batch agents may still be writing to the worktree. Commit once after step 5",
+      "skip_trigger": "autonomy_mode == full_auto OR autonomy_mode == checkpoint",
+      "what_happens_instead": "Commit deferred until after step 5 confirms all batch tasks complete"
+    },
+    {
+      "id": "G5.implement-feature.bookend-artifact-registration",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Bookend Artifact Registration",
+      "step_label": "Include artifact_register instructions in each bookend task's delegation prompt",
+      "optionality": "conditional",
+      "skip_condition": "If the issue number is not known, skip registration.",
+      "skip_trigger": "parent story issue number not known",
+      "what_happens_instead": "Bookend agents run without artifact_register instructions"
+    },
+    {
+      "id": "G5.implement-feature.worktree-isolation-variant",
+      "skill": "implement-feature",
+      "source_file": "SKILL.md:Variant: Worktree Isolation",
+      "step_label": "Variant: Worktree Isolation — for milestone-scoped execution where each item gets its own worktree, use /work-milestone instead",
+      "optionality": "conditional",
+      "skip_condition": "only active when invoked via /dh:work-milestone",
+      "skip_trigger": "not invoked via /dh:work-milestone",
+      "what_happens_instead": "Default same-worktree mode used; orchestrator owns all commits"
+    },
+    {
+      "id": "G5.complete-implementation.input-format-detection",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Input Format Detection",
+      "step_label": "Input Format Detection — detect whether input is a plan file path, #N hash, bare number, or GitHub URL",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.complete-implementation.proportional-path",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Proportional Quality Gates",
+      "step_label": "Proportional Quality Gates — Entered only when the issue has no linked plan.",
+      "optionality": "conditional",
+      "skip_condition": "Skip this section when input is a file path or when the issue has a linked plan (auto-resolved to SAM path).",
+      "skip_trigger": "input is a plan file path OR issue has a linked plan field (non-empty)",
+      "what_happens_instead": "Proceed to existing 7-phase SAM path (Resolve Plan Address)"
+    },
+    {
+      "id": "G5.complete-implementation.full-sam-t0-multi-perspective",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Proportional Quality Gates",
+      "step_label": "T0 Multi-Perspective Review (full SAM 7-phase only)",
+      "optionality": "conditional",
+      "skip_condition": "The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional",
+      "skip_trigger": "proportional path selected (issue with no linked plan)",
+      "what_happens_instead": "T0 not included in proportional QG plan; pqg- prefix plan has only 5 tasks"
+    },
+    {
+      "id": "G5.complete-implementation.full-sam-t6-context-refinement",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Proportional Quality Gates",
+      "step_label": "T6 Context Refinement (full SAM 7-phase only)",
+      "optionality": "conditional",
+      "skip_condition": "The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional",
+      "skip_trigger": "proportional path selected (issue with no linked plan)",
+      "what_happens_instead": "T6 not included in proportional QG plan"
+    },
+    {
+      "id": "G5.complete-implementation.pre-phase-tn-verification",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Pre-Phase 1: TN Verification Check",
+      "step_label": "Pre-Phase 1: TN Verification Check",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.complete-implementation.pre-phase-migration-fidelity",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Pre-Phase 1a: Migration Fidelity Sign-Off",
+      "step_label": "Pre-Phase 1a: Migration Fidelity Sign-Off — Execute the full gate procedure",
+      "optionality": "conditional",
+      "skip_condition": "If no signal found — skip gate, proceed to Artifact Discovery.",
+      "skip_trigger": "No migration signals in issue title/body or task acceptance_criteria (no 'migrat', 'convert format', 'replace .md', 'format conversion', 'move from', 'transition from', 'delete', 'remove source', 'after migration complete', 'drop the source')",
+      "what_happens_instead": "Skip gate, proceed to Artifact Discovery"
+    },
+    {
+      "id": "G5.complete-implementation.pre-phase-artifact-discovery",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Pre-Phase: Artifact Discovery",
+      "step_label": "When the parent story issue number is known, query the artifact manifest via artifact_list(item_id=N)",
+      "optionality": "conditional",
+      "skip_condition": "If `artifact_list` returns an empty manifest or an error, quality gate agents use filesystem path conventions as before.",
+      "skip_trigger": "parent story issue number not known; OR artifact_list returns empty/error",
+      "what_happens_instead": "Quality gate agents use filesystem path conventions (backward compatible)"
+    },
+    {
+      "id": "G5.complete-implementation.pre-phase-concerns",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Pre-Phase 1b: Process Accumulated Concerns",
+      "step_label": "Pre-Phase 1b: Process Accumulated Concerns",
+      "optionality": "mandatory",
+      "skip_condition": null,
+      "skip_trigger": null,
+      "what_happens_instead": null
+    },
+    {
+      "id": "G5.complete-implementation.qg-plan-existing-skip",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Quality Gate Plan Creation Step 1",
+      "step_label": "Check for existing QG plan — if all tasks terminal: Skip to Completion Verification Gate",
+      "optionality": "conditional",
+      "skip_condition": "Yes — COMPLETE or SKIPPED → Skip to Completion Verification Gate",
+      "skip_trigger": "QG plan found and all tasks have terminal status (COMPLETE or SKIPPED)",
+      "what_happens_instead": "Skip directly to Completion Verification Gate; no new plan creation or dispatch"
+    },
+    {
+      "id": "G5.complete-implementation.t5-documentation-update",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Completion Verification Gate",
+      "step_label": "T5 Documentation Update — may be skipped when T4 found no drift",
+      "optionality": "conditional",
+      "skip_condition": "T4Post: 0 findings — no drift → sam_task(plan='{PQG}', task='T5', config={action=state, status=skipped}). Skip whitelist: ONLY T5 (Documentation Update) may have `status: skipped`.",
+      "skip_trigger": "T4 doc-drift-auditor returns Total findings: 0",
+      "what_happens_instead": "T5 marked skipped; completion verification accepts skipped T5 as passing"
+    },
+    {
+      "id": "G5.complete-implementation.follow-up-routing-section",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Constants Step 1: Detect Follow-up Files",
+      "step_label": "If both `artifact_read` and the SAM search return empty: skip the entire routing section (no follow-ups to route)",
+      "optionality": "conditional",
+      "skip_condition": "If both `artifact_read` and the SAM search return empty: skip the entire routing section (no follow-ups to route).",
+      "skip_trigger": "artifact_read returns empty AND SAM search returns empty",
+      "what_happens_instead": "Entire follow-up routing section skipped; proceed to Apply status:verified label"
+    },
+    {
+      "id": "G5.complete-implementation.follow-up-routing-pass-verdict",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Constants Step 1: Detect Follow-up Files",
+      "step_label": "Check the `verdict` field — PASS: no blocking findings; skip the entire routing section",
+      "optionality": "conditional",
+      "skip_condition": "`PASS` — no blocking findings; skip the entire routing section (no follow-ups to route)",
+      "skip_trigger": "code-review verdict field == PASS",
+      "what_happens_instead": "Skip follow-up routing section entirely"
+    },
+    {
+      "id": "G5.complete-implementation.post-phase6-divergence",
+      "skill": "complete-implementation",
+      "source_file": "SKILL.md:Post-Phase-6: Surface Divergence Findings",
+      "step_label": "Post-Phase-6: Surface Divergence Findings",
+      "optionality": "conditional",
+      "skip_condition": "only relevant when T6 (Context Refinement) ran in full SAM 7-phase path",
+      "skip_trigger": "proportional path selected (no T6)",
+      "what_happens_instead": "Step not reached; proportional path proceeds directly to follow-up routing"
+    }
+  ]
+}

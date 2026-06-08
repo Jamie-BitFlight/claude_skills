@@ -1,0 +1,267 @@
+{
+  "concurrency_map": [
+    {
+      "id": "G4.groom-swarm.wave0-technical-researcher",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Team mode (preferred)",
+      "dispatch_label": "O->>TR: spawn (technology, concern from RT-ICA conditions, depth, item_ref)",
+      "mechanism": "Agent",
+      "condition": "team mode: single Agent call; skip Wave 0 when: item type is bug/fix, OR item is a micro-task with no external dependencies, OR RT-ICA has no technology-related MISSING conditions",
+      "agents_dispatched": ["technical-researcher"],
+      "concurrency": "sequential",
+      "dependencies": [],
+      "barrier": "TR-->>O: STATUS: DONE (or BLOCKED — proceed without research context)",
+      "team_name_pattern": "groom-{item-slug}",
+      "wave": "0"
+    },
+    {
+      "id": "G4.groom-swarm.wave0-technical-researcher-internal",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Team mode (preferred) + agents/technical-researcher.md",
+      "dispatch_label": "TR->>TR: run 4 angles in parallel (api-state, ecosystem-research, impact-measurement, codebase-auditor)",
+      "mechanism": "sequential_Agent_calls",
+      "condition": null,
+      "agents_dispatched": [
+        "dh:api-state",
+        "dh:ecosystem-research",
+        "dh:impact-measurement",
+        "dh:codebase-auditor"
+      ],
+      "concurrency": "parallel",
+      "dependencies": [],
+      "barrier": "TR->>TR: internal review gate — cross-angle signals, conflict detection",
+      "team_name_pattern": null,
+      "wave": "0"
+    },
+    {
+      "id": "G4.groom-swarm.team-create",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Team mode (preferred)",
+      "dispatch_label": "TeamCreate(team_name: \"groom-{item-slug}\")",
+      "mechanism": "TeamCreate",
+      "condition": null,
+      "agents_dispatched": [
+        "impact-analyst",
+        "fact-checker",
+        "rtica-assessor",
+        "classifier",
+        "groomer",
+        "alignment-analyst"
+      ],
+      "concurrency": "parallel",
+      "dependencies": [],
+      "barrier": "O->>O: all tasks complete — shutdown team",
+      "team_name_pattern": "groom-{item-slug}",
+      "wave": null
+    },
+    {
+      "id": "G4.groom-swarm.wave1-parallel",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Wave 1 (parallel)",
+      "dispatch_label": "Note over O,AA: Wave 1 — parallel (fact-checker receives Research section as prior context)",
+      "mechanism": "TeamCreate",
+      "condition": null,
+      "agents_dispatched": ["impact-analyst", "fact-checker", "classifier"],
+      "concurrency": "parallel",
+      "dependencies": [],
+      "barrier": "After Wave 1: read Impact Radius and Fact-Check. If scope expanded, spawn second fact-checker.",
+      "team_name_pattern": "groom-{item-slug}",
+      "wave": "1"
+    },
+    {
+      "id": "G4.groom-swarm.wave1-alignment-analyst",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Team mode (preferred)",
+      "dispatch_label": "O->>AA: spawn (item design intent — waits for IA)",
+      "mechanism": "TeamCreate",
+      "condition": "spawned after impact-analyst completes (alignment-analyst waits for IA)",
+      "agents_dispatched": ["alignment-analyst"],
+      "concurrency": "conditional",
+      "dependencies": ["alignment-analyst waits for IA"],
+      "barrier": "AA->>AA: write Design Intent Alignment section via MCP",
+      "team_name_pattern": "groom-{item-slug}",
+      "wave": "1"
+    },
+    {
+      "id": "G4.groom-swarm.wave1-rtica-assessor",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Team mode (preferred)",
+      "dispatch_label": "O->>RT: spawn (item details — waits for IA + FC)",
+      "mechanism": "TeamCreate",
+      "condition": "spawned within Wave 1 team but waits for IA + FC broadcast signals before completing",
+      "agents_dispatched": ["rtica-assessor"],
+      "concurrency": "conditional",
+      "dependencies": ["rtica-assessor waits for IA + FC"],
+      "barrier": "RT->>RT: write RT-ICA section via MCP",
+      "team_name_pattern": "groom-{item-slug}",
+      "wave": "1"
+    },
+    {
+      "id": "G4.groom-swarm.wave2-no-team-fallback",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Wave 2 (depends on Wave 1)",
+      "dispatch_label": "Wave 2 (depends on Wave 1)",
+      "mechanism": "sequential_Agent_calls",
+      "condition": "no-team fallback path only",
+      "agents_dispatched": ["rtica-assessor", "alignment-analyst"],
+      "concurrency": "parallel",
+      "dependencies": ["Wave 2 depends on Wave 1"],
+      "barrier": "If RT-ICA BLOCKED, stop and present MISSING conditions. Do not proceed to Wave 3.",
+      "team_name_pattern": null,
+      "wave": "2"
+    },
+    {
+      "id": "G4.groom-swarm.wave3-groomer",
+      "skill": "work-backlog-item/groom",
+      "source_file": "groom/swarm.md:Wave 3 (depends on Wave 2)",
+      "dispatch_label": "Wave 3 (depends on Wave 2)",
+      "mechanism": "Agent",
+      "condition": null,
+      "agents_dispatched": ["groomer"],
+      "concurrency": "sequential",
+      "dependencies": [
+        "Wave 3 depends on Wave 2",
+        "Note over GR: unblocked after RT-ICA + Classification complete"
+      ],
+      "barrier": "groomer writes all groomed subsections",
+      "team_name_pattern": null,
+      "wave": "3"
+    },
+    {
+      "id": "G4.implement-feature.per_task",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "dispatch_label": "If autonomy_mode == \"per_task\": Dispatch task N via a single Agent call (not TeamCreate).",
+      "mechanism": "Agent",
+      "condition": "autonomy_mode == \"per_task\"",
+      "agents_dispatched": ["dh:task-worker (one per task, sequentially)"],
+      "concurrency": "sequential",
+      "dependencies": ["Per-task Confirmation Gate fires before dispatching task N+1"],
+      "barrier": "Per-task Confirmation Gate (after step 4b, before dispatching task N+1): await explicit user confirmation",
+      "team_name_pattern": null,
+      "wave": null
+    },
+    {
+      "id": "G4.implement-feature.full_auto-or-checkpoint",
+      "skill": "implement-feature",
+      "source_file": "implement-feature/SKILL.md:Progress Loop",
+      "dispatch_label": "TeamCreate(team_name: \"impl-{slug}\") — Spawn one teammate per ready task. When only one task is ready, a single Agent call is acceptable.",
+      "mechanism": "TeamCreate",
+      "condition": "autonomy_mode is \"full_auto\" or \"checkpoint\" AND count with 2+ tasks in the ready list",
+      "agents_dispatched": ["dh:task-worker (one per ready task — dynamic count)"],
+      "concurrency": "parallel",
+      "dependencies": [
+        "SAM task dependencies govern readiness — only tasks with all dependencies complete appear in sam_plan(action=ready)"
+      ],
+      "barrier": "After step 5 confirms all tasks in the current batch are complete: sam_plan(action=status) check — then commit batch; full_auto: no wave gate; checkpoint: Wave-Completion Confirmation Gate fires (await user confirmation before next batch)",
+      "team_name_pattern": "impl-{slug}",
+      "wave": null
+    },
+    {
+      "id": "G4.complete-implementation.multi-perspective-review",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop (Phases T0-T6):Team Setup + multi-perspective-review/SKILL.md:Step 4",
+      "dispatch_label": "TeamCreate(team_name=\"multi-review-{slug}\") — Dispatch all four workers simultaneously. Do NOT wait between spawns — all four are independent and must run in parallel.",
+      "mechanism": "TeamCreate",
+      "condition": "T0 (Multi-Perspective Review) is the ready task in the QG plan SAM dispatch loop",
+      "agents_dispatched": [
+        "security-worker (dh:task-worker, reviewer-security)",
+        "performance-worker (dh:task-worker, reviewer-performance)",
+        "quality-worker (dh:task-worker, reviewer-quality)",
+        "accessibility-worker (dh:task-worker, reviewer-accessibility)"
+      ],
+      "concurrency": "parallel",
+      "dependencies": [],
+      "barrier": "Collect[Wait for 4 SendMessage arrivals]; Gate{Any REJECT?}; TeamDelete. Exit non-zero if any REJECT.",
+      "team_name_pattern": "multi-review-{slug}",
+      "wave": null
+    },
+    {
+      "id": "G4.complete-implementation.qg-plan-dispatch-loop",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop (Phases T0-T6):Dispatch Loop",
+      "dispatch_label": "Check for an existing implementation team before dispatching QG agents: team_name = \"impl-{slug}\" — If no team exists, create one: TeamCreate(team_name=\"impl-{slug}\")",
+      "mechanism": "TeamCreate",
+      "condition": null,
+      "agents_dispatched": [
+        "T0: dh:multi-perspective-review (orchestrated, dependencies=[])",
+        "T1: code-reviewer (dependencies=[])",
+        "T2: feature-verifier (dependencies=[\"T1\"])",
+        "T3: integration-checker (dependencies=[\"T2\"])",
+        "T4: doc-drift-auditor (dependencies=[\"T3\"])",
+        "T5: service-docs-maintainer (dependencies=[\"T4\"], conditional: skipped if T4 finds 0 drift)",
+        "T6: context-refinement (dependencies=[\"T5\"])"
+      ],
+      "concurrency": "conditional",
+      "dependencies": [
+        "T0 and T1 have dependencies=[] — both simultaneously ready at plan start",
+        "T2 depends on T1",
+        "T3 depends on T2",
+        "T4 depends on T3",
+        "T5 depends on T4",
+        "T6 depends on T5"
+      ],
+      "barrier": "Completion Verification Gate: sam_plan(action=status) — all T0–T6 must reach terminal status (complete or skipped for T5 only)",
+      "team_name_pattern": "impl-{slug}",
+      "wave": null
+    },
+    {
+      "id": "G4.complete-implementation.proportional-qg-dispatch-loop",
+      "skill": "complete-implementation",
+      "source_file": "complete-implementation/SKILL.md:Proportional Quality Gates",
+      "dispatch_label": "Use the same SAM Dispatch Loop as the existing 7-phase flow. The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional, but retains the T4/T5 documentation pass.",
+      "mechanism": "TeamCreate",
+      "condition": "No linked plan address (backlog_view shows no Plan field) — proportional path selected",
+      "agents_dispatched": [
+        "T1: code-reviewer (dependencies=[])",
+        "T2: test-verification (dependencies=[])",
+        "T3: acceptance-check (dependencies=[])",
+        "T4: doc-drift-auditor (dependencies=[\"T3\"])",
+        "T5: service-docs-maintainer (dependencies=[\"T4\"], conditional: skipped if T4 finds 0 drift)"
+      ],
+      "concurrency": "conditional",
+      "dependencies": [
+        "T1, T2, T3 have dependencies=[] — simultaneously ready at plan start",
+        "T4 depends on T3",
+        "T5 depends on T4"
+      ],
+      "barrier": "Step 5 — Completion verification gate: sam_plan(action=status, plan='{PQG}') — all 5 tasks must have status==complete, T5 may be skipped if T4 found 0 drift",
+      "team_name_pattern": "impl-{slug}",
+      "wave": null
+    },
+    {
+      "id": "G4.work-milestone.per-wave-kage-bunshin",
+      "skill": "work-milestone",
+      "source_file": "work-milestone/SKILL.md:Main Workflow:Step 5c + Dispatch Step (Step 5 Detail)",
+      "dispatch_label": "Step 5c: Spawn Kage-Bunshin Sessions — For each worktree: cd into it, then: claude -p --model {model} [--effort {level}] --permission-mode auto --output-format json 'Load /dh:work-backlog-item #{issue}' — Each session is a FULL orchestrator — has Agent tool, TeamCreate, all MCP. All sessions launch as background processes.",
+      "mechanism": "sequential_Agent_calls",
+      "condition": "dispatch_spawn MCP tool; kage-bunshin used instead of TeamCreate because teammates lack Agent tool (cannot spawn sub-agents or use TeamCreate internally)",
+      "agents_dispatched": [
+        "one independent claude -p process per wave item (dynamic count: one per item in wave)"
+      ],
+      "concurrency": "parallel",
+      "dependencies": [
+        "Step 5a: Create Worktrees per item first",
+        "Step 5b: Write Lock Files (.claude/kage-bunshin.lock) per worktree",
+        "wave N waits for all sessions in wave N-1 to complete before dispatching"
+      ],
+      "barrier": "Step 6: Wait for All Sessions — Poll PIDs for exit. Read result JSON from each /tmp/kb-work-{issue}.json; Step 6b: Merge Worktree Branches — Sequential merge into integration branch. One at a time, in return order.",
+      "team_name_pattern": null,
+      "wave": "per-wave (wave index from dispatch plan)"
+    },
+    {
+      "id": "G4.work-milestone.sequential-wave-loop",
+      "skill": "work-milestone",
+      "source_file": "work-milestone/SKILL.md:Main Workflow:Step 4 + Step 6d",
+      "dispatch_label": "Step 4: Wave Dispatch Loop — Read next wave from dispatch plan",
+      "mechanism": "sequential_Agent_calls",
+      "condition": null,
+      "agents_dispatched": ["all kage-bunshin sessions in wave N complete before wave N+1 starts"],
+      "concurrency": "sequential",
+      "dependencies": ["each wave waits for all sessions from previous wave to complete and merge"],
+      "barrier": "Step 6d: Discovery Relay — Build relay document from agent outputs. Include FILES_CHANGED, COMMITS, NOTES in next wave agent prompts. WaveItems{Wave has items?} → No waves remain → Land",
+      "team_name_pattern": null,
+      "wave": "cross-wave sequencing"
+    }
+  ]
+}

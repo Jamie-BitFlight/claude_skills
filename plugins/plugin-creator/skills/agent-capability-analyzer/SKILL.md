@@ -11,7 +11,7 @@ If the user's intent does not match the purpose of this skill, load `plugin-life
 
 Description drift occurs when an agent's frontmatter `description` no longer matches what the agent actually does. Orchestrators use descriptions for routing decisions — stale descriptions cause misrouting. This skill collects self-reported capabilities from agents and compares them against their static frontmatter descriptions to quantify the gap.
 
-The dataset lives in a LevelDB store (`agent-map.db/` relative to `$CLAUDE_PROJECT_DIR`) with two fields per agent: `description` (from frontmatter) and `capabilities` (self-reported). The `dump` command exports both fields to JSON for analysis.
+The dataset lives in a SQLite store (`agent-map.sqlite` relative to `$CLAUDE_PROJECT_DIR`) with two fields per agent: `description` (from frontmatter) and `capabilities` (self-reported). The `dump` command exports both fields to JSON for analysis.
 
 The canonical dataset location is `.plugin-creator/audits/agent-map.json`.
 
@@ -38,7 +38,7 @@ flowchart TD
     Multi --> M1[Read ./resources/describe-your-capabilities.template.md]
     M1 --> M2["Spawn all agent Tasks simultaneously<br>Template as-is — AGENT_ID_HERE substituted per agent"]
     M2 --> M3{Agent has Bash access?}
-    M3 -->|Yes — agent runs update script| M4[Agent writes to LevelDB directly<br>Confirms 'Updated agent-map.db']
+    M3 -->|Yes — agent runs update script| M4[Agent writes to SQLite directly<br>Confirms 'Updated agent-map.sqlite']
     M3 -->|No — agent returns XML text| M5["Orchestrator writes via script:<br>node scripts/update-agent-map.mjs --name 'agent-id' --capabilities 'TEXT'"]
     M4 --> M6[Wait for ALL Tasks to complete]
     M5 --> M6
@@ -48,7 +48,7 @@ flowchart TD
 
 **Single-agent mode** — the orchestrator receives the XML-tagged response directly in the Task reply. Gap analysis runs inline: compare the `capabilities` text against the agent's `description` field, reading from `.plugin-creator/audits/agent-map.json` if it exists, otherwise from the agent's frontmatter. No script execution is required in this mode.
 
-**Multi-agent mode** — uses LevelDB via the scripts. The orchestrator waits for all Tasks to complete before dumping. Agents that lack Bash access return their XML text and the orchestrator writes it via `update-agent-map.mjs` directly. The final dump produces `.plugin-creator/audits/agent-map.json` as the analysis input.
+**Multi-agent mode** — uses SQLite via the scripts. The orchestrator waits for all Tasks to complete before dumping. Agents that lack Bash access return their XML text and the orchestrator writes it via `update-agent-map.mjs` directly. The final dump produces `.plugin-creator/audits/agent-map.json` as the analysis input.
 
 **Template usage** — `./resources/describe-your-capabilities.template.md` is used in both modes. In single-agent mode, append the instruction `Return only the tagged content. Do not run any commands.` to the end of the prompt. In multi-agent mode, use the template as-is with `AGENT_ID_HERE` substituted for each agent's id.
 
@@ -167,5 +167,5 @@ Use `ALIGNED` when all three lists are empty or contain only minor phrasing diff
 ## Resources
 
 - `./resources/describe-your-capabilities.template.md` — standardized prompt template for capability collection. Read this file before spawning agents.
-- `./scripts/update-agent-map.mjs` — LevelDB-backed metadata store (write, dump, and load modes)
+- `./scripts/update-agent-map.mjs` — SQLite-backed metadata store (write, dump, and load modes)
 - `./scripts/populate-agent-descriptions.mjs` — batch-seeds `description` fields from frontmatter

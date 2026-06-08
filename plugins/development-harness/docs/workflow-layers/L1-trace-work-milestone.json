@@ -1,0 +1,638 @@
+{
+  "traces": [
+    {
+      "from_fork": "work-milestone.validate",
+      "branch_condition": "Plan missing",
+      "path": ["Step 2: Validate Plan", "BLOCKED — run /groom-milestone {N}"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "groom-milestone",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.validate",
+      "branch_condition": "Items changed since groom",
+      "path": ["Step 2: Validate Plan", "Re-run /groom-milestone {N}"],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "groom-milestone",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.validate",
+      "branch_condition": "Plan valid",
+      "path": [
+        "Step 2: Validate Plan",
+        "Step 3: Create Integration Branch",
+        "Step 3a: Prepare Clean Worktree Source State",
+        "Step 3b: Fetch All Items Once (Before Any Wave)",
+        "Step 4: Wave Dispatch Loop",
+        "work-milestone.waveitems"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.waveitems",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.waveitems",
+      "branch_condition": "No waves remain",
+      "path": [
+        "Step 4: Wave Dispatch Loop",
+        "Step 8: Land Integration Branch",
+        "work-milestone.finalresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.finalresult",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.waveitems",
+      "branch_condition": "Yes",
+      "path": [
+        "Step 4: Wave Dispatch Loop",
+        "Step 5a: Create Worktrees",
+        "dispatch_wave_start",
+        "Step 5c: dispatch_spawn",
+        "Step 6: Monitor Wave",
+        "work-milestone.checkresults"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/worktree-worker-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.checkresults",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.checkresults",
+      "branch_condition": "All succeeded",
+      "path": [
+        "Step 6a: Any sessions failed?",
+        "Step 6b: Parse Completion Reports",
+        "work-milestone.mergeresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.mergeresult",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.checkresults",
+      "branch_condition": "Some failed",
+      "path": [
+        "Step 6a: Any sessions failed?",
+        "InvestigateFail",
+        "work-milestone.investigatefail"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.investigatefail",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.investigatefail",
+      "branch_condition": "Yes",
+      "path": ["InvestigateFail", "Fix and re-spawn failed item only"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.checkresults",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.investigatefail",
+      "branch_condition": "No",
+      "path": [
+        "InvestigateFail",
+        "Skip failed item",
+        "Log to output",
+        "work-milestone.mergeresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.mergeresult",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult",
+      "branch_condition": "All clean",
+      "path": [
+        "Step 6c: Wave Complete",
+        "All branches merged",
+        "Delete worktree branches",
+        "work-milestone.partialcheck"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.partialcheck",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult",
+      "branch_condition": "Trivial/Medium conflict",
+      "path": ["Auto-resolve or spawn conflict-resolution agent", "work-milestone.resolvegates"],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.resolvegates",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult",
+      "branch_condition": "Heavy conflict (3+ files)",
+      "path": ["Create backlog item for conflict resolution", "Add to milestone"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.resolvegates",
+      "branch_condition": "Yes",
+      "path": [
+        "Resolution gates pass?",
+        "Step 6c: Wave Complete",
+        "All branches merged",
+        "Delete worktree branches",
+        "work-milestone.partialcheck"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.partialcheck",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.resolvegates",
+      "branch_condition": "No",
+      "path": [
+        "Resolution gates pass?",
+        "Create backlog item for conflict resolution",
+        "Add to milestone"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.partialcheck",
+      "branch_condition": "Yes",
+      "path": [
+        "Any agents returned PARTIAL?",
+        "Create backlog items for blocked tasks",
+        "Add to milestone",
+        "work-milestone.nextwavecheck"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.nextwavecheck",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.partialcheck",
+      "branch_condition": "No",
+      "path": ["Any agents returned PARTIAL?", "NextWaveCheck", "work-milestone.nextwavecheck"],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.nextwavecheck",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.nextwavecheck",
+      "branch_condition": "Yes",
+      "path": [
+        "More waves?",
+        "Step 4: Wave Dispatch Loop",
+        "Read next wave from dispatch plan",
+        "work-milestone.waveitems"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.waveitems",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.nextwavecheck",
+      "branch_condition": "No",
+      "path": [
+        "More waves?",
+        "Step 8: Land Integration Branch",
+        "Run full quality gate suite pre_merge + post_merge",
+        "work-milestone.finalresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.finalresult",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.finalresult",
+      "branch_condition": "Fail",
+      "path": [
+        "Gates pass?",
+        "Spawn fix agent in worktree on integration branch",
+        "work-milestone.finalresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.finalresult",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.finalresult",
+      "branch_condition": "Pass",
+      "path": [
+        "Gates pass?",
+        "Step 9: Merge to Main",
+        "git switch main",
+        "git merge --no-ff milestone/{N}-{slug}",
+        "git push origin main",
+        "Step 10: Complete Milestone",
+        "/complete-milestone {N}",
+        "Delete integration branch",
+        "Print pending auto-stash reminder(s)",
+        "Exit: milestone complete"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "hands_off_to_skill",
+      "terminal_target": "complete-milestone",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.status",
+      "branch_condition": "STATUS: COMPLETE — tasks done, changes committed",
+      "path": ["Agent output indicates success?", "Proceed to merge", "work-milestone.slot"],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.slot",
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.status",
+      "branch_condition": "STATUS: PARTIAL — some tasks done, some blocked",
+      "path": [
+        "Agent output indicates success?",
+        "Merge completed work",
+        "Create backlog item for remaining tasks",
+        "Add to current milestone"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.status",
+      "branch_condition": "Failure — no useful work done",
+      "path": [
+        "Agent output indicates success?",
+        "Log failure context",
+        "Escalate to user: item title, error, agent output summary"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/SKILL.md"
+    },
+    {
+      "from_fork": "work-milestone.slot",
+      "branch_condition": "Busy — another merge in progress",
+      "path": [
+        "Merge slot free?",
+        "Queue this completion",
+        "Continue processing other agent returns",
+        "work-milestone.slot"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.slot",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.slot",
+      "branch_condition": "Free — acquire slot",
+      "path": ["Merge slot free?", "PreVerify", "work-milestone.preverify"],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.preverify",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.preverify",
+      "branch_condition": "Matches — skip re-test",
+      "path": [
+        "Pre-Verification Check",
+        "Squash merge worktree branch into integration branch",
+        "work-milestone.mergeresult-2"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.mergeresult-2",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.preverify",
+      "branch_condition": "Diverged — rebase and run gates",
+      "path": [
+        "Pre-Verification Check",
+        "Rebase worktree branch onto integration branch HEAD",
+        "Run quality gate commands from dispatch plan pre_merge list",
+        "work-milestone.gatesresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.gatesresult",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.gatesresult",
+      "branch_condition": "All pass",
+      "path": [
+        "Gates pass?",
+        "Squash merge worktree branch into integration branch",
+        "work-milestone.mergeresult-2"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.mergeresult-2",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.gatesresult",
+      "branch_condition": "Any fail",
+      "path": [
+        "Gates pass?",
+        "Orchestrator spawns fix agent in worktree on integration branch",
+        "Fix agent resolves gate failures",
+        "Release merge slot",
+        "work-milestone.slot"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.slot",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult-2",
+      "branch_condition": "Clean",
+      "path": [
+        "Merge result?",
+        "Push integration branch",
+        "Update item status via backlog MCP",
+        "Release merge slot",
+        "Clean up worktree branch"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult-2",
+      "branch_condition": "1-2 files conflicting",
+      "path": ["Merge result?", "Classify conflict severity", "work-milestone.severity"],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.severity",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.mergeresult-2",
+      "branch_condition": "3+ files conflicting",
+      "path": [
+        "Merge result?",
+        "Abort merge",
+        "Create backlog item for conflict resolution",
+        "Add to current milestone for next wave",
+        "Report to user: conflicting files, both agents' approaches",
+        "Release merge slot"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity",
+      "branch_condition": "Trivial — whitespace,<br>import order, adjacent additions",
+      "path": [
+        "Conflict type",
+        "Auto-resolve",
+        "Run quality gates after resolve",
+        "work-milestone.autoresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.autoresult",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity",
+      "branch_condition": "Medium — same function<br>edited differently",
+      "path": [
+        "Conflict type",
+        "Auto-resolve",
+        "Run quality gates after resolve",
+        "work-milestone.autoresult"
+      ],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.autoresult",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity",
+      "branch_condition": "Heavy — file refactored<br>by multiple worktrees",
+      "path": [
+        "Conflict type",
+        "Abort merge",
+        "Create backlog item for conflict resolution",
+        "Add to current milestone for next wave",
+        "Report to user: conflicting files, both agents' approaches",
+        "Release merge slot"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.autoresult",
+      "branch_condition": "Yes",
+      "path": [
+        "Resolve succeeded?",
+        "Push integration branch",
+        "Update item status via backlog MCP",
+        "Release merge slot",
+        "Clean up worktree branch"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.autoresult",
+      "branch_condition": "No",
+      "path": [
+        "Resolve succeeded?",
+        "Abort merge",
+        "Create backlog item for conflict resolution",
+        "Add to current milestone for next wave",
+        "Report to user: conflicting files, both agents' approaches",
+        "Release merge slot"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.count",
+      "branch_condition": "0 files — clean merge",
+      "path": ["How many files have conflicts?", "No conflict — proceed"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.count",
+      "branch_condition": "1-2 files",
+      "path": ["How many files have conflicts?", "Severity", "work-milestone.severity-2"],
+      "crosses_into_files": ["skills/work-milestone/references/merge-queue-protocol.md"],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.severity-2",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.count",
+      "branch_condition": "3+ files",
+      "path": [
+        "How many files have conflicts?",
+        "HEAVY — assign_back",
+        "Create backlog item for design review"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity-2",
+      "branch_condition": "Whitespace, import order,<br>adjacent-line additions",
+      "path": ["Conflict type? Observable: git diff conflict markers", "TRIVIAL — auto-resolve"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity-2",
+      "branch_condition": "Same function/block<br>edited differently",
+      "path": [
+        "Conflict type? Observable: git diff conflict markers",
+        "MEDIUM — spawn conflict-resolution agent in worktree on integration branch"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.severity-2",
+      "branch_condition": "File restructured or<br>refactored differently<br>by both worktrees",
+      "path": [
+        "Conflict type? Observable: git diff conflict markers",
+        "HEAVY — assign_back",
+        "Create backlog item for design review"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.m8",
+      "branch_condition": "Not yet",
+      "path": [
+        "M8: Item Complete?",
+        "M4: Execute Work",
+        "Execute each task sequentially",
+        "sam_task claim + sam_task complete"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.m8",
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.m8",
+      "branch_condition": "Complete",
+      "path": [
+        "M8: Item Complete?",
+        "M9: Pre-Verify",
+        "Run quality gate commands from prompt",
+        "Fix any failures",
+        "Commit all remaining changes",
+        "work-milestone.gateresult"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.gateresult",
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.gateresult",
+      "branch_condition": "Fail — fix and re-run",
+      "path": [
+        "Quality gates pass?",
+        "M9: Pre-Verify",
+        "Run quality gate commands from prompt",
+        "Fix any failures",
+        "Commit all remaining changes"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "loops_back",
+      "terminal_target": "work-milestone.gateresult",
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.gateresult",
+      "branch_condition": "Pass",
+      "path": ["Quality gates pass?", "Output Completion Report (see Completion Report Format)"],
+      "crosses_into_files": [],
+      "terminal_type": "completes_workflow",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.classify",
+      "branch_condition": "All under plugins/X/",
+      "path": ["File paths share a common prefix?", "Domain = plugins/X"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.classify",
+      "branch_condition": "All under .claude/skills/",
+      "path": ["File paths share a common prefix?", "Domain = .claude/skills"],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    },
+    {
+      "from_fork": "work-milestone.classify",
+      "branch_condition": "Mixed paths",
+      "path": [
+        "File paths share a common prefix?",
+        "Domain = list of all top-level directories touched"
+      ],
+      "crosses_into_files": [],
+      "terminal_type": "STOP",
+      "terminal_target": null,
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md"
+    }
+  ]
+}

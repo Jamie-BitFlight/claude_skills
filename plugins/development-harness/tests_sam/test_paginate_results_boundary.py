@@ -8,7 +8,7 @@ Context:
     _paginate_results was refactored from O(N²) re-serialization to O(N)
     binary search at commit d7175a17.  The existing test suite exercises
     happy-path pagination but does not construct data that straddles the
-    4 400-token budget.  Any regression in the binary search (e.g. switching
+    token budget.  Any regression in the binary search (e.g. switching
     from bisect_right to bisect_left semantics, dropping the lo=1 floor)
     would be invisible without these tests.
 
@@ -19,16 +19,11 @@ Token counting implementation (from server.py):
     if the encoder changes; _assert_calibration() enforces this at collection
     time.
 
-Calibrated item shapes (verified against live _paginate_results in the
-Python 3.14 / tiktoken environment in use when these tests were written):
-    - body='x' * 2000: each item ~278 tokens (prefix-cumulative).
-      token_count([:15]) = 4 172 (≤ 4 400, fits)
-      token_count([:16]) = 4 450 (> 4 400, excluded)
-      Effective cut-point: 15 items returned when 20+ items are available.
-    - body='x' * 34957: single item = 4 401 tokens (> 4 400).
-      Forces effective_limit = 1 via the lo ≥ 1 guard.
-    - body='x' * 34956: single item = 4 400 tokens (= budget exactly).
-      Inclusive boundary: item is included (effective_limit = 1, count = 1).
+Calibration constants are computed dynamically at module load time against the
+current TOKEN_BUDGET.  TOKEN_BUDGET is environment-sensitive — it is set to
+int(MAX_MCP_OUTPUT_TOKENS) - 500 when that env var is present, or 9 500 by
+default.  Static constants would break whenever the env var changes, so binary
+search is used to derive the body-size thresholds for each environment.
 """
 
 from __future__ import annotations
@@ -44,43 +39,93 @@ from progressive_markdown.list_navigator import (
 )
 
 # ---------------------------------------------------------------------------
-# Calibrated constants
+# Calibrated constants — derived dynamically from _TOKEN_BUDGET
 #
-# All values below were measured by running the tiktoken cl100k_base encoder
-# against json.dumps output in the same Python / tiktoken environment used by
-# the plugin's test runner (Python 3.14, tiktoken with cl100k_base).
-#
-# _assert_calibration() verifies these constants at collection time.  If the
-# encoding changes, collection fails with a clear error message rather than
-# silently asserting a wrong cut-point.
+# TOKEN_BUDGET is environment-sensitive (MAX_MCP_OUTPUT_TOKENS env var).
+# Body sizes are computed via binary search so the invariants hold regardless
+# of which budget value is active.  _assert_calibration() verifies the
+# computed sizes produce the expected token-count relationships.
 # ---------------------------------------------------------------------------
 
-# Body character count for "normal" items in cut-point tests.
-# token_count([:15]) = 4 172 ≤ 4 400 (budget)
-# token_count([:16]) = 4 450 > 4 400 (excluded)
-_BODY_NORMAL: int = 2000
 
-# Expected effective_limit (cut-point) for 20+ items with _BODY_NORMAL.
+def _find_oversized_body(budget: int) -> int:
+    """Return the smallest body character count where a single item exceeds budget."""
+    lo, hi = 1, budget * 10
+    while lo < hi:
+        mid = (lo + hi) // 2
+        item = {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * mid}
+        if len(_enc.encode(json.dumps([item]))) < budget + 1:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+def _find_normal_body(budget: int, cut_k: int, oversized: int) -> int:
+    """Return the largest body size where cut_k items fit and cut_k+1 don't.
+
+    Binary searches for the largest body_chars where:
+        token_count([cut_k items]) <= budget < token_count([cut_k+1 items])
+    """
+
+    def _tc(body_chars: int, k: int) -> int:
+        items = [
+            {"id": f"T{i:02d}", "title": f"Task {i}", "status": "not-started", "body": "x" * body_chars}
+            for i in range(1, k + 1)
+        ]
+        return len(_enc.encode(json.dumps(items)))
+
+    # Binary search: find largest body_chars where _tc(body_chars, cut_k) <= budget
+    lo, hi = 1, oversized - 1
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _tc(mid, cut_k) <= budget:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def _find_item2_exact_body(budget: int, body_item1: int) -> int:
+    """Return smallest body2 where token_count([item1(body1), item2(body2)]) >= budget."""
+    lo, hi = 1, budget * 9
+
+    def _tc2(body2: int) -> int:
+        items = [
+            {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * body_item1},
+            {"id": "T02", "title": "Task 2", "status": "not-started", "body": "x" * body2},
+        ]
+        return len(_enc.encode(json.dumps(items)))
+
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if _tc2(mid) < budget:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+# Compute all calibration constants once at module load.
 _CUT_POINT_K: int = 15
-
-# Token counts at and just past the cut-point (used in calibration assertions).
-_T_AT_CUT: int = 4172
-_T_PAST_CUT: int = 4450
-
-# Minimum body character count that makes a SINGLE item exceed the budget.
-# token_count([:1]) = _TOKEN_BUDGET + 1 = 4 401.
-_BODY_OVERSIZED: int = 34957
-
-# 2-item discriminating dataset: item 1 body=1000, item 2 body=33725.
-# token_count([item1, item2][:2]) = _TOKEN_BUDGET = 4 400 (exactly at budget).
-# token_count([item1, item2, item3][:3]) = 4 441 > _TOKEN_BUDGET (item 3 excluded).
-# This dataset exercises the binary-search comparison (lo=1 < hi=3) so the
-# <= vs < operator is actually evaluated.  A single-item dataset is floor-dominated
-# and never evaluates the comparison.
-_BODY_ITEM1_EXACT: int = 1000
-_BODY_ITEM2_EXACT: int = 33725
+_BODY_OVERSIZED: int = _find_oversized_body(_TOKEN_BUDGET)
+_BODY_NORMAL: int = _find_normal_body(_TOKEN_BUDGET, _CUT_POINT_K, _BODY_OVERSIZED)
+_BODY_ITEM1_EXACT: int = max(1, _BODY_OVERSIZED // 40)
+_BODY_ITEM2_EXACT: int = _find_item2_exact_body(_TOKEN_BUDGET, _BODY_ITEM1_EXACT)
 _BODY_ITEM3_EXTRA: int = 100
-_T_PREFIX2_EXACT: int = 4400  # token_count([item1, item2][:2]) == _TOKEN_BUDGET
+
+# Token count constants — derived from the body sizes above.
+_items_for_cut = [
+    {"id": f"T{i:02d}", "title": f"Task {i}", "status": "not-started", "body": "x" * _BODY_NORMAL}
+    for i in range(1, _CUT_POINT_K + 2)
+]
+_T_AT_CUT: int = len(_enc.encode(json.dumps(_items_for_cut[:_CUT_POINT_K])))
+_T_PAST_CUT: int = len(_enc.encode(json.dumps(_items_for_cut[: _CUT_POINT_K + 1])))
+_exact_items_for_cal = [
+    {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * _BODY_ITEM1_EXACT},
+    {"id": "T02", "title": "Task 2", "status": "not-started", "body": "x" * _BODY_ITEM2_EXACT},
+]
+_T_PREFIX2_EXACT: int = len(_enc.encode(json.dumps(_exact_items_for_cal)))
 
 
 # ---------------------------------------------------------------------------
@@ -124,33 +169,34 @@ def _token_count_prefix(items: list[dict[str, Any]], k: int) -> int:
 
 
 def _assert_calibration() -> None:
-    """Assert that item shapes produce the expected token counts.
+    """Verify that the dynamically derived calibration constants satisfy required invariants.
 
-    Called once at module import time.  If tiktoken's cl100k_base encoding
-    changes, these assertions fail immediately rather than producing silent
-    wrong cut-point assertions in individual tests.
+    Called once at module import time.  Failures indicate that the binary-search
+    derivation above produced inconsistent results — most likely because tiktoken's
+    cl100k_base encoding changed or because a derivation function has a bug.
 
-    Body sizes were calibrated in the Python 3.14 / tiktoken environment
-    used by the plugin's test runner.  The calibration constants
-    (_BODY_OVERSIZED, _BODY_AT_BUDGET, _BODY_NORMAL, _CUT_POINT_K) are
-    module-level so every test references them rather than repeating literals.
+    Constants are derived from TOKEN_BUDGET so they are valid regardless of which
+    budget value is active (set by MAX_MCP_OUTPUT_TOKENS env var).
     """
-    items_2000 = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-    assert _token_count_prefix(items_2000, _CUT_POINT_K) == _T_AT_CUT, (
-        f"Calibration failure: {_CUT_POINT_K} x body={_BODY_NORMAL} no longer produces {_T_AT_CUT} tokens"
+    items_normal = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
+    # Cut-point invariant: CUT_POINT_K items fit, CUT_POINT_K+1 do not.
+    assert _token_count_prefix(items_normal, _CUT_POINT_K) <= _TOKEN_BUDGET, (
+        f"Calibration failure: {_CUT_POINT_K} x body={_BODY_NORMAL} → {_T_AT_CUT} tokens, expected ≤ {_TOKEN_BUDGET}"
     )
-    assert _token_count_prefix(items_2000, _CUT_POINT_K + 1) == _T_PAST_CUT, (
-        f"Calibration failure: {_CUT_POINT_K + 1} x body={_BODY_NORMAL} no longer produces {_T_PAST_CUT} tokens"
+    assert _token_count_prefix(items_normal, _CUT_POINT_K + 1) > _TOKEN_BUDGET, (
+        f"Calibration failure: {_CUT_POINT_K + 1} x body={_BODY_NORMAL} → {_T_PAST_CUT} tokens, "
+        f"expected > {_TOKEN_BUDGET}"
     )
-    assert _token_count_prefix([_make_item(1, _BODY_OVERSIZED)], 1) == _TOKEN_BUDGET + 1, (
-        f"Calibration failure: body={_BODY_OVERSIZED} no longer produces {_TOKEN_BUDGET + 1} tokens"
+    # Oversized invariant: single item exceeds budget by exactly 1 token.
+    actual_oversized = _token_count_prefix([_make_item(1, _BODY_OVERSIZED)], 1)
+    assert actual_oversized == _TOKEN_BUDGET + 1, (
+        f"Calibration failure: body={_BODY_OVERSIZED} produces {actual_oversized} tokens, expected {_TOKEN_BUDGET + 1}"
     )
-    # 2-item discriminating dataset (exercises the binary search comparison body)
+    # 2-item discriminating dataset: 2-item prefix at budget, 3-item prefix exceeds it.
     exact_items = [_make_item(1, _BODY_ITEM1_EXACT), _make_item(2, _BODY_ITEM2_EXACT), _make_item(3, _BODY_ITEM3_EXTRA)]
     assert _token_count_prefix(exact_items, 2) == _T_PREFIX2_EXACT, (
-        f"Calibration failure: 2-item prefix no longer produces "
-        f"{_T_PREFIX2_EXACT} tokens exactly (got "
-        f"{_token_count_prefix(exact_items, 2)})"
+        f"Calibration failure: 2-item prefix → {_token_count_prefix(exact_items, 2)} tokens, "
+        f"expected {_T_PREFIX2_EXACT}"
     )
     assert _token_count_prefix(exact_items, 3) > _TOKEN_BUDGET, (
         "Calibration failure: 3-item prefix should exceed budget (item 3 excluded)"
@@ -193,11 +239,11 @@ class TestTokenStraddlingCutPoint:
     """Verify the binary search finds the correct cut-point when items straddle the budget."""
 
     def test_cut_point_at_budget_boundary(self) -> None:
-        """Return exactly _CUT_POINT_K items when 20 items straddle the 4 400-token budget.
+        """Return exactly _CUT_POINT_K items when 20 items straddle the token budget.
 
         Calibration:
-            body=_BODY_NORMAL → token_count([:_CUT_POINT_K])     = _T_AT_CUT  ≤ 4 400 (fits)
-                                  token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > 4 400 (excluded)
+            body=_BODY_NORMAL → token_count([:_CUT_POINT_K])     = _T_AT_CUT  ≤ _TOKEN_BUDGET (fits)
+                                  token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > _TOKEN_BUDGET (excluded)
         The binary search must converge to effective_limit = _CUT_POINT_K, not
         _CUT_POINT_K - 1 or _CUT_POINT_K + 1.
         A bisect_left / bisect_right inversion would produce the wrong value.
@@ -266,7 +312,7 @@ class TestForcedMinimumOfOne:
     """
 
     def test_single_oversized_item_returns_effective_limit_one(self) -> None:
-        """A single item exceeding 4 400 tokens returns effective_limit=1.
+        """A single item exceeding the token budget returns effective_limit=1.
 
         Calibration:
             body=_BODY_OVERSIZED → token_count([:1]) = _TOKEN_BUDGET + 1 (exceeds)
@@ -326,15 +372,15 @@ class TestExactBudgetBoundary:
 
         Calibration:
             item1 body=_BODY_ITEM1_EXACT, item2 body=_BODY_ITEM2_EXACT:
-            token_count([:2]) = _TOKEN_BUDGET = 4 400 (inclusive boundary, fits by ≤)
+            token_count([:2]) = _TOKEN_BUDGET (inclusive boundary, fits by ≤)
             token_count([:3]) > _TOKEN_BUDGET (item 3 excluded)
 
         The binary search evaluates ``len(_enc.encode(json.dumps(page_items[:mid]))) <=
         _TOKEN_BUDGET`` with mid=2, so this test discriminates ``<=`` from ``<``.
         Under a strict ``<`` operator:
-            4400 < 4400 → False → hi = mid - 1 = 1 → effective_limit = 1 (wrong)
+            _TOKEN_BUDGET < _TOKEN_BUDGET → False → hi = mid - 1 = 1 → effective_limit = 1 (wrong)
         Under the correct ``<=`` operator:
-            4400 <= 4400 → True → lo = mid = 2 → effective_limit = 2 (correct)
+            _TOKEN_BUDGET <= _TOKEN_BUDGET → True → lo = mid = 2 → effective_limit = 2 (correct)
         """
         # Arrange
         items = [_make_item(1, _BODY_ITEM1_EXACT), _make_item(2, _BODY_ITEM2_EXACT), _make_item(3, _BODY_ITEM3_EXTRA)]

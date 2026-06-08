@@ -2,18 +2,22 @@
 /**
  * update-agent-map.mjs
  *
- * Manages agent metadata in a LevelDB store (`./agent-map.db/`).
+ * Manages agent metadata in a SQLite store (`./agent-map.sqlite`).
+ * Requires Node.js >= 22.5.0 (node:sqlite built-in).
  *
  * Write mode — concurrent-safe, called by many agents simultaneously:
  *   node update-agent-map.mjs --name <id> [--capabilities <string>] [--description <string>]
  *
  * Dump mode — called once after all agents finish:
  *   node update-agent-map.mjs dump --file <path-to.json>
+ *
+ * Load mode — seeds database from an existing JSON file (existing keys preserved):
+ *   node update-agent-map.mjs load --file <path-to.json>
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { Level } from 'level';
+import { DatabaseSync } from 'node:sqlite';
 
 /**
  * Parses named arguments and the first positional subcommand from process.argv.
@@ -49,20 +53,24 @@ function parseArgs(argv) {
   return { subcommand, flags };
 }
 
-const DB_PATH = resolve(process.cwd(), 'agent-map.db');
+const DB_PATH = resolve(process.cwd(), 'agent-map.sqlite');
 
 /**
- * Opens the LevelDB database at `DB_PATH`.
+ * Opens the SQLite database at `DB_PATH` and ensures the schema exists.
+ * WAL mode is enabled for concurrent-safe writes from parallel agents.
  *
- * Values are stored as JSON strings so that the underlying Level instance uses
- * the default `utf8` encoding — `JSON.stringify`/`JSON.parse` are applied
- * explicitly at each call site for clarity.
- *
- * @returns {Promise<Level>}
+ * @returns {DatabaseSync}
  */
-async function openDb() {
-  const db = new Level(DB_PATH);
-  await db.open();
+function openDb() {
+  const db = new DatabaseSync(DB_PATH);
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS agents (
+      name TEXT PRIMARY KEY,
+      capabilities TEXT,
+      description TEXT
+    )
+  `);
   return db;
 }
 
@@ -74,9 +82,8 @@ async function openDb() {
  * overwritten; absent flags leave the stored value untouched.
  *
  * @param {{ subcommand: string | null, flags: Map<string, string> }} parsed
- * @returns {Promise<void>}
  */
-async function runWrite(parsed) {
+function runWrite(parsed) {
   const { flags } = parsed;
   const name = flags.get('name');
 
@@ -85,17 +92,12 @@ async function runWrite(parsed) {
     process.exit(1);
   }
 
-  const db = await openDb();
+  const db = openDb();
 
   try {
-    /** @type {{ capabilities: string | null, description: string | null }} */
-    let existing = { capabilities: null, description: null };
-
-    const raw = await db.get(name);
-    if (raw !== undefined) {
-      existing = JSON.parse(raw);
-    }
-    // raw === undefined means key is absent — keep defaults
+    const existing = db
+      .prepare('SELECT capabilities, description FROM agents WHERE name = ?')
+      .get(name) ?? { capabilities: null, description: null };
 
     const merged = {
       capabilities: flags.has('capabilities')
@@ -106,22 +108,24 @@ async function runWrite(parsed) {
         : existing.description,
     };
 
-    await db.put(name, JSON.stringify(merged));
-    process.stdout.write(`Updated agent-map.db: added/updated entry "${name}"\n`);
+    db.prepare(
+      'INSERT OR REPLACE INTO agents (name, capabilities, description) VALUES (?, ?, ?)',
+    ).run(name, merged.capabilities, merged.description);
+
+    process.stdout.write(`Updated agent-map.sqlite: added/updated entry "${name}"\n`);
   } finally {
-    await db.close();
+    db.close();
   }
 }
 
 /**
- * Dump mode: reads all entries from LevelDB, merges them with the existing
- * JSON file at `--file` (LevelDB wins per top-level key), and writes the
+ * Dump mode: reads all entries from SQLite, merges them with the existing
+ * JSON file at `--file` (SQLite wins per top-level key), and writes the
  * result back with 2-space indentation and a trailing newline.
  *
  * @param {{ subcommand: string | null, flags: Map<string, string> }} parsed
- * @returns {Promise<void>}
  */
-async function runDump(parsed) {
+function runDump(parsed) {
   const { flags } = parsed;
   const filePath = flags.get('file');
 
@@ -132,7 +136,6 @@ async function runDump(parsed) {
 
   const resolvedPath = resolve(process.cwd(), filePath);
 
-  // Read existing JSON file, if present
   /** @type {Record<string, unknown>} */
   let existingJson = {};
 
@@ -152,37 +155,37 @@ async function runDump(parsed) {
     // File absent — start with empty object
   }
 
-  const db = await openDb();
+  const db = openDb();
 
   /** @type {Record<string, { capabilities: string | null, description: string | null }>} */
   const dbEntries = {};
 
   try {
-    for await (const [key, raw] of db.iterator()) {
-      dbEntries[key] = JSON.parse(raw);
+    const rows = db.prepare('SELECT name, capabilities, description FROM agents').all();
+    for (const row of rows) {
+      dbEntries[row.name] = { capabilities: row.capabilities, description: row.description };
     }
   } finally {
-    await db.close();
+    db.close();
   }
 
-  // Merge: JSON keys not in LevelDB are preserved; LevelDB wins on overlap
+  // Merge: JSON keys not in SQLite are preserved; SQLite wins on overlap
   const merged = { ...existingJson, ...dbEntries };
   const entryCount = Object.keys(dbEntries).length;
 
   writeFileSync(resolvedPath, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
-  process.stdout.write(`Dumped agent-map.db to ${resolvedPath} (${entryCount} entries)\n`);
+  process.stdout.write(`Dumped agent-map.sqlite to ${resolvedPath} (${entryCount} entries)\n`);
 }
 
 /**
  * Load mode: reads a JSON file at `--file`, iterates its top-level keys, and
- * writes each key to LevelDB only if it does not already exist (LevelDB wins).
+ * writes each key to SQLite only if it does not already exist (SQLite wins).
  *
  * Prints a summary of how many keys were written vs skipped.
  *
  * @param {{ subcommand: string | null, flags: Map<string, string> }} parsed
- * @returns {Promise<void>}
  */
-async function runLoad(parsed) {
+function runLoad(parsed) {
   const { flags } = parsed;
   const filePath = flags.get('file');
 
@@ -209,36 +212,28 @@ async function runLoad(parsed) {
     process.exit(1);
   }
 
-  const db = await openDb();
-
+  const db = openDb();
   let written = 0;
   let skipped = 0;
 
   try {
+    const stmt = db.prepare(
+      'INSERT OR IGNORE INTO agents (name, capabilities, description) VALUES (?, ?, ?)',
+    );
     for (const [key, value] of Object.entries(sourceJson)) {
-      let exists = false;
-      try {
-        await db.get(key);
-        exists = true;
-      } catch (err) {
-        if (err.code !== 'LEVEL_NOT_FOUND') {
-          throw err;
-        }
-      }
-
-      if (exists) {
-        skipped++;
-      } else {
-        await db.put(key, JSON.stringify(value));
+      const result = stmt.run(key, value.capabilities ?? null, value.description ?? null);
+      if (result.changes > 0) {
         written++;
+      } else {
+        skipped++;
       }
     }
   } finally {
-    await db.close();
+    db.close();
   }
 
   process.stdout.write(
-    `Loaded agent-map.db from ${resolvedPath}: ${written} written, ${skipped} skipped\n`,
+    `Loaded agent-map.sqlite from ${resolvedPath}: ${written} written, ${skipped} skipped\n`,
   );
 }
 
@@ -247,9 +242,9 @@ async function runLoad(parsed) {
 const parsed = parseArgs(process.argv);
 
 if (parsed.subcommand === 'dump') {
-  await runDump(parsed);
+  runDump(parsed);
 } else if (parsed.subcommand === 'load') {
-  await runLoad(parsed);
+  runLoad(parsed);
 } else {
-  await runWrite(parsed);
+  runWrite(parsed);
 }

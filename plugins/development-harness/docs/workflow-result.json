@@ -1,0 +1,2484 @@
+{
+  "summary": "Map complete DH backlog item workflow from source files with citation per step. GAP rule: any transition not attested by a fragment is emitted as GAP, never smoothed.",
+  "agentCount": 67,
+  "logs": [
+    "Routes found: create, groom, work, close, progress, resume, quick, setup-github, implement-feature, start-task, add-new-feature, complete-implementation",
+    "Flags: --auto, --quick, --complete, --language, --stack, interactive",
+    "Read 33 of 33 files successfully",
+    "Synthesizing routes: work/start.md, work, Work: Locate (Phase 1), find-item, issue-first, interactive-browser, Already Implemented Check (Step 2.1), Step 3.1 — Auto-Groom Check, Issue Sync (Steps 2.2–2.4), Step 3.2: RT-ICA Freshness Check, Phase 3, Step 3.4 — runs immediately after the RT-ICA gate (Steps 3.2 and 3.3), before Step 4.1 (Compose Feature Request), Work: Prepare (Phase 3), Step 4.1 — Feature request string template passed to add-new-feature, Phase 4 — Plan, Work: Validate (Phase 2), Validation Plan — GitHub Integration Workflow, field-mapping reference (no procedural steps), Post-Planning Output (Steps 4.5 + 4.5a), auto-mode, SAM (Stateless Agent Methodology) definition and pipeline reference, Commit Messages and PR Body — `Fixes #N` Restriction, error-handling, close / resolve, close / resolve examples, progress, resume, --quick, setup-github, implement-feature, start-task, add-new-feature, complete-implementation",
+    "Synthesized 32 route flows",
+    "Writing results to scratch directory"
+  ],
+  "result": {
+    "verified_routes": [
+      "work",
+      "close",
+      "progress",
+      "resume",
+      "quick",
+      "setup-github",
+      "implement-feature",
+      "start-task",
+      "add-new-feature",
+      "complete-implementation"
+    ],
+    "missing_routes": ["create", "groom"],
+    "invented_in_prior_doc": [
+      "Git timeline '12 minutes apart' claim — corrected to 40 minutes after verification; no synthesized flow attests any timing value between commits",
+      "Phase 3 table row extrapolations (2.1, 3.1, 3.2, 3.4, 4.1, 4.2, 4.3 from agent .md files) — partially attested by synthesized flows (Already Implemented Check attests 2.1; Step 3.1 Auto-Groom Check attests 3.1; Step 3.2 RT-ICA Freshness Check attests 3.2; Phase 3 Step 3.4 Feasibility Gate attests 3.4; Step 4.1 Feature Request attests 4.1; Phase 4 Plan steps attest 4.2/4.3) but no flow contradicts the table descriptions",
+      "Phase 4 table extrapolations (feature-researcher, codebase-analyzer, swarm-task-planner, plan-validator from agent .md files) — add-new-feature synthesized flow attests feature-researcher (phase-1), codebase-analyzer (phase-2), and plan-validator (phase-5) but does not attest 'swarm-task-planner' as a named agent; that name has no attestation in any synthesized flow",
+      "Phase 5 dispatch loop diagram extrapolated from agent .md descriptions — implement-feature synthesized flow attests the loop structure (progress-loop-step-1 through step-5, TeamCreate for parallel dispatch, per_task/full_auto/checkpoint autonomy modes) with no contradiction",
+      "Phase 6 gate sequence and table extrapolated from agent .md files — complete-implementation synthesized flow attests TN verification, migration fidelity gate, proportional quality gates, completion verification gate, recursive follow-up handling, apply-status-verified-label, and resolve-the-issue; no named 'Phase 6' structure is contradicted but the prior claim that 'only 4 complete-implementation reference files were actually read' means the gate count may differ from what the flow now shows (34 steps attested)"
+    ],
+    "gaps": [
+      {
+        "location": "work/start.md: start-checklist → interactive-1",
+        "description": "The Mermaid routing diagram in the Checklist section shows the branch to the interactive checklist, but the file does not explicitly state that start-checklist transitions to interactive-1 as the first numbered checklist step — the connection is implied by the checklist numbering, not attested as an explicit transition."
+      },
+      {
+        "location": "work/start.md: start-checklist → auto-1",
+        "description": "The Mermaid routing diagram in the Checklist section shows the branch to the auto checklist, but the file does not explicitly state that start-checklist transitions to auto-1 as the first numbered checklist step — the connection is implied by the checklist numbering, not attested as an explicit transition."
+      },
+      {
+        "location": "work/start.md: error-routing → stop-notification",
+        "description": "The Error Routing table and STOP Notification Protocol appear sequentially in the file but the file does not explicitly state that error-routing triggers stop-notification — the relationship is implied by section proximity, not attested as an explicit transition."
+      },
+      {
+        "location": "work (scope/examples): scope-required-outputs → ex1-load-issue",
+        "description": "scope.md's required-outputs section defers to prepare.md for operative step sequencing; the connection from scope constraints to the example execution sequence (ex1-load-issue) is not attested in either provided fragment — prepare.md is the intermediate file that would bridge normative scope to concrete steps."
+      },
+      {
+        "location": "work (scope/examples): scope-not-produced → ex1-load-issue",
+        "description": "scope.md's not-produced boundary defers to prepare.md; the link from that scope constraint into the example execution flow is not attested in either fragment."
+      },
+      {
+        "location": "work (scope/examples): ex1-next-steps → ex2-find-item",
+        "description": "The two examples (issue-first and title-substring) are presented as sibling variants, not a sequential chain; no ordering or routing condition between them is attested in examples.md — they represent alternative entry points, not a sequence."
+      },
+      {
+        "location": "work (scope/examples): ex1-rt-ica → ex1-set-status",
+        "description": "The example shows RT-ICA APPROVED immediately followed by status transition to in-progress; the condition under which RT-ICA approval triggers the status transition (versus halting on BLOCKED) is stated in the example output but the branching logic is not explicitly attested as normative in either fragment — only the APPROVED path is shown."
+      },
+      {
+        "location": "work (scope/examples): ex2-rt-ica → ex2-compose-feature",
+        "description": "Example 2 shows RT-ICA APPROVED followed immediately by 'Composing feature request' with no status-transition step shown; whether the in-progress status update is omitted from the example or genuinely absent from the title-substring path is not attested in either fragment."
+      },
+      {
+        "location": "Work: Locate (Phase 1): 1.1 → (next step after interactive-browser.md completes)",
+        "description": "The source file does not attest what happens after interactive-browser.md finishes. Whether it converges back into Step 1.3/1.4 or terminates Phase 1 independently is not stated in locate.md."
+      },
+      {
+        "location": "Work: Locate (Phase 1): 1.2 → (next step after issue-first.md completes)",
+        "description": "The source file does not attest what happens after issue-first.md finishes. Whether it feeds into Step 1.4 field extraction or proceeds directly to validate.md is not stated in locate.md."
+      },
+      {
+        "location": "Work: Locate (Phase 1): 1.3 (find-item.md completes) → 1.4",
+        "description": "The source file states 'Before executing Step 1.3: Load find-item.md' and records the priority section, but does not explicitly state that control returns from find-item.md to Step 1.4. The transition from find-item.md output back into Step 1.4 is implied by narrative order but not explicitly attested."
+      },
+      {
+        "location": "find-item: strategy-2-type-hint-derivation → strategy-2-filter-first (call)",
+        "description": "The hint derivation substep and the backlog_list call substep are described in the same section heading but their explicit sequencing within Strategy 2 is prose-implied, not stated as a numbered ordered procedure. The connection is described in prose but no explicit 'then' sequencing directive separates the derivation gate from the API call gate."
+      },
+      {
+        "location": "find-item: strategy-2-and-filter-note → strategy-2-filter-first (resolution)",
+        "description": "The AND-filter note is a constraint annotation on the call, not explicitly sequenced as a discrete step before or after the call. Its position in the ordered flow relative to the call itself is not attested."
+      },
+      {
+        "location": "find-item: strategy-3-llm-semantic-match → strategy-3-tiebreaker",
+        "description": "The tiebreaker substep is described under the same heading as the main semantic match step but is only triggered when two or more candidates are plausible after backlog_view reads. The transition condition (two-or-more plausible candidates persisting after backlog_view) is described in prose but the sequencing as a discrete ordered step following the main LLM selection step is not explicitly numbered or gated."
+      },
+      {
+        "location": "issue-first: 1.2.trigger → 1.2.fetch",
+        "description": "The file states the trigger condition and then describes calling backlog_view, but does not explicitly state that trigger match is the sole gate before the fetch call. The sequential connection is implied by prose order, not attested as an explicit conditional."
+      },
+      {
+        "location": "issue-first: 1.2.backend-modes → 1.2.build-working-item",
+        "description": "The file describes backend modes and then the working-item build table, but does not explicitly state that backend-mode interpretation precedes or gates working-item construction. Order is implied by prose position only."
+      },
+      {
+        "location": "issue-first: 1.2.build-working-item → 1.2.skip-note",
+        "description": "The file presents the working-item table and the skip note in the same section without an explicit sequencing statement connecting them."
+      },
+      {
+        "location": "issue-first: 1.2.skip-note → step-2.4",
+        "description": "The file says 'Proceed directly to Step 2.4' but Step 2.4 is not defined in this file fragment. The content and entry conditions of Step 2.4 are not attested in any provided fragment."
+      },
+      {
+        "location": "issue-first: closed.search-commits → closed.search-prs",
+        "description": "The numbered list implies sequential order but does not explicitly state that search-prs must follow search-commits rather than run concurrently or independently."
+      },
+      {
+        "location": "issue-first: closed.search-prs → closed.report",
+        "description": "The file implies reporting follows both searches but does not explicitly state that both searches must complete before the report step begins."
+      },
+      {
+        "location": "interactive-browser: step-1 → step-2",
+        "description": "The file does not explicitly state that step-2 follows immediately from a successful step-1 response; the transition from receiving backlog_list output to evaluating groomed status is not attested as a distinct handoff — only the defers_to for errors is attested."
+      },
+      {
+        "location": "interactive-browser: step-5 (G [number] / G all / D [number]) → step-3",
+        "description": "The file states 'then re-display the list' but does not explicitly reference step-3 by label or explain whether the list is regenerated via a fresh backlog_list call or re-rendered from cached state — the mechanism of re-display is not attested."
+      },
+      {
+        "location": "interactive-browser: step-5 (C [number]) → close path",
+        "description": "The file names the 'close path' destination but does not identify the file or skill that implements it; the connection to the close workflow is not attested in this file."
+      },
+      {
+        "location": "interactive-browser: step-5 (R [number]) → resolve path",
+        "description": "The file names the 'resolve path' destination but does not identify the file or skill that implements it; the connection to the resolve workflow is not attested in this file."
+      },
+      {
+        "location": "Already Implemented Check (Step 2.1): step-2.1.2 (no-evidence branch) → step-2.2-github-sync",
+        "description": "The source file references 'proceed to github-sync.md (Step 2.2)' as the next step when no evidence is found, but the content of that step and any transition logic between the two files is not attested in the already-implemented.md fragment provided."
+      },
+      {
+        "location": "Step 3.1 Auto-Groom Check: 3.1.phase2-find-sha → 3.1.phase2-spawn",
+        "description": "The source file presents these as sequential steps under the same heading 'Phase 2 — Drift assessment' but does not explicitly state that phase2-find-sha must complete before phase2-spawn begins. The ordering is implied by the dependency of the diff command on {groom_date_sha}, but the transition is not attested as a named handoff in either step."
+      },
+      {
+        "location": "Step 3.2 RT-ICA Freshness Check: 3.2.6 → 3.2.7",
+        "description": "The source file shows 'Run dh:rt-ica' and 'RT-ICA is fresh — use cached result' as two separate terminal nodes in the flowchart. The transition from step 3.2.6 (skill re-run completes and returns a result) into step 3.2.7 (evaluate that result) is not attested as an explicit labeled edge in the source file. The flowchart ends at 'RunRTICA' without showing a return arc to a result-evaluation node."
+      },
+      {
+        "location": "Step 3.2 RT-ICA Freshness Check: 3.2.7 → feasibility-gate.md",
+        "description": "Step 3.2.7 defers to feasibility-gate.md via a relative markdown link, but feasibility-gate.md was not provided as a source fragment. The content and entry point of that file are unknown from the attested source."
+      },
+      {
+        "location": "Phase 3 Step 3.4 Feasibility Gate: load → C1",
+        "description": "The Mermaid diagram in the source file shows RTICAPass feeding into Load and Load feeding into C1, but the file does not explicitly state the transition from load completion to C1 evaluation as a distinct documented handoff — it is implied by diagram node adjacency only."
+      },
+      {
+        "location": "Work: Prepare (Phase 3): 3.1 → 3.2",
+        "description": "The file lists Steps 3.1 then 3.2 in sequence but does not explicitly state that Step 3.2 begins after Step 3.1 completes (regardless of the grooming branch taken). The transition from groom-check.md back to the prepare.md flow and into 3.2 is not attested in the source fragment."
+      },
+      {
+        "location": "Work: Prepare (Phase 3): 3.2 → 3.3",
+        "description": "Step 3.3 says 'After dh:rt-ica completes (or the existing result is confirmed fresh)' but the connection from the rt-ica-gate.md deferred file back to Step 3.3 is not attested in the source fragment — only the trigger condition is stated in prepare.md."
+      },
+      {
+        "location": "Step 4.1 Feature Request: step-4.1-build-feature-request-string → add-new-feature invocation",
+        "description": "The file specifies building the string and conditionally invoking a language plugin, but the actual handoff mechanism (how the string is passed to add-new-feature, what tool or call is made) is not attested in the source file."
+      },
+      {
+        "location": "Phase 4 Plan: 4.3 → 4.3.2",
+        "description": "The Mermaid diagram in 4.3 shows 'RecordIssue' as a node after Update, but the transition from the backlog_update call to the 4.3.2 sub-step is only implied by node ordering in the diagram. The connection is shown visually but no explicit prose attests that 4.3.2 executes unconditionally after 4.3.1 completes (versus only when a plan was found)."
+      },
+      {
+        "location": "Phase 4 Plan: 4.5 → post-planning.md (auto mode Step 4.5a)",
+        "description": "Step 4.5 defers to post-planning.md for the auto-continue path. The content of post-planning.md (Step 4.5a) was not provided as a fragment — what occurs after auto mode hands off is not attested in the supplied source."
+      },
+      {
+        "location": "Work: Validate (Phase 2): 2.1 → 2.2",
+        "description": "Step 2.2 references 'After Step 1.4' as its trigger condition, placing it after a Phase 1 step rather than explicitly after Step 2.1. The transition from 2.1 (already-implemented check) to 2.2 (issue link check) is not attested in validate.md — the file lists them sequentially but does not describe the handoff or what state is carried forward."
+      },
+      {
+        "location": "Work: Validate (Phase 2): 2.3 → 2.4",
+        "description": "validate.md lists Step 2.3 (Create Linked Issue) and Step 2.4 (Set In-Progress) sequentially but does not explicitly state that 2.4 follows 2.3 in all cases, nor what output from 2.3 feeds into 2.4."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-1 → FIT-2",
+        "description": "Transition from setup-github verification to working the clang-format yaml item is listed sequentially in the Full Integration Test Sequence but no explicit handoff or precondition linking them is attested beyond ordinal position."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-2 (V2a, V2b, V3, V4) — ordering",
+        "description": "V2a, V2b, V3, and V4 are all cited as verifications triggered by FIT-2, but the source does not specify the execution order among them."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-2 → FIT-3",
+        "description": "Transition from issue-creation verification to '[implement the fix in code]' is listed sequentially but no explicit handoff is attested in the source."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-3 → FIT-4",
+        "description": "Transition from code implementation to running /work-backlog-item close is listed sequentially but no explicit precondition or handoff is attested beyond ordinal position."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-4 (V5, V6) — ordering",
+        "description": "V5 and V6 are both cited as verifications triggered by FIT-4, but the source does not specify which is checked first."
+      },
+      {
+        "location": "Validation Plan — GitHub Integration Workflow: FIT-4 → PYGITHUB-V",
+        "description": "PyGithub Validation appears in a separate section with no explicit dependency or ordering relationship to the Full Integration Test Sequence steps. Its position in the overall flow is not attested."
+      },
+      {
+        "location": "Post-Planning Output (Steps 4.5 + 4.5a): 4.5a.1 → 4.5a.2",
+        "description": "The source states step 2 fires 'when all tasks complete' but does not specify the mechanism by which dh:implement-feature signals completion back to the orchestrator, nor how the orchestrator detects that all tasks are done before invoking dh:complete-implementation. The transition condition is stated but the signalling protocol is not attested in this file."
+      },
+      {
+        "location": "auto-mode overlay: auto-no-title → auto-step-1-multiple-matches",
+        "description": "Ordering between the no-title auto-selection path and Step 1 multiple-matches handling is not attested in this fragment; Step 1 sequencing is defined in the parent work-mode workflow, which was not provided."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-1-multiple-matches → auto-step-1-2-issue-not-found",
+        "description": "The transition between Step 1 match outcomes (multiple matches vs. issue-not-found) is not attested in this fragment; these are distinct branch conditions within Step 1 of the parent workflow, not ordered steps."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-1-3-zero-matches → auto-step-2-2-github-issue-offer",
+        "description": "Transition from Step 1.3 (zero matches, create-backlog-item) to Step 2.2 (GitHub issue offer) is not attested in this fragment; ordering is defined in the parent work-mode workflow."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-2-2-github-issue-offer → auto-step-2-2-milestone-assignment",
+        "description": "Whether GitHub issue offer and milestone assignment are sequential or alternative sub-steps within Step 2.2 is not attested in this fragment."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-2-2-milestone-assignment → auto-rtica-blocked",
+        "description": "Transition from Step 2.2 (milestone assignment skip) to the RT-ICA BLOCKED gate is not attested in this fragment; both reference points in the parent workflow with unknown intervening steps."
+      },
+      {
+        "location": "auto-mode overlay: auto-rtica-blocked → auto-step-3-1-staleness-gate",
+        "description": "Transition from RT-ICA BLOCKED handling to Step 3.1 staleness check is not attested in this fragment; these are separate decision points whose relative ordering is defined in the parent workflow."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-3-1-functional-drift → Step 3.2",
+        "description": "Step 3.2 is referenced as the continuation after FUNCTIONAL_DRIFT but is not defined in this fragment; its content and next steps are defined in the parent work-mode workflow."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-3-1-cosmetic-only → Step 3.2",
+        "description": "Step 3.2 is referenced as the continuation after COSMETIC_ONLY but is not defined in this fragment; its content and next steps are defined in the parent work-mode workflow."
+      },
+      {
+        "location": "auto-mode overlay: auto-step-3-4-feasibility-gate → auto-step-5-interactive-questions",
+        "description": "Transition from Step 3.4 feasibility check to Step 5.1–5.7 interactive questions is not attested in this fragment; Steps 3.4 and 5 are non-adjacent in the parent workflow and intervening steps (including the note that 3.2–4.5 are unaffected by --auto) are not defined here."
+      },
+      {
+        "location": "auto-mode overlay: auto-announce → (any step)",
+        "description": "The stage announcement is described as a cross-cutting preamble applied 'before executing each checklist step' — its relationship to specific ordered steps is positional (before each), not sequential; no step-to-step ordering is attested."
+      },
+      {
+        "location": "auto-mode overlay: auto-rtica-blocked-auto-selected → (any step)",
+        "description": "The auto-selected item RT-ICA BLOCKED case is a terminal stop; which step in the parent workflow triggers this check is not attested in this fragment."
+      },
+      {
+        "location": "SAM definition: embody-1 → embody-2-register",
+        "description": "The transition from invoking /development-harness, /add-new-feature, or /work-backlog-item (embody-1) to registering artifacts via artifact_register (embody-2-register) is not explicitly attested in the source file. The file lists these as sequential numbered items under 'How to Embody SAM' but does not describe any handoff or trigger between them."
+      },
+      {
+        "location": "SAM definition: embody-2-monolithic → embody-2-incremental-1",
+        "description": "The source presents monolithic and incremental paths as alternatives (branch on task count < 16 vs 16+), not as a sequential flow. The decision point selecting between them is implied by the task count threshold but no explicit routing step is attested."
+      },
+      {
+        "location": "SAM definition: pipeline-S7 (CERTIFIED) → embody-6",
+        "description": "The connection between S7 producing CERTIFIED and the commit-atomically-per-task rule (embody-6) is not attested. embody-6 applies per completed task (after S6 COMPLETE), not after S7, but the source does not explicitly wire S6 COMPLETE to the commit step."
+      },
+      {
+        "location": "error-handling: EH-01 → EH-02",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-02 → EH-03",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-03 → EH-04",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-04 → EH-05",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-05 → EH-06",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-06 → EH-07",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-07 → EH-08",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-08 → EH-09",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-09 → EH-10",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-10 → EH-11",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-11 → EH-12",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-12 → EH-13",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-13 → EH-14",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-14 → EH-15",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-15 → EH-16",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-16 → EH-17",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-17 → EH-18",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-18 → EH-19",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "error-handling: EH-19 → EH-20",
+        "description": "Transition not attested in source — file presents error cases as a flat lookup table with no explicit ordering or flow between entries."
+      },
+      {
+        "location": "close/resolve: step 5.5 (no Plan field) → step 5.7",
+        "description": "Step 5.5 states 'skip to Step 5.7' when Plan field is absent. Step 5.6 is bypassed. The file does not attest what happens to acceptance-criteria verification for non-SAM items — the skip is stated but the justification or any interim action is not explicitly described in any fragment."
+      },
+      {
+        "location": "close/resolve: step 5.4 (no Plan field) → next step",
+        "description": "Step 5.4 states 'skip this step entirely' when Plan field is absent, implying flow continues. The destination step is not explicitly named in step 5.4 — the file attests only that the step is skipped, not which step follows. Step 5.5 is the next numbered step but the connection is not explicitly attested in step 5.4 text."
+      },
+      {
+        "location": "close/resolve examples: example-1-resolve-by-title-output → example-2-resolve-by-issue-number",
+        "description": "The two resolve examples are presented as independent alternative invocations. No attested sequencing or conditional routing between them exists in the source file."
+      },
+      {
+        "location": "close/resolve examples: example-2-resolve-by-issue-number-output → example-3-close-dismiss",
+        "description": "The resolve-by-issue-number example and the close/dismiss example are presented as independent alternative invocations. No attested sequencing or conditional routing between them exists in the source file."
+      },
+      {
+        "location": "quick: Q3 → Q4",
+        "description": "Step 3 ends by extracting description and acceptance criteria from response[\"sections\"] when the item is found, and Step 4 says to extract them if available. The file does not explicitly state how Q3's extraction result is passed into or distinguished from Q4's extraction action — whether Q4 is a separate pass or a continuation of Q3's logic is not attested."
+      },
+      {
+        "location": "setup-github: S1 → S2",
+        "description": "Transition from label taxonomy setup to milestone check is not explicitly attested in source — steps are sequentially numbered but no linking condition or handoff text connects them."
+      },
+      {
+        "location": "setup-github: S2 → S3",
+        "description": "Transition from milestone check (and optional creation) to project check is not explicitly attested in source — steps are sequentially numbered but no linking condition or handoff text connects them."
+      },
+      {
+        "location": "setup-github: S3 → S4",
+        "description": "Transition from project check (and optional creation) to setup summary output is not explicitly attested in source — steps are sequentially numbered but no linking condition or handoff text connects them."
+      },
+      {
+        "location": "implement-feature: resolve-task-file → progress-loop-step-1",
+        "description": "The source has a horizontal rule separating '## Resolve Task File' and '## Progress Loop'. No sentence states 'then begin the loop' or equivalent. The only connection is a data dependency (P{N} is produced by resolve-task-file and consumed by progress-loop-step-1), which is not an explicit transition attestation."
+      },
+      {
+        "location": "implement-feature: progress-loop-step-5 → completion-gate",
+        "description": "Step 5 only describes what to do when tasks remain ('return to step 2'). The all-COMPLETE exit path is not described in step 5 itself. The completion-gate lives in a separate '## Completion Gate' section. No sentence in step 5 or in the completion-gate section explicitly wires the transition from step-5's no-tasks-remain branch into the completion-gate invocation."
+      },
+      {
+        "location": "implement-feature: agent-health-check → progress-loop-step-4-concerns",
+        "description": "Agent health check is described as a 'while waiting' side-process triggered off step 3. The re-entry point into the main linear flow after health check resolution (crash/respawn/idle/active verdicts) is not stated. The source does not describe how the orchestrator re-joins steps 4, 4a, 4b after a health check completes."
+      },
+      {
+        "location": "implement-feature: bookend-task-ordering (placement in linear order)",
+        "description": "The Bookend Task Ordering section appears after '## Progress Loop' in the source but states that bookends are dispatched via 'existing readiness logic' in steps 2 and 3, not as a sequential step after step 5. The section's position in the linear execution order relative to the numbered progress loop steps is not explicitly attested."
+      },
+      {
+        "location": "implement-feature: wave-completion-confirmation-gate → progress-loop-step-2 (loop-back when confirmed)",
+        "description": "Step 5a states 'If confirmed: proceed to step 2 to fetch the next batch.' However, step 5a is only active when tasks remain (step 5 result: tasks remaining > 0), meaning the step 5 → step 5a transition is conditional on autonomy_mode==\"checkpoint\" AND tasks remaining. The precise ordering between step 5, step 5a, and the loop-back to step 2 under non-checkpoint modes is stated only partially — the checkpoint path is attested, but the full_auto path's loop-back through step 5 directly to step 2 (bypassing 5a) relies on the gate's skip condition rather than an explicit transition statement."
+      },
+      {
+        "location": "start-task: mcp-availability-check → parse-args",
+        "description": "The MCP availability check appears as a blockquote precondition above the Parse Arguments heading in the source file but no explicit sequencing statement connects these two steps. The ordering is inferred from document position, not attested by a transition statement in the source."
+      },
+      {
+        "location": "start-task: step-4-register-active-task → step-5-record-divergence",
+        "description": "Steps 4 and 5 are numbered consecutively in the source but step 5 concerns an ongoing behavior during implementation (record divergences while implementing), not a discrete action that follows step 4 in strict sequence. The file does not explicitly state a hand-off transition between registering active-task context and beginning divergence recording."
+      },
+      {
+        "location": "start-task: step-5-record-divergence → step-6-commit-restriction",
+        "description": "Steps 5 and 6 are numbered consecutively in the source. Step 5 is an ongoing observation behavior; step 6 is a standing constraint on commit messages. No explicit transition statement connects them — their ordering is inferred from list numbering only."
+      },
+      {
+        "location": "start-task: step-6-commit-restriction → step-7-implement",
+        "description": "Steps 6 and 7 are numbered consecutively in the source. Step 6 is a standing constraint; step 7 is the implementation action. No explicit transition statement states that satisfying the constraint precedes or enables step 7."
+      },
+      {
+        "location": "add-new-feature: phase-2 → phase-3-role-resolve",
+        "description": "The skill lists phase-2 as optional and shows phase-3 starting immediately after, but no explicit transition condition or signal from phase-2 to phase-3-role-resolve is attested. The connection is implicit (sequential ordering in the document) not an explicit handoff."
+      },
+      {
+        "location": "add-new-feature: phase-3-domain-signal → phase-3-dispatch",
+        "description": "The skill states domain_skills must be populated before building the prompt, and the dispatch section states 'If {domain_skills} is non-empty, prepend...', but no explicit gate or transition signal between the domain signal detection step and the dispatch step is attested — the connection is structural, not procedurally described."
+      },
+      {
+        "location": "complete-implementation: resolve-issue-step-2 (plan present branch) → resolve-plan-address",
+        "description": "The mermaid in Step 2 attests 'proceed to Resolve Plan Address' when a plan is found, but resolve-issue-step-3 (Extract context for proportional gates) sits between them in document order. It is not stated whether Step 3 executes on the plan-present branch or only on the plan-absent (PQG) branch. The SKILL.md says 'These values are used by the Proportional Quality Gates section' which implies Step 3 is PQG-only, but the routing between Step 2 plan-present branch and resolve-plan-address bypassing Step 3 is not explicitly attested."
+      },
+      {
+        "location": "complete-implementation: resolve-plan-address → pre-phase-1-tn-verification-check",
+        "description": "Resolve Plan Address ends with 'Use P{N} in all sam CLI calls below' with no explicit forward pointer to Pre-Phase 1: TN Verification Check. The connection rests on document adjacency only."
+      },
+      {
+        "location": "complete-implementation: pre-phase-1-tn-verification-check → pre-phase-1a-migration-fidelity",
+        "description": "Pre-Phase 1: TN Verification Check's success exit says the agent proceeds but names neither Pre-Phase 1a nor any specific next step. The step numbering (1 → 1a) provides ordering but is not an explicit forward pointer in the text."
+      },
+      {
+        "location": "complete-implementation: pre-phase-artifact-discovery → pre-phase-1b-concerns-processing",
+        "description": "Pre-Phase: Artifact Discovery has no exit transition statement. The connection to Pre-Phase 1b: Process Accumulated Concerns rests on document adjacency only. Pre-Phase 1a → Artifact Discovery IS attested ('proceed to Artifact Discovery')."
+      },
+      {
+        "location": "complete-implementation: completion-verification-gate → post-phase-6-surface-divergence",
+        "description": "The Completion Verification Gate's success branch says 'Proceed to Recursive Follow-up Handling', not to Post-Phase-6: Surface Divergence Findings. Where in the sequence Post-Phase-6 executes — whether before or after Recursive Follow-up Handling, or as part of the dispatch loop — is not explicitly stated in the source."
+      },
+      {
+        "location": "complete-implementation: resolve-the-issue → final-handoff-output",
+        "description": "pqg-step-7 lists only three closing sections (Final Step: Commit and Push, Team Shutdown, Resolve the Issue) without mentioning Final Handoff Output. The SAM path sections likewise do not explicitly chain Resolve the Issue to Final Handoff Output. The connection rests on document adjacency only."
+      }
+    ],
+    "lifecycle_flow": [
+      {
+        "phase": "Auxiliary: Repository Setup",
+        "route": "setup-github",
+        "entry_trigger": "User invokes /work-backlog-item setup-github (mode flag 'setup-github' detected)",
+        "terminal": false,
+        "exits_to": ["work (scope entry)"],
+        "steps": [
+          {
+            "step_id": "S1",
+            "action": "Call backlog_sync() to create missing labels; optionally verify via backlog_list_labels()",
+            "source_heading": "S1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_sync",
+            "writes": ["GitHub label taxonomy"]
+          },
+          {
+            "step_id": "S2",
+            "action": "Call backlog_list_milestones() to check for existing milestones",
+            "source_heading": "S2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list_milestones",
+            "reads": ["GitHub milestones"]
+          },
+          {
+            "step_id": "S3",
+            "action": "Call backlog_list_projects() to check for existing projects",
+            "source_heading": "S3",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list_projects",
+            "reads": ["GitHub projects"]
+          },
+          {
+            "step_id": "S4",
+            "action": "Output setup summary: labels created count, milestone, project, next steps",
+            "source_heading": "S4"
+          }
+        ]
+      },
+      {
+        "phase": "Cross-Cutting Reference: SAM Pipeline Definition",
+        "route": "SAM (Stateless Agent Methodology) definition and pipeline reference",
+        "entry_trigger": "Loaded as reference by any phase invoking SAM methodology",
+        "terminal": false,
+        "exits_to": ["add-new-feature", "implement-feature", "complete-implementation"],
+        "steps": [
+          {
+            "step_id": "pipeline-S1",
+            "action": "Discovery — receive user request; produce ARTIFACT:DISCOVERY(SCOPE:...)",
+            "source_heading": "pipeline-S1",
+            "writes": ["ARTIFACT:DISCOVERY"]
+          },
+          {
+            "step_id": "pipeline-S2",
+            "action": "Planning — run RT-ICA gate; produce ARTIFACT:PLAN; block if RT-ICA BLOCKED",
+            "source_heading": "pipeline-S2",
+            "writes": ["ARTIFACT:PLAN"],
+            "gates": [
+              {
+                "condition": "RT-ICA returns BLOCKED",
+                "outcome": "planning halted"
+              }
+            ]
+          },
+          {
+            "step_id": "pipeline-S3",
+            "action": "Context Integration — validate plan against codebase; produce contextualized ARTIFACT:PLAN",
+            "source_heading": "pipeline-S3",
+            "reads": ["codebase"],
+            "writes": ["ARTIFACT:PLAN (contextualized)"]
+          },
+          {
+            "step_id": "pipeline-S4",
+            "action": "Task Decomposition — break plan into per-task ARTIFACT:TASK files",
+            "source_heading": "pipeline-S4",
+            "writes": ["ARTIFACT:TASK (per task)"]
+          },
+          {
+            "step_id": "pipeline-S5",
+            "action": "Execution — implement single task; fresh agent session per task; produce ARTIFACT:EXECUTION",
+            "source_heading": "pipeline-S5",
+            "writes": ["ARTIFACT:EXECUTION"]
+          },
+          {
+            "step_id": "pipeline-S6",
+            "action": "Review — orchestrator review loop; NEEDS_WORK re-dispatches (max 3); produce ARTIFACT:REVIEW",
+            "source_heading": "pipeline-S6",
+            "writes": ["ARTIFACT:REVIEW"],
+            "gates": [
+              {
+                "condition": "NEEDS_WORK after 3 loops",
+                "outcome": "escalate to human"
+              }
+            ]
+          },
+          {
+            "step_id": "pipeline-S7",
+            "action": "Verification — goal-backward check; CERTIFIED or NOT_CERTIFIED (max 2 loops)",
+            "source_heading": "pipeline-S7",
+            "gates": [
+              {
+                "condition": "NOT_CERTIFIED after 2 loops",
+                "outcome": "escalate to human"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Cross-Cutting Reference: Commit Message Rules",
+        "route": "Commit Messages and PR Body — `Fixes #N` Restriction",
+        "entry_trigger": "Applied throughout implementation (start-task) and completion (complete-implementation)",
+        "terminal": false,
+        "exits_to": ["complete-implementation"],
+        "steps": [
+          {
+            "step_id": "rule-1",
+            "action": "Task-level commits from /start-task must NEVER include Fixes #N, Closes #N, or Resolves #N trailers",
+            "source_heading": "rule-1"
+          },
+          {
+            "step_id": "rule-2",
+            "action": "/complete-implementation final commit is the only place Fixes #N trailers appear — after all quality gates pass",
+            "source_heading": "rule-2"
+          },
+          {
+            "step_id": "rule-3",
+            "action": "Do NOT add Fixes #N to PR body manually — the final commit trailer closes the issue via GitHub automation",
+            "source_heading": "rule-3"
+          }
+        ]
+      },
+      {
+        "phase": "Cross-Cutting Reference: Error Handling",
+        "route": "error-handling",
+        "entry_trigger": "Condition-matched lookup — each EH step entered independently when its trigger condition is met",
+        "terminal": false,
+        "exits_to": ["work/start.md", "close / resolve", "find-item", "issue-first"],
+        "steps": [
+          {
+            "step_id": "EH-01",
+            "action": "#N / URL / bare number not found: report and list available items via backlog_list",
+            "source_heading": "EH-01",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "EH-02",
+            "action": "#N already closed: run Completed Issue Discovery (search commits/PRs, close local item with reference, or ask user)",
+            "source_heading": "EH-02"
+          },
+          {
+            "step_id": "EH-03",
+            "action": "close #N / resolve #N — issue not found: report and stop",
+            "source_heading": "EH-03"
+          },
+          {
+            "step_id": "EH-04",
+            "action": "Item not found: list available items via backlog_list with priority sections",
+            "source_heading": "EH-04",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "EH-05",
+            "action": "Multiple matches: present numbered list, ask user to choose",
+            "source_heading": "EH-05"
+          },
+          {
+            "step_id": "EH-06",
+            "action": "backlog_list returns error: report the error message",
+            "source_heading": "EH-06"
+          },
+          {
+            "step_id": "EH-07",
+            "action": "RT-ICA BLOCKED: report missing inputs and wait for user — do not proceed",
+            "source_heading": "EH-07"
+          },
+          {
+            "step_id": "EH-08",
+            "action": "backlog_view returns error: report and stop",
+            "source_heading": "EH-08"
+          },
+          {
+            "step_id": "EH-09",
+            "action": "backlog_update returns error: report the error message",
+            "source_heading": "EH-09"
+          },
+          {
+            "step_id": "EH-10",
+            "action": "backlog_close returns error: report the error message",
+            "source_heading": "EH-10"
+          },
+          {
+            "step_id": "EH-11",
+            "action": "backlog_resolve returns error: report and stop",
+            "source_heading": "EH-11"
+          },
+          {
+            "step_id": "EH-12",
+            "action": "GitHub API rate limit: report and wait",
+            "source_heading": "EH-12"
+          },
+          {
+            "step_id": "EH-13",
+            "action": "GitHub API authentication error: report and stop",
+            "source_heading": "EH-13"
+          },
+          {
+            "step_id": "EH-14",
+            "action": "Item marked as completed but no implementation evidence found: do not resolve — offer close as alternative",
+            "source_heading": "EH-14"
+          },
+          {
+            "step_id": "EH-15",
+            "action": "Acceptance criteria not met: report gaps — do not resolve",
+            "source_heading": "EH-15"
+          },
+          {
+            "step_id": "EH-16",
+            "action": "User provides no summary for resolve: block until user provides summary",
+            "source_heading": "EH-16"
+          },
+          {
+            "step_id": "EH-17",
+            "action": "Plan not found for item: report and offer to create plan via /work-backlog-item",
+            "source_heading": "EH-17"
+          },
+          {
+            "step_id": "EH-18",
+            "action": "SAM server unavailable: report and wait for initialization (10–30 seconds)",
+            "source_heading": "EH-18"
+          },
+          {
+            "step_id": "EH-19",
+            "action": "No open P0/P1 items found in auto mode: report and stop",
+            "source_heading": "EH-19"
+          },
+          {
+            "step_id": "EH-20",
+            "action": "create-backlog-item --auto failed: report error and stop",
+            "source_heading": "EH-20"
+          }
+        ]
+      },
+      {
+        "phase": "Cross-Cutting Reference: Field Mapping",
+        "route": "field-mapping reference (no procedural steps)",
+        "entry_trigger": "Referenced by issue-first.md and github-sync.md when building GitHub issue body",
+        "terminal": false,
+        "exits_to": ["Issue Sync (Steps 2.2–2.4)"],
+        "steps": [
+          {
+            "step_id": "field-mapping-table",
+            "action": "Defines bidirectional field mapping between Backlog Item fields (via MCP) and GitHub Issue fields; issue body template is built into the backlog_update MCP tool",
+            "source_heading": "field-mapping-table"
+          }
+        ]
+      },
+      {
+        "phase": "Cross-Cutting Reference: Validation Plan",
+        "route": "Validation Plan — GitHub Integration Workflow",
+        "entry_trigger": "Full integration test sequence for GitHub workflow validation",
+        "terminal": true,
+        "exits_to": [],
+        "steps": [
+          {
+            "step_id": "FIT-1",
+            "action": "Run /work-backlog-item setup-github",
+            "source_heading": "FIT-1",
+            "defers_to": ["setup-github"]
+          },
+          {
+            "step_id": "V1",
+            "action": "Call backlog_list_labels(); verify 13 taxonomy labels present",
+            "source_heading": "V1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list_labels"
+          },
+          {
+            "step_id": "FIT-2",
+            "action": "Run /work-backlog-item clang-format yaml",
+            "source_heading": "FIT-2"
+          },
+          {
+            "step_id": "V2a",
+            "action": "Call backlog_list_issues(state='open'); verify priority:p1, type:*, status:in-progress labels present",
+            "source_heading": "V2a",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list_issues"
+          },
+          {
+            "step_id": "V2b",
+            "action": "Call backlog_view(selector='{title}'); verify response contains 'issue' field with '#N' value",
+            "source_heading": "V2b",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "V3",
+            "action": "Verify issue has correct labels and milestone assignment on GitHub",
+            "source_heading": "V3"
+          },
+          {
+            "step_id": "V4",
+            "action": "Verify backlog item body contains **Issue**: #N field",
+            "source_heading": "V4"
+          },
+          {
+            "step_id": "FIT-3",
+            "action": "Implement the fix in code",
+            "source_heading": "FIT-3"
+          },
+          {
+            "step_id": "FIT-4",
+            "action": "Run /work-backlog-item close {title}",
+            "source_heading": "FIT-4",
+            "defers_to": ["close / resolve"]
+          },
+          {
+            "step_id": "V5",
+            "action": "Verify backlog item status is closed/completed",
+            "source_heading": "V5"
+          },
+          {
+            "step_id": "V6",
+            "action": "Verify GitHub issue is closed and state is consistent",
+            "source_heading": "V6"
+          },
+          {
+            "step_id": "PYGITHUB-V",
+            "action": "PyGithub Validation: list all open P1 issues with labels and milestone",
+            "source_heading": "PYGITHUB-V"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Initialization",
+        "route": "work/start.md",
+        "entry_trigger": "User invokes /dh:work-backlog-item with any arguments; start-0 executed first",
+        "terminal": false,
+        "exits_to": ["Work: Locate (Phase 1)", "implement-feature", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "start-0",
+            "action": "Read scope.md before proceeding. All work actions operate within that scope boundary.",
+            "source_heading": "start-0",
+            "reads": ["scope.md"]
+          },
+          {
+            "step_id": "start-checklist",
+            "action": "At workflow start, create a TodoWrite checklist using the NUMBERED CHECKLIST for mode (interactive or auto). Mode determined from <mode/> input.",
+            "source_heading": "start-checklist",
+            "branches": [
+              {
+                "condition": "mode = 'interactive'",
+                "action": "proceed to interactive-1 checklist"
+              },
+              {
+                "condition": "mode = 'auto'",
+                "action": "proceed to auto-1 checklist"
+              }
+            ]
+          },
+          {
+            "step_id": "interactive-1",
+            "action": "Read scope.md — align all actions with the work scope boundary",
+            "source_heading": "interactive-1",
+            "reads": ["scope.md"]
+          },
+          {
+            "step_id": "interactive-2",
+            "action": "Locate: find and extract backlog item fields via locate.md. Step 2.1: Interactive browser (no args). Step 2.2: Issue-first path (#N, bare number, URL). Step 2.3: Find by title substring. Step 2.4: Extract item fields. If item already has Plan field: invoke implement-feature and stop.",
+            "source_heading": "interactive-2",
+            "defers_to": ["Work: Locate (Phase 1)"],
+            "branches": [
+              {
+                "condition": "Item already has Plan field",
+                "action": "invoke Skill(skill: 'dh:implement-feature', args: '{plan_address}') and stop",
+                "defers_to": "implement-feature"
+              }
+            ]
+          },
+          {
+            "step_id": "interactive-3",
+            "action": "Validate: verify item state and sync with GitHub via validate.md. Steps 3.1–3.5. If discovery gate STOP: report and stop.",
+            "source_heading": "interactive-3",
+            "defers_to": ["Work: Validate (Phase 2)"],
+            "gates": [
+              {
+                "condition": "discovery gate returns STOP",
+                "outcome": "report and stop"
+              }
+            ]
+          },
+          {
+            "step_id": "interactive-4",
+            "action": "Prepare: auto-groom check, RT-ICA gate, feasibility gate via prepare.md",
+            "source_heading": "interactive-4",
+            "defers_to": ["Work: Prepare (Phase 3)"],
+            "gates": [
+              {
+                "condition": "RT-ICA BLOCKED",
+                "outcome": "backlog_update blocked, stop"
+              },
+              {
+                "condition": "Feasibility gate BLOCKED",
+                "outcome": "report and stop"
+              }
+            ]
+          },
+          {
+            "step_id": "interactive-5",
+            "action": "Plan: compose feature request and invoke add-new-feature via plan.md",
+            "source_heading": "interactive-5",
+            "defers_to": ["Phase 4 — Plan"]
+          },
+          {
+            "step_id": "interactive-6",
+            "action": "Output plan report to user; await next action in interactive mode",
+            "source_heading": "interactive-6"
+          },
+          {
+            "step_id": "interactive-7",
+            "action": "Commit complete — interactive mode end",
+            "source_heading": "interactive-7"
+          },
+          {
+            "step_id": "auto-1",
+            "action": "Read scope.md (auto mode)",
+            "source_heading": "auto-1",
+            "reads": ["scope.md"]
+          },
+          {
+            "step_id": "auto-9",
+            "action": "Commit complete — auto mode end",
+            "source_heading": "auto-9"
+          },
+          {
+            "step_id": "error-routing",
+            "action": "On no item found: report and stop per Error Routing table",
+            "source_heading": "error-routing",
+            "defers_to": ["error-handling"]
+          },
+          {
+            "step_id": "stop-notification",
+            "action": "On user declines diagnostic: stop",
+            "source_heading": "stop-notification"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Scope Definition",
+        "route": "work",
+        "entry_trigger": "Scope boundary and examples loaded at work-backlog-item invocation",
+        "terminal": false,
+        "exits_to": [
+          "Work: Locate (Phase 1)",
+          "Work: Validate (Phase 2)",
+          "Work: Prepare (Phase 3)",
+          "Phase 4 — Plan"
+        ],
+        "steps": [
+          {
+            "step_id": "scope-what-it-covers",
+            "action": "Define work stage scope: item location, state validation, GitHub sync, discovery, auto-grooming, RT-ICA gating, feasibility, SAM plan creation",
+            "source_heading": "scope-what-it-covers"
+          },
+          {
+            "step_id": "scope-not-produced",
+            "action": "Enforce scope boundary: do NOT produce grooming analysis, RT-ICA assessment beyond gate check, problem framing, impact analysis, or discovery artifacts",
+            "source_heading": "scope-not-produced"
+          },
+          {
+            "step_id": "scope-required-outputs",
+            "action": "Verify required outputs: SAM plan file created; plan field on backlog item set to P{id}; item status set to in-progress",
+            "source_heading": "scope-required-outputs"
+          },
+          {
+            "step_id": "ex1-load-issue",
+            "action": "Example 1 (issue-first): Load GitHub Issue by number (#N) to resolve title, labels, milestone, state",
+            "source_heading": "ex1-load-issue",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "ex1-match-backlog",
+            "action": "Match loaded issue to backlog item for additional context",
+            "source_heading": "ex1-match-backlog"
+          },
+          {
+            "step_id": "ex1-rt-ica",
+            "action": "RT-ICA gate check — APPROVED path shown in example",
+            "source_heading": "ex1-rt-ica",
+            "gates": [
+              {
+                "condition": "RT-ICA BLOCKED",
+                "outcome": "halt with missing-inputs report"
+              }
+            ]
+          },
+          {
+            "step_id": "ex1-set-status",
+            "action": "Set item status to in-progress",
+            "source_heading": "ex1-set-status",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update"
+          },
+          {
+            "step_id": "ex1-next-steps",
+            "action": "Caller receives /implement-feature and /work-backlog-item close instructions",
+            "source_heading": "ex1-next-steps"
+          },
+          {
+            "step_id": "ex2-find-item",
+            "action": "Example 2 (title-substring): Find item by title substring match",
+            "source_heading": "ex2-find-item",
+            "defers_to": ["find-item"]
+          },
+          {
+            "step_id": "ex2-rt-ica",
+            "action": "RT-ICA gate check — APPROVED path shown in example",
+            "source_heading": "ex2-rt-ica",
+            "gates": [
+              {
+                "condition": "RT-ICA BLOCKED",
+                "outcome": "halt with missing-inputs report"
+              }
+            ]
+          },
+          {
+            "step_id": "ex2-compose-feature",
+            "action": "Compose feature request string for add-new-feature invocation",
+            "source_heading": "ex2-compose-feature"
+          },
+          {
+            "step_id": "ex2-next-steps",
+            "action": "Caller receives /implement-feature, /implementation-manager status, and /work-backlog-item close instructions",
+            "source_heading": "ex2-next-steps"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Locate Item (Sub-flow)",
+        "route": "Work: Locate (Phase 1)",
+        "entry_trigger": "Invoked from work/start.md interactive-2 or auto equivalents; entry determined by <mode/> value",
+        "terminal": false,
+        "exits_to": [
+          "interactive-browser",
+          "issue-first",
+          "find-item",
+          "Work: Validate (Phase 2)",
+          "implement-feature"
+        ],
+        "steps": [
+          {
+            "step_id": "1.1",
+            "action": "Load interactive-browser.md for MCP error handling, display format, and response handling",
+            "source_heading": "1.1",
+            "defers_to": ["interactive-browser"]
+          },
+          {
+            "step_id": "1.2",
+            "action": "Load issue-first.md for field mapping, completed-issue discovery, and behavior when <mode/> is `auto`",
+            "source_heading": "1.2",
+            "defers_to": ["issue-first"]
+          },
+          {
+            "step_id": "1.3",
+            "action": "Load find-item.md. Title = <item_ref/>+ joined. In auto mode with no title: scan P0 then P1 for first open item. Record priority section.",
+            "source_heading": "1.3",
+            "defers_to": ["find-item"]
+          },
+          {
+            "step_id": "1.4",
+            "action": "Extract fields from matched item via backlog_list and backlog_view. If item has Plan field: invoke implement-feature immediately. Else proceed to validate.md.",
+            "source_heading": "1.4",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view",
+            "reads": ["backlog_list response", "backlog_view response"],
+            "branches": [
+              {
+                "condition": "Item has Plan field",
+                "action": "invoke Skill(skill: 'dh:implement-feature', args: 'P{id}') and stop",
+                "defers_to": "implement-feature"
+              },
+              {
+                "condition": "No Plan field",
+                "action": "proceed to validate.md Step 2.1"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Locate Sub-flow: Interactive Browser",
+        "route": "interactive-browser",
+        "entry_trigger": "Loaded from Work: Locate Step 1.1 when no arguments provided (interactive browse path)",
+        "terminal": false,
+        "exits_to": ["find-item", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "step-1",
+            "action": "Call mcp__plugin_dh_backlog__backlog_list; parse returned dict; each entry has section, title, issue, plan, status, milestone, file_path, groomed",
+            "source_heading": "step-1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list",
+            "reads": ["backlog items"]
+          },
+          {
+            "step_id": "step-2",
+            "action": "Determine groomed status. For full content call backlog_view(selector='{title or #N}', summary=false)",
+            "source_heading": "step-2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "step-3",
+            "action": "Present numbered list grouped by P0/P1/P2/Ideas. Status indicators: checked=planned/in-progress, magnifier=groomed, clipboard=not groomed. Display options: [number]=select, G [number]=groom, G all=groom all, D [number]=details",
+            "source_heading": "step-3"
+          },
+          {
+            "step_id": "step-4",
+            "action": "Use AskUserQuestion: 'Which item would you like to work on next?'",
+            "source_heading": "step-4"
+          },
+          {
+            "step_id": "step-5",
+            "action": "Handle user response: [number]=select via find-item.md; C [number]=close path; R [number]=resolve path; G/D actions then re-display list",
+            "source_heading": "step-5",
+            "branches": [
+              {
+                "condition": "[number] selected",
+                "action": "defer to find-item.md",
+                "defers_to": "find-item"
+              },
+              {
+                "condition": "C [number]",
+                "action": "defer to close path",
+                "defers_to": "close / resolve"
+              },
+              {
+                "condition": "R [number]",
+                "action": "defer to resolve path",
+                "defers_to": "close / resolve"
+              },
+              {
+                "condition": "G [number] / G all / D [number]",
+                "action": "perform groom/detail action then re-display list (step-3)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Locate Sub-flow: Issue-First Path",
+        "route": "issue-first",
+        "entry_trigger": "Triggered when <mode/> matches #[0-9]+, bare number, or GitHub issue URL",
+        "terminal": false,
+        "exits_to": ["Work: Validate (Phase 2)", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "1.2.trigger",
+            "action": "Match trigger condition: #N, bare number, or GitHub issue URL",
+            "source_heading": "1.2.trigger"
+          },
+          {
+            "step_id": "1.2.fetch",
+            "action": "Call mcp__plugin_dh_backlog__backlog_view with selector=<mode/>",
+            "source_heading": "1.2.fetch",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "1.2.backend-modes",
+            "action": "Interpret response per backend mode: Connected (GitHub live) or Offline (local YAML cache with warnings)",
+            "source_heading": "1.2.backend-modes"
+          },
+          {
+            "step_id": "1.2.build-working-item",
+            "action": "Build working item from JSON response: title, description (body), source, priority, status, milestone, plan",
+            "source_heading": "1.2.build-working-item",
+            "reads": ["backlog_view JSON response"]
+          },
+          {
+            "step_id": "1.2.skip-note",
+            "action": "Skip Steps 2.1–2.3 (item has GitHub issue; backlog_view provides closed-state detection). Proceed to Step 2.4.",
+            "source_heading": "1.2.skip-note"
+          },
+          {
+            "step_id": "closed.search-commits",
+            "action": "If issue closed: search commits for implementation evidence via git log --grep",
+            "source_heading": "closed.search-commits"
+          },
+          {
+            "step_id": "closed.search-prs",
+            "action": "Search merged PRs for implementation evidence",
+            "source_heading": "closed.search-prs"
+          },
+          {
+            "step_id": "closed.report",
+            "action": "Report findings: if evidence found call backlog_resolve; if no evidence and interactive ask user; if auto log STOP",
+            "source_heading": "closed.report",
+            "branches": [
+              {
+                "condition": "evidence found",
+                "action": "call backlog_resolve with evidence",
+                "defers_to": "close / resolve"
+              },
+              {
+                "condition": "no evidence, interactive",
+                "action": "AskUserQuestion"
+              },
+              {
+                "condition": "no evidence, auto mode",
+                "action": "log AUTO STOP"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 1: Work Entry — Locate Sub-flow: Find Item",
+        "route": "find-item",
+        "entry_trigger": "Called from Work: Locate Step 1.3 for title-substring matching, or from interactive-browser on [number] selection",
+        "terminal": false,
+        "exits_to": ["issue-first", "Work: Locate (Phase 1)"],
+        "steps": [
+          {
+            "step_id": "bypass-check",
+            "action": "If <mode/> is #N, bare number, or GitHub issue URL — skip and go to issue-first.md",
+            "source_heading": "bypass-check",
+            "branches": [
+              {
+                "condition": "input is #N, bare number, or GitHub URL",
+                "action": "defer to issue-first.md",
+                "defers_to": "issue-first"
+              }
+            ]
+          },
+          {
+            "step_id": "strategy-1-substring-match",
+            "action": "Call backlog_list(title=query). If 1 result: use it. If multiple: present list (auto: pick first). If 0: proceed to Strategy 2.",
+            "source_heading": "strategy-1-substring-match",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "strategy-2-filter-first",
+            "action": "Derive type_hint and topic_hint from query. Call backlog_list(type=type_hint, topic=topic_hint). Perform case-insensitive substring match against returned titles.",
+            "source_heading": "strategy-2-filter-first",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "strategy-2-type-hint-derivation",
+            "action": "Derive type_hint from query keywords (bug/fix → Bug; feature/add → Feature; refactor → Refactor; no match → None). Derive topic_hint as longest non-stop-word in kebab-case.",
+            "source_heading": "strategy-2-type-hint-derivation"
+          },
+          {
+            "step_id": "strategy-2-and-filter-note",
+            "action": "AND-logic constraint: type and topic filters compose with AND; items missing the filtered metadata field are excluded",
+            "source_heading": "strategy-2-and-filter-note"
+          },
+          {
+            "step_id": "strategy-3-llm-semantic-match",
+            "action": "LLM semantic match: present all strategy-2 results to LLM with query and ask for best match. Call backlog_view for top candidates to verify match quality.",
+            "source_heading": "strategy-3-llm-semantic-match",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "strategy-3-tiebreaker",
+            "action": "If two or more plausible candidates after backlog_view reads: present to user for disambiguation (interactive) or pick first (auto)",
+            "source_heading": "strategy-3-tiebreaker"
+          },
+          {
+            "step_id": "zero-match-handling",
+            "action": "Zero matches after all strategies: interactive=offer to create new item; auto=invoke create-backlog-item --auto then re-run find-item",
+            "source_heading": "zero-match-handling"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 2: Work Entry — Validate Item State",
+        "route": "Work: Validate (Phase 2)",
+        "entry_trigger": "Entered from Work: Locate Step 1.4 after field extraction (no Plan field path)",
+        "terminal": false,
+        "exits_to": [
+          "Already Implemented Check (Step 2.1)",
+          "Issue Sync (Steps 2.2-2.4)",
+          "Work: Prepare (Phase 3)"
+        ],
+        "steps": [
+          {
+            "step_id": "2.1",
+            "action": "Before planning, verify feature/fix not already implemented. Load already-implemented.md for git commands, resolve calls, auto-mode behavior.",
+            "source_heading": "2.1",
+            "defers_to": ["Already Implemented Check (Step 2.1)"]
+          },
+          {
+            "step_id": "2.2",
+            "action": "After Step 1.4: check for **Issue**: #N in matched item. Load github-sync.md for MCP tool calls and branching. On issue-first path carry existing issue state forward without re-fetching.",
+            "source_heading": "2.2",
+            "defers_to": ["Issue Sync (Steps 2.2-2.4)"]
+          },
+          {
+            "step_id": "2.3",
+            "action": "Create linked GitHub issue for backlog item. Load github-sync.md step-2.3.",
+            "source_heading": "2.3",
+            "defers_to": ["Issue Sync (Steps 2.2-2.4)"]
+          },
+          {
+            "step_id": "2.4",
+            "action": "Two-part: (a) run backlog_update status=in-progress for current item. (b) Run milestone start only on explicit user intent to start whole milestone.",
+            "source_heading": "2.4",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update"
+          },
+          {
+            "step_id": "2.5",
+            "action": "Before grooming/planning, check for structured discovery artifact. Execute Mermaid-defined flowchart branching on issue link, label type, and artifact_list count.",
+            "source_heading": "2.5",
+            "tool_or_agent": "mcp__plugin_dh_backlog__artifact_list",
+            "gates": [
+              {
+                "condition": "discovery artifact absent after 1 retry",
+                "outcome": "STOP — workflow halts"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 2: Work Entry — Already Implemented Check",
+        "route": "Already Implemented Check (Step 2.1)",
+        "entry_trigger": "Loaded from Work: Validate Phase 2 Step 2.1",
+        "terminal": false,
+        "exits_to": ["Issue Sync (Steps 2.2-2.4)", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "step-2.1.1",
+            "action": "Search for commits and merged PRs matching item topic: git log --oneline --all -30 --grep='{keyword}' and git log --oneline --all -30 --merges --grep='{keyword}'",
+            "source_heading": "step-2.1.1"
+          },
+          {
+            "step_id": "step-2.1.2",
+            "action": "Spot-check codebase — read files at suggested_location; verify whether described behavior already exists",
+            "source_heading": "step-2.1.2",
+            "reads": ["suggested_location files"],
+            "branches": [
+              {
+                "condition": "no implementation evidence found",
+                "action": "proceed to github-sync.md Step 2.2",
+                "defers_to": "Issue Sync (Steps 2.2-2.4)"
+              }
+            ]
+          },
+          {
+            "step_id": "step-2.1.3",
+            "action": "Call backlog_resolve with evidence summary. In auto mode log decision. Report and stop — no planning needed.",
+            "source_heading": "step-2.1.3",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_resolve"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 2: Work Entry — Issue Sync",
+        "route": "Issue Sync (Steps 2.2–2.4)",
+        "entry_trigger": "Entered from Work: Validate Step 2.2 after already-implemented check passes",
+        "terminal": false,
+        "exits_to": ["Work: Prepare (Phase 3)"],
+        "steps": [
+          {
+            "step_id": "2.2",
+            "action": "Search matched item for **Issue**: #N. If found: call backlog_view(#N) and check state. If not found and P0/P1: offer to create linked issue or skip. If P2/Ideas: skip silently.",
+            "source_heading": "2.2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view",
+            "branches": [
+              {
+                "condition": "issue not found, priority P0/P1",
+                "action": "offer to create linked issue (proceed to Step 2.3 on confirmation)"
+              },
+              {
+                "condition": "issue not found, priority P2/Ideas",
+                "action": "skip issue sync silently"
+              },
+              {
+                "condition": "user declines",
+                "action": "skip issue sync"
+              }
+            ]
+          },
+          {
+            "step_id": "2.3",
+            "action": "Call mcp__plugin_dh_backlog__backlog_update with selector='{title}'. Tool creates linked issue automatically and records issue: '#N'. Check returned dict for error key.",
+            "source_heading": "2.3",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update",
+            "writes": ["issue: '#N' in backlog item"]
+          },
+          {
+            "step_id": "2.4",
+            "action": "Call mcp__plugin_dh_backlog__backlog_update with selector='{title}' and status='in-progress'. If item is in milestone with other issues, enumerate and bulk-transition all open milestone issues.",
+            "source_heading": "2.4",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update",
+            "writes": ["status: in-progress"]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 3: Work Entry — Prepare (Auto-Groom and RT-ICA)",
+        "route": "Work: Prepare (Phase 3)",
+        "entry_trigger": "Entered after Issue Sync (Step 2.4) completes; runs for all items (groomed and ungroomed)",
+        "terminal": false,
+        "exits_to": [
+          "Step 3.1 — Auto-Groom Check",
+          "Step 3.2: RT-ICA Freshness Check",
+          "Phase 3 Step 3.4 Feasibility Gate",
+          "Phase 4 — Plan"
+        ],
+        "steps": [
+          {
+            "step_id": "3.1",
+            "action": "Trigger always. Ungroomed: run grooming workflow via groom/start.md. Groomed: run two-phase staleness check (functional commits on Impact Radius files since groom date; classify as FUNCTIONAL_DRIFT/SUPERSEDED/COSMETIC_ONLY).",
+            "source_heading": "3.1",
+            "defers_to": ["Step 3.1 — Auto-Groom Check"]
+          },
+          {
+            "step_id": "3.2",
+            "action": "Trigger: RT-ICA result absent, stale (>7 days), or item updated since last run. Run RT-ICA gate per rt-ica-gate.md staleness policy.",
+            "source_heading": "3.2",
+            "defers_to": ["Step 3.2: RT-ICA Freshness Check"]
+          },
+          {
+            "step_id": "3.3",
+            "action": "After dh:rt-ica completes (or cached result confirmed fresh), write parseable Date: header to RT-ICA section. Format: RT-ICA Final: {title} / Date: {YYYY-MM-DD} / Goal: {goal}.",
+            "source_heading": "3.3",
+            "writes": ["RT-ICA Date header in backlog item"]
+          },
+          {
+            "step_id": "3.4",
+            "action": "Load feasibility-gate.md and evaluate all 4 criteria. BLOCKED stops workflow. PASS proceeds to plan.md (Step 4.1) with feasibility assessment appended.",
+            "source_heading": "3.4",
+            "defers_to": [
+              "Phase 3 Step 3.4 Feasibility Gate (runs immediately after RT-ICA gate, before Step 4.1 Compose Feature Request)"
+            ],
+            "gates": [
+              {
+                "condition": "feasibility gate BLOCKED",
+                "outcome": "workflow stops — do not proceed to Phase 4"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 3: Work Entry — Auto-Groom Sub-flow",
+        "route": "Step 3.1 — Auto-Groom Check",
+        "entry_trigger": "Always triggered from Work: Prepare Step 3.1",
+        "terminal": false,
+        "exits_to": ["Step 3.2: RT-ICA Freshness Check", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "3.1.entry",
+            "action": "Check whether groomed field in backlog_list output is absent or empty (item not yet groomed)",
+            "source_heading": "3.1.entry"
+          },
+          {
+            "step_id": "3.1.ungroomed",
+            "action": "Invoke Skill(skill: 'groom-backlog-item', args: '{item title}'). After grooming completes call backlog_view again to retrieve groomed sections.",
+            "source_heading": "3.1.ungroomed",
+            "agents_dispatched": ["groom-backlog-item"]
+          },
+          {
+            "step_id": "3.1.extract-ir",
+            "action": "Call backlog_view(summary=false). Extract file paths from sections['impact radius'] (primary) or sections['resources'] (fallback). Record as {impact_radius_files} and {groomed_date}.",
+            "source_heading": "3.1.extract-ir",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view",
+            "reads": ["impact radius section", "resources section"]
+          },
+          {
+            "step_id": "3.1.phase1",
+            "action": "Run git log --oneline --after='{groomed_date}' --diff-filter=AMRD -- {impact_radius_files}. Filter to functional commits (feat|fix|refactor|perf|revert prefix or .py|.ts|.yaml|.json files).",
+            "source_heading": "3.1.phase1"
+          },
+          {
+            "step_id": "3.1.phase2-find-sha",
+            "action": "Find SHA for groom date: git rev-list -1 --before='{groomed_date} 23:59:59' HEAD. Record as {groom_date_sha}.",
+            "source_heading": "3.1.phase2-find-sha"
+          },
+          {
+            "step_id": "3.1.phase2-spawn",
+            "action": "Phase 2 drift assessment: spawn diff agent with {groom_date_sha} to classify drift as FUNCTIONAL_DRIFT, SUPERSEDED, or COSMETIC_ONLY",
+            "source_heading": "3.1.phase2-spawn",
+            "branches": [
+              {
+                "condition": "FUNCTIONAL_DRIFT",
+                "action": "re-groom, then proceed to RT-ICA gate"
+              },
+              {
+                "condition": "SUPERSEDED",
+                "action": "call backlog_close as superseded; workflow stops",
+                "defers_to": "close / resolve"
+              },
+              {
+                "condition": "COSMETIC_ONLY",
+                "action": "proceed to RT-ICA gate"
+              }
+            ]
+          },
+          {
+            "step_id": "3.1.superseded-action",
+            "action": "Item closed as superseded; workflow stops here",
+            "source_heading": "3.1.superseded-action"
+          },
+          {
+            "step_id": "3.1.functional-drift-action",
+            "action": "Re-groom item; then proceed to rt-ica-gate.md",
+            "source_heading": "3.1.functional-drift-action"
+          },
+          {
+            "step_id": "3.1.cosmetic-only-action",
+            "action": "Proceed to rt-ica-gate.md",
+            "source_heading": "3.1.cosmetic-only-action"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 3: Work Entry — RT-ICA Freshness Sub-flow",
+        "route": "Step 3.2: RT-ICA Freshness Check",
+        "entry_trigger": "Entered from Work: Prepare Step 3.2 after auto-groom check completes (non-SUPERSEDED path)",
+        "terminal": false,
+        "exits_to": [
+          "Phase 3 Step 3.4 Feasibility Gate (runs immediately after RT-ICA gate, before Step 4.1 Compose Feature Request)"
+        ],
+        "steps": [
+          {
+            "step_id": "3.2.1",
+            "action": "Read backlog_view(selector=title, summary=false).sections['RT-ICA']",
+            "source_heading": "3.2.1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "3.2.2",
+            "action": "Check: sections['RT-ICA'] key present and non-empty?",
+            "source_heading": "3.2.2"
+          },
+          {
+            "step_id": "3.2.3",
+            "action": "Extract date using regex 'Date: YYYY-MM-DD'. If no match: try first ISO date in top 3 lines. Check: ISO date parseable?",
+            "source_heading": "3.2.3"
+          },
+          {
+            "step_id": "3.2.4",
+            "action": "Check: D older than 7 calendar days?",
+            "source_heading": "3.2.4"
+          },
+          {
+            "step_id": "3.2.5",
+            "action": "Check: backlog_view metadata.updated_at present AND updated_at > D?",
+            "source_heading": "3.2.5"
+          },
+          {
+            "step_id": "3.2.6",
+            "action": "Run dh:rt-ica via skill invocation when result is absent, stale, or item updated",
+            "source_heading": "3.2.6",
+            "defers_to": ["dh:rt-ica"]
+          },
+          {
+            "step_id": "3.2.7",
+            "action": "Evaluate RT-ICA result: APPROVED → proceed to feasibility-gate.md with DERIVABLE items as assumptions; BLOCKED → backlog_update blocked status, stop",
+            "source_heading": "3.2.7",
+            "gates": [
+              {
+                "condition": "RT-ICA BLOCKED",
+                "outcome": "halt — all MISSING conditions must be resolved before feasibility-gate.md"
+              },
+              {
+                "condition": "RT-ICA APPROVED",
+                "outcome": "proceed to feasibility-gate.md with DERIVABLE items as assumptions"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 3: Work Entry — Feasibility Gate Sub-flow",
+        "route": "Phase 3, Step 3.4 — Feasibility Gate (runs immediately after RT-ICA gate, before Step 4.1 Compose Feature Request)",
+        "entry_trigger": "Entered from Step 3.2 RT-ICA Freshness Check when RT-ICA returns APPROVED",
+        "terminal": false,
+        "exits_to": ["Step 4.1 — Feature request string template passed to add-new-feature"],
+        "steps": [
+          {
+            "step_id": "load",
+            "action": "Load feasibility-gate.md and evaluate all 4 criteria in order. A single BLOCKED terminal stops the workflow.",
+            "source_heading": "load"
+          },
+          {
+            "step_id": "C1",
+            "action": "Criterion 1 — Technical feasibility: Does suggested_location exist in codebase? Glob(suggested_location) returns results? Do referenced APIs resolve via Grep?",
+            "source_heading": "C1"
+          },
+          {
+            "step_id": "C2",
+            "action": "Criterion 2 — Effort proportionality: Does backlog_view.sections['Priority'] contain Effort field? Is effort proportionate to item's priority tier?",
+            "source_heading": "C2"
+          },
+          {
+            "step_id": "C2_warn_continue",
+            "action": "EffortWarn path: proceed to C3 with warning logged",
+            "source_heading": "C2_warn_continue"
+          },
+          {
+            "step_id": "C3_pattern_check",
+            "action": "Criterion 3 — Blast radius check: check whether any Impact Radius row contains a pattern: field",
+            "source_heading": "C3_pattern_check"
+          },
+          {
+            "step_id": "C4",
+            "action": "Criterion 4 — Prior attempt check (additional criteria not fully enumerated in fragment)",
+            "source_heading": "C4"
+          },
+          {
+            "step_id": "pass_output",
+            "action": "All criteria PASS: proceed to Step 4.1 Compose Feature Request with feasibility assessment appended",
+            "source_heading": "pass_output"
+          },
+          {
+            "step_id": "stale_groom_output",
+            "action": "Stale groom detected during feasibility: workflow stopped, re-groom required",
+            "source_heading": "stale_groom_output"
+          },
+          {
+            "step_id": "blocked_output",
+            "action": "BLOCKED criterion: workflow stopped, re-groom and retry required",
+            "source_heading": "blocked_output"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 4: Work Entry — Plan (Feature Request + SAM Planning)",
+        "route": "Phase 4 — Plan",
+        "entry_trigger": "Entered from Work: Prepare Step 3.4 PASS after feasibility assessment appended to feature request",
+        "terminal": false,
+        "exits_to": [
+          "Step 4.1 — Feature request string template passed to add-new-feature",
+          "Post-Planning Output (Steps 4.5 + 4.5a)",
+          "add-new-feature"
+        ],
+        "steps": [
+          {
+            "step_id": "4.1",
+            "action": "Read feature-request.md; extract feature request template, Impact Radius section, Ecosystem Completeness Constraint, language/stack flags. Assemble complete feature request string.",
+            "source_heading": "4.1",
+            "reads": ["feature-request.md", "Impact Radius section from grooming output"]
+          },
+          {
+            "step_id": "4.2",
+            "action": "Invoke SAM planning skill: Skill(skill: 'dh:add-new-feature', args: '{composed feature request}'). Runs full SAM workflow: discovery, codebase analysis, architecture spec, task decomposition, validation, context manifest.",
+            "source_heading": "4.2",
+            "defers_to": ["add-new-feature"]
+          },
+          {
+            "step_id": "4.3",
+            "action": "Link SAM plan to backlog item: compute slug, call sam_plan(action=list, search={slug}), call backlog_update(selector={title}, plan=P{id})",
+            "source_heading": "4.3",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update",
+            "writes": ["plan field on backlog item"]
+          },
+          {
+            "step_id": "4.3.2",
+            "action": "If backlog item body contains **Issue**: #N, write comment in plan file header: # Issue: #N",
+            "source_heading": "4.3.2",
+            "writes": ["plan file header comment"]
+          },
+          {
+            "step_id": "4.4",
+            "action": "Run code review skill only when source code was modified this session. Planning-only sessions skip. Run: git diff --stat HEAD; if .py/.js/.ts files changed: run Skill(skill: 'simplify'); else skip.",
+            "source_heading": "4.4"
+          },
+          {
+            "step_id": "4.5",
+            "action": "Branch on mode: interactive: output plan report and halt awaiting user input. auto: proceed to post-planning.md (Step 4.5a).",
+            "source_heading": "4.5",
+            "branches": [
+              {
+                "condition": "interactive mode",
+                "action": "output plan report and halt — user drives next action"
+              },
+              {
+                "condition": "auto mode",
+                "action": "proceed to post-planning.md Step 4.5a",
+                "defers_to": "Post-Planning Output (Steps 4.5 + 4.5a)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 4: Work Entry — Feature Request Build Sub-flow",
+        "route": "Step 4.1 — Feature request string template passed to add-new-feature",
+        "entry_trigger": "Entered from Phase 4 Plan Step 4.1 / Phase 3 Feasibility Gate pass_output",
+        "terminal": false,
+        "exits_to": ["add-new-feature"],
+        "steps": [
+          {
+            "step_id": "step-4.1-build-feature-request-string",
+            "action": "Build feature request string: assemble title, source, priority section, added date, description, research_first, suggested_location, RT-ICA Assessment block (APPROVED + AVAILABLE + DERIVABLE items), context manifest, Impact Radius section with planner constraint and Ecosystem Completeness Checklist, stack profile. If --stack specified append Stack profile line. If --language specified and not 'python': invoke corresponding language plugin.",
+            "source_heading": "step-4.1-build-feature-request-string",
+            "branches": [
+              {
+                "condition": "--language specified and not 'python'",
+                "action": "invoke language plugin (e.g., /typescript-development:add-new-feature)"
+              },
+              {
+                "condition": "default (python or no language)",
+                "action": "pass string to add-new-feature"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 4: Work Entry — Post-Planning Output",
+        "route": "Post-Planning Output (Steps 4.5 + 4.5a)",
+        "entry_trigger": "Branched from Phase 4 Plan Step 4.5 based on mode",
+        "terminal": false,
+        "exits_to": ["implement-feature", "complete-implementation"],
+        "steps": [
+          {
+            "step_id": "4.5",
+            "action": "Interactive mode: output plan report with plan access, execution, status, and close instructions. Do NOT close GitHub Issue. Do NOT include Fixes #N in commit/PR.",
+            "source_heading": "4.5"
+          },
+          {
+            "step_id": "4.5a.1",
+            "action": "Auto mode: skip interactive report. Invoke implementation: Skill(skill: 'dh:implement-feature', args: '{plan_address}')",
+            "source_heading": "4.5a.1",
+            "defers_to": ["implement-feature"]
+          },
+          {
+            "step_id": "4.5a.2",
+            "action": "When all tasks complete: invoke quality gates: Skill(skill: 'dh:complete-implementation', args: '{plan_address}')",
+            "source_heading": "4.5a.2",
+            "defers_to": ["complete-implementation"]
+          },
+          {
+            "step_id": "4.5a.3",
+            "action": "/dh:complete-implementation calls backlog_resolve as terminal step — GitHub Issue closed automatically. No manual close required.",
+            "source_heading": "4.5a.3"
+          },
+          {
+            "step_id": "4.5a.constraint",
+            "action": "Do not stop for user input at any point during auto mode sequence (steps 4.5a.1 through 4.5a.3)",
+            "source_heading": "4.5a.constraint"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 4: Work Entry — Auto-Mode Overlay",
+        "route": "auto-mode overlay — conditional substitutions applied at each interactive decision point in the parent work-mode workflow",
+        "entry_trigger": "Applied as cross-cutting overlay when mode='auto' throughout the work-backlog-item flow",
+        "terminal": false,
+        "exits_to": ["work/start.md", "find-item", "Issue Sync (Steps 2.2-2.4)", "close / resolve"],
+        "steps": [
+          {
+            "step_id": "auto-announce",
+            "action": "Before each checklist step emit [AUTO] Stage: {step name} — {brief description}. Announce then immediately execute. Do not stop for user input.",
+            "source_heading": "auto-announce"
+          },
+          {
+            "step_id": "auto-no-title",
+            "action": "When no title provided: call backlog_list and scan P0 then P1 for first open item. Log [AUTO] No title — auto-selected: {title} and proceed.",
+            "source_heading": "auto-no-title",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "auto-no-title-no-items",
+            "action": "Log [AUTO] STOP — no open P0/P1 items found. Stop. Do not attempt to create a new item.",
+            "source_heading": "auto-no-title-no-items"
+          },
+          {
+            "step_id": "auto-rtica-blocked-auto-selected",
+            "action": "Log [AUTO] STOP — RT-ICA BLOCKED on auto-selected item: {title}. {missing inputs}. Stop. Cannot resolve without human.",
+            "source_heading": "auto-rtica-blocked-auto-selected"
+          },
+          {
+            "step_id": "auto-step-1-multiple-matches",
+            "action": "Log [AUTO] Multiple matches — picking first: {title}. Proceed with first match.",
+            "source_heading": "auto-step-1-multiple-matches"
+          },
+          {
+            "step_id": "auto-step-1-2-issue-not-found",
+            "action": "Log [AUTO] STOP — Issue #N not found. Stop.",
+            "source_heading": "auto-step-1-2-issue-not-found"
+          },
+          {
+            "step_id": "auto-step-1-3-zero-matches",
+            "action": "Log [AUTO] No match — creating backlog item. Invoke create-backlog-item --auto {title}. On failure: log error and stop.",
+            "source_heading": "auto-step-1-3-zero-matches"
+          },
+          {
+            "step_id": "auto-step-2-2-github-issue-offer",
+            "action": "Skip offer to create GitHub issue silently in auto mode. Log [AUTO] GitHub issue creation skipped — P2/Ideas or auto mode.",
+            "source_heading": "auto-step-2-2-github-issue-offer"
+          },
+          {
+            "step_id": "auto-step-2-2-milestone-assignment",
+            "action": "Skip milestone assignment prompt in auto mode. Log [AUTO] Milestone assignment skipped.",
+            "source_heading": "auto-step-2-2-milestone-assignment"
+          },
+          {
+            "step_id": "auto-rtica-blocked",
+            "action": "Log [AUTO] STOP — RT-ICA BLOCKED: {missing inputs}. Stop.",
+            "source_heading": "auto-rtica-blocked"
+          },
+          {
+            "step_id": "auto-step-3-1-staleness-gate",
+            "action": "Staleness gate: if SUPERSEDED log [AUTO] STALENESS: SUPERSEDED — {commit refs}; call backlog_close; do not proceed to planning.",
+            "source_heading": "auto-step-3-1-staleness-gate",
+            "branches": [
+              {
+                "condition": "SUPERSEDED",
+                "action": "call backlog_close and stop",
+                "defers_to": "close / resolve"
+              },
+              {
+                "condition": "FUNCTIONAL_DRIFT",
+                "action": "re-groom and proceed to Step 3.2"
+              },
+              {
+                "condition": "COSMETIC_ONLY",
+                "action": "proceed to Step 3.2"
+              }
+            ]
+          },
+          {
+            "step_id": "auto-step-3-1-functional-drift",
+            "action": "Re-groom item automatically; proceed to Step 3.2",
+            "source_heading": "auto-step-3-1-functional-drift"
+          },
+          {
+            "step_id": "auto-step-3-1-cosmetic-only",
+            "action": "Proceed to Step 3.2 without re-grooming",
+            "source_heading": "auto-step-3-1-cosmetic-only"
+          },
+          {
+            "step_id": "auto-step-3-4-feasibility-gate",
+            "action": "Log [AUTO] STOP — feasibility blocked: {criterion}. Stop.",
+            "source_heading": "auto-step-3-4-feasibility-gate"
+          },
+          {
+            "step_id": "auto-step-5-interactive-questions",
+            "action": "Replace interactive discovery/scope questions with LLM derivations from item description and context; log [AUTO] Derived {field}: {value} for each derived value",
+            "source_heading": "auto-step-5-interactive-questions"
+          },
+          {
+            "step_id": "auto-user-summary-placeholder",
+            "action": "At backlog_resolve: derive summary from plan title, checklist status, and accepted criteria results rather than prompting user. Log [AUTO] Summary: {derived text}.",
+            "source_heading": "auto-user-summary-placeholder"
+          },
+          {
+            "step_id": "auto-auto-backlog-add",
+            "action": "When creating a new backlog item in auto mode via create-backlog-item --auto: all fields derived from invocation context with no user prompts",
+            "source_heading": "auto-auto-backlog-add"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 5: Add New Feature (SAM Phases 1-5)",
+        "route": "add-new-feature",
+        "entry_trigger": "Invoked from Phase 4 Plan Step 4.2 via Skill(skill: 'dh:add-new-feature', args: '{feature request}')",
+        "terminal": false,
+        "exits_to": ["implement-feature"],
+        "steps": [
+          {
+            "step_id": "pre-phase",
+            "action": "Parse feature_request for issue selector (#N or beads ID). If found: call artifact_list(item_id=N) to discover existing artifacts. Store as discovered_artifacts and append <prior_artifacts> to each phase delegation prompt. If no selector: skip discovery.",
+            "source_heading": "pre-phase",
+            "tool_or_agent": "mcp__plugin_dh_backlog__artifact_list"
+          },
+          {
+            "step_id": "phase-1",
+            "action": "Delegate to @dh:feature-researcher to produce feature-context-{slug}.md with WHAT/WHY analysis. Agent calls artifact_register(item_id, artifact_type='feature-context'). Orchestrator verifies artifact_list count > 0; re-dispatches if 0.",
+            "source_heading": "phase-1",
+            "agents_dispatched": ["dh:feature-researcher"],
+            "writes": ["feature-context-{slug}.md", "artifact: feature-context"]
+          },
+          {
+            "step_id": "phase-2",
+            "action": "Optionally delegate to @dh:codebase-analyzer for focus areas (patterns, architecture, testing, conventions). Each focus area produces codebase-{focus}-{slug} registered via artifact_register. Orchestrator verifies count > 0 per focus area.",
+            "source_heading": "phase-2",
+            "agents_dispatched": ["dh:codebase-analyzer"],
+            "writes": ["codebase-{focus}-{slug} artifact"]
+          },
+          {
+            "step_id": "phase-3-role-resolve",
+            "action": "Scan project root for language markers (pyproject.toml → Python, package.json → TypeScript, Cargo.toml → Rust). Resolve design-spec role from language manifest. Fallback: dh:task-worker with no specialist profile.",
+            "source_heading": "phase-3-role-resolve"
+          },
+          {
+            "step_id": "phase-3-domain-signal",
+            "action": "Check .dh/skill_discovery.yaml. Collect always_use_skills + LLM-evaluated skill_rules matches against feature_request, minus avoid_skills. Populate {domain_skills}. If absent: invoke Skill('dh:setup-skill-discovery', '--auto').",
+            "source_heading": "phase-3-domain-signal",
+            "reads": [".dh/skill_discovery.yaml"]
+          },
+          {
+            "step_id": "phase-3-dispatch",
+            "action": "Dispatch architect agent with feature-context artifact, codebase analysis artifacts, domain skills, and feasibility assessment. Agent produces architecture spec.",
+            "source_heading": "phase-3-dispatch",
+            "agents_dispatched": ["dh:python-cli-architect or resolved_agent"]
+          },
+          {
+            "step_id": "phase-4",
+            "action": "Task decomposition: break architecture spec into per-task SAM task files. Each task gets title, requirements, constraints, acceptance criteria, verification steps.",
+            "source_heading": "phase-4",
+            "writes": ["ARTIFACT:TASK files"]
+          },
+          {
+            "step_id": "phase-5",
+            "action": "Validation loop: run plan-validator until READY. If NOT_READY: re-decompose and re-validate (max loop).",
+            "source_heading": "phase-5",
+            "gates": [
+              {
+                "condition": "plan-validator returns READY",
+                "outcome": "proceed to success-outcome"
+              },
+              {
+                "condition": "plan-validator returns NOT_READY",
+                "outcome": "re-decompose plan and retry"
+              }
+            ]
+          },
+          {
+            "step_id": "success-outcome",
+            "action": "All phases complete. User receives slug, task file path, and implement-feature next-step instruction.",
+            "source_heading": "success-outcome"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 6: Implement Feature (SAM Execution Loop)",
+        "route": "implement-feature",
+        "entry_trigger": "Invoked via Skill(skill: 'dh:implement-feature', args: '{plan_address or feature slug}') from Post-Planning Output or directly by user",
+        "terminal": false,
+        "exits_to": ["start-task", "complete-implementation"],
+        "steps": [
+          {
+            "step_id": "resolve-task-file",
+            "action": "If <feature_input/> ends with .md: treat as task file path, extract P{N} from filename. Else: treat as feature slug, resolve via sam_plan(action='status', plan=<feature_input/>)",
+            "source_heading": "resolve-task-file",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan"
+          },
+          {
+            "step_id": "progress-loop-step-1",
+            "action": "Query status: sam_plan(action='status', plan='P{N}'). Extract and store autonomy_mode (per_task / full_auto / checkpoint). Governs gate behavior throughout Progress Loop.",
+            "source_heading": "progress-loop-step-1",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan"
+          },
+          {
+            "step_id": "progress-loop-step-2",
+            "action": "Query ready tasks ONCE per loop iteration. Prefer backlog_get_ready_sam_tasks(parent_issue_number=N) if known; else sam_plan(action='ready', plan='P{N}'). Store as current batch.",
+            "source_heading": "progress-loop-step-2",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan"
+          },
+          {
+            "step_id": "progress-loop-step-3-dispatch",
+            "action": "Dispatch based on autonomy_mode. per_task: single Agent call. full_auto/checkpoint: TeamCreate for 2+ tasks or single Agent call for 1 task. Each dispatched task invokes start-task.",
+            "source_heading": "progress-loop-step-3-dispatch",
+            "agents_dispatched": ["dh:task-worker"],
+            "defers_to": ["start-task"]
+          },
+          {
+            "step_id": "progress-loop-step-3-dispatch-skills",
+            "action": "Check task's skills list. If non-empty: include skill-loading instructions in delegation prompt. Launch dh:task-worker with start-task invocation.",
+            "source_heading": "progress-loop-step-3-dispatch-skills"
+          },
+          {
+            "step_id": "agent-health-check",
+            "action": "While waiting for dispatched agents: monitor token count (two readings) to assess agent activity. On crash: respawn. On idle: investigate.",
+            "source_heading": "agent-health-check"
+          },
+          {
+            "step_id": "progress-loop-step-4-concerns",
+            "action": "Collect concerns and contract violations from each returned task. Log per-task outcomes.",
+            "source_heading": "progress-loop-step-4-concerns"
+          },
+          {
+            "step_id": "progress-loop-step-4a",
+            "action": "Process task completion confirmations. Update plan status via sam_task(action='state', status='complete') for each completed task.",
+            "source_heading": "progress-loop-step-4a",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_task"
+          },
+          {
+            "step_id": "progress-loop-step-4b",
+            "action": "Escalate blocked tasks per SAM protocol. Blocked after 3 cycles: report to orchestrator for human escalation.",
+            "source_heading": "progress-loop-step-4b"
+          },
+          {
+            "step_id": "progress-loop-step-5",
+            "action": "Check remaining tasks. If tasks remain and autonomy_mode=checkpoint: trigger wave confirmation gate (step 5a). If tasks remain and other modes: return to step 2. If no tasks remain: proceed to completion-gate.",
+            "source_heading": "progress-loop-step-5",
+            "branches": [
+              {
+                "condition": "tasks remain AND autonomy_mode=checkpoint",
+                "action": "proceed to step 5a (wave confirmation)"
+              },
+              {
+                "condition": "tasks remain AND other modes",
+                "action": "return to step 2"
+              },
+              {
+                "condition": "no tasks remain",
+                "action": "proceed to completion-gate"
+              }
+            ]
+          },
+          {
+            "step_id": "wave-completion-confirmation-gate",
+            "action": "If autonomy_mode=checkpoint: pause and confirm next wave with user. If confirmed: proceed to step 2. If declined/cancelled: stop, report plan state.",
+            "source_heading": "wave-completion-confirmation-gate",
+            "gates": [
+              {
+                "condition": "user confirms next wave",
+                "outcome": "proceed to step 2"
+              },
+              {
+                "condition": "user declines/cancels",
+                "outcome": "stop and report plan state"
+              }
+            ]
+          },
+          {
+            "step_id": "bookend-task-ordering",
+            "action": "T0 (baseline capture) dispatched at start; TN (verification gate) dispatched after all implementation tasks COMPLETE. Handled via existing readiness logic in steps 2 and 3.",
+            "source_heading": "bookend-task-ordering"
+          },
+          {
+            "step_id": "completion-gate",
+            "action": "All tasks COMPLETE: invoke Skill(skill: 'dh:complete-implementation', args: '{plan_address}')",
+            "source_heading": "completion-gate",
+            "defers_to": ["complete-implementation"]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 6: Start Task (SAM S5 Execution)",
+        "route": "start-task",
+        "entry_trigger": "Dispatched from implement-feature progress-loop-step-3-dispatch for each ready task",
+        "terminal": false,
+        "exits_to": ["implement-feature"],
+        "steps": [
+          {
+            "step_id": "mcp-availability-check",
+            "action": "Verify mcp__plugin_dh_sam__* tools reachable. SAM server takes 10–30 seconds after session restart. If unavailable: follow mcp-connection-check.md.",
+            "source_heading": "mcp-availability-check"
+          },
+          {
+            "step_id": "parse-args",
+            "action": "Parse: plan_address (required, P{hex}), --task <id> (optional, defaults to first ready task), --complete <id> (optional, marks task COMPLETE)",
+            "source_heading": "parse-args"
+          },
+          {
+            "step_id": "complete-flag",
+            "action": "If --complete: run sam_task(plan='P{N}', task='T{M}', config={'action':'state','status':'complete'}). Output: 'Task {ID} marked as complete'. Exit.",
+            "source_heading": "complete-flag",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_task"
+          },
+          {
+            "step_id": "step-1-read-task",
+            "action": "Read task assignment: sam_task(plan='P{N}', task='T{M}', config={'action':'read'}). Response is TaskAssignment JSON with plan.goal, plan.context, task details, task.skills.",
+            "source_heading": "step-1-read-task",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_task",
+            "reads": ["TaskAssignment JSON"]
+          },
+          {
+            "step_id": "step-1a-artifact-manifest",
+            "action": "Discover plan artifacts via manifest. If parent_issue_number known: call artifact_list(item_id=N); read types 'architect' and 'feature-context'. Fallback: artifact_read directly.",
+            "source_heading": "step-1a-artifact-manifest",
+            "tool_or_agent": "mcp__plugin_dh_backlog__artifact_list"
+          },
+          {
+            "step_id": "step-2-load-skills",
+            "action": "Load task-level skills from task.skills list. Load each via Skill() call before proceeding to implementation.",
+            "source_heading": "step-2-load-skills"
+          },
+          {
+            "step_id": "step-3-claim-task",
+            "action": "Claim task: sam_task(plan='P{N}', task='T{M}', config={'action':'claim'}). If claimed:false: STOP — do not proceed.",
+            "source_heading": "step-3-claim-task",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_task",
+            "gates": [
+              {
+                "condition": "claimed: false",
+                "outcome": "STOP — do not proceed"
+              }
+            ]
+          },
+          {
+            "step_id": "step-4-register-active-task",
+            "action": "Register active task context for hooks: write task ID, plan address, and task details to active-task store via sam_active_task or equivalent.",
+            "source_heading": "step-4-register-active-task"
+          },
+          {
+            "step_id": "step-5-record-divergence",
+            "action": "Ongoing during implementation: record any divergences from task requirements, discovered constraints, or scope changes.",
+            "source_heading": "step-5-record-divergence"
+          },
+          {
+            "step_id": "step-6-commit-restriction",
+            "action": "Standing constraint: commit messages must NOT include Fixes #N, Closes #N, or Resolves #N trailers. Task-level commits only.",
+            "source_heading": "step-6-commit-restriction"
+          },
+          {
+            "step_id": "step-7-implement",
+            "action": "Implement task against acceptance criteria. Run verification steps from task file. On completion: invoke /dh:start-task --complete {task_id} to mark COMPLETE.",
+            "source_heading": "step-7-implement"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 7: Complete Implementation (Quality Gates + Closure)",
+        "route": "complete-implementation",
+        "entry_trigger": "Invoked from implement-feature completion-gate or Post-Planning Output Step 4.5a.2 when all tasks COMPLETE",
+        "terminal": true,
+        "exits_to": ["close / resolve"],
+        "steps": [
+          {
+            "step_id": "input-format-detection",
+            "action": "Parse $ARGUMENTS to determine input type: issue number (#N), plan address (P{hex}), or feature slug",
+            "source_heading": "input-format-detection"
+          },
+          {
+            "step_id": "resolve-issue-step-1",
+            "action": "Call backlog_view(selector='#{issue_number}'). If error key: output ERROR and Stop.",
+            "source_heading": "resolve-issue-step-1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "resolve-issue-step-2",
+            "action": "Read 'plan' field from backlog_view response. If plan present: proceed to resolve-plan-address. If absent: proceed to proportional quality gates (PQG) path.",
+            "source_heading": "resolve-issue-step-2",
+            "branches": [
+              {
+                "condition": "plan field present",
+                "action": "proceed to resolve-plan-address"
+              },
+              {
+                "condition": "plan field absent",
+                "action": "proceed to PQG path (pqg-step-1)"
+              }
+            ]
+          },
+          {
+            "step_id": "resolve-issue-step-3",
+            "action": "Extract from backlog_view response: issue_number (int), title (str), body (str), labels (list[str]). Used by Proportional Quality Gates section.",
+            "source_heading": "resolve-issue-step-3"
+          },
+          {
+            "step_id": "pqg-step-1",
+            "action": "Run git log --all --grep='#{issue_number}' to find commits. For each SHA: git diff-tree --name-only -r {sha}. Deduplicate. Fallback: git diff --name-only main...HEAD. Store as modified_files.",
+            "source_heading": "pqg-step-1"
+          },
+          {
+            "step_id": "pqg-step-2",
+            "action": "Classify modified files by type (Python, TypeScript, YAML, markdown, etc.) and determine applicable quality gates per file type",
+            "source_heading": "pqg-step-2"
+          },
+          {
+            "step_id": "pqg-step-3",
+            "action": "Run type-appropriate quality gates for each modified file category",
+            "source_heading": "pqg-step-3"
+          },
+          {
+            "step_id": "pqg-step-4",
+            "action": "Aggregate quality gate results; identify any blocking findings",
+            "source_heading": "pqg-step-4"
+          },
+          {
+            "step_id": "pqg-step-5",
+            "action": "Quality gate completion check. If any blocking findings: STOP — COMPLETION BLOCKED: Proportional Quality Gate Incomplete",
+            "source_heading": "pqg-step-5",
+            "gates": [
+              {
+                "condition": "blocking findings present",
+                "outcome": "STOP — COMPLETION BLOCKED: Proportional Quality Gate Incomplete"
+              }
+            ]
+          },
+          {
+            "step_id": "pqg-step-6",
+            "action": "Apply status:verified label to GitHub issue. If label application fails: STOP — COMPLETION BLOCKED: status:verified label could not be applied",
+            "source_heading": "pqg-step-6",
+            "gates": [
+              {
+                "condition": "label application fails",
+                "outcome": "STOP — COMPLETION BLOCKED: status:verified label could not be applied"
+              }
+            ]
+          },
+          {
+            "step_id": "pqg-step-7",
+            "action": "PQG path closing: Final Commit and Push, Team Shutdown, Resolve the Issue (backlog_resolve). Then final-handoff-output.",
+            "source_heading": "pqg-step-7",
+            "defers_to": ["close / resolve"]
+          },
+          {
+            "step_id": "resolve-plan-address",
+            "action": "Resolve P{N} from plan field. Use P{N} in all sam CLI calls below.",
+            "source_heading": "resolve-plan-address"
+          },
+          {
+            "step_id": "pre-phase-1-tn-verification-check",
+            "action": "Run TN Verification agent. If TN Verification FAILED: STOP — COMPLETION BLOCKED: TN Verification Failed",
+            "source_heading": "pre-phase-1-tn-verification-check",
+            "agents_dispatched": ["tn-verification-gate"],
+            "gates": [
+              {
+                "condition": "TN verification regressed",
+                "outcome": "STOP — COMPLETION BLOCKED: TN Verification Failed"
+              }
+            ]
+          },
+          {
+            "step_id": "pre-phase-1a-migration-fidelity",
+            "action": "Migration Fidelity Gate: verify migration artifacts match expected state. If unconfirmed: STOP — COMPLETION BLOCKED: Migration Fidelity Gate",
+            "source_heading": "pre-phase-1a-migration-fidelity",
+            "gates": [
+              {
+                "condition": "migration fidelity unconfirmed",
+                "outcome": "STOP — COMPLETION BLOCKED: Migration Fidelity Gate"
+              }
+            ]
+          },
+          {
+            "step_id": "pre-phase-artifact-discovery",
+            "action": "Discover plan artifacts via artifact_list. Collect architect and feature-context artifacts for use in verification.",
+            "source_heading": "pre-phase-artifact-discovery",
+            "tool_or_agent": "mcp__plugin_dh_backlog__artifact_list"
+          },
+          {
+            "step_id": "pre-phase-1b-concerns-processing",
+            "action": "Process accumulated concerns from task execution. Categorize and determine which require follow-up tasks.",
+            "source_heading": "pre-phase-1b-concerns-processing"
+          },
+          {
+            "step_id": "completion-verification-gate",
+            "action": "Run completion verification: goal-backward check, acceptance criteria check, code review. If gate fails: STOP — COMPLETION BLOCKED: Quality Gate Incomplete",
+            "source_heading": "completion-verification-gate",
+            "gates": [
+              {
+                "condition": "quality gate incomplete",
+                "outcome": "STOP — COMPLETION BLOCKED: Quality Gate Incomplete"
+              }
+            ]
+          },
+          {
+            "step_id": "recursive-follow-up-step-1",
+            "action": "Process blocking code review findings. Dispatch fix agents. Re-run gate. After loop exhausted: STOP — COMPLETION BLOCKED: Blocking Code Review Findings Not Resolved",
+            "source_heading": "recursive-follow-up-step-1",
+            "gates": [
+              {
+                "condition": "fix loop exhausted",
+                "outcome": "STOP — COMPLETION BLOCKED: Blocking Code Review Findings Not Resolved"
+              }
+            ]
+          },
+          {
+            "step_id": "apply-status-verified-label-step-2",
+            "action": "Apply status:verified label to GitHub issue. If fails: STOP — COMPLETION BLOCKED: status:verified label could not be applied",
+            "source_heading": "apply-status-verified-label-step-2",
+            "gates": [
+              {
+                "condition": "label application fails",
+                "outcome": "STOP — COMPLETION BLOCKED: status:verified label could not be applied"
+              }
+            ]
+          },
+          {
+            "step_id": "post-phase-6-surface-divergence",
+            "action": "Surface divergence findings from task execution. Report to user.",
+            "source_heading": "post-phase-6-surface-divergence"
+          },
+          {
+            "step_id": "resolve-the-issue",
+            "action": "Call backlog_resolve as terminal step. GitHub Issue closed automatically via Fixes #N in final commit.",
+            "source_heading": "resolve-the-issue",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_resolve",
+            "defers_to": ["close / resolve"]
+          },
+          {
+            "step_id": "final-handoff-output",
+            "action": "Output final handoff summary: plan address, issue number, implementation summary, next steps.",
+            "source_heading": "final-handoff-output"
+          }
+        ]
+      },
+      {
+        "phase": "Phase 8: Close or Resolve Item",
+        "route": "close / resolve",
+        "entry_trigger": "Triggered by mode 'close' or 'resolve' in work-backlog-item invocation, or via complete-implementation resolve-the-issue, or via interactive-browser C/R selection",
+        "terminal": true,
+        "exits_to": [],
+        "steps": [
+          {
+            "step_id": "5.2",
+            "action": "Call backlog_view(selector='<item_ref/>'). If error 'not found': report and stop. If multiple candidates: list and ask user. If status already 'completed': report and stop.",
+            "source_heading": "5.2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view"
+          },
+          {
+            "step_id": "5.3",
+            "action": "Close path only: AskUserQuestion for close reason (duplicate/out_of_scope/superseded/wontfix/blocked). If duplicate or superseded: ask for reference. Call backlog_close(selector, reason, reference, comment). Check for error key. Report result and stop.",
+            "source_heading": "5.3",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_close"
+          },
+          {
+            "step_id": "5.4",
+            "action": "Resolve path only: extract **Plan** field. If absent: skip this step (non-SAM item). If present: check labels for status:verified. If absent and no --force: emit blocked message with 3 options and stop. If --force: print warning and proceed.",
+            "source_heading": "5.4",
+            "reads": ["plan field", "labels list"],
+            "gates": [
+              {
+                "condition": "status:verified absent and no --force flag",
+                "outcome": "stop — emit blocked message with options"
+              }
+            ]
+          },
+          {
+            "step_id": "5.5",
+            "action": "Resolve path only: extract plan address from plan path (e.g., Pe9f0a1b2). Call sam_plan(action='status', plan='{address}'). Check status_counts: plan complete when not_started==0 AND in_progress==0 AND blocked==0. If incomplete: report and stop.",
+            "source_heading": "5.5",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan",
+            "gates": [
+              {
+                "condition": "any tasks incomplete",
+                "outcome": "report plan incomplete and stop"
+              }
+            ]
+          },
+          {
+            "step_id": "5.6",
+            "action": "Resolve path only: call backlog_view(summary=false); read sections['Acceptance Criteria']; parse each criterion. Spawn verification agent (subagent_type='dh:task-worker'). Agent reads plan, searches git log, checks files; returns per-criterion PASS/FAIL. If Overall PASS: proceed. If Overall FAIL: report gaps and stop.",
+            "source_heading": "5.6",
+            "agents_dispatched": ["dh:task-worker"],
+            "gates": [
+              {
+                "condition": "verification agent returns Overall FAIL",
+                "outcome": "report gaps and stop"
+              }
+            ]
+          },
+          {
+            "step_id": "5.7",
+            "action": "Call backlog_resolve(selector='{title}', summary='{user-provided or auto-derived summary}'). Check result. If no milestone: report and stop (Handoff E skipped). If milestone open_issues > 0: report and stop. If milestone open_issues == 0: emit Handoff E for complete-milestone.",
+            "source_heading": "5.7",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_resolve",
+            "branches": [
+              {
+                "condition": "milestone open_issues == 0",
+                "action": "emit Handoff E for complete-milestone"
+              },
+              {
+                "condition": "milestone open_issues > 0 or no milestone",
+                "action": "report and stop"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "phase": "Phase 8: Close / Resolve Examples (Reference)",
+        "route": "close / resolve examples",
+        "entry_trigger": "User invokes /work-backlog-item resolve <title>, /work-backlog-item resolve #<issue>, or /work-backlog-item close <title>",
+        "terminal": true,
+        "exits_to": [],
+        "steps": [
+          {
+            "step_id": "example-1-resolve-by-title",
+            "action": "User invokes /work-backlog-item resolve validator UX; system matches 'plugin-validator UX and coverage gaps' (P1), reads plan, reports 12/12 complete, spawns AC verification agent",
+            "source_heading": "example-1-resolve-by-title"
+          },
+          {
+            "step_id": "example-1-resolve-by-title-user-summary",
+            "action": "System prompts 'Summarize what was done'; user enters summary text",
+            "source_heading": "example-1-resolve-by-title-user-summary"
+          },
+          {
+            "step_id": "example-1-resolve-by-title-output",
+            "action": "Backlog item resolved: summary recorded, checklist 12/12, AC PASS, GitHub Issue #131 closed with evidence trail",
+            "source_heading": "example-1-resolve-by-title-output"
+          },
+          {
+            "step_id": "example-2-resolve-by-issue-number",
+            "action": "User invokes /work-backlog-item resolve #131; system fetches Issue #131, finds matching item, reports 12/12 complete, spawns AC verification agent",
+            "source_heading": "example-2-resolve-by-issue-number"
+          },
+          {
+            "step_id": "example-2-resolve-by-issue-number-output",
+            "action": "Backlog item resolved with summary and GitHub Issue #131 closed with evidence trail",
+            "source_heading": "example-2-resolve-by-issue-number-output"
+          },
+          {
+            "step_id": "example-3-close-dismiss",
+            "action": "User invokes /work-backlog-item close {title}; system asks for reason (duplicate/out_of_scope/superseded/wontfix/blocked); calls backlog_close",
+            "source_heading": "example-3-close-dismiss"
+          },
+          {
+            "step_id": "example-3-close-output",
+            "action": "Backlog item closed with Closed date, Reason, and Comment recorded",
+            "source_heading": "example-3-close-output"
+          }
+        ]
+      },
+      {
+        "phase": "Auxiliary: Progress Report",
+        "route": "progress",
+        "entry_trigger": "User invokes /work-backlog-item progress (or mode='progress')",
+        "terminal": true,
+        "exits_to": [],
+        "steps": [
+          {
+            "step_id": "P1",
+            "action": "Call backlog_list() to retrieve all open items. Count by priority (P0/P1/P2/Ideas) and status.",
+            "source_heading": "P1",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_list"
+          },
+          {
+            "step_id": "P2",
+            "action": "Query active milestone: backlog_get_soonest_milestone(). Extract milestone number, title, open_issues, closed_issues.",
+            "source_heading": "P2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_get_soonest_milestone"
+          },
+          {
+            "step_id": "P3",
+            "action": "Identify highest-priority groomed item with no **Plan** field — recommended next action.",
+            "source_heading": "P3"
+          },
+          {
+            "step_id": "P4",
+            "action": "Display formatted Backlog Health report: date, Active Milestone section, Overall Backlog counts (P0/P1/P2/Ideas with milestone and groomed breakdowns), Next recommended action (/work-backlog-item {title}).",
+            "source_heading": "P4"
+          }
+        ]
+      },
+      {
+        "phase": "Auxiliary: Resume In-Progress Work",
+        "route": "resume",
+        "entry_trigger": "User invokes /work-backlog-item resume <title or #N>",
+        "terminal": true,
+        "exits_to": [],
+        "steps": [
+          {
+            "step_id": "R1",
+            "action": "Extract title from <item_ref/>+. If starts with #: fetch title from GitHub Issue (issue-first path logic).",
+            "source_heading": "R1"
+          },
+          {
+            "step_id": "R2",
+            "action": "Call backlog_view(selector='{title or #N}', summary=false). Extract plan field. If absent: emit 'No plan file recorded' message and stop.",
+            "source_heading": "R2",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_view",
+            "gates": [
+              {
+                "condition": "plan field absent or empty",
+                "outcome": "emit no-plan message and stop"
+              }
+            ]
+          },
+          {
+            "step_id": "R3",
+            "action": "Read plan via sam_plan(action='read', plan='{plan_id}'). Parse: total_tasks, checked_tasks, last_checked (last task with status:complete), first_unchecked (first task with status:not-started or in-progress).",
+            "source_heading": "R3",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan"
+          },
+          {
+            "step_id": "R4",
+            "action": "Compute completion_pct = checked_tasks * 100 / total_tasks (integer).",
+            "source_heading": "R4"
+          },
+          {
+            "step_id": "R5",
+            "action": "Report resume summary block: title, plan_address, checked/total, completion_pct, last_checked, first_unchecked, continuation command (/implement-feature {slug}), close command.",
+            "source_heading": "R5"
+          }
+        ]
+      },
+      {
+        "phase": "Auxiliary: Quick Fix Integration",
+        "route": "--quick flag on /dh:work-backlog-item invocation → sequential steps Q1 → Q2 → Q2a_discover → Q2b_checklist → branch: (all pass → Q2a_integration, terminal) | (otherwise → Q3 → Q4 → Q5 → Q6 → Q7)",
+        "entry_trigger": "flags.quick = true parsed from /dh:work-backlog-item --quick {item title or #N}",
+        "terminal": false,
+        "exits_to": ["implement-feature"],
+        "steps": [
+          {
+            "step_id": "Q1",
+            "action": "Extract title from <item_ref/>+. Build slug: title lowercased, spaces → hyphens.",
+            "source_heading": "Q1"
+          },
+          {
+            "step_id": "Q2",
+            "action": "Determine whether fix belongs to work already in progress. If so: add to active plan instead of opening new item.",
+            "source_heading": "Q2"
+          },
+          {
+            "step_id": "Q2a_discover",
+            "action": "Call sam_active_task(action='get') and record as active_task. Call backlog_list(status='in-progress') and record as in_progress_items.",
+            "source_heading": "Q2a_discover",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_active_task"
+          },
+          {
+            "step_id": "Q2b_checklist",
+            "action": "Evaluate 3 checklist items: (1) Is there active work? (2) Does fix overlap in scope/subject/files? (3) Would fix be required or directly unblock active work?",
+            "source_heading": "Q2b_checklist",
+            "gates": [
+              {
+                "condition": "all 3 checklist items pass",
+                "outcome": "proceed to Q2a_integration (add to active plan)"
+              },
+              {
+                "condition": "otherwise",
+                "outcome": "proceed to Q3 (create new item)"
+              }
+            ]
+          },
+          {
+            "step_id": "Q2a_integration",
+            "action": "Resolve active_plan_id from active_task or in_progress_items. Call sam_plan(action='append_task', plan='{active_plan_id}', task={...}). Report: Fix added to active plan / task title / To execute: /dh:start-task {plan_id} {task_id}. Stop.",
+            "source_heading": "Q2a_integration",
+            "tool_or_agent": "mcp__plugin_dh_sam__sam_plan",
+            "writes": ["new task appended to active plan"]
+          },
+          {
+            "step_id": "Q3",
+            "action": "Create or locate backlog item for the fix. If item not found: invoke create-backlog-item workflow.",
+            "source_heading": "Q3"
+          },
+          {
+            "step_id": "Q4",
+            "action": "Extract description and acceptance criteria from item response[\"sections\"] if available.",
+            "source_heading": "Q4"
+          },
+          {
+            "step_id": "Q5",
+            "action": "Compose minimal SAM plan with single task for the fix. Write plan file.",
+            "source_heading": "Q5",
+            "writes": ["SAM plan file"]
+          },
+          {
+            "step_id": "Q6",
+            "action": "Register plan with backlog item via backlog_update(selector={title}, plan=P{id})",
+            "source_heading": "Q6",
+            "tool_or_agent": "mcp__plugin_dh_backlog__backlog_update"
+          },
+          {
+            "step_id": "Q7",
+            "action": "Report quick plan path to user. Normal completion.",
+            "source_heading": "Q7"
+          }
+        ]
+      }
+    ]
+  }
+}

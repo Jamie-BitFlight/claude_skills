@@ -1,0 +1,76 @@
+{
+  "complexity_signals": [
+    {
+      "id": "G7.rt-ica-completeness-gate",
+      "signal_name": "RT-ICA completeness gate",
+      "description": "Run dh:rt-ica before planning; if result is BLOCKED (any MISSING conditions), halt the workflow and do not proceed to the feasibility gate or plan creation.",
+      "enforcement_status": "enforced",
+      "enforcement_evidence": "RT-ICA Gate (Step 3.2) flowchart in work/rt-ica-gate.md: Absent/stale RT-ICA re-runs dh:rt-ica. 'Present and fresh — BLOCKED — stop. Do not proceed to feasibility-gate.md until all MISSING conditions are resolved.' RT-ICA SKILL.md Step 5: 'IF BLOCKED: 1. Do NOT plan 2. Ask ONLY for missing inputs'. work-backlog-item SKILL.md: 'Stops when the item already has a Plan field or when RT-ICA returns BLOCKED.'",
+      "enforcement_source": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md:RT-ICA Staleness Policy; skills/rt-ica/SKILL.md:Step 5 Action Based on Decision; skills/work-backlog-item/SKILL.md:description field",
+      "gap": null
+    },
+    {
+      "id": "G7.feasibility-gate",
+      "signal_name": "Feasibility gate (C1-C4 criteria)",
+      "description": "Four-criterion gate in work/feasibility-gate.md: C1 technical path, C2 effort proportionality, C3 blast radius, C4 prior attempts / over-engineering. A single BLOCKED terminal stops progression to Phase 4 (feature request composition).",
+      "enforcement_status": "enforced",
+      "enforcement_evidence": "Gate Logic flowchart in feasibility-gate.md: 'Evaluate all 4 criteria in order. A single BLOCKED terminal stops the workflow.' C1: 'suggested_location missing AND no alternative identifiable → BLOCKED: technical path unclear'. C2: 'Effort=FULL for P2 or Ideas item → BLOCKED: effort/priority mismatch'. C3: 'Over 20 systems → BLOCKED: blast radius exceeds safe threshold'. C4: 'Impact Radius = 1 file total AND task count >= 4 → BLOCKED: potential over-engineering'. BLOCKED Output Contract: 'When the feasibility gate blocks, do NOT proceed to Phase 4.'",
+      "enforcement_source": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md:Gate Logic; BLOCKED Output Contract",
+      "gap": null
+    },
+    {
+      "id": "G7.complexity-fit-model",
+      "signal_name": "Complexity-fit model (knowledge + uncertainty + context overhead) / available context",
+      "description": "Formula from CLAUDE.md memory note: complexity = (knowledge + uncertainty + context overhead) / available context. Intended to guide whether an item is a good fit for autonomous agent execution.",
+      "enforcement_status": "designed-only",
+      "enforcement_evidence": "planner-rt-ica/SKILL.md states: 'Task complexity is the ratio of project-specific knowledge required to context window available — not implementation difficulty.' This is a definitional statement, not an evaluated branch. No skill flowchart contains a conditional that reads this ratio and routes differently based on it. grep across all skills/ for 'complexity.fit|complexity_fit|knowledge.*uncertainty.*context|available.context' returned one match in human-touchpoint-model.md ('What the agent knows (bound constraints, available context)') — a descriptive phrase, not a gate. docs/complexity-fit-and-economics-of-agents.md exists but is a design doc, not a skill file. docs/complexity-fit-adoption-conditions.md was NOT FOUND.",
+      "enforcement_source": "skills/planner-rt-ica/SKILL.md:Complexity Model (definition only); plugins/development-harness/docs/complexity-fit-and-economics-of-agents.md (design doc, not skill logic)",
+      "gap": "No skill flowchart evaluates the ratio and changes dispatch path, autonomy_mode, or agent tier based on it. The model is defined in planner-rt-ica as a conceptual framing for planners to keep in mind, but it is not an observable conditional branch that routes or blocks."
+    },
+    {
+      "id": "G7.arl-human-touchpoints",
+      "signal_name": "ARL human touchpoints",
+      "description": "ARL (Autonomy Routing Logic) escalation triggers — unbound constraints, high-risk changes lacking domain precedent, thrashing detection (3 NEEDS_WORK loops), NOT_CERTIFIED loops — intended to pause execution for human review at defined SAM stage gates.",
+      "enforcement_status": "partially-enforced",
+      "enforcement_evidence": "sam-definition.md documents escalation criteria with specific triggers: 'Gate 1 (after S1): Escalate if unbound constraints or domain knowledge gaps. Gate 2 (after S4): Escalate if high complexity or novel architecture. After 3 NEEDS_WORK loops on the same task, escalate to human. After 2 NOT_CERTIFIED loops in S7, escalate to human.' human-touchpoint-model.md defines an escalation decision flowchart with Bound/Unbound/Mixed constraint types and Low/High Risk tiers. arl-touchpoints.md is a redirect stub pointing to human-touchpoint-model.md. evaluate-sdlc-layers/SKILL.md validates that ARL files exist. HOWEVER: implement-feature/SKILL.md and complete-implementation/SKILL.md contain no conditional branch reading constraint type or risk tier to gate progression. Thrashing detection (3-loop limit) is documented in sam-definition.md but no skill file contains a loop-count check or a NEEDS_WORK iteration counter that triggers escalation.",
+      "enforcement_source": "skills/work-backlog-item/references/workflows/work/sam-definition.md:Human Escalation Criteria; skills/development-harness/references/human-touchpoint-model.md:Escalation Decision Flowchart",
+      "gap": "The ARL escalation criteria are documented in sam-definition.md and human-touchpoint-model.md but are not wired as conditional branches in implement-feature or complete-implementation skill flowcharts. No skill file counts NEEDS_WORK iterations and routes to a human escalation step at iteration 3. The model is a reference specification that specialist agents are expected to follow by convention, not a gate enforced by skill flowchart logic."
+    },
+    {
+      "id": "G7.autonomy-mode",
+      "signal_name": "autonomy_mode (per_task / full_auto / checkpoint)",
+      "description": "Plan-level field that controls whether implement-feature dispatches tasks one at a time (per_task), in parallel batches (full_auto), or in parallel batches with wave-completion confirmation gates (checkpoint).",
+      "enforcement_status": "partially-enforced",
+      "enforcement_evidence": "implement-feature/SKILL.md: 'After receiving the status response, extract and store the autonomy mode: autonomy_mode = status[\"autonomy\"]'. 'Pre-existing plans that omit the autonomy field return \"full_auto\" (the Pydantic default)'. Explicit fork at line 74: 'If autonomy_mode == \"per_task\"' → single Agent call + per-task gate. 'Else (autonomy_mode is \"full_auto\" or \"checkpoint\")' → TeamCreate parallel dispatch. Per-task Confirmation Gate skips when full_auto or checkpoint (line 266). Wave-Completion Confirmation Gate skips when full_auto or per_task (line 291). Enforcement in implement-feature is complete. GAP: add-new-feature/SKILL.md contains no reference to autonomy_mode. grep of add-new-feature/ for autonomy_mode|per_task|full_auto returned no output. swarm-task-planner is delegated plan creation via sam_plan(action='create') but no skill file specifies who sets the autonomy field on the plan or what value it should carry given item characteristics. The field defaults to full_auto by Pydantic — the routing is enforced, but the selection of which mode to use for a given item is not governed by any skill logic.",
+      "enforcement_source": "skills/implement-feature/SKILL.md:lines 41-93 (dispatch based on autonomy_mode), lines 248-293 (Per-task and Wave-Completion gates)",
+      "gap": "No skill file specifies who writes autonomy_mode to the plan or what item-level signals (complexity, priority, blast radius) should determine its value. add-new-feature delegates to swarm-task-planner but passes no autonomy instruction. The field defaults to full_auto silently. The consumption of autonomy_mode in implement-feature is enforced; the production (who sets it and based on what) is not governed by any skill logic."
+    },
+    {
+      "id": "G7.issue-type-routing",
+      "signal_name": "Issue type routing (defect → find-cause; unbounded-design → extra research depth)",
+      "description": "Grooming should invoke find-cause for defect/recurring-pattern items, and should pass depth=deep to technical-researcher for unbounded-design items. The question is whether these type-based routes propagate into implement-feature or complete-implementation.",
+      "enforcement_status": "partially-enforced",
+      "enforcement_evidence": "In groom (swarm.md): 'depth: overview for procedural/fix items, standard for features and refactors, deep for unbounded-design items' — enforced as a conditional parameter to technical-researcher in Wave 0. groom/swarm.md Issue Classification section: defect/recurring-pattern → find-cause invoked, root-cause analysis written to item section. These routing decisions are enforced within the groom workflow. HOWEVER: implement-feature/SKILL.md contains no reference to issue type, defect, or find-cause (grep returned no output). complete-implementation/SKILL.md contains no issue-type routing. The type classification written during grooming is not read by implement-feature to change dispatch strategy, agent selection, or verification approach. Issue type routing changes what grooming does; it does not change what implement-feature or complete-implementation do.",
+      "enforcement_source": "skills/work-backlog-item/references/workflows/groom/swarm.md:Wave 0 depth parameter; Issue Classification; Root-Cause Analysis section",
+      "gap": "Issue type routing is enforced within the groom workflow but does not propagate into implement-feature or complete-implementation. No skill file reads metadata.type from the plan or backlog item to alter the implementation dispatch path. A defect item and a feature item follow identical implement-feature paths despite different grooming outputs."
+    },
+    {
+      "id": "G7.proportional-qg",
+      "signal_name": "Proportional quality gates (no plan → shorter quality gates)",
+      "description": "When complete-implementation is invoked on an issue with no linked SAM plan, it runs a proportional 5-task quality gate (pqg- prefix) instead of the full 7-phase SAM dispatch loop, omitting T0 (Multi-Perspective Review) and T6 (Context Refinement).",
+      "enforcement_status": "enforced",
+      "enforcement_evidence": "complete-implementation/SKILL.md: Input format detection flowchart at line 81: 'Plan → No → proceed to Proportional Quality Gates'. 'Proportional Quality Gates: Entered only when the issue has no linked plan. Skip this section when input is a file path or when the issue has a linked plan (auto-resolved to SAM path).' Step 3 builds a 5-task SAM plan with pqg- prefix: 'The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional, but retains the T4/T5 documentation pass.' The pqg- vs qg- prefix distinction is documented and enforced as a structural difference in the plan created.",
+      "enforcement_source": "skills/complete-implementation/SKILL.md:Input format detection flowchart line 81; Proportional Quality Gates section lines 104-174",
+      "gap": null
+    },
+    {
+      "id": "G7.wave0-optionality",
+      "signal_name": "Wave 0 optionality in groom",
+      "description": "Wave 0 (pre-swarm technical research via technical-researcher agent) is optional in the groom workflow. The condition controlling whether it runs determines how much pre-research context is available before Wave 1 teammates are spawned.",
+      "enforcement_status": "enforced",
+      "enforcement_evidence": "groom/swarm.md Wave 0 section specifies explicit skip conditions as a bulleted list: 'Skip Wave 0 when: (1) Item type is type:bug or type:fix — fact-checker covers the primary research need; (2) Item has no identifiable technology, library, or internal module to research; (3) Item description is a pure administrative or labelling task with no research questions.' depth parameter is also conditional on type: 'overview for procedural/fix items, standard for features and refactors, deep for unbounded-design items'. The positive trigger (run Wave 0) is implicit — it runs for all items that do not match any skip condition. If technical-researcher returns STATUS: BLOCKED (all four angles returned only gaps), proceed to Wave 1 without halting.",
+      "enforcement_source": "skills/work-backlog-item/references/workflows/groom/swarm.md:Wave 0 (pre-swarm research) section",
+      "gap": null
+    }
+  ]
+}

@@ -17,9 +17,11 @@ import uuid
 
 import backlog_core.models as _bc_models
 import pytest
-from backlog_core.backend_protocol import BacklogConfig as _BPBacklogConfig
-from backlog_core.backend_protocol import reset_config as _bp_reset_config
-from backlog_core.backend_protocol import set_config as _bp_set_config
+from backlog_core.backend_protocol import (
+    BacklogConfig as _BPBacklogConfig,
+    reset_config as _bp_reset_config,
+    set_config as _bp_set_config,
+)
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.models import BacklogConfig
 from backlog_core.server import mcp

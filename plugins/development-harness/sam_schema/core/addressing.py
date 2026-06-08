@@ -192,7 +192,11 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
         msg = f"Plan directory does not exist: {plan_dir}"
         raise FileNotFoundError(msg)
 
-    all_entries: list[Path] = sorted(plan_dir.iterdir(), key=_yaml_first_key)
+    # Only consider .yaml/.md files and directories; exclude sidecars (.sha256 etc.)
+    # that share the same P{ID}-{slug} prefix and would cause false collisions.
+    all_entries: list[Path] = sorted(
+        (p for p in plan_dir.iterdir() if p.suffix in {".yaml", ".md"} or p.is_dir()), key=_yaml_first_key
+    )
 
     # -------------------------------------------------------------------
     # Phase 1: {PREFIX}{NNN}-{slug} resolution (primary naming convention)

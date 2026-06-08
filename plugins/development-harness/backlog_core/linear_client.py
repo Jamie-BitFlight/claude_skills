@@ -13,7 +13,7 @@ SOURCE: https://linear.app/developers/attachments (accessed 2026-04-05)
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import Any, TypeGuard
 
 import httpx
 from typing_extensions import TypedDict
@@ -38,6 +38,26 @@ class LinearAttachmentNode(TypedDict):
     url: str
     title: str
     metadata: dict[str, object]
+
+
+# ---------------------------------------------------------------------------
+# Type-narrowing helpers (ADR-002: module-local, not shared)
+# ---------------------------------------------------------------------------
+
+
+def _is_dict_of_object(v: object) -> TypeGuard[dict[str, object]]:
+    """Return True when v is a dict with string keys.
+
+    Validates the structure at runtime and allows the type checker to narrow
+    the type from ``object`` to ``dict[str, object]`` after the guard.
+    All values are typed as ``object`` (weakest bound) per the API response shapes.
+    """
+    return isinstance(v, dict) and all(isinstance(k, str) for k in v)
+
+
+def _is_list_of_dicts(v: object) -> TypeGuard[list[dict[str, object]]]:
+    """Return True when v is a list of dicts with string keys."""
+    return isinstance(v, list) and all(_is_dict_of_object(item) for item in v)
 
 
 # ---------------------------------------------------------------------------
@@ -170,13 +190,19 @@ def linear_create_attachment(
         msg = f"Unexpected attachmentCreate response: {data!r}"
         raise BacklogError(msg)
 
-    result_d = cast("dict[str, object]", result)
+    if not _is_dict_of_object(result):
+        msg = f"attachmentCreate result has non-string keys: {result!r}"
+        raise BacklogError(msg)
+    result_d = result
     attachment = result_d.get("attachment")
     if not isinstance(attachment, dict):
         msg = f"attachmentCreate did not return an attachment: {result_d!r}"
         raise BacklogError(msg)
 
-    return cast("dict[str, object]", attachment)
+    if not _is_dict_of_object(attachment):
+        msg = f"attachmentCreate attachment has non-string keys: {attachment!r}"
+        raise BacklogError(msg)
+    return attachment
 
 
 def linear_get_attachments(api_key: str, issue_id: str) -> list[dict[str, object]]:
@@ -201,10 +227,16 @@ def linear_get_attachments(api_key: str, issue_id: str) -> list[dict[str, object
         msg = f"Unexpected attachments response: {data!r}"
         raise BacklogError(msg)
 
-    attachments_d = cast("dict[str, object]", attachments)
+    if not _is_dict_of_object(attachments):
+        msg = f"attachments response has non-string keys: {attachments!r}"
+        raise BacklogError(msg)
+    attachments_d = attachments
     nodes = attachments_d.get("nodes", [])
     if not isinstance(nodes, list):
         msg = f"Unexpected attachments.nodes shape: {attachments_d!r}"
         raise BacklogError(msg)
 
-    return cast("list[dict[str, object]]", nodes)
+    if not _is_list_of_dicts(nodes):
+        msg = f"attachments.nodes contains non-dict or non-string-keyed items: {nodes!r}"
+        raise BacklogError(msg)
+    return nodes

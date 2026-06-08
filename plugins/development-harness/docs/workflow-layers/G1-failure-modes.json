@@ -1,0 +1,484 @@
+{
+  "failure_modes": [
+    {
+      "id": "G1.work-backlog-item.parser-exit-nonzero",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "non-zero — script failed",
+      "detected_at": "work-backlog-item.exitcheck",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — return parser error to user"
+    },
+    {
+      "id": "G1.work-backlog-item.json-malformed",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "No — malformed stdout",
+      "detected_at": "work-backlog-item.jsoncheck",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — return JSON parse error to user"
+    },
+    {
+      "id": "G1.work-backlog-item.error-field-present",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "Yes — error present",
+      "detected_at": "work-backlog-item.errfield",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — return error value to user"
+    },
+    {
+      "id": "G1.work-backlog-item.required-key-absent",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "Yes — required key absent",
+      "detected_at": "work-backlog-item.keycheck",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — return missing key error to user"
+    },
+    {
+      "id": "G1.work-backlog-item.creation-failed",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "No — creation failed",
+      "detected_at": "work-backlog-item.createdone",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — report creation failure"
+    },
+    {
+      "id": "G1.work-backlog-item.item-already-exists",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:(document root)",
+      "failure_condition": "Yes — existing ref from input or GitHub issue URL",
+      "detected_at": "work-backlog-item.createitemref",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — item already exists, creation not needed"
+    },
+    {
+      "id": "G1.work-backlog-item.work-gate-blocked",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/SKILL.md:### Routing (evaluated first, before any step)",
+      "failure_condition": "Yes — gate blocked",
+      "detected_at": "work-backlog-item.workgate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — report blocking reason and missing prerequisites"
+    },
+    {
+      "id": "G1.work-backlog-item.already-implemented",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/already-implemented.md:Already Implemented Check (Step 2.1)",
+      "failure_condition": "evidence shows the work is already done",
+      "detected_at": "Step 2.1: Already Implemented Check",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Report to the user and stop — no planning needed."
+    },
+    {
+      "id": "G1.work-backlog-item.discovery-gate-stop",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/validate.md:Step 2.5: Discovery Gate",
+      "failure_condition": "No — still 0 after retry",
+      "detected_at": "Step 2.5: Discovery Gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STOP — report to user: dh:discovery completed but no feature-context artifact was registered for issue #{N}. Re-run /dh:discovery manually and retry."
+    },
+    {
+      "id": "G1.work-backlog-item.rtica-blocked",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md:RT-ICA Gate (Step 3.2)",
+      "failure_condition": "BLOCKED — stop. Do not proceed to feasibility-gate.md until all MISSING conditions are resolved.",
+      "detected_at": "Step 4.2: RT-ICA gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "RT-ICA BLOCKED (Step 4.2) — backlog_update(selector='<item_ref/>', status='blocked'), present MISSING conditions, stop"
+    },
+    {
+      "id": "G1.work-backlog-item.feasibility-gate-blocked",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md:Feasibility Gate Reference",
+      "failure_condition": "Feasibility gate BLOCKED (Step 4.4)",
+      "detected_at": "Step 4.4: Feasibility gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Feasibility gate BLOCKED (Step 4.4) — Report BLOCKED output, stop"
+    },
+    {
+      "id": "G1.work-backlog-item.no-item-found",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/start.md:Error Routing",
+      "failure_condition": "No item found matching input",
+      "detected_at": "Workflow: Work Backlog Item > Error Routing",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Report \"No backlog item found matching: {input}\", stop"
+    },
+    {
+      "id": "G1.work-backlog-item.item-has-plan-field",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/start.md:Checklist",
+      "failure_condition": "item already has a Plan field",
+      "detected_at": "Step 2: Locate — Step 2.4: Extract item fields",
+      "response": "escalate",
+      "bounce_target": "dh:implement-feature",
+      "bounce_source": "If item already has a Plan field: invoke Skill(skill: \"dh:implement-feature\", args: \"{plan_address}\") and stop"
+    },
+    {
+      "id": "G1.work-backlog-item.groom-rtica-blocked",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md:Workflow: Groom Backlog Item > Checklist",
+      "failure_condition": "RT-ICA BLOCKED (unresolvable MISSING conditions)",
+      "detected_at": "Finalize — RT-ICA final pass",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If BLOCKED: present MISSING conditions to user, wait for answers, re-check"
+    },
+    {
+      "id": "G1.work-backlog-item.groom-output-validation-fails",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md:Workflow: Groom Backlog Item > Checklist",
+      "failure_condition": "Output validation fails after 3 attempts",
+      "detected_at": "Finalize — Output validation gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If missing: retry same model with targeted prompt (up to 3 attempts, then blocked)"
+    },
+    {
+      "id": "G1.work-backlog-item.groom-discovery-gate-stop",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/groom/start.md:Workflow: Groom Backlog Item > Error Routing",
+      "failure_condition": "Discovery gate STOP (artifact not registered)",
+      "detected_at": "Analyze — discovery gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If STOP (discovery gate failure): report and stop"
+    },
+    {
+      "id": "G1.work-backlog-item.per-task-gate-declined",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/work/start.md:Checklist",
+      "failure_condition": "If declined or cancelled (per-task gate)",
+      "detected_at": "Progress Loop — per-task gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If declined or cancelled: stop the Progress Loop. Report the current plan state via mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\") and exit."
+    },
+    {
+      "id": "G1.work-backlog-item.resolve-verification-fail",
+      "skill": "work-backlog-item",
+      "source_file": "skills/work-backlog-item/references/workflows/close/start.md:Step 5.6: Resolve path — typed acceptance-criteria verification",
+      "failure_condition": "Overall FAIL (any criterion failed)",
+      "detected_at": "Step 5.6: Resolve path — typed acceptance-criteria verification",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Verification FAILED for \"{title}\". ... Address the failing criteria before resolving, or use /work-backlog-item close {title} to dismiss."
+    },
+    {
+      "id": "G1.add-new-feature.wizard-declined",
+      "skill": "add-new-feature",
+      "source_file": "skills/add-new-feature/SKILL.md:Phase 3: Architecture Spec — Domain Signal Detection",
+      "failure_condition": "WIZARD_DECLINED in wizard output",
+      "detected_at": "Phase 3 — Wizard Invocation Protocol",
+      "response": "bounce",
+      "bounce_target": "Phase 3 — suggest mode fallback (domain_skills = [], continue with note)",
+      "bounce_source": "If file still absent (WIZARD_DECLINED in wizard output): apply suggest-mode fallback"
+    },
+    {
+      "id": "G1.add-new-feature.plan-validator-blocked",
+      "skill": "add-new-feature",
+      "source_file": "skills/add-new-feature/SKILL.md:Phase 5: Plan Validation Gate (@dh:plan-validator)",
+      "failure_condition": "validator returns BLOCKED",
+      "detected_at": "Phase 5: Plan Validation Gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If the validator returns BLOCKED, do not proceed to Phase 6. Fix the identified gaps and re-run Phase 4 before retrying Phase 5."
+    },
+    {
+      "id": "G1.implement-feature.agent-crashed",
+      "skill": "implement-feature",
+      "source_file": "skills/implement-feature/SKILL.md:Progress Loop > Agent Health Check (While Waiting)",
+      "failure_condition": "Crashed — session ended abruptly after sam_task(action=claim) with no further turns",
+      "detected_at": "Progress Loop > Agent Health Check",
+      "response": "bounce",
+      "bounce_target": "Progress Loop — Re-spawn agent with same task file path and task ID",
+      "bounce_source": "Confirm task state via mcp__plugin_dh_sam__sam_task(plan, task, config={action:read}). Verify task is still CLAIMED. Re-spawn agent with same task file path and task ID."
+    },
+    {
+      "id": "G1.implement-feature.per-task-gate-declined",
+      "skill": "implement-feature",
+      "source_file": "skills/implement-feature/SKILL.md:Progress Loop",
+      "failure_condition": "If declined or cancelled (per-task gate)",
+      "detected_at": "Progress Loop — per-task confirmation gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If declined or cancelled: stop the Progress Loop. Report the current plan state via mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\") and exit."
+    },
+    {
+      "id": "G1.implement-feature.wave-gate-declined",
+      "skill": "implement-feature",
+      "source_file": "skills/implement-feature/SKILL.md:Progress Loop",
+      "failure_condition": "If declined or cancelled (wave gate)",
+      "detected_at": "Progress Loop — wave confirmation gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "If declined or cancelled: stop the Progress Loop. Report the current plan state and exit. The plan remains in its current state and can be resumed later."
+    },
+    {
+      "id": "G1.complete-implementation.input-format-unrecognized",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Input Format Detection",
+      "failure_condition": "No — unrecognized input format",
+      "detected_at": "complete-implementation.q5",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "ERROR: unrecognized format. Expected: plan path, #N, bare number, GitHub issue URL, or beads ID."
+    },
+    {
+      "id": "G1.complete-implementation.tn-verification-failed",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Pre-Phase 1: TN Verification Check",
+      "failure_condition": "Any criterion has status: regressed",
+      "detected_at": "Pre-Phase 1: TN Verification Check",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "COMPLETION BLOCKED — TN Verification Failed\n\nRegressed criteria:\n  {criterion-id}: {description}\n    command: {check_command}\n    T0 result: exit {code}, stdout: {stdout}\n    TN result: exit {code}, stdout: {stdout}\n\nFix the regressions, then re-run /complete-implementation."
+    },
+    {
+      "id": "G1.complete-implementation.migration-fidelity-blocked",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md:Migration Fidelity Sign-Off Gate",
+      "failure_condition": "Yes — unconfirmed items remain",
+      "detected_at": "Pre-Phase 1a: Migration Fidelity Sign-Off",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "COMPLETION BLOCKED — Migration Fidelity Gate\n\nUnconfirmed items:\n- [list each unchecked item]\n\nTo unblock: run uv run plugins/development-harness/scripts/verify_migration_fidelity.py against real production data and provide the path to the generated report in .tmp/scratch/reports/."
+    },
+    {
+      "id": "G1.complete-implementation.t0-reject",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:SAM Dispatch Loop (Phases T0-T6)",
+      "failure_condition": "Any REJECT from T0 Multi-Perspective Review",
+      "detected_at": "SAM Dispatch Loop — T0 post-dispatch",
+      "response": "bounce",
+      "bounce_target": "Recursive Follow-up Handling",
+      "bounce_source": "Any REJECT — trigger Recursive Follow-up Handling (same path as T1 NEEDS_WORK)."
+    },
+    {
+      "id": "G1.complete-implementation.t1-needs-work",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:SAM Dispatch Loop (Phases T0-T6)",
+      "failure_condition": "T1 Code Review verdict drives Recursive Follow-up Handling (NEEDS_WORK)",
+      "detected_at": "SAM Dispatch Loop — T1 post-dispatch",
+      "response": "bounce",
+      "bounce_target": "Recursive Follow-up Handling — Step 1: fix loop or backlog routing",
+      "bounce_source": "Read codebase-analysis artifact. Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)."
+    },
+    {
+      "id": "G1.complete-implementation.qg-task-unauthorized-skip",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Completion Verification Gate",
+      "failure_condition": "status == 'skipped' AND task_id != 'T5'",
+      "detected_at": "Completion Verification Gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "FAIL — unauthorized skip\nSTOP — report failures, do NOT apply label\nCOMPLETION BLOCKED — Proportional Quality Gate Incomplete"
+    },
+    {
+      "id": "G1.complete-implementation.qg-task-incomplete-blocked",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Completion Verification Gate",
+      "failure_condition": "any other status (task incomplete or blocked)",
+      "detected_at": "Completion Verification Gate",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "FAIL — task incomplete or blocked\nSTOP — report failures, do NOT apply label\nCOMPLETION BLOCKED — Proportional Quality Gate Incomplete\nBLOCKED tasks will be reset to NOT_STARTED automatically."
+    },
+    {
+      "id": "G1.complete-implementation.status-verified-label-failed",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Apply status:verified Label",
+      "failure_condition": "On failure (GitHub only)",
+      "detected_at": "Apply status:verified Label > Step 2: Apply the label",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "COMPLETION BLOCKED — status:verified label could not be applied.\n\nError: {error}\n\nFix the error (check backend credentials and access), then re-run /complete-implementation #{issue_number}."
+    },
+    {
+      "id": "G1.complete-implementation.backlog-resolve-failed",
+      "skill": "complete-implementation",
+      "source_file": "plugins/development-harness/skills/complete-implementation/SKILL.md:Resolve the Issue",
+      "failure_condition": "backlog_resolve call fails",
+      "detected_at": "Resolve the Issue",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "On failure: output COMPLETION BLOCKED — backlog_resolve failed: {error}. Stop."
+    },
+    {
+      "id": "G1.work-milestone.dispatch-plan-missing",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Step 2: Validate Plan",
+      "failure_condition": "Plan missing",
+      "detected_at": "work-milestone.validate",
+      "response": "escalate",
+      "bounce_target": "groom-milestone",
+      "bounce_source": "BLOCKED — run /groom-milestone {N}"
+    },
+    {
+      "id": "G1.work-milestone.items-changed-since-groom",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Step 2: Validate Plan",
+      "failure_condition": "Items changed since groom",
+      "detected_at": "work-milestone.validate",
+      "response": "escalate",
+      "bounce_target": "groom-milestone",
+      "bounce_source": "Re-run /groom-milestone {N}"
+    },
+    {
+      "id": "G1.work-milestone.backlog-mcp-unavailable",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Error Conditions",
+      "failure_condition": "Backlog MCP unavailable",
+      "detected_at": "Error Conditions",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Backlog MCP unavailable: PROCESS ERROR — report with exact error text"
+    },
+    {
+      "id": "G1.work-milestone.sam-mcp-unavailable",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Error Conditions",
+      "failure_condition": "SAM MCP unavailable",
+      "detected_at": "Error Conditions",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "SAM MCP unavailable: PROCESS ERROR — report with exact error text"
+    },
+    {
+      "id": "G1.work-milestone.session-exited-nonzero-fixable",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Step 6a: Any sessions failed?",
+      "failure_condition": "Some failed — Fixable",
+      "detected_at": "work-milestone.investigatefail",
+      "response": "bounce",
+      "bounce_target": "work-milestone.checkresults",
+      "bounce_source": "Fix and re-spawn failed item only"
+    },
+    {
+      "id": "G1.work-milestone.session-exited-nonzero-not-fixable",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Step 6a: Any sessions failed? / Error Conditions",
+      "failure_condition": "Kage-bunshin session exited non-zero — not fixable",
+      "detected_at": "work-milestone.investigatefail",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Skip failed item. Log to output. Kage-bunshin session exited non-zero: read error log, investigate if fixable, re-spawn if yes, skip item if no."
+    },
+    {
+      "id": "G1.work-milestone.agent-partial-result",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Agent Result Handling / Error Conditions",
+      "failure_condition": "STATUS: PARTIAL — some tasks done, some blocked",
+      "detected_at": "work-milestone.partialcheck",
+      "response": "create_backlog_item",
+      "bounce_target": "work-milestone.nextwavecheck",
+      "bounce_source": "Merge completed work. Create backlog item for remaining tasks. Add to current milestone."
+    },
+    {
+      "id": "G1.work-milestone.agent-failure-no-work",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Agent Result Handling",
+      "failure_condition": "Failure — no useful work done",
+      "detected_at": "work-milestone.status",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "Log failure context. Escalate to user: item title, error, agent output summary."
+    },
+    {
+      "id": "G1.work-milestone.heavy-conflict-3plus-files",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Main Workflow / references/merge-queue-protocol.md:Conflict Severity Classification",
+      "failure_condition": "Heavy conflict (3+ files)",
+      "detected_at": "work-milestone.mergeresult",
+      "response": "create_backlog_item",
+      "bounce_target": null,
+      "bounce_source": "Abort merge. Create backlog item for conflict resolution. Add to current milestone for next wave. Report to user: conflicting files, both agents' approaches. Release merge slot."
+    },
+    {
+      "id": "G1.work-milestone.heavy-conflict-file-restructured",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md:Conflict Severity Classification",
+      "failure_condition": "Heavy — file refactored by multiple worktrees",
+      "detected_at": "work-milestone.severity",
+      "response": "create_backlog_item",
+      "bounce_target": null,
+      "bounce_source": "Abort merge. Create backlog item for conflict resolution. Add to current milestone for next wave. Report to user: conflicting files, both agents' approaches. Release merge slot."
+    },
+    {
+      "id": "G1.work-milestone.auto-resolve-failed",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md:Merge Slot Lifecycle",
+      "failure_condition": "Resolve succeeded? No",
+      "detected_at": "work-milestone.autoresult",
+      "response": "create_backlog_item",
+      "bounce_target": null,
+      "bounce_source": "Abort merge. Create backlog item for conflict resolution. Add to current milestone for next wave. Report to user: conflicting files, both agents' approaches. Release merge slot."
+    },
+    {
+      "id": "G1.work-milestone.pre-merge-gates-fail",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/references/merge-queue-protocol.md:Merge Slot Lifecycle",
+      "failure_condition": "Any fail (quality gates)",
+      "detected_at": "work-milestone.gatesresult",
+      "response": "bounce",
+      "bounce_target": "work-milestone.slot",
+      "bounce_source": "Orchestrator spawns fix agent in worktree on integration branch. Fix agent resolves gate failures. Release merge slot."
+    },
+    {
+      "id": "G1.work-milestone.resolution-gates-no",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Main Workflow",
+      "failure_condition": "No (Resolution gates pass? — after Trivial/Medium conflict resolve attempt)",
+      "detected_at": "work-milestone.resolvegates",
+      "response": "create_backlog_item",
+      "bounce_target": null,
+      "bounce_source": "Create backlog item for conflict resolution. Add to milestone."
+    },
+    {
+      "id": "G1.work-milestone.all-quality-gates-fail-on-integration",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Error Conditions",
+      "failure_condition": "All quality gates fail on integration branch",
+      "detected_at": "Error Conditions",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "All quality gates fail on integration branch: escalate to user before landing"
+    },
+    {
+      "id": "G1.work-milestone.main-diverged",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/SKILL.md:Error Conditions",
+      "failure_condition": "Main diverged during milestone work",
+      "detected_at": "Error Conditions",
+      "response": "bounce",
+      "bounce_target": "Integration branch rebase before landing",
+      "bounce_source": "Main diverged during milestone work: rebase integration branch onto main before landing"
+    },
+    {
+      "id": "G1.work-milestone.worker-blocker",
+      "skill": "work-milestone",
+      "source_file": "skills/work-milestone/references/worktree-worker-protocol.md:Blocker Handling",
+      "failure_condition": "setup failure, environment issue, or catastrophic blocker",
+      "detected_at": "Worktree Worker Protocol — Completion Report",
+      "response": "STOP",
+      "bounce_target": null,
+      "bounce_source": "STATUS: FAILED\nBRANCH: {worktree branch name if any commits exist, else 'none'}\nTASKS_COMPLETED: 0\nBLOCKER: {description of the failure — be specific}"
+    }
+  ]
+}

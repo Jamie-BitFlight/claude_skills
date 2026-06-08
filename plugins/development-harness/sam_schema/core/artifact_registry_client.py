@@ -141,9 +141,27 @@ class ArtifactRegistryClient:
                 agent="gist-task-layer",
             )
             manifest = provider.get_manifest(issue)
-            updated_manifest = _artifact_registry.register(manifest, entry)
-            provider.set_manifest(issue, updated_manifest)
-            _log.info("ArtifactRegistryClient.store: registered %s manifest entry for issue #%d", artifact_type, issue)
+            # Skip the manifest PATCH when the entry is already registered.
+            # After create_plan the entry exists; every subsequent store() call
+            # for the same plan only refreshes the created_at timestamp — not
+            # worth a Gist PATCH on every task state change.
+            entry_exists = any(
+                e.artifact_type == entry.artifact_type
+                and e.artifact_id == entry.artifact_id
+                and e.status == entry.status
+                for e in manifest.artifacts
+            )
+            if not entry_exists:
+                updated_manifest = _artifact_registry.register(manifest, entry)
+                provider.set_manifest(issue, updated_manifest)
+                _log.info(
+                    "ArtifactRegistryClient.store: registered new %s manifest entry for issue #%d", artifact_type, issue
+                )
+            else:
+                _log.debug(
+                    "ArtifactRegistryClient.store: manifest entry already registered for issue #%d, skipping PATCH",
+                    issue,
+                )
 
             # Step 2: upload the content to the Gist file.
             provider.store_artifact_content(issue, artifact_type=artifact_type, path=path, content=content)
@@ -237,8 +255,20 @@ class ArtifactRegistryClient:
                 agent="plan-id-index",
             )
             manifest = provider.get_manifest(sentinel_issue)
-            updated_manifest = _artifact_registry.register(manifest, entry)
-            provider.set_manifest(sentinel_issue, updated_manifest)
+            entry_exists = any(
+                e.artifact_type == entry.artifact_type
+                and e.artifact_id == entry.artifact_id
+                and e.status == entry.status
+                for e in manifest.artifacts
+            )
+            if not entry_exists:
+                updated_manifest = _artifact_registry.register(manifest, entry)
+                provider.set_manifest(sentinel_issue, updated_manifest)
+            else:
+                _log.debug(
+                    "ArtifactRegistryClient.store_index: manifest entry already registered for sentinel #%d, skipping PATCH",
+                    sentinel_issue,
+                )
             provider.store_artifact_content(
                 sentinel_issue, artifact_type=_PLAN_INDEX_TYPE, path=_PLAN_INDEX_PATH, content=content
             )

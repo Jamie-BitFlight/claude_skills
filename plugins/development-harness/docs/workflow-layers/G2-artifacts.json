@@ -1,0 +1,364 @@
+{
+  "artifacts": [
+    {
+      "id": "G2.feature-context",
+      "name": "feature-context",
+      "artifact_type_key": "feature-context",
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 1: Discovery (@dh:feature-researcher)",
+        "action": "artifact_register(item_id={issue}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='feature-researcher', content=...)",
+        "agent": "feature-researcher"
+      },
+      "consumed_by": [
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 4: Task Decomposition (@dh:swarm-task-planner)",
+          "action": "artifact_read(item_id={issue}, artifact_type='feature-context')",
+          "agent": "swarm-task-planner"
+        },
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 3: Architecture Spec (design-spec role)",
+          "action": "Read the feature context via artifact_read(item_id={issue}, artifact_type='feature-context')",
+          "agent": null
+        },
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/validate.md:## Step 2.5: Discovery Gate",
+          "action": "artifact_list(item_id={N}, artifact_type='feature-context')",
+          "agent": null
+        },
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md:Discovery Gate",
+          "action": "artifact_read(item_id={issue_number}, artifact_type='feature-context')",
+          "agent": null
+        },
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 7 — Final Verification",
+          "action": "artifact_read(item_id={issue}, artifact_type='feature-context')",
+          "agent": "feature-verifier"
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.feature-context-synthesized",
+      "name": "feature-context (synthesized from groomed sections)",
+      "artifact_type_key": "feature-context",
+      "produced_by": {
+        "skill": "work-backlog-item",
+        "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md:Discovery Gate",
+        "action": "artifact_register(item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content=...)",
+        "agent": null
+      },
+      "consumed_by": [
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 4: Task Decomposition (@dh:swarm-task-planner)",
+          "action": "artifact_read(item_id={issue}, artifact_type='feature-context')",
+          "agent": "swarm-task-planner"
+        },
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/validate.md:## Step 2.5: Discovery Gate",
+          "action": "artifact_list(item_id={N}, artifact_type='feature-context')",
+          "agent": null
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.codebase-analysis",
+      "name": "codebase-analysis",
+      "artifact_type_key": "codebase-analysis",
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 2: Codebase Analysis (@dh:codebase-analyzer)",
+        "action": "artifact_register(item_id={issue}, artifact_type='codebase-analysis', artifact_id='codebase-{focus}-{slug}', content=..., agent='codebase-analyzer')",
+        "agent": "codebase-analyzer"
+      },
+      "consumed_by": [
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 6 — Forensic Review:Step 4 — Read codebase-analysis Artifact",
+          "action": "artifact_read(item_id={item_id}, artifact_type='codebase-analysis')",
+          "agent": null
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.architect",
+      "name": "architect spec",
+      "artifact_type_key": "architect",
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 3: Architecture Spec (design-spec role)",
+        "action": "artifact_register(item_id={issue}, artifact_type='architect', path='plan/architect-{slug}.md', agent='planning', content=...)",
+        "agent": "python-cli-design-spec"
+      },
+      "consumed_by": [
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 4: Task Decomposition (@dh:swarm-task-planner)",
+          "action": "Read the architecture spec via artifact_read(item_id={issue}, artifact_type='architect')",
+          "agent": "swarm-task-planner"
+        },
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 7 — Final Verification",
+          "action": "artifact_read(item_id={issue}, artifact_type='architect')",
+          "agent": "feature-verifier"
+        },
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 7 — Final Verification:Input",
+          "action": "Architect artifact via artifact_read(item_id={issue}, artifact_type='architect')",
+          "agent": null
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.task-plan",
+      "name": "task-plan",
+      "artifact_type_key": "task-plan",
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 4: Task Decomposition (@dh:swarm-task-planner)",
+        "action": "sam_plan(action='create', ...) — auto-registered as artifact_type='task-plan' by sam_plan MCP",
+        "agent": "swarm-task-planner"
+      },
+      "consumed_by": [
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:(plan_address passed to skill)",
+          "action": "sam_plan(action='read', plan='{plan_address}')",
+          "agent": null
+        },
+        {
+          "skill": "complete-implementation",
+          "source_file": "skills/complete-implementation/SKILL.md:Resolve Plan Address",
+          "action": "plan/P{id}-{slug}.yaml — plan address P{N} used in all sam calls",
+          "agent": null
+        },
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
+          "action": "artifact_read(item_id, artifact_type='task-plan')",
+          "agent": "tn-verification-gate"
+        }
+      ],
+      "storage": "sam_plan",
+      "persistent": true
+    },
+    {
+      "id": "G2.T0-baseline",
+      "name": "T0-baseline",
+      "artifact_type_key": "T0-baseline",
+      "produced_by": {
+        "skill": "implement-feature",
+        "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
+        "action": "artifact_register(item_id=N, artifact_type='T0-baseline', content=<baseline yaml string>, agent='t0-baseline-capture')",
+        "agent": "t0-baseline-capture"
+      },
+      "consumed_by": [
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
+          "action": "artifact_read(item_id, artifact_type='T0-baseline')",
+          "agent": "tn-verification-gate"
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.TN-verification",
+      "name": "TN-verification",
+      "artifact_type_key": "TN-verification",
+      "produced_by": {
+        "skill": "implement-feature",
+        "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
+        "action": "artifact_register(item_id=N, artifact_type='TN-verification', content=<verification yaml string>, agent='tn-verification-gate')",
+        "agent": "tn-verification-gate"
+      },
+      "consumed_by": [
+        {
+          "skill": "complete-implementation",
+          "source_file": "skills/complete-implementation/SKILL.md:SAM Dispatch Loop (Phases T0-T6)",
+          "action": "FAIL verdict on TN-verification blocks complete-implementation",
+          "agent": null
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.audit-report",
+      "name": "audit-report",
+      "artifact_type_key": "audit-report",
+      "produced_by": {
+        "skill": "complete-implementation",
+        "source_file": "skills/complete-implementation/SKILL.md:Quality Gates T4 Drift Audit",
+        "action": "artifact_register(item_id={item_id}, type='audit-report', artifact_id='doc-drift-audit-{slug}', content={report_markdown}, status='complete', agent='doc-drift-auditor')",
+        "agent": "doc-drift-auditor"
+      },
+      "consumed_by": [
+        {
+          "skill": "complete-implementation",
+          "source_file": "skills/complete-implementation/SKILL.md:Dispatch Loop:T4Post",
+          "action": "Read the Total findings count from T4's ARTIFACTS return block (full report is in the audit-report artifact)",
+          "agent": null
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.research",
+      "name": "research",
+      "artifact_type_key": "research",
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 1: Discovery (@dh:feature-researcher)",
+        "action": "artifact_register(..., artifact_type='research', ...) by any research agent",
+        "agent": null
+      },
+      "consumed_by": [
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 1: Discovery (@dh:feature-researcher)",
+          "action": "artifact_read(item_id={issue}, artifact_type='research') — read before starting discovery",
+          "agent": "feature-researcher"
+        }
+      ],
+      "storage": "gist_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.Impact-Radius-section",
+      "name": "Impact Radius section",
+      "artifact_type_key": null,
+      "produced_by": {
+        "skill": "work-backlog-item",
+        "source_file": "skills/work-backlog-item/references/workflows/groom/ (impact-analyst agent)",
+        "action": "backlog_groom(selector='{item_ref}', section='Impact Radius', content=...) written directly by impact-analyst",
+        "agent": "impact-analyst"
+      },
+      "consumed_by": [
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/groom-check.md:## Phase 1 — Drift detection",
+          "action": "git log ... -- {impact_radius_files} — impact_radius_files read from backlog_view sections",
+          "agent": null
+        },
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/feasibility-gate.md:## Gate Logic",
+          "action": "Any Impact Radius row contains pattern: field? — reads Impact Radius section from backlog_view",
+          "agent": null
+        }
+      ],
+      "storage": "backlog_section",
+      "persistent": true
+    },
+    {
+      "id": "G2.RT-ICA-section",
+      "name": "RT-ICA section",
+      "artifact_type_key": null,
+      "produced_by": {
+        "skill": "work-backlog-item",
+        "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md:Write Groomed Content",
+        "action": "backlog_groom(selector='{item_ref}', sections={'RT-ICA': '{rt_ica_final_content}', ...}, mark_groomed=True)",
+        "agent": "rtica-assessor"
+      },
+      "consumed_by": [
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+          "action": "backlog_view(selector='{item_ref}') — checks response['sections']['RT-ICA'] non-empty with Date and Decision",
+          "agent": null
+        }
+      ],
+      "storage": "backlog_section",
+      "persistent": true
+    },
+    {
+      "id": "G2.groomed-sections",
+      "name": "Groomed sections (Reproducibility, Priority, Acceptance Criteria, Files, Resources, Dependencies, Effort)",
+      "artifact_type_key": null,
+      "produced_by": {
+        "skill": "work-backlog-item",
+        "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md:Write Groomed Content",
+        "action": "backlog_groom(selector='{item_ref}', sections={'Reproducibility':..., 'Priority':..., 'Acceptance Criteria':..., 'Files':..., 'Resources':..., 'Dependencies':..., 'Effort':...}, mark_groomed=True)",
+        "agent": "backlog-item-groomer"
+      },
+      "consumed_by": [
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/groom/finalize.md:Diagnostic Gate — Before Retry or Direct Write",
+          "action": "backlog_view(selector='{item_ref}', summary=false) — checks all required sections present with minimum content",
+          "agent": null
+        },
+        {
+          "skill": "work-backlog-item",
+          "source_file": "skills/work-backlog-item/references/workflows/work/validate.md",
+          "action": "backlog_view to check groomed sections before planning",
+          "agent": null
+        }
+      ],
+      "storage": "backlog_section",
+      "persistent": true
+    },
+    {
+      "id": "G2.Concerns-section",
+      "name": "Concerns section",
+      "artifact_type_key": null,
+      "produced_by": {
+        "skill": "add-new-feature",
+        "source_file": "skills/add-new-feature/SKILL.md:## Phase 2: Codebase Analysis (@dh:codebase-analyzer)",
+        "action": "codebase-analyzer writes CONCERNS.md content registered as codebase-analysis artifact; Concerns section written to backlog item by impact-analyst or contract-verification agent",
+        "agent": "codebase-analyzer"
+      },
+      "consumed_by": [
+        {
+          "skill": "complete-implementation",
+          "source_file": "skills/complete-implementation/SKILL.md:feature-verifier:Step 1: Load Context",
+          "action": "The backlog item's Concerns section may contain CONTRACT: prefixed entries — review alongside task-agent concerns when verifying",
+          "agent": "feature-verifier"
+        }
+      ],
+      "storage": "backlog_section",
+      "persistent": true
+    },
+    {
+      "id": "G2.sam-task-body",
+      "name": "SAM task body sections (Review Results, task state)",
+      "artifact_type_key": null,
+      "produced_by": {
+        "skill": "implement-feature",
+        "source_file": "skills/implement-feature/SKILL.md:SAM Stage 6 — Forensic Review:Step 4",
+        "action": "sam_task(plan='{plan_id}', task='{task_id}', config={'action':'update', 'append_section':'Review Results', 'section_content':'{artifact_content}'})",
+        "agent": null
+      },
+      "consumed_by": [
+        {
+          "skill": "implement-feature",
+          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 7 — Final Verification",
+          "action": "sam_task(plan='{plan_id}', task='{task_id}', config={'action':'read'}) — review content stored in task body sections",
+          "agent": "feature-verifier"
+        }
+      ],
+      "storage": "sam_plan",
+      "persistent": true
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import pytest
 from backlog_core.artifact_provider import GitHubGistArtifactProvider
 from backlog_core.models import BacklogError
 from github import GithubException
+from github.AuthenticatedUser import AuthenticatedUser
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -96,8 +97,9 @@ def mock_gist_user(mocker: MockerFixture) -> MagicMock:
     mock_gh = MagicMock()
     mock_gist = MagicMock()
     mock_gist.id = "abc123"
-    mock_gh.get_user.return_value.__class__ = MagicMock
-    mock_gh.get_user.return_value.create_gist.return_value = mock_gist
+    mock_user = MagicMock(spec=AuthenticatedUser)
+    mock_user.create_gist.return_value = mock_gist
+    mock_gh.get_user.return_value = mock_user
     mock_client_fn.return_value = mock_gh
     return mock_gh
 
