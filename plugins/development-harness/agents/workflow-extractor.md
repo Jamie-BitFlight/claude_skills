@@ -18,7 +18,9 @@ and the sonnet reducer validates the assembled schema.
 
 ```
 Phase 0 — Plan
-  uv run plan_ensemble.py extraction-rules.json --report-dir <REPORT_DIR> --window 4 --json
+  uv run plugins/plugin-creator/skills/ensemble-rule-review/scripts/plan_ensemble.py \
+    plugins/development-harness/docs/workflow-layers/extraction-rules.json \
+    --report-dir <REPORT_DIR> --window 4 --json
   → worker_assignments: [{worker_id, groups, outfile}]
 
 Phase 1 — Fan-out (parallel)
@@ -27,7 +29,8 @@ Phase 1 — Fan-out (parallel)
   Wait for all 3 STATUS: DONE
 
 Phase 2 — Reduce (deterministic)
-  uv run reduce.py <REPORT_DIR> --keep-threshold 2
+  uv run plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py \
+    <REPORT_DIR> --keep-threshold 2
   → ranked findings file at <REPORT_DIR>/reduce-output.md
 
 Phase 3 — Assemble (sonnet)

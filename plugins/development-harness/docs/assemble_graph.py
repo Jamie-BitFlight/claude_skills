@@ -169,11 +169,6 @@ def load_layers(layers_dir: Path) -> LayerData:
     g4 = _load_json(layers_dir / "G4-concurrency.json")
     g8 = _load_json(layers_dir / "G8-backend-routing.json")
 
-    # G1 and G3 are loaded for completeness but their data is not yet used
-    # in graph construction — they inform the layer inventory.
-    _load_json(layers_dir / "G1-failure-modes.json")
-    _load_json(layers_dir / "G3-actor-types.json")
-
     if l0:
         ld.forks = l0.get("forks", [])
     if g2:
@@ -619,7 +614,7 @@ def build_reads_edges(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for art in artifacts:
         art_id_raw = art["id"].removeprefix("G2.")
         target_id = f"artifact.{slugify(art_id_raw)}"
-        for i, consumer in enumerate(art.get("consumed_by", [])):
+        for consumer in art.get("consumed_by", []):
             consumer_skill = consumer.get("skill")
             if not consumer_skill:
                 continue
@@ -627,11 +622,10 @@ def build_reads_edges(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             action = (consumer.get("action") or "")[:60]
             dedup_key = f"e.reads.{slugify(consumer_skill)}.{slugify(art_id_raw)}"
             if dedup_key not in edges:
-                eid = f"{dedup_key}.{i}"
                 raw_sf, heading = split_source_file(consumer.get("source_file"))
                 source_file = prefix_source_file(raw_sf)
                 edges[dedup_key] = _edge(
-                    eid,
+                    dedup_key,
                     "reads",
                     source_id,
                     target_id,
@@ -659,7 +653,7 @@ def build_dispatches_edges(concurrency_map: list[dict[str, Any]]) -> list[dict[s
         dispatch_label = (item.get("dispatch_label") or "")[:60]
         for agent_name in item.get("agents_dispatched", []):
             target_id = _node_id("agent", agent_name)
-            eid = f"e.dispatches.{slugify(item['id'])}.{slugify(agent_name)}"
+            eid = f"e.dispatches.{slugify(item.get('id', ''))}.{slugify(agent_name)}"
             if eid not in edges:
                 edges[eid] = _edge(
                     eid,

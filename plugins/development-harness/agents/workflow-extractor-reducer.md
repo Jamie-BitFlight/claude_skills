@@ -64,8 +64,12 @@ the flat schema could not carry. What to fill depends on LAYER_TYPE:
 **Step 3 — Assemble layer JSON.**
 Build a JSON fragment matching the layer schema in
 `plugins/development-harness/docs/graph-schema.md`. Every item must carry:
-- `source_file` — from the finding's location field
-- `source_heading` — from the finding's location field
+- `source_file` — split from the finding's location field at the FIRST `:` character;
+  everything before `:` is the file path, everything after is the heading. Example:
+  location `"skills/work-backlog-item/SKILL.md:## Parser Exit"` → `source_file =
+  "skills/work-backlog-item/SKILL.md"`, `source_heading = "## Parser Exit"`. When no
+  `:` is present, `source_file` is the full location string and `source_heading` is null.
+- `source_heading` — extracted as above
 - `verified: true` — for items from the corroborated set
 - `unverified: true` — for items from the unverified set
 
@@ -75,7 +79,10 @@ main data array. They are present for inspection, not for downstream use.
 **Step 4 — Self-check.**
 - Count of items in main array must equal count of verified findings from reduce output.
 - Every `source_file` in the output must be a real file path (check with Glob).
-- Every `source_heading` must appear in SOURCE_FILE (spot-check 3-5 entries).
+- Every `source_heading` must appear in SOURCE_FILE (spot-check 3-5 entries). If a
+  heading is NOT found in SOURCE_FILE, move the affected item from the main array to
+  `unverified_items` and add `"reducer_note": "heading not found in source"` to the item.
+  Do not silently keep an item with a non-existent heading in the verified set.
 - Zero items in main array where `verified` is false or absent.
 
 Write the result to OUTFILE as compact JSON (no indentation).
