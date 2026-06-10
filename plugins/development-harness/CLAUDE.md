@@ -414,7 +414,7 @@ Load these documents based on what you are doing. They contain the system design
 
 **Adding skills or agents, or modifying workflow logic (Mermaid forks, agent dispatch, MCP tools, artifact flows):**
 
-- Run [Workflow Graph Refresh](./skills/meta-workflow-graph-refresh/SKILL.md) — step-by-step extraction and assembly process for keeping `docs/dh-workflow-graph.json` accurate after structural changes; covers which layer to re-extract, how to run the ensemble, and how to rebuild the graph
+- Run `/dh:meta-workflow-graph-refresh` — step-by-step extraction and assembly process for keeping `docs/dh-workflow-graph.json` accurate after structural changes; covers which layer to re-extract, how to run the ensemble, and how to rebuild the graph
 
 Note: Four layer-0 design documents (artifact-conventions, task-file-format, sam-pipeline, arl-touchpoints) were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
 
@@ -426,9 +426,9 @@ After completing your work, update the architectural documents above if your cha
 |---|---|
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
 | Data structure change (new field, changed type, new entity) | Yes — update `models.py` first, then Task File Format |
-| New or removed MCP tool | Yes — update Workflow Architecture Diagram; run [Workflow Graph Refresh](./skills/meta-workflow-graph-refresh/SKILL.md) to update G8 layer |
-| New artifact type or changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run [Workflow Graph Refresh](./skills/meta-workflow-graph-refresh/SKILL.md) to update G2 layer |
-| New skill, agent, or Mermaid decision fork added | Yes — run [Workflow Graph Refresh](./skills/meta-workflow-graph-refresh/SKILL.md) to update L0/L1 or G4 layer |
+| New or removed MCP tool | Yes — update Workflow Architecture Diagram; run `/dh:meta-workflow-graph-refresh` to update G8 layer |
+| New artifact type or changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
+| New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |
 | Refactoring (same behavior, different code structure) | No |
 | Agent prompt changes (better instructions, same behavior) | No |
 | UI/UX changes | No |
