@@ -48,6 +48,7 @@ from backlog_core.sync_state import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from github import GithubException
     from pytest_mock import MockerFixture
 
 
@@ -997,6 +998,26 @@ class TestProgressUnitConsistency:
 # ---------------------------------------------------------------------------
 
 
+def _make_malformed_github_exception(bad_status: object, data: str = "") -> GithubException:
+    """Construct a GithubException whose .status returns a non-int value.
+
+    PyGitHub stores status in a name-mangled private attribute and declares
+    the constructor parameter as ``int``.  To simulate malformed API responses
+    (where status may be ``None`` or a string) without violating the constructor's
+    type contract, this helper bypasses ``__init__`` and injects the value
+    directly into the instance dict.
+    """
+    from github import GithubException
+
+    exc: GithubException = GithubException.__new__(GithubException)
+    exc.__dict__["_GithubException__status"] = bad_status
+    exc.__dict__["_GithubException__data"] = data
+    exc.__dict__["_GithubException__headers"] = {}
+    exc.__dict__["_GithubException__message"] = None
+    exc.args = (bad_status, data, {})
+    return exc
+
+
 class TestClassifyGithubExceptionNonIntStatus:
     """_classify_github_exception must handle non-int exc.status gracefully.
 
@@ -1006,10 +1027,7 @@ class TestClassifyGithubExceptionNonIntStatus:
 
     def test_non_int_status_returns_unknown(self) -> None:
         """GithubException with None status -> SyncErrorKind.UNKNOWN (not TypeError)."""
-        from github import GithubException
-
-        exc = GithubException(status=200, data="weird response", headers={})
-        vars(exc)["_GithubException__status"] = None
+        exc = _make_malformed_github_exception(None, "weird response")
         result = classify_sync_error(exc)
 
         assert result == SyncErrorKind.UNKNOWN, (
@@ -1018,10 +1036,7 @@ class TestClassifyGithubExceptionNonIntStatus:
 
     def test_string_status_returns_unknown(self) -> None:
         """GithubException with string status -> SyncErrorKind.UNKNOWN (not TypeError)."""
-        from github import GithubException
-
-        exc = GithubException(status=200, data="unprocessable", headers={})
-        vars(exc)["_GithubException__status"] = "422"
+        exc = _make_malformed_github_exception("422", "unprocessable")
         result = classify_sync_error(exc)
 
         assert result == SyncErrorKind.UNKNOWN, (
