@@ -203,7 +203,7 @@ Register each document and return:
        mcp__plugin_dh_backlog__artifact_register(
            item_id={issue},
            artifact_type="codebase-analysis",
-           artifact_id="codebase-{focus}-{slug}",
+           artifact_id="plan/codebase-{focus}-{slug}.md",
            content="<full codebase analysis markdown>",
            agent="codebase-analyzer"
        )
@@ -214,7 +214,7 @@ Register each document and return:
 2. Return:
 
        STATUS: DONE
-       path: codebase-{focus}-{slug}
+       path: plan/codebase-{focus}-{slug}.md
 ```
 
 After the agent completes, verify the artifact was registered:
