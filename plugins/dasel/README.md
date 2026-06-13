@@ -125,7 +125,7 @@ cat config.yaml | dasel -i yaml 'server.port'
 cat data.json | dasel -i json 'users.[0].name'
 
 # Update a value (safe: writes to temp file then renames)
-dasel put -f config.yaml -o config.yaml -t string 'server.host' 'newhost'
+cat config.yaml | dasel -i yaml --root 'server.host = "newhost"' > config_tmp.yaml && mv config_tmp.yaml config.yaml
 
 # Convert YAML to JSON
 cat config.yaml | dasel -i yaml -o json > config.json
@@ -168,7 +168,7 @@ Claude: The database host is "db.example.com".
 
 ```
 You: Update the server port to 9090 in config.yaml
-Claude: [dasel put -f config.yaml -t int 'server.port' 9090]
+Claude: [cat config.yaml | dasel -i yaml --root 'server.port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml]
 Claude: Done. server.port is now 9090.
 ```
 
