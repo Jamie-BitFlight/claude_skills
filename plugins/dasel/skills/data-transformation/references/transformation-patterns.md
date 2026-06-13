@@ -20,7 +20,7 @@ Detailed dasel v3 patterns organized by use case. Each pattern follows the struc
 **Problem**: Update a database host in a multi-level YAML config.
 
 ```bash
-dasel -f config.yaml --root 'database.connection.host = "db-prod.example.com"' > tmp.yaml && mv tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root 'database.connection.host = "db-prod.example.com"' > tmp.yaml && mv tmp.yaml config.yaml
 ```
 
 **Expected**: Full document output with only the target field changed.
@@ -30,7 +30,7 @@ dasel -f config.yaml --root 'database.connection.host = "db-prod.example.com"' >
 **Problem**: Add an entirely new top-level section.
 
 ```bash
-dasel -f config.yaml --root '{ $root..., "monitoring": {"enabled": true, "port": 9090} }' > tmp.yaml && mv tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root '{ $root..., "monitoring": {"enabled": true, "port": 9090} }' > tmp.yaml && mv tmp.yaml config.yaml
 ```
 
 **Expected**: Original document preserved with new `monitoring` section appended.
@@ -40,7 +40,7 @@ dasel -f config.yaml --root '{ $root..., "monitoring": {"enabled": true, "port":
 **Problem**: Update version in pyproject.toml.
 
 ```bash
-dasel -f pyproject.toml --root 'project.version = "2.0.0"' > tmp.toml && mv tmp.toml pyproject.toml
+cat pyproject.toml | dasel -i toml --root 'project.version = "2.0.0"' > tmp.toml && mv tmp.toml pyproject.toml
 ```
 
 ### TOML Settings — Add Array-of-Tables Entry
@@ -48,7 +48,7 @@ dasel -f pyproject.toml --root 'project.version = "2.0.0"' > tmp.toml && mv tmp.
 **Problem**: Add a new `[[tool.ruff.per-file-ignores]]` entry or similar array-of-tables.
 
 ```bash
-dasel -f pyproject.toml --root 'tool.ruff.per-file-ignores = [$root.tool.ruff.per-file-ignores..., {"pattern": "tests/**", "ignore": ["S101"]}]' > tmp.toml && mv tmp.toml pyproject.toml
+cat pyproject.toml | dasel -i toml --root 'tool.ruff.per-file-ignores = [$root.tool.ruff.per-file-ignores..., {"pattern": "tests/**", "ignore": ["S101"]}]' > tmp.toml && mv tmp.toml pyproject.toml
 ```
 
 **Caveat**: TOML array-of-tables have specific serialization rules. Verify output format matches TOML spec expectations.
@@ -58,7 +58,7 @@ dasel -f pyproject.toml --root 'tool.ruff.per-file-ignores = [$root.tool.ruff.pe
 **Problem**: Bump version in package.json.
 
 ```bash
-dasel -f package.json --root 'version = "3.1.0"' > tmp.json && mv tmp.json package.json
+cat package.json | dasel -i json --root 'version = "3.1.0"' > tmp.json && mv tmp.json package.json
 ```
 
 ### JSON Package Files — Add Dependency
@@ -66,7 +66,7 @@ dasel -f package.json --root 'version = "3.1.0"' > tmp.json && mv tmp.json packa
 **Problem**: Add a new dependency to package.json.
 
 ```bash
-dasel -f package.json --root '{ $root..., "dependencies": { $root.dependencies..., "lodash": "^4.17.21" } }' > tmp.json && mv tmp.json package.json
+cat package.json | dasel -i json --root '{ $root..., "dependencies": { $root.dependencies..., "lodash": "^4.17.21" } }' > tmp.json && mv tmp.json package.json
 ```
 
 ---
@@ -79,7 +79,7 @@ dasel -f package.json --root '{ $root..., "dependencies": { $root.dependencies..
 
 ```bash
 # Get full names from objects with firstName and lastName
-dasel -f users.json 'users.map({ "full": firstName })'
+cat users.json | dasel -i json 'users.map({ "full": firstName })'
 ```
 
 ### Filter Then Transform
@@ -88,7 +88,7 @@ dasel -f users.json 'users.map({ "full": firstName })'
 
 ```bash
 # Chain filter + each
-dasel -f products.json --root '$expensive = products.filter(price > 100); $expensive.each(price = price * 0.9)'
+cat products.json | dasel -i json --root '$expensive = products.filter(price > 100); $expensive.each(price = price * 0.9)'
 ```
 
 **Caveat**: The `each` mutates in the query context. Use `--root` to get the full document with changes applied.
@@ -98,7 +98,7 @@ dasel -f products.json --root '$expensive = products.filter(price > 100); $expen
 **Problem**: Set all users to inactive.
 
 ```bash
-dasel -f data.json --root 'users.each(active = false)'
+cat data.json | dasel -i json --root 'users.each(active = false)'
 ```
 
 **Expected**: Every element in the `users` array has `active` set to `false`.
@@ -108,7 +108,7 @@ dasel -f data.json --root 'users.each(active = false)'
 **Problem**: Increase all prices by 15%.
 
 ```bash
-dasel -f catalog.json --root 'items.each(price = price * 1.15)'
+cat catalog.json | dasel -i json --root 'items.each(price = price * 1.15)'
 ```
 
 ### Conditional Batch Update
@@ -116,7 +116,7 @@ dasel -f catalog.json --root 'items.each(price = price * 1.15)'
 **Problem**: Set status based on a threshold.
 
 ```bash
-dasel -f data.json --root 'items.each(status = if(score > 80) { "pass" } else { "fail" })'
+cat data.json | dasel -i json --root 'items.each(status = if(score > 80) { "pass" } else { "fail" })'
 ```
 
 ---
@@ -216,7 +216,7 @@ echo '{"db_host":"localhost","db_port":5432}' | \
 **Problem**: Pull out only specific fields from a large document.
 
 ```bash
-dasel -f large.json '{ name, version, description }'
+cat large.json | dasel -i json '{ name, version, description }'
 ```
 
 ### Array to Object Mapping
@@ -225,7 +225,7 @@ dasel -f large.json '{ name, version, description }'
 
 ```bash
 # Use map to extract, then reconstruct
-dasel -f data.json 'settings.map({ key, value })'
+cat data.json | dasel -i json 'settings.map({ key, value })'
 ```
 
 ---
@@ -238,7 +238,7 @@ dasel -f data.json 'settings.map({ key, value })'
 
 ```bash
 for f in configs/*.yaml; do
-  dasel -f "$f" --root 'metadata.version = "2.0"' > "${f}.tmp" && mv "${f}.tmp" "$f"
+  cat "$f" | dasel -i yaml --root 'metadata.version = "2.0"' > "${f}.tmp" && mv "${f}.tmp" "$f"
 done
 ```
 
@@ -254,7 +254,7 @@ done
 
 ```bash
 for f in services/*/config.yaml; do
-  echo "$f: $(dasel -f "$f" 'service.port')"
+  echo "$f: $(cat "$f" | dasel -i yaml 'service.port')"
 done
 ```
 
@@ -271,8 +271,8 @@ done
 **Fix**: Verify path with exploration commands first:
 
 ```bash
-dasel -f data.json 'keys($this)'
-dasel -f data.json 'has("fieldname")'
+cat data.json | dasel -i json 'keys($this)'
+cat data.json | dasel -i json 'has("fieldname")'
 ```
 
 **Error**: `cannot use X as type Y`
@@ -282,7 +282,7 @@ dasel -f data.json 'has("fieldname")'
 **Fix**: Use type casting functions:
 
 ```bash
-dasel -f data.json --root 'port = toInt("9090")'
+cat data.json | dasel -i json --root 'port = toInt("9090")'
 ```
 
 **Error**: `expected array, got object` (or vice versa)
@@ -292,7 +292,7 @@ dasel -f data.json --root 'port = toInt("9090")'
 **Fix**: Check type before operating:
 
 ```bash
-dasel -f data.json 'typeOf(items)'
+cat data.json | dasel -i json 'typeOf(items)'
 ```
 
 **Error**: Truncated/empty output file
@@ -302,7 +302,7 @@ dasel -f data.json 'typeOf(items)'
 **Fix**: Always use temp file + rename pattern:
 
 ```bash
-dasel -f input.json --root '...' > tmp.json && mv tmp.json input.json
+cat input.json | dasel -i json --root '...' > tmp.json && mv tmp.json input.json
 ```
 
 ### Defensive Transformation Pattern
@@ -311,10 +311,10 @@ For critical files, validate before overwriting:
 
 ```bash
 # 1. Transform to temp
-dasel -f config.yaml --root 'server.port = 9090' > config_new.yaml
+cat config.yaml | dasel -i yaml --root 'server.port = 9090' > config_new.yaml
 
 # 2. Verify temp is valid (non-empty, parseable)
-dasel -f config_new.yaml 'keys($this)' > /dev/null && mv config_new.yaml config.yaml || echo "Transformation produced invalid output"
+cat config_new.yaml | dasel -i yaml 'keys($this)' > /dev/null && mv config_new.yaml config.yaml || echo "Transformation produced invalid output"
 ```
 
 ### Dry Run Pattern
@@ -323,7 +323,7 @@ Preview transformation without writing:
 
 ```bash
 # Just print — do not redirect
-dasel -f config.yaml --root 'server.port = 9090'
+cat config.yaml | dasel -i yaml --root 'server.port = 9090'
 ```
 
 Inspect the output. If correct, re-run with redirect.
@@ -336,7 +336,7 @@ Inspect the output. If correct, re-run with redirect.
 
 ```bash
 # Store filtered subset, then transform
-dasel -f data.json '$active = users.filter(active == true); $names = $active.map(name); $names'
+cat data.json | dasel -i json '$active = users.filter(active == true); $names = $active.map(name); $names'
 ```
 
 ### Passing External Variables
@@ -345,7 +345,7 @@ Use `--var` to inject values from the shell:
 
 ```bash
 VERSION="3.0.0"
-dasel -f package.json --var "v=$VERSION" --root 'version = $v' > tmp.json && mv tmp.json package.json
+cat package.json | dasel -i json --var "v=$VERSION" --root 'version = $v' > tmp.json && mv tmp.json package.json
 ```
 
 ### Chaining with Shell Pipes

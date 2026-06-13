@@ -22,60 +22,60 @@ JSON is dasel's native format. All operations work without caveats.
 
 ```bash
 # Top-level keys
-dasel -f data.json 'keys($this)'
+cat data.json | dasel -i json 'keys($this)'
 
 # Nested object keys
-dasel -f data.json 'keys(config.database)'
+cat data.json | dasel -i json 'keys(config.database)'
 ```
 
 ### Inspect Arrays of Objects
 
 ```bash
 # Preview first element to understand object shape
-dasel -f data.json 'users[0]'
+cat data.json | dasel -i json 'users[0]'
 
 # Keys of first element (reveals schema of array items)
-dasel -f data.json 'keys(users[0])'
+cat data.json | dasel -i json 'keys(users[0])'
 
 # Count elements
-dasel -f data.json 'len(users)'
+cat data.json | dasel -i json 'len(users)'
 
 # Sample first 3 elements
-dasel -f data.json 'users[0:3]'
+cat data.json | dasel -i json 'users[0:3]'
 ```
 
 ### Search Nested Objects
 
 ```bash
 # Find all objects containing "email" at any depth
-dasel -f data.json 'search(has("email"))'
+cat data.json | dasel -i json 'search(has("email"))'
 
 # Find objects where "status" equals "active"
-dasel -f data.json 'search(status == "active")'
+cat data.json | dasel -i json 'search(status == "active")'
 
 # Combined predicate
-dasel -f data.json 'search(has("id") && has("name"))'
+cat data.json | dasel -i json 'search(has("id") && has("name"))'
 ```
 
 ### Extract Specific Fields from Arrays
 
 ```bash
 # Get all names from users array
-dasel -f data.json 'users.map(name)'
+cat data.json | dasel -i json 'users.map(name)'
 
 # Get all unique roles
-dasel -f data.json 'users.map(role)' | dasel -i json '$this...' | sort -u
+cat data.json | dasel -i json 'users.map(role)' | dasel -i json '$this...' | sort -u
 ```
 
 ### Mixed-Type Detection
 
 ```bash
 # Check type of ambiguous field
-dasel -f data.json 'typeOf(config.port)'
+cat data.json | dasel -i json 'typeOf(config.port)'
 # Returns: "int", "string", "float", etc.
 
 # Check if field is array or object
-dasel -f data.json 'typeOf(metadata)'
+cat data.json | dasel -i json 'typeOf(metadata)'
 ```
 
 ---
@@ -88,46 +88,46 @@ YAML supports anchors, multi-document files, and deep nesting common in Kubernet
 
 ```bash
 # Top-level keys
-dasel -f config.yaml 'keys($this)'
+cat config.yaml | dasel -i yaml 'keys($this)'
 
 # Deeply nested config (common in Kubernetes)
-dasel -f deployment.yaml 'keys(spec.template.spec)'
+cat deployment.yaml | dasel -i yaml 'keys(spec.template.spec)'
 ```
 
 ### Deep Nesting Navigation
 
 ```bash
 # Step through Kubernetes manifest
-dasel -f deployment.yaml 'keys($this)'
+cat deployment.yaml | dasel -i yaml 'keys($this)'
 # -> ["apiVersion", "kind", "metadata", "spec"]
 
-dasel -f deployment.yaml 'keys(spec)'
+cat deployment.yaml | dasel -i yaml 'keys(spec)'
 # -> ["replicas", "selector", "template"]
 
-dasel -f deployment.yaml 'spec.template.spec.containers[0].image'
+cat deployment.yaml | dasel -i yaml 'spec.template.spec.containers[0].image'
 ```
 
 ### Inspect Nested Arrays
 
 ```bash
 # List container names in a pod spec
-dasel -f deployment.yaml 'spec.template.spec.containers.map(name)'
+cat deployment.yaml | dasel -i yaml 'spec.template.spec.containers.map(name)'
 
 # Count containers
-dasel -f deployment.yaml 'len(spec.template.spec.containers)'
+cat deployment.yaml | dasel -i yaml 'len(spec.template.spec.containers)'
 
 # Get all environment variable names from first container
-dasel -f deployment.yaml 'spec.template.spec.containers[0].env.map(name)'
+cat deployment.yaml | dasel -i yaml 'spec.template.spec.containers[0].env.map(name)'
 ```
 
 ### Recursive Key Search
 
 ```bash
 # Find all keys named "image" at any depth
-dasel -f deployment.yaml '..image'
+cat deployment.yaml | dasel -i yaml '..image'
 
 # Find all objects with a "name" field
-dasel -f deployment.yaml 'search(has("name"))'
+cat deployment.yaml | dasel -i yaml 'search(has("name"))'
 ```
 
 ---
@@ -140,38 +140,38 @@ TOML uses tables (sections) and arrays of tables. Common in Rust (Cargo.toml), P
 
 ```bash
 # Top-level tables and keys
-dasel -f pyproject.toml 'keys($this)'
+cat pyproject.toml | dasel -i toml 'keys($this)'
 
 # Nested tables
-dasel -f Cargo.toml 'keys(dependencies)'
-dasel -f pyproject.toml 'keys(tool.ruff)'
+cat Cargo.toml | dasel -i toml 'keys(dependencies)'
+cat pyproject.toml | dasel -i toml 'keys(tool.ruff)'
 ```
 
 ### Inspect Arrays of Tables
 
 ```bash
 # pyproject.toml optional-dependencies or similar array sections
-dasel -f Cargo.toml 'keys(bin[0])'
-dasel -f Cargo.toml 'len(bin)'
+cat Cargo.toml | dasel -i toml 'keys(bin[0])'
+cat Cargo.toml | dasel -i toml 'len(bin)'
 ```
 
 ### Value Extraction
 
 ```bash
 # Package metadata
-dasel -f pyproject.toml 'project.name'
-dasel -f pyproject.toml 'project.version'
+cat pyproject.toml | dasel -i toml 'project.name'
+cat pyproject.toml | dasel -i toml 'project.version'
 
 # Dependency list
-dasel -f pyproject.toml 'keys(project.dependencies)'
+cat pyproject.toml | dasel -i toml 'keys(project.dependencies)'
 ```
 
 ### Type Checking
 
 ```bash
 # Verify field types (TOML distinguishes int, float, string, bool, datetime)
-dasel -f config.toml 'typeOf(server.port)'
-dasel -f config.toml 'typeOf(server.debug)'
+cat config.toml | dasel -i toml 'typeOf(server.port)'
+cat config.toml | dasel -i toml 'typeOf(server.debug)'
 ```
 
 ---
@@ -184,21 +184,21 @@ XML has elements, attributes, and text content. Dasel represents these as nested
 
 ```bash
 # Top-level element (XML has single root)
-dasel -f data.xml 'keys($this)'
+cat data.xml | dasel -i xml 'keys($this)'
 
 # Child elements
-dasel -f pom.xml 'keys(project)'
-dasel -f pom.xml 'keys(project.dependencies)'
+cat pom.xml | dasel -i xml 'keys(project)'
+cat pom.xml | dasel -i xml 'keys(project.dependencies)'
 ```
 
 ### Inspect Repeated Elements
 
 ```bash
 # Count dependency entries in Maven POM
-dasel -f pom.xml 'len(project.dependencies.dependency)'
+cat pom.xml | dasel -i xml 'len(project.dependencies.dependency)'
 
 # First dependency
-dasel -f pom.xml 'project.dependencies.dependency[0]'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency[0]'
 ```
 
 ### Attribute Access
@@ -207,14 +207,14 @@ XML attributes are accessible as properties on the element. The exact representa
 
 ```bash
 # View full element to see attribute representation
-dasel -f data.xml 'root.element[0]'
+cat data.xml | dasel -i xml 'root.element[0]'
 ```
 
 ### Recursive Search
 
 ```bash
 # Find all elements with a specific child
-dasel -f data.xml 'search(has("version"))'
+cat data.xml | dasel -i xml 'search(has("version"))'
 ```
 
 ---
@@ -227,33 +227,33 @@ CSV files are represented as arrays of objects (header row becomes keys).
 
 ```bash
 # Get column names from first row
-dasel -f data.csv 'keys($this[0])'
+cat data.csv | dasel -i csv 'keys($this[0])'
 ```
 
 ### Row Count
 
 ```bash
-dasel -f data.csv 'len($this)'
+cat data.csv | dasel -i csv 'len($this)'
 ```
 
 ### Sample Rows
 
 ```bash
 # First row (as object with column keys)
-dasel -f data.csv '$this[0]'
+cat data.csv | dasel -i csv '$this[0]'
 
 # First 3 rows
-dasel -f data.csv '$this[0:3]'
+cat data.csv | dasel -i csv '$this[0:3]'
 ```
 
 ### Column Sampling
 
 ```bash
 # Extract single column values
-dasel -f data.csv '$this.map(name)'
+cat data.csv | dasel -i csv '$this.map(name)'
 
 # Unique values in a column
-dasel -f data.csv '$this.map(category)' | dasel -i json '$this...' | sort -u
+cat data.csv | dasel -i csv '$this.map(category)' | dasel -i json '$this...' | sort -u
 ```
 
 ### Type Inspection
@@ -261,7 +261,7 @@ dasel -f data.csv '$this.map(category)' | dasel -i json '$this...' | sort -u
 CSV values are typically strings. Check with:
 
 ```bash
-dasel -f data.csv 'typeOf($this[0].age)'
+cat data.csv | dasel -i csv 'typeOf($this[0].age)'
 ```
 
 ---
@@ -274,7 +274,7 @@ HCL (HashiCorp Configuration Language) uses blocks with labels. Common in Terraf
 
 ```bash
 # Top-level block types
-dasel -f main.tf 'keys($this)'
+cat main.tf | dasel -i hcl 'keys($this)'
 # -> ["resource", "variable", "output", "provider"]
 ```
 
@@ -282,29 +282,29 @@ dasel -f main.tf 'keys($this)'
 
 ```bash
 # Resource types
-dasel -f main.tf 'keys(resource)'
+cat main.tf | dasel -i hcl 'keys(resource)'
 
 # Specific resource
-dasel -f main.tf 'resource.aws_instance'
-dasel -f main.tf 'keys(resource.aws_instance)'
+cat main.tf | dasel -i hcl 'resource.aws_instance'
+cat main.tf | dasel -i hcl 'keys(resource.aws_instance)'
 ```
 
 ### Nested Block Inspection
 
 ```bash
 # Terraform resource attributes
-dasel -f main.tf 'resource.aws_instance.web'
-dasel -f main.tf 'keys(resource.aws_instance.web)'
+cat main.tf | dasel -i hcl 'resource.aws_instance.web'
+cat main.tf | dasel -i hcl 'keys(resource.aws_instance.web)'
 ```
 
 ### Variable Discovery
 
 ```bash
 # List all variable names
-dasel -f variables.tf 'keys(variable)'
+cat variables.tf | dasel -i hcl 'keys(variable)'
 
 # Get variable default value
-dasel -f variables.tf 'variable.region.default'
+cat variables.tf | dasel -i hcl 'variable.region.default'
 ```
 
 ---
@@ -317,29 +317,29 @@ INI files have sections and key-value pairs. Common in systemd, PHP, Git config.
 
 ```bash
 # List all sections
-dasel -f config.ini 'keys($this)'
+cat config.ini | dasel -i ini 'keys($this)'
 ```
 
 ### Key Listing Within Section
 
 ```bash
 # Keys in a specific section
-dasel -f config.ini 'keys(database)'
-dasel -f config.ini 'keys(server)'
+cat config.ini | dasel -i ini 'keys(database)'
+cat config.ini | dasel -i ini 'keys(server)'
 ```
 
 ### Value Extraction
 
 ```bash
-dasel -f config.ini 'database.host'
-dasel -f config.ini 'server.port'
+cat config.ini | dasel -i ini 'database.host'
+cat config.ini | dasel -i ini 'server.port'
 ```
 
 ### Full Section Dump
 
 ```bash
 # View all keys and values in a section
-dasel -f config.ini 'database'
+cat config.ini | dasel -i ini 'database'
 ```
 
 ---

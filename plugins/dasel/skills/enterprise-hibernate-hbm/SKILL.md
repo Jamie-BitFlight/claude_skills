@@ -21,20 +21,20 @@ Domain skill for dasel v3 queries against Hibernate `.hbm.xml` mapping files.
 
 ```bash
 # Fully qualified Java entity class name
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.-name'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.-name'
 
 # Database table the entity maps to
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.-table'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.-table'
 ```
 
 ## Property Column Mapping
 
 ```bash
 # All mapped Java property names in the entity
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.property.map(-name)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.property.map(-name)'
 
 # All database column names for mapped properties
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.property.map(-column)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.property.map(-column)'
 ```
 
 ## Collection Relationships
@@ -43,10 +43,10 @@ dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.property.map(-column)'
 
 ```bash
 # All set collection names (one-to-many)
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.set.map(-name)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.set.map(-name)'
 
 # All list collection names
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.list.map(-name)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.list.map(-name)'
 ```
 
 ## Foreign Key Discovery
@@ -55,10 +55,10 @@ dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.list.map(-name)'
 
 ```bash
 # All foreign key column names
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.many-to-one.map(-column)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.many-to-one.map(-column)'
 
 # All referenced entity class names (the FK target)
-dasel -f User.hbm.xml -i xml 'hibernate-mapping.class.many-to-one.map(-class)'
+cat User.hbm.xml | dasel -i xml 'hibernate-mapping.class.many-to-one.map(-class)'
 ```
 
 ## Batch Entity-Table Mapping
@@ -67,8 +67,8 @@ Extract entity→table pairs across all `.hbm.xml` files. Write to `/tmp/` — n
 
 ```bash
 for f in $(fdfind -e hbm.xml .); do
-  entity=$(dasel -f "$f" -i xml 'hibernate-mapping.class.-name' 2>/dev/null)
-  table=$(dasel -f "$f" -i xml 'hibernate-mapping.class.-table' 2>/dev/null)
+  entity=$(cat "$f" | dasel -i xml 'hibernate-mapping.class.-name' 2>/dev/null)
+  table=$(cat "$f" | dasel -i xml 'hibernate-mapping.class.-table' 2>/dev/null)
   echo "$entity -> $table"
 done > /tmp/entity_table_map.txt
 ```

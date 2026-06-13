@@ -32,13 +32,13 @@ Always give complete commands. Never describe an approach without a concrete com
 
 ```bash
 # Top-level keys
-dasel -f data.json 'keys($this)'
+cat data.json | dasel -i json 'keys($this)'
 
 # Children of a specific node
-dasel -f config.yaml 'root.keys($this)'
+cat config.yaml | dasel -i yaml 'root.keys($this)'
 
 # Keys at any node including XML element attributes
-dasel -f file.xml -i xml 'root.element[0].keys($this)'
+cat file.xml | dasel -i xml 'root.element[0].keys($this)'
 ```
 
 `keys($this)` returns all child element names and attribute names at the current node.
@@ -49,10 +49,10 @@ Recursive descent finds at any depth without knowing the full path:
 
 ```bash
 # Find all elements named "item" at any depth
-dasel -f data.json '..item'
+cat data.json | dasel -i json '..item'
 
 # Find any node where a field exists
-dasel -f file.xml -i xml 'search(has("-name"))'
+cat file.xml | dasel -i xml 'search(has("-name"))'
 ```
 
 `..elementName` descends recursively through all levels. `search(predicate)` finds any node where the predicate matches.
@@ -61,10 +61,10 @@ dasel -f file.xml -i xml 'search(has("-name"))'
 
 ```bash
 # Extract "name" from every element in a collection
-dasel -f data.json 'items.map(name)'
+cat data.json | dasel -i json 'items.map(name)'
 
 # Extract an XML attribute from every matching element
-dasel -f file.xml -i xml '..element.map("-id")'
+cat file.xml | dasel -i xml '..element.map("-id")'
 ```
 
 XML attributes are accessed with a `-` prefix in friendly mode. The `id` attribute is `-id`.
@@ -73,13 +73,13 @@ XML attributes are accessed with a `-` prefix in friendly mode. The `id` attribu
 
 ```bash
 # Filter by exact value
-dasel -f data.json 'items.filter(status == "active").map(name)'
+cat data.json | dasel -i json 'items.filter(status == "active").map(name)'
 
 # Filter by pattern match
-dasel -f file.xml -i xml 'root.items.filter(-class ~ ".*Service.*").map("-id")'
+cat file.xml | dasel -i xml 'root.items.filter(-class ~ ".*Service.*").map("-id")'
 
 # Filter where a child element exists matching a condition
-dasel -f file.xml -i xml 'root.items.filter(child.filter(-name == "key").len($this) > 0).map("-id")'
+cat file.xml | dasel -i xml 'root.items.filter(child.filter(-name == "key").len($this) > 0).map("-id")'
 ```
 
 Pattern for child-existence filter: `parentCollection.filter(childElement.filter(condition).len($this) > 0)`.
@@ -88,10 +88,10 @@ Pattern for child-existence filter: `parentCollection.filter(childElement.filter
 
 ```bash
 # Count all elements at any depth
-dasel -f file.xml -i xml 'len(..elementName)'
+cat file.xml | dasel -i xml 'len(..elementName)'
 
 # Count after filtering
-dasel -f data.json 'len(items.filter(active == true))'
+cat data.json | dasel -i json 'len(items.filter(active == true))'
 ```
 
 ### "How do I diff two files to find what changed?"
@@ -100,8 +100,8 @@ Dasel extracts the data; shell tooling handles the diff:
 
 ```bash
 # Extract a field from both files, sort, then diff
-dasel -f file1.json 'items.map(name)' | sort > /tmp/file1_names.txt
-dasel -f file2.json 'items.map(name)' | sort > /tmp/file2_names.txt
+cat file1.json | dasel -i json 'items.map(name)' | sort > /tmp/file1_names.txt
+cat file2.json | dasel -i json 'items.map(name)' | sort > /tmp/file2_names.txt
 diff /tmp/file1_names.txt /tmp/file2_names.txt
 ```
 
@@ -109,8 +109,8 @@ diff /tmp/file1_names.txt /tmp/file2_names.txt
 
 ```bash
 # <element id="foo">some text</element>
-dasel -f file.xml -i xml 'root.element[0].-id'     # → foo
-dasel -f file.xml -i xml 'root.element[0].#text'   # → some text
+cat file.xml | dasel -i xml 'root.element[0].-id'     # → foo
+cat file.xml | dasel -i xml 'root.element[0].#text'   # → some text
 ```
 
 Attributes use `-` prefix. Text content uses `#text`.
@@ -120,41 +120,41 @@ Attributes use `-` prefix. Text content uses `#text`.
 Dasel friendly mode strips namespace prefixes from element names. If namespace prefixes cause selector failures, use structured mode:
 
 ```bash
-dasel -f file.xml -i xml --read-flag xml-mode=structured 'root.element[0]'
+cat file.xml | dasel -i xml --read-flag xml-mode=structured 'root.element[0]'
 ```
 
 ## XML Selector Reference
 
 ```bash
 # Navigate to element
-dasel -f file.xml -i xml 'root.child.grandchild'
+cat file.xml | dasel -i xml 'root.child.grandchild'
 
 # Attribute access (- prefix)
-dasel -f file.xml -i xml 'root.element.-id'
+cat file.xml | dasel -i xml 'root.element.-id'
 
 # Text content
-dasel -f file.xml -i xml 'root.element.#text'
+cat file.xml | dasel -i xml 'root.element.#text'
 
 # Array indexing (zero-based)
-dasel -f file.xml -i xml 'root.element[0]'
+cat file.xml | dasel -i xml 'root.element[0]'
 
 # Recursive descent
-dasel -f file.xml -i xml '..elementName'
+cat file.xml | dasel -i xml '..elementName'
 
 # Filter by attribute value
-dasel -f file.xml -i xml 'root.element.filter(-id == "target")'
+cat file.xml | dasel -i xml 'root.element.filter(-id == "target")'
 
 # Filter by attribute pattern
-dasel -f file.xml -i xml 'root.element.filter(-class ~ ".*Pattern.*")'
+cat file.xml | dasel -i xml 'root.element.filter(-class ~ ".*Pattern.*")'
 
 # Map field across all matching elements
-dasel -f file.xml -i xml 'root.element.map("-name")'
+cat file.xml | dasel -i xml 'root.element.map("-name")'
 
 # Count matching elements
-dasel -f file.xml -i xml 'len(..elementName)'
+cat file.xml | dasel -i xml 'len(..elementName)'
 
 # Check attribute existence
-dasel -f file.xml -i xml 'root.element.filter(has("-id"))'
+cat file.xml | dasel -i xml 'root.element.filter(has("-id"))'
 ```
 
 ## v3 vs v2 Differences
