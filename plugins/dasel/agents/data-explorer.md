@@ -22,7 +22,7 @@ You are a fast read-only exploration agent for querying structured data files us
 
 1. Receive file path + question (or exploration request)
 2. Construct a dasel v3 selector targeting the requested data
-3. Execute via `dasel -f <file> [-i <format>] '<selector>'`
+3. Execute via `cat <file> | dasel -i <format> '<selector>'`
 4. Return the exact dasel command used and its output
 
 Always show the exact command before showing output. For XML files, always pass `-i xml` explicitly.
@@ -31,35 +31,35 @@ Always show the exact command before showing output. For XML files, always pass 
 
 ```bash
 # Top-level keys
-dasel -f data.json 'keys($this)'
+cat data.json | dasel -i json 'keys($this)'
 
 # Children of a specific element
-dasel -f config.yaml 'root.keys($this)'
+cat config.yaml | dasel -i yaml 'root.keys($this)'
 
 # Keys at any node
-dasel -f file.xml -i xml 'root.element[0].keys($this)'
+cat file.xml | dasel -i xml 'root.element[0].keys($this)'
 ```
 
 ## Common Query Patterns
 
 ```bash
 # Navigate a path
-dasel -f config.yaml 'server.host'
+cat config.yaml | dasel -i yaml 'server.host'
 
 # Array element by index
-dasel -f data.json 'items[0]'
+cat data.json | dasel -i json 'items[0]'
 
 # Recursive search for element name at any depth
-dasel -f file.xml -i xml '..elementName'
+cat file.xml | dasel -i xml '..elementName'
 
 # Filter by attribute or field value
-dasel -f file.xml -i xml 'root.items.filter(-id == "target")'
+cat file.xml | dasel -i xml 'root.items.filter(-id == "target")'
 
 # Map a field across all elements in a collection
-dasel -f data.json 'items.map(name)'
+cat data.json | dasel -i json 'items.map(name)'
 
 # Count elements
-dasel -f file.xml -i xml 'len(..elementName)'
+cat file.xml | dasel -i xml 'len(..elementName)'
 ```
 
 ## XML Mode Notes
@@ -70,8 +70,8 @@ dasel -f file.xml -i xml 'len(..elementName)'
 
 ```bash
 # Element with both attribute and text content
-dasel -f file.xml -i xml 'root.element[0].-id'
-dasel -f file.xml -i xml 'root.element[0].#text'
+cat file.xml | dasel -i xml 'root.element[0].-id'
+cat file.xml | dasel -i xml 'root.element[0].#text'
 ```
 
 ## Error Handling
@@ -94,19 +94,19 @@ Common errors:
 
 <example>
 User: What top-level keys does this JSON file have?
-Action: `dasel -f data.json 'keys($this)'`
+Action: `cat data.json | dasel -i json 'keys($this)'`
 Return: The command and its output listing all top-level keys.
 </example>
 
 <example>
 User: Find all name values in config.yaml
-Action: `dasel -f config.yaml '..name'`
+Action: `cat config.yaml | dasel -i yaml '..name'`
 Return: The command and the list of matching values.
 </example>
 
 <example>
 User: List all elements at the root of this XML file
-Action: `dasel -f file.xml -i xml 'keys($this)'`
+Action: `cat file.xml | dasel -i xml 'keys($this)'`
 Return: The command and all root element names.
 </example>
 

@@ -17,17 +17,17 @@ Domain skill for querying Tomcat web.xml files using dasel v3. Always use `-i xm
 
 ```bash
 # All servlet names
-dasel -f web.xml -i xml 'web-app.servlet.map(servlet-name)'
+cat web.xml | dasel -i xml 'web-app.servlet.map(servlet-name)'
 
 # Count servlet definitions
-dasel -f web.xml -i xml 'len(web-app.servlet)'
+cat web.xml | dasel -i xml 'len(web-app.servlet)'
 ```
 
 ## Filter Chain Analysis
 
 ```bash
 # Find filters by class pattern (e.g., Security filters)
-dasel -f web.xml -i xml 'web-app.filter.filter(filter-class ~ ".*Security.*")'
+cat web.xml | dasel -i xml 'web-app.filter.filter(filter-class ~ ".*Security.*")'
 ```
 
 Replace `Security` with any class name fragment.
@@ -36,23 +36,23 @@ Replace `Security` with any class name fragment.
 
 ```bash
 # Count listener definitions
-dasel -f web.xml -i xml 'len(web-app.listener)'
+cat web.xml | dasel -i xml 'len(web-app.listener)'
 ```
 
 ## Context Parameters
 
 ```bash
 # All context-param names
-dasel -f web.xml -i xml 'web-app.context-param.map(param-name)'
+cat web.xml | dasel -i xml 'web-app.context-param.map(param-name)'
 ```
 
 ## Init Parameter Inspection
 
 ```bash
 # Find servlets with a specific init-param name — filters parent collection by testing child length > 0
-dasel -f web.xml -i xml 'web-app.servlet.filter(init-param.filter(param-name == "debug").len($this) > 0).map(servlet-name)'
+cat web.xml | dasel -i xml 'web-app.servlet.filter(init-param.filter(param-name == "debug").len($this) > 0).map(servlet-name)'
 ```
 
 Replace `"debug"` with the target param-name value.
 
-All selectors require the full command prefix: `dasel -f web.xml -i xml '<selector>'`
+All selectors require the full command prefix: `cat web.xml | dasel -i xml '<selector>'`

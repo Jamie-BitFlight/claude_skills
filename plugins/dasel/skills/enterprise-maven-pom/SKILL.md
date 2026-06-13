@@ -17,7 +17,7 @@ Domain skill for querying Maven POM XML files using dasel v3. Always pass `-i xm
 
 ```bash
 # All dependency groupIds from a single POM
-dasel -f pom.xml -i xml 'project.dependencies.dependency.map(groupId)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.map(groupId)'
 ```
 
 ## Framework Version Filtering
@@ -26,20 +26,20 @@ Filter dependencies by groupId to isolate framework-specific versions.
 
 ```bash
 # Spring dependency versions
-dasel -f pom.xml -i xml 'project.dependencies.dependency.filter(groupId == "org.springframework").map(version)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.filter(groupId == "org.springframework").map(version)'
 
 # Hibernate dependency versions
-dasel -f pom.xml -i xml 'project.dependencies.dependency.filter(groupId == "org.hibernate").map(version)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.filter(groupId == "org.hibernate").map(version)'
 ```
 
 ## Scope Filtering
 
 ```bash
 # Test-scoped dependency artifactIds
-dasel -f pom.xml -i xml 'project.dependencies.dependency.filter(scope == "test").map(artifactId)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.filter(scope == "test").map(artifactId)'
 
 # Compile-scoped dependencies (no scope element defaults to compile)
-dasel -f pom.xml -i xml 'project.dependencies.dependency.filter(scope == "compile").map(artifactId)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.filter(scope == "compile").map(artifactId)'
 ```
 
 ## Module Hierarchy
@@ -48,7 +48,7 @@ Extract module paths from a parent POM to map the project structure.
 
 ```bash
 # Module list from parent POM
-dasel -f pom.xml -i xml 'project.modules.module'
+cat pom.xml | dasel -i xml 'project.modules.module'
 ```
 
 ## Cross-POM Version Conflict Detection
@@ -59,7 +59,7 @@ Batch pattern — iterate all POMs, extract dependencies per file, compare. Writ
 # Collect all dependency groupIds across every POM in the hierarchy
 for pom in $(fdfind -e xml -n pom.xml .); do
   echo "=== $pom ===" >> /tmp/all_deps.txt
-  dasel -f "$pom" -i xml 'project.dependencies.dependency.map(groupId)' >> /tmp/all_deps.txt 2>/dev/null
+  cat "$pom" | dasel -i xml 'project.dependencies.dependency.map(groupId)' >> /tmp/all_deps.txt 2>/dev/null
 done
 ```
 
@@ -71,8 +71,8 @@ Extract groupId and artifactId together for dependency inventory.
 
 ```bash
 # Dependency coordinates (groupId + artifactId) — run as two passes
-dasel -f pom.xml -i xml 'project.dependencies.dependency.map(groupId)'
-dasel -f pom.xml -i xml 'project.dependencies.dependency.map(artifactId)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.map(groupId)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.map(artifactId)'
 ```
 
 ## DependencyManagement vs Dependencies
@@ -81,8 +81,8 @@ Enterprise POMs use `dependencyManagement` to declare BOM-controlled versions se
 
 ```bash
 # Managed dependency versions (BOM section)
-dasel -f pom.xml -i xml 'project.dependencyManagement.dependencies.dependency.map(version)'
+cat pom.xml | dasel -i xml 'project.dependencyManagement.dependencies.dependency.map(version)'
 
 # Active dependency versions (may be empty if version comes from BOM)
-dasel -f pom.xml -i xml 'project.dependencies.dependency.map(version)'
+cat pom.xml | dasel -i xml 'project.dependencies.dependency.map(version)'
 ```

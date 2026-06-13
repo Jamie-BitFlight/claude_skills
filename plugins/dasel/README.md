@@ -119,10 +119,10 @@ Available options:
 
 ```bash
 # Read a value
-dasel -f config.yaml 'server.port'
+cat config.yaml | dasel -i yaml 'server.port'
 
 # Read from JSON
-dasel -f data.json -i json 'users.[0].name'
+cat data.json | dasel -i json 'users.[0].name'
 
 # Update a value (safe: writes to temp file then renames)
 dasel put -f config.yaml -o config.yaml -t string 'server.host' 'newhost'
@@ -134,13 +134,13 @@ cat config.yaml | dasel -i yaml -o json > config.json
 cat data.json | dasel -i json -o toml > data.toml
 
 # List all top-level keys
-dasel -f config.yaml 'all()'
+cat config.yaml | dasel -i yaml 'all()'
 
 # Count array elements
-dasel -f data.json 'len(items)'
+cat data.json | dasel -i json 'len(items)'
 
 # Filter array by condition
-dasel -f data.json 'items.filter(type = "admin").map(name)'
+cat data.json | dasel -i json 'items.filter(type = "admin").map(name)'
 ```
 
 ## Example
@@ -162,7 +162,7 @@ Claude: [reads config.yaml into context, writes Python to parse and rewrite YAML
 
 ```
 You: What database host is configured in config.yaml?
-Claude: [runs: dasel -f config.yaml 'database.host']
+Claude: [runs: cat config.yaml | dasel -i yaml 'database.host']
 Claude: The database host is "db.example.com".
 ```
 
@@ -174,7 +174,7 @@ Claude: Done. server.port is now 9090.
 
 ```
 You: How many beans are in chaosrouter_beans.xml?
-Claude: [dasel -f chaosrouter_beans.xml -i xml 'len(beans.bean)']
+Claude: [cat chaosrouter_beans.xml | dasel -i xml 'len(beans.bean)']
 Claude: chaosrouter_beans.xml contains 47 beans.
 ```
 

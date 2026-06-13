@@ -25,19 +25,19 @@ Activate this skill when:
 
 ```bash
 # WRONG — destroys input
-dasel -f config.yaml --root 'port = 9090' > config.yaml
+cat config.yaml | dasel -i yaml --root 'port = 9090' > config.yaml
 
 # CORRECT — write to temp, then rename
-dasel -f config.yaml --root 'port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root 'port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
 ```
 
 **Always verify before overwriting.** Preview the transformation output first, then redirect:
 
 ```bash
 # Preview
-dasel -f config.yaml --root 'server.port = 9090'
+cat config.yaml | dasel -i yaml --root 'server.port = 9090'
 # Apply
-dasel -f config.yaml --root 'server.port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root 'server.port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
 ```
 
 </constraints>
@@ -50,7 +50,7 @@ In dasel v3, `put` and `delete` subcommands do not exist. All modifications use 
 
 ```bash
 # Output full document with one field changed
-dasel -f config.yaml --root 'server.port = 9090'
+cat config.yaml | dasel -i yaml --root 'server.port = 9090'
 
 # Numeric, boolean, and string assignments
 echo '{"count": 1}' | dasel -i json --root 'count = 42'
@@ -61,18 +61,18 @@ echo '{"name": "old"}' | dasel -i json --root 'name = "new"'
 ### Set Nested Values
 
 ```bash
-dasel -f config.yaml --root 'database.connection.host = "db.example.com"'
-dasel -f config.yaml --root 'database.connection.port = 5432'
+cat config.yaml | dasel -i yaml --root 'database.connection.host = "db.example.com"'
+cat config.yaml | dasel -i yaml --root 'database.connection.port = 5432'
 ```
 
 ## In-Place Modification (Safe Pattern)
 
 ```bash
 # Single field update
-dasel -f config.yaml --root 'server.port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root 'server.port = 9090' > config_tmp.yaml && mv config_tmp.yaml config.yaml
 
 # Multiple fields — chain with semicolons
-dasel -f config.yaml --root 'server.port = 9090; server.host = "0.0.0.0"' > config_tmp.yaml && mv config_tmp.yaml config.yaml
+cat config.yaml | dasel -i yaml --root 'server.port = 9090; server.host = "0.0.0.0"' > config_tmp.yaml && mv config_tmp.yaml config.yaml
 ```
 
 ## Format Conversion
@@ -106,17 +106,17 @@ echo '[1,2,3]' | dasel -i json --root '[$this..., 4]'
 # Output: [1, 2, 3, 4]
 
 # Append object to array
-dasel -f data.json --root 'items = [$root.items..., {"name": "new", "value": 42}]'
+cat data.json | dasel -i json --root 'items = [$root.items..., {"name": "new", "value": 42}]'
 ```
 
 ### Batch Update with each
 
 ```bash
 # Multiply all prices by 1.1 (10% increase)
-dasel -f data.json --root 'items.each(price = price * 1.1)'
+cat data.json | dasel -i json --root 'items.each(price = price * 1.1)'
 
 # Set a flag on all elements
-dasel -f data.json --root 'users.each(active = true)'
+cat data.json | dasel -i json --root 'users.each(active = true)'
 
 # Increment all values
 echo '[1,2,3]' | dasel -i json --root 'each($this = $this + 1)'
@@ -126,7 +126,7 @@ echo '[1,2,3]' | dasel -i json --root 'each($this = $this + 1)'
 
 ```bash
 # Get only active users, then extract names
-dasel -f data.json 'users.filter(active == true).map(name)'
+cat data.json | dasel -i json 'users.filter(active == true).map(name)'
 ```
 
 ## Object Operations
@@ -135,10 +135,10 @@ dasel -f data.json 'users.filter(active == true).map(name)'
 
 ```bash
 # Add new key to existing object
-dasel -f base.json --root '{ $root..., "newKey": "value" }'
+cat base.json | dasel -i json --root '{ $root..., "newKey": "value" }'
 
 # Merge two objects
-dasel -f base.json --root '{ $root..., "extra": true, "version": 2 }'
+cat base.json | dasel -i json --root '{ $root..., "extra": true, "version": 2 }'
 ```
 
 ### Field Deletion via Reconstruction
@@ -162,17 +162,17 @@ Use variable assignment and semicolons for complex operations:
 
 ```bash
 # Store intermediate result in variable, then transform
-dasel -f data.json '$active = users.filter(active == true); $active.map(name)'
+cat data.json | dasel -i json '$active = users.filter(active == true); $active.map(name)'
 
 # Multiple variables
-dasel -f data.json '$a = items.filter(price > 100); $b = $a.map(name); $b'
+cat data.json | dasel -i json '$a = items.filter(price > 100); $b = $a.map(name); $b'
 ```
 
 ## Conditional Transformation
 
 ```bash
 # Set value based on condition
-dasel -f data.json --root 'if(count > 5) { status = "many" } else { status = "few" }'
+cat data.json | dasel -i json --root 'if(count > 5) { status = "many" } else { status = "few" }'
 ```
 
 ## Transformation Patterns

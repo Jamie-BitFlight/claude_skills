@@ -19,13 +19,13 @@ Dasel v3 selector patterns for Spring bean factory XML. Always pass `-i xml` exp
 
 ```bash
 # All bean IDs
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.filter(has("-id")).map("-id")'
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.filter(has("-id")).map("-id")'
 
 # All bean classes
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.filter(has("-class")).map("-class")'
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.filter(has("-class")).map("-class")'
 
 # Map -class across every bean (includes beans without -id)
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.map("-class")'
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.map("-class")'
 ```
 
 ## Class Pattern Matching
@@ -34,10 +34,10 @@ Filter beans by class name via regex on `-class`.
 
 ```bash
 # Beans whose class contains JmsTemplate
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.filter(-class ~ ".*JmsTemplate.*").map("-id")'
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.filter(-class ~ ".*JmsTemplate.*").map("-id")'
 
 # Count beans matching a class pattern
-dasel -f beans.xml -i xml 'len(beans.bean.filter(-class ~ ".*Jms.*"))'
+cat beans.xml | dasel -i xml 'len(beans.bean.filter(-class ~ ".*Jms.*"))'
 ```
 
 ## Dependency Wiring Analysis
@@ -48,7 +48,7 @@ Find beans referencing other beans via the `-ref` attribute on `property` child 
 
 ```bash
 # Beans that reference a specific bean ID via ref attribute
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.filter(property.filter(-ref == "targetBeanId").len($this) > 0).map("-id")'
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.filter(property.filter(-ref == "targetBeanId").len($this) > 0).map("-id")'
 ```
 
 ## JMS Destination Mapping
@@ -57,7 +57,7 @@ Find which beans consume which JMS destinations via `property` child elements.
 
 ```bash
 # Beans wired to a specific destination property
-dasel -f integrationpoint_beans.xml -i xml 'beans.bean.filter(property.filter(-name == "destination").len($this) > 0).map("-id")'
+cat integrationpoint_beans.xml | dasel -i xml 'beans.bean.filter(property.filter(-name == "destination").len($this) > 0).map("-id")'
 ```
 
 ## Property Injection Extraction
@@ -66,19 +66,19 @@ Extract externalized `${...}` placeholder values from bean definitions.
 
 ```bash
 # All property values using ${...} placeholders
-dasel -f storage_beans.xml -i xml 'beans.bean.property.filter(-value ~ ".*\\$\\{.*\\}.*").map("-value")'
+cat storage_beans.xml | dasel -i xml 'beans.bean.property.filter(-value ~ ".*\\$\\{.*\\}.*").map("-value")'
 ```
 
 ## Attribute and Text Content Access
 
 ```bash
 # <bean id="myBean" class="com.example.Foo">some text</bean>
-dasel -f beans.xml -i xml 'beans.bean[0].-id'       # myBean
-dasel -f beans.xml -i xml 'beans.bean[0].-class'    # com.example.Foo
-dasel -f beans.xml -i xml 'beans.bean[0].#text'     # some text
+cat beans.xml | dasel -i xml 'beans.bean[0].-id'       # myBean
+cat beans.xml | dasel -i xml 'beans.bean[0].-class'    # com.example.Foo
+cat beans.xml | dasel -i xml 'beans.bean[0].#text'     # some text
 
 # Discover all keys (attributes + child elements) on first bean
-dasel -f beans.xml -i xml 'beans.bean[0].keys($this)'
+cat beans.xml | dasel -i xml 'beans.bean[0].keys($this)'
 ```
 
 ## Namespace Handling
@@ -88,7 +88,7 @@ Friendly mode strips namespace prefixes from element names — works for most Sp
 When namespace prefixes cause selector failures (element not found despite existing), switch to structured mode:
 
 ```bash
-dasel -f spring-context.xml -i xml --read-flag xml-mode=structured 'beans.bean[0]'
+cat spring-context.xml | dasel -i xml --read-flag xml-mode=structured 'beans.bean[0]'
 ```
 
 ## Cross-File Analysis
@@ -97,7 +97,7 @@ Write intermediate results to `/tmp/` — never to the source tree.
 
 ```bash
 # Extract bean IDs from multiple files, compare
-dasel -f chaosrouter_beans.xml -i xml 'beans.bean.filter(has("-id")).map("-id")' > /tmp/chaosrouter_beans.txt
-dasel -f integrationpoint_beans.xml -i xml 'beans.bean.filter(has("-id")).map("-id")' > /tmp/integration_beans.txt
+cat chaosrouter_beans.xml | dasel -i xml 'beans.bean.filter(has("-id")).map("-id")' > /tmp/chaosrouter_beans.txt
+cat integrationpoint_beans.xml | dasel -i xml 'beans.bean.filter(has("-id")).map("-id")' > /tmp/integration_beans.txt
 diff /tmp/chaosrouter_beans.txt /tmp/integration_beans.txt
 ```

@@ -33,21 +33,21 @@ State the full plan before executing the first step.
 
 ```bash
 # Top-level keys
-dasel -f data.json 'keys($this)'
+cat data.json | dasel -i json 'keys($this)'
 
 # Enumerate all elements of a type
-dasel -f config.yaml 'root.items.map(name)'
+cat config.yaml | dasel -i yaml 'root.items.map(name)'
 
 # Count occurrences
-dasel -f file.xml -i xml 'len(..elementName)'
+cat file.xml | dasel -i xml 'len(..elementName)'
 ```
 
 ### Cross-File Comparison
 
 ```bash
 # Extract a field from two files, sort, diff
-dasel -f file1.json 'items.map(name)' | sort > /tmp/file1_names.txt
-dasel -f file2.json 'items.map(name)' | sort > /tmp/file2_names.txt
+cat file1.json | dasel -i json 'items.map(name)' | sort > /tmp/file1_names.txt
+cat file2.json | dasel -i json 'items.map(name)' | sort > /tmp/file2_names.txt
 diff /tmp/file1_names.txt /tmp/file2_names.txt > /tmp/comparison.txt
 cat /tmp/comparison.txt
 ```
@@ -58,7 +58,7 @@ cat /tmp/comparison.txt
 # Run the same query across all matching files
 for f in $(fdfind -e xml .); do
   echo "=== $f ===" >> /tmp/all_results.txt
-  dasel -f "$f" -i xml '<selector>' >> /tmp/all_results.txt 2>/dev/null
+  cat "$f" | dasel -i xml '<selector>' >> /tmp/all_results.txt 2>/dev/null
 done
 ```
 
@@ -66,23 +66,23 @@ done
 
 ```bash
 # Filter by field value
-dasel -f data.json 'items.filter(status == "active").map(name)'
+cat data.json | dasel -i json 'items.filter(status == "active").map(name)'
 
 # Filter by pattern
-dasel -f file.xml -i xml 'root.items.filter(-class ~ ".*Service.*").map("-id")'
+cat file.xml | dasel -i xml 'root.items.filter(-class ~ ".*Service.*").map("-id")'
 
 # Filter where child matches condition
-dasel -f file.xml -i xml 'root.items.filter(child.filter(-name == "key").len($this) > 0).map("-id")'
+cat file.xml | dasel -i xml 'root.items.filter(child.filter(-name == "key").len($this) > 0).map("-id")'
 ```
 
 ### Recursive Search
 
 ```bash
 # Find all elements of a type at any depth
-dasel -f file.xml -i xml '..elementName.map("-name")'
+cat file.xml | dasel -i xml '..elementName.map("-name")'
 
 # Find all nodes where a field exists
-dasel -f file.xml -i xml 'search(has("-platform")).map("-platform")'
+cat file.xml | dasel -i xml 'search(has("-platform")).map("-platform")'
 ```
 
 ## Cross-File Analysis Protocol
@@ -96,8 +96,8 @@ When analysis spans multiple files:
 
 ```bash
 # Pattern for reproducible cross-file analysis
-dasel -f file1.xml -i xml '<selector>' > /tmp/file1_result.txt
-dasel -f file2.xml -i xml '<selector>' > /tmp/file2_result.txt
+cat file1.xml | dasel -i xml '<selector>' > /tmp/file1_result.txt
+cat file2.xml | dasel -i xml '<selector>' > /tmp/file2_result.txt
 diff /tmp/file1_result.txt /tmp/file2_result.txt > /tmp/comparison.txt
 cat /tmp/comparison.txt
 ```
