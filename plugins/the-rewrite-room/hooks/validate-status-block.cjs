@@ -86,19 +86,19 @@ function validateStatusBlock(text) {
 
   // SUMMARY: non-empty
   const summaryMatch = text.match(/^\s*SUMMARY:\s*(.+)/m);
-  if (!summaryMatch || !summaryMatch[1].trim()) {
+  if (!summaryMatch?.[1].trim()) {
     missingFields.push('SUMMARY');
   }
 
   // ARTIFACTS: non-empty (value may be "none" — that is acceptable)
   const artifactsMatch = text.match(/^\s*ARTIFACTS:\s*(.+)/m);
-  if (!artifactsMatch || !artifactsMatch[1].trim()) {
+  if (!artifactsMatch?.[1].trim()) {
     missingFields.push('ARTIFACTS');
   }
 
   // VALIDATION: non-empty
   const validationMatch = text.match(/^\s*VALIDATION:\s*(.+)/m);
-  if (!validationMatch || !validationMatch[1].trim()) {
+  if (!validationMatch?.[1].trim()) {
     missingFields.push('VALIDATION');
   }
 
