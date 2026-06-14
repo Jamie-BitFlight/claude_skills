@@ -49,7 +49,7 @@ function extractLastAssistantText(transcriptPath) {
     if (record.type !== 'assistant') continue;
 
     const message = record.message;
-    if (!message || message.role !== 'assistant') continue;
+    if (message?.role !== 'assistant') continue;
 
     const content = Array.isArray(message.content) ? message.content : [];
     const textParts = content
