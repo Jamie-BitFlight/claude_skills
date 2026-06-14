@@ -119,7 +119,7 @@ function readStdin() {
 
 function main() {
   const raw = readStdin();
-  if (!raw || !raw.trim()) {
+  if (!raw?.trim()) {
     // No input — nothing to validate
     process.exit(0);
   }
