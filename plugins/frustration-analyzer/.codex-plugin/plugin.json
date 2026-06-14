@@ -6,13 +6,6 @@
     "name": "Jamie-BitFlight"
   },
   "license": "MIT",
-  "keywords": [
-    "transcripts",
-    "frustration",
-    "rage-receipt",
-    "duckdb",
-    "session-analysis",
-    "png"
-  ],
+  "keywords": ["transcripts", "frustration", "rage-receipt", "duckdb", "session-analysis", "png"],
   "skills": "./skills/"
 }
