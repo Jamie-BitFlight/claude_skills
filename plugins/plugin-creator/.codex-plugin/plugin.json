@@ -17,5 +17,18 @@
     "refactoring",
     "frontmatter"
   ],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Plugin Creator",
+    "shortDescription": "Complete plugin development toolkit for creating, refactoring, and validating Claude Code plugins and agents. Use when creating new plugins/skills/agents, refactoring existing plugins/skills, validating frontmatter, or restructuring plugin components. Includes specialized agents for assessment, planning, execution, and validation workflows.",
+    "longDescription": "Complete plugin development toolkit for creating, refactoring, and validating Claude Code plugins and agents. Use when creating new plugins/skills/agents, refactoring existing plugins/skills, validating frontmatter, or restructuring plugin components. Includes specialized agents for assessment, planning, execution, and validation workflows.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
 }

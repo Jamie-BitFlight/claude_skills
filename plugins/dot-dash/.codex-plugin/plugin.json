@@ -5,5 +5,17 @@
   "author": {
     "name": "Jamie-BitFlight"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dot Dash",
+    "shortDescription": "Live multi-session dashboard for Claude Code — real-time visibility and control over every Claude Code session from a browser",
+    "longDescription": "Live multi-session dashboard for Claude Code — real-time visibility and control over every Claude Code session from a browser",
+    "developerName": "Jamie-BitFlight",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
 }

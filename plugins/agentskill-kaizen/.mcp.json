@@ -1,12 +1,19 @@
 {
-  "mcpServers": {
-    "kaizen-duckdb": {
-      "command": "uvx",
-      "args": ["mcp-server-motherduck", "--db-path", ":memory:", "--read-write"]
-    },
-    "kaizen-analysis": {
-      "command": "uv",
-      "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"]
-    }
+  "kaizen-duckdb": {
+    "command": "uvx",
+    "args": [
+      "mcp-server-motherduck",
+      "--db-path",
+      ":memory:",
+      "--read-write"
+    ]
+  },
+  "kaizen-analysis": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--script",
+      "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"
+    ]
   }
 }

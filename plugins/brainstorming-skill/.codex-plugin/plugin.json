@@ -6,5 +6,16 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Brainstorming Skill",
+    "shortDescription": "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches to problems. Use when users request help with ideation, content planning, product features, marketing campaigns, strategic planning, creative writing, or any task requiring structured idea generation. The skill provides 30+ research-validated prompt patterns across 14 categories with exact templates, success metrics, and domain-specific applications.",
+    "longDescription": "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches to problems. Use when users request help with ideation, content planning, product features, marketing campaigns, strategic planning, creative writing, or any task requiring structured idea generation. The skill provides 30+ research-validated prompt patterns across 14 categories with exact templates, success metrics, and domain-specific applications.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  }
 }

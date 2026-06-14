@@ -1,0 +1,9 @@
+{
+  "sequential_thinking": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-sequential-thinking@latest"
+    ]
+  }
+}

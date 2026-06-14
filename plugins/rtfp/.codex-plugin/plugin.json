@@ -8,6 +8,22 @@
   },
   "repository": "https://github.com/Jamie-BitFlight/claude_skills",
   "license": "MIT",
-  "keywords": ["session-analysis", "emotional-reaction", "instruction-following", "png-artifact"],
-  "skills": "./skills/"
+  "keywords": [
+    "session-analysis",
+    "emotional-reaction",
+    "instruction-following",
+    "png-artifact"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Rtfp",
+    "shortDescription": "Read The Fucking Prompt — mines Claude Code session transcripts to surface the strongest user reactions to assistant instruction-following failures and renders the exchange as a terminal-style PNG",
+    "longDescription": "Read The Fucking Prompt — mines Claude Code session transcripts to surface the strongest user reactions to assistant instruction-following failures and renders the exchange as a terminal-style PNG",
+    "developerName": "Jamie-BitFlight",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  }
 }

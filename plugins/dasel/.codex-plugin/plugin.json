@@ -19,5 +19,17 @@
     "format-conversion",
     "structured-data"
   ],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dasel",
+    "shortDescription": "Query, transform, and convert structured data files (JSON, YAML, TOML, XML, CSV, HCL, INI) using dasel v3. Provides reference syntax, exploration workflows, transformation patterns, and cross-platform installation.",
+    "longDescription": "Query, transform, and convert structured data files (JSON, YAML, TOML, XML, CSV, HCL, INI) using dasel v3. Provides reference syntax, exploration workflows, transformation patterns, and cross-platform installation.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
 }

@@ -6,5 +6,16 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Perl Development",
+    "shortDescription": "Comprehensive Perl 5.30+ development plugin with modular skills for scripting, CPAN ecosystem, environment setup, testing, linting, and validation. Includes specialized agents for script development, code auditing, and CLI architecture.",
+    "longDescription": "Comprehensive Perl 5.30+ development plugin with modular skills for scripting, CPAN ecosystem, environment setup, testing, linting, and validation. Includes specialized agents for script development, code auditing, and CLI architecture.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  }
 }

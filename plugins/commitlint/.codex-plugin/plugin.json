@@ -6,5 +6,16 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Commitlint",
+    "shortDescription": "When setting up commit message validation for a project. When project has commitlint.config.js or .commitlintrc files. When configuring CI/CD to enforce commit format. When extracting commit rules for LLM prompt generation. When debugging commit message rejection errors.",
+    "longDescription": "When setting up commit message validation for a project. When project has commitlint.config.js or .commitlintrc files. When configuring CI/CD to enforce commit format. When extracting commit rules for LLM prompt generation. When debugging commit message rejection errors.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  }
 }

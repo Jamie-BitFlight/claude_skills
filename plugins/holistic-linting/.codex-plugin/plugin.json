@@ -16,5 +16,17 @@
     "formatting",
     "type-checking"
   ],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Holistic Linting",
+    "shortDescription": "This skill should be used when the model needs to ensure code quality through comprehensive linting and formatting. It provides automatic linting workflows for orchestrators (format → lint → resolve via concurrent agents) and sub-agents (lint touched files before task completion). Prevents claiming \"production ready\" code without verification. Includes linting rules knowledge base for ruff, mypy, and bandit, plus the linting-root-cause-resolver agent for systematic issue resolution.",
+    "longDescription": "This skill should be used when the model needs to ensure code quality through comprehensive linting and formatting. It provides automatic linting workflows for orchestrators (format → lint → resolve via concurrent agents) and sub-agents (lint touched files before task completion). Prevents claiming \"production ready\" code without verification. Includes linting rules knowledge base for ruff, mypy, and bandit, plus the linting-root-cause-resolver agent for systematic issue resolution.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
 }

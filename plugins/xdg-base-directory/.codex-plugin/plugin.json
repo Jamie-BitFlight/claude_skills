@@ -6,5 +6,16 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Xdg Base Directory",
+    "shortDescription": "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live. When code writes to ~/.appname or hardcoded home paths. When implementing cross-platform file storage with platformdirs.",
+    "longDescription": "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live. When code writes to ~/.appname or hardcoded home paths. When implementing cross-platform file storage with platformdirs.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ]
+  }
 }
