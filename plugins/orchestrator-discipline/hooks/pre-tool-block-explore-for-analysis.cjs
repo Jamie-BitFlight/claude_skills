@@ -124,7 +124,7 @@ function readStdin() {
 
 function main() {
   const raw = readStdin();
-  if (!raw || !raw.trim()) {
+  if (!raw?.trim()) {
     process.exit(0);
   }
 
