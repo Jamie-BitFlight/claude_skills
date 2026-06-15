@@ -17,6 +17,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Python 3.11+ development workflows including CLI apps with Typer/Rich, script writing, test development, code review, linting"
     ]
   },
   "mcpServers": "./.mcp.json"

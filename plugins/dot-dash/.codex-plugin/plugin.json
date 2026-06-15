@@ -16,6 +16,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Live multi-session dashboard for Claude Code — real-time visibility and control over every Claude Code session from a browser"
     ]
   }
 }

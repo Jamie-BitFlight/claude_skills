@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "This skill should be used when the model's ROLE_TYPE is orchestrator and needs to delegate tasks to specialist sub-agents."
     ]
   }
 }

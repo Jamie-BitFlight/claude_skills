@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches"
     ]
   }
 }

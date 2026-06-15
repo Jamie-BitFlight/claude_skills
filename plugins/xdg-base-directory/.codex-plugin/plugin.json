@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live."
     ]
   }
 }

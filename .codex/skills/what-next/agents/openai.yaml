@@ -1,0 +1,4 @@
+interface:
+  display_name: "What Next"
+  short_description: "Choose the next move with evidence"
+  default_prompt: "Use $what-next to decide the next action for this goal."

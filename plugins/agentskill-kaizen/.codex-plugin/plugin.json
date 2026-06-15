@@ -26,6 +26,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling"
     ]
   },
   "mcpServers": "./.mcp.json"

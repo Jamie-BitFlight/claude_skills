@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "Enforce mandatory pre-action verification checkpoints to prevent pattern-matching from overriding explicit reasoning. Use this"
     ]
   }
 }

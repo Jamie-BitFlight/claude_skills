@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "Comprehensive Bash 5.1+ and POSIX shell development plugin with modular skills for scripting, portability, testing, linting,"
     ]
   }
 }

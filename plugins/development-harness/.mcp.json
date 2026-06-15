@@ -1,25 +1,29 @@
 {
-  "backlog": {
-    "command": "uv",
-    "args": [
-      "run",
-      "--script",
-      "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py"
-    ]
-  },
-  "sam": {
-    "command": "uv",
-    "args": [
-      "run",
-      "--script",
-      "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"
-    ]
-  },
-  "sequential_thinking": {
-    "command": "npx",
-    "args": [
-      "-y",
-      "@modelcontextprotocol/server-sequential-thinking@latest"
-    ]
+  "mcpServers": {
+    "backlog": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "scripts/run_backlog_server.py"
+      ],
+      "cwd": "."
+    },
+    "sam": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "scripts/run_sam_server.py"
+      ],
+      "cwd": "."
+    },
+    "sequential_thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking@latest"
+      ]
+    }
   }
 }

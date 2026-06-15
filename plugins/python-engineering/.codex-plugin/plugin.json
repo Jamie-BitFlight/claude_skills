@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell"
     ]
   }
 }

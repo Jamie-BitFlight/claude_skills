@@ -27,6 +27,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "This skill should be used when the model needs to ensure code quality through comprehensive linting and formatting. It provides"
     ]
   }
 }

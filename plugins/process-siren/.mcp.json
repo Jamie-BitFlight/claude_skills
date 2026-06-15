@@ -1,9 +1,11 @@
 {
-  "mcp-mermaid": {
-    "command": "npx",
-    "args": [
-      "-y",
-      "mcp-mermaid@latest"
-    ]
+  "mcpServers": {
+    "mcp-mermaid": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-mermaid@latest"
+      ]
+    }
   }
 }

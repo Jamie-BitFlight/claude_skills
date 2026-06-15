@@ -1,10 +1,13 @@
 {
-  "experiment-registry": {
-    "command": "uv",
-    "args": [
-      "run",
-      "--script",
-      "${CLAUDE_PLUGIN_ROOT}/mcp/experiment-registry/server.py"
-    ]
+  "mcpServers": {
+    "experiment-registry": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "mcp/experiment-registry/server.py"
+      ],
+      "cwd": "."
+    }
   }
 }

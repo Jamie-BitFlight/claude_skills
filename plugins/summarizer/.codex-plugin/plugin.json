@@ -25,6 +25,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Faithful information summarization with fidelity preservation, structured output, and anti-hallucination methodology. Provides"
     ]
   }
 }

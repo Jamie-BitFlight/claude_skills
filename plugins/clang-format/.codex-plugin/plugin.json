@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "The model must invoke this skill when any trigger occurs - (1) user mentions \"clang-format\" or \".clang-format\", (2) user"
     ]
   }
 }

@@ -24,6 +24,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "Read The Fucking Prompt — mines Claude Code session transcripts to surface the strongest user reactions to assistant"
     ]
   }
 }

@@ -3,7 +3,6 @@ name: rtfp
 description: Read The Fucking Prompt — finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs what the assistant did wrong, and renders a shareable terminal-style PNG. Use when asked to find rage moments, generate a rage receipt, or capture a frustration incident from a session.
 argument-hint: '[session-path]'
 allowed-tools: mcp__frustration-analyzer__list_sessions, mcp__frustration-analyzer__extract_user_messages, mcp__frustration-analyzer__get_context_window, mcp__frustration-analyzer__get_scenario, mcp__frustration-analyzer__render_rage_receipt, Read, Write, Glob
-disable-model-invocation: true
 ---
 
 # RTFP — Read The Fucking Prompt

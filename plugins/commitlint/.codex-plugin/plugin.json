@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "When setting up commit message validation for a project. When project has commitlint.config.js or .commitlintrc files. When"
     ]
   }
 }

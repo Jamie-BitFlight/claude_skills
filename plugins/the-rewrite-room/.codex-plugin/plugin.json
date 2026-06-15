@@ -28,6 +28,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Documentation and authoring workflow router: audit docs vs code drift, sync docs after changes, optimize prompts and SKILL.md"
     ]
   }
 }

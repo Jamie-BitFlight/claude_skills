@@ -1,10 +1,13 @@
 {
-  "frustration-analyzer": {
-    "command": "uv",
-    "args": [
-      "run",
-      "--script",
-      "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"
-    ]
+  "mcpServers": {
+    "frustration-analyzer": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--script",
+        "mcp/server.py"
+      ],
+      "cwd": "."
+    }
   }
 }

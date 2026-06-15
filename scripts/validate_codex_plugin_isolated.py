@@ -36,8 +36,11 @@ class ValidationWorkspace:
     """Paths for a single isolated marketplace validation run."""
 
     root: Path
+    mode: str
+    marketplace_name: str
+    marketplace_source: Path
     marketplace_path: Path
-    copied_plugin_dir: Path
+    plugin_dir: Path
     project_dir: Path
     codex_home: Path
 
@@ -85,9 +88,22 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--distribution-mode",
+        choices=("repo", "copy"),
+        default="repo",
+        help=(
+            "Validation source: 'repo' uses the repository marketplace root as the Codex "
+            "install source; 'copy' copies exactly one plugin into a temp marketplace tree. "
+            "Default: repo."
+        ),
+    )
+    parser.add_argument(
         "--zip-unzip",
         action="store_true",
-        help="Zip and re-extract the copied plugin before installation to simulate distribution.",
+        help=(
+            "Zip and re-extract the copied plugin before installation to simulate distribution. "
+            "Valid only with --distribution-mode copy."
+        ),
     )
     parser.add_argument(
         "--run",
@@ -95,9 +111,20 @@ def create_parser() -> argparse.ArgumentParser:
         help="Execute the Codex marketplace/install/exec smoke flow instead of printing commands.",
     )
     parser.add_argument(
+        "--copy-auth-from-current-home",
+        action="store_true",
+        help=(
+            "Copy auth.json from the current Codex home into the temp CODEX_HOME before "
+            "running. This is opt-in because auth.json contains credentials."
+        ),
+    )
+    parser.add_argument(
         "--keep-tempdir",
         action="store_true",
-        help="Preserve the generated temp workspace after a run.",
+        help=(
+            "Preserve the generated temp workspace after a run. Avoid combining this with "
+            "--copy-auth-from-current-home unless you intend to keep a temp copy of auth.json."
+        ),
     )
     return parser
 
@@ -152,8 +179,47 @@ def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
 
     return ValidationWorkspace(
         root=root,
+        mode="copy",
+        marketplace_name=MARKETPLACE_NAME,
+        marketplace_source=root,
         marketplace_path=marketplace_path,
-        copied_plugin_dir=copied_plugin_dir,
+        plugin_dir=copied_plugin_dir,
+        project_dir=project_dir,
+        codex_home=codex_home,
+    )
+
+
+def load_repo_marketplace_name() -> str:
+    """Read the repository marketplace name from .agents/plugins/marketplace.json."""
+
+    marketplace_path = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+    if not marketplace_path.is_file():
+        raise HarnessError(f"Repository marketplace file is missing: {marketplace_path}")
+    marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+    name = marketplace.get("name")
+    if not isinstance(name, str) or not name:
+        raise HarnessError(f"Repository marketplace name is missing in {marketplace_path}")
+    return name
+
+
+def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
+    """Create an isolated temp Codex home that installs from the repository marketplace root."""
+
+    root = Path(tempfile.mkdtemp(prefix=f"codex-plugin-{plugin_name}-"))
+    project_dir = root / "project"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    codex_home = root / "codex-home"
+    codex_home.mkdir(parents=True, exist_ok=True)
+    plugin_dir = resolve_plugin_dir(plugin_name)
+    marketplace_path = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+
+    return ValidationWorkspace(
+        root=root,
+        mode="repo",
+        marketplace_name=load_repo_marketplace_name(),
+        marketplace_source=REPO_ROOT,
+        marketplace_path=marketplace_path,
+        plugin_dir=plugin_dir,
         project_dir=project_dir,
         codex_home=codex_home,
     )
@@ -188,7 +254,7 @@ def write_marketplace_json(marketplace_path: Path, plugin_name: str) -> None:
 def maybe_zip_unzip_plugin(workspace: ValidationWorkspace, plugin_name: str) -> Path:
     """Round-trip the copied plugin through zip/unzip inside the temp tree."""
 
-    plugin_dir = workspace.copied_plugin_dir
+    plugin_dir = workspace.plugin_dir
     archive_path = workspace.root / f"{plugin_name}.zip"
 
     with zipfile.ZipFile(archive_path, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -200,7 +266,7 @@ def maybe_zip_unzip_plugin(workspace: ValidationWorkspace, plugin_name: str) -> 
 
     shutil.rmtree(plugin_dir)
     with zipfile.ZipFile(archive_path) as archive:
-        archive.extractall(workspace.copied_plugin_dir.parent)
+        archive.extractall(workspace.plugin_dir.parent)
 
     return archive_path
 
@@ -209,6 +275,28 @@ def default_output_file(plugin_name: str) -> Path:
     """Choose a stable output file path outside the temp workspace."""
 
     return Path.cwd() / f"{plugin_name}.codex-smoke.txt"
+
+
+def current_codex_home() -> Path:
+    """Return the active Codex home outside the temp validation workspace."""
+
+    return Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+
+
+def copy_auth_from_current_home(workspace: ValidationWorkspace) -> Path:
+    """Copy file-backed Codex auth into the temp CODEX_HOME when explicitly requested."""
+
+    source_auth = current_codex_home() / "auth.json"
+    if not source_auth.is_file():
+        raise HarnessError(
+            f"Cannot copy auth: {source_auth} does not exist. "
+            "Use CODEX_ACCESS_TOKEN in the environment or log in with Codex first."
+        )
+
+    destination_auth = workspace.codex_home / "auth.json"
+    shutil.copy2(source_auth, destination_auth)
+    destination_auth.chmod(0o600)
+    return destination_auth
 
 
 def build_command_strings(
@@ -226,10 +314,10 @@ def build_command_strings(
         env_parts.append(f"PATH={shlex.quote(expanded_prefix)}:$PATH")
     env_prefix = " ".join(env_parts)
     marketplace_cmd = (
-        f"{env_prefix} codex plugin marketplace add {shlex.quote(str(workspace.marketplace_path))}"
+        f"{env_prefix} codex plugin marketplace add {shlex.quote(str(workspace.marketplace_source))}"
     )
     install_cmd = (
-        f"{env_prefix} codex plugin add {shlex.quote(f'{plugin_name}@{MARKETPLACE_NAME}')}"
+        f"{env_prefix} codex plugin add {shlex.quote(f'{plugin_name}@{workspace.marketplace_name}')}"
     )
     exec_cmd = (
         f"{env_prefix} codex exec --skip-git-repo-check -o {shlex.quote(str(output_file))} "
@@ -289,14 +377,18 @@ def print_plan(
     """Print the dry-run plan and commands."""
 
     print("Isolated Codex plugin validation plan")
+    print(f"  distribution:   {workspace.mode}")
     print(f"  temp workspace: {workspace.root}")
-    print(f"  plugin source:  {workspace.copied_plugin_dir}")
+    print(f"  plugin source:  {workspace.plugin_dir}")
     print(f"  marketplace:    {workspace.marketplace_path}")
+    print(f"  source root:    {workspace.marketplace_source}")
+    print(f"  marketplace id: {workspace.marketplace_name}")
     print(f"  codex home:     {workspace.codex_home}")
     print(f"  project dir:    {workspace.project_dir}")
     print(f"  output file:    {output_file}")
     if zip_archive is not None:
         print(f"  zip archive:    {zip_archive}")
+    print("  auth:           not copied in dry-run output")
     print()
     print("Commands to run:")
     for command in build_command_strings(workspace, plugin_name, prompt, output_file, path_prefix):
@@ -318,7 +410,14 @@ def main() -> int:
     workspace: ValidationWorkspace | None = None
 
     try:
-        workspace = create_temp_workspace(args.plugin)
+        if args.zip_unzip and args.distribution_mode != "copy":
+            raise HarnessError("--zip-unzip requires --distribution-mode copy")
+
+        workspace = (
+            create_repo_workspace(args.plugin)
+            if args.distribution_mode == "repo"
+            else create_temp_workspace(args.plugin)
+        )
         zip_archive = maybe_zip_unzip_plugin(workspace, args.plugin) if args.zip_unzip else None
         output_file = args.output_file or default_output_file(args.plugin)
 
@@ -332,10 +431,17 @@ def main() -> int:
                 zip_archive,
             )
             print()
-            print(
-                "Dry run only: temp workspace preserved so the printed commands remain usable."
-            )
+            print("Dry run only: temp workspace preserved so the printed commands remain usable.")
+            if args.copy_auth_from_current_home:
+                print(
+                    "Note: --copy-auth-from-current-home is only applied with --run; "
+                    "no auth file was copied during this dry run."
+                )
             return 0
+
+        if args.copy_auth_from_current_home:
+            copied_auth = copy_auth_from_current_home(workspace)
+            print(f"Copied Codex auth into temp home: {copied_auth}")
 
         env = build_env(args.path_prefix, workspace.codex_home)
         print(f"Workspace: {workspace.root}")
@@ -348,7 +454,7 @@ def main() -> int:
                 "plugin",
                 "marketplace",
                 "add",
-                str(workspace.marketplace_path),
+                str(workspace.marketplace_source),
             ],
             cwd=workspace.project_dir,
             env=env,
@@ -359,7 +465,7 @@ def main() -> int:
                 "codex",
                 "plugin",
                 "add",
-                f"{args.plugin}@{MARKETPLACE_NAME}",
+                f"{args.plugin}@{workspace.marketplace_name}",
             ],
             cwd=workspace.project_dir,
             env=env,

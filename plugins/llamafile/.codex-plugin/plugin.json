@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "When setting up local LLM inference without cloud APIs. When running GGUF models locally. When needing OpenAI-compatible API"
     ]
   }
 }

@@ -1,7 +1,6 @@
 ---
 name: review
 description: Reviews Python code across type safety, error handling, security, performance, modern patterns, design clarity, typed-boundary compliance, test quality, and documentation. Use when performing code review, PR review, pre-merge quality checks, or assessing Python for security vulnerabilities, bare except clauses, Any usage outside boundaries, or missing input validation at system boundaries.
-disable-model-invocation: true
 argument-hint: '[path or scope]'
 ---
 

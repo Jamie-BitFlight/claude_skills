@@ -17,7 +17,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Enforces orchestrator context window discipline via PreToolUse hooks and rules. Prevents the orchestrator from reading source"
     ]
-  },
-  "hooks": "./hooks.json"
+  }
 }

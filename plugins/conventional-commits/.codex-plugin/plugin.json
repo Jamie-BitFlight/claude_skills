@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "When writing a git commit message. When task completes and changes need committing. When project uses semantic-release,"
     ]
   }
 }

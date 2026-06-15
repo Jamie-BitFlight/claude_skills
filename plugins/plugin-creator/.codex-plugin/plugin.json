@@ -28,6 +28,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Complete plugin development toolkit for creating, refactoring, and validating Claude Code plugins and agents. Use when creating"
     ]
   },
   "mcpServers": "./.mcp.json"

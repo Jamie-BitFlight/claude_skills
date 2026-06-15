@@ -481,19 +481,11 @@ rules: {
 
 ## Pre-commit Integration
 
-For pre-commit hook integration with commitlint, activate the pre-commit skill:
-
-```text
-Skill(skill: "python3-development:pre-commit")
-```
+For pre-commit hook integration with commitlint, configure your hook manager directly. If your workspace includes an installed pre-commit plugin, you can use that for hook setup guidance.
 
 ## Conventional Commits Reference
 
-For Conventional Commits format specification and examples, activate the conventional-commits skill:
-
-```text
-Skill(skill: "conventional-commits:conventional-commits")
-```
+For Conventional Commits format specification and examples, use the reference in this document. If your workspace includes an installed Conventional Commits plugin, you can defer to it for additional examples and messaging patterns.
 
 ## References
 

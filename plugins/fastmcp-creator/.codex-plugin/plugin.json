@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "Build FastMCP 3.x Python MCP servers — covers provider/transform architecture (including CodeMode, Tool Search, and server-level"
     ]
   }
 }

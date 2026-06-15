@@ -24,6 +24,9 @@
       "Interactive",
       "Read",
       "Write"
+    ],
+    "defaultPrompt": [
+      "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes"
     ]
   },
   "mcpServers": "./.mcp.json"

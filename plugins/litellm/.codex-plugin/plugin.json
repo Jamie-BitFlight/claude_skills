@@ -16,6 +16,9 @@
     "capabilities": [
       "Interactive",
       "Read"
+    ],
+    "defaultPrompt": [
+      "When calling LLM APIs from Python code. When connecting to llamafile or local LLM servers. When switching between"
     ]
   }
 }
