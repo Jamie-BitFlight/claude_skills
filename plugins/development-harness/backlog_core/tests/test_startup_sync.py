@@ -1008,7 +1008,8 @@ class TestClassifyGithubExceptionNonIntStatus:
         """GithubException with None status -> SyncErrorKind.UNKNOWN (not TypeError)."""
         from github import GithubException
 
-        exc = GithubException(status=None, data="weird response", headers={})  # type: ignore[arg-type]
+        exc = GithubException(status=200, data="weird response", headers={})
+        vars(exc)["_GithubException__status"] = None
         result = classify_sync_error(exc)
 
         assert result == SyncErrorKind.UNKNOWN, (
@@ -1019,7 +1020,8 @@ class TestClassifyGithubExceptionNonIntStatus:
         """GithubException with string status -> SyncErrorKind.UNKNOWN (not TypeError)."""
         from github import GithubException
 
-        exc = GithubException(status="422", data="unprocessable", headers={})  # type: ignore[arg-type]
+        exc = GithubException(status=200, data="unprocessable", headers={})
+        vars(exc)["_GithubException__status"] = "422"
         result = classify_sync_error(exc)
 
         assert result == SyncErrorKind.UNKNOWN, (
