@@ -1,22 +1,21 @@
-"""Regression tests for numeric-string item_id coercion in artifact_provider.
+"""Regression tests for item_id type contract in artifact_provider.
 
-Bug: ``artifact_read`` and ``artifact_list`` fail with
+Background: ``artifact_read`` and ``artifact_list`` raised
 ``GitHubGistArtifactProvider requires an integer item ID, got '2459'``
-when a numeric string is passed instead of an integer.
+when a numeric string was passed instead of an integer.
 
-The MCP tool schema declares ``item_id: Union[str, int]`` to handle both
-GitHub integer IDs and beads nanoid strings (e.g. ``'bd-a3f8'``).  But
-``_require_int_item_id`` currently raises on ANY string — including strings
-that are valid integer representations like ``'2459'``.
+Fix approach (implemented): The MCP tool schema uses ``item_id: int | str``
+(integer-first union) so Pydantic coerces numeric inputs to ``int`` at the
+MCP boundary before they reach ``_require_int_item_id``.  The previous
+``isdigit()`` coercion branch in ``_require_int_item_id`` was removed — any
+string that arrives at the guard is a provider-routing error.
 
-The expected post-fix behaviour:
-- A numeric-only string such as ``'2459'`` is coerced to ``int(2459)`` and
-  returned without raising.
-- A non-numeric beads string such as ``'bd-a3f8'`` still raises ``TypeError``
-  because it cannot route to a GitHub/GitLab provider.
-- A plain integer ``2459`` is returned unchanged.
-
-These tests are RED (failing) before the fix is applied.
+Post-fix contract:
+- A plain integer ``2459`` passes through unchanged.
+- A numeric string ``'2459'`` raises ``TypeError`` — Pydantic delivers int at
+  the MCP boundary, so a string here means the caller bypassed the boundary.
+- A beads nanoid string ``'bd-a3f8'`` raises ``TypeError`` — must route via
+  ``BeadsArtifactProvider``, not GitHub/GitLab providers.
 """
 
 from __future__ import annotations
@@ -27,24 +26,21 @@ from backlog_core.artifact_provider import _require_int_item_id
 
 
 class TestRequireIntItemIdCoercion:
-    """_require_int_item_id coerces numeric strings and rejects beads strings."""
+    """_require_int_item_id rejects all strings; ints pass through unchanged."""
 
-    def test_numeric_string_is_coerced_to_int(self) -> None:
-        """A numeric string like '2459' must be coerced to int(2459), not raise.
+    def test_numeric_string_raises_type_error(self) -> None:
+        """A numeric string like '2459' must raise TypeError, not coerce.
 
-        This is the root-cause reproduction of the reported bug.  Agents pass
-        item_id as a string when the MCP tool schema allows str|int; the helper
-        must accept numeric strings instead of raising TypeError.
+        The MCP boundary (int | str annotation) coerces numeric inputs to int
+        before reaching this guard.  A string here means the caller bypassed
+        the MCP boundary — that is a routing error and must raise immediately.
         """
         # Arrange
         item_id_string = "2459"
 
-        # Act
-        result = _require_int_item_id("GitHubGistArtifactProvider", item_id_string)
-
-        # Assert
-        assert result == 2459
-        assert isinstance(result, int)
+        # Act / Assert
+        with pytest.raises(TypeError, match="requires an integer item ID"):
+            _require_int_item_id("GitHubGistArtifactProvider", item_id_string)
 
     def test_beads_string_still_raises_type_error(self) -> None:
         """A beads nanoid string like 'bd-a3f8' must still raise TypeError.
@@ -83,11 +79,11 @@ class TestRequireIntItemIdCoercion:
             _require_int_item_id("GitLabArtifactProvider", "bd-a3f8")
 
     def test_zero_string_raises_type_error(self) -> None:
-        """item_id='0' must raise TypeError because GitHub issue IDs start at 1.
+        """item_id='0' must raise TypeError — all strings are rejected.
 
-        '0'.isdigit() returns True, so int('0') = 0 would silently pass the
-        isdigit() guard without this check. Zero is not a valid GitHub issue ID
-        and is likely an unsubstituted template placeholder.
+        With the isdigit() coercion removed, '0' raises the same way as any
+        other string.  Business-level zero validation (GitHub IDs start at 1)
+        is the caller's responsibility; the guard only enforces the type contract.
         """
         # Arrange / Act / Assert
         with pytest.raises(TypeError, match="requires an integer item ID"):

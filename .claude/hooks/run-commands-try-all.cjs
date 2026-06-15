@@ -29,7 +29,7 @@ function getCommands() {
   }
   try {
     const stdin = fs.readFileSync(0, 'utf8');
-    if (!stdin || !stdin.trim()) return [];
+    if (!stdin?.trim()) return [];
     const data = JSON.parse(stdin);
     const cmds = data.commands ?? data.command ?? [];
     return Array.isArray(cmds) ? cmds : [String(cmds)];

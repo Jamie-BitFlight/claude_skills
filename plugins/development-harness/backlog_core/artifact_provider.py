@@ -143,11 +143,17 @@ def _make_github_client() -> Github:
 def _require_int_item_id(cls_name: str, item_id: ItemId) -> int:
     """Raise ``TypeError`` when *item_id* is a string.
 
-    GitHub and GitLab providers require a positive integer item ID.  String
+    GitHub and GitLab providers require an integer item ID.  String
     identifiers (beads nanoid ``"bd-a3f8"``) are only valid for
     ``BeadsArtifactProvider``.  Linear UUID strings must NOT pass through
     this helper — ``LinearArtifactProvider`` accepts strings natively and
     does not call this function.
+
+    The MCP tool boundary uses ``int | str`` (integer-first) annotations so
+    Pydantic delivers ``int`` for numeric inputs at the boundary.  String
+    coercion via ``isdigit()`` was removed — any string that reaches this
+    guard is a provider-routing error and must raise immediately rather than
+    silently coerce.
 
     Args:
         cls_name: Name of the calling provider class, used in the error message.
@@ -160,15 +166,6 @@ def _require_int_item_id(cls_name: str, item_id: ItemId) -> int:
         TypeError: When *item_id* is a ``str`` instance.
     """
     if isinstance(item_id, str):
-        if item_id.isdigit():
-            coerced = int(item_id)
-            if coerced <= 0:
-                msg = (
-                    f"{cls_name} requires an integer item ID, got {item_id!r}. "
-                    "Use BeadsArtifactProvider for string (beads) item identifiers."
-                )
-                raise TypeError(msg)
-            return coerced
         msg = (
             f"{cls_name} requires an integer item ID, got {item_id!r}. "
             "Use BeadsArtifactProvider for string (beads) item identifiers."

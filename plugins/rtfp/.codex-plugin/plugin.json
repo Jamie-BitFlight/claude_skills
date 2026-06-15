@@ -8,11 +8,6 @@
   },
   "repository": "https://github.com/Jamie-BitFlight/claude_skills",
   "license": "MIT",
-  "keywords": [
-    "session-analysis",
-    "emotional-reaction",
-    "instruction-following",
-    "png-artifact"
-  ],
+  "keywords": ["session-analysis", "emotional-reaction", "instruction-following", "png-artifact"],
   "skills": "./skills/"
 }
