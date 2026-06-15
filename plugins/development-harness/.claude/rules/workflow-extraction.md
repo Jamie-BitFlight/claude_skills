@@ -1,9 +1,6 @@
 ---
 paths:
 - docs/workflow-layers/**
-- agents/workflow-extractor.md
-- agents/workflow-extractor-worker.md
-- agents/workflow-extractor-reducer.md
 - docs/workflow-trace-methodology.md
 ---
 
@@ -28,15 +25,9 @@ methodology is in `docs/workflow-trace-methodology.md`.
 
 ## Agent roles
 
-| Role | Agent | Model |
-|---|---|---|
-| Orchestrator | `dh:workflow-extractor` | sonnet |
-| Map worker | `dh:workflow-extractor-worker` | haiku |
-| Reducer / assembler | `dh:workflow-extractor-reducer` | sonnet |
-
-NEVER use `general-purpose` for any extraction role.
-NEVER dispatch `dh:workflow-extractor-worker` without a corresponding reducer.
-NEVER write worker output directly to a layer JSON — it must pass through `reduce.py` first.
+Extraction agents are pending redesign (see PRD at `.tmp/scratch/plans/prd-workflow-extractor.md`).
+Do not use `general-purpose` for any extraction role.
+Do not write worker output directly to a layer JSON without corroboration.
 
 ## Existing layer data (collected 2026-06-08)
 
