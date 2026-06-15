@@ -436,72 +436,67 @@ class TestGitHubArtifactProviderSetManifest:
         assert "<!-- artifact-gist:" in mutation_variables["body"]
 
     def test_set_manifest_skips_edit_when_body_unchanged(
-        self, provider: GitHubArtifactProvider, mock_issue: MagicMock, mock_repo: MagicMock, registry: ArtifactRegistry
+        self, provider: GitHubArtifactProvider, mock_repo: MagicMock
     ) -> None:
-        """set_manifest skips the mutation when the rendered body equals the current body.
+        """set_manifest calls gist.edit() but skips updateIssue when sentinel is already in body.
 
-        Tests: No-op optimisation when body content is identical
-        How: Use a stateful graphql_query side_effect that records the body written by
-             the first call and returns it on the second fetch. Verify the mutation is
-             NOT called on the second set_manifest invocation.
-        Why: Avoids unnecessary GitHub API writes that consume GitHub rate limit quota.
+        Tests: When the issue body already carries the gist sentinel, set_manifest updates
+               the Gist content via gist.edit() but does NOT issue a GraphQL updateIssue
+               mutation (the issue body does not need to change).
+        How: Pre-populate provider._gist_cache with a mock Gist and configure graphql_query
+             to return a body containing the sentinel. Call set_manifest once. Assert
+             gist.edit() is called but no updateIssue mutation is issued.
+        Why: _get_gist() checks _gist_cache first (before calling _make_github_client).
+             Pre-seeding the cache and body avoids all live API calls while exercising the
+             correct code path. The previous implementation called _make_github_client()
+             (which uses GITHUB_TOKEN) when the sentinel was absent, hitting the real API
+             under CI conditions with a live token.
         """
-        from backlog_core.artifact_registry import parse_manifest_section
+        # Arrange — a hex gist_id matching _GIST_SENTINEL_RE: r"<!-- artifact-gist:(?P<gist_id>[0-9a-f]+) -->"
+        gist_id = "abc123def456abcd"
+        sentinel_body = f"Issue description.\n<!-- artifact-gist:{gist_id} -->"
 
-        # Arrange — stateful mock: tracks the most recently written body
-        written_body: list[str] = [""]  # mutable container to allow mutation inside side_effect
+        mock_gist = MagicMock()
+        # Pre-seed the cache: _get_gist checks this before calling _make_github_client
+        provider._gist_cache[965] = mock_gist
 
-        def _graphql_query_side_effect(query: str, variables: dict[str, Any]) -> tuple[dict, dict]:
-            # Mutation queries contain 'updateIssue' — capture the written body
-            if "updateIssue" in query:
-                written_body[0] = variables.get("body", written_body[0])
-                return ({}, {"data": {"updateIssue": {}}})
-            # Query: return the most recently written body
-            return (
-                {},
-                {
-                    "data": {
-                        "repository": {
-                            "issue": {
-                                "id": "I_test_node_id",
-                                "number": 965,
-                                "title": "",
-                                "state": "OPEN",
-                                "body": written_body[0],
-                                "createdAt": "2026-01-01T00:00:00Z",
-                                "updatedAt": "2026-01-01T00:00:00Z",
-                                "labels": {"nodes": []},
-                                "milestone": None,
-                                "assignees": {"nodes": []},
-                            }
+        mock_repo.requester.graphql_query.return_value = (
+            {},
+            {
+                "data": {
+                    "repository": {
+                        "issue": {
+                            "id": "I_test_node_id",
+                            "number": 965,
+                            "title": "",
+                            "state": "OPEN",
+                            "body": sentinel_body,
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-01T00:00:00Z",
+                            "labels": {"nodes": []},
+                            "milestone": None,
+                            "assignees": {"nodes": []},
                         }
                     }
-                },
-            )
-
-        mock_repo.requester.graphql_query.side_effect = _graphql_query_side_effect
+                }
+            },
+        )
 
         manifest = ArtifactManifest(issue_number=965)
 
-        # First call: body is empty → mutation is issued
+        # Act
         provider.set_manifest(965, manifest)
-        assert mock_repo.requester.graphql_query.call_count == 2  # fetch + mutation
 
-        # Capture what was written and reconstruct the same manifest
-        updated_body = written_body[0]
-        same_manifest = parse_manifest_section(updated_body, 965)
-        mock_repo.requester.graphql_query.reset_mock()
+        # Assert — gist.edit() was called with the serialised manifest JSON
+        mock_gist.edit.assert_called_once()
+        call_files: dict[str, Any] = mock_gist.edit.call_args.kwargs["files"]
+        assert "manifest.json" in call_files
 
-        # Act — second call: graphql_query now returns updated_body → new_body == current_body
-        # set_manifest stamps last_updated; however, same_manifest carries no last_updated
-        # from the re-parse, so rendered output will differ in the timestamp.
-        # The test verifies the conditional path is exercised — mutation call count reflects
-        # whether body changed. With a freshly stamped last_updated on the same base manifest,
-        # the body WILL differ from updated_body → mutation IS called again.
-        provider.set_manifest(965, same_manifest)
-
-        # Assert — at least one graphql_query call was made (the second fetch)
-        assert mock_repo.requester.graphql_query.call_count >= 1
+        # The issue body did not change (sentinel was already present) — no updateIssue mutation
+        mutation_calls = [
+            call for call in mock_repo.requester.graphql_query.call_args_list if "updateIssue" in call[0][0]
+        ]
+        assert mutation_calls == [], "updateIssue mutation must not fire when sentinel is already in body"
 
 
 # ---------------------------------------------------------------------------
