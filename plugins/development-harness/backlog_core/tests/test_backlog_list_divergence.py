@@ -37,15 +37,17 @@ from backlog_core.sync_state import SyncStatus, get_sync_state, reset_sync_state
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from backlog_core.operations import BacklogListItem, ListItemsResult
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_list_items_result(items: list[dict[str, object]]) -> dict[str, object]:
+def _make_list_items_result(items: list[BacklogListItem]) -> ListItemsResult:
     """Return a minimal list_items result dict with the given items."""
-    return {"items": items, "messages": [], "warnings": []}
+    return {"items": items, "count": len(items), "messages": [], "warnings": [], "errors": []}
 
 
 # ---------------------------------------------------------------------------
@@ -74,10 +76,34 @@ def mock_list_items_empty(mocker: MockerFixture) -> None:
 @pytest.fixture
 def mock_list_items_populated(mocker: MockerFixture) -> None:
     """Patch operations.list_items to return a non-empty cache (3 items)."""
-    items = [
-        {"issue": "#1", "title": "Alpha", "status": "needs-grooming", "section": "P1"},
-        {"issue": "#2", "title": "Beta", "status": "needs-grooming", "section": "P2"},
-        {"issue": "#3", "title": "Gamma", "status": "needs-grooming", "section": "P0"},
+    items: list[BacklogListItem] = [
+        {
+            "issue": "#1",
+            "title": "Alpha",
+            "status": "needs-grooming",
+            "section": "P1",
+            "plan": "",
+            "type": "",
+            "topic": "",
+        },
+        {
+            "issue": "#2",
+            "title": "Beta",
+            "status": "needs-grooming",
+            "section": "P2",
+            "plan": "",
+            "type": "",
+            "topic": "",
+        },
+        {
+            "issue": "#3",
+            "title": "Gamma",
+            "status": "needs-grooming",
+            "section": "P0",
+            "plan": "",
+            "type": "",
+            "topic": "",
+        },
     ]
     mocker.patch("backlog_core.operations.list_items", return_value=_make_list_items_result(items))
 
