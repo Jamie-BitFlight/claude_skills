@@ -1,0 +1,22 @@
+{
+  "0": "BacklogCore — Config & Rendering",
+  "1": "Artifact Provider — Filesystem & Registry",
+  "2": "Artifact Provider — Gist & GitHub",
+  "3": "SAM Schema — Context & Task Config",
+  "4": "BacklogCore — Config & Backend Wiring",
+  "5": "Backend Protocol — GitHub & SQLite & Memory",
+  "6": "GitHub Backend — Sync & GraphQL",
+  "7": "GitHub Backend — Status & Operations",
+  "8": "Beads Backend — bd CLI Runner",
+  "9": "SAM Schema — GistTaskLayer & Plan Models",
+  "10": "Sync Engine — Progress & Backoff",
+  "11": "Beads Backend — Document & Memory",
+  "12": "Artifact Backend — Protocol & Providers",
+  "13": "Beads Task Provider — SAM Backend",
+  "14": "SAM Schema — Acceptance Criteria & Bookends",
+  "15": "LocalYamlTaskProvider — Plan & Task I/O",
+  "16": "Progressive Markdown — Navigator & Tests",
+  "17": "BacklogCore — Section Rendering & Merge",
+  "18": "Scripts & Path Utilities",
+  "19": "Backlog — Section Normalisation & Tests"
+}

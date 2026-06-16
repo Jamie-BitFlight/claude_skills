@@ -59,6 +59,7 @@ repos:
       - id: check-toml
       - id: check-added-large-files
         args: ["--maxkb=10000"] # 10MB limit
+        exclude: graphify-out/
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: mixed-line-ending
@@ -99,12 +100,13 @@ repos:
         additional_dependencies: ["@biomejs/biome@2.4.16"]
         types_or: [javascript, jsx, ts, tsx, json, css]
         pass_filenames: true
+        exclude: graphify-out/
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.0
     hooks:
       - id: markdownlint-cli2
-        exclude: ^(plan/|\.claude/backlog/|\.claude/BACKLOG\.md)
+        exclude: ^(plan/|\.claude/backlog/|\.claude/BACKLOG\.md|.*/graphify-out/)
 
   # GitHub Actions structural validation (beyond YAML parsability)
   - repo: https://github.com/rhysd/actionlint
