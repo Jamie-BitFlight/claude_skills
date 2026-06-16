@@ -72,3 +72,7 @@ plan/
 .dolt/
 *.db
 .beads-credential-key
+
+# graphify — commit graphify-out/ for team graph sharing; exclude local-only files
+graphify-out/cost.json
+graphify-out/cache/
