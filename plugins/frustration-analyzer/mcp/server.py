@@ -40,7 +40,7 @@ import sys
 import xml.etree.ElementTree as ET  # noqa: S405
 from datetime import UTC, datetime
 from io import TextIOWrapper
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -522,9 +522,13 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
         First 80 characters of the first human-typed user message,
         or the filename stem as fallback.
     """
-    own_conn = conn is None
     try:
-        db: duckdb.DuckDBPyConnection = duckdb.connect() if own_conn else cast("duckdb.DuckDBPyConnection", conn)
+        if conn is None:
+            db = duckdb.connect()
+            own_conn = True
+        else:
+            db = conn
+            own_conn = False
         rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
         if own_conn:
             db.close()

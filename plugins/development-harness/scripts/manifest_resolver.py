@@ -17,7 +17,7 @@ import sys
 from dataclasses import asdict
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, overload
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -173,6 +173,14 @@ def resolve_for_project(
     return resolve_extends_chain(best.path, search_paths=search_paths)
 
 
+@overload
+def _normalize_for_json(obj: dict[str, object]) -> dict[str, Any]: ...
+
+
+@overload
+def _normalize_for_json(obj: object) -> object: ...
+
+
 def _normalize_for_json(obj: object) -> object:
     """Recursively normalize types for JSON serialization.
 
@@ -197,7 +205,7 @@ def _manifest_to_dict(m: LanguageManifest) -> dict[str, Any]:
         Dict representation of the manifest with all types JSON-compatible.
     """
     raw = asdict(m)
-    return cast("dict[str, Any]", _normalize_for_json(raw))
+    return _normalize_for_json(raw)
 
 
 def _validate_plugin_dir(path: Path) -> Path:
