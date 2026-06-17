@@ -47,7 +47,7 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, TypedDict, cast
+from typing import Literal, TypedDict, TypeGuard
 
 # Git status parsing constants
 _MIN_PLUGIN_PATH_PARTS = 2
@@ -87,6 +87,38 @@ class MarketplaceChanges(TypedDict):
     added: set[str]
     deleted: set[str]
     modified: list[tuple[str, str]]
+
+
+class _MarketplaceMetadata(TypedDict, total=False):
+    """Typed metadata sub-object in marketplace.json."""
+
+    version: str
+
+
+class _MarketplacePluginEntry(TypedDict):
+    """Typed plugin entry in the marketplace.json plugins list."""
+
+    name: str
+    source: str
+
+
+class _MarketplaceJsonData(TypedDict, total=False):
+    """Typed structure of marketplace.json."""
+
+    metadata: _MarketplaceMetadata
+    plugins: list[_MarketplacePluginEntry]
+
+
+def _is_str_dict(obj: object) -> TypeGuard[dict[str, object]]:
+    """Return True when obj is a dict with exclusively string keys.
+
+    Args:
+        obj: Any Python object to test.
+
+    Returns:
+        True if obj is a dict and every key is a str.
+    """
+    return isinstance(obj, dict) and all(isinstance(k, str) for k in obj)
 
 
 def run_git_command(args: list[str]) -> str:
@@ -265,10 +297,9 @@ def _extract_version_from_json(data: object, key_path: list[str]) -> tuple[int, 
     """
     obj: object = data
     for key in key_path:
-        if not isinstance(obj, dict):
+        if not _is_str_dict(obj):
             return None
-        # json.loads produces dict[str, Any]; cast for type checker compat.
-        node = cast("dict[str, object]", obj)
+        node = obj
         if key not in node:
             return None
         obj = node[key]
@@ -666,9 +697,9 @@ def _extract_str_version(json_data: object, key: str) -> str | None:
     Returns:
         The version string, or None if absent or not a string.
     """
-    if not isinstance(json_data, dict):
+    if not _is_str_dict(json_data):
         return None
-    raw = cast("dict[str, object]", json_data).get(key)
+    raw = json_data.get(key)
     return raw if isinstance(raw, str) else None
 
 
@@ -767,7 +798,8 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
     with plugin_json_path.open(encoding="utf-8") as f:
         data: dict[str, list[str] | str] = json.load(f)
 
-    current_version = cast("str", data.get("version", "0.0.0"))
+    raw_ver = data.get("version", "0.0.0")
+    current_version = raw_ver if isinstance(raw_ver, str) else "0.0.0"
 
     base_ref = resolve_base()
     if base_ref is not None:
@@ -803,7 +835,7 @@ def _read_plugin_name(plugin_dir_name: str) -> str:
     return plugin_dir_name
 
 
-def _update_marketplace_plugins(data: dict[str, Any], plugin_changes: MarketplaceChanges) -> bool:
+def _update_marketplace_plugins(data: _MarketplaceJsonData, plugin_changes: MarketplaceChanges) -> bool:
     """Add and remove plugins in the marketplace data structure.
 
     The ``"name"`` field in each marketplace entry is derived from plugin.json
@@ -820,12 +852,12 @@ def _update_marketplace_plugins(data: dict[str, Any], plugin_changes: Marketplac
 
     for plugin_dir_name in plugin_changes["added"]:
         canonical_name = _read_plugin_name(plugin_dir_name)
-        plugin_entry = {"name": canonical_name, "source": f"./plugins/{plugin_dir_name}"}
+        plugin_entry = _MarketplacePluginEntry(name=canonical_name, source=f"./plugins/{plugin_dir_name}")
 
         if "plugins" not in data:
             data["plugins"] = []
 
-        plugins_list = cast("list[dict[str, str]]", data["plugins"])
+        plugins_list = data["plugins"]
 
         if not any(p["name"] == canonical_name for p in plugins_list):
             plugins_list.append(plugin_entry)
@@ -834,7 +866,7 @@ def _update_marketplace_plugins(data: dict[str, Any], plugin_changes: Marketplac
     for plugin_dir_name in plugin_changes["deleted"]:
         if "plugins" in data:
             canonical_name = _read_plugin_name(plugin_dir_name)
-            plugins_list = cast("list[dict[str, str]]", data["plugins"])
+            plugins_list = data["plugins"]
             data["plugins"] = [p for p in plugins_list if p["name"] != canonical_name]
             modified = True
 
@@ -861,9 +893,9 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         return False
 
     with marketplace_json_path.open(encoding="utf-8") as f:
-        data = json.load(f)
+        data: _MarketplaceJsonData = json.load(f)
 
-    metadata = cast("dict[str, str]", data.get("metadata", {}))
+    metadata: _MarketplaceMetadata = data.get("metadata", {})
     current_version = metadata.get("version", "0.0.0")
 
     # Skip if the version was already bumped (e.g., user manually edited
@@ -889,7 +921,7 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         if "metadata" not in data:
             data["metadata"] = {}
 
-        metadata = cast("dict[str, str]", data["metadata"])
+        metadata = data["metadata"]
         metadata["version"] = new_version
 
         new_content = _format_json(data)
@@ -1333,7 +1365,8 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
         has_drift |= _reconcile_mode_b(data, "commands", disk_commands_full, plugin_name, dry_run=dry_run)
 
     if has_drift and not dry_run:
-        current_version = cast("str", data.get("version", "0.0.0"))
+        raw_ver = data.get("version", "0.0.0")
+        current_version = raw_ver if isinstance(raw_ver, str) else "0.0.0"
         data["version"] = bump_version(current_version, "minor")
         _write_json_lf(plugin_json_path, _format_json(data))
         print(f"  Updated {plugin_name} -> {data['version']}")
@@ -1462,8 +1495,8 @@ def _reconcile_component_array(
 
 
 def _apply_marketplace_drift(
-    data: dict[str, Any],
-    plugins_list: list[dict[str, Any]],
+    data: _MarketplaceJsonData,
+    plugins_list: list[_MarketplacePluginEntry],
     missing: set[str],
     stale: set[str],
     disk_plugins: dict[str, str],
@@ -1485,7 +1518,9 @@ def _apply_marketplace_drift(
         for name in sorted(missing):
             print(f"  {label} plugin to marketplace: {name}")
         if not dry_run:
-            plugins_list.extend({"name": name, "source": f"./plugins/{disk_plugins[name]}"} for name in sorted(missing))
+            plugins_list.extend(
+                _MarketplacePluginEntry(name=name, source=f"./plugins/{disk_plugins[name]}") for name in sorted(missing)
+            )
 
     if stale:
         label = "Would remove" if dry_run else "Removing"
@@ -1514,9 +1549,9 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
         return False
 
     with marketplace_path.open(encoding="utf-8") as f:
-        data = json.load(f)
+        data: _MarketplaceJsonData = json.load(f)
 
-    plugins_list = cast("list[dict[str, Any]]", data.get("plugins", []))
+    plugins_list = data.get("plugins", [])
     # Only track locally-sourced plugins (relative path strings) in the stale check.
     # Plugins with external sources (dict with "source": "github" etc.) are managed
     # manually and must not be removed by reconciliation.
@@ -1537,7 +1572,7 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
     _apply_marketplace_drift(data, plugins_list, missing, stale, disk_plugins, dry_run=dry_run)
 
     if (missing or stale) and not dry_run:
-        metadata = cast("dict[str, str]", data.get("metadata", {}))
+        metadata: _MarketplaceMetadata = data.get("metadata", {})
         current_version = metadata.get("version", "0.0.0")
         bump_type: Literal["major", "minor", "patch"] = "major" if stale else "minor"
         metadata["version"] = bump_version(current_version, bump_type)
@@ -1645,7 +1680,7 @@ def _precommit_sync() -> int:
         marketplace_path = Path(".claude-plugin/marketplace.json")
         if marketplace_path.exists():
             with marketplace_path.open(encoding="utf-8") as f:
-                mdata: dict[str, Any] = json.load(f)
+                mdata: _MarketplaceJsonData = json.load(f)
             if _update_marketplace_plugins(mdata, marketplace_changes):
                 _write_json_lf(marketplace_path, _format_json(mdata))
                 _git_stage_file(".claude-plugin/marketplace.json")
@@ -1685,8 +1720,8 @@ def _sync_marketplace_mode() -> int:
 
     # Read version before reconcile
     with marketplace_path.open(encoding="utf-8") as f:
-        pre_data: dict[str, Any] = json.load(f)
-    pre_meta = cast("dict[str, str]", pre_data.get("metadata", {}))
+        pre_data: _MarketplaceJsonData = json.load(f)
+    pre_meta: _MarketplaceMetadata = pre_data.get("metadata", {})
     version_before = pre_meta.get("version", "0.0.0")
 
     # Reconcile plugin list structure (handles add/remove + their version bumps)
@@ -1694,8 +1729,8 @@ def _sync_marketplace_mode() -> int:
 
     # Re-read after reconcile
     with marketplace_path.open(encoding="utf-8") as f:
-        post_data: dict[str, Any] = json.load(f)
-    post_meta = cast("dict[str, str]", post_data.get("metadata", {}))
+        post_data: _MarketplaceJsonData = json.load(f)
+    post_meta: _MarketplaceMetadata = post_data.get("metadata", {})
     version_after = post_meta.get("version", "0.0.0")
 
     # If reconcile didn't bump (no plugin added/removed), do a patch bump

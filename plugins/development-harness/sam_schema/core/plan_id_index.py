@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 from ruamel.yaml import YAML
 
@@ -319,6 +319,11 @@ def create_plan_id_index(artifact_client: ArtifactRegistryClient) -> PlanIdIndex
     return PlanIdIndex(artifact_client=artifact_client, sentinel_issue=sentinel_issue)
 
 
+def _is_str_dict(obj: object) -> TypeGuard[dict[str, object]]:
+    """Return True when *obj* is a dict with exclusively string keys."""
+    return isinstance(obj, dict) and all(isinstance(k, str) for k in obj)
+
+
 def _load_sentinel_issue() -> int:
     """Read the sentinel issue number from ``.dh/config.yaml``.
 
@@ -334,9 +339,9 @@ def _load_sentinel_issue() -> int:
         if data is None:
             continue
         sam_section = data.get("sam")
-        if not isinstance(sam_section, dict):
+        if not _is_str_dict(sam_section):
             continue
-        raw = cast("dict[str, object]", sam_section).get("plan_index_issue")
+        raw = sam_section.get("plan_index_issue")
         if isinstance(raw, int) and raw > 0:
             _log.debug("_load_sentinel_issue: found plan_index_issue=%d in %s", raw, config_path)
             return raw
@@ -360,9 +365,7 @@ def _load_yaml_file(path: Path) -> dict[str, object] | None:
     except Exception as exc:  # noqa: BLE001 — ruamel raises many internal exception types
         _log.warning("plan_id_index: failed to parse index blob: %s", exc)
         return None
-    if not isinstance(data, dict):
-        return None
-    return cast("dict[str, object]", data)
+    return data if _is_str_dict(data) else None
 
 
 def _config_search_paths() -> list[Path]:
