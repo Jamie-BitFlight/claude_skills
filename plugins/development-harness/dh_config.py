@@ -29,7 +29,7 @@ from __future__ import annotations
 import contextlib
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeGuard
 
 if TYPE_CHECKING:
     import types
@@ -61,6 +61,11 @@ _DEFAULTS: dict[str, str] = {"backlog": "github", "task": "local", "context": "l
 _CONFIG_FILENAME = "config.yaml"
 
 
+def _is_str_dict(obj: object) -> TypeGuard[dict[str, object]]:
+    """Return True when *obj* is a dict with exclusively string keys."""
+    return isinstance(obj, dict) and all(isinstance(k, str) for k in obj)
+
+
 # ---------------------------------------------------------------------------
 # YAML config loader
 # ---------------------------------------------------------------------------
@@ -84,9 +89,7 @@ def _load_yaml_config(path: Path) -> dict[str, object] | None:
     except _YAML_PARSE_ERRORS:
         return None
     else:
-        if not isinstance(data, dict):
-            return None
-        return cast("dict[str, object]", data)
+        return data if _is_str_dict(data) else None
 
 
 def _dh_user_root_path() -> Path:
@@ -144,15 +147,15 @@ def _resolve_from_config(subsystem: str) -> str | None:
 
         # Step 2: subsystem-specific override
         subsystem_section = data.get(subsystem)
-        if isinstance(subsystem_section, dict):
-            sub_backend = cast("dict[str, object]", subsystem_section).get("backend")
+        if _is_str_dict(subsystem_section):
+            sub_backend = subsystem_section.get("backend")
             if isinstance(sub_backend, str) and sub_backend:
                 return sub_backend
 
         # Step 3: global backend.name
         backend_section = data.get("backend")
-        if isinstance(backend_section, dict):
-            global_name = cast("dict[str, object]", backend_section).get("name")
+        if _is_str_dict(backend_section):
+            global_name = backend_section.get("name")
             if isinstance(global_name, str) and global_name:
                 return global_name
 
