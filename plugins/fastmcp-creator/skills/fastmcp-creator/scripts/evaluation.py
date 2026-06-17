@@ -13,7 +13,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import defusedxml.ElementTree as DefusedElementTree
 from anthropic import Anthropic
@@ -128,7 +128,7 @@ def extract_xml_content(text: str, tag: str) -> str | None:
 
 
 async def agent_loop(
-    *, client: Anthropic, model: str, question: str, tools: list[dict[str, Any]], connection: MCPConnection
+    *, client: Anthropic, model: str, question: str, tools: list[ToolParam], connection: MCPConnection
 ) -> tuple[str | None, dict[str, ToolMetric]]:
     """Run the agent loop with MCP tools.
 
@@ -146,12 +146,7 @@ async def agent_loop(
     messages: list[MessageParam] = [{"role": "user", "content": question}]
 
     raw_response = await asyncio.to_thread(
-        client.messages.create,
-        model=model,
-        max_tokens=4096,
-        system=EVALUATION_PROMPT,
-        messages=messages,
-        tools=cast("list[ToolParam]", tools),
+        client.messages.create, model=model, max_tokens=4096, system=EVALUATION_PROMPT, messages=messages, tools=tools
     )
     if not isinstance(raw_response, Message):
         raise TypeError(f"Expected Message, got {type(raw_response).__name__}")
@@ -200,7 +195,7 @@ async def agent_loop(
             max_tokens=4096,
             system=EVALUATION_PROMPT,
             messages=messages,
-            tools=cast("list[ToolParam]", tools),
+            tools=tools,
         )
         if not isinstance(raw_response, Message):
             raise TypeError(f"Expected Message, got {type(raw_response).__name__}")
@@ -217,7 +212,7 @@ async def evaluate_single_task(
     client: Anthropic,
     model: str,
     qa_pair: dict[str, Any],
-    tools: list[dict[str, Any]],
+    tools: list[ToolParam],
     connection: MCPConnection,
     task_index: int,
 ) -> dict[str, Any]:

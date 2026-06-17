@@ -29,7 +29,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from health import run_health
 
@@ -286,7 +286,7 @@ def _is_idle(lines: list[str]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _load_registry(registry_path: Path) -> list[dict[str, Any]] | None:
+def _load_registry(registry_path: Path) -> list[Any] | None:
     """Load the kage-bunshin registry JSON file.
 
     Args:
@@ -306,9 +306,9 @@ def _load_registry(registry_path: Path) -> list[dict[str, Any]] | None:
         return None
 
     if isinstance(data, dict):
-        return cast("list[dict[str, Any]]", list(data.values()))
+        return list(data.values())
     if isinstance(data, list):
-        return cast("list[dict[str, Any]]", data)
+        return data
     return None
 
 

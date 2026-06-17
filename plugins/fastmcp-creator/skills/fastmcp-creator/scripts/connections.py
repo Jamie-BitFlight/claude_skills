@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from typing import TYPE_CHECKING, Any, Self, cast
 
+from anthropic.types import ToolParam
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
@@ -81,7 +82,7 @@ class MCPConnection(ABC):
         self.session = None
         self._stack = None
 
-    async def list_tools(self) -> list[dict[str, Any]]:
+    async def list_tools(self) -> list[ToolParam]:
         """Retrieve available tools from the MCP server.
 
         Returns:
@@ -94,7 +95,7 @@ class MCPConnection(ABC):
             raise RuntimeError("No active session. Use async with context.")
         response = await self.session.list_tools()
         return [
-            {"name": tool.name, "description": tool.description, "input_schema": tool.inputSchema}
+            ToolParam(name=tool.name, description=tool.description or "", input_schema=tool.inputSchema)
             for tool in response.tools
         ]
 
