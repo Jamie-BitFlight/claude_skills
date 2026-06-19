@@ -343,6 +343,27 @@ Each backend imports from `backend_protocol` (for TypedDicts and config) and `mo
 
 ---
 
+## Selector Resolution — Beads Nanoid Support
+
+All seven beads-capable tools in `server.py` (`backlog_view`, `backlog_close`, `backlog_resolve`,
+`backlog_update`, `backlog_groom`, `backlog_strike_entry`, `backlog_pull`) accept a beads nanoid
+(e.g. `bd-a3f8`) as a selector value.
+
+Resolution is handled by `find_item` in `parsing.py`. The resolution order is:
+
+1. GitHub issue URL — extracts integer issue number, matches by `item.issue`
+2. `#N` or bare integer — matches by integer issue number
+3. String-ID exact match — compares selector directly against `item.issue`; covers beads nanoids and other non-integer backends (Linear, etc.)
+4. Title substring — case-insensitive; raises `AmbiguousSelectorError` when multiple distinct items match
+
+The string-ID path fires when the selector is not a URL, `#N`, or bare integer. No additional routing logic is needed in `server.py` — the selector string passes through to `find_item` unchanged.
+
+**`try_get_github` None contract**: `try_get_github` in `gh_client.py` returns `None` when `GITHUB_TOKEN` is absent or the GitHub API returns an error. Callers receiving `None` must skip GitHub-dependent steps and proceed with local-only data. This is the standard graceful-degradation path for beads-backed projects where no GitHub token is configured.
+
+SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comment), `gh_client.py:try_get_github`, commit `f6438cac` (2026-06-19)
+
+---
+
 ## Module: server.py
 
 **Responsibility**: FastMCP 3.x server exposing all operations as MCP tools.

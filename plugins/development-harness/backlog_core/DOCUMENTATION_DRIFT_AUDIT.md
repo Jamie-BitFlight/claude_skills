@@ -14,6 +14,27 @@
 >
 > All other findings remain valid unless explicitly addressed in a subsequent audit.
 
+> **Note (2026-06-19)**: PR #2656 resolved two gaps identified in session log `dh-with-bd-example.txt`.
+>
+> **Gap 1 — selector Field descriptions omitted beads nanoid format** (RESOLVED, commit `f6438cac`):
+> All seven beads-capable tools (`backlog_view`, `backlog_close`, `backlog_resolve`,
+> `backlog_update`, `backlog_groom`, `backlog_strike_entry`, `backlog_pull`) had `selector`
+> `Field(description=...)` strings that omitted the beads nanoid format. Agents reading the MCP
+> tool schema had no indication that a `bd-a3f8` nanoid was a valid selector, causing them to
+> bypass `backlog_view` and embed issue content in prompts instead. Fix: added `, or beads nanoid
+> (e.g. bd-a3f8)` to all seven `selector` Field descriptions. String-literal-only change (ADR-2);
+> no runtime logic touched. Resolution documented in `ARCHITECTURE.md` under
+> "Selector Resolution — Beads Nanoid Support".
+>
+> **Gap 2 — `AttributeError` on `NoneType` during GitHub view enrichment** (operational fix, not in this PR):
+> When `try_get_github` returns `None` (no `GITHUB_TOKEN` or GitHub unreachable), downstream
+> callers that assume a Repository object can raise `AttributeError: 'NoneType' object has no
+> attribute '...'`. This is a cache-skew symptom: the local beads backend has the item but GitHub
+> view enrichment cannot complete. The correct reading is not a code bug but an operational
+> misconfiguration (missing token or network isolation). Callers of `try_get_github` must check
+> for `None` and skip GitHub-dependent steps. Gap 2 content was removed from plan Pa924eca3 scope
+> after the source memory entry (35-day-old) was not confirmed by the session log.
+
 **Analyzed Files**:
 
 - Implementation: `backlog_core/__init__.py`, `backlog_core/models.py`, `backlog_core/parsing.py`, `backlog_core/gh_client.py`, `backlog_core/operations.py`, `backlog_core/server.py`
