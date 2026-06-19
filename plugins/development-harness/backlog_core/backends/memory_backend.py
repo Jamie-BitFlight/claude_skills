@@ -29,7 +29,14 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_protocol import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from backlog_core.backend_protocol import (
+    BacklogBackend,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -76,7 +83,7 @@ def _make_issue_node(
     )
 
 
-class InMemoryBackend:
+class InMemoryBackend(BacklogBackend):
     """In-memory BacklogBackend for use in tests.
 
     All state lives in plain Python dicts and lists.  Every method is
