@@ -21,6 +21,7 @@ from backlog_core.parsing import (
     loads_frontmatter,
     merge_sections,
     normalize_issue_title,
+    parse_issue_selector,
     parse_item_file,
     title_to_slug,
     view_result_from_local_item,
@@ -516,6 +517,44 @@ class TestFindItem:
 
         assert result is not None
         assert result.issue == "#30"
+
+    def test_find_item_resolves_beads_nanoid_via_string_id_path(self) -> None:
+        """find_item resolves a beads nanoid via exact issue-field match (string-ID path).
+
+        Guards: parse_issue_selector returns None for nanoids (no numeric form),
+        so find_item must fall through to the string-ID branch and match on
+        item.issue directly.
+        """
+        # Arrange
+        items = [BacklogItem(issue="bd-a3f8", title="foo")]
+
+        # Act
+        result = find_item(items, "bd-a3f8")
+
+        # Assert — item found via string-ID branch
+        assert result is not None
+        assert result.issue == "bd-a3f8"
+        # parse_issue_selector must return None for nanoids (not a URL, #N, or digit string)
+        assert parse_issue_selector("bd-a3f8") is None
+
+    def test_find_item_beads_nanoid_no_title_fallthrough(self) -> None:
+        """Exact nanoid in item.issue takes precedence over title substring containing the same string.
+
+        Guards the string-ID exact match precedence: if find_item returned the
+        title-substring item instead, this assertion would fail.
+        """
+        # Arrange — two items: one whose issue IS the nanoid, another whose TITLE contains it
+        item_by_issue = BacklogItem(issue="bd-a3f8", title="Authentication refactor")
+        item_by_title = BacklogItem(issue="bd-zzzz", title="bd-a3f8 related task")
+        items = [item_by_issue, item_by_title]
+
+        # Act
+        result = find_item(items, "bd-a3f8")
+
+        # Assert — must match by issue field, not by title substring
+        assert result is not None
+        assert result.issue == "bd-a3f8"
+        assert result.title == "Authentication refactor"
 
 
 # ---------------------------------------------------------------------------

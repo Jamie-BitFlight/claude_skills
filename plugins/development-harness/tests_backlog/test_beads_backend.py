@@ -173,6 +173,32 @@ def test_try_get_github_returns_none() -> None:
 
 
 # ---------------------------------------------------------------------------
+# try_get_github — returns None without raising and satisfies Protocol (T3.c)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_try_get_github_returns_none_without_raising_and_satisfies_protocol() -> None:
+    """BeadsBackend.try_get_github() returns None, raises no exception, and satisfies BacklogBackend Protocol.
+
+    Guards:
+    - try_get_github must return None (not raise) — callers use the optional-connection pattern
+    - isinstance check confirms BeadsBackend satisfies the runtime-checkable Protocol,
+      which is the gating mechanism in operations.py
+    """
+    # Arrange
+    runner = _make_runner()
+    backend = BeadsBackend(runner=runner)
+
+    # Act — must not raise
+    result = backend.try_get_github()
+
+    # Assert
+    assert result is None
+    assert isinstance(backend, BacklogBackend)
+
+
+# ---------------------------------------------------------------------------
 # ADR-001 — GraphQL stubs raise NotImplementedError
 # ---------------------------------------------------------------------------
 
