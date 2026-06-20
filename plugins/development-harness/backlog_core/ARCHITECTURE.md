@@ -356,11 +356,9 @@ Resolution is handled by `find_item` in `parsing.py`. The resolution order is:
 3. String-ID exact match — compares selector directly against `item.issue`; covers beads nanoids and other non-integer backends (Linear, etc.)
 4. Title substring — case-insensitive; raises `AmbiguousSelectorError` when multiple distinct items match
 
-The string-ID path fires when the selector is not a URL, `#N`, or bare integer. No additional routing logic is needed in `server.py` — the selector string passes through to `find_item` unchanged.
+The string-ID path fires when the selector is not a URL, `#N`, or bare integer. No additional routing logic is needed in `server.py` — the selector string passes through to `find_item` unchanged. GitHub URL detection is a regex operation (`GITHUB_ISSUE_URL_RE`) — no GitHub token or API call is involved at any point in selector resolution.
 
-**`try_get_github` None contract**: `try_get_github` in `gh_client.py` returns `None` when `GITHUB_TOKEN` is absent or the GitHub API returns an error. Callers receiving `None` must skip GitHub-dependent steps and proceed with local-only data. This is the standard graceful-degradation path for beads-backed projects where no GitHub token is configured.
-
-SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comment), `gh_client.py:try_get_github`, commit `f6438cac` (2026-06-19)
+SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comment), `parsing.py:parse_issue_selector`, commit `f6438cac` (2026-06-19)
 
 ---
 
