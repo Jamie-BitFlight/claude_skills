@@ -2382,7 +2382,12 @@ def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) ->
     )
 )
 async def backlog_view(
-    selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     summary: Annotated[
         bool,
         Field(
@@ -2674,7 +2679,7 @@ async def backlog_sync(
     )
 )
 async def backlog_close(
-    selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
+    selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
     reason: Annotated[
         str,
         Field(
@@ -2722,7 +2727,12 @@ async def backlog_close(
     )
 )
 async def backlog_resolve(
-    selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     summary: Annotated[str, Field(description="What was done — 1-2 sentence completion summary (required)")],
     plan: Annotated[str | None, Field(description="Plan path or completion reference")] = None,
     method: Annotated[str | None, Field(description="How the work was done — approach taken")] = None,
@@ -2770,7 +2780,12 @@ async def backlog_resolve(
     )
 )
 async def backlog_update(
-    selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
     status: Annotated[
         str | None,
@@ -2853,7 +2868,12 @@ async def backlog_update(
 )
 async def backlog_groom(
     ctx: Context,
-    selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     section: Annotated[
         str | None, Field(description="Section name for incremental update (use with content parameter)")
     ] = None,
@@ -3522,7 +3542,12 @@ async def backlog_get_ready_sam_tasks(
     )
 )
 async def backlog_strike_entry(
-    selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     entry_id: Annotated[str, Field(description="Timestamp ID of the entry to strike")],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
