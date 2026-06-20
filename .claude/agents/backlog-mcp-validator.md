@@ -233,19 +233,6 @@ stored as `item.issue` will match on this path.
 selector and confirm the tool returns the item (not an `"error"` key). A successful return
 confirms the string-ID path is working.
 
-### AttributeError on NoneType — Cache-Skew Interpretation
-
-If a tool call returns `AttributeError: 'NoneType' object has no attribute '...'`, the most
-common cause is `try_get_github` returning `None` while downstream code expects a `Repository`
-object. This happens when `GITHUB_TOKEN` is absent or GitHub is unreachable.
-
-Interpretation: this is a **cache-skew operational condition**, not a code bug. The local beads
-backend has the item but GitHub view enrichment cannot complete. The validator MUST NOT flag this
-as a tool regression unless the same call succeeds with a valid `GITHUB_TOKEN` configured.
-
-Record the finding as: `SKIP (no GITHUB_TOKEN)` rather than `FAIL` when the environment
-intentionally has no GitHub credentials.
-
 ---
 
 ## Navigate Ordinal Grammar
