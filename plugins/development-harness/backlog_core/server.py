@@ -2679,12 +2679,7 @@ async def backlog_sync(
     )
 )
 async def backlog_close(
-    selector: Annotated[
-        str,
-        Field(
-            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
-        ),
-    ],
+    selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
     reason: Annotated[
         str,
         Field(
@@ -3015,7 +3010,7 @@ async def backlog_pull(
     selector: Annotated[
         str | None,
         Field(
-            description="Optional selector to pull a single issue: #N, bare number, GitHub URL, title substring, or beads nanoid (e.g. bd-a3f8). When omitted, pulls all issues."
+            description="Optional selector to pull a single issue: #N, bare number, GitHub URL, or title substring. When omitted, pulls all issues."
         ),
     ] = None,
     dry_run: Annotated[bool, Field(description="Preview what would be pulled without modifying local files")] = False,

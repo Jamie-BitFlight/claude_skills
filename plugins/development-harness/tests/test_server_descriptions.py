@@ -27,9 +27,7 @@ import pytest
 SERVER_PY = Path(__file__).parent.parent / "backlog_core" / "server.py"
 
 BEADS_CAPABLE_TOOLS: list[str] = [
-    "backlog_close",
     "backlog_groom",
-    "backlog_pull",
     "backlog_resolve",
     "backlog_strike_entry",
     "backlog_update",
