@@ -26,6 +26,7 @@ from sam_schema.core.exceptions import (
 )
 from sam_schema.core.models import Plan, PlanState, Task, TaskStatus
 from sam_schema.readers.detect import FormatDetectionError
+from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -194,7 +195,7 @@ class LocalYamlTaskProvider:
             RuntimeError: If plan_dir is None and dh_paths is not importable.
         """
         if plan_dir is None:
-            import dh_paths  # noqa: PLC0415
+            import dh_paths
 
             plan_dir = dh_paths.plan_dir()
         self._plan_dir: Path = plan_dir
@@ -202,6 +203,25 @@ class LocalYamlTaskProvider:
         # calling append_task multiple times on the same plan in sequence.
         # Keyed by plan_id (str); invalidated on finalize_plan.
         self._task_id_cache: dict[str, set[str]] = {}
+
+    @property
+    def plan_dir(self) -> Path:
+        """The filesystem path to the plan directory."""
+        return self._plan_dir
+
+    def resolve_path(self, plan_id: str) -> Path:
+        """Resolve a plan_id to its filesystem path (public API).
+
+        Args:
+            plan_id: Backend-assigned plan identifier (e.g. 'P912').
+
+        Returns:
+            Path to the plan file or directory.
+
+        Raises:
+            PlanNotFoundError: When the plan_id cannot be resolved.
+        """
+        return self._resolve_path(plan_id)
 
     def _resolve_path(self, plan_id: str) -> Path:
         """Resolve a plan_id to its filesystem path.
@@ -273,8 +293,6 @@ class LocalYamlTaskProvider:
             raise TaskValidationError(0, msg) from exc
 
         if not tasks:
-            from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
-
             plan = plan.model_copy(update={"state": PlanState.DRAFTING})
             if plan.source_path is not None:
                 write_plan(plan, plan.source_path, force_single=True)
@@ -488,8 +506,6 @@ class LocalYamlTaskProvider:
             PlanNotFoundError: When plan_id cannot be resolved.
             TaskNotFoundError: When ``task.id`` does not exist within the plan.
         """
-        from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
-
         path = self._resolve_path(plan_id)
         try:
             result = query.load_plan(path)
@@ -564,8 +580,6 @@ class LocalYamlTaskProvider:
             PlanNotFoundError: When plan_id cannot be resolved to a file.
             TaskValidationError: When the task ID already exists in the plan.
         """
-        from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
-
         path = self._resolve_path(plan_id)
         result = query.load_plan(path)
         plan = result.plan
@@ -599,8 +613,6 @@ class LocalYamlTaskProvider:
         Raises:
             PlanNotFoundError: When plan_id cannot be resolved to a file.
         """
-        from sam_schema.writers.yaml_writer import write_plan  # noqa: PLC0415
-
         path = self._resolve_path(plan_id)
         result = query.load_plan(path)
         plan = result.plan

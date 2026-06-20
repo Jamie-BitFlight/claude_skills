@@ -313,6 +313,16 @@ class FinalizePlanConfig(_ActionConfigBase):
     """
 
     action: Literal["finalize"] = "finalize"
+    issue: int | None = Field(
+        default=None,
+        description=(
+            "Optional GitHub issue number for late-binding artifact registration. "
+            "Use when the plan was created with action='create' and tasks=[] but "
+            "without an issue number. Providing it here uploads the finalized plan "
+            "YAML to Gist and registers the task-plan artifact, identical to plans "
+            "created with issue= on the create action."
+        ),
+    )
 
 
 # Discriminated union for sam_plan — discriminator is the ``action`` field.

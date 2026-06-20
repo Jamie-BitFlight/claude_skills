@@ -15,7 +15,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any
 
 import tiktoken
 from fastmcp import FastMCP
@@ -27,6 +27,7 @@ from sam_schema.core.action_models import (
     ActiveTaskActionConfig,
     AppendTaskConfig,
     CreatePlanConfig,
+    FinalizePlanConfig,
     ListPlansConfig,
     PlanActionConfig,
     ReadyPlanConfig,
@@ -37,6 +38,8 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import (
@@ -46,7 +49,9 @@ from sam_schema.core.exceptions import (
     SamError,
     TaskNotFoundError,
 )
+from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
+from sam_schema.core.plan_id_index import create_plan_id_index
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
@@ -100,13 +105,11 @@ def _claim_task_via_backend(backend: TaskBackend, plan_id: str, task_id: str) ->
         ``(True, warning_str)`` when claim fell back to local backend.
         ``(False, None)`` when task is not claimable.
     """
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-
     try:
         return backend.claim_task(plan_id, task_id), None
     except ConcurrentClaimUnsupportedError:
         # Local-only plan (issue=None): fall back to local backend claim.
-        local_backend = backend._local if isinstance(backend, GistTaskLayer) else backend  # noqa: SLF001
+        local_backend = backend.local if isinstance(backend, GistTaskLayer) else backend
         claimed = local_backend.claim_task(plan_id, task_id)
         warning = (
             f"Plan '{plan_id}' has no associated GitHub issue — claimed locally only. "
@@ -139,11 +142,6 @@ def _get_backend(plan_dir_str: str) -> TaskBackend:
         :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
         this tool call (always a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`).
     """
-    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
-
     artifact_client = ArtifactRegistryClient()
     plan_index = create_plan_id_index(artifact_client)
 
@@ -308,8 +306,6 @@ def _sam_plan_read(plan: str, plan_dir: str) -> dict:
     (ADR-2509-5).  This surfaces the degraded-source status to the MCP caller without
     changing the response shape — the ``warnings`` key is additive.
     """
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-
     backend = _get_backend(plan_dir)
     plan_data = backend.read_plan(plan)
     plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
@@ -369,10 +365,6 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
             "This plan is not portable across environments and cannot be retrieved from CI "
             "or fresh checkouts. Associate a GitHub issue to enable portability."
         )
-
-    # GistTaskLayer stores index-failure warnings in last_warnings (set after successful
-    # content upload).  Import GistTaskLayer locally to avoid a module-level circular import.
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
 
     if isinstance(backend, GistTaskLayer) and backend.last_warnings:
         warnings.extend(backend.last_warnings)
@@ -506,16 +498,46 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
     return backend.append_task(plan, config.task)
 
 
-def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
+def _sam_plan_finalize(plan: str, config: FinalizePlanConfig, plan_dir: str) -> dict:
     """Transition a plan from drafting state to ready state.
 
     See FinalizePlanConfig and #1770 for the ADR.
+
+    When ``config.issue`` is set and the backend is a ``GistTaskLayer``, passes
+    the issue for late-binding artifact registration — enabling plans created
+    without ``issue=`` to upload their finalized YAML to Gist retroactively.
 
     Returns:
         Result dict from ``backend.finalize_plan`` — shape: ``{"finalized": True, "state": "ready"}``.
     """
     backend = _get_backend(plan_dir)
+    if isinstance(backend, GistTaskLayer):
+        return backend.finalize_plan(plan, issue=config.issue)
     return backend.finalize_plan(plan)
+
+
+def _require_plan(plan: str | None, action: str) -> str:
+    """Narrow ``plan: str | None`` to ``str`` for actions that require it.
+
+    The ``_SAM_PLAN_REQUIRED_ACTIONS`` guard in ``sam_plan`` raises ``ToolError``
+    before the match statement when ``plan`` is ``None`` for a required action,
+    so this branch is unreachable in normal execution.  It is retained to satisfy
+    the type checker without using ``cast`` or ``assert``.
+
+    Args:
+        plan: The optional plan address from the tool call.
+        action: Action name, used only in the error message.
+
+    Returns:
+        The validated non-None plan address string.
+
+    Raises:
+        ToolError: If ``plan`` is ``None`` (unreachable after the outer guard).
+    """
+    if plan is None:  # pragma: no cover
+        msg = f"sam_plan: action='{action}' requires the 'plan' parameter (e.g., plan='P1')."
+        raise ToolError(msg)
+    return plan
 
 
 @mcp.tool(
@@ -578,14 +600,9 @@ def sam_plan(
         )
         raise ToolError(msg)
 
-    # The earlier _SAM_PLAN_REQUIRED_ACTIONS guard has already raised ToolError
-    # when plan is None for any action that requires it. The casts below narrow
-    # the type for the static checker only — the runtime check has already
-    # happened. (This is post-validated narrowing, not the previously-removed
-    # cast-as-type-pun pattern that hid real type issues.)
     match config.action:
         case "read":
-            return _sam_plan_read(cast("str", plan), plan_dir)
+            return _sam_plan_read(_require_plan(plan, "read"), plan_dir)
         case "create":
             if not isinstance(config, CreatePlanConfig):
                 raise TypeError(f"Expected CreatePlanConfig, got {type(config).__name__}")
@@ -595,21 +612,23 @@ def sam_plan(
                 raise TypeError(f"Expected ListPlansConfig, got {type(config).__name__}")
             return _sam_plan_list(config, plan_dir)
         case "status":
-            return _sam_plan_status(cast("str", plan), plan_dir)
+            return _sam_plan_status(_require_plan(plan, "status"), plan_dir)
         case "ready":
             if not isinstance(config, ReadyPlanConfig):
                 raise TypeError(f"Expected ReadyPlanConfig, got {type(config).__name__}")
-            return _sam_plan_ready(cast("str", plan), config, plan_dir)
+            return _sam_plan_ready(_require_plan(plan, "ready"), config, plan_dir)
         case "update":
             if not isinstance(config, UpdatePlanConfig):
                 raise TypeError(f"Expected UpdatePlanConfig, got {type(config).__name__}")
-            return _sam_plan_update(cast("str", plan), config, plan_dir)
+            return _sam_plan_update(_require_plan(plan, "update"), config, plan_dir)
         case "append_task":
             if not isinstance(config, AppendTaskConfig):
                 raise TypeError(f"Expected AppendTaskConfig, got {type(config).__name__}")
-            return _sam_plan_append_task(cast("str", plan), config, plan_dir)
+            return _sam_plan_append_task(_require_plan(plan, "append_task"), config, plan_dir)
         case "finalize":
-            return _sam_plan_finalize(cast("str", plan), plan_dir)
+            if not isinstance(config, FinalizePlanConfig):
+                raise TypeError(f"Expected FinalizePlanConfig, got {type(config).__name__}")
+            return _sam_plan_finalize(_require_plan(plan, "finalize"), config, plan_dir)
         case _:  # pragma: no cover
             msg = f"sam_plan: unhandled action '{config.action}'"
             raise ValueError(msg)

@@ -105,9 +105,9 @@ The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related 
 For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
 `sam_plan create`:
 
-1. `sam_plan(action='create', tasks=[])` — creates a drafting plan; returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
+1. `sam_plan(action='create', tasks=[], issue=<github_issue_number>)` — creates a drafting plan and registers it as an artifact on the issue; returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
 2. `sam_plan(plan='Pa1b2c3d4', action='append_task', task=<TaskDefinition dict>)` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
-3. `sam_plan(plan='Pa1b2c3d4', action='finalize')` — clears drafting state, plan becomes ready
+3. `sam_plan(plan='Pa1b2c3d4', action='finalize')` — clears drafting state, plan becomes ready and artifact content is updated
 
 While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` return a drafting
 marker instead of task counts — this prevents dispatching a partial plan. Only `finalize` makes
