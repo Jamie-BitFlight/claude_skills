@@ -220,18 +220,23 @@ CLI:     (no direct CLI equivalent — backlog_strike_entry is MCP-only)
 
 ### Selector Format (PR #2656, 2026-06-19)
 
-All seven beads-capable tools (`backlog_view`, `backlog_close`, `backlog_resolve`,
-`backlog_update`, `backlog_groom`, `backlog_strike_entry`, `backlog_pull`) accept a beads nanoid
-(e.g. `bd-a3f8`) as the `selector` value. This was added in commit `f6438cac` to the `selector`
-`Field(description=...)` strings; no runtime logic was changed.
+Five beads-capable tools (`backlog_view`, `backlog_resolve`, `backlog_update`, `backlog_groom`,
+`backlog_strike_entry`) accept a beads nanoid (e.g. `bd-a3f8`) as the `selector` value. This
+was added in commit `f6438cac` to the `selector` `Field(description=...)` strings; no runtime
+logic was changed.
+
+`backlog_close` and `backlog_pull` do NOT support beads nanoid selectors — their selector Field
+descriptions were deliberately left without the nanoid clause because the underlying operations
+have no beads code path (`backlog_close` raises `ValueError` for non-numeric issue refs;
+`backlog_pull` calls `get_github()` with no beads equivalent).
 
 Resolution is handled by `find_item` in `parsing.py`. When the selector is not a URL, `#N`, or
 bare integer, `find_item` performs a string-ID exact match against `item.issue`. A beads nanoid
 stored as `item.issue` will match on this path.
 
 **Validator implication**: When validating against a beads-backed project, pass a nanoid as the
-selector and confirm the tool returns the item (not an `"error"` key). A successful return
-confirms the string-ID path is working.
+selector to the five supported tools and confirm each returns the item (not an `"error"` key).
+Do not test `backlog_close` or `backlog_pull` with nanoid selectors — both will fail by design.
 
 ---
 
