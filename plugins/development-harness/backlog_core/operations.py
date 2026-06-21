@@ -719,8 +719,8 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    msg = f"Invalid issue ref: {issue_ref!r}"
-                    raise ValueError(msg)
+                    out.warn(f"  WARNING: {issue_ref!r} is not a numeric GitHub issue ref; skipping title update")
+                    return True
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
@@ -768,8 +768,8 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    msg = f"Invalid issue ref: {issue_ref!r}"
-                    raise ValueError(msg)
+                    out.warn(f"  WARNING: {issue_ref!r} is not a numeric GitHub issue ref; skipping plan comment")
+                    return True
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")
@@ -3424,7 +3424,12 @@ def view_item(
         if item:
             result.groomed = item.metadata.groomed
     elif not item:
-        raise ItemNotFoundError(selector)
+        if get_config().backend.issue_id_type == "string":
+            enriched = view_enrich_from_github(result, selector.strip(), repo)
+            if not enriched:
+                raise ItemNotFoundError(selector)
+        else:
+            raise ItemNotFoundError(selector)
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show
