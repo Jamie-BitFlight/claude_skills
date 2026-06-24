@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -45,12 +45,12 @@ def backend_instance(request: pytest.FixtureRequest) -> BacklogBackend:
     """
     name: str = request.param
     if name == "github":
-        return cast("BacklogBackend", GitHubBackend())
+        return GitHubBackend()
     if name == "sqlite":
-        return cast("BacklogBackend", SQLiteBackend(db_path=":memory:"))
+        return SQLiteBackend(db_path=":memory:")
     if name == "beads":
-        return cast("BacklogBackend", BeadsBackend())
-    return cast("BacklogBackend", InMemoryBackend())
+        return BeadsBackend()
+    return InMemoryBackend()
 
 
 # ---------------------------------------------------------------------------
