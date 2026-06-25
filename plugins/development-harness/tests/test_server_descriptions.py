@@ -92,6 +92,10 @@ def _extract_selector_descriptions(source: str) -> dict[str, str]:
                         f"{node.name}: selector Field description is not a string constant "
                         f"(got {type(kw.value).__name__})"
                     )
+                    assert isinstance(kw.value.value, str), (
+                        f"{node.name}: selector Field description value is not a str "
+                        f"(got {type(kw.value.value).__name__})"
+                    )
                     selector_desc = kw.value.value
                     break
             assert selector_desc is not None, f"{node.name}: selector Field has no description= keyword"
