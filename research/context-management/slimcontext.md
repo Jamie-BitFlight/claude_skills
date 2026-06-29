@@ -40,6 +40,7 @@ Token-based compression that removes oldest non-system messages when cumulative 
 **How it works**: Messages are estimated for token count using a built-in heuristic (message length ÷ 4, customizable). When total tokens exceed `maxModelTokens × thresholdPercent`, the oldest messages are dropped first—except system messages and a configurable tail of recent messages (`minRecentMessages`, default 2) which are always preserved. Trimming continues until token count falls below threshold.
 
 **Configuration** (defaults shown):
+
 ```typescript
 new TrimCompressor({
   maxModelTokens: 8192,        // model's context window
@@ -58,6 +59,7 @@ AI-powered compression that condenses older conversation segments into a concise
 **How it works**: When token usage exceeds threshold, the library extracts all messages before the preserved tail, formats them as a conversation transcript, sends them to a user-provided chat model with a structured summarization prompt, receives the summary, and injects it as a new system message before the preserved recent messages. The summary preserves facts, decisions, user goals, and constraints while omitting small talk.
 
 **Configuration** (defaults shown):
+
 ```typescript
 new SummarizeCompressor({
   model: yourChatModel,        // SlimContextChatModel instance (required)
@@ -80,6 +82,7 @@ new SummarizeCompressor({
 **LangChain Adapter**: Provides seamless integration with LangChain chat models via `toSlimModel()` wrapper and one-call helper `compressLangChainHistory()`. Optional peer dependency (`@langchain/core >=0.3.71 <1.0`).
 
 **Example** (LangChain integration):
+
 ```typescript
 import { langchain } from 'slimcontext';
 const lc = new ChatOpenAI({ model: 'gpt-4-mini', temperature: 0 });

@@ -186,6 +186,7 @@ Each skill is implemented as a Markdown-based Claude Code skill file (prompts + 
 - For `/browse` native binary: macOS or Linux (x64 or arm64)
 
 **Global Install**:
+
 ```bash
 git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
 cd ~/.claude/skills/gstack
@@ -198,6 +199,7 @@ The `setup` script:
 3. Creates symlinks at `~/.claude/skills/` for each skill (browse, qa, review, etc.)
 
 **Project-Local Install** (optional, for team sharing):
+
 ```bash
 cp -Rf ~/.claude/skills/gstack .claude/skills/gstack
 rm -rf .claude/skills/gstack/.git
@@ -215,6 +217,7 @@ cd .claude/skills/gstack
 Everything lives in `.claude/` — nothing touches PATH or runs in background.
 
 **Upgrade**:
+
 ```bash
 cd ~/.claude/skills/gstack && git fetch origin && git reset --hard origin/main && ./setup
 ```

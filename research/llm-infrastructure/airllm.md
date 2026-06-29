@@ -59,6 +59,7 @@ The `AutoModel` class detects the model architecture automatically and instantia
 - Unknown → defaults to `AirLLMLlama2`
 
 **Usage example from README**:
+
 ```python
 from airllm import AutoModel
 model = AutoModel.from_pretrained("garage-bAInd/Platypus2-70B-instruct")
@@ -89,6 +90,7 @@ This provides "10% speed improvement" according to the release notes for v2.5.
 The codebase defines a `AirLLMBaseModel` class (in `airllm_base.py`) that implements the layer-streaming protocol. Each model variant (Llama, Qwen, ChatGLM, etc.) extends this base with model-specific layer-name mappings.
 
 **Key fields in layer_names_dict** (from base class):
+
 ```python
 'embed': 'model.embed_tokens',
 'layer_prefix': 'model.layers',
@@ -182,11 +184,13 @@ pip install airllm
 ```
 
 For quantization support (4bit/8bit compression):
+
 ```bash
 pip install -U bitsandbytes
 ```
 
 For macOS MLX support:
+
 ```bash
 pip install mlx
 ```

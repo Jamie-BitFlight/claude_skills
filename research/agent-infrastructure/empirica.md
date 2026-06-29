@@ -231,6 +231,7 @@ Source: MEMORY_ARCHITECTURE.md §Data Flow (lines 88–120+); SENTINEL_ARCHITECT
 ### Data Model — Epistemic Vectors & Transactions
 
 **Transaction record** (in sessions.db):
+
 ```
 {
   transaction_id: UUID,
@@ -302,6 +303,7 @@ This command automatically configures:
 - `.empirica/` project initialization
 
 **First-time session:**
+
 ```bash
 empirica onboard  # Interactive walkthrough
 ```
@@ -309,6 +311,7 @@ empirica onboard  # Interactive walkthrough
 Then work normally — the AI manages the epistemic workflow automatically.
 
 **For existing Claude Code projects** (preserve other hooks):
+
 ```bash
 empirica setup-claude-code --force  # Only removes empirica's own hooks, preserves Railway, Superpowers, etc.
 ```
@@ -318,12 +321,14 @@ Source: README.md §Quick Start (lines 65–129); CLAUDE_CODE_SETUP.md.
 ### Alternative Installations
 
 **Homebrew (macOS)**:
+
 ```bash
 brew tap nubaeon/tap && brew install empirica
 empirica setup-claude-code
 ```
 
 **Docker**:
+
 ```bash
 docker pull nubaeon/empirica:1.7.7-alpine  # 276MB, security-hardened
 docker pull nubaeon/empirica:1.7.7         # 414MB, Debian slim
@@ -331,6 +336,7 @@ docker run -it -v $(pwd)/.empirica:/data/.empirica nubaeon/empirica:1.7.7 /bin/b
 ```
 
 **Manual / Other Platforms**:
+
 ```bash
 pip install empirica
 pip install empirica-mcp  # For Cursor, Cline, etc.
@@ -366,6 +372,7 @@ Source: README.md §How You Use It (line 57); docs/human/developers/CLI_COMMANDS
 - `EMPIRICA_MCP_TIMEOUT` — MCP tool timeout in seconds (default: 30s)
 
 **Project-local configuration** (`.empirica/config.yaml`):
+
 ```yaml
 project:
   name: "project-slug"

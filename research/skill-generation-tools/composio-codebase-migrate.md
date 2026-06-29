@@ -43,6 +43,7 @@ Large codebase migrations face two competing constraints:
 Skill guides definition of exact transforms before execution, with ripgrep scoping to find affected files.
 
 **Example workflow:**
+
 ```bash
 rg -l 'jest\.(mock|fn|spyOn)' | wc -l    # Find scope
 rg -l 'from "jest"' | sort                # Find import patterns
@@ -65,6 +66,7 @@ Orchestrates GitHub and issue-tracking operations:
 - `GITHUB_LIST_WORKFLOW_RUNS_FOR_A_REPOSITORY` — poll CI status and wait for green
 
 **Example:**
+
 ```bash
 composio execute GITHUB_CREATE_A_PULL_REQUEST -d '{
   "owner":"acme","repo":"app",
@@ -76,6 +78,7 @@ composio execute GITHUB_CREATE_A_PULL_REQUEST -d '{
 
 ### 4. Verification Loop After Each Merge
 Runs trending metrics to confirm progress:
+
 ```bash
 rg 'jest\.(mock|fn|spyOn)' | wc -l    # Should trend to 0
 npm test                               # Full suite
@@ -197,6 +200,7 @@ composio execute GITHUB_LIST_WORKFLOW_RUNS_FOR_A_REPOSITORY -d '{...}'
 ### Example: Jest → Vitest Migration
 
 Transform definition:
+
 ```bash
 # Find affected files
 rg -l 'jest\.(mock|fn|spyOn)' | sort
@@ -206,6 +210,7 @@ rg -l 'from "jest"' | wc -l
 ```
 
 Batch workflow script (`scripts/migrate-batch.ts`):
+
 ```ts
 const batch = process.argv[process.argv.indexOf("--batch") + 1];
 const pr = await execute("GITHUB_CREATE_A_PULL_REQUEST", {
@@ -222,6 +227,7 @@ await execute("LINEAR_CREATE_COMMENT", {
 ```
 
 Run per batch:
+
 ```bash
 composio run --file scripts/migrate-batch.ts -- --batch 3
 ```

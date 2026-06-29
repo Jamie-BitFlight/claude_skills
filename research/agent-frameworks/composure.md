@@ -307,6 +307,7 @@ claude plugin install composure@composure
 ```
 
 For Pro Patterns (private submodule):
+
 ```bash
 git submodule update --init --recursive
 ```

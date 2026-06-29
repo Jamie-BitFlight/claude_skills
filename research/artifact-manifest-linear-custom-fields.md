@@ -195,6 +195,7 @@ Attachments also support simple key-value pairs with "any string or number" valu
 Linear attachments represent external resources (GitHub PR, Jira issue, support ticket, etc.) and can be created/read via GraphQL API:
 
 **Query Example**:
+
 ```graphql
 query {
   issue(id: "ISSUE-ID") {
@@ -211,6 +212,7 @@ query {
 ```
 
 **Mutation Example** (create attachment):
+
 ```graphql
 mutation {
   attachmentCreate(input: {

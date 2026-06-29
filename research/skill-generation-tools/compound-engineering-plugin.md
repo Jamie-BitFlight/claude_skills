@@ -152,6 +152,7 @@ Extracted from plugin code and README:
 **Location**: `src/index.ts` (Bun/TypeScript)
 
 **Command structure**:
+
 ```bash
 bunx @every-env/compound-plugin <command> [args]
 ```
@@ -175,6 +176,7 @@ bunx @every-env/compound-plugin <command> [args]
 ### Plugin Structure
 
 **Directory layout** (from `plugins/compound-engineering/`):
+
 ```
 agents/
 ├── review/              # Code review agents (20+ files)
@@ -259,16 +261,19 @@ skills/
 ### Install to Other Platforms
 
 **OpenCode**:
+
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to opencode
 ```
 
 **Codex**:
+
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to codex
 ```
 
 **GitHub Copilot**:
+
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to copilot
 ```

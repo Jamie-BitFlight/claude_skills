@@ -152,6 +152,7 @@ brew install --cask cmux
 ```
 
 Update later:
+
 ```bash
 brew upgrade --cask cmux
 ```

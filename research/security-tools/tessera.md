@@ -134,6 +134,7 @@ All control messages use length-prefixed JSON framing ([internal/proto/](https:/
 Every access event is logged to an append-only JSON lines file ([internal/audit/](https://github.com/emmayusufu/tessera/blob/main/internal/audit/audit.go)):
 
 **Event record structure**:
+
 ```go
 type Event struct {
   Time      time.Time  // server time
@@ -322,6 +323,7 @@ Append-only file prevents tampering (one-way writes, fsync per record).
 **Two production paths** ([deploy/DEPLOYING.md](https://github.com/emmayusufu/tessera/blob/main/deploy/DEPLOYING.md)):
 
 1. **Native binary + systemd** (recommended):
+
    ```bash
    curl https://github.com/emmayusufu/tessera/releases/download/v0.3.0/coordinator-linux-amd64 \
      > /usr/local/bin/coordinator
@@ -329,13 +331,16 @@ Append-only file prevents tampering (one-way writes, fsync per record).
    cp tessera-coordinator.service /etc/systemd/system/
    sudo systemctl enable --now tessera-coordinator
    ```
+
    - Verify: `curl http://localhost:8080/healthz` → "ok v0.3.0"
 
 2. **Docker container** (18 MB distroless image):
+
    ```bash
    docker build -t tessera .
    docker compose up -d
    ```
+
    - Image contains all three binaries (coordinator, agent, tessera)
    - Entrypoint defaults to coordinator; override with `--entrypoint` for agent/client
 
@@ -358,6 +363,7 @@ Append-only file prevents tampering (one-way writes, fsync per record).
 - Operator token (if revoke is needed)
 
 **Run agent**:
+
 ```bash
 agent -coordinator coordinator.example.org:8443 \
   -share-id {some-id} \
@@ -365,21 +371,26 @@ agent -coordinator coordinator.example.org:8443 \
 ```
 
 **Shell mode**:
+
 ```bash
 agent -coordinator ... -shell-mode -record-path /var/lib/tessera/sessions
 ```
+
 - Records PTY activity to `{session-id}.log` in record directory
 - RecordPath directory must exist (agent doesn't create it)
 
 ### Guest Workflow
 
 1. Generate cert bundle:
+
    ```bash
    tessera join https://coordinator.example.org
    ```
+
    Saves to `~/.config/tessera/{cert,key,ca}.pem`
 
 2. Request and forward in one command:
+
    ```bash
    tessera -coordinator coordinator.example.org:8443 \
      -share-id host-share \
@@ -387,6 +398,7 @@ agent -coordinator ... -shell-mode -record-path /var/lib/tessera/sessions
      -reason "emergency debug" \
      -local-listen 127.0.0.1:9999
    ```
+
    - Waits for approval at host terminal
    - On approval, forwards localhost:9999 → target through coordinator
 

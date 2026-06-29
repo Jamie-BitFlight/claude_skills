@@ -155,6 +155,7 @@ Tori uses a two-process architecture separated by SSH and Unix sockets:
 - Hourly pruning by timestamp (`alerts` pruned on `fired_at`, logs pruned on `created_at`)
 
 **Compute Loop** (Agent):
+
 ```
 collect():
   1. Read host metrics from /proc/stat, /proc/meminfo, /proc/diskstats, /proc/net/dev, /proc/uptime

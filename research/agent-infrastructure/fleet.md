@@ -164,6 +164,7 @@ Supported on: Linux (all distros), macOS, Windows, Chromebooks, AWS, GCP, Azure,
 **Hosted Option**: Fleet offers cloud-hosted deployments at <https://fleetdm.com/pricing> (premium tier)
 
 **Self-Hosted Deployment**:
+
 ```bash
 # 1. Database setup (MySQL 5.7+)
 # 2. Configuration file (fleet.yml or environment variables)

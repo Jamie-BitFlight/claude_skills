@@ -57,6 +57,7 @@ mcpskills-cli generates two output formats from discovered MCP tools:
 Generates one SKILL.md file documenting all MCP tools plus a multi-tool call script.
 
 **Output structure**:
+
 ```
 ~/.cursor/skills/<server-name>/
   SKILL.md              # Frontmatter (YAML name/description) + tool documentation
@@ -77,6 +78,7 @@ Generates one SKILL.md file documenting all MCP tools plus a multi-tool call scr
 With `--multi-skills` flag, generates one SKILL.md per tool:
 
 **Output structure**:
+
 ```
 ~/.cursor/skills/<server-name>-<tool-name-1>/
   SKILL.md
@@ -109,6 +111,7 @@ Generated call scripts invoke MCP tools via Streamable HTTP protocol in the agen
 2. Extracts server URL and Bearer token from credentials by section name
 3. Accepts tool name and JSON arguments as command-line parameters
 4. Constructs MCP protocol request (JSON-RPC 2.0 format):
+
    ```json
    {
      "jsonrpc": "2.0",
@@ -117,6 +120,7 @@ Generated call scripts invoke MCP tools via Streamable HTTP protocol in the agen
      "id": 1
    }
    ```
+
 5. POSTs to MCP server with:
    - Authorization header: `Bearer <token>`
    - Content-Type: `application/json`
@@ -125,6 +129,7 @@ Generated call scripts invoke MCP tools via Streamable HTTP protocol in the agen
 6. Parses streaming response, extracts result/error, and outputs as JSON
 
 **Invocation pattern**:
+
 ```bash
 bash ~/.cursor/skills/my-db/scripts/call.sh <tool_name> '{"key":"value"}'
 ```
@@ -245,11 +250,13 @@ No other external dependencies. Build system is `hatchling`.
 ### Installation
 
 Via pip (requires Python >= 3.10):
+
 ```bash
 pip install mcpskills-cli
 ```
 
 Development install (from repository):
+
 ```bash
 pip install -e .
 ```
@@ -257,10 +264,13 @@ pip install -e .
 ### Basic Workflow
 
 1. **Generate skills** from an MCP server:
+
    ```bash
    mcpskills-cli --url http://localhost:8027/mcp/abc123 --token mytoken --name my-db
    ```
+
    Output:
+
    ```
    Credentials saved to ~/.mcps/credentials (chmod 600)
    Skill generated at ~/.cursor/skills/my-db
@@ -270,6 +280,7 @@ pip install -e .
    ```
 
 2. **Invoke a tool** via generated script:
+
    ```bash
    bash ~/.cursor/skills/my-db/scripts/call.sh list_tables '{}'
    ```

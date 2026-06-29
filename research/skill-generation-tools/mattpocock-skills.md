@@ -127,6 +127,7 @@ Each skill is a directory containing:
 - **Support files** (optional): ADR templates, context format guides, agent briefs
 
 Example (tdd skill):
+
 ```
 tdd/
 ├── SKILL.md           # Core skill with philosophy and workflow
@@ -208,6 +209,7 @@ npx skills@latest add mattpocock/skills/tdd
 4. Workflow produces artifacts (code, tests, GitHub issues, architectural plans)
 
 Example TDD workflow:
+
 ```
 Planning → Review requirements with user, list behaviors to test, get approval
 Tracer Bullet → RED: one test, GREEN: minimal code, REFACTOR: improve

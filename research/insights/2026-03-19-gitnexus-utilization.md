@@ -39,6 +39,7 @@ The `detect_changes` tool (line 134-144 in research entry) maps git diffs to aff
 ### Integration sketch
 
 **For code-review impact assessment**:
+
 ```python
 # Pseudo-code showing tool call pattern from research entry line 133-143
 impact_result = gitnexus_impact({
@@ -59,6 +60,7 @@ impact_result = gitnexus_impact({
 ```
 
 **For post-commit verification**:
+
 ```python
 # From research entry line 144, detect_changes maps diffs to execution flows
 changed_impact = gitnexus_detect_changes({
@@ -117,6 +119,7 @@ This enables:
 ### Integration sketch
 
 **Wiki generation** (from research entry line 220, 228-235):
+
 ```bash
 # Pre-commit or post-merge hook:
 npx gitnexus wiki --model gpt-4o-mini
@@ -134,6 +137,7 @@ npx gitnexus wiki --model gpt-4o-mini
 ```
 
 **Skills generation** (from research entry line 210, 190-194):
+
 ```bash
 # After indexing:
 npx gitnexus analyze --skills

@@ -109,6 +109,7 @@ Each skill is a self-contained directory following the Agent Skills standard wit
 - Frontmatter-based metadata enabling agent auto-discovery
 
 Example SKILL.md structure:
+
 ```yaml
 ---
 name: scanpy

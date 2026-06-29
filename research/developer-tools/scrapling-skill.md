@@ -201,12 +201,14 @@ SOURCE: api-quick-ref.md, SKILL.md "Cookie 格式速查" and "超时单位速查
 ### Installation Steps
 
 1. **Install scrapling library**:
+
    ```bash
    pip install "scrapling[fetchers]"
    scrapling install  # Install browser dependencies (Camoufox, Playwright)
    ```
 
 2. **Install skill to Claude Code**:
+
    ```bash
    # User-level (available in all projects)
    cp -r . ~/.claude/skills/scrapling
@@ -250,6 +252,7 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 2. Load `templates/basic_fetch.py`
 3. Parameterize: URL="<https://example.com/blog>", CSS_SELECTOR="article h1::text"
 4. Execute:
+
    ```python
    from scrapling.fetchers import Fetcher
    page = Fetcher.get("https://example.com/blog", impersonate='chrome', timeout=30)
@@ -265,6 +268,7 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 2. Load `templates/stealth_cloudflare.py`
 3. Parameterize: URL="<https://protected.example.com>", CSS_SELECTOR=None, COOKIES=None
 4. Execute:
+
    ```python
    from scrapling.fetchers import StealthyFetcher
    page = StealthyFetcher.fetch(
@@ -285,6 +289,7 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 2. Load `templates/session_login.py`
 3. Parameterize: LOGIN_URL, LOGIN_DATA, TARGET_URLS
 4. Execute:
+
    ```python
    from scrapling.fetchers import FetcherSession
    with FetcherSession(impersonate='chrome') as s:
@@ -302,6 +307,7 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 2. Load `templates/parse_only.py`
 3. Parameterize: Selector(html_string)
 4. Execute:
+
    ```python
    from scrapling.parser import Selector
    page = Selector(html_string)

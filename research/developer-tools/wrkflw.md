@@ -75,6 +75,7 @@ Syntax checking and structural validation with CI/CD-friendly exit codes:
 - **Verbose output**: Optional detailed error reporting via `--verbose` flag
 
 **Example**:
+
 ```bash
 wrkflw validate .github/workflows/ci.yml
 wrkflw validate path/to/workflows/ --verbose
@@ -90,6 +91,7 @@ Execute workflows with multiple runtime modes:
 - **Secure Emulation**: Sandboxed host processes with filesystem/network restrictions for untrusted workflows
 
 **Example**:
+
 ```bash
 wrkflw run .github/workflows/ci.yml                  # Docker (default)
 wrkflw run --runtime podman .github/workflows/ci.yml # Podman
@@ -123,6 +125,7 @@ New in v0.8.0: Skip workflows that wouldn't trigger for a given event and change
 - **Base branch specification**: Required for `pull_request` events to evaluate `branches:` filters correctly
 
 **Example**:
+
 ```bash
 wrkflw run --diff --event push .github/workflows/ci.yml
 wrkflw run --event pull_request --base-branch main --diff .github/workflows/ci.yml
@@ -326,23 +329,27 @@ wrkflw validate .gitlab-ci.yml --gitlab
 ### Execution Examples
 
 **Basic execution**:
+
 ```bash
 wrkflw run .github/workflows/ci.yml
 ```
 
 **With runtime selection**:
+
 ```bash
 wrkflw run --runtime podman .github/workflows/ci.yml
 wrkflw run --runtime secure-emulation .github/workflows/ci.yml
 ```
 
 **Single job**:
+
 ```bash
 wrkflw run --job build .github/workflows/ci.yml
 wrkflw run --jobs .github/workflows/ci.yml  # List only
 ```
 
 **Trigger-aware execution (v0.8.0)**:
+
 ```bash
 # Auto-detect changed files from git
 wrkflw run --diff --event push .github/workflows/ci.yml

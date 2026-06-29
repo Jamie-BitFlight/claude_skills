@@ -148,6 +148,7 @@ This design allows Syft to be used both as a command-line tool and as a Go libra
 ### Installation
 
 **Recommended (automated installer with signature verification):**
+
 ```bash
 curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 ```
@@ -167,6 +168,7 @@ SOURCE: "See [Installation docs](https://oss.anchore.com/docs/installation/syft/
 ### Basic Usage
 
 **List packages in a container image:**
+
 ```bash
 syft alpine:latest
 ```
@@ -174,6 +176,7 @@ syft alpine:latest
 SOURCE: "See the packages within a container image or directory: `syft alpine:latest`" — GitHub README (accessed 2026-03-28)
 
 **List packages in a local directory:**
+
 ```bash
 syft ./my-project
 ```
@@ -181,6 +184,7 @@ syft ./my-project
 SOURCE: "See the packages within a container image or directory: `syft ./my-project`" — GitHub README (accessed 2026-03-28)
 
 **Generate SBOMs in multiple formats:**
+
 ```bash
 syft alpine:latest -o spdx-json=./spdx.json -o cyclonedx-json=./cdx.json
 ```
@@ -188,6 +192,7 @@ syft alpine:latest -o spdx-json=./spdx.json -o cyclonedx-json=./cdx.json
 SOURCE: "Multiple SBOMs to files: `syft <image> -o spdx-json=./spdx.json -o cyclonedx-json=./cdx.json`" — GitHub README (accessed 2026-03-28)
 
 **Human-readable output:**
+
 ```bash
 syft alpine:latest -o table
 ```

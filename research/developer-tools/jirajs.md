@@ -107,6 +107,7 @@ console.log(issue.fields.summary); // TypeScript knows this is a string
 ### 3. Multiple Authentication Methods
 
 **API Token** (Cloud - Recommended):
+
 ```typescript
 authentication: {
   basic: {
@@ -117,6 +118,7 @@ authentication: {
 ```
 
 **OAuth 2.0** (Cloud):
+
 ```typescript
 authentication: {
   oauth2: {
@@ -126,6 +128,7 @@ authentication: {
 ```
 
 **Personal Access Token** (Server/Data Center):
+
 ```typescript
 authentication: {
   personalAccessToken: 'your-pat-token'
@@ -133,6 +136,7 @@ authentication: {
 ```
 
 **Basic Authentication** (Server/Data Center - Legacy):
+
 ```typescript
 authentication: {
   basic: {

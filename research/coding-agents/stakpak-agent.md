@@ -101,6 +101,7 @@ Stakpak runs as a system service (launchd on macOS, systemd on Linux) with persi
 - **Preflight Checks**: `stakpak autopilot doctor` validates system readiness before startup.
 
 Commands:
+
 ```
 stakpak up                      # Start autopilot
 stakpak down                    # Stop autopilot
@@ -165,6 +166,7 @@ Stakpak abstracts LLM providers behind a unified interface, supporting:
 5. **Custom OpenAI-Compatible**: Local endpoints (Ollama, LM Studio) or custom inference servers
 
 Configuration via `~/.stakpak/config.toml` with provider-prefixed model names:
+
 ```toml
 model = "anthropic/claude-sonnet-4-5"
 model = "openai/gpt-4"

@@ -197,12 +197,15 @@ Visit impeccable.style and download ready-to-use bundles as ZIP files.
 **Option 2: Copy from Repository**
 
 **For Cursor:**
+
 ```bash
 cp -r dist/cursor/.cursor your-project/
 ```
+
 Note: Cursor requires Nightly channel and "Agent Skills" enabled in settings.
 
 **For Claude Code:**
+
 ```bash
 # Project-specific
 cp -r dist/claude-code/.claude your-project/
@@ -212,12 +215,15 @@ cp -r dist/claude-code/.claude/* ~/.claude/
 ```
 
 **For Gemini CLI:**
+
 ```bash
 cp -r dist/gemini/.gemini your-project/
 ```
+
 Note: Requires `npm i -g @google/gemini-cli@preview` and manual skill enabling.
 
 **For Codex CLI:**
+
 ```bash
 cp -r dist/codex/.codex/* ~/.codex/
 ```

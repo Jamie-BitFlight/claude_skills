@@ -167,6 +167,7 @@ with open(diary_path, "a") as f:
 ```
 
 On agent startup:
+
 ```python
 # In agent initialization:
 from pathlib import Path

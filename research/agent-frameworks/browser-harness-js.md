@@ -176,6 +176,7 @@ export class Page {
 ```
 
 Regeneration is on-demand when protocol JSONs change:
+
 ```bash
 cd <skill-dir>/sdk && bun gen.ts
 browser-harness-js --restart

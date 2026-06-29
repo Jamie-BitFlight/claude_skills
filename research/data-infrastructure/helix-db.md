@@ -133,6 +133,7 @@ Graph traversal starts with `g()` and chains methods for navigation:
 ### Storage Options
 
 **Local Development** (in-memory by default):
+
 ```bash
 helix start dev              # in-memory, ephemeral
 helix start dev --disk       # persistent to local disk
@@ -164,9 +165,11 @@ helix update  # Update to latest version
 ### Project Initialization (Fastest Path)
 
 **Interactive bootstrapper** (recommended for agents):
+
 ```bash
 helix chef
 ```
+
 This single command:
 - Scaffolds a new project directory
 - Installs HelixDB query skills + docs MCP
@@ -175,6 +178,7 @@ This single command:
 - Writes `HELIX_CHEF_PROMPT.md` for AI agents
 
 **Manual setup**:
+
 ```bash
 mkdir my-helix-app && cd my-helix-app
 helix init                              # Creates helix.toml, .helix/, examples/request.json
@@ -192,6 +196,7 @@ cargo init && cargo add helix-db tokio sonic-rs
 ```
 
 **Example query** (from README.md):
+
 ```rust
 use helix_db::Client;
 use helix_db::dsl::prelude::*;
@@ -234,6 +239,7 @@ npm init -y && npm install @helix-db/helix-db
 ```
 
 **Example query** (from README.md):
+
 ```typescript
 import {
   Predicate, PropertyInput, PropertyProjection,
@@ -273,6 +279,7 @@ pip install helix-db  # or: pip install -e sdks/python
 ```
 
 **Example query** (from README.md):
+
 ```python
 from helixdb import Client, Predicate, g, param, define_params, read_batch, write_batch
 

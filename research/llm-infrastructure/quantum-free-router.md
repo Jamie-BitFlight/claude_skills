@@ -127,23 +127,29 @@ Source: install.sh (full script and automation steps), installation.md lines 1�
 Three operational tools are provided:
 
 1. **Health Check** (`scripts/health-check.sh`):
+
    ```bash
    curl -fsS http://127.0.0.1:4000/health
    ```
+
    Returns HTTP 200 with status JSON when router is operational.
 
 2. **Config Validation** (`scripts/validate-config.py`):
+
    ```bash
    python3 scripts/validate-config.py ~/.quantum-free-router/config.json --allow-real-keys
    ```
+
    Validates JSON shape and checks for secret-pattern violations in the local config.
 
 3. **Live Certification** (`scripts/certify-router.sh`):
+
    ```bash
    QFR_BASE_URL=http://127.0.0.1:4000/v1 \
    QFR_MODEL_FILE=configs/certification-models.txt \
    scripts/certify-router.sh
    ```
+
    Sends a small deterministic request to every model in the file, prints PASS or FAIL. Current state evidence, not a guarantee of future availability.
 
 Source: installation.md lines 36–99, limits-and-reliability.md lines 1–52, SECURITY.md.
@@ -178,6 +184,7 @@ Each provider can be configured with:
 - `max_retries` (typically 1, allowing fast failover to next provider rather than repeated attempts)
 
 Example from config.template.json:
+
 ```json
 "opencode": {
   "network_config": {

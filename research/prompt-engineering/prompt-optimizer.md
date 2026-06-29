@@ -200,6 +200,7 @@ installI18n(app) — bilingual support (English/Chinese)
 Vue 3 + Vite frontend entry point. Consumes `@prompt-optimizer/core` (services) and `@prompt-optimizer/ui` (components).
 
 **Build Pipeline**:
+
 ```bash
 pnpm build:ui         # Compile UI library to ESM
 pnpm build:web        # Vite build for static assets

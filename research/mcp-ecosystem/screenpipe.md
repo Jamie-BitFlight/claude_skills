@@ -105,6 +105,7 @@ Full REST API on localhost:3030 (default):
 - **SDK**: JavaScript/TypeScript SDK available
 
 **Example**:
+
 ```javascript
 import { pipe } from "@screenpipe/js";
 const results = await pipe.queryScreenpipe({

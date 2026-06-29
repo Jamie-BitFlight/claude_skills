@@ -317,6 +317,7 @@ Source: README.md lines 426–453 (accessed 2026-05-10).
 ### Claude Code (Recommended)
 
 **Via Plugin Marketplace**:
+
 ```bash
 /plugin marketplace add hyhmrright/brooks-lint
 /plugin install brooks-lint@brooks-lint-marketplace
@@ -325,6 +326,7 @@ Source: README.md lines 426–453 (accessed 2026-05-10).
 Short-form commands are auto-installed on first session start.
 
 **Manual Install**:
+
 ```bash
 mkdir -p ~/.claude/skills/brooks-lint
 cp -r skills/* ~/.claude/skills/brooks-lint/
@@ -333,11 +335,13 @@ cp -r skills/* ~/.claude/skills/brooks-lint/
 ### Gemini CLI
 
 **Via Extension**:
+
 ```bash
 /extensions install https://github.com/hyhmrright/brooks-lint
 ```
 
 **Manual Install**:
+
 ```bash
 mkdir -p ~/.gemini/skills/brooks-lint
 cp -r skills/* ~/.gemini/skills/brooks-lint/
@@ -346,11 +350,13 @@ cp -r skills/* ~/.gemini/skills/brooks-lint/
 ### Codex CLI
 
 **Via Skill Installer** (in Codex session):
+
 ```
 Install the brooks-lint skill from hyhmrright/brooks-lint
 ```
 
 **Manual Install**:
+
 ```bash
 git clone https://github.com/hyhmrright/brooks-lint.git /tmp/brooks-lint
 mkdir -p ~/.codex/skills/brooks-lint

@@ -52,6 +52,7 @@ Boneyard solves this by:
 **Mechanism**: The `snapshotBones()` function walks the rendered DOM tree, reads `getBoundingClientRect()` on every visible leaf element and container, and stores positions as a flat array.
 
 **Example usage**:
+
 ```typescript
 import { snapshotBones } from 'boneyard-js'
 const bones = snapshotBones(document.querySelector('.my-card'))
@@ -73,6 +74,7 @@ const bones = snapshotBones(document.querySelector('.my-card'))
 **Mechanism**: The `<Skeleton>` component conditionally renders either the skeleton (gray bone rectangles with pulse animation) or the real content based on the `loading` prop. It auto-detects dark mode, tracks container resize, and picks the correct breakpoint from pre-generated bones.
 
 **Example usage**:
+
 ```tsx
 import { Skeleton } from 'boneyard-js/react'
 
@@ -103,6 +105,7 @@ function BlogCard({ post, isLoading }) {
 **Mechanism**: The `npx boneyard-js build` command launches a dev server, uses Playwright to navigate to each component route, injects the snapshot function into the page, and writes bones to `./src/bones/registry.ts`.
 
 **Usage**:
+
 ```bash
 npx boneyard-js build                           # Auto-detect dev server
 npx boneyard-js build http://localhost:3000    # Explicit URL
@@ -114,6 +117,7 @@ npx boneyard-js build --breakpoints 390,820,1440 --out ./public/bones
 - `src/bones/registry.ts` — auto-generated import of all bone files
 
 **App setup** (one-time):
+
 ```tsx
 // app/layout.tsx
 import './bones/registry'  // Populates the bones registry
@@ -128,6 +132,7 @@ import './bones/registry'  // Populates the bones registry
 **Default breakpoints**: 375px (mobile), 768px (tablet), 1024px (desktop)
 
 **Example**:
+
 ```typescript
 const descriptor = extractResponsive(element, [375, 768, 1280])
 // Returns: { 375: SkeletonDescriptor, 768: SkeletonDescriptor, 1280: SkeletonDescriptor }
@@ -147,6 +152,7 @@ const descriptor = extractResponsive(element, [375, 768, 1280])
 **Use case**: Pre-compute bones at build time without a DOM or browser.
 
 **Example**:
+
 ```typescript
 import { computeLayout, renderBones } from 'boneyard-js'
 
@@ -233,6 +239,7 @@ const html = renderBones(bones)  // Render to HTML string
 - `captureRoundedBorders` — include containers with visible rounded borders even if background is white (default: true)
 
 Pass via:
+
 ```tsx
 <Skeleton snapshotConfig={{ excludeTags: ['nav'], excludeSelectors: ['.icon'] }}>
   <MyComponent />
@@ -245,6 +252,7 @@ Pass via:
 - `animate` — enable/disable pulse animation (default: true)
 
 **Manual Bone Supply** via `initialBones` prop:
+
 ```tsx
 import bones from './src/bones/blog-card.bones.json'
 <Skeleton loading={isLoading} initialBones={bones}>

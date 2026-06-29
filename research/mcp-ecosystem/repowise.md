@@ -219,13 +219,16 @@ repowise serve                # workspace dashboard + per-repo pages
 ### Claude Code Integration
 
 Option A: Plugin (one-command setup)
+
 ```
 /plugin marketplace add repowise-dev/repowise
 /plugin install repowise@repowise
 ```
+
 Then use `/repowise:init`, `/repowise:health`, `/repowise:risk`, etc.
 
 Option B: Manual MCP registration
+
 ```json
 {
   "mcpServers": {
@@ -235,6 +238,7 @@ Option B: Manual MCP registration
 ```
 
 Option C: Codex editor
+
 ```bash
 repowise init --codex         # writes .codex/config.toml, hooks.json, AGENTS.md
 ```

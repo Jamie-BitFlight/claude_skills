@@ -187,10 +187,12 @@ app.Start()
 1. Install Go 1.25+
 2. Create project with `go mod init myapp && go mod tidy`
 3. Import and use PocketBase:
+
    ```go
    import "github.com/pocketbase/pocketbase"
    app := pocketbase.New()
    ```
+
 4. Run: `go run main.go serve` or build: `CGO_ENABLED=0 go build`
 
 **Extract**: "To build a statically linked executable, you can run CGO_ENABLED=0 go build and then start the created executable with ./myapp serve" (README.md, accessed 2026-03-28)

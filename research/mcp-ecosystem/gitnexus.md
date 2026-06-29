@@ -300,6 +300,7 @@ This command:
 ### MCP Configuration (One-Time)
 
 **Automatic**:
+
 ```bash
 npx gitnexus setup
 ```
@@ -309,11 +310,13 @@ This auto-detects your editors and writes the correct global MCP config. Only ne
 **Manual Configuration**:
 
 **Claude Code**:
+
 ```bash
 claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **Cursor** (`~/.cursor/mcp.json` — global, works for all projects):
+
 ```json
 {
   "mcpServers": {
@@ -326,6 +329,7 @@ claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **OpenCode** (`~/.config/opencode/config.json`):
+
 ```json
 {
   "mcp": {
@@ -338,6 +342,7 @@ claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **Codex** (`~/.codex/config.toml` for system scope, or `.codex/config.toml` for project scope):
+
 ```toml
 [mcp_servers.gitnexus]
 command = "npx"
@@ -349,6 +354,7 @@ args = ["-y", "gitnexus@latest", "mcp"]
 **Live**: No install—visit [gitnexus.vercel.app](https://gitnexus.vercel.app) and drag & drop a ZIP or GitHub repo URL.
 
 **Local Development**:
+
 ```bash
 git clone https://github.com/abhigyanpatwari/GitNexus.git
 cd gitnexus/gitnexus-web
@@ -357,6 +363,7 @@ npm run dev
 ```
 
 **Local Backend Mode** (connect CLI-indexed repos to web UI):
+
 ```bash
 gitnexus serve
 # Opens http://localhost with auto-detection of local indexed repos

@@ -154,12 +154,14 @@ Skills work across 8+ platforms (Claude Code, Cursor, Antigravity, Gemini, Winds
 ### Claude Code (Recommended)
 
 **Marketplace installation:**
+
 ```bash
 /plugin marketplace add addyosmani/agent-skills
 /plugin install agent-skills@addy-agent-skills
 ```
 
 **Local development:**
+
 ```bash
 git clone https://github.com/addyosmani/agent-skills.git
 claude --plugin-dir /path/to/agent-skills
@@ -168,11 +170,13 @@ claude --plugin-dir /path/to/agent-skills
 ### Antigravity CLI
 
 **From repository:**
+
 ```bash
 agy plugin install https://github.com/addyosmani/agent-skills.git
 ```
 
 **From local clone:**
+
 ```bash
 git clone https://github.com/addyosmani/agent-skills.git
 agy plugin install ./agent-skills

@@ -88,6 +88,7 @@ Developers and AI teams face five persistent friction points:
 **16+ coding agents compatible** (README lines 286–315): Claude Code, Codex CLI, Gemini CLI, Cursor, Copilot, Continue, OpenCode, Kilo Code, Droid, OpenClaw, Kiro, Command Code, Cline, Antigravity, Windsurf, AMP, Hermes.
 
 **Backwards-compatible aliases for legacy clients** that cannot send `Authorization` headers:
+
 ```text
 http://localhost:20128/vscode/YOUR_KEY/chat/completions
 http://localhost:20128/vscode/YOUR_KEY/models
@@ -107,6 +108,7 @@ http://localhost:20128/vscode/YOUR_KEY/models
 4. **Free** (Kiro, Qoder, Pollinations, LongCat) — no cap or very high limit.
 
 **Real example combo** (README line 248–253):
+
 ```
 Combo: "always-on" (strategy: priority)
   1. cc/claude-opus-4-7   ← subscription (use it fully)
@@ -150,6 +152,7 @@ Result: 4 layers of fallback = zero downtime
 | **Stacked (RTK → Caveman)** | **78–95%** | **Mixed prompts + tool logs** |
 
 **Real example — Standard mode** (README lines 472–478):
+
 ```
 Before (69 tokens):
   "The reason your React component is re-rendering is likely because you're
@@ -166,6 +169,7 @@ Same answer. 72% fewer tokens. Zero accuracy loss. ✅
 ```
 
 **Math**: when RTK (80% reduction) + Caveman (46% reduction) stack:
+
 ```
 combined = 1 − (1 − 0.80) × (1 − 0.46) = 89.2% saved
 range    = 78.4–94.6%
@@ -397,6 +401,7 @@ PORT=20128 npm run dev
 ### Per-Tool Setup Examples
 
 **Claude Code** (`~/.claude/claude.code/config.json`):
+
 ```json
 {
   "anthropic": {
@@ -408,12 +413,14 @@ PORT=20128 npm run dev
 ```
 
 **Cursor** (Settings → Features → Claude → API Key & Base URL):
+
 ```
 Base URL: http://localhost:20128/v1
 API Key:  [copy from Dashboard]
 ```
 
 **OpenCode** (Provider Settings):
+
 ```
 Name:     omniroute
 Base URL: http://localhost:20128/v1

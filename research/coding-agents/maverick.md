@@ -87,6 +87,7 @@ Each skill is machine-readable markdown with YAML frontmatter, enabling the LLM 
 While best-practice skills define universal standards, every project has unique technology choices (Pino vs Bunyan for logging, Vitest vs Jest for testing, etc.). The **upskill system** bridges this:
 
 From docs/architecture.md:
+
 ```
 1. Scan codebase for each topic defined in `skills/upskill/topics.json`
 2. If an implementation exists (e.g., Pino logger configured), document exactly what's there
@@ -170,6 +171,7 @@ Maverick provides three entry points accommodating different trust/autonomy mode
 The core innovation is layered enforcement. Each practice (logging, testing, security, etc.) is enforced at multiple checkpoints:
 
 From docs/overview.md:
+
 ```
 Enforcement Chain:
 1. Best-practice skill — prevents anti-patterns (console.log vs structured logger)
@@ -196,6 +198,7 @@ Example (logging):
 For scaling autonomous development beyond local Claude Code, Maverick deploys workers to AWS:
 
 **Architecture** (from claude-code-workers.md):
+
 ```
 GitHub webhook → SQS message queue → EC2 worker → Claude Code
 ```
@@ -217,6 +220,7 @@ GitHub webhook → SQS message queue → EC2 worker → Claude Code
 7. Output streams to CloudWatch Logs at `/maverick/worker`
 
 **Commands** (from CLI):
+
 ```bash
 maverick cloud init           # Initialize AWS infrastructure
 maverick build-ami            # Bake Ubuntu 24.04 LTS AMI (~10-15 min)
@@ -292,6 +296,7 @@ Makes the `maverick` command available globally.
 ### Initialize a Project
 
 Within Claude Code:
+
 ```
 /maverick:init
 ```
@@ -305,22 +310,26 @@ This:
 ### Run a Development Task
 
 **Autonomous (no human involvement until PR review)**:
+
 ```
 /maverick:do-issue-solo 42
 ```
 
 **Supervised (human checkpoints)**:
+
 ```
 /maverick:do-issue-guided 42
 ```
 
 **Local task without GitHub**:
+
 ```
 /maverick:do-task-solo
 # User describes the task, Claude handles design → execution → PR
 ```
 
 **Audit codebase against Maverick standards**:
+
 ```
 /maverick:codebase-audit
 ```

@@ -141,6 +141,7 @@ Export to Web/Mobile/XR
 ### Example Workflows
 
 **Workflow 1: Marketing Landing Page**
+
 ```
 Prompt: "Create an interactive landing page for a SaaS product with a 3D animated hero section, pricing table with hover effects, and testimonial carousel. Use a blue and white color scheme."
 
@@ -148,6 +149,7 @@ Output: Fully functional landing page (HTML/CSS/JS) + 3D hero model + testimonia
 ```
 
 **Workflow 2: Data Dashboard**
+
 ```
 Prompt: "Build a real-time sales dashboard with CSV data showing regional revenue, with animated bar charts and a 3D globe showing sales by country."
 
@@ -155,6 +157,7 @@ Output: Interactive web app reading CSV data + animated chart components + 3D gl
 ```
 
 **Workflow 3: Interactive Product Demo**
+
 ```
 Prompt: "Generate an interactive 3D product explorer for a furniture company. Show product variations with rotation controls, material selection, and AR preview option."
 

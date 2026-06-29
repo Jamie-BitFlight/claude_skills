@@ -130,6 +130,7 @@ HomeButler presents **direct integration opportunities** as an MCP server depend
 ### Phase 1: Optional MCP Server Addition (1-2 hours)
 
 1. **Conditional MCP Configuration** — Update `.claude-plugin/plugin.json` to optionally include homebutler
+
    ```json
    {
      "mcpServers": {

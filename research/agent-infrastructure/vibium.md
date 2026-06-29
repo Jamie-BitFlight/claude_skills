@@ -59,6 +59,7 @@ The `map` command returns an interactive element reference set (`@e1`, `@e2`, et
 Vibium provides client libraries for three languages, each with both async and sync APIs:
 
 **JavaScript/TypeScript**:
+
 ```javascript
 import { browser } from 'vibium'
 const bro = await browser.start()
@@ -69,6 +70,7 @@ await bro.stop()
 ```
 
 Or synchronous version:
+
 ```javascript
 const { browser } = require('vibium/sync')
 const bro = browser.start()
@@ -77,6 +79,7 @@ vibe.go('https://example.com')
 ```
 
 **Python** (async and sync):
+
 ```python
 from vibium.async_api import browser
 bro = await browser.start()
@@ -85,6 +88,7 @@ await vibe.go("https://example.com")
 ```
 
 **Java**:
+
 ```java
 var bro = Vibium.start();
 var vibe = bro.page();
@@ -124,6 +128,7 @@ The browser cache is platform-specific:
 - Windows: `%LOCALAPPDATA%\vibium\`
 
 Users can skip the download if managing Chrome separately:
+
 ```bash
 VIBIUM_SKIP_BROWSER_DOWNLOAD=1 npm install vibium
 ```
@@ -261,6 +266,7 @@ node hello.js  # Run script using sync API
 ```
 
 Full script:
+
 ```javascript
 const fs = require('fs')
 const { browser } = require('vibium/sync')

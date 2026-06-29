@@ -89,6 +89,7 @@ Blueprints are versioned Python artifacts with immutable release streams. The pl
    - Network isolation via default policy; approved endpoints persist for session
 
 **Inference Flow:**
+
 ```
 Agent (sandbox) → OpenShell gateway (host) → Provider (NVIDIA/OpenAI/Anthropic/etc)
 ```

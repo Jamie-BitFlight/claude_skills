@@ -108,6 +108,7 @@ When the desktop app is running, omit the file argument to operate on the live c
 - **Tailwind CSS JSX export** — Export selections as HTML with Tailwind v4 utility classes
 
 Example output:
+
 ```html
 <div className="flex flex-col gap-4 p-6 bg-white rounded-xl">
   <p className="text-2xl font-bold text-[#1D1B20]">Card Title</p>

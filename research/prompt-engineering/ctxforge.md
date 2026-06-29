@@ -158,11 +158,13 @@ Source: README.md lines 593-629.
 ### Installation
 
 **For Node.js projects:**
+
 ```bash
 npx ctxforge init
 ```
 
 **Universal installation (any language):**
+
 ```bash
 curl -L https://github.com/vencolini/ctxforge/archive/refs/heads/main.zip -o ctxforge.zip
 unzip ctxforge.zip
@@ -195,26 +197,31 @@ Source: README.md lines 774-794.
 ### Platform Integration
 
 **Claude Code:**
+
 ```bash
 claude-code docs/context/CORE.md
 ```
 
 **Cursor (.cursorrules file):**
+
 ```
 Before starting tasks, read docs/context/CORE.md to load the ctxforge framework and follow the appropriate protocol for the task type.
 ```
 
 **ChatGPT (Custom Instructions):**
+
 ```
 For coding projects: If docs/context/CORE.md exists, read it at session start and follow the protocol-based workflow for all tasks.
 ```
 
 **Cline / Continue / Aider / Other CLIs:**
+
 ```
 Universal command: Read docs/context/CORE.md and ask what I want to work on
 ```
 
 **GitHub Copilot (Workspace context):**
+
 ```
 Add docs/context/ to workspace context sources
 Prefix requests with: "Following ctxforge protocols in docs/context/"
@@ -225,6 +232,7 @@ Source: README.md lines 482-507.
 ### Example: Feature Development Workflow
 
 **Without ctxforge:**
+
 ```
 Developer: "Add search functionality"
 LLM: [Implements Elasticsearch cluster with Docker, Redis caching, complex distributed architecture]
@@ -233,6 +241,7 @@ Developer: "I need simple PostgreSQL full-text search for 50K items..."
 ```
 
 **With ctxforge:**
+
 ```
 Developer: "Add search functionality"
 LLM: ✓ Intent detected: NEW_FEATURE

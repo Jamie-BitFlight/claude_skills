@@ -93,6 +93,7 @@ The rewritten version of OpenCut is introducing several architectural innovation
 ## Installation & Usage
 
 **Development Setup**:
+
 ```bash
 # Install dependencies with Bun
 bun install
@@ -113,6 +114,7 @@ cd apps/web && bun test
 - TypeScript 6.0.2 (included in devDependencies)
 
 **Production Deployment**:
+
 ```bash
 bun run build  # Outputs optimized Vite bundle
 wrangler deploy  # Deploys to Cloudflare Workers

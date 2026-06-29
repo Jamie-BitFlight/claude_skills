@@ -29,6 +29,7 @@ Replacing the Python script invocation with a direct `gh api` call would:
 ### Integration sketch
 
 **Current (via Python script):**
+
 ```bash
 uv run .claude/skills/gh/scripts/github_project_setup.py milestone create \
   --title "{title}" \
@@ -37,6 +38,7 @@ uv run .claude/skills/gh/scripts/github_project_setup.py milestone create \
 ```
 
 **Proposed (direct `gh api`):**
+
 ```bash
 gh api \
   --method POST \
@@ -77,12 +79,14 @@ Replacing the Python script removes a dependency and makes the milestone closure
 ### Integration sketch
 
 **Current (via Python script):**
+
 ```bash
 uv run .claude/skills/gh/scripts/github_project_setup.py milestone close --number {number}
 uv run .claude/skills/gh/scripts/github_project_setup.py project update-status --issue {issue_number} --status Done
 ```
 
 **Proposed (direct `gh api` + label operations):**
+
 ```bash
 # Close the milestone
 gh api \
@@ -127,6 +131,7 @@ Replacing the Python script would:
 ### Integration sketch
 
 **Current (via Python script):**
+
 ```bash
 uv run .claude/skills/gh/scripts/github_project_setup.py issue create \
   --title "{type}: {title}" \
@@ -145,6 +150,7 @@ uv run .claude/skills/gh/scripts/github_project_setup.py project update-status \
 ```
 
 **Proposed (direct `gh` commands):**
+
 ```bash
 # Create issue with labels in one command
 gh issue create -R {owner}/{repo} \
@@ -166,6 +172,7 @@ gh api \
 ```
 
 Query all issues in milestone:
+
 ```bash
 gh issue list -R {owner}/{repo} --milestone {number} --json number,title,state
 ```

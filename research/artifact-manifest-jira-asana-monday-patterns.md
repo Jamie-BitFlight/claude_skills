@@ -59,6 +59,7 @@ Example: "Issue A blocks Issue B"
 [Source: Jira Cloud REST API - Attachments](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-attachments/)
 
 **REST API Design** (extensible remote linking)
+
 ```
 POST /issue/{issueIdOrKey}/remotelink
 {
@@ -251,21 +252,27 @@ Asana models artifact relationships separately from task dependencies:
 ### 4.4 Cross-System Reference Patterns
 
 **Jira Remote Links** (most sophisticated)
+
 ```
 Issue -> RemoteLink -> External URL + Metadata
 ```
+
 Enables: external artifact system maintains single source of truth; multiple issues can reference same artifact without redundancy.
 
 **Monday Connect Boards**
+
 ```
 ItemA -> ConnectColumn -> ItemB (on different board)
 ```
+
 Enables: cross-board relationships without duplication; automated linking via shared data fields.
 
 **Asana Dependencies** (limited to timing)
+
 ```
 TaskA -> DependsOn -> TaskB
 ```
+
 Enables: workflow sequencing, not artifact referencing. No structural connection between dependencies and attachments.
 
 ---
@@ -275,6 +282,7 @@ Enables: workflow sequencing, not artifact referencing. No structural connection
 ### 5.1 REST/GraphQL Endpoints
 
 **Jira REST API Issue Links**
+
 ```
 POST /rest/api/3/issueLink
 {
@@ -285,6 +293,7 @@ POST /rest/api/3/issueLink
 ```
 
 **Jira REST API Remote Links**
+
 ```
 POST /rest/api/2/issue/{issueIdOrKey}/remotelink
 {
@@ -297,12 +306,14 @@ POST /rest/api/2/issue/{issueIdOrKey}/remotelink
 ```
 
 **Asana API Attachments**
+
 ```
 GET /attachments/{attachment_gid}
 → {name, resource_subtype, created_at, created_by, url, view_url, resource}
 ```
 
 **Monday GraphQL Files Column**
+
 ```graphql
 query {
   items {
@@ -339,6 +350,7 @@ query {
 ### 6.1 Pattern for Plan Artifacts
 
 **Current State** (plan files + task files + backlog GitHub issues)
+
 ```
 Issue #N → GitHub issue body (groomed content)
          → Local plan/tasks-{N}-{slug}.md (SAM plan file)
@@ -351,6 +363,7 @@ Issue #N → GitHub issue body (groomed content)
 **Why**: Plan artifacts are already distributed (GitHub issues, local plan files, architecture specs). A Jira-style remote-linking approach avoids redundancy:
 
 **Model**:
+
 ```
 GitHub Issue #N → (canonical source)
                 → Links to:
@@ -371,6 +384,7 @@ GitHub Issue #N → (canonical source)
 **Why**: If task/artifact relationships need cross-board querying:
 
 **Model**:
+
 ```
 Task Item (GitHub issue)
   → Connect Column: [linked plan files]
@@ -387,6 +401,7 @@ Drawback: Requires adopting Monday or similar platform; doesn't work with GitHub
 **Why**: Simpler, no external reference system:
 
 **Model**:
+
 ```
 GitHub Issue
   → Task description (embedded feature context)

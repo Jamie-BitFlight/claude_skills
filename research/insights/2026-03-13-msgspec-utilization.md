@@ -29,6 +29,7 @@ The MCP server processes JSONL files containing Claude Code session transcripts 
 ### Integration sketch
 
 **Before** (current stdlib json):
+
 ```python
 def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
     """Read a JSONL file and return a list of parsed records."""
@@ -41,6 +42,7 @@ def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
 **After** (msgspec.json with optional schema validation):
 
 *Option A: Direct replacement without schema (compatible with current code)*:
+
 ```python
 import msgspec
 
@@ -53,6 +55,7 @@ def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
 ```
 
 *Option B: With Struct schema validation (requires changes to caller contract)*:
+
 ```python
 import msgspec
 
@@ -103,6 +106,7 @@ Switching to msgspec.json.decode with a Struct would:
 ### Integration sketch
 
 **Current validation pattern** (lines 193-215):
+
 ```python
 try:
     record = json.loads(line)
@@ -130,6 +134,7 @@ text = _extract_text(content)
 ```
 
 **After msgspec.Struct**:
+
 ```python
 import msgspec
 

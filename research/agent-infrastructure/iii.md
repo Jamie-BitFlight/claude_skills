@@ -227,22 +227,26 @@ Source: "[This starts the engine with the built-in modules and an in-memory Open
 ### Quick Start
 
 1. Install iii engine:
+
 ```bash
 curl -fsSL https://install.iii.dev/iii/main/install.sh | sh
 ```
 
 2. Scaffold a project:
+
 ```bash
 iii project init myapp
 cd myapp
 ```
 
 3. Start the engine:
+
 ```bash
 iii
 ```
 
 4. Open the console:
+
 ```bash
 iii console
 ```

@@ -138,6 +138,7 @@ AI coding agents (Claude Code, Codex, Cursor, Aider, Windsurf) ship with general
 **Feature:** Skills published to ClawHub marketplace and Claude Code plugin marketplace. Plugin registry in `.claude-plugin/marketplace.json` coordinates distribution across multiple tools.
 
 **Registry Format** (source: `.claude-plugin/marketplace.json` excerpt):
+
 ```json
 {
   "name": "claude-code-skills",

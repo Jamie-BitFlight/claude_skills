@@ -64,6 +64,7 @@ query {
 **Filter type**: `WorkItemWidgetCustomFieldFilterInputType`
 
 **Example structure**:
+
 ```graphql
 query {
   issues(customField: [
@@ -99,6 +100,7 @@ Work items use a widget-based system for all attributes. Custom fields should fo
 - Database migration example: `db/migrate/20250121163545_add_custom_fields_widget_to_work_item_types.rb`
 
 **Pattern for updating via workItemUpdate**:
+
 ```graphql
 mutation {
   workItemUpdate(input: {
@@ -157,6 +159,7 @@ The full GraphQL type definitions for `CustomField`, `CustomFieldValue`, `Custom
 ### For Reading Custom Fields (WORKS)
 
 1. **Query custom field definitions via GraphQL**:
+
    ```graphql
    query {
      customField(id: "gid://gitlab/Issuables::CustomField/1") {
@@ -167,6 +170,7 @@ The full GraphQL type definitions for `CustomField`, `CustomFieldValue`, `Custom
    ```
 
 2. **Filter work items by custom field values via GraphQL**:
+
    ```graphql
    query {
      issues(customField: [{
@@ -183,6 +187,7 @@ The full GraphQL type definitions for `CustomField`, `CustomFieldValue`, `Custom
 ### For Writing/Updating Custom Fields (UNCLEAR)
 
 Based on the widget architecture, the pattern should be:
+
 ```graphql
 mutation {
   workItemUpdate(input: {

@@ -153,12 +153,14 @@ Starts the local API and opens the UI (unless `OCTOGENT_NO_OPEN=1` is set). On f
 ### CLI Commands
 
 **Tentacles**:
+
 ```bash
 octogent tentacle create <name> --description "API runtime and routes"
 octogent tentacle list
 ```
 
 **Terminals**:
+
 ```bash
 octogent terminal create --name "API runtime" --tentacle-id api-runtime
 octogent terminal list
@@ -168,6 +170,7 @@ octogent terminal prune
 ```
 
 **Inter-Agent Messaging**:
+
 ```bash
 octogent channel send <terminal-id> "message"
 octogent channel list <terminal-id>

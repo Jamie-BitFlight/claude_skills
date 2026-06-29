@@ -83,6 +83,7 @@ The DIRECTORY.md file documents implementations across 40+ categories:
 - Correctness verification (against Python's built-in `sorted()`)
 
 Example from bubble_sort.py:
+
 ```python
 >>> bubble_sort_iterative([0, 5, 2, 3, 2])
 [0, 2, 2, 3, 5]
@@ -128,6 +129,7 @@ The repository organizes algorithms by category in top-level directories. Each c
 - Optional `README.md` with category-specific documentation
 
 Example structure for sorts:
+
 ```
 sorts/
 ├── __init__.py

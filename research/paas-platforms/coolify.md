@@ -179,6 +179,7 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 Installs Coolify Docker Compose stack with default services: coolify app, PostgreSQL, Redis, Soketi, Vite dev server, Mailpit, MinIO.
 
 Start development environment:
+
 ```bash
 spin up
 # or: docker compose -f docker-compose.dev.yml up -d

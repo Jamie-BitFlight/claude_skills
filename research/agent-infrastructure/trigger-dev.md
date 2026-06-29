@@ -42,6 +42,7 @@ The platform solves four core problems:
 
 ### Task Definition and Execution
 From README code example:
+
 ```typescript
 import { task } from "@trigger.dev/sdk";
 
@@ -52,6 +53,7 @@ export const helloWorld = task({
   },
 });
 ```
+
 Tasks are written in TypeScript/JavaScript in the user's codebase, version-controlled, and deployed to Trigger.dev.
 
 ### Long-running Tasks
