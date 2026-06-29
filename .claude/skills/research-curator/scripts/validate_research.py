@@ -42,7 +42,10 @@ class Issue(TypedDict):
 
 app = typer.Typer(add_completion=False)
 
-REQUIRED_SECTIONS = [
+# Sections required in the body for all formats.
+# For yaml_frontmatter entries, freshness data lives in the frontmatter, so
+# the Freshness Tracking body section is not required.
+REQUIRED_BODY_SECTIONS = [
     "Overview",
     "Problem Addressed",
     "Key Statistics",
@@ -51,8 +54,11 @@ REQUIRED_SECTIONS = [
     "Installation & Usage",
     "Relevance to Claude Code Development",
     "References",
-    "Freshness Tracking",
 ]
+
+# Additional body section required only for text-header format entries.
+# YAML frontmatter entries satisfy freshness via frontmatter keys instead.
+_REQUIRED_SECTIONS_TEXT_HEADER_ONLY = ["Freshness Tracking"]
 
 # Alternative accepted spellings for section headings
 SECTION_ALIASES: dict[str, list[str]] = {"Installation & Usage": ["Installation and Usage"]}
@@ -206,8 +212,12 @@ def _section_content(lines: list[str], start: int, end: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _check_section_completeness(sections: dict[str, tuple[int, int]]) -> list[Issue]:
+def _check_section_completeness(sections: dict[str, tuple[int, int]], required: list[str]) -> list[Issue]:
     """Check that all required sections exist.
+
+    Args:
+        sections: Section heading → (start_line, end_line) mapping.
+        required: List of section headings that must be present.
 
     Returns:
         List of ``Issue`` dicts, one per missing required section.
@@ -215,16 +225,16 @@ def _check_section_completeness(sections: dict[str, tuple[int, int]]) -> list[Is
     issues: list[Issue] = []
     section_names = set(sections.keys())
 
-    for required in REQUIRED_SECTIONS:
-        found = required in section_names
+    for section in required:
+        found = section in section_names
         if not found:
-            aliases = SECTION_ALIASES.get(required, [])
+            aliases = SECTION_ALIASES.get(section, [])
             found = any(alias in section_names for alias in aliases)
         if not found:
             issues.append({
                 "check": "section_completeness",
                 "severity": "error",
-                "message": f"Missing section: {required}",
+                "message": f"Missing section: {section}",
                 "line": None,
             })
     return issues
@@ -543,7 +553,7 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
         body_lines = _yaml_body_lines(lines)
         sections = _parse_sections(body_lines)
         all_issues: list[Issue] = []
-        all_issues.extend(_check_section_completeness(sections))
+        all_issues.extend(_check_section_completeness(sections, REQUIRED_BODY_SECTIONS))
         all_issues.extend(_check_header_fields_yaml(frontmatter))
         all_issues.extend(_check_empty_sections(body_lines, sections))
         all_issues.extend(_check_access_dates(body_lines, sections))
@@ -555,7 +565,9 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
         header_lines, _ = _get_header_block(lines)
         sections = _parse_sections(lines)
         all_issues = []
-        all_issues.extend(_check_section_completeness(sections))
+        all_issues.extend(
+            _check_section_completeness(sections, REQUIRED_BODY_SECTIONS + _REQUIRED_SECTIONS_TEXT_HEADER_ONLY)
+        )
         all_issues.extend(_check_header_fields_text(header_lines))
         all_issues.extend(_check_empty_sections(lines, sections))
         all_issues.extend(_check_access_dates(lines, sections))
