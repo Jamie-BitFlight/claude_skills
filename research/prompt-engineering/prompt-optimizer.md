@@ -409,14 +409,20 @@ For Claude Code users working with `/ai-design-tools` skills (visual design, wir
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [System Prompts & AI Tools](./system-prompts-ai-tools.md) | prompt-engineering | leaked system prompts and configs for AI tools including Claude and Cursor; informs prompt analysis patterns |
-| [Nano Banana Pro Prompting](./nano-banana-pro-prompting.md) | prompt-engineering | prompt engineering techniques and best practices for multi-model optimization |
-| [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | quality-enforcement layer for Claude Code with prompt testing and optimization via TDD workflow |
-| [GrepAI](../developer-tools/grepai.md) | developer-tools | semantic code search for AI agents; enables context-aware prompt refinement with codebase grounding |
-| [Perplexity MCP Server](../mcp-ecosystem/perplexity-mcp-server.md) | mcp-ecosystem | MCP server for real-time web search; extends Prompt Optimizer with live information for iterative refinement |
-| [Ultra MCP](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | unified multi-model MCP interface (OpenAI/Gemini/Azure/Grok); shared provider abstraction pattern |
-| [mcpskills-cli](../skill-generation-tools/mcpskills-cli.md) | skill-generation-tools | MCP-to-skill converter; complementary tool for converting optimized prompts into reusable AI skills |
-| [Dify](../agent-frameworks/dify.md) | agent-frameworks | open-source LLM application platform with visual RAG pipeline builder; integrates prompt optimization into workflow systems |
+| [System Prompts & AI Tools](./system-prompts-ai-tools.md) | prompt-engineering | leaked system prompts and model configs for 30+ AI tools including Claude, Cursor, Windsurf; informs prompt analysis patterns and system instruction design |
+| [Nano Banana Pro Prompting](./nano-banana-pro-prompting.md) | prompt-engineering | multi-model prompting techniques for Google Gemini; complementary strategy guide for prompt engineering across model families |
+| [Prompt Engine](./prompt-engine.md) | prompt-engineering | SaaS prompt generator converting plain-language to professional prompts in <15s; alternative commercial tool in same domain |
+| [ctxforge](./ctxforge.md) | prompt-engineering | protocol-based context engineering framework with 16 auto-loaded workflows; shares context-injection pattern with Prompt Optimizer's template system |
+| [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | quality-enforcement layer for Claude Code with TDD lifecycle hooks and persistent memory; enables prompt optimization via /spec workflow |
+| [GrepAI](../developer-tools/grepai.md) | developer-tools | semantic code search and call graph analysis for AI agents; enables context-aware prompt refinement with codebase-grounded examples |
+| [Ultra MCP](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | unified multi-model MCP interface (OpenAI/Gemini/Azure/Grok) with cost tracking and React dashboard; same provider abstraction pattern as Prompt Optimizer adapters |
+| [Perplexity MCP Server](../mcp-ecosystem/perplexity-mcp-server.md) | mcp-ecosystem | real-time web search and reasoning MCP server; extends Prompt Optimizer with live information sources for grounding iterative refinement |
+| [mcpskills-cli](../skill-generation-tools/mcpskills-cli.md) | skill-generation-tools | MCP-to-skill converter generating SKILL.md and polyglot call scripts; converts optimized prompts from Prompt Optimizer into reusable AI skills |
+| [Dify](../agent-frameworks/dify.md) | agent-frameworks | open-source LLM application platform with visual workflow builder, RAG pipelines, 100+ model providers; integrates prompt optimization into end-to-end workflow systems |
+| [TAKT](../research-agent-patterns/takt.md) | research-agent-patterns | multi-agent workflow engine with faceted prompting (persona/policy/knowledge/instruction); demonstrates advanced prompt decomposition pattern for specialized agent roles |
+| [oh-my-opencode](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | production-scale Claude Code orchestration with category-based model routing; shares multi-model evaluation pattern with Prompt Optimizer's compare feature |
+| [Google Stitch](../ai-design-tools/google-stitch.md) | ai-design-tools | AI UI design tool generating app frontends from text/image prompts using Gemini 2.5; demonstrates image-to-code prompt optimization workflow |
+| [Open Pencil](../ai-design-tools/open-pencil.md) | ai-design-tools | open-source Figma alternative with 87+ AI design tools and MCP server; extends Prompt Optimizer's image generation capabilities to design artifact creation |
 
 ---
 
