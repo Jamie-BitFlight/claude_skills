@@ -1,11 +1,5 @@
-# Utilization Proposals: Mission Control
-
-**Research entry**: ./research/agent-frameworks/mission-control.md
-**Generated**: 2026-04-03
-**Integration surfaces found**: 4 (REST API | WebSocket | Webhooks | NPM package)
-**Proposals written**: 2
-**Skipped**: 3 — research-curator (no cost tracking API consumption needed), backlog-tools-administrator (orthogonal scope), swarm-spawning (no external orchestration service needed)
-
+---
+title: "Utilization Proposals: Mission Control"
 ---
 
 ## Utilization 1: swarm-orchestrating → Mission Control Cost Tracking API
@@ -149,4 +143,3 @@ The research entry documents the knowledge pattern at high level (lines 99-102) 
 **Why skipped**: Claude Code has no local equivalent to the "merged PR health check → auto-revert" pattern. This would require integrating with Claude Code's PR workflow and adding a rollback mechanism, which is architectural scope larger than a single skill/agent integration. The research entry documents the pattern clearly (lines 150-152) but implementing it in Claude Code would require creating a new GitHub Actions workflow or webhook receiver, not just consuming an external API.
 
 This is a **pattern adoption opportunity** (not a utilization opportunity per se) and should be tracked separately as an architectural enhancement.
-

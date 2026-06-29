@@ -1,12 +1,5 @@
-# Improvement Proposals: Zeroboot
-
-**Research entry**: ./research/agent-infrastructure/zeroboot.md
-**Generated**: 2026-03-21
-**Patterns assessed**: 5
-**Backlog items created**: 0 (issues: none)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Zeroboot"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

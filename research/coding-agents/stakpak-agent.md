@@ -1,15 +1,6 @@
-# Stakpak Agent — Secure DevOps AI Agent
-
-## Identity
-
-**Name**: Stakpak Agent
-**Repository**: <https://github.com/stakpak/agent>
-**Description**: "Ship your code, on autopilot. An open source agent that lives on your machines 24/7, keeps your apps running, and only pings when it needs a human."
-**Language**: Rust (edition 2024, nightly)
-**License**: Apache-2.0
-**Latest Version**: 0.3.68 (released 2026-03-13)
-**GitHub Stats**: 872 stars, 98 forks (as of 2026-03-13)
-
+---
+title: "Stakpak Agent — Secure DevOps AI Agent"
+license: "Apache-2.0"
 ---
 
 ## Purpose & Use Cases
@@ -318,20 +309,6 @@ Reduction is budget-aware—when conversation exceeds the LLM's context window t
 6. **MCP Integration**: Reference implementation of MCP client/server with security hardening
 7. **Editor Integration**: ACP protocol for embedding agents in code editors
 8. **Real-Time Progress Streaming**: Pattern for streaming long-running operation updates without blocking
-
----
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|-----------|---------------|-------------|
-| Identity/Metadata | high | 2026-03-13 | 2026-06-13 |
-| Architecture | high | 2026-03-13 | 2026-06-13 |
-| Features | high | 2026-03-13 | 2026-06-13 |
-| LLM Providers | high | 2026-03-13 | 2026-06-13 |
-| Installation | high | 2026-03-13 | 2026-06-13 |
-| Usage | high | 2026-03-13 | 2026-06-13 |
-| Limitations | medium | 2026-03-13 | 2026-06-13 |
 
 ---
 

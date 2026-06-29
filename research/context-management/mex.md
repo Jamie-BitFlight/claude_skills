@@ -110,7 +110,7 @@ mex integrates with multiple AI tools. From README section "Supported Tools":
 | OpenCode | `.opencode/opencode.json` |
 | Codex | `AGENTS.md` |
 
-Neovim/Vim users can integrate via [docs/vim-neovim.md](./docs/vim-neovim.md): "mex's scaffold is tool-agnostic — any AI plugin that can read a system prompt or config file can use it."
+Neovim/Vim users can integrate via [docs/vim-neovim.md](https://github.com/theDakshJaitly/mex/blob/main/docs/vim-neovim.md): "mex's scaffold is tool-agnostic — any AI plugin that can read a system prompt or config file can use it."
 
 ### 5. Agent Memory Mode
 

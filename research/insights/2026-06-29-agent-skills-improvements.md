@@ -1,12 +1,5 @@
-# Improvement Proposals: Agent Skills
-
-**Research entry**: ./research/skill-generation-tools/agent-skills.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 6
-**Backlog items created**: 2 (local-only files; GitHub backend offline — sync pending)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Agent Skills"
 ---
 
 ## Improvement 1: Add anti-rationalization, red-flag, and evidence-verification sections to skill anatomy

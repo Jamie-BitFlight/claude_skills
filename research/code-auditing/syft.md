@@ -1,3 +1,9 @@
+---
+title: "Syft: Software Bill of Materials (SBOM) Generation Tool"
+license: "Apache-2.0"
+next_review: "2026-06-28 (3 months)"
+---
+
 # Syft: Software Bill of Materials (SBOM) Generation Tool
 
 ## Overview
@@ -254,29 +260,6 @@ Syft's license detection supports ensuring Claude Code plugins meet open source 
 - **CLI Reference**: <https://oss.anchore.com/docs/reference/syft/cli/>
 - **GitHub Release Page**: <https://github.com/anchore/syft/releases/latest>
 - **Anchore Blog — SBOM Generation**: <https://anchore.com/blog/how-syft-scans-software-to-generate-sboms/>
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-28
-**Next Review**: 2026-06-28 (3 months)
-
-### Confidence Assessment
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| **Overview & Metadata** | high | GitHub API, official repository metadata, latest release verified |
-| **Problem Addressed** | high | Official documentation and README clearly state problem domain |
-| **Key Features** | high | Extracted from GitHub README with official documentation references |
-| **Technical Architecture** | high | Full read of architecture documentation and code structure from shallow clone |
-| **Installation & Usage** | high | Official installation guide and verified CLI examples from README |
-| **Limitations & Caveats** | medium | Inferred from architectural constraints and feature documentation; no explicit limitations document found in repository |
-| **Relevance to Claude Code** | medium | Inferred based on Claude Code's use of containerization and plugin architecture; no direct Claude Code integration verified |
-
-### Data Quality
-
-All factual claims trace to extracted passages from primary sources (GitHub repository README, official Anchore documentation, GitHub API metadata, or local file inspection). Version numbers, contributor counts, and release dates are exact values from authoritative sources. No speculative or inferred content presented as fact.
-
-Limitations section uses precise language per Fidelity Rules: "not mentioned in official documentation" vs. "does not exist."
 
 ## Cross-References
 

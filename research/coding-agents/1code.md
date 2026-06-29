@@ -1,11 +1,13 @@
-# 1Code
-
-**Research Date**: 2026-03-17
-**Source URL**: <https://1code.dev>
-**GitHub Repository**: <https://github.com/21st-dev/1code>
-**Version at Research**: v0.0.84
-**License**: Apache License 2.0
-
+---
+title: "1Code"
+research_date: "2026-03-17"
+source_url: "https://1code.dev"
+github_url: "https://github.com/21st-dev/1code"
+version_at_research: "v0.0.84"
+license: "Apache License 2.0"
+last_verified: "2026-03-17"
+version_at_verification: "v0.0.84"
+next_review: "2026-04-17"
 ---
 
 ## Overview
@@ -244,14 +246,3 @@ Pre-built releases and background agent support require a subscription at `https
 | [OpenAI Symphony](./openai-symphony.md) | coding-agents | alternative autonomous coding agent platform with workspace sandboxing and issue-tracker-driven workflows |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-17 |
-| Version at Verification | v0.0.84 |
-| Next Review Recommended | 2026-04-17 |
-| Confidence Map | Overview: high; Key Statistics: high; Key Features: high; Technical Architecture: high (doc + code-read); Installation & Usage: high; Limitations: high; Relevance: medium |
-
-Note on review interval: 1Code is in rapid development (v0.0.72 in package.json vs v0.0.84 latest release, 12 releases in the git tag listing, repository only 2 months old). A 4-week review cadence is recommended over the standard 3-month baseline.

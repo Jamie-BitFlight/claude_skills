@@ -1,12 +1,5 @@
-# Improvement Proposals: CocoIndex Code
-
-**Research entry**: ./research/mcp-ecosystem/cocoindex-code.md
-**Generated**: 2026-03-10
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: CocoIndex Code"
 ---
 
 ## Improvement 1: Add zero-configuration MCP server pattern guidance to fastmcp-creator skill

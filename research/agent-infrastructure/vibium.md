@@ -1,3 +1,8 @@
+---
+title: "Vibium"
+next_review: "2026-06-24 (3 months)"
+---
+
 # Vibium
 
 ## Overview
@@ -428,20 +433,3 @@ No official documentation explicitly lists performance limitations, browser comp
 | [claude-quickstarts.md](../developer-tools/claude-quickstarts.md) | developer-tools | reference implementation for browser automation with Claude; overlapping use case in agent workflows |
 | [retio-pagemap.md](../mcp-ecosystem/retio-pagemap.md) | mcp-ecosystem | complements browser automation: token-efficient page representation for LLM processing |
 | [gstack.md](../agent-frameworks/gstack.md) | agent-frameworks | similar element selection pattern: accessibility-based vs semantic text/label finding for agent browser QA |
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-24
-**Next Review**: 2026-06-24 (3 months)
-
-### Confidence by Section
-
-- **Overview**: high — Full repository read, official documentation
-- **Problem Addressed**: high — Detailed explanation in webdriver-bidi.md with historical context
-- **Key Statistics**: high — Retrieved from GitHub API, dated 2026-03-24
-- **Key Features**: high — Extracted directly from README CLI quick reference, code examples verified in documentation
-- **Technical Architecture**: high — Full diagram and component structure from README, Go source structure confirmed via Glob
-- **Installation & Usage**: high — Official tutorials read (getting-started-js.md)
-- **Platform Support**: high — Official matrix from README
-- **Relevance to Claude Code**: medium-high — Inferred from problem statement and architecture, explicit MCP reference in README
-- **Limitations and Caveats**: medium — Roadmap deferred features are explicit, but GitHub issue list (29 items) not fully examined; early project status confirmed from release date

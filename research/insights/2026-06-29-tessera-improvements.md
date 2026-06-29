@@ -1,12 +1,5 @@
-# Improvement Proposals: Tessera
-
-**Research entry**: ./research/security-tools/tessera.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 5
-**Backlog items created**: 1 (local-only — GitHub offline at creation time, no issue number assigned; file: p1-add-exponential-backoff-with-jitter-to-kage-bunshin-spawn-la.yaml)
-**Deferred (low confidence)**: 1
-**Skipped (already covered, not applicable, or policy conflict)**: 3
-
+---
+title: "Improvement Proposals: Tessera"
 ---
 
 ## Improvement 1: Add exponential backoff with jitter to kage-bunshin spawn launcher

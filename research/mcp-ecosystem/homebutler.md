@@ -1,11 +1,13 @@
-# HomeButler
-
-**Research Date**: 2026-05-03
-**Source URL**: <https://github.com/Higangssh/homebutler>
-**GitHub Repository**: <https://github.com/Higangssh/homebutler>
-**Version at Research**: v0.18.1
-**License**: MIT
-
+---
+title: "HomeButler"
+research_date: "2026-05-03"
+source_url: "https://github.com/Higangssh/homebutler"
+github_url: "https://github.com/Higangssh/homebutler"
+version_at_research: "v0.18.1"
+license: "MIT"
+last_verified: "2026-05-03"
+version_at_verification: "v0.18.1"
+next_review: "2026-08-03"
 ---
 
 ## Overview
@@ -181,12 +183,3 @@ homebutler install <app-template>
 | [Model Context Protocol](./model-context-protocol.md) | mcp-ecosystem | Core protocol implementation |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-05-03 |
-| Version at Verification | v0.18.1 |
-| Next Review Recommended | 2026-08-03 |
-| Confidence Map | `Overview: high (README + release notes)`, `Features: high (README + API reference)`, `Architecture: medium (code-read from go.mod and cmd/)`, `Statistics: high (GitHub API)` |

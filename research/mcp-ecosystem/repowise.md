@@ -1,10 +1,12 @@
-# repowise — Codebase Intelligence Layer for AI Agents
-
-**Research Date**: 2026-06-18
-**Source URL**: <https://github.com/repowise-dev/repowise>
-**Version at Research**: 0.20.0
-**License**: AGPL-3.0-only
-
+---
+title: "repowise — Codebase Intelligence Layer for AI Agents"
+research_date: "2026-06-18"
+source_url: "https://github.com/repowise-dev/repowise"
+version_at_research: "0.20.0"
+license: "AGPL-3.0-only"
+last_verified: "2026-06-18"
+version_at_verification: "0.20.0"
+next_review: "2026-09-18"
 ---
 
 ## Overview
@@ -338,25 +340,3 @@ The codebase is open-source (AGPL-3.0) and plugin-extensible:
 | [oh-my-opencode.md](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | production-scale MCP orchestration: 37.5K-star multi-agent harness consuming repowise-like code intelligence |
 
 ---
-
-## Freshness Tracking
-
-**Last Verified**: 2026-06-18
-**Version at Verification**: 0.20.0
-**Index age at verification**: 0 days (at HEAD commit 69d5a90, v0.20.0)
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| **Identity & Metadata** | high | README, pyproject.toml, git history, homepage all corroborate version, license, language support |
-| **Five Intelligence Layers** | high | Detailed in INTELLIGENCE_LAYERS.md, fully verified across docs. Feature descriptions extracted verbatim. |
-| **Code Health Biomarkers** | high | CODE_HEALTH.md provides per-biomarker definitions, calibration methodology, defect-prediction validation (AUC 0.731 across 21 repos, reproducible benchmark). |
-| **Nine MCP Tools** | high | MCP_TOOLS.md specifies all tool signatures, parameters, return types, and use cases. Fully documented API surface. |
-| **Benchmarks** | high | Reproducible benchmark reports on public repos (Flask, scikit-learn) available at repowise-bench; token/file/tool call savings verified. |
-| **Technical Architecture** | medium | Inferred from code structure, documentation, CLI reference. Core components identified from file structure and tool flow. |
-| **Limitations** | medium | License verified (AGPL-3.0). Feature gaps inferred from docs absence, not from explicit "not supported" statements. Enterprise features confirmed as commercial-tier-only. |
-| **Commercial Licensing** | high | docs/COMMERCIAL.md and website cross-reference; no AGPL obligation for proprietary embeddings, SSO/SCIM/RBAC, on-prem. |
-
-**Next Review Recommended**: 2026-09-18
-

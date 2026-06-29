@@ -1,15 +1,7 @@
-# SlimContext
-
-## Overview
-
-**SlimContext** is a lightweight, model-agnostic TypeScript library for compressing chat history in AI assistants while preserving conversational context. It provides two compression strategies—token-aware trimming and AI-powered summarization—both operating under a "Bring Your Own Model" (BYOM) architecture with zero runtime dependencies in the core library.
-
-**Repository**: <https://github.com/agentailor/slimcontext>
-**Current Version**: 2.1.3 (released 2025-09-14)
-**License**: MIT
-**Language**: TypeScript
-**Package Manager**: pnpm 10.14.0
-
+---
+title: "SlimContext"
+license: "MIT"
+next_review: "2026-06-17 (3 months)"
 ---
 
 ## Problem Addressed
@@ -297,23 +289,6 @@ See [examples/OPENAI_EXAMPLE.md](https://github.com/agentailor/slimcontext/blob/
 
 ---
 
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Notes |
-|---------|-----------|---------------|-------|
-| Identity/Metadata | high | 2026-03-17 | Package manifest and GitHub API consistent; version 2.1.3 confirmed |
-| Key Statistics | high | 2026-03-17 | Repository statistics from GitHub API; 6-month-old project |
-| Key Features | high | 2026-03-17 | README and source code (interfaces.ts, trim.ts, summarize.ts) aligned; feature behavior extracted verbatim |
-| Technical Architecture | high | 2026-03-17 | Source files read: interfaces.ts, strategies/trim.ts, strategies/summarize.ts; component names and data flows documented |
-| Usage Examples | high | 2026-03-17 | Code examples extracted from README verbatim; copy-paste accuracy verified |
-| Limitations | medium | 2026-03-17 | Documented limitations from code comments and CLAUDE.md; undocumented limitations inferred from source inspection. No explicit limitation statement in README. |
-| Relevance to Claude Code | medium | 2026-03-17 | Assessment based on SlimContext architecture alignment with Claude Code SAM workflow; no direct integration evidence yet. Requires validation through prototype. |
-
-**Next Review**: 2026-06-17 (3 months)
-**Review Trigger**: New major release, significant dependency updates (LangChain peer version bump), or adoption in Claude Code workflows.
-
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
@@ -326,4 +301,3 @@ See [examples/OPENAI_EXAMPLE.md](https://github.com/agentailor/slimcontext/blob/
 | [SourceSync.ai](./sourcesyncai.md) | context-management | multi-source RAG platform with hybrid search and namespace-based knowledge isolation |
 | [Straion](./straion.md) | context-management | dynamic context injection with task-scoped rules and token budget awareness |
 | [ctxforge](../prompt-engineering/ctxforge.md) | prompt-engineering | context engineering framework with protocol-based token budget management and discovery workflows |
-

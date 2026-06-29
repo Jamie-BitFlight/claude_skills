@@ -1,12 +1,5 @@
-# Improvement Proposals: gh-skill
-
-**Research entry**: ./research/developer-tools/gh-skill.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 7
-**Backlog items created**: 2 (issues: #2245, #2247)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: gh-skill"
 ---
 
 ## Improvement 1: Detect git remote / proxy host in setup_gh.py and write a default --repo config

@@ -1,12 +1,5 @@
-# Improvement Proposals: Ponytail
-
-**Research entry**: ./research/agent-frameworks/ponytail.md
-**Generated**: 2026-06-18
-**Patterns assessed**: 5
-**Backlog items created**: 1 (issues: #2649)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Ponytail"
 ---
 
 ## Improvement 1: Add a simplicity / over-engineering reviewer perspective to multi-perspective-review

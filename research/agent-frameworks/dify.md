@@ -1,12 +1,14 @@
-# Dify
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://dify.ai>
-**GitHub Repository**: <https://github.com/langgenius/dify>
-**Documentation**: <https://docs.dify.ai>
-**Version at Research**: v1.13.0
-**License**: Dify Open Source License (Apache 2.0 with additional conditions)
-
+---
+title: "Dify"
+research_date: "2026-02-23"
+source_url: "https://dify.ai"
+github_url: "https://github.com/langgenius/dify"
+documentation_url: "https://docs.dify.ai"
+version_at_research: "v1.13.0"
+license: "Dify Open Source License (Apache 2.0 with additional conditions)"
+last_verified: "2026-02-23"
+version_at_verification: "v1.13.0"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -276,20 +278,3 @@ curl -X POST https://api.dify.ai/v1/workflows/run \
 **Research Method**: Information gathered from the official GitHub repository README, GitHub API (stars, forks, issues, contributors, releases), official documentation, and release notes. Statistics verified via direct GitHub API calls on 2026-02-23.
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v1.13.0 |
-| Next Review Recommended | 2026-05-23 |
-
-**Review Triggers**:
-
-- Major version release (v2.x)
-- New MCP or Claude integration announcements
-- GitHub stars milestone (150K, 200K)
-- Significant new node types in the workflow builder
-- Changes to open-source licensing terms
-- New vector store or model provider integrations

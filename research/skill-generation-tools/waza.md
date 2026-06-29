@@ -1,11 +1,13 @@
-# Waza
-
-**Research Date**: 2026-05-04
-**Source URL**: <https://github.com/tw93/Waza>
-**GitHub Repository**: <https://github.com/tw93/Waza>
-**Version at Research**: v3.12.2 (GitHub release tag); per-skill SKILL.md versions: check: 3.20.0, think: 3.17.0, design: 3.19.0, hunt: 3.19.0, read: 3.14.0, write: 3.18.0, learn: 3.15.0, health: 3.17.0
-**License**: MIT License
-
+---
+title: "Waza"
+research_date: "2026-05-04"
+source_url: "https://github.com/tw93/Waza"
+github_url: "https://github.com/tw93/Waza"
+version_at_research: "v3.12.2 (GitHub release tag); per-skill SKILL.md versions: check: 3.20.0, think: 3.17.0, design: 3.19.0, hunt: 3.19.0, read: 3.14.0, write: 3.18.0, learn: 3.15.0, health: 3.17.0"
+license: "MIT License"
+last_verified: "2026-05-04"
+version_at_verification: "v3.12.2 (GitHub release tag); per-skill: check: 3.20.0, think: 3.17.0, design: 3.19.0, hunt: 3.19.0, read: 3.14.0, write: 3.18.0, learn: 3.15.0, health: 3.17.0"
+next_review: "2026-08-04"
 ---
 
 ## Overview
@@ -225,12 +227,3 @@ npx skills remove tw93/Waza -g
 | None at this time | — | — |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-05-04 |
-| Version at Verification | v3.12.2 (GitHub release tag); per-skill: check: 3.20.0, think: 3.17.0, design: 3.19.0, hunt: 3.19.0, read: 3.14.0, write: 3.18.0, learn: 3.15.0, health: 3.17.0 |
-| Next Review Recommended | 2026-08-04 |
-| Confidence Map | Overview: high, Problem Addressed: high, Key Statistics: high, Key Features: high (doc-read), Technical Architecture: high (doc-read), Installation & Usage: high (verified), Relevance to Claude Code: high, References: high |

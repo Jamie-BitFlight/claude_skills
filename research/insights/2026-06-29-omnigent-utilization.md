@@ -1,11 +1,5 @@
-# Utilization Proposals: Omnigent
-
-**Research entry**: ./research/agent-frameworks/omnigent.md
-**Generated**: 2026-06-29
-**Integration surfaces found**: 4 (CLI | SDK | YAML agent definitions | Policy configuration)
-**Proposals written**: 2
-**Skipped**: 2 — orchestrating-swarms (facade router, not orchestration engine); swarm-operations (documentation only, no executable component)
-
+---
+title: "Utilization Proposals: Omnigent"
 ---
 
 ## Utilization 1: swarm-from-markdown → Omnigent Agent YAML Export
@@ -135,4 +129,3 @@ subprocess.run(["omnigent", "run", "agent.yaml", "--policy-config", "server_conf
 |---|---|
 | orchestrating-swarms (.claude/skills/orchestrating-swarms/SKILL.md) | Facade router that delegates to specialist skills (swarm-primitives, swarm-spawning, swarm-operations, swarm-patterns). Not an executable orchestration engine itself; Omnigent is a framework for orchestration, not a specialist skill. No direct caller relationship. |
 | swarm-operations (.claude/skills/swarm-operations/SKILL.md) | Documentation and API reference for Claude Code swarm tools (TeamCreate, SendMessage, TaskCreate). Contains no executable code or subprocess dispatch; documents internal tooling only. Omnigent policy engine (research entry §Declarative Policy Enforcement) is conceptually related but does not substitute for swarm-operations' tool documentation. No integration surface match for a documentation-only skill. |
-

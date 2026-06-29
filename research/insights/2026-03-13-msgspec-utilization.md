@@ -1,11 +1,5 @@
-# Utilization Proposals: msgspec
-
-**Research entry**: ./research/serialization-libraries/msgspec.md
-**Generated**: 2026-03-13
-**Integration surfaces found**: 3 (Python SDK package + API + module functions)
-**Proposals written**: 2
-**Skipped**: 2 — integration surface present but scope mismatch
-
+---
+title: "Utilization Proposals: msgspec"
 ---
 
 ## Utilization 1: agentskill-kaizen JSONL parser → msgspec.json
@@ -199,4 +193,3 @@ The refactored version consolidates eight explicit validation checks into a sing
 2. **Proposal 2** (sentiment-score.py): Define Struct schema for SessionRecord and Message types, then replace json.loads + validation chain with msgspec.json.decode(line, type=SessionRecord). This consolidates scattered validation logic and provides better error reporting.
 
 Both integrations should be added to the PEP 723 inline script metadata in their respective files.
-

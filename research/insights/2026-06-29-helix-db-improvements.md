@@ -1,12 +1,5 @@
-# Improvement Proposals: HelixDB
-
-**Research entry**: ./research/data-infrastructure/helix-db.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 2
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: HelixDB"
 ---
 
 ## Assessment summary

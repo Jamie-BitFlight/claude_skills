@@ -1,12 +1,13 @@
-# SourceSync.ai MCP Server
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://sourcesync.ai>
-**GitHub Repository**: <https://github.com/scmdr/sourcesyncai-mcp>
-**npm Package**: <https://www.npmjs.com/package/sourcesyncai-mcp>
-**Version at Research**: v1.0.11
-**License**: ISC
-
+---
+title: "SourceSync.ai MCP Server"
+research_date: "2026-02-23"
+source_url: "https://sourcesync.ai"
+github_url: "https://github.com/scmdr/sourcesyncai-mcp"
+version_at_research: "v1.0.11"
+license: "ISC"
+last_verified: "2026-02-23"
+version_at_verification: "v1.0.11"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -222,18 +223,3 @@ npx -y @smithery/cli install @pbteja1998/sourcesyncai-mcp --client claude
 - [Model Context Protocol](https://modelcontextprotocol.io/introduction) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v1.0.11 |
-| Next Review Recommended | 2026-05-23 |
-
-**Change Detection Indicators**:
-
-- Monitor npm for version bumps (active development: `1.0.x` series)
-- Check for new ingest source connectors (Confluence, Slack, Jira are common requests)
-- Verify vector store backend expansion beyond Pinecone
-- Track SourceSync.ai pricing changes affecting free-tier access

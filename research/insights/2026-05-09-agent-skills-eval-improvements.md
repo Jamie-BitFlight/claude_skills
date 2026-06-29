@@ -1,12 +1,5 @@
-# Improvement Proposals: agent-skills-eval
-
-**Research entry**: ./research/evaluation-testing/agent-skills-eval.md
-**Generated**: 2026-05-09
-**Patterns assessed**: 7
-**Backlog items created**: 3
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: agent-skills-eval"
 ---
 
 ## Improvement 1: Provider abstraction for skill evaluation runner

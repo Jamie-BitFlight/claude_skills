@@ -1,12 +1,5 @@
-# Improvement Proposals: repowise
-
-**Research entry**: ./research/mcp-ecosystem/repowise.md
-**Generated**: 2026-06-18
-**Patterns assessed**: 5
-**Backlog items created**: 2 (issues: #2589, #2590)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: repowise"
 ---
 
 ## Improvement 1: Command output distillation hook — compress noisy shell stdout before the agent reads it

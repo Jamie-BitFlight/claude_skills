@@ -1,12 +1,13 @@
-# SourceSync.ai
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://sourcesync.ai>
-**GitHub Repository**: <https://github.com/scmdr/sourcesyncai-mcp> (MCP server)
-**API Reference**: <https://sourcesync.ai/api-reference/authentication>
-**Version at Research**: SaaS platform (no version; REST API v1)
-**License**: Proprietary SaaS (BYOC — Bring Your Own Cloud)
-
+---
+title: "SourceSync.ai"
+research_date: "2026-02-23"
+source_url: "https://sourcesync.ai"
+github_url: "<https://github.com/scmdr/sourcesyncai-mcp> (MCP server)"
+version_at_research: "SaaS platform (no version; REST API v1)"
+license: "Proprietary SaaS (BYOC — Bring Your Own Cloud)"
+last_verified: "2026-02-23"
+version_at_verification: "REST API v1 (SaaS, versioned per release)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -244,19 +245,3 @@ curl -X POST https://api.sourcesync.ai/v1/search/hybrid \
 - [MCP Server on Smithery](https://smithery.ai/server/@pbteja1998/sourcesyncai-mcp) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | REST API v1 (SaaS, versioned per release) |
-| Next Review Recommended | 2026-05-23 |
-
-**Change Detection Indicators**:
-
-- Monitor connector roadmap for new live connectors (Confluence, GitBook, Slack are high-value)
-- Track pricing changes — no free tier currently; watch for freemium tier announcement
-- Verify vector store backend expansion beyond Pinecone
-- Check for SDK releases (currently REST-only with no official SDK)
-- Watch for self-hosted / open-core variant announcements

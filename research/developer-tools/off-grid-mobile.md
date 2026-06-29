@@ -1,11 +1,13 @@
-# Off Grid Mobile
-
-**Research Date**: 2026-02-28
-**Source URL**: <https://github.com/alichherawalla/off-grid-mobile>
-**GitHub Repository**: <https://github.com/alichherawalla/off-grid-mobile>
-**Version at Research**: v0.0.58
-**License**: MIT
-
+---
+title: "Off Grid Mobile"
+research_date: "2026-02-28"
+source_url: "https://github.com/alichherawalla/off-grid-mobile"
+github_url: "https://github.com/alichherawalla/off-grid-mobile"
+version_at_research: "v0.0.58"
+license: "MIT"
+last_verified: "2026-02-28"
+version_at_verification: "v0.0.58"
+next_review: "2026-05-28"
 ---
 
 ## Overview
@@ -155,11 +157,3 @@ End users can install without building:
 - [Community Slack](https://join.slack.com/t/off-grid-mobile/shared_invite/zt-3q7kj5gr6-rVzx5gl5LKPQh4mUE2CCvA) (accessed 2026-02-28)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-28 |
-| Version at Verification | v0.0.58 |
-| Next Review Recommended | 2026-05-28 |

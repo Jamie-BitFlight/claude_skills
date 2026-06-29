@@ -1,12 +1,5 @@
-# Improvement Proposals: Tolaria
-
-**Research entry**: ./research/developer-tools/tolaria.md
-**Generated**: 2026-04-26
-**Patterns assessed**: 8
-**Backlog items created**: 4 (issues: #1949, #1951, #1952, #1953)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Tolaria"
 ---
 
 ## Improvement 1: Transactional staging for research-curator file rewrites

@@ -1,12 +1,5 @@
-# Improvement Proposals: Maverick
-
-**Research entry**: ./research/coding-agents/maverick.md
-**Generated**: 2026-03-23
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Maverick"
 ---
 
 ## Improvement 1: Automated Project-Specific Skill Generation (Upskill System)

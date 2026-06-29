@@ -1,12 +1,14 @@
-# Snyk CLI for Open-Source C++ Scans
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://docs.snyk.io/supported-languages/supported-languages-list/c-c++/snyk-cli-for-open-source-c++-scans>
-**GitHub Repository**: <https://github.com/snyk/snyk> (CLI source)
-**Documentation**: <https://docs.snyk.io/supported-languages/supported-languages-list/c-c++>
-**Version at Research**: Current (last updated ~June 2025 per docs)
-**License**: Proprietary — Commercial (subscription required; free tier available for open-source projects)
-
+---
+title: "Snyk CLI for Open-Source C++ Scans"
+research_date: "2026-02-23"
+source_url: "https://docs.snyk.io/supported-languages/supported-languages-list/c-c++/snyk-cli-for-open-source-c++-scans"
+github_url: "<https://github.com/snyk/snyk> (CLI source)"
+documentation_url: "https://docs.snyk.io/supported-languages/supported-languages-list/c-c++"
+version_at_research: "Current (last updated ~June 2025 per docs)"
+license: "Proprietary — Commercial (subscription required; free tier available for open-source projects)"
+last_verified: "2026-02-23"
+version_at_verification: "Current (docs last updated ~June 2025)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -173,11 +175,3 @@ snyk monitor --unmanaged --project-name=my-c-project
 - [Snyk CLI GitHub repository](https://github.com/snyk/snyk) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | Current (docs last updated ~June 2025) |
-| Next Review Recommended | 2026-05-23 |

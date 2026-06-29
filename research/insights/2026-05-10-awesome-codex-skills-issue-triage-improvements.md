@@ -1,12 +1,5 @@
-# Improvement Proposals: Awesome Codex Skills — Issue Triage
-
-**Research entry**: ./research/skill-generation-tools/awesome-codex-skills-issue-triage.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #2244)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Awesome Codex Skills — Issue Triage"
 ---
 
 ## Improvement 1: Cluster open backlog items into duplicate groups via a new MCP tool

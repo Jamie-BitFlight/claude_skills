@@ -1,11 +1,5 @@
-# Utilization Proposals: OpenSpec MCP
-
-**Research entry**: ./research/mcp-ecosystem/openspec-mcp.md
-**Generated**: 2026-04-29
-**Integration surfaces found**: 3 (MCP server | npm package | CLI)
-**Proposals written**: 2
-**Skipped**: 3 — existing task tracking via backlog MCP server, dashboard rendering not applicable to CLI-only agents, approval workflows already implemented in GitHub issues
-
+---
+title: "Utilization Proposals: OpenSpec MCP"
 ---
 
 ## Utilization 1: `/dh:implement-feature` → OpenSpec MCP

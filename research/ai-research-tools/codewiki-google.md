@@ -1,11 +1,5 @@
-# CodeWiki (Google)
-
-**Resource**: CodeWiki — AI-powered documentation system for code repositories
-**Official Site**: <https://codewiki.google>
-**Creator**: Google
-**Release**: November 2025 (public preview)
-**Status**: Public preview for open-source; private version in development
-
+---
+title: "CodeWiki (Google)"
 ---
 
 ## Overview
@@ -187,33 +181,3 @@ CodeWiki combines text, diagrams, and interactive chat to explain code. Claude C
 | [NotebookLM](./notebooklm.md) | ai-research-tools | Gemini-backed document understanding and chat interface parallels CodeWiki's AI-powered exploration agent |
 
 ---
-
-## Freshness Tracking
-
-**Entry Created**: 2026-03-18
-**Next Review Date**: 2026-06-18 (3 months)
-
-### Confidence Assessment by Section
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| **Problem Addressed** | high | Official announcement and multiple independent sources corroborate problem statement. 30-40% time metric cited consistently. |
-| **Key Features** | high | Features extracted verbatim from official Google blog and independent coverage. All claims verified across 3+ sources. |
-| **Technical Architecture** | medium | General architecture described in multiple sources, but detailed implementation details (model versions, indexing system specifics) not exposed in public documentation. Inferred some components from feature descriptions. |
-| **Installation & Usage** | high | Usage instructions extracted from official site navigation and guides. Public preview access verified; private version status confirmed from multiple sources. |
-| **Limitations** | medium | Documented limitations and caveats sourced from public sources. Current language/framework support not exhaustively specified in sources. |
-| **Relevance to Claude Code** | medium | Assessment based on documented CodeWiki features mapped to Claude Code patterns. Represents analytical inference rather than direct source attribution. |
-
-### Source Accessibility Status
-
-- ✅ <https://developers.googleblog.com> — accessible
-- ✅ <https://www.infoq.com> — accessible
-- ✅ <https://www.analyticsvidhya.com> — accessible
-- ✅ <https://jangwook.net> — accessible
-- ✅ <https://www.theregister.com> — accessible
-- ⚠️ <https://devops.com> — HTTP 403 (Forbidden) — summary included from web search results
-- ✅ <https://codewiki.google> — accessible (SPA, dynamic content)
-
-### Source Quality Assessment
-
-Sources include official Google announcement (highest authority), reputable tech publications (InfoQ, The Register, DevOps.com), and independent tech blogs. Information is consistent across sources with no contradictions detected. Release date (November 2025) confirmed across 5+ independent sources.

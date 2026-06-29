@@ -1,11 +1,5 @@
-# Utilization Proposals: GitNexus
-
-**Research entry**: ./research/mcp-ecosystem/gitnexus.md
-**Generated**: 2026-03-19
-**Integration surfaces found**: 2 (MCP server CLI | Agent skills generation | PreToolUse/PostToolUse hooks)
-**Proposals written**: 2
-**Skipped**: 3 — (python3-development plugin uses Grep/Glob for exploration instead of graph queries; no existing impact-analysis agent in this repo; context-gathering already has codebase reading capability but doesn't perform impact analysis)
-
+---
+title: "Utilization Proposals: GitNexus"
 ---
 
 ## Utilization 1: python3-development plugin → GitNexus MCP impact analysis
@@ -195,4 +189,3 @@ Both proposals assume `.worktrees/GitNexus/gitnexus-claude-plugin/` is available
 3. **Test detect_changes integration**: Verify PostToolUse hook properly invokes `gitnexus_detect_changes()` for staged commits
 4. **Enable wiki generation in service-docs-maintainer**: Add CLI invocation for `npx gitnexus wiki` with LLM model configuration
 5. **Validate skills generation**: Confirm `.claude/skills/generated/` skills are discoverable by task file skill: field
-

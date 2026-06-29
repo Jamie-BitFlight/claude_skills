@@ -1,14 +1,7 @@
-# Fleet: Open-Source Device Management Platform
-
-## Overview
-
-Fleet is an open-source device management platform designed for IT and security teams managing thousands of computers. It provides APIs, GitOps, webhooks, YAML, and human-friendly interfaces for managing endpoints at scale. Fleet is built on osquery, nanoMDM, Nudge, and swiftDialog, and supports Windows, macOS, Linux, Chromebooks, cloud infrastructure (AWS, GCP, Azure), and containers.
-
-**Repository**: <https://github.com/fleetdm/fleet>
-**Primary Language**: Go (backend), TypeScript/React (frontend)
-**Latest Version**: 4.82.1 (released Mar 18, 2026)
-**License**: Mixed (MIT for open source, commercial license for premium features)
-
+---
+title: "Fleet: Open-Source Device Management Platform"
+license: "Mixed (MIT for open source, commercial license for premium features)"
+next_review: "2026-06-28"
 ---
 
 ## Problem Addressed
@@ -247,32 +240,6 @@ From reviewed sources:
 - **server/service/service.go**: Core service interface and implementation (accessed 2026-03-28)
 - **server/datastore/mysql/mysql.go**: MySQL datastore implementation (accessed 2026-03-28)
 - **server/fleet/service.go**: Enterprise overrides pattern (accessed 2026-03-28)
-
----
-
-## Freshness Tracking
-
-**Entry Created**: 2026-03-28
-**Last Updated**: 2026-03-28
-**Next Review**: 2026-06-28
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Overview | high | Full README read, official website documentation |
-| Problem Addressed | high | Extracted from README and official docs; organization use cases documented |
-| Key Statistics | high | GitHub API data (stars, forks, issues); changelog for version info; commit history from local clone |
-| Key Features | high | Extracted from README "What's it for?" section and changelog 4.82.0 and 4.82.1 |
-| Technical Architecture | high | Code read from main.go, service.go, datastore/mysql/mysql.go; interface definitions from server/fleet/service.go |
-| Installation & Usage | high | Extracted from orbit/README.md build instructions and cmd/fleet/main.go entrypoint |
-| Relevance to Claude Code | medium | Inferred from architectural patterns observed in code; not explicitly documented by Fleet |
-| Limitations | medium | Free tier constraints from README; scale caveats inferred from large organization mention; osquery dependency explicit in README |
-
-**Data Sources**:
-- Primary code analysis: `/home/user/claude_skills/.worktrees/fleet/` shallow clone
-- Official documentation: <https://github.com/fleetdm/fleet/README.md>, CHANGELOG.md, orbit/README.md
-- GitHub API: Repository metadata (stars, forks, license, language, topics)
 
 ---
 

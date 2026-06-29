@@ -1,12 +1,5 @@
-# Improvement Proposals: AirLLM
-
-**Research entry**: ./research/llm-infrastructure/airllm.md
-**Generated**: 2026-06-18
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: AirLLM"
 ---
 
 ## Summary

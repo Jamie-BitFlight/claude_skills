@@ -1,11 +1,5 @@
-# Utilization Proposals: Agent Deck
-
-**Research entry**: ./research/developer-tools/agent-deck.md
-**Generated**: 2026-03-17
-**Integration surfaces found**: 4 (CLI | Web API | Hooks | Config files)
-**Proposals written**: 0
-**Skipped**: 5 — architectural gap; no existing local orchestrator
-
+---
+title: "Utilization Proposals: Agent Deck"
 ---
 
 ## Skipped Systems

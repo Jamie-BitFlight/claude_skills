@@ -1,12 +1,14 @@
-# Jina AI
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://jina.ai>
-**GitHub Repository**: <https://github.com/jina-ai>
-**Documentation**: <https://jina.ai/reader>, <https://jina.ai/embeddings>
-**Version at Research**: jina-embeddings-v4 (models), Reader API v1
-**License**: Apache 2.0 (Reader/infrastructure); CC BY-NC 4.0 (jina-embeddings-v3); Qwen Research License (jina-embeddings-v4)
-
+---
+title: "Jina AI"
+research_date: "2026-02-23"
+source_url: "https://jina.ai"
+github_url: "https://github.com/jina-ai"
+documentation_url: "https://jina.ai/reader>, <https://jina.ai/embeddings"
+version_at_research: "jina-embeddings-v4 (models), Reader API v1"
+license: "Apache 2.0 (Reader/infrastructure); CC BY-NC 4.0 (jina-embeddings-v3); Qwen Research License (jina-embeddings-v4)"
+last_verified: "2026-02-23"
+version_at_verification: "jina-embeddings-v4, Reader API v1"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -207,19 +209,3 @@ curl https://api.jina.ai/v1/rerank \
 - [ReaderLM-v2 Blog Post](https://jina.ai/news/readerlm-v2-frontier-small-language-model-for-html-to-markdown-and-json) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-| ----- | ----- |
-| Last Verified | 2026-02-23 |
-| Version at Verification | jina-embeddings-v4, Reader API v1 |
-| Next Review Recommended | 2026-05-23 |
-
-**Review Triggers**:
-
-- New embedding model release (v5 or beyond)
-- Significant API changes post-Elastic acquisition
-- New reranker model release
-- DeepSearch major version or open-source release
-- Licensing changes for embedding models

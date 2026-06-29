@@ -1,11 +1,13 @@
-# Tembo
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://www.tembo.io/>
-**GitHub Repository**: <https://github.com/tembo-io/tembo> (private / organization page)
-**Version at Research**: Cloud service (SaaS)
-**License**: Proprietary (commercial SaaS)
-
+---
+title: "Tembo"
+research_date: "2026-02-23"
+source_url: "https://www.tembo.io/"
+github_url: "<https://github.com/tembo-io/tembo> (private / organization page)"
+version_at_research: "Cloud service (SaaS)"
+license: "Proprietary (commercial SaaS)"
+last_verified: "2026-02-23"
+version_at_verification: "Cloud service (SaaS)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -208,11 +210,3 @@ Add a `tembo.md` (or `AGENTS.md`) to your repo root to guide agent behavior:
 - [Tembo: The Background Coding Agents Company — Cerebral Valley](https://cerebralvalley.beehiiv.com/p/tembo-the-background-coding-agents-company) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | Cloud service (SaaS) |
-| Next Review Recommended | 2026-05-23 |

@@ -1,13 +1,12 @@
-# Nano-Banana Pro Prompting Guide: Strategies
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://dev.to/googleai/nano-banana-pro-prompting-guide-strategies-1h9n>
-**Developer Guide**: <https://dev.to/googleai/introducing-nano-banana-pro-complete-developer-tutorial-5fc8>
-**API Reference**: <https://ai.google.dev/gemini-api/docs>
-**Cookbook (Colab)**: <https://colab.sandbox.google.com/github/google-gemini/cookbook/blob/main/quickstarts/Get_Started_Nano_Banana.ipynb>
-**Version at Research**: Nano-Banana Pro (`gemini-3-pro-image-preview` preview)
-**License**: Google API Terms of Service (output owned by user; usage billed via Gemini API quota)
-
+---
+title: "Nano-Banana Pro Prompting Guide: Strategies"
+research_date: "2026-02-23"
+source_url: "https://dev.to/googleai/nano-banana-pro-prompting-guide-strategies-1h9n"
+version_at_research: "Nano-Banana Pro (`gemini-3-pro-image-preview` preview)"
+license: "Google API Terms of Service (output owned by user; usage billed via Gemini API quota)"
+last_verified: "2026-02-23"
+version_at_verification: "`gemini-3-pro-image-preview` (preview)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -223,11 +222,3 @@ See the [Gemini Cookbook Colab](https://colab.sandbox.google.com/github/google-g
 - [Google AI Studio](https://aistudio.google.com/) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | `gemini-3-pro-image-preview` (preview) |
-| Next Review Recommended | 2026-05-23 |

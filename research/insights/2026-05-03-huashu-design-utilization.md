@@ -1,11 +1,5 @@
-# Utilization Proposals: Huashu Design
-
-**Research entry**: ./research/ai-design-tools/huashu-design.md
-**Generated**: 2026-05-03
-**Integration surfaces found**: 2 (NPM skill + CLI toolchain)
-**Proposals written**: 2
-**Skipped**: 1 — see below
-
+---
+title: "Utilization Proposals: Huashu Design"
 ---
 
 ## Utilization 1: /prepare-walkthrough-presentation → Huashu Design (Deck Export)

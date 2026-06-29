@@ -1,11 +1,13 @@
-# SkillsMP
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://skillsmp.com/docs>
-**GitHub Repository**: <https://github.com/yan-labs/skillsmp>
-**Version at Research**: npm `skillsmp` (JavaScript, no explicit version tag)
-**License**: MIT
-
+---
+title: "SkillsMP"
+research_date: "2026-02-23"
+source_url: "https://skillsmp.com/docs"
+github_url: "https://github.com/yan-labs/skillsmp"
+version_at_research: "npm `skillsmp` (JavaScript, no explicit version tag)"
+license: "MIT"
+last_verified: "2026-02-23"
+version_at_verification: "npm `skillsmp` (no explicit version tag; platform version not published)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -209,19 +211,3 @@ mv SKILL.md .claude/skills/skill-name/
 - [SkillsMP Complete Guide 2026 — SmartScope](https://smartscope.blog/en/blog/skillsmp-marketplace-guide/) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | npm `skillsmp` (no explicit version tag; platform version not published) |
-| Next Review Recommended | 2026-05-23 |
-
-**Review Triggers**:
-
-- Skill count crosses 100K milestone
-- Official versioned releases appear on yan-labs/skillsmp
-- REST API gains write endpoints (skill submission via API)
-- SkillsMP gains affiliation with Anthropic or OpenAI
-- MCP server star count grows significantly

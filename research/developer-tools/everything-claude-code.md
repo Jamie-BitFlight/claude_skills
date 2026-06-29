@@ -1,11 +1,13 @@
-# Everything Claude Code
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://github.com/affaan-m/everything-claude-code>
-**GitHub Repository**: <https://github.com/affaan-m/everything-claude-code>
-**Version at Research**: v1.8.0 (Harness Performance Release)
-**License**: MIT
-
+---
+title: "Everything Claude Code"
+research_date: "2026-03-06"
+source_url: "https://github.com/affaan-m/everything-claude-code"
+github_url: "https://github.com/affaan-m/everything-claude-code"
+version_at_research: "v1.8.0 (Harness Performance Release)"
+license: "MIT"
+last_verified: "2026-03-06"
+version_at_verification: "v1.8.0"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -400,16 +402,6 @@ This repository is the closest peer project to `claude_skills` in the Claude Cod
 - [ecc-agentshield npm package](https://www.npmjs.com/package/ecc-agentshield) (accessed 2026-02-26)
 - [Repository README](https://github.com/affaan-m/everything-claude-code/blob/main/README.md) (accessed 2026-03-06)
 - [Repository CLAUDE.md](https://github.com/affaan-m/everything-claude-code/blob/main/CLAUDE.md) (accessed 2026-02-26)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | v1.8.0 |
-| Next Review Recommended | 2026-06-06 |
 
 ---
 

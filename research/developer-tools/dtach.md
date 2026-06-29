@@ -1,11 +1,13 @@
-# dtach
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://github.com/crigler/dtach>
-**GitHub Repository**: <https://github.com/crigler/dtach>
-**Version at Research**: v0.9
-**License**: GNU General Public License v2.0
-
+---
+title: "dtach"
+research_date: "2026-03-01"
+source_url: "https://github.com/crigler/dtach"
+github_url: "https://github.com/crigler/dtach"
+version_at_research: "v0.9"
+license: "GNU General Public License v2.0"
+last_verified: "2026-03-01"
+version_at_verification: "v0.9"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -193,11 +195,3 @@ dtach -a /tmp/my-session -e '^A'
 - [GitHub API — repo metadata](https://api.github.com/repos/crigler/dtach) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.9 |
-| Next Review Recommended | 2026-06-01 |

@@ -1,12 +1,5 @@
-# Improvement Proposals: mcpskills-cli
-
-**Research entry**: ./research/mcp-ecosystem/mcpskills-cli.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 2
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: mcpskills-cli"
 ---
 
 ## Skipped Patterns

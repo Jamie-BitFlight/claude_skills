@@ -1,3 +1,7 @@
+---
+title: "Arxitect"
+---
+
 # Arxitect
 
 ## Overview
@@ -220,24 +224,6 @@ Arxitect directly supports Claude Code development workflows by:
 - GitHub repository: <https://github.com/andonimichael/arxitect> (accessed 2026-04-08)
 - GitHub releases: <https://github.com/andonimichael/arxitect/releases> (accessed 2026-04-08)
 - Claude Code plugin marketplace: <https://code.claude.com/docs/en/discover-plugins> (referenced in installation docs, not directly accessed)
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified |
-|---------|-----------|----------------|
-| Identity/Metadata | high | 2026-04-08 |
-| Problem Addressed | high | 2026-04-08 |
-| Key Features | high | 2026-04-08 |
-| Technical Architecture | high | 2026-04-08 |
-| Installation & Usage | high | 2026-04-08 |
-| Limitations | medium | 2026-04-08 |
-| Relevance to Claude Code | high | 2026-04-08 |
-
-**Next review:** 2026-07-08 (3 months)
-
-**Confidence rationale:**
-- High confidence sections: Based on official README, SKILL.md files, agent definitions, and GitHub API — all primary sources fully read
-- Medium confidence on limitations: Early-stage project with few users; long-term stability patterns cannot be assessed yet
 
 ## Cross-References
 

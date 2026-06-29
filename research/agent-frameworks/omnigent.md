@@ -1,10 +1,12 @@
-# Omnigent
-
-**Research Date**: 2026-06-18
-**Source URL**: <https://github.com/omnigent-ai/omnigent>
-**Version at Research**: 0.1.0
-**License**: see repository
-
+---
+title: "Omnigent"
+research_date: "2026-06-18"
+source_url: "https://github.com/omnigent-ai/omnigent"
+version_at_research: "0.1.0"
+license: "see repository"
+last_verified: "2026-06-18"
+version_at_verification: "0.1.0"
+next_review: "2026-09-18"
 ---
 
 ## Overview
@@ -269,21 +271,6 @@ Omnigent is highly relevant to Claude Code and AI coding agents because:
 - **CONTRIBUTING guide**: <https://raw.githubusercontent.com/omnigent-ai/omnigent/main/CONTRIBUTING.md> (accessed 2026-06-18)
 - **Source tree**: omnigent/ directory (accessed 2026-06-18)
 - **Project metadata**: pyproject.toml, setup.py (accessed 2026-06-18)
-
-## Freshness Tracking
-
-**Last Verified**: 2026-06-18
-**Version at Verification**: 0.1.0
-**Next Review Recommended**: 2026-09-18
-
-**Confidence summary**:
-- **Identity/Metadata**: high — version, authorship, Python requirements extracted from official pyproject.toml
-- **Features**: high — all features verified against README and POLICIES.md with exact quotes
-- **Architecture**: high — component names and data flow verified via source tree inspection; dependencies verified from pyproject.toml
-- **Usage Examples**: high — commands and YAML examples extracted verbatim from README
-- **Limitations**: medium — early-stage status confirmed from classifiers; platform constraints from pyproject.toml; lack of official GitHub Releases from API query; internal API documentation limitations inferred from source review but not explicitly stated in docs
-
-**Changes since last research**: Initial entry created.
 
 ## Cross-References
 

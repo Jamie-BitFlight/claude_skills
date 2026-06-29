@@ -1,11 +1,13 @@
-# voxcii
-
-**Research Date**: 2026-02-28
-**Source URL**: <https://github.com/ashish0kumar/voxcii>
-**GitHub Repository**: <https://github.com/ashish0kumar/voxcii>
-**Version at Research**: No tagged releases — latest commit 2026-02-27
-**License**: GNU General Public License v3.0
-
+---
+title: "voxcii"
+research_date: "2026-02-28"
+source_url: "https://github.com/ashish0kumar/voxcii"
+github_url: "https://github.com/ashish0kumar/voxcii"
+version_at_research: "No tagged releases — latest commit 2026-02-27"
+license: "GNU General Public License v3.0"
+last_verified: "2026-02-28"
+version_at_verification: "No tagged releases — commit 2026-02-27"
+next_review: "2026-05-28"
 ---
 
 ## Overview
@@ -188,11 +190,3 @@ q             Quit
 - [main.cpp — rendering implementation](https://github.com/ashish0kumar/voxcii/blob/main/src/main.cpp) (accessed 2026-02-28)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-28 |
-| Version at Verification | No tagged releases — commit 2026-02-27 |
-| Next Review Recommended | 2026-05-28 |

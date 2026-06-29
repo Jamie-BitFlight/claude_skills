@@ -1,9 +1,6 @@
-# The Algorithms — Python
-
-**Status**: Educational reference collection
-**Primary URL**: <https://github.com/TheAlgorithms/Python>
-**License**: MIT License
-
+---
+title: "The Algorithms — Python"
+license: "MIT License"
 ---
 
 ## Overview
@@ -300,29 +297,6 @@ Requires Python 3.14+, excluding deployment on systems with older Python version
 - **Project Configuration**: `pyproject.toml` (accessed 2026-04-26)
 - **Community Channels**: Discord (<https://the-algorithms.com/discord>) and Gitter (<https://gitter.im/TheAlgorithms/community>)
 - **Website**: <https://the-algorithms.com/>
-
----
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|-----------|---|---|
-| Identity/Metadata | high | 2026-04-26 | 2026-07-26 |
-| Features | high | 2026-04-26 | 2026-07-26 |
-| Architecture | high | 2026-04-26 | 2026-07-26 |
-| Installation/Usage | high | 2026-04-26 | 2026-07-26 |
-| Statistics | high | 2026-04-26 | 2026-05-26 |
-| Limitations | high | 2026-04-26 | 2026-07-26 |
-| Relevance | high | 2026-04-26 | 2026-07-26 |
-
-**Confidence rationale**:
-- Identity/Metadata: Full repository read, GitHub API metadata current as of today
-- Features: Comprehensive directory listing and example code read from primary source
-- Architecture: Directory structure, file naming, code samples analyzed from repository
-- Installation/Usage: pyproject.toml and CONTRIBUTING.md read in full; tested patterns extracted
-- Statistics: GitHub API called 2026-04-26 for current metrics
-- Limitations: README, CONTRIBUTING.md, and implicit limitations from code analysis
-- Relevance: Assessment based on repository structure and educational mission
 
 ---
 

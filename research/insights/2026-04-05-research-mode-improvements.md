@@ -1,12 +1,5 @@
-# Improvement Proposals: Research Mode
-
-**Research entry**: ./research/ai-observability/research-mode.md
-**Generated**: 2026-04-05
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Research Mode"
 ---
 
 ## Improvement 1: Add source lookup cascade with cost tiers to research-curator agent

@@ -1,11 +1,13 @@
-# abtop
-
-**Research Date**: 2026-04-25
-**Source URL**: <https://github.com/graykode/abtop>
-**GitHub Repository**: <https://github.com/graykode/abtop>
-**Version at Research**: v0.3.7
-**License**: MIT
-
+---
+title: "abtop"
+research_date: "2026-04-25"
+source_url: "https://github.com/graykode/abtop"
+github_url: "https://github.com/graykode/abtop"
+version_at_research: "v0.3.7"
+license: "MIT"
+last_verified: "2026-04-25"
+version_at_verification: "v0.3.7"
+next_review: "2026-07-25"
 ---
 
 ## Overview
@@ -324,12 +326,3 @@ tmux new -s work
 | [TUI Studio](./tui-studio.md) | developer-tools | visual TUI design tool; abtop's dashboard could be redesigned visually using TUI Studio's component export workflow |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-25 |
-| Version at Verification | v0.3.7 |
-| Next Review Recommended | 2026-07-25 |
-| Confidence Map | Overview: high (README + WebFetch), Problem Addressed: high (README + code-read), Key Statistics: high (WebFetch 2026-04-25), Key Features: high (doc + code-read), Technical Architecture: high (code-read), Installation & Usage: high (README), Limitations: high (README), Relevance: medium (inferred from feature set) |

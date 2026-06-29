@@ -1,11 +1,5 @@
-# Utilization Proposals: vibium
-
-**Research entry**: ./research/agent-infrastructure/vibium.md
-**Generated**: 2026-03-24
-**Integration surfaces found**: 4 (CLI binary + MCP server + Python SDK + JavaScript SDK)
-**Proposals written**: 1
-**Skipped**: 1 — alternative implementation, not new capability
-
+---
+title: "Utilization Proposals: vibium"
 ---
 
 ## Utilization 1: agent-browser skill → Vibium as standards-based alternative backend

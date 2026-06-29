@@ -1,11 +1,13 @@
-# Everything Claude Code
-
-**Research Date**: 2026-03-10
-**Source URL**: <https://github.com/affaan-m/everything-claude-code>
-**GitHub Repository**: <https://github.com/affaan-m/everything-claude-code>
-**Version at Research**: 1.8.0
-**License**: MIT
-
+---
+title: "Everything Claude Code"
+research_date: "2026-03-10"
+source_url: "https://github.com/affaan-m/everything-claude-code"
+github_url: "https://github.com/affaan-m/everything-claude-code"
+version_at_research: "1.8.0"
+license: "MIT"
+last_verified: "2026-03-10"
+version_at_verification: "1.8.0 (released 2026-03-09)"
+next_review: "2026-06-10"
 ---
 
 ## Overview
@@ -365,23 +367,3 @@ node scripts/setup-package-manager.js --detect
 - [MIT License](https://github.com/affaan-m/everything-claude-code/blob/main/LICENSE) (accessed 2026-03-10)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-10 |
-| Version at Verification | 1.8.0 (released 2026-03-09) |
-| Next Review Recommended | 2026-06-10 |
-
-**Confidence Summary**
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Identity/Metadata | high | Official plugin.json, LICENSE, and GitHub stats directly extracted |
-| Features | high | 16 agents and 69 skills enumerated from directory listing and README |
-| Architecture | medium | Hook and orchestration model inferred from documentation; no source code examination of hook script implementation |
-| Usage Examples | medium | Installation and command examples from Quick Start section; no end-to-end testing performed |
-| Limitations | low | Constraints inferred from documentation (e.g., "plugins cannot distribute rules") without testing; hook edge cases and cross-harness parity claims not independently verified |
-
-**Calibration**: High-activity repository (50K+ stars, 6K+ forks, 30 contributors, recent v1.8.0 release on 2026-03-09). Recommend 4-week review cycle for tracking breaking API changes, new skill additions, and hook reliability improvements.

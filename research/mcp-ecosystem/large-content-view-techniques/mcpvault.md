@@ -1,8 +1,5 @@
-# Research: mcpvault (bitbonsai) — MCP Content Presentation Patterns
-
-**Date**: 2026-05-30
-**Sources**: All claims cite exact file paths or URLs. No training-data recall used.
-
+---
+title: "Research: mcpvault (bitbonsai) — MCP Content Presentation Patterns"
 ---
 
 ## 1. What mcpvault IS

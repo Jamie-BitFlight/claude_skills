@@ -1,12 +1,5 @@
-# Improvement Proposals: Unblocked
-
-**Research entry**: ./research/context-management/unblocked.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Unblocked"
 ---
 
 ## Improvement 1: Project-specific pattern retrieval in code-reviewer agent

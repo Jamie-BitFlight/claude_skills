@@ -1,11 +1,13 @@
-# Capacitor
-
-**Research Date**: 2026-03-05
-**Source URL**: <https://capacitorjs.com>
-**GitHub Repository**: <https://github.com/ionic-team/capacitor>
-**Version at Research**: v8.1.0
-**License**: MIT
-
+---
+title: "Capacitor"
+research_date: "2026-03-05"
+source_url: "https://capacitorjs.com"
+github_url: "https://github.com/ionic-team/capacitor"
+version_at_research: "v8.1.0"
+license: "MIT"
+last_verified: "2026-03-05"
+version_at_verification: "v8.1.0"
+next_review: "2026-06-05"
 ---
 
 ## Overview
@@ -217,11 +219,3 @@ console.log(photo.webPath);
 - [ionic-team/capacitor GitHub Repository](https://github.com/ionic-team/capacitor) (accessed 2026-03-05)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-05 |
-| Version at Verification | v8.1.0 |
-| Next Review Recommended | 2026-06-05 |

@@ -1,9 +1,5 @@
-# Utilization Assessment: OpenSpace
-
-**Research entry**: ./research/ai-research-tools/OpenSpace.md
-**Assessment date**: 2026-03-28
-**Status**: No utilization surface
-
+---
+title: "Utilization Assessment: OpenSpace"
 ---
 
 ## Integration Surfaces Identified

@@ -1,12 +1,13 @@
-# Oh My OpenCode
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://github.com/code-yeongyu/oh-my-opencode>
-**GitHub Repository**: <https://github.com/code-yeongyu/oh-my-opencode>
-**npm Package**: <https://www.npmjs.com/package/oh-my-opencode>
-**Version at Research**: v3.10.0 (latest release) / v3.10.1 (package.json)
-**License**: SUL-1.0 (Sisyphus Use License — custom, non-OSI)
-
+---
+title: "Oh My OpenCode"
+research_date: "2026-03-06"
+source_url: "https://github.com/code-yeongyu/oh-my-opencode"
+github_url: "https://github.com/code-yeongyu/oh-my-opencode"
+version_at_research: "v3.10.0 (latest release) / v3.10.1 (package.json)"
+license: "SUL-1.0 (Sisyphus Use License — custom, non-OSI)"
+last_verified: "2026-03-06"
+version_at_verification: "v3.10.0"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -202,16 +203,6 @@ curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/he
 - [npm package: oh-my-opencode](https://www.npmjs.com/package/oh-my-opencode) (accessed 2026-03-06)
 - [Homepage: ohmyopencode.org](https://ohmyopencode.org) (not fetched — redirects to GitHub)
 - [Exa web search: oh-my-opencode multi-model orchestration](https://exa.ai) (accessed 2026-03-06)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | v3.10.0 |
-| Next Review Recommended | 2026-06-06 |
 
 ---
 

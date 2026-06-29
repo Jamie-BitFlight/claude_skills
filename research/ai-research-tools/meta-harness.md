@@ -1,11 +1,12 @@
-# Meta-Harness: End-to-End Optimization of Model Harnesses
-
-**Research Date**: 2026-04-06
-**Source URL**: <https://arxiv.org/abs/2603.28052>
-**ArXiv ID**: 2603.28052
-**Version at Research**: v1 (preprint)
-**License**: Not specified (arXiv preprint)
-
+---
+title: "Meta-Harness: End-to-End Optimization of Model Harnesses"
+research_date: "2026-04-06"
+source_url: "https://arxiv.org/abs/2603.28052"
+version_at_research: "v1 (preprint)"
+license: "Not specified (arXiv preprint)"
+last_verified: "2026-04-06"
+version_at_verification: "v1 (preprint)"
+next_review: "2026-07-06"
 ---
 
 ## Overview
@@ -169,14 +170,3 @@ The paper describes sufficient methodological detail to reconstruct the system:
 | [SlimContext](../context-management/slimcontext.md) | context-management | Parallel optimization targets: Meta-Harness optimizes what information to present via harness code, while SlimContext optimizes context compression; both achieve 4x-5x efficiency gains |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-06 |
-| Version at Verification | v1 (preprint) |
-| Next Review Recommended | 2026-07-06 |
-| Confidence Map | Overview: high (direct paper abstract), Technical Architecture: medium (inferred from methodology description), Relevance to Claude Code: medium (requires validation through implementation testing), Key Statistics: high (exact figures from paper) |
-
-**Note on Freshness**: This is a very recent preprint (March 2026). Initial review set to 3 months. If code/implementation is released, a follow-up research should be conducted to evaluate actual framework usage and integration opportunities.

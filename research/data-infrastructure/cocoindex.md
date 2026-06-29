@@ -1,13 +1,14 @@
-# CocoIndex
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://github.com/cocoindex-io/cocoindex>
-**GitHub Repository**: <https://github.com/cocoindex-io/cocoindex>
-**Documentation**: <https://cocoindex.io/docs>
-**PyPI Package**: <https://pypi.org/project/cocoindex/>
-**Version at Research**: v0.3.33
-**License**: Apache 2.0
-
+---
+title: "CocoIndex"
+research_date: "2026-02-23"
+source_url: "https://github.com/cocoindex-io/cocoindex"
+github_url: "https://github.com/cocoindex-io/cocoindex"
+documentation_url: "https://cocoindex.io/docs"
+version_at_research: "v0.3.33"
+license: "Apache 2.0"
+last_verified: "2026-02-23"
+version_at_verification: "v0.3.33"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -232,11 +233,3 @@ def text_embedding_flow(
 - [CocoIndex Claude Plugin](https://github.com/cocoindex-io/cocoindex-claude) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v0.3.33 |
-| Next Review Recommended | 2026-05-23 |

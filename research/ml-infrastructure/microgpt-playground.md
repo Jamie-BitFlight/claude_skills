@@ -1,15 +1,8 @@
-# microgpt Playground
-
-| Field         | Value                                                                            |
-| ------------- | -------------------------------------------------------------------------------- |
-| Research Date | 2026-02-23                                                                       |
-| Primary URL   | <https://huggingface.co/spaces/webml-community/microgpt-playground>             |
-| GitHub        | <https://github.com/xenova/microgpt.js>                                          |
-| Original      | <https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95>             |
-| Version       | Single-file implementation (no versioned releases)                               |
-| License       | MIT                                                                              |
-| Author        | [Xenova](https://huggingface.co/Xenova) (HF Staff) / webml-community            |
-
+---
+title: "microgpt Playground"
+last_verified: "2026-02-23"
+version_at_verification: "n/a (single-file, no releases)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -179,11 +172,3 @@ worker.onmessage = (e) => console.log('Loss:', e.data.loss);
 - [Karpathy's microgpt.py Dissected](https://blog.sotaaz.com/post/microgpt-en) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field                     | Value      |
-| ------------------------- | ---------- |
-| Last Verified             | 2026-02-23 |
-| Version at Verification   | n/a (single-file, no releases) |
-| Next Review Recommended   | 2026-05-23 |

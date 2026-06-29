@@ -1,13 +1,7 @@
-# Boneyard — Pixel-Perfect Skeleton Loading Screens
-
-**Version**: 1.5.1
-**Repository**: <https://github.com/0xGF/boneyard>
-**NPM**: <https://www.npmjs.org/package/boneyard-js>
-**License**: MIT
-**Research Date**: 2026-04-03
-**Last Updated**: 2026-04-03
-**Next Review Recommended**: 2026-07-03
-
+---
+title: "Boneyard — Pixel-Perfect Skeleton Loading Screens"
+research_date: "2026-04-03"
+license: "MIT"
 ---
 
 ## Overview
@@ -432,28 +426,3 @@ Boneyard is relevant to Claude Code in the following scenarios:
 | [CopilotKit](../agent-frameworks/copilotkit.md) | agent-frameworks | React-first framework with bi-directional state sync; skeleton screens complement Copilot UI for loading state visualization during agent operations |
 
 ---
-
-## Freshness Tracking
-
-**Last researched**: 2026-04-03
-**Next review**: 2026-07-03
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|------------|-------|
-| Identity/Metadata | high | npm registry and local package.json read in full; version, license, description confirmed |
-| Key Features | high | All features extracted from source code with exact line references; algorithms traced through implementation |
-| Technical Architecture | high | Core components and data flow reverse-engineered from source; types and function signatures exact |
-| Installation & Usage | high | Examples extracted from README and official source code; commands and patterns verified |
-| Limitations | medium | Documented limitations are minimal; inferred limitations based on code inspection (not explicitly stated in docs) |
-| Relevance to Claude Code | medium | Use cases are plausible but not validated against actual Claude Code workflows; relevance is inferred from feature set |
-
-### Data Changes Since Last Research
-
-N/A — first research entry.
-
----
-
-**Research completed by Research Curator Agent**
-**Methodology**: Shallow repository clone, Phase 1 extractive read (README, package.json, core source files), no Phase 1b code analysis required (doc sufficiency check passed: features and architecture named with specific components and data flow).

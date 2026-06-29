@@ -1,12 +1,5 @@
-# Improvement Proposals: Ruflo
-
-**Research entry**: ./research/agent-frameworks/ruflo.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Ruflo"
 ---
 
 ## Improvement 1: Goal-drift validation between task batches in implement-feature

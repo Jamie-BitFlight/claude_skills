@@ -1,14 +1,7 @@
-# SimpleMem-Cross: Persistent Cross-Conversation Memory for LLM Agents
-
-## Overview
-
-SimpleMem-Cross extends the SimpleMem memory framework with persistent cross-conversation memory capabilities, enabling LLM agents to recall context, decisions, and learnings from previous sessions automatically. The extension is built entirely through composition—the original SimpleMem codebase remains "byte-identical" and unmodified. Published by AIMING Lab on February 9, 2026.
-
-SimpleMem-Cross achieves a LoCoMo benchmark score of **48**, outperforming Claude-Mem by **64%** (Claude-Mem score: 29.3). The system comprises 10 core Python modules totaling ~4,000 lines of production code, with 127 passing test cases.
-
-**Repository**: <https://github.com/aiming-lab/SimpleMem/tree/main/cross>
-**License**: MIT (Copyright 2025 AIMING Lab)
-
+---
+title: "SimpleMem-Cross: Persistent Cross-Conversation Memory for LLM Agents"
+license: "MIT (Copyright 2025 AIMING Lab)"
+next_review: "2026-06-19 (3 months)"
 ---
 
 ## Problem Addressed
@@ -322,26 +315,3 @@ SimpleMem-Cross is directly applicable to Claude Code's agent systems:
 | [LiteAgents - Multi-Tool AI Development Toolkit](../agent-frameworks/liteagents.md) | agent-frameworks | Hot Memory pipeline (`/stash` → `/friction` → `/remember`) consolidates session context and learning into persistent `MEMORY.md`, sharing SimpleMem-Cross's session lifecycle and consolidation approach |
 
 ---
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified |
-|---------|-----------|---------------|
-| Identity/Metadata | high | 2026-03-19 (repo clone, README read, license verified) |
-| Key Statistics | high | 2026-03-19 (exact numbers extracted from official README) |
-| Key Features | high | 2026-03-19 (extracted from cross/README.md documentation) |
-| Technical Architecture | high | 2026-03-19 (module structure from cross/README.md:216-228, data flow from architecture diagram) |
-| Installation & Usage | high | 2026-03-19 (code examples from official Quick Start section) |
-| HTTP API | high | 2026-03-19 (endpoint table from cross/README.md:301-310) |
-| MCP Integration | high | 2026-03-19 (tool list from cross/README.md:343-352) |
-| Configuration | high | 2026-03-19 (configuration options from cross/README.md:379-399) |
-| Relevance to Claude Code | medium | 2026-03-19 (inferred from architecture; not explicitly documented in SimpleMem repo) |
-| Limitations | medium | 2026-03-19 (limitations not comprehensively documented in source; identified from architecture constraints) |
-
-**Next Review**: 2026-06-19 (3 months)
-
-**Notes on Confidence**:
-- High confidence: All factual claims (versions, metrics, API endpoints) extracted verbatim from official README or source files
-- Medium confidence: Relevance and limitations sections inferred from architectural design; not exhaustively enumerated in official documentation
-- No sections with low confidence — all claims traceable to primary sources
-

@@ -1,12 +1,5 @@
-# Improvement Proposals: TAKT (TAKT Agent Koordination Topology)
-
-**Research entry**: ./research/research-agent-patterns/takt.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 11
-**Backlog items created**: 0
-**Deferred (low confidence)**: 4
-**Skipped (already covered or tracked)**: 7
-
+---
+title: "Improvement Proposals: TAKT (TAKT Agent Koordination Topology)"
 ---
 
 ## Improvement 1: Faceted prompt composition for skill instructions

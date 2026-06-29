@@ -1,12 +1,5 @@
-# Improvement Proposals: CodeWiki (Google)
-
-**Research entry**: ./research/ai-research-tools/codewiki-google.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: CodeWiki (Google)"
 ---
 
 ## Improvement 1: CI-triggered documentation drift detection

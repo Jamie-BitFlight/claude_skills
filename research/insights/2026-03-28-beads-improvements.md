@@ -1,13 +1,5 @@
-# Improvement Proposals: Beads (bd)
-
-**Research entry**: ./research/task-management/beads.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #1089)
-**Deferred (low confidence)**: 0
-**Deferred (medium confidence)**: 3
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Beads (bd)"
 ---
 
 ## Improvement 1: Semantic compaction for completed SAM tasks

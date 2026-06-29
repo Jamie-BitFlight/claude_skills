@@ -1,11 +1,5 @@
-# Utilization Proposals: SoulForge
-
-**Research entry**: ./research/coding-agents/soulforge.md
-**Generated**: 2026-04-05
-**Integration surfaces found**: 2 (CLI | SDK)
-**Proposals written**: 2
-**Skipped**: 3 — typescript-pro (SoulForge is competitor agent, not library), orchestrating-swarms (skill documentation, not callable system), javascript-pro (code implementation agent, no context synthesis need)
-
+---
+title: "Utilization Proposals: SoulForge"
 ---
 
 ## Utilization 1: context-gathering → SoulForge repo map

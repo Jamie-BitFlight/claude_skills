@@ -1,9 +1,5 @@
-# Research: Notion MCP Server — Large Content Tree Patterns
-
-**Date**: 2026-05-30
-**Sources**: makenotion/notion-mcp-server repo (v2.3.1), Notion API reference docs
-**Purpose**: Identify patterns adoptable for a section-index + paginated body + token-budget pipeline
-
+---
+title: "Research: Notion MCP Server — Large Content Tree Patterns"
 ---
 
 ## 1. Architecture Overview

@@ -1,12 +1,5 @@
-# Improvement Proposals: Stop Slop
-
-**Research entry**: ./research/ai-writing-tools/stop-slop.md
-**Generated**: 2026-04-03
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 4
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Stop Slop"
 ---
 
 ## Improvement 1: Add prose quality validation rule to research entry validator

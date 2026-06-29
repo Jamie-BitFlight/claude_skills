@@ -1,12 +1,5 @@
-# Improvement Proposals: PocketBase
-
-**Research entry**: ./research/data-infrastructure/pocketbase.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: PocketBase"
 ---
 
 ## Improvement 1: SSE-based realtime push for swarm/task status monitoring

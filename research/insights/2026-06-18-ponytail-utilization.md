@@ -1,11 +1,5 @@
-# Utilization Proposals: Ponytail
-
-**Research entry**: ./research/agent-frameworks/ponytail.md
-**Generated**: 2026-06-18
-**Integration surfaces found**: 3 (skill | ruleset | hooks)
-**Proposals written**: 2
-**Skipped**: 3 — already constraint-enforcing or conceptual-only
-
+---
+title: "Utilization Proposals: Ponytail"
 ---
 
 ## Utilization 1: research-insight-extractor → Ponytail ruleset

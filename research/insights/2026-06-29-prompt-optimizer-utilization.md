@@ -1,11 +1,5 @@
-# Utilization Proposals: Prompt Optimizer
-
-**Research entry**: ./research/prompt-engineering/prompt-optimizer.md
-**Generated**: 2026-06-29
-**Integration surfaces found**: 4 (MCP server, SDK, Web API, Docker)
-**Proposals written**: 1
-**Skipped**: 3 — scope mismatch, existing coverage, architectural constraints
-
+---
+title: "Utilization Proposals: Prompt Optimizer"
 ---
 
 ## Utilization 1: `/plugin-creator:subagent-refactorer` → Prompt Optimizer MCP Server
@@ -92,4 +86,3 @@ await artifactManager.register({
 - Integrating web app UI for interactive prompt refinement (requires browser context, not applicable to CLI/agent workflow)
 - Text-to-image generation for `/ai-design-tools` skills (out of scope for prompt engineering focus)
 - Chrome extension for in-browser optimization (user-facing, not agent-facing)
-

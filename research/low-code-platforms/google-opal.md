@@ -1,11 +1,13 @@
-# Google Opal
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://opal.google/landing/>
-**GitHub Repository**: N/A (closed-source Google experiment)
-**Version at Research**: Experiment (no versioned releases; agent step launched February 24, 2026)
-**License**: Proprietary (Google Terms of Service)
-
+---
+title: "Google Opal"
+research_date: "2026-03-04"
+source_url: "https://opal.google/landing/"
+github_url: "N/A (closed-source Google experiment)"
+version_at_research: "Experiment (no versioned releases; agent step launched February 24, 2026)"
+license: "Proprietary (Google Terms of Service)"
+last_verified: "2026-03-04"
+version_at_verification: "Experiment — agent step (February 2026)"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -193,11 +195,3 @@ SOURCE: [Introducing Opal — Google Developers Blog](https://developers.googleb
 - [Google Labs Introduces Opal, a Visual Platform for Creating AI Mini-Apps — InfoQ](https://www.infoq.com/news/2025/07/google-opal-ai/) (accessed 2026-03-04)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | Experiment — agent step (February 2026) |
-| Next Review Recommended | 2026-06-04 |

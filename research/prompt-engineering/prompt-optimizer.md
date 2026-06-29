@@ -1,8 +1,8 @@
 ---
 title: Prompt Optimizer
 resource_url: "https://github.com/linshenkx/prompt-optimizer"
-created_date: 2026-06-18
-freshness_date: 2026-06-18
+date_created: 2026-06-18
+date_last_reviewed: 2026-06-18
 next_review: 2026-09-18
 license: "AGPL-3.0"
 ---

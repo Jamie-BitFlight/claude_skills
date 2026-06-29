@@ -1,11 +1,13 @@
-# Sidecar
-
-**Research Date**: 2026-03-17
-**Source URL**: <https://marcus.github.io/sidecar/>
-**GitHub Repository**: <https://github.com/marcus/sidecar>
-**Version at Research**: v0.78.0
-**License**: MIT
-
+---
+title: "Sidecar"
+research_date: "2026-03-17"
+source_url: "https://marcus.github.io/sidecar/"
+github_url: "https://github.com/marcus/sidecar"
+version_at_research: "v0.78.0"
+license: "MIT"
+last_verified: "2026-03-17"
+version_at_verification: "v0.78.0"
+next_review: "2026-06-17"
 ---
 
 ## Overview
@@ -277,12 +279,3 @@ Keyboard shortcuts:
 | [Claude Task Master](../task-management/claude-task-master.md) | task-management | Alternative task management system for AI-driven development workflows integrated via MCP |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-17 |
-| Version at Verification | v0.78.0 |
-| Next Review Recommended | 2026-06-17 |
-| Confidence Map | `Overview: high (doc + README)`, `Problem Addressed: high (doc)`, `Key Statistics: high (gh API)`, `Key Features: high (doc + code-read)`, `Technical Architecture: medium (doc + code-read)`, `Installation & Usage: high (doc)`, `Relevance to Claude Code Development: high (inference from architecture)` |

@@ -1,12 +1,5 @@
-# Improvement Proposals: Scrapling — Claude Code Web Scraping Skill
-
-**Research entry**: ./research/developer-tools/scrapling-skill.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Scrapling — Claude Code Web Scraping Skill"
 ---
 
 ## Improvement 1: Per-skill experience accumulation with structured pattern files

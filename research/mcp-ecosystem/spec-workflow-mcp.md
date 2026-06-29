@@ -1,13 +1,13 @@
-# Spec Workflow MCP
-
-**Research Date**: 2026-03-02
-**Source URL**: <https://github.com/Pimzino/spec-workflow-mcp>
-**GitHub Repository**: <https://github.com/Pimzino/spec-workflow-mcp>
-**npm Package**: <https://www.npmjs.com/package/@pimzino/spec-workflow-mcp>
-**VSCode Extension**: <https://marketplace.visualstudio.com/items?itemName=Pimzino.spec-workflow-mcp>
-**Version at Research**: v2.2.5 (tag v0.0.28 is the latest git tag; npm package version is 2.2.5)
-**License**: GPL-3.0
-
+---
+title: "Spec Workflow MCP"
+research_date: "2026-03-02"
+source_url: "https://github.com/Pimzino/spec-workflow-mcp"
+github_url: "https://github.com/Pimzino/spec-workflow-mcp"
+version_at_research: "v2.2.5 (tag v0.0.28 is the latest git tag; npm package version is 2.2.5)"
+license: "GPL-3.0"
+last_verified: "2026-03-02"
+version_at_verification: "2.2.5 (npm), v0.0.28 (git tag)"
+next_review: "2026-06-02"
 ---
 
 ## Overview
@@ -236,11 +236,3 @@ SPEC_WORKFLOW_HOME=/workspace/.spec-workflow-mcp npx -y @pimzino/spec-workflow-m
 - [package.json via GitHub API](https://api.github.com/repos/Pimzino/spec-workflow-mcp/contents/package.json) (accessed 2026-03-02)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-02 |
-| Version at Verification | 2.2.5 (npm), v0.0.28 (git tag) |
-| Next Review Recommended | 2026-06-02 |

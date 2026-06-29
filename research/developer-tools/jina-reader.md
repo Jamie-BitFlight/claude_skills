@@ -1,11 +1,13 @@
-# Jina Reader
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://jina.ai/reader>
-**GitHub Repository**: <https://github.com/jina-ai/reader>
-**Version at Research**: Not versioned (continuously deployed from main branch)
-**License**: Apache 2.0
-
+---
+title: "Jina Reader"
+research_date: "2026-02-23"
+source_url: "https://jina.ai/reader"
+github_url: "https://github.com/jina-ai/reader"
+version_at_research: "Not versioned (continuously deployed from main branch)"
+license: "Apache 2.0"
+last_verified: "2026-02-23"
+version_at_verification: "Continuously deployed (no versioning)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -214,20 +216,3 @@ results = response.json()  # list of {title, content, url}
 - [Apache-2.0 License](https://github.com/jina-ai/reader/blob/main/LICENSE) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-| ----- | ----- |
-| Last Verified | 2026-02-23 |
-| Version at Verification | Continuously deployed (no versioning) |
-| Next Review Recommended | 2026-05-23 |
-
-**Review Triggers**:
-
-- New request header options added
-- Rate limit or pricing changes
-- New output format support (beyond markdown/html/text/screenshot/json)
-- ReaderLM-v2 fully replacing the Puppeteer pipeline
-- Breaking changes post-Elastic acquisition
-- Self-hosting documentation added

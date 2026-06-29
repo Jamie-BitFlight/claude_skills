@@ -1,11 +1,13 @@
-# Merly Mentor
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://www.merly.ai/mentor>
-**GitHub Repository**: <https://github.com/merly-ai/merly-mentor>
-**Version at Research**: v0.0.20
-**License**: Proprietary (Commercial)
-
+---
+title: "Merly Mentor"
+research_date: "2026-03-18"
+source_url: "https://www.merly.ai/mentor"
+github_url: "https://github.com/merly-ai/merly-mentor"
+version_at_research: "v0.0.20"
+license: "Proprietary (Commercial)"
+last_verified: "2026-03-18"
+version_at_verification: "v0.0.20 (released 2024-12-20)"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -227,13 +229,3 @@ curl http://localhost:8080/api/v1/repositories/{id}/issues \
 | [Harness Engineering (OpenAI)](../evaluation-testing/harness-engineering-openai.md) | evaluation-testing | Quality gates and code quality enforcement in CI/CD pipelines for AI-driven development workflows |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | v0.0.20 (released 2024-12-20) |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | `Identity: high (official docs + API spec)`, `Features: high (official docs + API spec)`, `Architecture: high (Docker Compose + API spec)`, `Usage Examples: high (official README + Docker configs)`, `Relevance: medium (inferred from Claude Code context)` |
-

@@ -1,12 +1,5 @@
-# Improvement Proposals: OpenPencil
-
-**Research entry**: ./research/ai-design-tools/open-pencil.md
-**Generated**: 2026-03-19
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: OpenPencil"
 ---
 
 ## Skipped Patterns

@@ -1,14 +1,6 @@
-# Maverick
-
-> Claude Code plugin and CLI for autonomous AI-driven software development with enforced quality, security, and operational best practices.
-
-**Repository**: <https://github.com/thermiteau/maverick>
-**License**: Apache 2.0
-**Current Version**: 0.5.5 (released 2026-03-19)
-**Latest Commit**: e352bef (2026-03-19 14:47:56 +1100)
-**Primary Language**: Python 3.10+
-**Source**: README.md, docs/overview.md, docs/architecture.md, CHANGELOG.md
-
+---
+title: "Maverick"
+license: "Apache 2.0"
 ---
 
 ## Overview
@@ -419,28 +411,6 @@ This means cloud infrastructure features (remote workers, AMI building, instance
 3. **Hook enforcement coverage unclear** — Documentation mentions "hooks" enforce rules at tool-call boundaries but does not enumerate which hooks exist or which LLM behaviors they block.
 
 4. **Session recovery** (`claude-code-error-handling-and-recovery.md`) exists but is not detailed in reviewed sources. How recovery state is tracked and what happens if workers crash mid-task is not documented.
-
----
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Notes |
-|---------|-----------|---|---|
-| Identity/Metadata | high | 2026-03-23 | Version 0.5.5 confirmed in pyproject.toml; commit date verified from git log |
-| Problem Addressed | high | 2026-03-23 | Extracted from docs/overview.md and README.md; failure modes align with stated design goals |
-| Key Features | high | 2026-03-23 | Skills, agents, workflows all extracted from docs/architecture.md; specific skill names verified from skills/ directory listing |
-| Technical Architecture | medium | 2026-03-23 | Component relationships extracted from architecture docs; cloud infrastructure details from claude-code-workers.md; CLI structure from pyproject.toml. Hook enforcement mechanism not deeply documented in reviewed sources. |
-| Installation & Usage | high | 2026-03-23 | Installation commands and workflow usage extracted from README.md and documentation; CLI commands verified from claude-code-workers.md |
-| Relevance to Claude Code | medium | 2026-03-23 | Determined from direct examination of skill/agent design and workflow patterns. No explicit documentation of relevance claims; assessment based on architectural fit. |
-| Limitations | medium | 2026-03-23 | Maturity warnings from README.md and architecture docs are explicit; infrastructure brittleness noted in README. AWS-only constraint confirmed from cloud-init docs. Upskill edge cases inferred from documented pattern-matching approach. Mono-repo support recent (v0.4.0); extent of testing not documented. |
-
-### Next Review
-
-2026-06-23 (3 months) — By this date, v0.5.5 may be superseded. Recommend re-checking:
-- Current version (may be v0.6+ or v1.0 by June)
-- Cloud infrastructure stability improvements (stated as priority in README)
-- Hook enforcement documentation completeness
-- Remote worker production deployment reports (if any)
 
 ---
 

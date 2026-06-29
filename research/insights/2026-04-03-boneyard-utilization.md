@@ -1,11 +1,5 @@
-# Utilization Proposals: Boneyard
-
-**Research entry**: ../developer-tools/boneyard.md
-**Generated**: 2026-04-03
-**Integration surfaces found**: 2 (NPM SDK | CLI tool)
-**Proposals written**: 1
-**Skipped**: 1 — localhost-only app with no persistent loading states
-
+---
+title: "Utilization Proposals: Boneyard"
 ---
 
 ## Utilization 1: dot-dash frontend → Boneyard skeleton screens

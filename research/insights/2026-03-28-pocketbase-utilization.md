@@ -1,9 +1,5 @@
-# Utilization Assessment: PocketBase
-
-**Research entry**: ./research/data-infrastructure/pocketbase.md
-**Generated**: 2026-03-28
-**Assessment**: No viable utilization opportunities identified
-
+---
+title: "Utilization Assessment: PocketBase"
 ---
 
 ## Finding Summary

@@ -1,12 +1,5 @@
-# Improvement Proposals: MemPalace
-
-**Research entry**: ./research/context-management/mempalace.md
-**Generated**: 2026-04-08
-**Patterns assessed**: 6
-**Backlog items created**: 2 (issues: #1677, #1678)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: MemPalace"
 ---
 
 ## Improvement 1: PreCompact hook for emergency context preservation

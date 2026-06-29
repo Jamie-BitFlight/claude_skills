@@ -1,11 +1,13 @@
-# Crawler.sh
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://crawler.sh/>
-**GitHub Repository**: Not publicly listed (closed-source / proprietary binary distribution)
-**Version at Research**: v0.2.3
-**License**: Proprietary (free tier available; premium tier with 50% off launch promotion)
-
+---
+title: "Crawler.sh"
+research_date: "2026-03-04"
+source_url: "https://crawler.sh/"
+github_url: "Not publicly listed (closed-source / proprietary binary distribution)"
+version_at_research: "v0.2.3"
+license: "Proprietary (free tier available; premium tier with 50% off launch promotion)"
+last_verified: "2026-03-04"
+version_at_verification: "v0.2.3"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -210,11 +212,3 @@ crawler seo site.crawl --output report.txt
 - [Crawler.sh on Product Hunt](https://www.producthunt.com/products/crawler-sh) (accessed 2026-03-04)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | v0.2.3 |
-| Next Review Recommended | 2026-06-04 |

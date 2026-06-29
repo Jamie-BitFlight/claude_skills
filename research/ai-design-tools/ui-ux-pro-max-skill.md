@@ -1,11 +1,13 @@
-# UI UX Pro Max Skill
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://www.uupm.cc/>
-**GitHub Repository**: <https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>
-**Version at Research**: v2.2.1
-**License**: MIT
-
+---
+title: "UI UX Pro Max Skill"
+research_date: "2026-02-26"
+source_url: "https://www.uupm.cc/"
+github_url: "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+version_at_research: "v2.2.1"
+license: "MIT"
+last_verified: "2026-02-26"
+version_at_verification: "v2.2.1"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -181,11 +183,3 @@ python3 src/ui-ux-pro-max/scripts/search.py "dashboard" --domain chart --stack r
 - [Product Website: uupm.cc](https://www.uupm.cc/) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v2.2.1 |
-| Next Review Recommended | 2026-05-26 |

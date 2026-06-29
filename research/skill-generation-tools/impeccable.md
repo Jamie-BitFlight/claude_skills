@@ -1,143 +1,9 @@
-# Impeccable
-
-## Overview
-
-**Impeccable** is a cross-provider design skills platform that distributes a comprehensive frontend design skill and 20 specialized design commands across multiple AI harness tools. Created by Paul Bakaus and first released in November 2025, Impeccable provides ready-to-use skill bundles for Cursor, Claude Code, OpenCode, Pi, Gemini CLI, Codex CLI, VS Code Copilot, and Kiro.
-
-**Repository**: <https://github.com/pbakaus/impeccable>
-**Website**: <https://impeccable.style>
-**License**: Apache 2.0 (based on Anthropic's frontend-design skill; see NOTICE.md for attribution)
-**Latest version**: 1.5.1
-**GitHub stars**: 11,915 (as of 2026-03-21)
-**Last updated**: 2026-03-21
-
-## Problem Addressed
-
-Impeccable targets a pervasive problem in AI-generated user interfaces: generic, predictable aesthetics. According to the project README, "Every LLM learned from the same generic templates. Without guidance, you get the same predictable mistakes: Inter font, purple gradients, cards nested in cards, gray text on colored backgrounds."
-
-The core insight is that design quality depends on explicit, actionable guidance. Without domain-specific instruction, AI models replicate common patterns rather than creating distinctive, production-grade interfaces. Impeccable solves this by providing:
-
-1. A comprehensive skill with 7 reference files covering the full breadth of frontend design decisions
-2. 20 specialized commands that guide the AI through specific design workflows (audit, normalize, polish, etc.)
-3. Curated anti-patterns that explicitly tell the AI what NOT to do
-
-The project explicitly builds on Anthropic's original frontend-design skill, extending it with "deeper expertise and more control."
-
-## Key Statistics
-
-- **11,915 GitHub stars** (as of 2026-03-21)
-- **469 forks**
-- **21 subscribers**
-- **11 open issues**
-- **Package version**: 1.5.1
-- **Primary language**: JavaScript
-- **Repository created**: 2025-11-16
-- **Last commit**: 2026-03-21 (merge PR #60)
-- **Contributors**: Public repository, 21 watchers
-
-## Key Features
-
-### 1. Core Skill: frontend-design
-
-Impeccable provides a comprehensive frontend-design skill containing 7 domain-specific reference files:
-
-- **typography.md** — "Type systems, font pairing, modular scales, OpenType"
-- **color-and-contrast.md** — "OKLCH, tinted neutrals, dark mode, accessibility"
-- **spatial-design.md** — "Spacing systems, grids, visual hierarchy"
-- **motion-design.md** — "Easing curves, staggering, reduced motion"
-- **interaction-design.md** — "Forms, focus states, loading patterns"
-- **responsive-design.md** — "Mobile-first, fluid design, container queries"
-- **ux-writing.md** — "Button labels, error messages, empty states"
-
-Each reference file contains structured design principles with do/don't guidance rather than generic advice.
-
-### 2. Twenty Design Commands
-
-The README documents 20 commands, each with a specific workflow purpose:
-
-| Command | Purpose |
-|---------|---------|
-| `/teach-impeccable` | One-time setup: gather design context, save to config |
-| `/audit` | Run technical quality checks (a11y, performance, responsive) |
-| `/critique` | UX design review: hierarchy, clarity, emotional resonance |
-| `/normalize` | Align with design system standards |
-| `/polish` | Final pass before shipping |
-| `/distill` | Strip to essence |
-| `/clarify` | Improve unclear UX copy |
-| `/optimize` | Performance improvements |
-| `/harden` | Error handling, i18n, edge cases |
-| `/animate` | Add purposeful motion |
-| `/colorize` | Introduce strategic color |
-| `/bolder` | Amplify boring designs |
-| `/quieter` | Tone down overly bold designs |
-| `/delight` | Add moments of joy |
-| `/extract` | Pull into reusable components |
-| `/adapt` | Adapt for different devices |
-| `/onboard` | Design onboarding flows |
-| `/typeset` | Fix font choices, hierarchy, sizing |
-| `/arrange` | Fix layout, spacing, visual rhythm |
-| `/overdrive` | Add technically extraordinary effects |
-
-Commands accept optional arguments to focus on specific areas (e.g., `/audit header`, `/polish checkout-form`).
-
-### 3. Explicit Anti-Pattern Guidance
-
-The frontend-design skill includes a documented list of anti-patterns the AI should avoid:
-
-- "Don't use overused fonts (Arial, Inter, system defaults)"
-- "Don't use gray text on colored backgrounds"
-- "Don't use pure black/gray (always tint)"
-- "Don't wrap everything in cards or nest cards inside cards"
-- "Don't use bounce/elastic easing (feels dated)"
-
-Anti-patterns are woven throughout the reference files with "DON'T" sections in each design category.
-
-### 4. Multi-Provider Distribution
-
-Impeccable generates provider-specific skill packages from a single source format, supporting:
-
-- Cursor
-- Claude Code
-- OpenCode
-- Pi
-- Gemini CLI
-- Codex CLI
-- VS Code Copilot
-- Kiro
-
-The build process generates provider-specific variants in `dist/` while maintaining full metadata (args, user-invocable, allowed-tools, license, compatibility) in source files.
-
-### 5. Website and Case Studies
-
-A website at impeccable.style provides:
-
-- Ready-to-use skill bundles for download as ZIP files
-- "Before/after case studies of real projects transformed with Impeccable commands"
-
-## Technical Architecture
-
-### Build System
-
-Impeccable uses **Bun** (a fast JavaScript runtime and package manager) to generate provider-specific skill formats from a unified source. The architecture is documented in DEVELOP.md as "Option A": maintain full metadata in source files and downgrade for providers with limited support.
-
-**Build command**: `bun run build`
-
-**Build artifacts**:
-- Source: `source/skills/{name}/SKILL.md`
-- Output: `dist/{provider}/.{provider}/skills/{name}/SKILL.md`
-
-**Key dependencies** (from package.json v1.5.1):
-- `archiver@^7.0.1` — ZIP archive creation for distribution bundles
-- `motion@^12.23.26` — Motion/animation library
-- `playwright@^1.57.0` — Browser automation for screenshots/testing
-- `wrangler@^4.71.0` (dev) — Cloudflare Pages deployment
-
-### Skill Format
-
-Skills follow the [Agent Skills specification](https://agentskills.io/specification) with YAML frontmatter:
-
-```yaml
 ---
+title: "Impeccable"
+license: "Apache 2.0 (based on Anthropic's frontend-design skill; see NOTICE.md for attribution)"
+next_review: "2026-06-21 (3 months)"
+---
+
 name: skill-name
 description: What this skill provides
 license: License info (optional)
@@ -147,6 +13,7 @@ args: Array of argument objects (optional)
 allowed-tools: Pre-approved tools list (optional, experimental)
 ---
 Skill instructions for the LLM...
+
 ```
 
 ### Design Principles in Reference Files
@@ -162,10 +29,12 @@ The typography reference (typography.md) introduces three foundational concepts:
 The color-and-contrast reference (color-and-contrast.md) advocates for OKLCH over HSL:
 
 ```css
+
 /* OKLCH: lightness (0-100%), chroma (0-0.4+), hue (0-360) */
 --color-primary: oklch(60% 0.15 250);      /* Blue */
 --color-primary-light: oklch(85% 0.08 250); /* Same hue, lighter */
 --color-primary-dark: oklch(35% 0.12 250);  /* Same hue, darker */
+
 ```
 
 The key insight: "As you move toward white or black, reduce chroma (saturation). High chroma at extreme lightness looks garish."
@@ -199,7 +68,9 @@ Visit impeccable.style and download ready-to-use bundles as ZIP files.
 **For Cursor:**
 
 ```bash
+
 cp -r dist/cursor/.cursor your-project/
+
 ```
 
 Note: Cursor requires Nightly channel and "Agent Skills" enabled in settings.
@@ -212,12 +83,15 @@ cp -r dist/claude-code/.claude your-project/
 
 # Or global
 cp -r dist/claude-code/.claude/* ~/.claude/
+
 ```
 
 **For Gemini CLI:**
 
 ```bash
+
 cp -r dist/gemini/.gemini your-project/
+
 ```
 
 Note: Requires `npm i -g @google/gemini-cli@preview` and manual skill enabling.
@@ -225,7 +99,9 @@ Note: Requires `npm i -g @google/gemini-cli@preview` and manual skill enabling.
 **For Codex CLI:**
 
 ```bash
+
 cp -r dist/codex/.codex/* ~/.codex/
+
 ```
 
 ### Usage
@@ -233,17 +109,21 @@ cp -r dist/codex/.codex/* ~/.codex/
 After installation, commands are available in the AI harness:
 
 ```bash
+
 /audit           # Find issues
 /normalize       # Fix inconsistencies
 /polish          # Final cleanup
 /distill         # Remove complexity
+
 ```
 
 Commands accept optional scope arguments:
 
 ```bash
+
 /audit header
 /polish checkout-form
+
 ```
 
 **Codex CLI exception**: Uses `/prompts:audit`, `/prompts:polish` syntax instead.
@@ -287,23 +167,6 @@ The website includes "case studies" of before/after design improvements, but no 
 ### Limited Community Engagement
 
 While the project has 11,915 stars, there are only 11 open issues and no visible discussion forums or community channels. Feedback mechanisms are not documented.
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-21
-**Next Review**: 2026-06-21 (3 months)
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Identity/Metadata | high | Repository API confirms stars (11,915), license (Apache 2.0), version (1.5.1), creation date (2025-11-16), last update (2026-03-21) |
-| Key Features | high | Skill directory structure directly read from worktree; all 20 commands and 7 reference files enumerated from README and source |
-| Technical Architecture | high | Build system, skill format, and dependencies directly read from package.json and DEVELOP.md |
-| Design Principles | high | Typography and color-and-contrast reference files fully read and quoted verbatim |
-| Installation & Usage | high | Installation instructions extracted verbatim from README; command syntax verified from README |
-| Limitations | medium | Project scope limitations inferred from feature absence and documented workflow requirements. Codex CLI syntax exception documented in README. API limitations inferred from command-based interface design |
-| Relevance | medium | Applicability to Claude Code development inferred from architecture patterns and skill model. Not independently validated against Claude Code requirements |
 
 ## References
 

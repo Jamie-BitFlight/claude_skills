@@ -1,12 +1,5 @@
-# Improvement Proposals: Omnigent
-
-**Research entry**: ./research/agent-frameworks/omnigent.md
-**Generated**: 2026-06-18
-**Patterns assessed**: 6 (Relevance section) + 2 concrete mechanisms (cost_budget, max_tool_calls_per_session from Policy Configuration section)
-**Backlog items created**: 0
-**Deferred (low/medium confidence)**: 2
-**Skipped (already covered or not actionable)**: 6
-
+---
+title: "Improvement Proposals: Omnigent"
 ---
 
 The Omnigent entry's "Relevance to Claude Code Development" section is populated with six

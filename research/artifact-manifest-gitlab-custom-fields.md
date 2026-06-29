@@ -1,8 +1,6 @@
-# GitLab Custom Fields and Structured Metadata Capabilities for Issues
-
-**Research Date**: March 2026
-**Focus**: Custom fields, metadata storage, issue linking, epics, and API support
-
+---
+title: "GitLab Custom Fields and Structured Metadata Capabilities for Issues"
+research_date: "March 2026"
 ---
 
 ## Executive Summary
@@ -260,4 +258,3 @@ If planning to migrate GitHub Issue Fields to GitLab:
 - [MCP Server Tools Not Visible in Claude Code (#8117) - GitLab Issue](https://gitlab.com/gitlab-org/cli/-/issues/8117)
 - [Serializing Data | GitLab Docs](https://docs.gitlab.com/development/database/serializing_data/)
 - [Tutorial: Connect Claude Desktop to GitLab MCP server | GitLab Docs](https://docs.gitlab.com/tutorials/connect_claude_desktop_with_gitlab_mcp_server/)
-

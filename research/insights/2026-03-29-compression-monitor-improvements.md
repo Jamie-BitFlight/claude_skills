@@ -1,12 +1,5 @@
-# Improvement Proposals: compression-monitor
-
-**Research entry**: ./research/ai-observability/compression-monitor.md
-**Generated**: 2026-03-29
-**Patterns assessed**: 6
-**Backlog items created**: 3 (issues: #1109, #1110, #1111)
-**Deferred (low confidence)**: 3 (medium: 2, low: 1)
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: compression-monitor"
 ---
 
 ## Improvement 1: Behavioral fingerprint tracking in PostToolUse hook

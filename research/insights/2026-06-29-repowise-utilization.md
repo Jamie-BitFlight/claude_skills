@@ -1,11 +1,5 @@
-# Utilization Proposals: repowise
-
-**Research entry**: ./research/mcp-ecosystem/repowise.md
-**Generated**: 2026-06-29
-**Integration surfaces found**: 3 (MCP Server | Python SDK | CLI)
-**Proposals written**: 3
-**Skipped**: 2
-
+---
+title: "Utilization Proposals: repowise"
 ---
 
 ## Utilization 1: doc-drift-auditor → repowise
@@ -209,4 +203,3 @@ repowise v0.20.0 is production-ready (GA release, research entry line 8). Before
 5. **Validate PR Directives**: Before relying on `get_risk()` `missing_cochanges` and `will_break` in production, manually verify against 5-10 real PRs to ensure co-change detection is accurate
 
 The MCP server mode is the best integration path (vs. CLI subprocess) because it avoids spawning separate processes and provides streaming results with `.meta` envelope (index_age_days, stale_warning) for confidence tracking.
-

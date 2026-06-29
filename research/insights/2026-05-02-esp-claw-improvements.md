@@ -1,12 +1,5 @@
-# Improvement Proposals: ESP-CLAW
-
-**Research entry**: ./research/agent-frameworks/esp-claw.md
-**Generated**: 2026-05-02
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #2097)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: ESP-CLAW"
 ---
 
 ## Improvement 1: Add semantic (paraphrase) deduplication to research-curator entry creation

@@ -1,12 +1,5 @@
-# Improvement Proposals: SimpleMem-Cross
-
-**Research entry**: ./research/context-management/simplemem-cross.md
-**Generated**: 2026-03-19
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: SimpleMem-Cross"
 ---
 
 ## Improvement 1: Cross-session context recovery for agent workflows

@@ -1,8 +1,6 @@
-# Research: Linear Custom Fields and Structured Metadata Capabilities
-
-**Research Date**: 2026-03-21
-**Status**: Complete
-
+---
+title: "Research: Linear Custom Fields and Structured Metadata Capabilities"
+research_date: "2026-03-21"
 ---
 
 ## Executive Summary

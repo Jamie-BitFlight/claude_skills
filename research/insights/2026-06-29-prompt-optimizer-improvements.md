@@ -1,20 +1,5 @@
-# Improvement Proposals: Prompt Optimizer
-
-**Research entry**: ./research/prompt-engineering/prompt-optimizer.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 4
-**Backlog items created**: 0 (backend offline — see note below)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
-> **Backend note**: At generation time the backlog MCP backend was offline (GitHub
-> unavailable, `GITHUB_TOKEN` not set/invalid — serving stale cache of 8 open / 279 total).
-> `backlog_add` also requires a `gate_token` supplied only by the `/dh:work-backlog-item` or
-> `/dh:create-backlog-item` skill, which is not loadable from this agent context. The single
-> high-confidence + actionable proposal below is therefore recorded as **READY TO BACKLOG**
-> with the exact title/description/priority/source to file once the backend is reachable and
-> the gate token is available. No item was created to avoid silent failure against a stale cache.
-
+---
+title: "Improvement Proposals: Prompt Optimizer"
 ---
 
 ## Improvement 1: Add a quantified before/after evaluation step to subagent-refactoring methodology

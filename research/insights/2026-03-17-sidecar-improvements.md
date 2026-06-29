@@ -1,12 +1,5 @@
-# Improvement Proposals: Sidecar
-
-**Research entry**: ./research/developer-tools/sidecar.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 8
-**Backlog items created**: 1 (issues: #775)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Sidecar"
 ---
 
 ## Improvement 1: Persistent structured session metadata for cross-session context recovery

@@ -1,9 +1,5 @@
-# HomeButler Utilization Assessment
-
-**Assessment Date**: 2026-05-03
-**Source**: ./research/mcp-ecosystem/homebutler.md (v0.18.1)
-**Assessed By**: Claude Code Agent
-
+---
+title: "HomeButler Utilization Assessment"
 ---
 
 ## Status
@@ -218,4 +214,3 @@ If Phase 1–2 integrated:
 - Related: `./research/mcp-ecosystem/model-context-protocol.md`
 - Agent: `/dh:implementation-manager`, `/dh:development-harness`
 - Pattern: Single-binary distribution, CLI-to-protocol extension, chatops workflows
-

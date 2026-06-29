@@ -1,12 +1,5 @@
-# Improvement Proposals: gstack
-
-**Research entry**: ./research/agent-frameworks/gstack.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: gstack"
 ---
 
 ## Improvement 1: Add production failure mode checklist to code-reviewer agent

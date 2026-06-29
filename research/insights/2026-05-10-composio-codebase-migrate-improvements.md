@@ -1,12 +1,5 @@
-# Improvement Proposals: Composio Codebase Migrate
-
-**Research entry**: ./research/skill-generation-tools/composio-codebase-migrate.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 6
-**Backlog items created**: 4 (issues: #2240, #2241, #2242, #2243)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Composio Codebase Migrate"
 ---
 
 ## Improvement 1: Per-wave PR-and-merge mode in work-milestone

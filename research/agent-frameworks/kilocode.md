@@ -1,10 +1,12 @@
-# Kilocode
-
-**Research Date**: 2026-06-29
-**Source URL**: <https://github.com/Kilo-Org/kilocode>
-**Version at Research**: v7.3.54
-**License**: MIT
-
+---
+title: "Kilocode"
+research_date: "2026-06-29"
+source_url: "https://github.com/Kilo-Org/kilocode"
+version_at_research: "v7.3.54"
+license: "MIT"
+last_verified: "2026-06-29"
+version_at_verification: "v7.3.54"
+next_review: "2026-09-29"
 ---
 
 ## Overview
@@ -322,21 +324,3 @@ SOURCE: README.md — "For configuration and everything else, head over to the d
 - VS Code Marketplace: <https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code> (accessed 2026-06-29)
 - JetBrains Marketplace: <https://plugins.jetbrains.com/plugin/28350-kilo-code> (accessed 2026-06-29)
 - Community: Discord <https://kilo.ai/discord>, X <https://x.com/kilocode>, Reddit <https://reddit.com/r/kilocode/> (accessed 2026-06-29)
-
-## Freshness Tracking
-
-**Last Verified**: 2026-06-29
-**Version at Verification**: v7.3.54
-**Next Review Recommended**: 2026-09-29
-
-### Confidence Summary
-
-- **Identity/Metadata** — high: Official GitHub repository, version confirmed from releases page, license verified from LICENSE file.
-- **Key Features** — high: README.md and AGENTS.md comprehensively document all major capabilities with code examples and architecture details.
-- **Technical Architecture** — high: AGENTS.md provides detailed monorepo structure, package responsibilities, technology stack, and development workflows. package.json confirms dependencies and versions.
-- **Installation & Usage** — high: Verified installation commands from README and tested platforms match release artifacts.
-- **Limitations** — medium: Documented limitations drawn from official sources; some limitations (fork maintenance overhead, beta dependencies) inferred from code structure rather than explicit disclaimers but remain accurate reflections of source state.
-
----
-
-*This entry traces all factual claims to extracted passages from official GitHub sources, release pages, and repository documentation. Every claim about version, features, architecture, and installation has been verified against primary sources and reflects the state of Kilocode as of the research date.*

@@ -1,15 +1,5 @@
-# Artifact Linking Patterns: Jira, Asana, Monday.com
-
-## Executive Summary
-
-All three platforms support linking artifacts to work items, but use fundamentally different mental models:
-
-- **Jira**: Issue-centric linking via bidirectional relationships (issue links + remote links) + Confluence integration
-- **Asana**: Task-centric attachment model with separate custom field and dependency systems
-- **Monday.com**: Column-based metadata model with structured file columns and connect-boards cross-references
-
-Key pattern: **Source-of-truth separation**. Jira and Monday separate artifacts from issues; Asana embeds them. Jira's remote links and Monday's connect-boards columns achieve cross-system reference without redundancy.
-
+---
+title: "Artifact Linking Patterns: Jira, Asana, Monday.com"
 ---
 
 ## 1. JIRA: Issue-Link Centered Architecture

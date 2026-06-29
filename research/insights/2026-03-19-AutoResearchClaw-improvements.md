@@ -1,12 +1,5 @@
-# Improvement Proposals: AutoResearchClaw
-
-**Research entry**: ./research/agent-frameworks/AutoResearchClaw.md
-**Generated**: 2026-03-19
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #845)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: AutoResearchClaw"
 ---
 
 ## Improvement 1: Add automated citation verification to research-curator validate mode

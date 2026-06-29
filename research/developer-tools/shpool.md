@@ -1,11 +1,13 @@
-# shpool
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://github.com/shell-pool/shpool>
-**GitHub Repository**: <https://github.com/shell-pool/shpool>
-**Version at Research**: v0.9.3
-**License**: Apache License 2.0
-
+---
+title: "shpool"
+research_date: "2026-03-01"
+source_url: "https://github.com/shell-pool/shpool"
+github_url: "https://github.com/shell-pool/shpool"
+version_at_research: "v0.9.3"
+license: "Apache License 2.0"
+last_verified: "2026-03-01"
+version_at_verification: "v0.9.3"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -218,11 +220,3 @@ action = "detach"
 - [GitHub Releases — v0.9.3](https://github.com/shell-pool/shpool/releases/tag/v0.9.3) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.9.3 |
-| Next Review Recommended | 2026-06-01 |

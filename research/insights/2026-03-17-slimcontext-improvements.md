@@ -1,12 +1,5 @@
-# Improvement Proposals: SlimContext
-
-**Research entry**: ./research/context-management/slimcontext.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: SlimContext"
 ---
 
 ## Improvement 1: Compression guard to prevent context compaction during tool-use cycles

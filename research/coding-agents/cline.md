@@ -1,13 +1,14 @@
-# Cline - Open-Source Autonomous Coding Agent
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://cline.bot>
-**GitHub Repository**: <https://github.com/cline/cline>
-**Documentation**: <https://docs.cline.bot>
-**VS Code Marketplace**: <https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev>
-**Version at Research**: v3.66.0
-**License**: Apache-2.0
-
+---
+title: "Cline - Open-Source Autonomous Coding Agent"
+research_date: "2026-02-23"
+source_url: "https://cline.bot"
+github_url: "https://github.com/cline/cline"
+documentation_url: "https://docs.cline.bot"
+version_at_research: "v3.66.0"
+license: "Apache-2.0"
+last_verified: "2026-02-23"
+version_at_verification: "v3.66.0"
+next_review: "2026-05-23 (3 months)"
 ---
 
 ## Overview
@@ -265,25 +266,6 @@ For trusted, low-risk operations, users can configure auto-approval rules to red
 - [Cline Enterprise Documentation](https://docs.cline.bot/enterprise-solutions/overview) (accessed 2026-02-23)
 - [Cline CLI Documentation](https://docs.cline.bot/cline-cli/overview) (accessed 2026-02-23)
 - [GitHub Releases: cline/cline](https://github.com/cline/cline/releases) (accessed 2026-02-23)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-| ------------------------------- | --------------------- |
-| Last Verified | 2026-02-23 |
-| Version at Verification | v3.66.0 |
-| GitHub Stars at Verification | ~58,200 |
-| Next Review Recommended | 2026-05-23 (3 months) |
-
-**Change Detection Indicators**:
-
-- Monitor GitHub releases for new versions (currently multiple releases per week)
-- Track feature announcements on the [Cline blog](https://cline.bot/blog)
-- Check pricing changes (Teams tier was free through Q1 2026, then $20/user/month)
-- Watch for MCP marketplace expansions
-- Monitor star growth trajectory (highly active community)
 
 ---
 

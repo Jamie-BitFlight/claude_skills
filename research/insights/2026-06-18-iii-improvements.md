@@ -1,12 +1,5 @@
-# Improvement Proposals: iii — Unified Backend Composition Engine
-
-**Research entry**: ./research/agent-infrastructure/iii.md
-**Generated**: 2026-06-18
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low/medium confidence)**: 3
-**Skipped (already covered or architecturally incompatible)**: 3
-
+---
+title: "Improvement Proposals: iii — Unified Backend Composition Engine"
 ---
 
 ## Summary

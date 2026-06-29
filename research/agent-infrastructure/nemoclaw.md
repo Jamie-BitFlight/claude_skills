@@ -1,3 +1,8 @@
+---
+title: "NVIDIA NemoClaw"
+next_review: "2026-06-28 (3 months)"
+---
+
 # NVIDIA NemoClaw
 
 ## Overview
@@ -240,31 +245,3 @@ Network egress approvals for unknown hosts require operator interaction via Open
 | [PicoClaw](./picoclaw.md) | agent-infrastructure | Sibling project in the Claw ecosystem; ultra-lightweight agent design vs NemoClaw's reference stack approach |
 | [AutoResearchClaw](./AutoResearchClaw.md) | agent-infrastructure | Advanced Claw variant; extends autonomous agent patterns with multi-stage pipeline and self-healing capabilities |
 | [OpenAI Codex CLI](../coding-agents/openai-codex-cli.md) | coding-agents | Shared security design pattern; both implement OS sandbox isolation plus policy-enforced approval model for untrusted code execution |
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-28
-
-**Latest Commit in Repository**: 2026-03-27 20:36:26 UTC (commit eb4ba8c)
-
-**Next Review**: 2026-06-28 (3 months)
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Overview | high | Official documentation, README, recently updated repository |
-| Problem Addressed | high | Stated in official overview documentation |
-| Key Statistics | high | Verified from GitHub API and package.json |
-| Key Features | high | Extracted from official documentation with verbatim quotes |
-| Technical Architecture | high | Architecture documentation provides detailed component structure |
-| Installation & Usage | high | Official quickstart guide with exact command reproduction |
-| Limitations | high | Explicitly documented in README and reference docs |
-| Relevance to Claude Code | medium | Inferred from architecture and patterns; not explicitly stated by project |
-
-**Data Freshness Notes**:
-- Repository created 2026-03-15, latest commit 2026-03-27 (very recent)
-- Package version 0.1.0 reflects alpha status
-- GitHub stars count reflects early adoption interest (17,312 in first ~2 weeks)
-- All documentation accessed directly from primary sources (official repo, docs site)
-- No external summaries or secondhand sources relied upon

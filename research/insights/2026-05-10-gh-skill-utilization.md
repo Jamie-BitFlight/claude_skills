@@ -1,11 +1,5 @@
-# Utilization Proposals: GitHub CLI (gh) Skill
-
-**Research entry**: ./research/developer-tools/gh-skill.md
-**Generated**: 2026-05-10
-**Integration surfaces found**: 3 (CLI | SDK | Shell subprocess)
-**Proposals written**: 3
-**Skipped**: 2
-
+---
+title: "Utilization Proposals: GitHub CLI (gh) Skill"
 ---
 
 ## Utilization 1: create-milestone → GitHub CLI (gh)

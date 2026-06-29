@@ -1,15 +1,7 @@
-# Mission Control (Autensa) — Autonomous Product Engine
-
-## Overview
-
-**Mission Control**, publicly branded as **Autensa**, is an open-source autonomous product improvement engine that orchestrates AI agents to research, ideate, build, test, review, and deploy features end-to-end. It provides a full-stack platform for continuous product evolution with human oversight at the decision boundary.
-
-The system is built on **Next.js 14** with **TypeScript** and uses **SQLite** for persistence. Agents are executed via the **OpenClaw Gateway** (a separate AI runtime), with communication over WebSocket. The platform supports multi-agent orchestration via "Convoy Mode" (parallel execution with dependency graphs) and includes a Tinder-style swipe interface for human approval of AI-generated ideas.
-
-**Current version**: v2.4.0 (released 2026-03-22)
-**License**: MIT
-**Repository**: <https://github.com/crshdn/mission-control>
-
+---
+title: "Mission Control (Autensa) — Autonomous Product Engine"
+license: "MIT"
+next_review: "2026-07-03"
 ---
 
 ## Problem Addressed
@@ -221,25 +213,6 @@ npm run build && npx next start -p 4000
 - **Next.js**: <https://nextjs.org/> (framework)
 - **OpenClaw Gateway**: <https://github.com/open-claw/open-claw-gateway> (AI runtime)
 - **Discord**: <https://discord.gg/3u62kySzM> (community)
-
----
-
-## Freshness Tracking
-
-**Current Version**: v2.4.0 (released 2026-03-22)
-**Last Updated**: 2026-04-03
-**Next Review**: 2026-07-03
-
-| Section | Confidence | Basis |
-|---------|------------|-------|
-| Identity/Metadata | high | Official package.json, README, CHANGELOG |
-| Features | high | v2.4.0 release notes, README feature list, source code |
-| Architecture | high | Direct code reading (14+ files, 4,596 line autopilot module) |
-| Installation | high | Official README Quick Start, Docker, Production guides |
-| Limitations | medium | README + GitHub issues; some inferred from code |
-| Relevance | medium | Pattern analysis; not field-tested in Claude Code |
-
-**Session Summary**: Entry created 2026-04-03 from shallow clone of mission-control repo. All claims trace to README, CHANGELOG, or source code inspection. 10 sections complete with extracted passages documented.
 
 ---
 

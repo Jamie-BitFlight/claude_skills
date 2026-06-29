@@ -1,12 +1,5 @@
-# Improvement Proposals: abtop
-
-**Research entry**: ./research/developer-tools/abtop.md
-**Generated**: 2026-04-25
-**Patterns assessed**: 6
-**Backlog items created**: 5 (issues: #1944, #1945, #1946, #1947, #1948)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: abtop"
 ---
 
 ## Improvement 1: Stalled-session detection using LastActivity timestamp

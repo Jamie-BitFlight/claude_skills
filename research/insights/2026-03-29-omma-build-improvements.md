@@ -1,12 +1,5 @@
-# Improvement Proposals: Omma (omma.build)
-
-**Research entry**: ./research/ai-design-tools/omma-build.md
-**Generated**: 2026-03-29
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Omma (omma.build)"
 ---
 
 ## Improvement 1: Real-Time Cross-Agent Dependency Resolution

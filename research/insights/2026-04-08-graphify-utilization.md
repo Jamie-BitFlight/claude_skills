@@ -1,11 +1,5 @@
-# Utilization Proposals: graphify
-
-**Research entry**: ./research/skill-generation-tools/graphify.md
-**Generated**: 2026-04-08
-**Integration surfaces found**: 3 (CLI | SDK | MCP server)
-**Proposals written**: 2
-**Skipped**: 5 — existing tools redundant or incompatible scope
-
+---
+title: "Utilization Proposals: graphify"
 ---
 
 ## Utilization 1: context-gathering → graphify
@@ -89,4 +83,3 @@ diff baseline-graph-out/GRAPH_REPORT.md graphify-out/GRAPH_REPORT.md
 **Note**: The research entry documents a PreToolUse hook for Claude Code (line 60) that surfaces `GRAPH_REPORT.md` before every Glob/Grep. This is setup by `graphify claude install`, which is **user-initiated**, not an automatic skill enhancement. No skill modification is needed; users run the install command explicitly.
 
 However, if the `/gh` skill or `/knowledge-explorer` skill wanted to auto-run graphify on known repositories as part of their initialization, that would be a valid enhancement point (out of scope for this assessment, deferred to operational setup).
-

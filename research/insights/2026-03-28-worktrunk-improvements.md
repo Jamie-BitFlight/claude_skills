@@ -1,12 +1,5 @@
-# Improvement Proposals: Worktrunk
-
-**Research entry**: ./research/developer-tools/worktrunk.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 6
-**Backlog items created**: 0 (backlog MCP tools unavailable in this session)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Worktrunk"
 ---
 
 ## Improvement 1: CI status integration for agent-facing branch context

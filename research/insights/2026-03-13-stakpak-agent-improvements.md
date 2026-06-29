@@ -1,12 +1,5 @@
-# Improvement Proposals: Stakpak Agent
-
-**Research entry**: ./research/coding-agents/stakpak-agent.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Stakpak Agent"
 ---
 
 ## Improvement 1: Stall detection using LastActivity field in SAM task execution

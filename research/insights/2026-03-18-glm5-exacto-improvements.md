@@ -1,12 +1,5 @@
-# Improvement Proposals: GLM-5:exacto via OpenRouter
-
-**Research entry**: ./research/llm-infrastructure/glm5-exacto.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 3
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: GLM-5:exacto via OpenRouter"
 ---
 
 ## Skipped Patterns

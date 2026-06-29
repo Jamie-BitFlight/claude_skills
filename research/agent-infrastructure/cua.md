@@ -1,25 +1,5 @@
-# CUA (Computer-Use Agents)
-
-## Identity & Metadata
-
-**Project Name:** CUA (Computer-Use Agents)
-
-**Repository:** <https://github.com/trycua/cua>
-
-**Current Version:** cua-driver-v0.1.2 (latest release May 2, 2026)
-
-**License:** MIT (with third-party components under CC-BY-4.0 and AGPL-3.0)
-
-**Author Organization:** Trycua
-
-**Python Requirement:** Python 3.11+
-
-**Source Repo Languages:** HTML (67.2%), Python (20.2%), Swift (6.8%), TypeScript (3.0%)
-
-**Package Managers:** pip (Python SDK), npm (CuaBot), shell scripts (Cua Driver)
-
-**Official Documentation:** <https://cua.ai/docs>
-
+---
+title: "CUA (Computer-Use Agents)"
 ---
 
 ## Key Statistics

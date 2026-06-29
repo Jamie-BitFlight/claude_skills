@@ -1,25 +1,5 @@
-# AgentScope
-
-## Identity & Metadata
-
-**Project Name:** AgentScope
-
-**Repository:** <https://github.com/agentscope-ai/agentscope>
-
-**Current Version:** v1.0.19dev (development version as of 2026-03-28)
-
-**License:** Apache-2.0
-
-**Author Organization:** SysML team of Alibaba Tongyi Lab
-
-**Python Requirement:** Python 3.10+
-
-**Source Repo Language:** Python
-
-**Package Manager:** PyPI (pip install agentscope)
-
-**Official Documentation:** <https://doc.agentscope.io/> (English and Chinese)
-
+---
+title: "AgentScope"
 ---
 
 ## Key Statistics
@@ -461,38 +441,6 @@ AgentScope is async-first. Blocking I/O in tools or agent code will block the en
 
 - Discord: <https://discord.gg/eYMpfnkG8h>
 - Biweekly Meetings: <https://github.com/agentscope-ai/agentscope/discussions/1126> (started 2026-01)
-
----
-
-## Freshness Tracking
-
-**Last Accessed:** 2026-03-28
-
-**Source Status:**
-
-| Source | Status | Last Update |
-|--------|--------|------------|
-| GitHub Repository | Accessible | 2026-03-28T01:31:35Z |
-| Official Docs (doc.agentscope.io) | Accessible | Not directly checked (assumed current) |
-| PyPI Package | Accessible | Version 1.0.19dev |
-| README (en) | Accessible | 2026-03-28 |
-| Roadmap | Accessible | 2026-03-28 |
-| arXiv Paper | Accessible | cs.MA-2402.14034 |
-
-**Confidence Assessment:**
-
-| Section | Confidence | Rationale |
-|---------|-----------|-----------|
-| Identity/Metadata | high | GitHub API verified, pyproject.toml read from source |
-| Key Features | high | Extracted from official README, __init__.py module exports, and source code structure |
-| Technical Architecture | high | Direct code reads from src/agentscope/ with class hierarchies and imports verified |
-| Installation & Usage | high | Official README examples extracted verbatim |
-| Limitations | medium | Based on code structure and documented constraints; some limitations inferred from design patterns |
-| Relevance to Claude Code | medium | Pattern analysis based on AgentScope design; integration feasibility assessed qualitatively |
-
-**Next Scheduled Review:** 2026-06-28 (3 months from research date)
-
-**Changes Detected Since Last Entry:** N/A (first entry)
 
 ---
 

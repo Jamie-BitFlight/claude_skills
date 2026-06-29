@@ -1,9 +1,5 @@
-# GitLab Custom Fields API — Exhaustive Research Report
-
-**Date**: March 22, 2026
-**Research Scope**: GraphQL and REST API documentation for GitLab custom fields on work items
-**Conclusion**: GitLab has documented custom fields functionality, but API mutation documentation for writing custom field values is incomplete or scattered across development docs and merge requests.
-
+---
+title: "GitLab Custom Fields API — Exhaustive Research Report"
 ---
 
 ## Executive Summary

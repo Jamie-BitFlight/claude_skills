@@ -1,8 +1,5 @@
-# GitHub Projects V2 Custom Fields API Research
-
-**Date**: 2026-03-21
-**Status**: VERIFIED with primary sources
-
+---
+title: "GitHub Projects V2 Custom Fields API Research"
 ---
 
 ## Research Questions Answered

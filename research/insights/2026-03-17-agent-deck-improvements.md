@@ -1,12 +1,5 @@
-# Improvement Proposals: Agent Deck
-
-**Research entry**: ./research/developer-tools/agent-deck.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 10
-**Backlog items created**: 1 (issues: #776)
-**Deferred (low confidence)**: 4
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Agent Deck"
 ---
 
 ## Improvement 1: Hook-based instant status detection via SQLite event store

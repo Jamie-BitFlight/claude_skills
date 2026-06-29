@@ -1,11 +1,13 @@
-# Byobu
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://byobu.org>
-**GitHub Repository**: <https://github.com/dustinkirkland/byobu>
-**Version at Research**: 6.14
-**License**: GNU General Public License v3.0
-
+---
+title: "Byobu"
+research_date: "2026-03-01"
+source_url: "https://byobu.org"
+github_url: "https://github.com/dustinkirkland/byobu"
+version_at_research: "6.14"
+license: "GNU General Public License v3.0"
+last_verified: "2026-03-01"
+version_at_verification: "6.14"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -283,11 +285,3 @@ docker run -it --rm byobu:6.14
 - [GitHub — Tmux Help File (help.tmux.txt)](https://github.com/dustinkirkland/byobu/blob/master/usr/share/doc/byobu/help.tmux.txt) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | 6.14 |
-| Next Review Recommended | 2026-06-01 |

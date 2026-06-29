@@ -1,11 +1,5 @@
-# Utilization Assessment: HelixDB
-
-**Research entry**: ./research/data-infrastructure/helix-db.md
-**Generated**: 2026-06-18
-**Integration surfaces found**: 4 (API | SDK | CLI | MCP)
-**Proposals written**: 0
-**Skipped**: All candidate systems
-
+---
+title: "Utilization Assessment: HelixDB"
 ---
 
 ## Summary
@@ -116,4 +110,3 @@ Reconsider HelixDB integration if ANY of the following occur:
 **Proposals written**: 0.
 
 The assessment concludes that while HelixDB is a capable unified data store for knowledge graphs, vector embeddings, and RAG applications, the current local system has no workflows that require its specific capabilities. The existing storage solutions (YAML, GitHub Issues, local artifact storage) are fit-for-purpose and simpler. Future integration should be reconsidered when new agent capabilities (session memory, knowledge graph, RAG) are added to the system.
-

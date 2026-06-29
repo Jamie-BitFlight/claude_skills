@@ -1,11 +1,13 @@
-# Worktrunk
-
-**Research Date**: 2026-03-28
-**Source URL**: <https://worktrunk.dev>
-**GitHub Repository**: <https://github.com/max-sixty/worktrunk>
-**Version at Research**: v0.33.0
-**License**: MIT OR Apache-2.0
-
+---
+title: "Worktrunk"
+research_date: "2026-03-28"
+source_url: "https://worktrunk.dev"
+github_url: "https://github.com/max-sixty/worktrunk"
+version_at_research: "v0.33.0"
+license: "MIT OR Apache-2.0"
+last_verified: "2026-03-28"
+version_at_verification: "v0.33.0"
+next_review: "2026-06-28"
 ---
 
 ## Overview
@@ -245,13 +247,3 @@ model = "claude-3-5-sonnet"
 | [Vibe Kanban](../vibe-kanban.md) | task-management | Kanban UI for parallel AI agent orchestration with git worktree isolation |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-28 |
-| Version at Verification | v0.33.0 |
-| Next Review Recommended | 2026-06-28 |
-| Confidence Map | Overview: high (official docs), Key Features: high (README verified), Architecture: medium (code-read, partial source inspection), Usage: high (official installation docs), Relevance: medium (inferred from capabilities) |
-

@@ -1,12 +1,5 @@
-# Improvement Proposals: 1Code
-
-**Research entry**: ./research/coding-agents/1code.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 8
-**Backlog items created**: 1 (issues: #758)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: 1Code"
 ---
 
 ## Improvement 1: Add plan-mode gate to implement-feature SAM execution workflow before destructive agent dispatch

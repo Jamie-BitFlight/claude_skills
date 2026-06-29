@@ -1,10 +1,12 @@
-# Ponytail — Lazy Senior Developer Mode for AI Agents
-
-**Research Date**: 2026-06-18
-**Source URL**: <https://github.com/DietrichGebert/ponytail>
-**Version at Research**: 4.7.0
-**License**: MIT
-
+---
+title: "Ponytail — Lazy Senior Developer Mode for AI Agents"
+research_date: "2026-06-18"
+source_url: "https://github.com/DietrichGebert/ponytail"
+version_at_research: "4.7.0"
+license: "MIT"
+last_verified: "2026-06-18"
+version_at_verification: "4.7.0"
+next_review: "2026-09-18"
 ---
 
 ## Overview
@@ -195,23 +197,6 @@ Ponytail is directly applicable to Claude Code plugins and agents:
 - **Agent Portability**: [docs/agent-portability.md](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md) (accessed 2026-06-18) — adapter matrix
 - **Core Ruleset**: [AGENTS.md](https://github.com/DietrichGebert/ponytail/blob/main/AGENTS.md) (accessed 2026-06-18) — 26-line compact form
 - **Development**: Tests via `npm test`, rule-copy verification via `node scripts/check-rule-copies.js`, OpenClaw skill build via `node scripts/build-openclaw-skills.js`
-
-## Freshness Tracking
-
-**Last Verified**: 2026-06-18
-**Version at Verification**: 4.7.0
-**Next Review Recommended**: 2026-09-18
-
-### Confidence by Section
-
-- **Identity/Metadata**: high — plugin.json and LICENSE directly consulted
-- **Problem Addressed**: high — README.md and AGENTS.md are authoritative
-- **Key Statistics**: high — all numbers extracted from benchmark report (README.md and benchmarks/README.md); cost verified at 30 runs on 2026-06-17 per README
-- **Key Features**: high — extracted from AGENTS.md (26 lines) and skills/ponytail/SKILL.md (100 lines); feature set stable across all 13 agent implementations
-- **Technical Architecture**: high — plugin.json, docs/agent-portability.md, and hooks/hooks.json consulted; architecture verified against source
-- **Installation & Usage**: high — direct quotes from README.md installation section and commands table
-- **Limitations and Caveats**: medium — derived from README.md discussion of model dependence, benchmark conditions, and AGENTS.md rules. The "no test framework" limitation is inferred from the stated "no fixtures, no per-function suites unless asked" rule; not a bug report or explicit documented limitation
-- **Relevance to Claude Code Development**: medium — extrapolated from ponytail's multi-agent portability and design philosophy; not a documented use case but a reasoned projection based on plugin architecture and the development-harness use patterns
 
 ## Cross-References
 

@@ -1,11 +1,13 @@
-# Jimeng AI (即梦AI)
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://jimeng.jianying.com>
-**GitHub Repository**: Not publicly available
-**Version at Research**: SeedDance 2.0
-**License**: Proprietary
-
+---
+title: "Jimeng AI (即梦AI)"
+research_date: "2026-02-23"
+source_url: "https://jimeng.jianying.com"
+github_url: "Not publicly available"
+version_at_research: "SeedDance 2.0"
+license: "Proprietary"
+last_verified: "2026-02-23"
+version_at_verification: "SeedDance 2.0"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -168,11 +170,3 @@ no extra logos, keep brand colors exactly, no text overlays.
 - [WaveSpeed AI — SeedDance 2.0 international access](https://wavespeed.ai) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | SeedDance 2.0 |
-| Next Review Recommended | 2026-05-23 |

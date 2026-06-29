@@ -1,12 +1,5 @@
-# Improvement Proposals: PyScript
-
-**Research entry**: ./research/developer-tools/pyscript.md
-**Generated**: 2026-04-12
-**Patterns assessed**: 3
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: PyScript"
 ---
 
 ## Assessment Summary

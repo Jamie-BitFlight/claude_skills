@@ -1,3 +1,7 @@
+---
+title: "Dual-Target Plugin Search Log"
+---
+
 # Dual-Target Plugin Search Log
 
 Date: 2026-06-07

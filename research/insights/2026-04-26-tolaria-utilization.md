@@ -1,11 +1,5 @@
-# Utilization Proposals: Tolaria
-
-**Research entry**: ./research/developer-tools/tolaria.md
-**Generated**: 2026-04-26
-**Integration surfaces found**: 1 (MCP server with 14 tools)
-**Proposals written**: 2
-**Skipped**: 3 — (knowledge-explorer already covers KB scope; backlog-tools insufficient integration justification; doc-drift-auditor not applicable)
-
+---
+title: "Utilization Proposals: Tolaria"
 ---
 
 ## Utilization 1: research-context-agent → Tolaria MCP Server

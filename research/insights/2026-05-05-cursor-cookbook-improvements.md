@@ -1,12 +1,5 @@
-# Improvement Proposals: Cursor Cookbook
-
-**Research entry**: ./research/agent-frameworks/cursor-cookbook.md
-**Generated**: 2026-05-05
-**Patterns assessed**: 5
-**Backlog items created**: 2 (issues: #2143, #2144)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Cursor Cookbook"
 ---
 
 ## Improvement 1: Persisted task results enabling parent-output injection into child task prompts

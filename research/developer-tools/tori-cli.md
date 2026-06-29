@@ -1,11 +1,13 @@
-# tori-cli
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://toricli.sh/>
-**GitHub Repository**: <https://github.com/thobiasn/tori-cli>
-**Version at Research**: v0.3.1
-**License**: MIT
-
+---
+title: "tori-cli"
+research_date: "2026-03-18"
+source_url: "https://toricli.sh/"
+github_url: "https://github.com/thobiasn/tori-cli"
+version_at_research: "v0.3.1"
+license: "MIT"
+last_verified: "2026-03-18"
+version_at_verification: "v0.3.1 (released 2026-03-06)"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -395,12 +397,3 @@ tori --socket /run/tori/tori.sock
 | [devenv](./devenv.md) | developer-tools | Infrastructure-as-code philosophy; both provide single-binary/declarative configuration approaches to managing distributed server and development environments without external dependencies |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | v0.3.1 (released 2026-03-06) |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | Overview: high (README + source read); Problem Addressed: high (feature list from docs); Key Statistics: high (GitHub API); Key Features: high (README + source); Technical Architecture: high (code-read + CLAUDE.md); Installation & Usage: high (README + install script); Relevance: medium (inference from architecture) |

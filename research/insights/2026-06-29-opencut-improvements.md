@@ -1,12 +1,5 @@
-# Improvement Proposals: OpenCut
-
-**Research entry**: ./research/coding-agents/opencut.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered, incompatible, or not yet implemented)**: 5
-
+---
+title: "Improvement Proposals: OpenCut"
 ---
 
 ## Summary

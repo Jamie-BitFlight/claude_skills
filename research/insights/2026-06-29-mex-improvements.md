@@ -1,13 +1,5 @@
-# Improvement Proposals: mex
-
-**Research entry**: ./research/context-management/mex.md
-**Generated**: 2026-06-29
-**Patterns assessed**: 5
-**Backlog items created**: 0 — backlog write blocked (see Backlog Creation Status below)
-**High-confidence actionable gaps**: 2 (would be backlogged: P1, P1)
-**Deferred (low/medium confidence)**: 2
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: mex"
 ---
 
 ## Backlog Creation Status

@@ -1,28 +1,8 @@
-# msgspec — Fast Serialization and Validation Library
-
-## Identity and Metadata
-
-**Project Name**: msgspec
-
-**Current Version**: 0.20.0 (released 2025-11-23)
-SOURCE: GitHub releases page (<https://github.com/jcrist/msgspec/releases>) accessed 2026-03-13
-
-**Repository**: <https://github.com/jcrist/msgspec>
-
-**Documentation**: <https://jcristharif.com/msgspec/>
-
-**Primary Author**: Jim Crist-Harif (<jcristharif@gmail.com>)
-
-**Maintainers**: Jim Crist-Harif, Ofek Lev
-
-**License**: BSD-3-Clause (New or Revised)
-SOURCE: LICENSE file in repository
-
-**Python Support**: 3.10, 3.11, 3.12, 3.13, 3.14
-SOURCE: pyproject.toml classifiers
-
-**Installation**: `pip install msgspec` or `conda install msgspec`
-
+---
+title: "msgspec — Fast Serialization and Validation Library"
+documentation_url: "https://jcristharif.com/msgspec/"
+license: "BSD-3-Clause (New or Revised)"
+next_review: "2026-06-13 (3 months)"
 ---
 
 ## Statistics and Community
@@ -412,35 +392,6 @@ These improvements directly translate to reduced latency and resource usage in a
 | [OpenAI Symphony](../coding-agents/openai-symphony.md) | coding-agents | JSON-RPC agent communication harness; msgspec optimized for frequent serialization/deserialization of agent tool calls and responses |
 | [Agno](../agent-frameworks/agno.md) | agent-frameworks | Provides type-safe structured data with validation; msgspec's Struct type offers same pattern with superior GC efficiency (75x faster) for high-volume agent workflows |
 | [JSON-Render](../agent-frameworks/json-render.md) | agent-frameworks | Zod schema validation for TypeScript generative UI; msgspec's type-annotation validation provides Python equivalent for structured agent output constraints |
-
----
-
-## Freshness Tracking
-
-**Research Date**: 2026-03-13
-
-**Next Review**: 2026-06-13 (3 months)
-
-**Data Sources**:
-- Repository code and metadata: current (last push 2025-11-27)
-- Official documentation: current (accessed 2026-03-13)
-- Latest release: v0.20.0 (2025-11-23)
-- Benchmark data: v0.18.5 baseline (documented on benchmark page)
-
-### Confidence Assessment
-
-| Section | Confidence | Basis |
-|---------|-----------|-------|
-| Identity/Metadata | high | Official GitHub repository, pyproject.toml, releases page |
-| Statistics | high | Real-time GitHub API data (stars, issues, contributors) |
-| Overview/Purpose | high | Official README and documentation homepage |
-| Key Features | high | Feature list from README; benchmark data from official benchmarks page |
-| Architecture | medium | Source code structure visible; detailed implementation is C-based and requires code review |
-| Usage Patterns | high | Code examples extracted from README and API documentation |
-| Performance | high | Official benchmark page with detailed methodology and tables |
-| Limitations | high | Changelog, API docs, and issue tracker reviewed |
-| Integration | high | Official documentation "Used By" section with links to projects |
-| Relevance | medium | Assessment based on feature review; not tested in live Claude Code environment |
 
 ---
 

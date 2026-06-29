@@ -1,12 +1,13 @@
-# AI Data Science Team
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://github.com/business-science/ai-data-science-team>
-**GitHub Repository**: <https://github.com/business-science/ai-data-science-team>
-**PyPI**: <https://pypi.org/project/ai-data-science-team/>
-**Version at Research**: 0.0.0.9017
-**License**: MIT
-
+---
+title: "AI Data Science Team"
+research_date: "2026-03-04"
+source_url: "https://github.com/business-science/ai-data-science-team"
+github_url: "https://github.com/business-science/ai-data-science-team"
+version_at_research: "0.0.0.9017"
+license: "MIT"
+last_verified: "2026-03-04"
+version_at_verification: "0.0.0.9017"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -200,11 +201,3 @@ response = team.invoke({"messages": [{"role": "user", "content": "Load data.csv,
 - [GitHub API: repos/business-science/ai-data-science-team](https://api.github.com/repos/business-science/ai-data-science-team) (accessed 2026-03-04)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | 0.0.0.9017 |
-| Next Review Recommended | 2026-06-04 |

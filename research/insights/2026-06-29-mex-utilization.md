@@ -1,11 +1,5 @@
-# Utilization Proposals: mex
-
-**Research entry**: ./research/context-management/mex.md
-**Generated**: 2026-06-29
-**Integration surfaces found**: 3 (CLI | npm package | TypeScript SDK)
-**Proposals written**: 2
-**Skipped**: 2 — doc-drift-auditor already covers code-docs drift; session-historian is session capture, not project state monitoring
-
+---
+title: "Utilization Proposals: mex"
 ---
 
 ## Utilization 1: doc-drift-auditor → mex drift detection
@@ -122,4 +116,3 @@ mex provides three integration surfaces for this codebase:
 3. **Multi-tool instruction synchronization** — not utilized in current proposals, but available if CLAUDE.md synchronization with other AI tool configs becomes a pain point
 
 The strongest fits are doc-drift-auditor (catch instruction file decay automatically) and refresh-research (persist research refresh decisions across sessions). Both integrate at the CLI level with no API dependencies; setup cost is npm installation + one-time mex setup.
-

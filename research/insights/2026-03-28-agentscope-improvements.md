@@ -1,12 +1,5 @@
-# Improvement Proposals: AgentScope
-
-**Research entry**: ./research/agent-frameworks/agentscope.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: AgentScope"
 ---
 
 ## Improvement 1: Fine-grained MCP tool extraction from remote servers

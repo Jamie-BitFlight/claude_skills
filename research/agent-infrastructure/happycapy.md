@@ -1,10 +1,5 @@
-# HappyCapy — Agent-Native Computer for Developers
-
-**Official Website**: <https://happycapy.ai>
-**Launch Date**: February 11, 2026
-**Primary Repository**: <https://github.com/happycapy-ai/Happycapy-skills>
-**Company**: HappyCapy (built by original Trickle team)
-
+---
+title: "HappyCapy — Agent-Native Computer for Developers"
 ---
 
 ## Identity & Overview
@@ -303,28 +298,6 @@ The primary sources do not document:
 | [PicoClaw](./picoclaw.md) | agent-infrastructure | minimal Rust agent runtime for resource-constrained hardware with 6 messaging channels |
 | [Yume](../developer-tools/yume.md) | developer-tools | native desktop GUI wrapper for Claude Code CLI with multi-agent orchestration and zero-flicker rendering |
 | [SkillsMP](../skill-generation-tools/skillsmp.md) | skill-generation-tools | unified marketplace of 66,500+ AI agent skills using the SKILL.md standard compatible with HappyCapy's skill system |
-
----
-
-## Freshness Tracking
-
-**Entry Created**: 2026-03-13
-**Next Review Date**: 2026-06-13 (3 months)
-**Data Sources**: All primary sources accessed between 2026-01-28 and 2026-03-13
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Identity & Overview | high | Direct quotes from official site and launch announcements |
-| Architecture & Execution | high | Multiple detailed sources (SuperGok, Oreate AI) with architectural explanations |
-| Key Features | high | Features documented across official site, multiple reviews, and GitHub repo |
-| Pricing & Tiers | high | Official pricing page with exact numbers |
-| Use Cases | medium | Use cases derived from reviews and marketing; no customer case studies in sources |
-| Comparison to Alternatives | medium | Comparisons stated in product reviews; not independently verified against alternative products |
-| Relevance to Claude Code | medium | Based on direct integration facts; relevance assessment requires ongoing observation of adoption patterns |
-| Recent Activity | high | Repository stats and launch metrics from direct GitHub and social media sources |
-| Limitations | low | No limitations documented in reviewed sources; cannot confirm absence |
 
 ---
 
