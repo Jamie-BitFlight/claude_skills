@@ -670,18 +670,67 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
     return modified
 
 
-_PATH_ARG = typer.Argument(Path("./research/"), help="File or directory to validate")
-_JSON_OPT = typer.Option(False, "--json", help="Output machine-readable JSON")
-_VERBOSE_OPT = typer.Option(False, "--verbose", help="Show per-file detail")
+def _collect_deduped_files(paths: list[Path]) -> list[Path]:
+    """Collect files from all paths, preserving order and deduplicating.
+
+    Args:
+        paths: Files or directories to collect from.
+
+    Returns:
+        Ordered, deduplicated list of matching research files.
+    """
+    seen: set[Path] = set()
+    files: list[Path] = []
+    for p in paths:
+        for f in collect_files(p):
+            if f not in seen:
+                seen.add(f)
+                files.append(f)
+    return files
+
+
+def _print_text_report(entries: list[dict[str, Any]], total_errors: int, total_warnings: int, verbose: bool) -> None:
+    """Print a human-readable validation report.
+
+    Args:
+        entries: Validated entry results.
+        total_errors: Count of error-severity issues across all entries.
+        total_warnings: Count of warning-severity issues across all entries.
+        verbose: When True, print per-file issue detail.
+    """
+    total = len(entries)
+    passed = sum(1 for e in entries if e["status"] == "pass")
+    failed = total - passed
+    print(f"Research Validation: {total} entries scanned")
+    print(f"  ✓ {passed} passed")
+    if failed > 0:
+        print(f"  ✗ {failed} failed ({total_errors} errors, {total_warnings} warnings)")
+    else:
+        print(f"  {total_warnings} warnings")
+    if verbose:
+        print()
+        for entry in entries:
+            marker = "✓" if entry["status"] == "pass" else "✗"
+            print(f"{marker} {entry['file']} [{entry['format']}]")
+            for issue in entry["issues"]:
+                severity_label = issue["severity"].upper()
+                print(f"  {severity_label}: {issue['message']}")
 
 
 @app.command()
-def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = _VERBOSE_OPT) -> None:
+def main(
+    paths: Annotated[
+        list[Path] | None, typer.Argument(help="Files or directories to validate. Defaults to ./research/")
+    ] = None,
+    output_json: Annotated[bool, typer.Option("--json", help="Output machine-readable JSON")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Show per-file detail")] = False,
+) -> None:
     """Validate research entries against quality standards."""
-    research_root = path if path.is_dir() else path.parent
+    resolved = paths or [Path("./research/")]
+    research_root = next((p for p in resolved if p.is_dir()), resolved[0].parent)
     today = datetime.now(tz=UTC).date()
 
-    files = collect_files(path)
+    files = _collect_deduped_files(resolved)
     if not files:
         if output_json:
             print(
@@ -712,22 +761,7 @@ def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = 
         }
         print(json.dumps(result, indent=2))
     else:
-        failed = total - passed
-        print(f"Research Validation: {total} entries scanned")
-        print(f"  ✓ {passed} passed")
-        if failed > 0:
-            print(f"  ✗ {failed} failed ({total_errors} errors, {total_warnings} warnings)")
-        else:
-            print(f"  {total_warnings} warnings")
-
-        if verbose:
-            print()
-            for entry in entries:
-                marker = "✓" if entry["status"] == "pass" else "✗"
-                print(f"{marker} {entry['file']} [{entry['format']}]")
-                for issue in entry["issues"]:
-                    severity_label = issue["severity"].upper()
-                    print(f"  {severity_label}: {issue['message']}")
+        _print_text_report(entries, total_errors, total_warnings, verbose)
 
     if total_errors > 0:
         sys.exit(1)

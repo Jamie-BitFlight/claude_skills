@@ -174,18 +174,18 @@ repos:
 
       - id: fix-research-formatting
         name: Fix MD031 and trailing whitespace in research entries
-        entry: uv run .claude/skills/research-curator/scripts/fix_research_formatting.py ./research/
+        entry: uv run .claude/skills/research-curator/scripts/fix_research_formatting.py
         language: system
         stages: [pre-commit]
-        pass_filenames: false
+        pass_filenames: true
         files: ^research/.*\.md$
 
       - id: validate-research-entries
         name: Validate research entry structure and completeness
-        entry: uv run .claude/skills/research-curator/scripts/validate_research.py main ./research/
+        entry: uv run .claude/skills/research-curator/scripts/validate_research.py main
         language: system
         stages: [pre-commit]
-        pass_filenames: false
+        pass_filenames: true
         files: ^research/.*\.md$
 
       - id: enable-rerere
