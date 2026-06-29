@@ -1,11 +1,5 @@
-# Utilization Proposals: SimpleMem-Cross
-
-**Research entry**: ./research/context-management/simplemem-cross.md
-**Generated**: 2026-03-19
-**Integration surfaces found**: 3 (Python async library, HTTP REST API, MCP tools)
-**Proposals written**: 3
-**Skipped**: 1 — agent-orchestration skill scope does not overlap with memory lifecycle hooks
-
+---
+title: "Utilization Proposals: SimpleMem-Cross"
 ---
 
 ## Utilization 1: context-gathering agent → SimpleMem-Cross cross-session memory
@@ -324,4 +318,3 @@ SimpleMem-Cross provides three concrete integration opportunities:
 3. **Task_status_hook.py** augments local lifecycle tracking with cross-session audit trails, supporting execution analysis
 
 All three require pip dependency (`simplemem[cross]`), async integration, and context manifest serialization. Combined setup cost is high, but benefits compound: as features accumulate, cross-session memory accelerates both discovery and execution phases.
-

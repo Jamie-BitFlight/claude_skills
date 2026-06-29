@@ -1,12 +1,5 @@
-# Improvement Proposals: OpenSpec MCP
-
-**Research entry**: ./research/mcp-ecosystem/openspec-mcp.md
-**Generated**: 2026-04-29
-**Patterns assessed**: 5
-**Backlog items created**: 2 (issues: #1, #2)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: OpenSpec MCP"
 ---
 
 ## Improvement 1: State Machine Enforcement for Feature Change Lifecycle
@@ -247,4 +240,3 @@ The MCP server logs the explicit intent tool, making the audit trail more readab
 | Approval Workflow State Machine (draft → pending_approval → approved → implementing → completed → archived) | Not skipped; implemented as Improvement 1 |
 | Review System with Threading | Not skipped; implemented as Improvement 2 |
 | Change creation/validation/archive lifecycle | Already covered in `backlog_close`, `backlog_resolve`, and SAM task lifecycle. New state machine (Improvement 1) extends this with audit trail. |
-

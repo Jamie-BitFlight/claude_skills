@@ -1,11 +1,5 @@
-# Utilization Proposals: 1Code
-
-**Research entry**: ./research/coding-agents/1code.md
-**Generated**: 2026-03-17
-**Integration surfaces found**: 1 (API)
-**Proposals written**: 1
-**Skipped**: 2 — implement-feature and complete-implementation skills use local in-session agent execution incompatible with async cloud-sandbox PR delivery model
-
+---
+title: "Utilization Proposals: 1Code"
 ---
 
 ## Utilization 1: `.github/workflows/code-quality.yml` → 1Code REST API

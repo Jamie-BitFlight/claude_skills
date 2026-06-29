@@ -1,11 +1,13 @@
-# Biome
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://biomejs.dev>
-**GitHub Repository**: <https://github.com/biomejs/biome>
-**Version at Research**: v2.4.3
-**License**: MIT OR Apache 2.0
-
+---
+title: "Biome"
+research_date: "2026-02-23"
+source_url: "https://biomejs.dev"
+github_url: "https://github.com/biomejs/biome"
+version_at_research: "v2.4.3"
+license: "MIT OR Apache 2.0"
+last_verified: "2026-02-23"
+version_at_verification: "v2.4.3"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -271,11 +273,3 @@ npx @biomejs/biome migrate prettier --write
 - [Biome Configuration Reference](https://biomejs.dev/reference/configuration) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v2.4.3 |
-| Next Review Recommended | 2026-05-23 |

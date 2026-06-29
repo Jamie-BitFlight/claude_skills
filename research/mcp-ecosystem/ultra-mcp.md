@@ -1,12 +1,13 @@
-# Ultra MCP
-
-**Research Date**: 2026-03-02
-**Source URL**: <https://github.com/RealMikeChong/ultra-mcp>
-**GitHub Repository**: <https://github.com/RealMikeChong/ultra-mcp>
-**npm Package**: <https://www.npmjs.com/package/ultra-mcp>
-**Version at Research**: v0.8.1
-**License**: MIT
-
+---
+title: "Ultra MCP"
+research_date: "2026-03-02"
+source_url: "https://github.com/RealMikeChong/ultra-mcp"
+github_url: "https://github.com/RealMikeChong/ultra-mcp"
+version_at_research: "v0.8.1"
+license: "MIT"
+last_verified: "2026-03-02"
+version_at_verification: "v0.8.1"
+next_review: "2026-06-02"
 ---
 
 ## Overview
@@ -237,11 +238,3 @@ SOURCE: [GitHub README - RealMikeChong/ultra-mcp](https://github.com/RealMikeCho
 - [LiteLLM Pricing Data](https://github.com/BerriAI/litellm) (accessed 2026-03-02)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-02 |
-| Version at Verification | v0.8.1 |
-| Next Review Recommended | 2026-06-02 |

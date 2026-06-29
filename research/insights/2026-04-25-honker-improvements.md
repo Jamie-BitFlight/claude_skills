@@ -1,12 +1,5 @@
-# Improvement Proposals: Honker
-
-**Research entry**: ./research/data-infrastructure/honker.md
-**Generated**: 2026-04-25
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Honker"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

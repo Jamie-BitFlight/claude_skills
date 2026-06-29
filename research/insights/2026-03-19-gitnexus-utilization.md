@@ -1,11 +1,5 @@
-# Utilization Proposals: GitNexus
-
-**Research entry**: ./research/mcp-ecosystem/gitnexus.md
-**Generated**: 2026-03-19
-**Integration surfaces found**: 2 (MCP server CLI | Agent skills generation | PreToolUse/PostToolUse hooks)
-**Proposals written**: 2
-**Skipped**: 3 — (python3-development plugin uses Grep/Glob for exploration instead of graph queries; no existing impact-analysis agent in this repo; context-gathering already has codebase reading capability but doesn't perform impact analysis)
-
+---
+title: "Utilization Proposals: GitNexus"
 ---
 
 ## Utilization 1: python3-development plugin → GitNexus MCP impact analysis
@@ -39,6 +33,7 @@ The `detect_changes` tool (line 134-144 in research entry) maps git diffs to aff
 ### Integration sketch
 
 **For code-review impact assessment**:
+
 ```python
 # Pseudo-code showing tool call pattern from research entry line 133-143
 impact_result = gitnexus_impact({
@@ -59,6 +54,7 @@ impact_result = gitnexus_impact({
 ```
 
 **For post-commit verification**:
+
 ```python
 # From research entry line 144, detect_changes maps diffs to execution flows
 changed_impact = gitnexus_detect_changes({
@@ -117,6 +113,7 @@ This enables:
 ### Integration sketch
 
 **Wiki generation** (from research entry line 220, 228-235):
+
 ```bash
 # Pre-commit or post-merge hook:
 npx gitnexus wiki --model gpt-4o-mini
@@ -134,6 +131,7 @@ npx gitnexus wiki --model gpt-4o-mini
 ```
 
 **Skills generation** (from research entry line 210, 190-194):
+
 ```bash
 # After indexing:
 npx gitnexus analyze --skills
@@ -191,4 +189,3 @@ Both proposals assume `.worktrees/GitNexus/gitnexus-claude-plugin/` is available
 3. **Test detect_changes integration**: Verify PostToolUse hook properly invokes `gitnexus_detect_changes()` for staged commits
 4. **Enable wiki generation in service-docs-maintainer**: Add CLI invocation for `npx gitnexus wiki` with LLM model configuration
 5. **Validate skills generation**: Confirm `.claude/skills/generated/` skills are discoverable by task file skill: field
-

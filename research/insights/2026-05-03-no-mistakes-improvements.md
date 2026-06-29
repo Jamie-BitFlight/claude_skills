@@ -1,12 +1,5 @@
-# Improvement Proposals: no-mistakes
-
-**Research entry**: ./research/developer-tools/no-mistakes.md
-**Generated**: 2026-05-03
-**Patterns assessed**: 8
-**Backlog items created**: 5 (issues: #2104, #2105, #2106, #2107, #2108)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or out of scope)**: 1
-
+---
+title: "Improvement Proposals: no-mistakes"
 ---
 
 ## Improvement 1: Run /complete-implementation quality gates in an isolated worktree

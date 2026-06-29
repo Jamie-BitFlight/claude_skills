@@ -1,11 +1,5 @@
-# Utilization Proposals: Boneyard
-
-**Research entry**: ../developer-tools/boneyard.md
-**Generated**: 2026-04-03
-**Integration surfaces found**: 2 (NPM SDK | CLI tool)
-**Proposals written**: 1
-**Skipped**: 1 — localhost-only app with no persistent loading states
-
+---
+title: "Utilization Proposals: Boneyard"
 ---
 
 ## Utilization 1: dot-dash frontend → Boneyard skeleton screens
@@ -28,11 +22,13 @@ The App.tsx reducer dispatches `set_sessions` and `add_event` actions as WebSock
 ### Integration sketch
 
 **1. Install dependency:**
+
 ```bash
 npm install boneyard-js
 ```
 
 **2. Wrap SessionList in App.tsx (lines 149–153):**
+
 ```tsx
 import { Skeleton } from 'boneyard-js/react'
 
@@ -54,6 +50,7 @@ const isLoadingInitial = state.wsConnected && state.sessions.length === 0
 ```
 
 **3. Wrap Transcript in App.tsx (line 154):**
+
 ```tsx
 <Skeleton
   name="transcript"
@@ -64,6 +61,7 @@ const isLoadingInitial = state.wsConnected && state.sessions.length === 0
 ```
 
 **4. Build bones once (one-time dev task):**
+
 ```bash
 cd plugins/dot-dash/frontend
 npm run dev  # Start dev server in one terminal
@@ -72,6 +70,7 @@ npm run build  # Rebuild for production
 ```
 
 The CLI writes `src/bones/registry.ts` and per-component bone files. Import the registry in the frontend entry point:
+
 ```tsx
 // src/main.tsx
 import './bones/registry'  // Populates the in-memory bones registry

@@ -1,9 +1,5 @@
-# Utilization Assessment: Pi Monorepo
-
-**Research entry**: ./research/agent-frameworks/pi-mono.md
-**Generated**: 2026-03-14
-**Assessment result**: No suitable local callers identified
-
+---
+title: "Utilization Assessment: Pi Monorepo"
 ---
 
 ## Integration Surfaces Found

@@ -1,12 +1,6 @@
-# OpenPencil
-
-**Repository**: <https://github.com/open-pencil/open-pencil>
-**Homepage**: <https://openpencil.dev>
-**License**: MIT (Copyright 2026 Danila Poyarkov)
-**Version**: v0.10.0 (released 2026-03-15)
-**Status**: Active development. Not ready for production use.
-**Try Online**: <https://app.openpencil.dev/demo>
-
+---
+title: "OpenPencil"
+license: "MIT (Copyright 2026 Danila Poyarkov)"
 ---
 
 ## Overview
@@ -108,6 +102,7 @@ When the desktop app is running, omit the file argument to operate on the live c
 - **Tailwind CSS JSX export** — Export selections as HTML with Tailwind v4 utility classes
 
 Example output:
+
 ```html
 <div className="flex flex-col gap-4 p-6 bg-white rounded-xl">
   <p className="text-2xl font-bold text-[#1D1B20]">Card Title</p>
@@ -500,35 +495,3 @@ The CLI and MCP server both support headless operation — no desktop UI require
 | [Browser MCP](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | Reference architecture for MCP server design: both expose domain tools (design vs browser automation) as structured resources |
 
 ---
-
-## Freshness Tracking
-
-**Last reviewed**: 2026-03-19
-**Next review**: 2026-06-19 (3 months)
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|------------|-------|
-| **Identity & Metadata** | high | GitHub API + repo metadata verified; version from official release |
-| **Problem Addressed** | high | Quoted directly from README.md problem statement |
-| **Key Features** | high | All features extracted from README with exact command examples and mechanism details |
-| **Technical Architecture** | high | Core package exports and modular structure verified from package.json files; module listing from filesystem; data flow inferred from dependency graph and source file organization |
-| **Installation & Usage** | high | Installation commands and development setup copied verbatim from README; verified Bun and Tauri integration |
-| **Limitations & Caveats** | medium | Pre-production status and roadmap items extracted from README; collaboration constraints and file format boundaries are inferred from architecture (not explicitly documented) |
-| **Relevance to Claude Code** | high | MCP implementation and tool definitions are factual capabilities; integration pathways documented in README |
-| **References** | high | All URLs verified as accessible; release metadata from GitHub API; license from LICENSE file |
-
-**Data Sources**:
-- README.md — primary source for features, installation, development, architecture overview
-- GitHub API responses — repository metadata (stars, forks, open issues, language, license, latest release)
-- package.json files (root, packages/core, packages/cli, packages/mcp) — version numbers, dependencies, workspace structure
-- LICENSE file — license type and copyright holder
-- Repository filesystem structure — module organization and file inventory
-- .fig file codec architecture inferred from file naming conventions and documented tech stack (Kiwi + Zstd + ZIP)
-
-**Confidence Factors**:
-- Official documentation (README) is comprehensive and up-to-date (repository pushed 2026-03-17)
-- Package metadata consistent across monorepo
-- Repository is young (created 2026-02-27) with rapidly evolving feature set; some architectural details may be incomplete or subject to change
-- Roadmap items explicitly state features "not ready for production" — pre-release stability expected

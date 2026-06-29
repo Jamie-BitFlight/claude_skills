@@ -1,12 +1,13 @@
-# tmuxp
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://tmuxp.git-pull.com/>
-**GitHub Repository**: <https://github.com/tmux-python/tmuxp>
-**PyPI Package**: <https://pypi.org/project/tmuxp/>
-**Version at Research**: 1.64.0
-**License**: MIT
-
+---
+title: "tmuxp"
+research_date: "2026-03-01"
+source_url: "https://tmuxp.git-pull.com/"
+github_url: "https://github.com/tmux-python/tmuxp"
+version_at_research: "1.64.0"
+license: "MIT"
+last_verified: "2026-03-01"
+version_at_verification: "v1.64.0"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -440,11 +441,3 @@ Concrete applications:
 - [GitHub API — Repository Metadata](https://api.github.com/repos/tmux-python/tmuxp) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v1.64.0 |
-| Next Review Recommended | 2026-06-01 |

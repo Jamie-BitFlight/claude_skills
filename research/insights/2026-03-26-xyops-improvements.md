@@ -1,12 +1,5 @@
-# Improvement Proposals: xyOps
-
-**Research entry**: ./research/task-management/xyops.md
-**Generated**: 2026-03-26
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: xyOps"
 ---
 
 ## Skipped Patterns

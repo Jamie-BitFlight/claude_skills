@@ -1,11 +1,13 @@
-# Gas Town (gastown)
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://github.com/steveyegge/gastown>
-**GitHub Repository**: <https://github.com/steveyegge/gastown>
-**Version at Research**: v0.9.0
-**License**: MIT
-
+---
+title: "Gas Town (gastown)"
+research_date: "2026-03-01"
+source_url: "https://github.com/steveyegge/gastown"
+github_url: "https://github.com/steveyegge/gastown"
+version_at_research: "v0.9.0"
+license: "MIT"
+last_verified: "2026-03-01"
+version_at_verification: "v0.9.0"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -297,16 +299,6 @@ SOURCE: [gastown/README.md](https://github.com/steveyegge/gastown/blob/main/READ
 - [Witness AT Team Lead Design](https://github.com/steveyegge/gastown/blob/main/docs/design/witness-at-team-lead.md) (accessed 2026-03-01)
 - [GitHub API — Repository Metadata](https://api.github.com/repos/steveyegge/gastown) (accessed 2026-03-01)
 - [DoltHub Blog: "A Day in Gas Town"](https://www.dolthub.com/blog/2026-01-15-a-day-in-gas-town/) (Tim Sehn, 2026-01-15, accessed 2026-03-01) — early snapshot of Gas Town usage; describes Beads (Git+SQLite memory), Mayor coordination, tmux multi-terminal management, ~10x cost of standard Claude Code sessions, autonomous PR creation. **Note**: This blog captures Gas Town circa January 2026; the project has evolved significantly since then with hundreds of iterations
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.9.0 |
-| Next Review Recommended | 2026-06-01 |
 
 ---
 

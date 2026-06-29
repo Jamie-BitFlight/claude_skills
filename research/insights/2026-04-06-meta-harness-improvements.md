@@ -1,12 +1,5 @@
-# Improvement Proposals: Meta-Harness
-
-**Research entry**: ./research/ai-research-tools/meta-harness.md
-**Generated**: 2026-04-06
-**Patterns assessed**: 8
-**Backlog items created**: 0 (backlog MCP unavailable during extraction — items listed for manual creation)
-**Deferred (low confidence)**: 5
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: Meta-Harness"
 ---
 
 ## Improvement 1: Filesystem-based optimization history for kaizen improvement loop

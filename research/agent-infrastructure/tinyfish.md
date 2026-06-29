@@ -1,12 +1,13 @@
-# TinyFish
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://www.tinyfish.ai>
-**GitHub Repository**: <https://github.com/tinyfish-io/agentql-mcp> (AgentQL MCP server, MIT)
-**GitHub Repository (Cookbook)**: <https://github.com/tinyfish-io/TinyFish-cookbook>
-**Version at Research**: No versioned releases; API at `https://agent.tinyfish.ai/v1` (current as of 2026-02-23)
-**License**: Commercial SaaS (AgentQL MCP server: MIT)
-
+---
+title: "TinyFish"
+research_date: "2026-02-23"
+source_url: "https://www.tinyfish.ai"
+github_url: "<https://github.com/tinyfish-io/agentql-mcp> (AgentQL MCP server, MIT)"
+version_at_research: "No versioned releases; API at `https://agent.tinyfish.ai/v1` (current as of 2026-02-23)"
+license: "Commercial SaaS (AgentQL MCP server: MIT)"
+last_verified: "2026-02-23"
+version_at_verification: "API v1 (no versioned SDK release)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -225,11 +226,3 @@ curl --location 'https://agent.tinyfish.ai/v1/automation/run-sse' \
 - [AgentQL MCP Server on MCP Server Hub](https://mcpserverhub.net/server/agentql-mcp-tinyfish-io) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | API v1 (no versioned SDK release) |
-| Next Review Recommended | 2026-05-23 |

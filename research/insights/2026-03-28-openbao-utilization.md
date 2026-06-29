@@ -1,11 +1,5 @@
-# Utilization Proposals: OpenBao
-
-**Research entry**: ./research/llm-infrastructure/openbao.md
-**Generated**: 2026-03-28
-**Integration surfaces found**: 3 (HTTP API | Go SDK | Docker test cluster API | CLI)
-**Proposals written**: 0
-**Skipped**: 12 — no suitable callers identified
-
+---
+title: "Utilization Proposals: OpenBao"
 ---
 
 ## Integration Surfaces Identified

@@ -1,9 +1,5 @@
-# HomeButler Research — Actionable Improvements
-
-**Extracted**: 2026-05-03
-**Source Research**: ./research/mcp-ecosystem/homebutler.md
-**Project Relevance**: Claude Code MCP ecosystem, infrastructure automation, agent development
-
+---
+title: "HomeButler Research — Actionable Improvements"
 ---
 
 ## Critical Improvements Identified

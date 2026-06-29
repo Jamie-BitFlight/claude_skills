@@ -1,11 +1,13 @@
-# Stop Slop
-
-**Research Date**: 2026-04-03
-**Source URL**: <https://github.com/hardikpandya/stop-slop>
-**GitHub Repository**: <https://github.com/hardikpandya/stop-slop>
-**Version at Research**: 2026-01-13 (latest commit)
-**License**: MIT
-
+---
+title: "Stop Slop"
+research_date: "2026-04-03"
+source_url: "https://github.com/hardikpandya/stop-slop"
+github_url: "https://github.com/hardikpandya/stop-slop"
+version_at_research: "2026-01-13 (latest commit)"
+license: "MIT"
+last_verified: "2026-04-03"
+version_at_verification: "2026-01-13 (latest commit: 8da1f03)"
+next_review: "2026-07-03"
 ---
 
 ## Overview
@@ -238,12 +240,3 @@ SOURCE: SKILL.md lines 1-69, references/examples.md (accessed 2026-04-03)
 | [claude-conductor.md](../developer-tools/claude-conductor.md) | developer-tools | Context-Driven Development pattern reference layer applies Stop Slop principles to documentation artifacts |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-03 |
-| Version at Verification | 2026-01-13 (latest commit: 8da1f03) |
-| Next Review Recommended | 2026-07-03 |
-| Confidence Map | Overview: high (official repo README and SKILL.md), Key Features: high (comprehensive feature documentation with examples), Technical Architecture: high (editorial framework documented in SKILL.md), Usage Examples: high (5 complete before/after examples in references/examples.md), Relevance: medium (inferred from Claude Code context, not explicitly stated in repository) |

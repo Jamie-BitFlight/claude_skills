@@ -1,7 +1,5 @@
-# gstack — Claude Code Workflow Skills
-
-**Quick Summary**: gstack is a TypeScript-based collection of eight specialized Claude Code workflow skills that convert Claude from a single generic assistant into role-specific agents (founder, engineering manager, code reviewer, release engineer, QA engineer, session manager, retrospective analyst). Each skill implements a distinct cognitive mode and toolset for planning, review, shipping, and testing phases of software development.
-
+---
+title: "gstack — Claude Code Workflow Skills"
 ---
 
 ## Identity & Metadata
@@ -186,6 +184,7 @@ Each skill is implemented as a Markdown-based Claude Code skill file (prompts + 
 - For `/browse` native binary: macOS or Linux (x64 or arm64)
 
 **Global Install**:
+
 ```bash
 git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
 cd ~/.claude/skills/gstack
@@ -198,6 +197,7 @@ The `setup` script:
 3. Creates symlinks at `~/.claude/skills/` for each skill (browse, qa, review, etc.)
 
 **Project-Local Install** (optional, for team sharing):
+
 ```bash
 cp -Rf ~/.claude/skills/gstack .claude/skills/gstack
 rm -rf .claude/skills/gstack/.git
@@ -215,6 +215,7 @@ cd .claude/skills/gstack
 Everything lives in `.claude/` — nothing touches PATH or runs in background.
 
 **Upgrade**:
+
 ```bash
 cd ~/.claude/skills/gstack && git fetch origin && git reset --hard origin/main && ./setup
 ```
@@ -416,27 +417,6 @@ Each workspace gets isolated browser instance (separate Chromium process, cookie
 ### Retrospective Workflow
 
 From README (lines 502): `/retro compare` for weekly trends. JSON snapshots saved to `.context/retros/` for baseline tracking.
-
----
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|-----------|---------------|------------|
-| Identity/Metadata | High | 2026-03-13 (GitHub API) | 2026-06-13 |
-| Design Philosophy | High | 2026-03-13 (README) | 2026-06-13 |
-| Eight Skills | High | 2026-03-13 (README + SKILL.md files) | 2026-06-13 |
-| Installation & Setup | High | 2026-03-13 (README) | 2026-06-13 |
-| Architecture | High | 2026-03-13 (BROWSER.md, CLAUDE.md) | 2026-06-13 |
-| Features Deep Dive | High | 2026-03-13 (BROWSER.md) | 2026-06-13 |
-| Limitations | Medium | 2026-03-13 (Inferred from docs) | 2026-06-13 |
-| Relevance | Medium | 2026-03-13 (Analysis) | 2026-06-13 |
-| Usage Patterns | High | 2026-03-13 (README) | 2026-06-13 |
-
-**Confidence Notes**:
-- High-confidence sections: Directly extracted from official README, BROWSER.md, CHANGELOG, package.json, GitHub API
-- Medium-confidence sections: Inferred from documented scope + technical capabilities (e.g., accessibility-tree limitations for shadow DOM)
-- All numerical metrics, version numbers, and URLs verified from primary sources
 
 ---
 

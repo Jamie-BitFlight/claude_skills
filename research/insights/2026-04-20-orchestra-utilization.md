@@ -1,12 +1,5 @@
-# Utilization Assessment: Orchestra
-
-**Research entry**: ./research/agent-frameworks/orchestra.md
-**Generated**: 2026-04-20
-**Integration surfaces found**: Yes (CLI commands, state files, configuration)
-**Proposals written**: 0
-**Skipped**: 3
-**Assessment**: Integration surfaces identified, but no suitable local integration proposals
-
+---
+title: "Utilization Assessment: Orchestra"
 ---
 
 ## Integration Surface Analysis

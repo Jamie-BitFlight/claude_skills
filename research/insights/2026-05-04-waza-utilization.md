@@ -1,11 +1,5 @@
-# Utilization Proposals: Waza
-
-**Research entry**: ./research/skill-generation-tools/waza.md
-**Generated**: 2026-05-04
-**Integration surfaces found**: 4 (CLI skills + installation mechanism)
-**Proposals written**: 3
-**Skipped**: 2 — pattern-only (no direct callable surface documented)
-
+---
+title: "Utilization Proposals: Waza"
 ---
 
 ## Utilization 1: `dh:analyze-test-failures` → Waza `/hunt` skill
@@ -145,4 +139,3 @@ When conducting deep research on a topic:
 | Utilization 1 (`/hunt`) | High | Clear overlap with debugging discipline; Waza's design is documented and the skill is production-tested. Requires routing logic only. |
 | Utilization 2 (`/check`) | High | Waza's project-context extraction is novel and fills a gap our language-specific reviewers don't address. Integration is additive, not replacing. |
 | Utilization 3 (`/learn`) | Medium | Waza's `/learn` phases are documented but we have not tested the skill's output format against our research entry schema. Format compatibility must be verified before committing integration. |
-

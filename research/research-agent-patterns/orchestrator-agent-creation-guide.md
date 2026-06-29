@@ -516,6 +516,7 @@ Minimal mode should contain **no narrative** beyond the routing line.
 
 ### Delegation
 [The actual tool call(s) to the task tool]
+
 ```
 
 ### Verbose Mode (When Asked OR Confidence Low)
@@ -529,6 +530,7 @@ Minimal mode should contain **no narrative** beyond the routing line.
 
 ### Delegation
 [The actual tool call(s) to the task tool]
+
 ```
 
 ## Example Scenarios

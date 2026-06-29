@@ -1,12 +1,13 @@
-# Google AI Studio
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://aistudio.google.com/>
-**Documentation**: <https://ai.google.dev/gemini-api/docs>
-**GitHub (Cookbook)**: <https://github.com/google-gemini/cookbook>
-**Version at Research**: Gemini 2.5 Pro / Gemini 3 (preview)
-**License**: Free tier available; paid usage billed per token via Google account
-
+---
+title: "Google AI Studio"
+research_date: "2026-02-23"
+source_url: "https://aistudio.google.com/"
+documentation_url: "https://ai.google.dev/gemini-api/docs"
+version_at_research: "Gemini 2.5 Pro / Gemini 3 (preview)"
+license: "Free tier available; paid usage billed per token via Google account"
+last_verified: "2026-02-23"
+version_at_verification: "Gemini 2.5 Pro / Gemini 3 preview"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -237,11 +238,3 @@ print(response.text)
 - [Batch API Documentation](https://ai.google.dev/gemini-api/docs/batch-api) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | Gemini 2.5 Pro / Gemini 3 preview |
-| Next Review Recommended | 2026-05-23 |

@@ -1,11 +1,13 @@
-# System Prompts and Models of AI Tools
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools>
-**GitHub Repository**: <https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools>
-**Version at Research**: main branch (last pushed 2026-02-17)
-**License**: GPL-3.0
-
+---
+title: "System Prompts and Models of AI Tools"
+research_date: "2026-02-23"
+source_url: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools"
+github_url: "https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools"
+version_at_research: "main branch (last pushed 2026-02-17)"
+license: "GPL-3.0"
+last_verified: "2026-02-23"
+version_at_verification: "main (2026-02-17 push)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -118,11 +120,3 @@ Content is gathered through:
 - [ZeroLeaks — Related AI security audit service referenced in README](https://zeroleaks.ai/) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | main (2026-02-17 push) |
-| Next Review Recommended | 2026-05-23 |

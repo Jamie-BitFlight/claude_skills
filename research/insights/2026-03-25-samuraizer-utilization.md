@@ -1,11 +1,5 @@
-# Utilization Proposals: Samuraizer
-
-**Research entry**: ./research/ai-research-tools/samuraizer.md
-**Generated**: 2026-03-25
-**Integration surfaces found**: 3 (API: /analyze, /search/semantic, /chat)
-**Proposals written**: 1
-**Skipped**: 2 — individual agents not suitable standalone callers; workflow-level integration is the correct unit of analysis
-
+---
+title: "Utilization Proposals: Samuraizer"
 ---
 
 ## Utilization 1: research-curator workflow → Samuraizer

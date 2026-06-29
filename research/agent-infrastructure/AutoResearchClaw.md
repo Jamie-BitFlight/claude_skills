@@ -1,11 +1,6 @@
-# AutoResearchClaw
-
-**GitHub**: <https://github.com/aiming-lab/AutoResearchClaw>
-**Latest Release**: v0.3.1 (2026-03-18)
-**License**: MIT
-**Language**: Python 3.11+
-**Repository**: Active (last commit 2026-03-19)
-
+---
+title: "AutoResearchClaw"
+license: "MIT"
 ---
 
 ## Overview
@@ -433,25 +428,6 @@ The KB tracks decisions, experiments, findings, and lessons across runs. Persist
 - **OpenClaw Compatibility**: Declared in README; compatible with Claude Code, OpenCode, Codex, Gemini, Kimi via ACP protocol
 - **MetaClaw Integration**: <https://github.com/aiming-lab/MetaClaw> — cross-run learning framework
 - **Test Coverage**: 1,634 tests in `tests/` directory, 100% pass rate as of 2026-03-19
-
----
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|-----------|-------------|------------|
-| Identity/Metadata | high | 2026-03-19 | 2026-06-19 |
-| Key Statistics | high | 2026-03-19 (GitHub API) | 2026-06-19 |
-| Problem Addressed | high | 2026-03-19 (README) | 2026-06-19 |
-| Key Features | high | 2026-03-19 (README + SKILL.md context) | 2026-06-19 |
-| Architecture | high | 2026-03-19 (source code structure + README) | 2026-06-19 |
-| Installation & Usage | high | 2026-03-19 (README quick start) | 2026-06-19 |
-| Limitations | medium | 2026-03-19 (README + source code review) | 2026-06-19 |
-| References | high | 2026-03-19 (GitHub API + local files) | 2026-06-19 |
-
-**Overall Confidence**: HIGH — All sections sourced from official README, GitHub API metadata, and repository structure inspection. Latest release v0.3.1 (2026-03-18) reviewed in full.
-
-**Next Review Date**: 2026-06-19 (3 months from today)
 
 ---
 

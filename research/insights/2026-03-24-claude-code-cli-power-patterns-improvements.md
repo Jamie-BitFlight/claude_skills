@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Code CLI Power Patterns
-
-**Research entry**: ./research/developer-tools/claude-code-cli-power-patterns.md
-**Generated**: 2026-03-24
-**Patterns assessed**: 8
-**Backlog items created**: 2 (issues: #1061, #1062)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Claude Code CLI Power Patterns"
 ---
 
 ## Improvement 1: Add effort level control to kage-bunshin spawn and work-milestone dispatch

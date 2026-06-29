@@ -75,6 +75,7 @@ The same agent definition can be exported to multiple frameworks via adapters. E
 - **cursor** — Cursor `.cursor/rules/*.mdc` files
 
 **Usage example**:
+
 ```bash
 gitagent export --format system-prompt     # Outputs concatenated prompt
 gitagent export --format claude-code       # Outputs CLAUDE.md
@@ -102,6 +103,7 @@ GitAgent has embedded compliance configuration for financial services and other 
 **Segregation of Duties (SOD)**: Define roles (maker, checker, executor, auditor) with permissions, conflict matrix (which role pairs cannot be held by the same agent), handoff workflows (require multi-agent participation), and enforcement level (strict blocks deployment; advisory issues warnings).
 
 Example compliance configuration from spec:
+
 ```yaml
 compliance:
   risk_tier: high
@@ -135,6 +137,7 @@ Agents declare reusable capability modules. Skills are stored in a `skills/` dir
 Skills can be discovered, installed from git repositories, and composed into workflows.
 
 **CLI example**:
+
 ```bash
 gitagent skills list
 gitagent skills search "code-review"
@@ -348,6 +351,7 @@ npm install @shreyaskapale/gitagent
 ```
 
 **Verify**:
+
 ```bash
 gitagent --version   # v0.1.7
 gitagent --help
@@ -356,6 +360,7 @@ gitagent --help
 ### Quick Start
 
 **Create a new agent**:
+
 ```bash
 gitagent init --template standard --dir ./my-agent
 ```
@@ -369,28 +374,33 @@ Generated structure:
 - `examples/` — Calibration interactions
 
 **Validate**:
+
 ```bash
 gitagent validate -d ./my-agent
 gitagent validate -d ./my-agent --compliance  # If compliance config present
 ```
 
 **Export to Claude Code**:
+
 ```bash
 gitagent export --format claude-code -d ./my-agent
 # Output: CLAUDE.md with agent identity, SOUL, RULES, skills, compliance
 ```
 
 **Run with Claude Code adapter**:
+
 ```bash
 gitagent run -d ./my-agent --adapter claude-code --prompt "Hello"
 ```
 
 **Run from a git repository**:
+
 ```bash
 gitagent run -r https://github.com/user/my-agent --prompt "Summarize this project"
 ```
 
 **Run with auto-detected adapter** (git runner):
+
 ```bash
 gitagent run -r https://github.com/user/my-agent --adapter git --prompt "Hello"
 # Auto-detects best adapter from repo hints (.gitagent_adapter file)
@@ -405,6 +415,7 @@ Agents learning new skills or writing to memory open a branch + PR for human rev
 Multi-agent workflows where no single agent controls a critical process end-to-end. Define roles (maker, checker, executor, auditor), conflict matrix (which roles can't be the same agent), and handoff workflows.
 
 Example from README:
+
 ```yaml
 compliance:
   segregation_of_duties:

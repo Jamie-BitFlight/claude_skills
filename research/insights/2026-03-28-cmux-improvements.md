@@ -1,12 +1,5 @@
-# Improvement Proposals: cmux
-
-**Research entry**: ./research/agent-infrastructure/cmux.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: cmux"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

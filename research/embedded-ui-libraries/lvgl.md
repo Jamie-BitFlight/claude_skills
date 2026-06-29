@@ -1,11 +1,13 @@
-# LVGL (Light and Versatile Graphics Library)
-
-**Research Date**: 2026-03-05
-**Source URL**: <https://lvgl.io>
-**GitHub Repository**: <https://github.com/lvgl/lvgl>
-**Version at Research**: v9.5.0
-**License**: MIT License
-
+---
+title: "LVGL (Light and Versatile Graphics Library)"
+research_date: "2026-03-05"
+source_url: "https://lvgl.io"
+github_url: "https://github.com/lvgl/lvgl"
+version_at_research: "v9.5.0"
+license: "MIT License"
+last_verified: "2026-03-05"
+version_at_verification: "v9.5.0"
+next_review: "2026-06-05"
 ---
 
 ## Overview
@@ -367,11 +369,3 @@ relevant in two specific contexts:
 - [GitHub API — lvgl/lvgl latest release](https://api.github.com/repos/lvgl/lvgl/releases/latest) (accessed 2026-03-05)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-05 |
-| Version at Verification | v9.5.0 |
-| Next Review Recommended | 2026-06-05 |

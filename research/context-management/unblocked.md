@@ -1,12 +1,8 @@
-# Unblocked — Context Engine for AI-Driven Development
-
-**Resource**: Unblocked
-**Primary URL**: <https://getunblocked.com/>
-**Documentation**: <https://docs.getunblocked.com/>
-**Type**: SaaS platform — context management layer for coding agents
-**License**: Proprietary
-**Target Users**: Development teams using AI coding assistants (Claude Code, Cursor, Copilot, etc.)
-
+---
+title: "Unblocked — Context Engine for AI-Driven Development"
+documentation_url: "https://docs.getunblocked.com/"
+license: "Proprietary"
+next_review: "2026-06-13 (90 days)"
 ---
 
 ## Identity
@@ -300,23 +296,6 @@ Unblocked directly addresses a core pain point in AI-driven development: context
 | [Claude-Task-Master](../task-management/claude-task-master.md) | task-management | Adjacent workflow: task decomposition benefits from Unblocked's architectural context for code generation fidelity |
 | [SourceSync.ai MCP](../mcp-ecosystem/sourcesyncai-mcp.md) | mcp-ecosystem | MCP server alternative for unified knowledge base access; both expose RAG context to agents via standardized protocol |
 | [Cline](../coding-agents/cline.md) | coding-agents | End-user agent; Unblocked integration improves Cline's ability to generate org-specific code without context hallucinations |
-
----
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-13
-**Next Review**: 2026-06-13 (90 days)
-
-### Confidence Assessment
-
-- **Identity/Metadata**: high (official website, documentation, recent funding data)
-- **Features**: high (comprehensive documentation with examples and API specs)
-- **Architecture**: high (official platform overview with technical details)
-- **Performance Claims**: medium (quantified metrics from official marketing; actual customer benchmark data not independently verified)
-- **Pricing**: high (published pricing pages and plan comparison)
-- **Security**: high (documented compliance and security features; full details on on-premises options not disclosed)
-- **Limitations**: low (only documented limits found in API reference; absence of documented limitations may indicate gaps in public documentation)
 
 ---
 

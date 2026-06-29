@@ -1,12 +1,5 @@
-# Improvement Proposals: Pilot Shell
-
-**Research entry**: ./research/coding-agents/pilot-shell.md
-**Generated**: 2026-05-25
-**Patterns assessed**: 9
-**Backlog items created**: 4 (issues: #2444, #2445, #2447, #2448)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Pilot Shell"
 ---
 
 ## Improvement 1: Add `/spec` orchestration skill that gates implementation on user plan approval with inline annotations

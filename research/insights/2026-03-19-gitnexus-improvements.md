@@ -1,12 +1,5 @@
-# Improvement Proposals: GitNexus
-
-**Research entry**: ./research/mcp-ecosystem/gitnexus.md
-**Generated**: 2026-03-19
-**Patterns assessed**: 4
-**Backlog items created**: 0 (none)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: GitNexus"
 ---
 
 ## Skipped Patterns

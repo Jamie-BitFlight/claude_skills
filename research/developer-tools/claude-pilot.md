@@ -1,11 +1,13 @@
-# Claude Pilot
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://github.com/maxritter/claude-pilot>
-**GitHub Repository**: <https://github.com/maxritter/claude-pilot>
-**Version at Research**: v6.10.2
-**License**: Proprietary — Commercial (subscription required, 7-day free trial; source code viewable for inspection only, output belongs to the user)
-
+---
+title: "Claude Pilot"
+research_date: "2026-02-23"
+source_url: "https://github.com/maxritter/claude-pilot"
+github_url: "https://github.com/maxritter/claude-pilot"
+version_at_research: "v6.10.2"
+license: "Proprietary — Commercial (subscription required, 7-day free trial; source code viewable for inspection only, output belongs to the user)"
+last_verified: "2026-02-23"
+version_at_verification: "v6.10.2"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -288,11 +290,3 @@ curl -fsSL https://raw.githubusercontent.com/maxritter/claude-pilot/main/uninsta
 - [Claude Pilot License](https://github.com/maxritter/claude-pilot/blob/main/LICENSE) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v6.10.2 |
-| Next Review Recommended | 2026-05-23 |

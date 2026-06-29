@@ -1,11 +1,5 @@
-# Utilization Proposals: Claude Code CLI Power Patterns
-
-**Research entry**: ./research/developer-tools/claude-code-cli-power-patterns.md
-**Generated**: 2026-03-24
-**Integration surfaces found**: 7 (CLI flags, environment variables, JSON schema)
-**Proposals written**: 4
-**Skipped**: 4 — interactive REPL features (no external integration surface)
-
+---
+title: "Utilization Proposals: Claude Code CLI Power Patterns"
 ---
 
 ## Utilization 1: `/dh:work-milestone` → Parallel Worktree Isolation

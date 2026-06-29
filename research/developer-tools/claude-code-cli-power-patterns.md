@@ -51,6 +51,7 @@ Three production engineering challenges frame these capabilities:
 **Mechanism**: Works like `git branch` for LLM context. The original session remains intact; the fork operates on an identical snapshot. All previous context — architectural docs, API specs, coding standards — transfers intact to the forked session without re-reading (source: Tip 1).
 
 **Usage pattern**:
+
 ```bash
 # Build master session once with heavy context
 claude "Read the architecture docs and prepare for feature work"
@@ -75,6 +76,7 @@ claude --resume master-context --fork-session
 **Mechanism**: When `gh pr create` is executed during a Claude session, Claude records the session ID in the PR metadata. When you later invoke `claude --from-pr <number-or-url>`, the CLI fetches the original session context and resumes the agent at that exact state — with full conversation history, all files it read, all trade-off decisions it considered, all constraints it was working within (source: Tip 2).
 
 **Usage pattern**:
+
 ```bash
 claude --from-pr 447
 # or
@@ -104,6 +106,7 @@ claude --from-pr https://github.com/org/repo/pull/447
 **Mechanism**: Commands prefixed with `!` execute in the host shell with full terminal output capture. No copy-pasting, no manual "here's the error I'm seeing" preamble — the model already has the output in context (source: Tip 4).
 
 **Usage pattern**:
+
 ```bash
 ! npm run test:e2e
 ! git log --oneline -10
@@ -124,6 +127,7 @@ claude --from-pr https://github.com/org/repo/pull/447
 - **Medium/High**: Intermediate compute for tasks between these extremes (inferred from tier descriptions).
 
 **Mechanism**: The `/model` command in interactive sessions surfaces the effort slider. For headless scripts, set the environment variable to enforce a tier:
+
 ```bash
 export CLAUDE_CODE_EFFORT_LEVEL=low
 claude -p "Add JSDoc comments to src/utils.ts"
@@ -142,6 +146,7 @@ claude -p "Add JSDoc comments to src/utils.ts"
 **Mechanism**: The flag carves out a completely isolated physical directory (defaulting to `.claude/worktrees/<branch-name>`) that shares the same git history but maintains an independent working tree. Each agent gets its own sandbox; file edits cannot interfere (source: Tip 6).
 
 **Usage pattern**:
+
 ```bash
 # Terminal 1
 claude --worktree feature/auth-refactor
@@ -163,6 +168,7 @@ claude --worktree feature/dashboard-ui
 **Mechanism**: `-p` enables non-interactive print mode, `--output-format json` constrains output to JSON format, and `--json-schema` accepts a path to a JSON Schema file that defines the exact output shape. The model is constrained to produce exactly that schema (source: Tip 7).
 
 **Usage pattern**:
+
 ```bash
 claude -p \
   --output-format json \
@@ -195,6 +201,7 @@ claude -p \
 **Mechanism**: Pass a JSON object to `--agents` containing agent definitions. Each agent has fields: `description`, `prompt`, `model`, `tools`, and optionally `isolation` (source: Tip 9).
 
 **Usage pattern**:
+
 ```bash
 claude --agents '{
   "test-engineer": {
@@ -227,6 +234,7 @@ claude --agents '{
 You need both `--max-turns` and `--max-budget-usd`. Either one alone has gaps (source: Tip 10).
 
 **Usage pattern**:
+
 ```bash
 gh pr diff $PR_NUMBER | claude -p \
   --max-turns 3 \

@@ -1,11 +1,13 @@
-# JAX
-
-**Research Date**: 2026-04-12
-**Source URL**: <https://docs.jax.dev/en/latest/quickstart.html>
-**GitHub Repository**: <https://github.com/jax-ml/jax>
-**Version at Research**: 0.9.2 (released 2026-03-18)
-**License**: Apache-2.0
-
+---
+title: "JAX"
+research_date: "2026-04-12"
+source_url: "https://docs.jax.dev/en/latest/quickstart.html"
+github_url: "https://github.com/jax-ml/jax"
+version_at_research: "0.9.2 (released 2026-03-18)"
+license: "Apache-2.0"
+last_verified: "2026-04-12"
+version_at_verification: "0.9.2"
+next_review: "2026-07-12"
 ---
 
 ## Overview
@@ -226,12 +228,3 @@ JAX's approach to composable program transformations has relevance to Claude Cod
 | [RustPython](../python-runtimes/rustpython.md) | python-runtimes | Alternative Python runtime enabling JAX execution in embedded and WebAssembly contexts |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-12 |
-| Version at Verification | 0.9.2 |
-| Next Review Recommended | 2026-07-12 |
-| Confidence Map | Overview: high; Key Statistics: high (dated); Key Features: high; Technical Architecture: medium (inferred from public docs + code); Installation & Usage: high; Relevance to Claude Code: medium (speculative); References: high |

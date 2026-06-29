@@ -1,12 +1,5 @@
-# Improvement Proposals: OpenBao
-
-**Research entry**: ./research/llm-infrastructure/openbao.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: OpenBao"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

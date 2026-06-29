@@ -1,13 +1,14 @@
-# Piebald - Cross-Platform Agentic AI Desktop Client
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://piebald.ai>
-**GitHub Repository**: <https://github.com/Piebald-AI/piebald> (issue tracker; application is closed-source)
-**Documentation**: <https://docs.piebald.ai>
-**Version at Research**: v0.1.19
-**License**: Proprietary (Free + Pro tiers)
-**Platforms**: macOS (Universal), Windows 64-bit, Linux 64-bit
-
+---
+title: "Piebald - Cross-Platform Agentic AI Desktop Client"
+research_date: "2026-02-23"
+source_url: "https://piebald.ai"
+github_url: "<https://github.com/Piebald-AI/piebald> (issue tracker; application is closed-source)"
+documentation_url: "https://docs.piebald.ai"
+version_at_research: "v0.1.19"
+license: "Proprietary (Free + Pro tiers)"
+last_verified: "2026-02-23"
+version_at_verification: "v0.1.19"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -258,21 +259,3 @@ Switch profile per chat via the chat configuration panel.
 - [AgentSkills.io](https://agentskills.io/home) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v0.1.19 |
-| Next Review Recommended | 2026-05-23 |
-
-### Update Triggers
-
-- New major features added (image/vision support, Piebald Cloud, Git worktree support, file browser, web version — all in-progress per roadmap)
-- Hooks support added (on roadmap) — directly relevant to skill development patterns
-- Local model support added (on roadmap) — changes provider landscape
-- Pro tier pricing published
-- Source code or license terms change
-- AgentSkills.io compatibility changes
-- Subagent orchestration capabilities expand beyond v0.1.18 baseline

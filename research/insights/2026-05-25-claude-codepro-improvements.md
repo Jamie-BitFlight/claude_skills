@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude CodePro
-
-**Research entry**: ./research/coding-agents/claude-codepro.md
-**Generated**: 2026-05-25
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Claude CodePro"
 ---
 
 ## Improvement 1: MCP server lazy-loading guidance in mcp-integration skill

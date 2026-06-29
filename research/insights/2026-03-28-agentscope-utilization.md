@@ -1,11 +1,5 @@
-# Utilization Proposals: AgentScope
-
-**Research entry**: ./research/agent-frameworks/agentscope.md
-**Generated**: 2026-03-28
-**Integration surfaces found**: 2 (SDK | Architecture Pattern)
-**Proposals written**: 0
-**Skipped**: 4 — architectural mismatch with local orchestration model
-
+---
+title: "Utilization Proposals: AgentScope"
 ---
 
 ## Analysis Summary

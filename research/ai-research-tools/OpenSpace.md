@@ -1,3 +1,9 @@
+---
+title: "OpenSpace: Self-Evolving Skills Engine for AI Agents"
+license: "MIT"
+next_review: "2026-06-28"
+---
+
 # OpenSpace: Self-Evolving Skills Engine for AI Agents
 
 ## Overview
@@ -292,22 +298,3 @@ OpenSpace is directly compatible with Claude Code and other agent platforms that
 | [ruflo.md](../agent-frameworks/ruflo.md) | agent-frameworks | 100+ specialized agents with RuVector self-learning layer — shares self-evolving agent design and skill reuse model |
 | [oh-my-opencode.md](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | 37.5K-star production Claude Code orchestration with model routing — adjacent workflow: skill evolution improves agent coordination |
 | [gastown.md](../research-agent-patterns/gastown.md) | research-agent-patterns | Multi-agent workspace manager with Dolt SQL ledger — potential integration point for OpenSpace skill versioning via SQL record store |
-
-## Freshness Tracking
-
-**Created**: 2026-03-28
-**Next Review**: 2026-06-28
-**Last Updated**: 2026-03-28
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Identity/Metadata | high | Version, license, and author extracted directly from pyproject.toml and LICENSE file |
-| Key Statistics | high | Star count and economic benchmark from official README and GitHub web interface; all numbers sourced from primary documentation |
-| Key Features | high | Feature descriptions extracted directly from README.md sections on Self-Evolution, Quality Monitoring, and Collective Intelligence |
-| Technical Architecture | medium-high | Core components documented in README code structure section and source files (tool_layer.py, evolver.py, mcp_server.py); data flow inferred from component relationships and README framework diagram |
-| Installation & Usage | high | Installation steps, configuration examples, and CLI commands extracted verbatim from README.md and host_skills/README.md |
-| Relevance to Claude Code | medium | Based on official compatibility statements in README (Claude Code listed as supported agent); specific integration examples from pyproject.toml MCP server and mcp_server.py; real-world validation through showcase project |
-| Limitations | medium | Caveats identified from v0.1.0 versioning, missing tuning guidance in docs, cloud community governance not documented, safety mechanism details limited to high-level mentions |
-

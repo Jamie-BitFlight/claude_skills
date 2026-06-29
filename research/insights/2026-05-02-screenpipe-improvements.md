@@ -1,12 +1,5 @@
-# Improvement Proposals: Screenpipe
-
-**Research entry**: ./research/mcp-ecosystem/screenpipe.md
-**Generated**: 2026-05-02
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Screenpipe"
 ---
 
 ## Improvement 1: Document transport-aware tool exposure (HTTP subset vs stdio full toolset) in fastmcp-creator

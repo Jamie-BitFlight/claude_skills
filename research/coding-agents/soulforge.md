@@ -1,11 +1,13 @@
-# SoulForge
-
-**Research Date**: 2026-04-05
-**Source URL**: <https://github.com/ProxySoul/soulforge>
-**GitHub Repository**: <https://github.com/ProxySoul/soulforge>
-**Version at Research**: 2.4.0
-**License**: Business Source License 1.1 (converts to Apache 2.0 on March 15, 2030)
-
+---
+title: "SoulForge"
+research_date: "2026-04-05"
+source_url: "https://github.com/ProxySoul/soulforge"
+github_url: "https://github.com/ProxySoul/soulforge"
+version_at_research: "2.4.0"
+license: "Business Source License 1.1 (converts to Apache 2.0 on March 15, 2030)"
+last_verified: "2026-04-05"
+version_at_verification: "2.4.0"
+next_review: "2026-07-05"
 ---
 
 ## Overview
@@ -288,12 +290,3 @@ Project config (`.soulforge/config.json`) overrides global settings.
 | Aider | coding-agents | Inspirational source; SoulForge extends tree-sitter repo maps with cochange, blast radius, clone detection, live updates |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-05 |
-| Version at Verification | 2.4.0 |
-| Next Review Recommended | 2026-07-05 |
-| Confidence Map | Overview: high; Problem Addressed: high; Key Statistics: medium (star/contributor counts unavailable from shallow clone); Key Features: high; Technical Architecture: high (doc + code-read); Installation & Usage: high; Relevance to Claude Code: high; Limitations: high (documented), medium (undocumented gaps); References: high |

@@ -1,8 +1,5 @@
-# Research: mcpvault (bitbonsai) — MCP Content Presentation Patterns
-
-**Date**: 2026-05-30
-**Sources**: All claims cite exact file paths or URLs. No training-data recall used.
-
+---
+title: "Research: mcpvault (bitbonsai) — MCP Content Presentation Patterns"
 ---
 
 ## 1. What mcpvault IS
@@ -131,6 +128,7 @@ SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/filesyste
 `search_notes` returns only `{ p, t, ex, mc, ln, uri }` — a compact manifest with a ±21 character excerpt window per match. The agent reads this ranked list, identifies which notes are relevant, then calls `read_note` on only the ones it wants. Full content is never sent speculatively.
 
 Excerpt extraction (from `src/search.ts`):
+
 ```typescript
 const excerptStart = Math.max(0, firstIndex - 21);
 const excerptEnd = Math.min(searchableText.length, firstIndex + firstTerm.length + 21);

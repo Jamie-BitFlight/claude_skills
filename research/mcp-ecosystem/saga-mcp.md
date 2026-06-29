@@ -1,12 +1,13 @@
-# saga-mcp
-
-**Research Date**: 2026-03-02
-**Source URL**: <https://github.com/spranab/saga-mcp>
-**GitHub Repository**: <https://github.com/spranab/saga-mcp>
-**npm Package**: <https://www.npmjs.com/package/saga-mcp>
-**Version at Research**: v1.5.3
-**License**: MIT
-
+---
+title: "saga-mcp"
+research_date: "2026-03-02"
+source_url: "https://github.com/spranab/saga-mcp"
+github_url: "https://github.com/spranab/saga-mcp"
+version_at_research: "v1.5.3"
+license: "MIT"
+last_verified: "2026-03-02"
+version_at_verification: "v1.5.3"
+next_review: "2026-06-02"
 ---
 
 ## Overview
@@ -241,11 +242,3 @@ tracker_dashboard({})
 - [better-sqlite3 npm Package](https://www.npmjs.com/package/better-sqlite3) (accessed 2026-03-02)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-02 |
-| Version at Verification | v1.5.3 |
-| Next Review Recommended | 2026-06-02 |

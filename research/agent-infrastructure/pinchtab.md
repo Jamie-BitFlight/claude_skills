@@ -1,11 +1,13 @@
-# PinchTab
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://pinchtab.com/docs>
-**GitHub Repository**: <https://github.com/pinchtab/pinchtab>
-**Version at Research**: v0.7.6
-**License**: MIT
-
+---
+title: "PinchTab"
+research_date: "2026-03-01"
+source_url: "https://pinchtab.com/docs"
+github_url: "https://github.com/pinchtab/pinchtab"
+version_at_research: "v0.7.6"
+license: "MIT"
+last_verified: "2026-03-01"
+version_at_verification: "v0.7.6"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -263,11 +265,3 @@ Note: 3-second wait is required after navigation — Chrome's accessibility tree
 - [v0.7.6 Release Notes](https://github.com/pinchtab/pinchtab/releases/tag/v0.7.6) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.7.6 |
-| Next Review Recommended | 2026-06-01 |

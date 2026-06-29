@@ -1,9 +1,5 @@
-# Utilization Assessment: Composure
-
-**Research entry**: ./research/agent-frameworks/composure.md
-**Generated**: 2026-03-23
-**Assessment**: No direct utilization surface
-
+---
+title: "Utilization Assessment: Composure"
 ---
 
 ## Summary

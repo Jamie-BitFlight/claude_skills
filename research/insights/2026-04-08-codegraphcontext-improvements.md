@@ -1,12 +1,5 @@
-# Improvement Proposals: CodeGraphContext
-
-**Research entry**: ./research/mcp-ecosystem/codegraphcontext.md
-**Generated**: 2026-04-08
-**Patterns assessed**: 9
-**Backlog items created**: 0 (none)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: CodeGraphContext"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

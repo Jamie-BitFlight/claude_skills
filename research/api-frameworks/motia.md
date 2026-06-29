@@ -1,16 +1,5 @@
-# Motia
-
-| Field         | Value                                         |
-| ------------- | --------------------------------------------- |
-| Research Date | 2026-02-23                                    |
-| Primary URL   | <https://www.motia.dev/>                      |
-| GitHub        | <https://github.com/MotiaDev/motia>           |
-| npm           | <https://www.npmjs.com/package/motia>         |
-| Version       | v0.17.14-beta.196 (released 2026-01-09)       |
-| License       | Apache-2.0                                    |
-| Discord       | <https://discord.gg/motia>                    |
-| Docs          | <https://www.motia.dev/docs>                  |
-
+---
+title: "Motia"
 ---
 
 ## Overview
@@ -269,22 +258,3 @@ export const handler: Handlers['DailySummary'] = async ({ state, enqueue }) => {
 **Research Method**: Information gathered from official website, GitHub repository README, GitHub API (stars, forks, issues, contributors), npm downloads API, and official documentation.
 
 ---
-
-## Freshness Tracking
-
-| Field              | Value                                   |
-| ------------------ | --------------------------------------- |
-| Version Documented | v0.17.14-beta.196                       |
-| Release Date       | 2026-01-09                              |
-| GitHub Stars       | 15,107 (as of 2026-02-23)               |
-| npm Monthly DL     | 9,837 (as of 2026-02-23)                |
-| Next Review Date   | 2026-05-23                              |
-
-**Review Triggers**:
-
-- v1.0 stable release (currently beta)
-- Core primitive API breaking changes
-- Go language support becomes stable
-- GitHub stars milestone (20K, 30K)
-- MCP server integration announced
-- `iii` engine stable release

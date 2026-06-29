@@ -1,12 +1,5 @@
-# Improvement Proposals: Raincast
-
-**Research entry**: ./research/coding-agents/raincast.md
-**Generated**: 2026-04-25
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #1936)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Raincast"
 ---
 
 ## Improvement 1: Domain-specific skill scaffolding templates analogous to Raincast's 9 layout templates

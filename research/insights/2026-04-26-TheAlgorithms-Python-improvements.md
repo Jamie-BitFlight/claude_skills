@@ -1,12 +1,5 @@
-# Improvement Proposals: TheAlgorithms-Python
-
-**Research entry**: /home/user/claude_skills/research/learning-resources/TheAlgorithms-Python.md
-**Generated**: 2026-04-26
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #1958)
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: TheAlgorithms-Python"
 ---
 
 ## Improvement 1: Add "expand acronyms" naming convention rule to Python coding standards

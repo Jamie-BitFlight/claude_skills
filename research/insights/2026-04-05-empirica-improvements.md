@@ -1,12 +1,5 @@
-# Improvement Proposals: Empirica
-
-**Research entry**: ./research/agent-infrastructure/empirica.md
-**Generated**: 2026-04-05
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #1572)
-**Deferred (low confidence)**: 4
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: Empirica"
 ---
 
 ## Improvement 1: Structured epistemic artifact logging per task (findings, unknowns, dead-ends)

@@ -1,11 +1,13 @@
-# Tolaria
-
-**Research Date**: 2026-04-26
-**Source URL**: <https://github.com/refactoringhq/tolaria>
-**GitHub Repository**: <https://github.com/refactoringhq/tolaria>
-**Version at Research**: v0.1.0
-**License**: AGPL-3.0-or-later
-
+---
+title: "Tolaria"
+research_date: "2026-04-26"
+source_url: "https://github.com/refactoringhq/tolaria"
+github_url: "https://github.com/refactoringhq/tolaria"
+version_at_research: "v0.1.0"
+license: "AGPL-3.0-or-later"
+last_verified: "2026-04-26"
+version_at_verification: "0.1.0"
+next_review: "2026-07-26"
 ---
 
 ## Overview
@@ -460,14 +462,3 @@ This writes server config to `~/.claude.json` for Claude Code or `~/.cursor/mcp.
 | [SourceSync.ai](../context-management/sourcesyncai.md) | context-management | Managed RAG platform with auto-syncing connectors; complements Tolaria vaults for ingesting external knowledge sources with semantic preservation |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-26 |
-| Version at Verification | 0.1.0 |
-| Next Review Recommended | 2026-07-26 |
-| Confidence Map | `Overview: high (doc-read)`, `Features: high (doc-read)`, `Architecture: high (doc + code-read)`, `Installation: high (doc-verified)`, `Relevance: medium (analyzed)` |
-
-**Confidence Rationale**: All documentation claims derive from primary sources (README, ARCHITECTURE.md, ABSTRACTIONS.md, package.json). Architecture section includes code-level citations from ARCHITECTURE.md and ABSTRACTIONS.md. Statistics limited to version and git history (shallow clone did not fetch star count). Relevance section is analytical based on observed architecture and design patterns.

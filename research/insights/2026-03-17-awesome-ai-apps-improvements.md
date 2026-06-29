@@ -1,12 +1,5 @@
-# Improvement Proposals: Awesome AI Apps
-
-**Research entry**: ./research/ai-research-tools/awesome-ai-apps.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Awesome AI Apps"
 ---
 
 ## Improvement 1: Persistent agent memory across sessions

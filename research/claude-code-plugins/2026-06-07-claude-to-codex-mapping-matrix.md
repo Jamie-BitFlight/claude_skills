@@ -1,3 +1,7 @@
+---
+title: "Claude to Codex Plugin Mapping Matrix"
+---
+
 # Claude to Codex Plugin Mapping Matrix
 
 Date: 2026-06-07

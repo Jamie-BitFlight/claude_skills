@@ -1,11 +1,13 @@
-# devenv
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://devenv.sh>
-**GitHub Repository**: <https://github.com/cachix/devenv>
-**Version at Research**: v1.11.2
-**License**: Apache-2.0
-
+---
+title: "devenv"
+research_date: "2026-02-26"
+source_url: "https://devenv.sh"
+github_url: "https://github.com/cachix/devenv"
+version_at_research: "v1.11.2"
+license: "Apache-2.0"
+last_verified: "2026-02-26"
+version_at_verification: "v1.11.2"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -297,11 +299,3 @@ imports:
 - [GitHub API release v1.11.2](https://github.com/cachix/devenv/releases/tag/v1.11.2) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v1.11.2 |
-| Next Review Recommended | 2026-05-26 |

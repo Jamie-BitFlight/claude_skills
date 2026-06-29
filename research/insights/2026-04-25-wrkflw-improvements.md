@@ -1,12 +1,5 @@
-# Improvement Proposals: wrkflw
-
-**Research entry**: ./research/developer-tools/wrkflw.md
-**Generated**: 2026-04-25
-**Patterns assessed**: 6
-**Backlog items created**: 3 (issues: #1933, #1934, #1935)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: wrkflw"
 ---
 
 ## Improvement 1: Add local GitHub Actions schema validation to pre-commit

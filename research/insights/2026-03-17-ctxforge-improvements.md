@@ -1,12 +1,5 @@
-# Improvement Proposals: ctxforge
-
-**Research entry**: ./research/prompt-engineering/ctxforge.md
-**Generated**: 2026-03-17
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: ctxforge"
 ---
 
 ## Improvement 1: Auto-applied performance and security directives for implementation agents

@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Code Skills Library by Alireza Rezvani
-
-**Research entry**: ./research/skill-generation-tools/claude-code-skills-alirezarezvani.md
-**Generated**: 2026-03-10
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #559)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Claude Code Skills Library by Alireza Rezvani"
 ---
 
 ## Improvement 1: Pre-activation skill security auditor

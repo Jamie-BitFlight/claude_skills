@@ -1,12 +1,5 @@
-# Improvement Proposals: Browser Harness JS
-
-**Research entry**: ./research/agent-frameworks/browser-harness-js.md
-**Generated**: 2026-05-02
-**Patterns assessed**: 6
-**Backlog items created**: 0 (issues: none — see Deferred section)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Browser Harness JS"
 ---
 
 ## Notes on the Mapping

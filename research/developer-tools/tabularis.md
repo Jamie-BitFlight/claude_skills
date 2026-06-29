@@ -190,6 +190,7 @@ Files:
 ```bash
 winget install Debba.Tabularis
 ```
+
 Or download from Releases: `tabularis_0.9.15_x64-setup.exe`
 
 ### macOS

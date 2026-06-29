@@ -1,11 +1,12 @@
-# Diode
-
-**Research Date**: 2026-03-12
-**Source URL**: <https://www.withdiode.com>
-**GitHub Organization**: <https://github.com/withdiode>
-**Version at Research**: Active (no version string provided)
-**License**: Not documented
-
+---
+title: "Diode"
+research_date: "2026-03-12"
+source_url: "https://www.withdiode.com"
+version_at_research: "Active (no version string provided)"
+license: "Not documented"
+last_verified: "2026-03-12"
+version_at_verification: "Active (no version string)"
+next_review: "2026-06-12"
 ---
 
 ## Overview
@@ -175,18 +176,3 @@ Diode was discussed on Hacker News (post ID: 47094768) where the community provi
 - [Diode LED Toggler Example Project](https://www.withdiode.com/projects/62716731-5e1e-4622-86af-90d8e6b5123b) (accessed 2026-03-12)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-12 |
-| Version at Verification | Active (no version string) |
-| Next Review Recommended | 2026-06-12 |
-| Confidence: Identity/Metadata | High (primary sources confirmed) |
-| Confidence: Features | Medium (limited official documentation; some details from community discussion) |
-| Confidence: Architecture | Medium (inferred from technical implementation; no architectural documentation found) |
-| Confidence: Usage Examples | Medium (example project URL provided; detailed API/programming docs not available) |
-| Confidence: Limitations | High (constraints extracted from community feedback and project status) |
-
-**Note**: Confidence ratings reflect data availability from primary sources. Project shutdown in 2022 with continued website operation creates ambiguity about active maintenance status. Community feedback provides richer detail on use cases and limitations than official documentation.

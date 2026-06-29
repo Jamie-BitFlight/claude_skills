@@ -1,11 +1,6 @@
-# Screenpipe
-
-**Resource**: Screenpipe — AI memory for your screen
-**URL**: <https://github.com/screenpipe/screenpipe>
-**License**: MIT OR Apache-2.0
-**Latest Version**: 0.3.307 (as of 2026-05-02)
-**Repository**: <https://github.com/screenpipe/screenpipe>
-
+---
+title: "Screenpipe"
+license: "MIT OR Apache-2.0"
 ---
 
 ## Identity & Quick Facts
@@ -105,6 +100,7 @@ Full REST API on localhost:3030 (default):
 - **SDK**: JavaScript/TypeScript SDK available
 
 **Example**:
+
 ```javascript
 import { pipe } from "@screenpipe/js";
 const results = await pipe.queryScreenpipe({
@@ -361,27 +357,6 @@ The HTTP server exposes `search_content` only. Full toolset (export-video, list-
 Scheduled pipes introduce latency between triggering event and agent execution. For real-time use cases (e.g., keystroke logging), direct API access is more responsive.
 
 **Source**: README.md § "Plugin system (Pipes)" (accessed 2026-05-02)
-
----
-
-## Freshness Tracking
-
-**Date created**: 2026-05-02
-**Date last reviewed**: 2026-05-02
-**Next review**: 2026-08-02 (3 months)
-
-### Confidence Summary
-
-| Section | Confidence | Rationale |
-|---------|-----------|-----------|
-| Identity & Quick Facts | **high** | Official repo, Cargo.toml version verified, website documentation accessed |
-| Problem Addressed | **high** | VISION.md from official repo, primary sources quoted directly |
-| Key Features | **high** | README.md comprehensive, all features extracted with direct quotes |
-| Technical Architecture | **high** | Code directory structure verified, Cargo.toml workspace members confirmed, README.md § "Technical architecture" detailed |
-| Relevance to Claude Code | **high** | VISION.md, MCP integration explicitly documented, integration with Claude Desktop confirmed |
-| Integrations | **high** | Official documentation lists all integrations |
-| Limitations | **high** | TESTING.md provides extensive regression test documentation, edge cases enumerated |
-| Freshness Tracking | **high** | Clone timestamp 2026-05-02, latest commit same date |
 
 ---
 

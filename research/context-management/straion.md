@@ -1,11 +1,13 @@
-# Straion
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://straion.com/>
-**GitHub Repository**: Not publicly available (SaaS product)
-**Version at Research**: Not versioned — SaaS platform
-**License**: Proprietary (SaaS, free tier available)
-
+---
+title: "Straion"
+research_date: "2026-03-04"
+source_url: "https://straion.com/"
+github_url: "Not publicly available (SaaS product)"
+version_at_research: "Not versioned — SaaS platform"
+license: "Proprietary (SaaS, free tier available)"
+last_verified: "2026-03-04"
+version_at_verification: "SaaS — no version number"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -207,11 +209,3 @@ SOURCE: [Your AGENTS.md is costing more than you think](https://straion.com/blog
 - [Marathon Venture Capital](https://marathon.vc/) — lead investor in seed round
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | SaaS — no version number |
-| Next Review Recommended | 2026-06-04 |

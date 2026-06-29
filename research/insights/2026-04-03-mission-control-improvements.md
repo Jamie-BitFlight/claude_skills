@@ -1,12 +1,5 @@
-# Improvement Proposals: Mission Control
-
-**Research entry**: ./research/agent-frameworks/mission-control.md
-**Generated**: 2026-04-03
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 4
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Mission Control"
 ---
 
 ## Improvement 1: Stall detection for in-progress SAM tasks using LastActivity timestamps

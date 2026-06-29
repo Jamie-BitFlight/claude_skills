@@ -1,12 +1,5 @@
-# Improvement Proposals: SoulForge
-
-**Research entry**: ./research/coding-agents/soulforge.md
-**Generated**: 2026-04-05
-**Patterns assessed**: 12
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 9
-
+---
+title: "Improvement Proposals: SoulForge"
 ---
 
 ## Improvement 1: File-level edit coordination for parallel swarm agents

@@ -1,12 +1,5 @@
-# Improvement Proposals: Pi Monorepo
-
-**Research entry**: ./research/agent-frameworks/pi-mono.md
-**Generated**: 2026-03-14
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Pi Monorepo"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

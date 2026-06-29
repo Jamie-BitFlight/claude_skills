@@ -1,12 +1,5 @@
-# Improvement Proposals: The Delegation
-
-**Research entry**: ./research/research-agent-patterns/the-delegation.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #779)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: The Delegation"
 ---
 
 ## Improvement 1: Plan-level workflow phase field in SAM data model

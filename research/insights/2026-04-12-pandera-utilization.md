@@ -1,11 +1,5 @@
-# Utilization Proposals: Pandera
-
-**Research entry**: ./research/data-infrastructure/pandera.md
-**Generated**: 2026-04-12
-**Integration surfaces found**: 2 (pip dependency, decorator API)
-**Proposals written**: 1
-**Skipped**: 2 — no data-processing scope, out-of-scope CLI tools
-
+---
+title: "Utilization Proposals: Pandera"
 ---
 
 ## Utilization 1: python-pytest-architect → Pandera

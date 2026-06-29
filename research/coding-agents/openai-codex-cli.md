@@ -1,12 +1,14 @@
-# OpenAI Codex CLI - OpenAI's Terminal Coding Agent
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://developers.openai.com/codex/cli>
-**GitHub Repository**: <https://github.com/openai/codex>
-**Documentation**: <https://developers.openai.com/codex>
-**Version at Research**: v0.106.0 (rust-v0.106.0)
-**License**: Apache-2.0
-
+---
+title: "OpenAI Codex CLI - OpenAI's Terminal Coding Agent"
+research_date: "2026-03-01"
+source_url: "https://developers.openai.com/codex/cli"
+github_url: "https://github.com/openai/codex"
+documentation_url: "https://developers.openai.com/codex"
+version_at_research: "v0.106.0 (rust-v0.106.0)"
+license: "Apache-2.0"
+last_verified: "2026-03-01"
+version_at_verification: "v0.106.0"
+next_review: "2026-06-01 (3 months)"
 ---
 
 ## Overview
@@ -429,22 +431,3 @@ Launches the Electron-based desktop application UI (available at `chatgpt.com/co
 - [GitHub Releases: openai/codex](https://github.com/openai/codex/releases) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-| ------------------------------- | --------------------- |
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.106.0 |
-| GitHub Stars at Verification | 62,506 |
-| Next Review Recommended | 2026-06-01 (3 months) |
-
-**Change Detection Indicators**:
-
-- Monitor GitHub releases (currently releasing frequently — v0.106.0 as of 2026-02-26)
-- Track `codex-rs/docs/` for new architecture documentation
-- Watch for MCP server mode graduating from experimental
-- Monitor `collaborationMode` feature as it matures
-- Check if `child_agents_md` feature flag becomes default
-- Track whether multi-agent coordination moves beyond experimental status
-- Watch for pricing changes as Codex Web (cloud agent) and CLI pricing may be unified or separated

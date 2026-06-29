@@ -1,8 +1,5 @@
-# Research: How Linear Handles Artifact and Document Linking
-
-**Date**: 2026-03-21
-**Research Goal**: Understand Linear's data model and mechanisms for linking artifacts, documents, and sub-items to issues.
-
+---
+title: "Research: How Linear Handles Artifact and Document Linking"
 ---
 
 ## Executive Summary

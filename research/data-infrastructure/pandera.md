@@ -1,11 +1,10 @@
-# Pandera
-
-**Research Date**: 2026-04-12
-**Source URL**: <https://pandera.readthedocs.io/en/stable/>
-**GitHub Repository**: <https://github.com/unionai-oss/pandera>
-**Version at Research**: v0.30.1 (released 2026-03-18)
-**License**: MIT
-
+---
+title: "Pandera"
+research_date: "2026-04-12"
+source_url: "https://pandera.readthedocs.io/en/stable/"
+github_url: "https://github.com/unionai-oss/pandera"
+version_at_research: "v0.30.1 (released 2026-03-18)"
+license: "MIT"
 ---
 
 ## Overview
@@ -261,26 +260,6 @@ Index validation is less documented and tested compared to column validation. Co
 - PySpark Performance Issues: <https://github.com/unionai-oss/pandera/issues/1409> (accessed 2026-04-12)
 - Data Validation with PySpark Applications (KDnuggets): <https://www.kdnuggets.com/2023/08/data-validation-pyspark-applications-pandera.html> (accessed 2026-04-12)
 - PyPI Download Statistics: <https://pypistats.org/packages/pandera> (accessed 2026-04-12)
-
----
-
-## Freshness Tracking
-
-**Last Review**: 2026-04-12
-**Next Review Due**: 2026-07-12
-
-### Confidence Summary
-
-- **Identity/Metadata**: high — version, license, and URLs verified from official sources
-- **Features**: high — extracted from official documentation and GitHub repository
-- **Architecture**: high — core validation flow and multi-backend architecture documented in official sources
-- **Installation & Usage**: high — examples extracted verbatim from official documentation
-- **Limitations & Caveats**: high — documented in GitHub issues and official limitations guides
-- **Relevance to Claude Code**: medium — assessment based on feature analysis and integration patterns, not tested in actual Claude Code workflows
-
-### Changed Since Last Review
-
-Initial research entry created 2026-04-12. No prior reviews.
 
 ---
 

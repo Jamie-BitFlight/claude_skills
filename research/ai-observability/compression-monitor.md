@@ -64,6 +64,7 @@ The toolkit provides **three surface-level instruments** that measure distinct b
 **Mechanism**: High-precision terms (e.g., "immutable", "schema", "rollback") are more vulnerable to compression loss than common terms. Their disappearance signals constraint loss without output-quality change.
 
 **Example Output** (from README):
+
 ```
 pre_vocab_size: 145
 post_vocab_size: 118
@@ -123,6 +124,7 @@ ghost_terms (first 30): ["schema", "immutable", "constraint", ...]
 - Detects when compaction suppresses deliberation before output layer
 
 **Usage**:
+
 ```python
 from negative_space_log import NegativeSpaceLog
 log = NegativeSpaceLog("agent_skips.jsonl")
@@ -216,11 +218,13 @@ pip install "git+https://github.com/agent-morrow/compression-monitor[embed]"  # 
 ### Quick Start
 
 **Live example** (2-second run, no config):
+
 ```bash
 python quickstart.py
 ```
 
 **Claude Code Auto-Detection**:
+
 ```bash
 # Extract pre/post samples from latest session
 python parse_claude_session.py --auto
@@ -235,6 +239,7 @@ python semantic_drift.py --pre session_pre.jsonl --post session_post.jsonl
 ```
 
 **Generic JSONL Input**:
+
 ```bash
 # Each line: {"text": "<agent output>"}
 python ghost_lexicon.py --pre outputs_before.jsonl --post outputs_after.jsonl
@@ -243,6 +248,7 @@ python semantic_drift.py --pre outputs_before.jsonl --post outputs_after.jsonl
 ```
 
 **Negative-Space Logging**:
+
 ```python
 from negative_space_log import NegativeSpaceLog
 log = NegativeSpaceLog("agent_skips.jsonl")
@@ -251,6 +257,7 @@ skip_id = log.log_skip(cycle_id="t42", option_considered="rewrite", criterion="t
 ```
 
 **Calibration Report**:
+
 ```bash
 python negative_space_log.py demo
 # Outputs: skip significance labels vs actual impact delta

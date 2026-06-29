@@ -1,11 +1,13 @@
-# Stoat
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://github.com/jxdones/stoat>
-**GitHub Repository**: <https://github.com/jxdones/stoat>
-**Version at Research**: v0.9.0
-**License**: MIT License
-
+---
+title: "Stoat"
+research_date: "2026-03-18"
+source_url: "https://github.com/jxdones/stoat"
+github_url: "https://github.com/jxdones/stoat"
+version_at_research: "v0.9.0"
+license: "MIT License"
+last_verified: "2026-03-18"
+version_at_verification: "v0.9.0"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -202,12 +204,3 @@ stoat
 | [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | Version-controlled SQL database queryable via Stoat's database client interface |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | v0.9.0 |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | Overview: high (GitHub README + release notes) \| Features: high (official docs) \| Architecture: medium (inferred from feature design) \| Usage: high (verified installation methods) \| Statistics: high (GitHub API) |

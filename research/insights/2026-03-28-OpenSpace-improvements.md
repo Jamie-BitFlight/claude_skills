@@ -1,12 +1,5 @@
-# Improvement Proposals: OpenSpace
-
-**Research entry**: ./research/ai-research-tools/OpenSpace.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 6
-**Backlog items created**: 0 (backlog MCP tools unavailable in this session)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: OpenSpace"
 ---
 
 ## Improvement 1: Skill Health Metrics Tracking

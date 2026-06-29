@@ -1,12 +1,5 @@
-# Improvement Proposals: NVIDIA NemoClaw
-
-**Research entry**: ./research/agent-infrastructure/nemoclaw.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 3
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: NVIDIA NemoClaw"
 ---
 
 ## Skipped Patterns

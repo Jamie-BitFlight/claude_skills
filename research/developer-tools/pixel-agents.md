@@ -1,11 +1,13 @@
-# Pixel Agents
-
-**Research Date**: 2026-03-05
-**Source URL**: <https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents>
-**GitHub Repository**: <https://github.com/pablodelucca/pixel-agents>
-**Version at Research**: v1.0.2
-**License**: MIT
-
+---
+title: "Pixel Agents"
+research_date: "2026-03-05"
+source_url: "https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents"
+github_url: "https://github.com/pablodelucca/pixel-agents"
+version_at_research: "v1.0.2"
+license: "MIT"
+last_verified: "2026-03-05"
+version_at_verification: "v1.0.2"
+next_review: "2026-06-05"
 ---
 
 ## Overview
@@ -170,11 +172,3 @@ Usage workflow:
 - [JIK-A-4 Metro City character pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack) (referenced in README, not accessed directly)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-05 |
-| Version at Verification | v1.0.2 |
-| Next Review Recommended | 2026-06-05 |

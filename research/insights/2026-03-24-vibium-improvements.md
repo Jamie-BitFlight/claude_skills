@@ -1,12 +1,5 @@
-# Improvement Proposals: Vibium
-
-**Research entry**: ./research/agent-infrastructure/vibium.md
-**Generated**: 2026-03-24
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Vibium"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

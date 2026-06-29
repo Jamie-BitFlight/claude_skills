@@ -1,15 +1,5 @@
-# PicoClaw
-
-| Field         | Value                                            |
-| ------------- | ------------------------------------------------ |
-| Research Date | 2026-02-23                                       |
-| Primary URL   | <https://github.com/sipeed/picoclaw>             |
-| GitHub        | <https://github.com/sipeed/picoclaw>             |
-| Website       | <https://picoclaw.io>                            |
-| Version       | v0.1.2 (latest at research date)                 |
-| License       | MIT                                              |
-| Company       | Sipeed (<https://sipeed.com>)                    |
-
+---
+title: "PicoClaw"
 ---
 
 ## Overview
@@ -284,22 +274,3 @@ not production infrastructure.
 issues, releases), and project README. Repository created 2026-02-04; rapidly growing community.
 
 ---
-
-## Freshness Tracking
-
-| Field              | Value                     |
-| ------------------ | ------------------------- |
-| Version Documented | v0.1.2                    |
-| Release Date       | 2026-02-23 (approximate)  |
-| GitHub Stars       | 18,121 (as of 2026-02-23) |
-| GitHub Forks       | 2,164 (as of 2026-02-23)  |
-| Next Review Date   | 2026-05-23                |
-
-**Review Triggers**:
-
-- v1.0 release (README flags this as the production-readiness milestone)
-- Stars exceed 30K (sustained community traction indicator)
-- RAM footprint optimization milestone completed
-- Security advisories (project flagged active network security issues pre-v1.0)
-- New channels or provider integrations added
-- Changes to Sipeed hardware lineup that affect deployment targets

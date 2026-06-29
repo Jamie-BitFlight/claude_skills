@@ -1,12 +1,5 @@
-# Improvement Proposals: GitAgent
-
-**Research entry**: ./research/agent-frameworks/gitagent.md
-**Generated**: 2026-03-29
-**Patterns assessed**: 10
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 7
-
+---
+title: "Improvement Proposals: GitAgent"
 ---
 
 ## Improvement 1: Add examples/ directory convention to skill structure

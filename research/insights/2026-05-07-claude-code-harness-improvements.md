@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Code Harness
-
-**Research entry**: ./research/agent-frameworks/claude-code-harness.md
-**Generated**: 2026-05-07
-**Patterns assessed**: 9
-**Backlog items created**: 6 (issues: #2180, #2181, #2182, #2183, #2184, #2185)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 1
-
+---
+title: "Improvement Proposals: Claude Code Harness"
 ---
 
 ## Improvement 1: PreToolUse Bash guardrail rules for destructive commands

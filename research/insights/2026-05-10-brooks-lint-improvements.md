@@ -1,12 +1,5 @@
-# Improvement Proposals: brooks-lint
-
-**Research entry**: ./research/coding-agents/brooks-lint.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 8
-**Backlog items created**: 6 (issues: #2248, #2250, #2251, #2252, #2253, #2254)
-**Deferred (low/medium confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: brooks-lint"
 ---
 
 ## Improvement 1: Adopt Iron Law structured diagnosis chain (Symptom → Source → Consequence → Remedy) for every code-review finding

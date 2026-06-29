@@ -1,11 +1,5 @@
-# Utilization Proposals: claude-replay
-
-**Research entry**: ./research/coding-agents/claude-replay.md
-**Generated**: 2026-03-13
-**Integration surfaces found**: 3 (CLI, npm package, Node.js module)
-**Proposals written**: 1
-**Skipped**: 2 — reasons listed below
-
+---
+title: "Utilization Proposals: claude-replay"
 ---
 
 ## Utilization 1: transcript-analysis skill → claude-replay CLI

@@ -1,11 +1,13 @@
-# TrainLoop
-
-**Research Date**: 2026-03-12
-**Source URL**: <https://www.trainloop.ai/>
-**GitHub Repository**: Not publicly available
-**Version at Research**: Not versioned (platform service)
-**License**: Proprietary (managed service)
-
+---
+title: "TrainLoop"
+research_date: "2026-03-12"
+source_url: "https://www.trainloop.ai/"
+github_url: "Not publicly available"
+version_at_research: "Not versioned (platform service)"
+license: "Proprietary (managed service)"
+last_verified: "2026-03-12"
+version_at_verification: "Service (no version)"
+next_review: "2026-06-12"
 ---
 
 ## Overview
@@ -157,24 +159,3 @@ SOURCE: Multiple sources confirm three-line SDK and OpenAI API compatibility (ac
 - [Y Combinator Launch Post](https://www.ycombinator.com/launches/Msf-trainloop-unlock-next-level-reasoning-through-fine-tuning) (accessed 2026-03-12)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-12 |
-| Version at Verification | Service (no version) |
-| Next Review Recommended | 2026-06-12 |
-| Confidence: Identity/Metadata | high |
-| Confidence: Features | high |
-| Confidence: Architecture | medium |
-| Confidence: Usage Examples | medium |
-| Confidence: Limitations | low |
-
-**Notes on confidence**:
-- Identity/Metadata: high — Multiple primary sources (YC, official site, team bios)
-- Features: high — Consistent across YC profile, blog posts, and product pages
-- Architecture: medium — Technical details confirmed but limited public documentation on internal systems
-- Usage Examples: medium — SDK pattern confirmed (3 lines) but specific code examples adapted from general patterns, not official documentation
-- Limitations: low — No documented limitations found in reviewed sources; absence of limitation documentation does not confirm absence of limitations
-

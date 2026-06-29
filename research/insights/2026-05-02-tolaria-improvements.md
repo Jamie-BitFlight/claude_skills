@@ -1,14 +1,5 @@
-# Improvement Proposals: Tolaria (ai-design-tools entry)
-
-**Research entry**: ./research/ai-design-tools/tolaria.md
-**Generated**: 2026-05-02
-**Patterns assessed**: 4
-**Backlog items created**: 0 (all actionable gaps already tracked from earlier entry)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
-> Note: A second Tolaria research entry exists at `./research/developer-tools/tolaria.md` (created 2026-04-26) with a more detailed "Patterns Worth Adopting" section. The 4 actionable improvements from that entry were captured in `./research/insights/2026-04-26-tolaria-improvements.md` and produced backlog items #1949, #1951, #1952, #1953. The current `ai-design-tools/tolaria.md` entry has only a "Relevance to Claude Code Development" section — its 4 sub-items are higher-level framings of patterns already extracted, plus one item about AGENTS.md that is already a foundational repo design choice.
-
+---
+title: "Improvement Proposals: Tolaria (ai-design-tools entry)"
 ---
 
 ## Skipped Patterns

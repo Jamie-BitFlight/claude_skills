@@ -1,11 +1,13 @@
-# Anthropic Code Simplifier Plugin
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md>
-**GitHub Repository**: <https://github.com/anthropics/claude-plugins-official>
-**Version at Research**: 1.0.0
-**License**: Apache-2.0
-
+---
+title: "Anthropic Code Simplifier Plugin"
+research_date: "2026-02-23"
+source_url: "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md"
+github_url: "https://github.com/anthropics/claude-plugins-official"
+version_at_research: "1.0.0"
+license: "Apache-2.0"
+last_verified: "2026-02-23"
+version_at_verification: "1.0.0"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -199,11 +201,3 @@ no explicit invocation is required. To scope beyond recently modified code:
 - [Official Claude Code Plugin Documentation](https://code.claude.com/docs/en/plugins) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | 1.0.0 |
-| Next Review Recommended | 2026-05-23 |

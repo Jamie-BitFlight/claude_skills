@@ -1,11 +1,5 @@
-# Utilization Proposals: Honker
-
-**Research entry**: ./research/data-infrastructure/honker.md
-**Generated**: 2026-04-25
-**Integration surfaces found**: 3 (Python SDK | SQLite extension | Pub/Sub primitives)
-**Proposals written**: 2
-**Skipped**: 2 — dispatch system already uses custom SQLite schema (optimization, not replacement); backlog MCP uses GitHub Issues (different scope; honker unsuitable)
-
+---
+title: "Utilization Proposals: Honker"
 ---
 
 ## Utilization 1: development-harness dispatch orchestration → honker work queues

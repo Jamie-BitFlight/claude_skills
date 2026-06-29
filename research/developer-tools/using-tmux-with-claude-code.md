@@ -1,11 +1,13 @@
-# Using tmux with Claude Code
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://hboon.com/using-tmux-with-claude-code/>
-**GitHub Repository**: N/A (blog post/guide, no associated repository)
-**Version at Research**: Published 2025-11-28
-**License**: All rights reserved (blog post — no open-source license)
-
+---
+title: "Using tmux with Claude Code"
+research_date: "2026-03-01"
+source_url: "https://hboon.com/using-tmux-with-claude-code/"
+github_url: "N/A (blog post/guide, no associated repository)"
+version_at_research: "Published 2025-11-28"
+license: "All rights reserved (blog post — no open-source license)"
+last_verified: "2026-03-01"
+version_at_verification: "Published 2025-11-28"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -190,11 +192,3 @@ tmux capture-pane -t 0 -p -S -10000 | v
 - [Interactive Terminal Workarounds — .claude/rules/interactive-terminal-workarounds.md](./../../.claude/rules/interactive-terminal-workarounds.md) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | Published 2025-11-28 |
-| Next Review Recommended | 2026-06-01 |

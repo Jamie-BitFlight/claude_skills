@@ -1,9 +1,5 @@
-# Utilization Assessment: Rope Python Refactoring Library
-
-**Research entry**: ./research/code-auditing/rope.md
-**Generated**: 2026-03-29
-**Assessment**: No suitable local callers identified
-
+---
+title: "Utilization Assessment: Rope Python Refactoring Library"
 ---
 
 ## Integration Surface Analysis

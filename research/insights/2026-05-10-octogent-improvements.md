@@ -1,12 +1,5 @@
-# Improvement Proposals: Octogent
-
-**Research entry**: ./research/agent-frameworks/octogent.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 10
-**Backlog items created**: 2 (issues: #2238, #2239)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: Octogent"
 ---
 
 ## Improvement 1: Todo-driven worker prompt generation from markdown checkbox files

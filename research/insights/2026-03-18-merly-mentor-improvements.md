@@ -1,12 +1,5 @@
-# Improvement Proposals: Merly Mentor
-
-**Research entry**: ./research/ai-research-tools/merly-mentor.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 10
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 9
-
+---
+title: "Improvement Proposals: Merly Mentor"
 ---
 
 ## Improvement 1: Code Snippet Syntax Validation in Research Entries

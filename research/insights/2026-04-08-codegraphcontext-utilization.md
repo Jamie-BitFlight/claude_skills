@@ -1,11 +1,5 @@
-# Utilization Proposals: CodeGraphContext
-
-**Research entry**: ./research/mcp-ecosystem/codegraphcontext.md
-**Generated**: 2026-04-08
-**Integration surfaces found**: 3 (CLI | MCP Server | Python SDK)
-**Proposals written**: 2
-**Skipped**: 1
-
+---
+title: "Utilization Proposals: CodeGraphContext"
 ---
 
 ## Utilization 1: doc-drift-auditor → CodeGraphContext
@@ -138,4 +132,3 @@ CodeGraphContext is an alpha release (v0.4.0, per research entry line 452). Befo
 4. **Watch Pattern**: Leverage `cgc watch` for incremental re-indexing during active development to keep the graph fresh
 
 The MCP server mode is the best integration path (vs. CLI subprocess) because it avoids spawning separate processes and provides streaming results.
-

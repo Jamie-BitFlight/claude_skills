@@ -1,25 +1,7 @@
-# GitNexus
-
-**Identity**: GitNexus: Code Intelligence Engine
-
-**Version**: 1.4.6 (CLI/npm package); latest commit 2026-03-18
-
-**Repository**: <https://github.com/abhigyanpatwari/GitNexus>
-
-**Live Demo**: <https://gitnexus.vercel.app>
-
-**License**: PolyForm Noncommercial 1.0.0
-
-**Primary Language**: TypeScript
-
-**GitHub Statistics** (accessed 2026-03-19):
-- **Stars**: 17,498
-- **Forks**: 1,999
-- **Open Issues**: 156
-- **Contributors**: Not queried
-- **First Commit**: 2025-08-02
-- **Last Update**: 2026-03-19
-
+---
+title: "GitNexus"
+license: "PolyForm Noncommercial 1.0.0"
+next_review: "2026-06-19 (3 months)"
 ---
 
 ## Overview
@@ -300,6 +282,7 @@ This command:
 ### MCP Configuration (One-Time)
 
 **Automatic**:
+
 ```bash
 npx gitnexus setup
 ```
@@ -309,11 +292,13 @@ This auto-detects your editors and writes the correct global MCP config. Only ne
 **Manual Configuration**:
 
 **Claude Code**:
+
 ```bash
 claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **Cursor** (`~/.cursor/mcp.json` — global, works for all projects):
+
 ```json
 {
   "mcpServers": {
@@ -326,6 +311,7 @@ claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **OpenCode** (`~/.config/opencode/config.json`):
+
 ```json
 {
   "mcp": {
@@ -338,6 +324,7 @@ claude mcp add gitnexus -- npx -y gitnexus@latest mcp
 ```
 
 **Codex** (`~/.codex/config.toml` for system scope, or `.codex/config.toml` for project scope):
+
 ```toml
 [mcp_servers.gitnexus]
 command = "npx"
@@ -349,6 +336,7 @@ args = ["-y", "gitnexus@latest", "mcp"]
 **Live**: No install—visit [gitnexus.vercel.app](https://gitnexus.vercel.app) and drag & drop a ZIP or GitHub repo URL.
 
 **Local Development**:
+
 ```bash
 git clone https://github.com/abhigyanpatwari/GitNexus.git
 cd gitnexus/gitnexus-web
@@ -357,6 +345,7 @@ npm run dev
 ```
 
 **Local Backend Mode** (connect CLI-indexed repos to web UI):
+
 ```bash
 gitnexus serve
 # Opens http://localhost with auto-detection of local indexed repos
@@ -418,34 +407,6 @@ No limitations were documented in the official documentation or README beyond th
 | Web UI package.json | gitnexus-web/package.json in local clone | 2026-03-19 |
 | CLAUDE.md (GitNexus index docs) | .worktrees/GitNexus/CLAUDE.md | 2026-03-19 |
 | GitHub Releases | <https://github.com/abhigyanpatwari/GitNexus/releases> | Not fetched (latest via API) |
-
----
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-19
-
-**Next Review Recommended**: 2026-06-19 (3 months)
-
-**Index Last Commit**: 2026-03-18 (feature-phase7-type-resolution branch, 2075 symbols, 4935 relationships, 157 execution flows)
-
-### Confidence by Section
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| **Identity/Metadata** | high | GitHub API + package.json verified; version string confirmed |
-| **Problem Addressed** | high | README explicitly describes problem scenario and traditional vs GitNexus approach |
-| **Key Statistics** | high | GitHub API (stars, forks, issues) as of 2026-03-19; version from package.json |
-| **Key Features** | high | README sections directly extracted (interfaces, tools, CLI commands, language matrix) |
-| **Technical Architecture** | high | Tech stack table directly from README; dependencies verified in package.json |
-| **Installation & Usage** | high | CLI commands and MCP setup extracted verbatim from official docs |
-| **Relevance to Claude Code** | medium | Based on documented MCP integration + hooks + skills generation; integration depth inferred from CLAUDE.md but not fully tested in this session |
-| **Limitations** | medium | Documented limitations from README extracted; undocumented limitations listed as "not mentioned" with explicit acknowledgment that absence is not confirmation |
-
-**Confidence Rationale**:
-- High-confidence sections rely on official documentation (README, API, package.json), which are authoritative sources.
-- Medium-confidence sections infer integration depth from CLAUDE.md and Hook implementation names without testing actual agent behavior.
-- Limitations section distinguishes documented vs undocumented gaps, avoiding false certainty about absence of issues.
 
 ---
 

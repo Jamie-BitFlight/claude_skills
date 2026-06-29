@@ -176,6 +176,7 @@ Supporting tables:
 ### Local Setup
 
 **1. Configuration**:
+
 ```bash
 cp .env.example .env
 # Edit .env with required keys
@@ -192,6 +193,7 @@ Optional:
 - `FLASK_DEBUG` — enable Flask debug mode (development only)
 
 **2. Install dependencies**:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -200,17 +202,20 @@ cd frontend && npm install
 ```
 
 **3. Run backend**:
+
 ```bash
 python server.py
 ```
 
 **4. Run frontend** (separate terminal):
+
 ```bash
 cd frontend
 npm run dev
 ```
 
 **5. (Optional) Run Telegram bot**:
+
 ```bash
 python telegram_bot.py
 ```
@@ -218,6 +223,7 @@ python telegram_bot.py
 ### Key APIs
 
 **Analyze URLs**:
+
 ```
 POST /analyze
 Body: { "url": "https://github.com/owner/repo" }
@@ -225,6 +231,7 @@ Response: Stream NDJSON events (status, summary, category, tags, entry_id)
 ```
 
 **Analyze PDFs**:
+
 ```
 POST /analyze-pdf
 Body: multipart/form-data with file field
@@ -232,24 +239,28 @@ Response: Stream NDJSON events (same shape as /analyze)
 ```
 
 **Retrieve PDFs**:
+
 ```
 GET /entries/<id>/pdf               (inline view)
 GET /entries/<id>/pdf?dl=1          (download)
 ```
 
 **List entries** (with filters):
+
 ```
 GET /entries?search=query&category=cve&tag=rce&list_id=5&read=false&useful=true
 Response: JSON array of entries
 ```
 
 **Semantic search**:
+
 ```
 GET /search/semantic?q=privilege+escalation
 Response: JSON array sorted by cosine similarity
 ```
 
 **RAG chat**:
+
 ```
 POST /chat
 Body: { "session_id": 3, "query": "How does this CVE work?", "pinned_entry_ids": [5, 7] }
@@ -257,6 +268,7 @@ Response: Stream NDJSON events (token, sources, final_answer)
 ```
 
 **YouTube subscriptions**:
+
 ```
 GET /yt-channels
 POST /yt-channels/preview  Body: { "url": "https://www.youtube.com/@handle" }
@@ -266,6 +278,7 @@ DELETE /yt-channels/<id>
 ```
 
 **RSS feeds**:
+
 ```
 GET /rss-feeds
 POST /rss-feeds           Body: { "url": "...", "name": "..." }
@@ -274,6 +287,7 @@ DELETE /rss-feeds/<id>
 ```
 
 **Chat sessions**:
+
 ```
 GET /chat/sessions
 POST /chat/sessions       Body: { "name": "...", "model": "gemini-2.5-flash" }

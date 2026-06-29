@@ -1,12 +1,5 @@
-# Improvement Proposals: Chroma
-
-**Research entry**: ./research/data-infrastructure/chroma.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 8
-
+---
+title: "Improvement Proposals: Chroma"
 ---
 
 ## Skipped Patterns

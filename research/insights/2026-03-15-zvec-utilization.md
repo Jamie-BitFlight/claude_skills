@@ -1,11 +1,5 @@
-# Utilization Proposals: Zvec
-
-**Research entry**: ./research/ml-infrastructure/zvec.md
-**Generated**: 2026-03-15
-**Integration surfaces found**: 2 (SDK: pip package, npm package)
-**Proposals written**: 3
-**Skipped**: 0
-
+---
+title: "Utilization Proposals: Zvec"
 ---
 
 ## Utilization 1: context-gathering agent → Vector-backed retrieval

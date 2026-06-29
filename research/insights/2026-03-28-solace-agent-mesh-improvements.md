@@ -1,12 +1,5 @@
-# Improvement Proposals: Solace Agent Mesh
-
-**Research entry**: ./research/agent-frameworks/solace-agent-mesh.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Solace Agent Mesh"
 ---
 
 ## Improvement 1: Permission scope propagation through agent delegation chains

@@ -1,8 +1,6 @@
-# Research: Linear Custom Fields and Structured Metadata Capabilities
-
-**Research Date**: 2026-03-21
-**Status**: Complete
-
+---
+title: "Research: Linear Custom Fields and Structured Metadata Capabilities"
+research_date: "2026-03-21"
 ---
 
 ## Executive Summary
@@ -195,6 +193,7 @@ Attachments also support simple key-value pairs with "any string or number" valu
 Linear attachments represent external resources (GitHub PR, Jira issue, support ticket, etc.) and can be created/read via GraphQL API:
 
 **Query Example**:
+
 ```graphql
 query {
   issue(id: "ISSUE-ID") {
@@ -211,6 +210,7 @@ query {
 ```
 
 **Mutation Example** (create attachment):
+
 ```graphql
 mutation {
   attachmentCreate(input: {

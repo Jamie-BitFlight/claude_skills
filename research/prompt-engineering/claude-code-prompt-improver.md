@@ -1,3 +1,7 @@
+---
+title: "Claude Code Prompt Improver"
+---
+
 # Claude Code Prompt Improver
 
 ## Identity
@@ -239,19 +243,6 @@ For Claude Code plugin developers, this repository demonstrates best practices f
 - **Progressive disclosure:** Loading reference materials only when needed
 - **Testing plugins:** Comprehensive test suite for hooks, skills, and end-to-end flows
 - **Token efficiency:** Optimizing for the common case (clear prompts) while maintaining comprehensive guidance for complex scenarios
-
-## Freshness Tracking
-
-**Last reviewed:** 2026-03-07
-**Next review recommended:** 2026-06-07 (3 months)
-
-### Confidence Summary
-
-- **Identity/Metadata:** high (GitHub API, repository files, release tags verified)
-- **Features:** high (README, SKILL.md, scripts read and analyzed)
-- **Architecture:** high (source code examined, design documented in CLAUDE.md)
-- **Usage Examples:** high (extracted from README and SKILL.md with line references)
-- **Limitations:** medium (derived from README and architecture analysis; not all edge cases tested in reviewed sources)
 
 ## References
 

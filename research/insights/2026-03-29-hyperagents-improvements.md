@@ -1,12 +1,5 @@
-# Improvement Proposals: HyperAgents
-
-**Research entry**: ./research/coding-agents/hyperagents.md
-**Generated**: 2026-03-29
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: HyperAgents"
 ---
 
 ## Improvement 1: Staged evaluation cascade with early-exit gates for quality gate dispatch

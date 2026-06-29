@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Code Prompt Improver
-
-**Research entry**: ./research/prompt-engineering/claude-code-prompt-improver.md
-**Generated**: 2026-03-07
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #505)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Claude Code Prompt Improver"
 ---
 
 ## Improvement 1: Add hook+skill two-layer prompt evaluation recipe to hooks-patterns
