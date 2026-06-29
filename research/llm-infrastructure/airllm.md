@@ -355,12 +355,12 @@ class AirLLMCompletionServer:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [localai](../llm-infrastructure/localai.md) | llm-infrastructure | alternative local inference engine using different optimization strategy for consumer-hardware LLM deployment |
-| [tensorzero](../llm-infrastructure/tensorzero.md) | llm-infrastructure | LLM inference gateway architecture that could expose AirLLM as a provider for unified model routing |
-| [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | secrets management for securing locally-deployed AirLLM instances in agentic workflows |
-| [ray](../ml-infrastructure/ray.md) | ml-infrastructure | distributed compute engine for scaling AirLLM inference across multi-GPU clusters |
-| [trainloop](../ml-infrastructure/trainloop.md) | ml-infrastructure | fine-tuning platform that pairs with AirLLM for efficient local inference of custom-trained models |
-| [chroma](../data-infrastructure/chroma.md) | data-infrastructure | vector database integration point for RAG workflows combining local AirLLM inference with semantic search |
-| [claude-mem](../context-management/claude-mem.md) | context-management | memory compression technique sharing conceptual similarity with AirLLM's layer-streaming approach for token reduction |
-| [micro-agent](../agent-frameworks/micro-agent.md) | agent-frameworks | lightweight agent framework designed to embed AirLLM-powered local inference for offline reasoning and decision-making |
+| [LocalAI](../llm-infrastructure/localai.md) | llm-infrastructure | alternative local inference engine with different optimization strategy (quantization-first) for consumer-hardware LLM deployment |
+| [TensorZero](../llm-infrastructure/tensorzero.md) | llm-infrastructure | LLM inference gateway with multi-model routing that could expose AirLLM as a selectable provider backend |
+| [OpenBao](../llm-infrastructure/openbao.md) | llm-infrastructure | secrets management system (Vault fork) for authenticating gated models and securing locally-deployed AirLLM in agent workflows |
+| [Ray](../ml-infrastructure/ray.md) | ml-infrastructure | distributed compute engine for orchestrating AirLLM inference across multi-GPU clusters and horizontally scaled deployments |
+| [TrainLoop](../ml-infrastructure/trainloop.md) | ml-infrastructure | managed fine-tuning platform enabling efficient local inference of custom-trained models via AirLLM layer-streaming |
+| [Chroma](../data-infrastructure/chroma.md) | data-infrastructure | vector database completing RAG workflows by pairing AirLLM's local inference with semantic vector search and retrieval |
+| [Claude-Mem](../context-management/claude-mem.md) | context-management | memory compression system sharing conceptual approach with AirLLM's layer-streaming for reducing token consumption |
+| [Micro-Agent](../agent-frameworks/micro-agent.md) | agent-frameworks | lightweight Python ReAct agent framework designed to integrate AirLLM for local offline reasoning without API dependencies |
 

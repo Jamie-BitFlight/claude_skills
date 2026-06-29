@@ -572,4 +572,19 @@ OmniRoute is **directly relevant** to Claude Code as:
 
 ---
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ponytail.md](../agent-frameworks/ponytail.md) | agent-frameworks | complements OmniRoute's compression with agent-level code reduction (80–94% savings) and lazy evaluation patterns |
+| [everything-claude-code.md](../agent-frameworks/everything-claude-code.md) | agent-frameworks | shares multi-provider model routing and token optimization strategies for extended Claude Code sessions |
+| [pi-mono.md](../agent-frameworks/pi-mono.md) | agent-frameworks | unified LLM API abstraction layer; similar provider aggregation model for CLI, TUI, and web UI tools |
+| [localai.md](../llm-infrastructure/localai.md) | llm-infrastructure | provides local LLM inference backend compatible with OmniRoute's OpenAI-compatible endpoint |
+| [omnigent.md](../agent-frameworks/omnigent.md) | agent-frameworks | orchestration layer leveraging OmniRoute-style provider abstraction for unified Claude Code/Codex/Cursor workflow governance |
+| [claude-code-harness.md](../agent-frameworks/claude-code-harness.md) | agent-frameworks | Go-native guardrail engine consuming OmniRoute-style multi-provider LLM backend with fallback resilience |
+| [fastapi.md](../api-frameworks/fastapi.md) | api-frameworks | modern API framework with Pydantic validation and MCP foundation; can serve as alternative foundation to OmniRoute's Next.js stack |
+| [compression-monitor.md](../ai-observability/compression-monitor.md) | ai-observability | behavioral drift detection for OmniRoute's 9-engine compression pipeline; monitors semantic fidelity post-compression |
+
+---
+
 **Research entry generated 2026-06-17** — Extracted from README (primary), package.json, CLAUDE.md, and direct repository inspection. Every claim in this entry traces to a passage from the official repository (not inferred, not from training data).

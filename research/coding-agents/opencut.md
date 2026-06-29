@@ -165,6 +165,22 @@ OpenCut is highly relevant to Claude Code development in several ways:
 - **Production Site**: <https://opencut.app> (runs OpenCut Classic)
 - **Rewrite Preview**: <https://new.opencut.app>
 
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Pilot Shell](./pilot-shell.md) | coding-agents | Same architecture: MCP server for AI agents with plugin-first TypeScript monorepo |
+| [Pi-Mono](./pi-mono.md) | coding-agents | Cross-platform monorepo pattern with unified LLM API and interactive CLI from single codebase |
+| [Cline](./cline.md) | coding-agents | Autonomous coding agent with human-in-the-loop approvals; comparable agent architecture |
+| [Maverick](./maverick.md) | coding-agents | Claude Code plugin with CLI wrapping; similar DevOps workflow integration approach |
+| [1Code](./1code.md) | coding-agents | Electron desktop wrapper for coding agents with worktree isolation pattern |
+| [Hyperagents](./hyperagents.md) | coding-agents | Multi-agent orchestration with MCP server integration for autonomous workflows |
+| [Ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | Multi-agent orchestration with 215+ MCP tools and 100+ specialized agents; MCP ecosystem alignment |
+| [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | 27-agent Claude Code plugin with Plan/Work/Review/Compound workflow; plugin-first architecture pattern |
+| [OpenPencil](../ai-design-tools/open-pencil.md) | ai-design-tools | Open-source Figma alternative with native MCP server and 87+ AI tools; visual editor pattern with plugin system |
+
+---
+
 ## Freshness Tracking
 
 **Entry Created**: 2026-06-18
