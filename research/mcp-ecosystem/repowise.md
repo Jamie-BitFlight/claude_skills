@@ -1,14 +1,10 @@
----
-title: "repowise — Codebase Intelligence Layer for AI Agents"
-resource_type: "MCP Server"
-repository: "https://github.com/repowise-dev/repowise"
-primary_language: "Python"
-license: "AGPL-3.0-only"
-pypi_package: "repowise"
-latest_version: "0.20.0"
-release_date: "2024-12-19"
-home_url: "https://www.repowise.dev"
-mcp_status: "Full MCP 1.0 compatible"
+# repowise — Codebase Intelligence Layer for AI Agents
+
+**Research Date**: 2026-06-18
+**Source URL**: <https://github.com/repowise-dev/repowise>
+**Version at Research**: 0.20.0
+**License**: AGPL-3.0-only
+
 ---
 
 ## Overview
@@ -312,27 +308,15 @@ The codebase is open-source (AGPL-3.0) and plugin-extensible:
 
 ## References
 
-- **Homepage**: <https://www.repowise.dev>
+- **Homepage**: <https://www.repowise.dev> (accessed 2026-06-18)
 - **GitHub repository**: <https://github.com/repowise-dev/repowise> (accessed 2026-06-18)
-- **Documentation site**: <https://docs.repowise.dev>
+- **Documentation site**: <https://docs.repowise.dev> (accessed 2026-06-18)
 - **PyPI package**: <https://pypi.org/project/repowise/> (accessed 2026-06-18)
 - **Benchmarks & methodology**: <https://github.com/repowise-dev/repowise-bench> (accessed 2026-06-18)
 - **Code health defect prediction report**: <https://github.com/repowise-dev/repowise-bench/blob/master/health-defect/BENCHMARK_REPORT.md> (accessed 2026-06-18)
 - **Agent efficiency reports**: Flask v0.12.3 (48 files, 2,391 vs 64,039 tokens), Flask v3.0, scikit-learn v0.24.8 (accessed 2026-06-18)
-- **Discord community**: <https://discord.gg/cQVpuDB6rh>
-- **License**: <https://www.gnu.org/licenses/agpl-3.0> (AGPL-3.0-only)
-
----
-
-## Cross-References
-
-- **MCP ecosystem**: Model Context Protocol servers for AI agents (foundational for repowise delivery)
-- **Code-health tools**: CodeScene (commercial comparison tool)
-- **Documentation generators**: DeepWiki, Google Code Wiki, Swimm (competitors with different architectures)
-- **Agent frameworks**: Claude Code, Cursor, Cline, Windsurf (primary MCP clients)
-- **Codebase analysis**: Sourcegraph, GitClear (related intelligence platforms)
-
----
+- **Discord community**: <https://discord.gg/cQVpuDB6rh> (accessed 2026-06-18)
+- **License**: <https://www.gnu.org/licenses/agpl-3.0> (accessed 2026-06-18, AGPL-3.0-only)
 
 ---
 
@@ -353,7 +337,8 @@ The codebase is open-source (AGPL-3.0) and plugin-extensible:
 
 ## Freshness Tracking
 
-**Last verified**: 2026-06-18
+**Last Verified**: 2026-06-18
+**Version at Verification**: 0.20.0
 **Index age at verification**: 0 days (at HEAD commit 69d5a90, v0.20.0)
 
 ### Confidence Summary
@@ -369,5 +354,5 @@ The codebase is open-source (AGPL-3.0) and plugin-extensible:
 | **Limitations** | medium | License verified (AGPL-3.0). Feature gaps inferred from docs absence, not from explicit "not supported" statements. Enterprise features confirmed as commercial-tier-only. |
 | **Commercial Licensing** | high | docs/COMMERCIAL.md and website cross-reference; no AGPL obligation for proprietary embeddings, SSO/SCIM/RBAC, on-prem. |
 
-**Next review**: 2026-09-18 (3 months)
+**Next Review Recommended**: 2026-09-18
 

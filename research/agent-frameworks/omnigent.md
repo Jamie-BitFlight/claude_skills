@@ -1,18 +1,11 @@
----
-title: Omnigent
-category: agent-frameworks
-created: 2026-06-18
-updated: 2026-06-18
-confidence:
-  identity: high
-  features: high
-  architecture: high
-  usage: high
-  limitations: medium
-next_review: 2026-09-18
----
-
 # Omnigent
+
+**Research Date**: 2026-06-18
+**Source URL**: <https://github.com/omnigent-ai/omnigent>
+**Version at Research**: 0.1.0
+**License**: see repository
+
+---
 
 ## Overview
 
@@ -23,6 +16,20 @@ Omnigent is an open-source **AI agent framework** and meta-harness that gives yo
 Omnigent is authored by Databricks, Inc. and released as version 0.1.0 (currently in alpha status: Development Status :: 3 - Alpha).
 
 **Source**: omnigent pyproject.toml (accessed 2026-06-18)
+
+## Key Statistics
+
+| Metric | Value | Date Gathered |
+|--------|-------|---------------|
+| Latest Version | 0.1.0 | 2026-06-18 |
+| Development Status | Alpha (Development Status :: 3 - Alpha) | 2026-06-18 |
+| Python Requirement | 3.12+ | 2026-06-18 |
+| Supported Harnesses | 4 (Claude Code, Codex, Pi, custom YAML agents) | 2026-06-18 |
+| Built-in Policies | 4 (cost_budget, max_tool_calls_per_session, ask_on_os_tools, block_directory_change) | 2026-06-18 |
+| GitHub Releases Published | 0 (install from git only) | 2026-06-18 |
+| Author Organization | Databricks, Inc. | 2026-06-18 |
+
+**Source**: omnigent pyproject.toml and GitHub releases API (accessed 2026-06-18)
 
 ## Problem Addressed
 
@@ -125,12 +132,15 @@ Omnigent's architecture is organized around three core layers:
 **Source**: omnigent README (accessed 2026-06-18)
 
 **Initial setup**:
+
 ```bash
 omnigent setup
 ```
+
 On first run, Omnigent picks up model credentials already in your environment (ANTHROPIC_API_KEY, OPENAI_API_KEY, or a logged-in claude/codex CLI) and offers one as the default.
 
 **Running agents**:
+
 ```bash
 omnigent claude                      # Claude Code, in a session your team can join
 omnigent codex                       # Codex
@@ -138,17 +148,20 @@ omnigent run path/to/agent.yaml      # your own agent
 ```
 
 **Starting the server and web UI**:
+
 ```bash
 omnigent server start                # start local server and web UI in background
 omnigent host                        # (separate terminal) register this machine as a host
 ```
 
 **Joining a session from another device**:
+
 ```bash
 omnigent attach <session_id>
 ```
 
 **Credential management**:
+
 ```bash
 omnigent auth list                   # list configured credentials
 omnigent auth set-default <agent> <cred>  # set default for an agent
@@ -162,6 +175,7 @@ Omnigent supports four credential types:
 - Enterprise/SSO credentials (varies by deployment)
 
 **Upgrading**:
+
 ```bash
 omni upgrade            # detect install method, drain/stop local server, run matching upgrade
 omni upgrade --check    # just report whether a newer release is available
@@ -172,6 +186,7 @@ omni upgrade --check    # just report whether a newer release is available
 ### Custom Agent Definition (YAML)
 
 Users define custom agents in YAML:
+
 ```yaml
 name: my_agent
 prompt: You are a helpful data analyst.
@@ -204,6 +219,7 @@ policies:
 ```
 
 Built-in policies include:
+
 - `cost_budget` — enforce per-session spend limits with warnings
 - `max_tool_calls_per_session` — cap tool invocations
 - `ask_on_os_tools` — require approval before shell/file operations
@@ -256,8 +272,9 @@ Omnigent is highly relevant to Claude Code and AI coding agents because:
 
 ## Freshness Tracking
 
-**Last reviewed**: 2026-06-18
-**Next review**: 2026-09-18 (3 months)
+**Last Verified**: 2026-06-18
+**Version at Verification**: 0.1.0
+**Next Review Recommended**: 2026-09-18
 
 **Confidence summary**:
 - **Identity/Metadata**: high — version, authorship, Python requirements extracted from official pyproject.toml

@@ -1,11 +1,10 @@
----
-title: Ponytail — Lazy Senior Developer Mode for AI Agents
-resource_name: ponytail
-author: Dietrich Gebert
-repository_url: https://github.com/DietrichGebert/ponytail
-latest_version: "4.7.0"
-release_date: "2026-06-17"
-license: MIT
+# Ponytail — Lazy Senior Developer Mode for AI Agents
+
+**Research Date**: 2026-06-18
+**Source URL**: <https://github.com/DietrichGebert/ponytail>
+**Version at Research**: 4.7.0
+**License**: MIT
+
 ---
 
 ## Overview
@@ -191,16 +190,17 @@ Ponytail is directly applicable to Claude Code plugins and agents:
 - **Repository**: <https://github.com/DietrichGebert/ponytail> (accessed 2026-06-18)
 - **Latest Release**: v4.7.0 (released 2026-06-17)
 - **License**: MIT
-- **Benchmarks**: [benchmarks/README.md](https://github.com/DietrichGebert/ponytail/tree/main/benchmarks) — reproduce with `npx promptfoo eval -c promptfooconfig.yaml`
-- **Examples**: [examples/](https://github.com/DietrichGebert/ponytail/tree/main/examples) — real model output from benchmark runs
-- **Agent Portability**: [docs/agent-portability.md](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md) — adapter matrix
-- **Core Ruleset**: [AGENTS.md](https://github.com/DietrichGebert/ponytail/blob/main/AGENTS.md) — 26-line compact form
+- **Benchmarks**: [benchmarks/README.md](https://github.com/DietrichGebert/ponytail/tree/main/benchmarks) (accessed 2026-06-18) — reproduce with `npx promptfoo eval -c promptfooconfig.yaml`
+- **Examples**: [examples/](https://github.com/DietrichGebert/ponytail/tree/main/examples) (accessed 2026-06-18) — real model output from benchmark runs
+- **Agent Portability**: [docs/agent-portability.md](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md) (accessed 2026-06-18) — adapter matrix
+- **Core Ruleset**: [AGENTS.md](https://github.com/DietrichGebert/ponytail/blob/main/AGENTS.md) (accessed 2026-06-18) — 26-line compact form
 - **Development**: Tests via `npm test`, rule-copy verification via `node scripts/check-rule-copies.js`, OpenClaw skill build via `node scripts/build-openclaw-skills.js`
 
 ## Freshness Tracking
 
-**Last verified**: 2026-06-18
-**Next review**: 2026-09-18 (3 months)
+**Last Verified**: 2026-06-18
+**Version at Verification**: 4.7.0
+**Next Review Recommended**: 2026-09-18
 
 ### Confidence by Section
 
