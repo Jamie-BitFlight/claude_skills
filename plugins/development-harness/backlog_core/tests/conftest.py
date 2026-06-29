@@ -19,20 +19,37 @@ pre-populates that cache *before any test imports ``server``*:
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, Literal
 
 import tiktoken
 import tiktoken.registry
 
+if TYPE_CHECKING:
+    from collections.abc import Collection, Sequence, Set as AbstractSet
 
-class _StubEncoder:
-    """Deterministic ~4-chars-per-token stand-in for cl100k_base (offline only)."""
 
-    def encode(self, text: str, *_args: object, **_kwargs: object) -> list[int]:
+class _StubEncoder(tiktoken.Encoding):
+    """Deterministic ~4-chars-per-token stand-in for cl100k_base (offline only).
+
+    Inherits from tiktoken.Encoding so it satisfies the ENCODINGS registry type
+    (dict[str, Encoding]) without a cast().  __init__ bypasses the BPE
+    initialisation — the stub only needs encode() and decode().
+    """
+
+    def __init__(self) -> None:
+        object.__init__(self)  # skip BPE init — no encoding data is needed
+
+    def encode(
+        self,
+        text: str,
+        *,
+        allowed_special: Literal["all"] | AbstractSet[str] = frozenset(),
+        disallowed_special: Literal["all"] | Collection[str] = "all",
+    ) -> list[int]:
         """Return a token list whose length tracks the input length monotonically."""
         return [0] * ((len(text) + 3) // 4)
 
-    def decode(self, tokens: list[int], *_args: object, **_kwargs: object) -> str:
+    def decode(self, tokens: Sequence[int], errors: str = "replace") -> str:
         """Return a placeholder string proportional to the token count."""
         return " " * (len(tokens) * 4)
 
@@ -52,7 +69,7 @@ def _ensure_cl100k_cached() -> bool:
     try:
         tiktoken.get_encoding("cl100k_base")  # populates ENCODINGS from cache/network
     except Exception:  # noqa: BLE001 - tiktoken raises undeclared download/network errors when its cache is empty and the network is unreachable; the concrete class is not part of its public API, so seed a deterministic stub to keep server importable offline.
-        tiktoken.registry.ENCODINGS["cl100k_base"] = cast("tiktoken.Encoding", _StubEncoder())
+        tiktoken.registry.ENCODINGS["cl100k_base"] = _StubEncoder()
         return False
     else:
         return True
