@@ -102,14 +102,14 @@ To expand this entry with deeper analysis:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [dify.md](./dify.md) | agent-frameworks | Comparable open-source platform for building LLM applications and agentic workflows with visual canvas, 130K+ stars |
-| [cline.md](../coding-agents/cline.md) | coding-agents | Autonomous coding agent for VS Code/terminal with model-agnostic architecture and human-in-the-loop approval workflow |
-| [claude-code-harness.md](./claude-code-harness.md) | agent-frameworks | Production-grade plugin for Claude Code with structured "Plan → Work → Review → Release" workflow and Go-native guardrails |
-| [openhands.md](../coding-agents/openhands.md) | coding-agents | Open-source AI software engineer for autonomous coding with multi-agent orchestration and code understanding |
-| [everything-claude-code.md](./everything-claude-code.md) | agent-frameworks | Multi-agent orchestration framework with 16+ specialized agents and skill binding similar to kilocode's agent composition |
-| [composure.md](./composure.md) | agent-frameworks | Multi-language agentic system with hook-based automation and cross-platform agent deployment patterns |
-| [ai-agents-frameworks.md](./ai-agents-frameworks.md) | agent-frameworks | Comprehensive index of open-source agent frameworks with comparison of architecture patterns and tool integration |
-| [github-cli.md](../developer-tools/github-cli.md) | developer-tools | CLI tool for GitHub workflow automation, relevant to agent integration with development infrastructure |
+| [ai-agents-frameworks.md](./ai-agents-frameworks.md) | agent-frameworks | Comparative benchmark study of 10 agent frameworks; kilocode sits in this ecosystem as a TypeScript-native orchestration platform |
+| [everything-claude-code.md](./everything-claude-code.md) | agent-frameworks | 16-agent specialized harness with 65+ skills for Claude Code; overlapping multi-agent composition and skill orchestration patterns |
+| [mission-control.md](./mission-control.md) | agent-frameworks | Autonomous product engine orchestrating agents for research-ideate-build workflow; TypeScript-based agent coordination similar to kilocode |
+| [copilotkit.md](./copilotkit.md) | agent-frameworks | React-first agentic frontend with bi-directional state sync; complementary approach to kilocode's backend-focused agent orchestration (TypeScript, 28.9K stars) |
+| [dify.md](./dify.md) | agent-frameworks | Visual LLM application and agentic workflow builder; comparable all-in-one platform positioning with 130K+ stars |
+| [pi-mono.md](./pi-mono.md) | agent-frameworks | TypeScript monorepo unifying LLM API, agent runtime, CLI, and TUI; overlapping architecture for multi-tool agent composition |
+| [agentscope.md](./agentscope.md) | agent-frameworks | Alibaba multi-agent framework with actor-model parallelism; alternative orchestration architecture for scalable agent systems |
+| [ruflo.md](./ruflo.md) | agent-frameworks | Production multi-agent orchestration with 100+ specialized agents and 215+ MCP tools; high-complexity use case for agent composition |
 
 ---
 
