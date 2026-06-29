@@ -434,7 +434,7 @@ def _collect_files(paths: list[Path]) -> list[Path]:
 def migrate(
     paths: Annotated[
         list[Path] | None, typer.Argument(help="Files or directories to migrate. Defaults to ./research/.")
-    ] = None,  # type: ignore[assignment]
+    ] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would change without writing.")] = False,
     check: Annotated[bool, typer.Option("--check", help="Exit non-zero if any file needs migration.")] = False,
 ) -> None:
