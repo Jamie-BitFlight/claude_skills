@@ -527,6 +527,36 @@ def _flatten_yaml_keys(data: dict[str, Any], prefix: str = "") -> set[str]:
 # ---------------------------------------------------------------------------
 
 
+def _infer_research_root(resolved: list[Path]) -> Path:
+    """Infer the research root as the common ancestor of all input paths.
+
+    When all inputs share a common directory ancestor (e.g. ``research/``),
+    that ancestor is returned and used as the base for relative path display.
+    If only a single path is provided and it is a directory, that directory is
+    the root. Falls back to the current working directory when the common
+    ancestor cannot be determined from the input set alone.
+
+    Args:
+        resolved: Non-empty list of file or directory paths to validate.
+
+    Returns:
+        A ``Path`` that is an ancestor of every path in ``resolved``.
+    """
+    # Resolve all paths to absolute so commonpath works across relative inputs.
+    absolute_paths = [p.resolve() for p in resolved]
+
+    # Directories contribute themselves; files contribute their parent.
+    # This means a lone directory arg returns that directory as the root,
+    # and a set of files returns their deepest common directory ancestor.
+    candidate_dirs = [p if p.is_dir() else p.parent for p in absolute_paths]
+
+    if len(candidate_dirs) == 1:
+        return candidate_dirs[0]
+
+    # os.path.commonpath returns the longest common sub-path string.
+    return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
+
+
 def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str, Any]:
     """Validate a single research markdown file.
 
@@ -542,7 +572,17 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
     Returns:
         Dict with keys ``file``, ``format``, ``status`` (pass/fail), and ``issues``.
     """
-    relative = str(filepath.relative_to(research_root))
+    # Use absolute paths for the relative_to call to guarantee both sides match.
+    abs_filepath = filepath.resolve()
+    abs_root = research_root.resolve()
+    try:
+        relative = str(abs_filepath.relative_to(abs_root))
+    except ValueError:
+        # filepath is outside research_root (e.g. an absolute path to a
+        # completely different tree). Fall back to the bare filename so the
+        # report is still readable rather than crashing.
+        relative = str(abs_filepath)
+
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines()
 
@@ -727,7 +767,7 @@ def main(
 ) -> None:
     """Validate research entries against quality standards."""
     resolved = paths or [Path("./research/")]
-    research_root = next((p for p in resolved if p.is_dir()), resolved[0].parent)
+    research_root = _infer_research_root(resolved)
     today = datetime.now(tz=UTC).date()
 
     files = _collect_deduped_files(resolved)
