@@ -1147,6 +1147,7 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 | [trainloop.md](./ml-infrastructure/trainloop.md) | TrainLoop - managed RL fine-tuning platform: 3-line SDK for production signal collection, reward model training (DPO/GRPO), OpenAI-compatible deployment; 50x error reduction reported (YC W25) | 2026-03-12   |
 | [zvec.md](./ml-infrastructure/zvec.md) | zvec - Alibaba's embedded vector database built on Proxima engine; in-process SQLite-style deployment, dense+sparse vectors, Python/Node.js/C++, Apache 2.0 (8.9K stars) | 2026-03-15   |
 | [jax.md](./ml-infrastructure/jax.md) | JAX 0.9.2 — Composable transformations for Python+NumPy: JIT compilation (XLA), automatic differentiation (grad), vectorization (vmap), distributed execution (pmap); CPU/GPU/TPU/Apple Silicon support; Python 3.11+; 35.3K stars | 2026-04-12   |
+| [slime.md](./ml-infrastructure/slime.md) | slime - THUDM LLM post-training framework for RL scaling; Megatron training + SGLang rollout, Ray orchestration, agentic customization hooks, Apache 2.0 (7.1K stars) | 2026-06-29   |
 
 **Key Topics**:
 
