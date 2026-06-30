@@ -81,7 +81,7 @@ fi
 # This must be replaced with the real github.com URL for fetch and push to work.
 echo ""
 log "Checking remote.origin.url..."
-raw_url=$(cd "${REPO_ROOT}" && git config --local remote.origin.url 2>/dev/null || true)
+raw_url=$(git -C "${REPO_ROOT}" config --local remote.origin.url 2>/dev/null) || raw_url=""
 
 # Detect stale local proxy URLs (pattern: http(s)://...@127.0.0.1:.../git/<owner>/<repo>)
 # or plain http://127.0.0.1:... URLs from previous proxy injection
@@ -103,8 +103,12 @@ if [[ "${raw_url}" =~ 127\.0\.0\.1 ]] || [[ "${raw_url}" =~ local_proxy ]]; then
     fi
 elif [[ "${raw_url}" == https://github.com/* ]] || [[ "${raw_url}" =~ ^https://[^@]+@github\.com/ ]]; then
     # URL points to github.com (with or without embedded credentials) — refresh token
-    bare_url=$(echo "${raw_url}" | sed 's|https://[^@]*@github\.com/|https://github.com/|')
-    repo_path="${bare_url#https://github.com/}"
+    # Extract owner/repo using parameter expansion (avoids SC2001 sed warning)
+    if [[ "${raw_url}" == *"@github.com/"* ]]; then
+        repo_path="${raw_url##*@github.com/}"
+    else
+        repo_path="${raw_url#https://github.com/}"
+    fi
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
         new_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${repo_path}"
         if [[ "${raw_url}" != "${new_url}" ]]; then
