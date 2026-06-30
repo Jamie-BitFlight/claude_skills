@@ -48,7 +48,8 @@ fi
 
 # ─── 3. Proxy connectivity check ─────────────────────────────────────────────
 # Extract port from HTTPS_PROXY=http://127.0.0.1:<port>  using greedy strip to last colon.
-PROXY_PORT="${HTTPS_PROXY##*:}"
+# Use :+ so the expansion is empty (not an unbound-variable abort) when HTTPS_PROXY is unset.
+PROXY_PORT="${HTTPS_PROXY:+${HTTPS_PROXY##*:}}"
 if [[ -n "${PROXY_PORT}" ]] &&
     curl -sS --max-time 2 "http://127.0.0.1:${PROXY_PORT}/__agentproxy/status" >/dev/null 2>&1; then
     ok "Proxy reachable at port ${PROXY_PORT}"
@@ -182,7 +183,7 @@ else
     warn "shellcheck not in PATH"
     warn "  Pre-commit hook 'shellcheck-py' will fail: pip downloads a ~2.5MB binary"
     warn "  from GitHub releases and the proxy drops large streaming downloads."
-    warn "  Use --no-verify for commits that trigger shellcheck until fixed."
+    warn "  Commits touching shell files will be blocked until shellcheck is available."
     warn "  Permanent fix: see infrastructure requirements below."
 fi
 
