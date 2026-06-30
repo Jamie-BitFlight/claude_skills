@@ -124,13 +124,10 @@ repos:
           - "4"
           - -ci
 
-  - repo: local
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        name: shellcheck
-        language: system
-        entry: shellcheck
-        types: [shell]
 
   # Local hooks for type checking
   - repo: local
