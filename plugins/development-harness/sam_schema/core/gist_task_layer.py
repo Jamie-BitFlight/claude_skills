@@ -344,8 +344,7 @@ class GistTaskLayer:
         # here would overwrite the in-flight local mutation via _write_local_cache.
         if plan_id in self._local_authoritative_plans:
             _log.debug(
-                "GistTaskLayer.read_plan: %s is local-authoritative (pending Gist sync), serving from local",
-                plan_id,
+                "GistTaskLayer.read_plan: %s is local-authoritative (pending Gist sync), serving from local", plan_id
             )
             plan_data = self._local.read_plan(plan_id)
             self.last_read_source = "local"
