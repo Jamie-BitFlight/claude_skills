@@ -586,7 +586,11 @@ class GistTaskLayer:
 
         Raises:
             ArtifactWriteError: When the local YAML cannot be read, or when
-                the Gist upload fails.
+                the Gist upload fails due to a genuine error (e.g. wrong token
+                scope).  Rate-limit responses (secondary rate limit, abuse
+                detection) are handled by logging a WARNING and returning
+                without raising — local YAML state is preserved and the MCP
+                call succeeds.
         """
         yaml_content = self._read_local_yaml_for_plan(plan_id)
         content_hash = hashlib.sha256(yaml_content.encode()).hexdigest()
@@ -619,10 +623,22 @@ class GistTaskLayer:
                     exc_info=True,
                 )
 
+        RATE_LIMIT_SIGNALS = ("secondary rate limit", "abuse detection")
+
         try:
             self._artifact_client.store(issue=issue, content=yaml_content)
             _log.info("GistTaskLayer._write_through: uploaded plan %s YAML to Gist (issue #%d)", plan_id, issue)
-        except ArtifactWriteError:
+        except ArtifactWriteError as exc:
+            reason_lower = exc.reason.lower()
+            if any(signal in reason_lower for signal in RATE_LIMIT_SIGNALS):
+                _log.warning(
+                    "GistTaskLayer._write_through: Gist upload skipped for plan %s (issue #%d) due to rate limit"
+                    " — local YAML is preserved; remote may be stale. Reason: %s",
+                    plan_id,
+                    issue,
+                    exc.reason,
+                )
+                return
             _log.error(
                 "GistTaskLayer._write_through: Gist upload failed for plan %s (issue #%d) — raising", plan_id, issue
             )
