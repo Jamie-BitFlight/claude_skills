@@ -159,6 +159,12 @@ class GistTaskLayer:
         #: when served from the local filesystem cache.  ``None`` before the
         #: first read.  The MCP handler surfaces a warning when this is ``"local"``.
         self.last_read_source: str | None = None
+        #: Plan IDs whose local YAML is known to be ahead of Gist because a
+        #: rate-limited ``_write_through`` skipped the upload.  ``read_plan``
+        #: bypasses the Gist-first read for these plans to prevent stale Gist
+        #: content from overwriting the in-flight local mutation.  Entries are
+        #: cleared when a subsequent successful write-through syncs the plan.
+        self._local_authoritative_plans: set[str] = set()
 
     # ------------------------------------------------------------------
     # Plan lifecycle — create_plan has write-through logic; others delegate
@@ -332,6 +338,18 @@ class GistTaskLayer:
         """
         # Always reset source annotation at the start of each read.
         self.last_read_source = None
+
+        # Skip Gist-first read when local YAML is known to be ahead of Gist because a
+        # rate-limited _write_through skipped the upload.  Fetching stale Gist content
+        # here would overwrite the in-flight local mutation via _write_local_cache.
+        if plan_id in self._local_authoritative_plans:
+            _log.debug(
+                "GistTaskLayer.read_plan: %s is local-authoritative (pending Gist sync), serving from local",
+                plan_id,
+            )
+            plan_data = self._local.read_plan(plan_id)
+            self.last_read_source = "local"
+            return plan_data
 
         # Step 1: resolve plan_id → issue via PlanIdIndex.
         issue: int | None = None
@@ -628,6 +646,7 @@ class GistTaskLayer:
         try:
             self._artifact_client.store(issue=issue, content=yaml_content)
             _log.info("GistTaskLayer._write_through: uploaded plan %s YAML to Gist (issue #%d)", plan_id, issue)
+            self._local_authoritative_plans.discard(plan_id)
         except ArtifactWriteError as exc:
             reason_lower = exc.reason.lower()
             if any(signal in reason_lower for signal in RATE_LIMIT_SIGNALS):
@@ -638,6 +657,7 @@ class GistTaskLayer:
                     issue,
                     exc.reason,
                 )
+                self._local_authoritative_plans.add(plan_id)
                 return
             _log.error(
                 "GistTaskLayer._write_through: Gist upload failed for plan %s (issue #%d) — raising", plan_id, issue

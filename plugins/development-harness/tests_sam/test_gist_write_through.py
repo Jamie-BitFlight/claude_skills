@@ -1130,6 +1130,55 @@ def test_update_task_status_succeeds_on_rate_limit(tmp_path: Path) -> None:
     )
 
 
+def test_rate_limit_local_authoritative_prevents_stale_gist_overwrite(tmp_path: Path) -> None:
+    """Rate-limit P1: read_plan after skipped write-through must NOT return stale Gist content.
+
+    Verifies that when ``_write_through`` skips due to secondary rate limit, a
+    subsequent ``read_plan()`` serves from local (which has the mutation) rather
+    than fetching stale pre-mutation Gist content and overwriting local state.
+
+    This is the production-realistic scenario: the Gist store is NOT cleared
+    between the skipped write and the read — contrast with
+    ``test_update_task_status_succeeds_on_rate_limit`` which calls
+    ``clear_content_store()`` to force the local fallback.  Without the
+    ``_local_authoritative_plans`` guard added by the Codex P1 fix, this test
+    would regress: ``read_plan`` would fetch the stale pre-mutation Gist YAML,
+    write it to local cache (overwriting the mutation), and return stale state.
+    """
+    # Arrange: create plan while the store is healthy.
+    layer, rate_store = _make_rate_limit_layer(tmp_path)
+    tasks = _two_tasks()
+    plan_data = layer.create_plan(
+        slug="stale-gist-regression",
+        goal="Verify local-authoritative bypass on rate-limited write-through",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable rate-limit so the next write-through is skipped.
+    rate_store.force_rate_limit = True
+    layer.update_task_status(plan_id, "T1", "in-progress")  # write-through skipped
+
+    # Production scenario: Gist store still holds the pre-mutation content.
+    # Do NOT call rate_store.clear_content_store() — that would mask the bug.
+    assert rate_store.read(_PLAN_ISSUE, "task-plan") is not None, (
+        "Gist store must still hold pre-mutation content for the regression scenario to be valid"
+    )
+
+    # Act: read_plan must serve from local (mutation present), not Gist (stale).
+    retrieved = layer.read_plan(plan_id)
+
+    # Assert: mutation is visible in the returned data.
+    task_t1 = next(t for t in retrieved["tasks"] if t["id"] == "T1")
+    assert task_t1["status"] == "in-progress", (
+        "read_plan after rate-limited write-through must serve local state, not stale Gist content"
+    )
+    assert layer.last_read_source == "local", (
+        "read_plan must annotate source='local' when serving a local-authoritative plan"
+    )
+
+
 def test_rate_limit_emits_warning_log(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Rate-limit degrade: a WARNING log is emitted when _write_through absorbs a rate limit.
 
