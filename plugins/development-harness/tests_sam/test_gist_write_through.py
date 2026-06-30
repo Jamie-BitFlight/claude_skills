@@ -1179,6 +1179,104 @@ def test_rate_limit_local_authoritative_prevents_stale_gist_overwrite(tmp_path: 
     )
 
 
+def test_rate_limit_stale_sidecar_persists_across_layer_instances(tmp_path: Path) -> None:
+    """Rate-limit P1 (cross-call): local-authoritative bypass survives GistTaskLayer re-instantiation.
+
+    ``_get_backend()`` in ``server.py`` constructs a fresh ``GistTaskLayer`` per
+    MCP tool call.  The in-memory ``_local_authoritative_plans`` set resets to empty
+    each time, so the bypass from the P1 fix would not survive across calls without
+    the persistent ``.stale`` sidecar file.
+
+    This test simulates a second MCP call by constructing a new ``GistTaskLayer``
+    over the same plan directory after a rate-limited write-through on the first
+    layer.  The second layer must still bypass Gist-first and serve the mutated
+    local state.
+    """
+    # Call 1: create plan and perform a rate-limited mutation.
+    layer1, rate_store = _make_rate_limit_layer(tmp_path)
+    tasks = _two_tasks()
+    plan_data = layer1.create_plan(
+        slug="cross-call-stale-sidecar",
+        goal="Verify .stale sidecar persists local-authoritative bypass across layer instances",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    rate_store.force_rate_limit = True
+    layer1.update_task_status(plan_id, "T1", "in-progress")  # write-through skipped, .stale written
+
+    # Verify the .stale sidecar exists on disk.
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+
+    plan_dir = tmp_path / "plan"
+    local = LocalYamlTaskProvider(plan_dir)
+    local_path = local._resolve_path(plan_id)  # noqa: SLF001
+    stale_sidecar = local_path.with_suffix(".stale")
+    assert stale_sidecar.exists(), ".stale sidecar must be written when rate-limited write-through skips Gist upload"
+
+    # Call 2: construct a fresh GistTaskLayer (simulating a new MCP call).
+    # The in-memory _local_authoritative_plans set starts empty in this new instance.
+    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+    from sam_schema.core.plan_id_index import PlanIdIndex  # noqa: PLC0415
+
+    client2 = _make_fake_client(rate_store)
+    plan_index2 = PlanIdIndex(artifact_client=client2, sentinel_issue=_SENTINEL_ISSUE)
+    layer2 = GistTaskLayer(local_backend=local, artifact_client=client2, plan_index=plan_index2)
+
+    assert plan_id not in layer2._local_authoritative_plans, (  # noqa: SLF001
+        "Fresh GistTaskLayer must start with empty _local_authoritative_plans"
+    )
+
+    # Act: read_plan on the new layer must bypass Gist-first (via .stale sidecar).
+    # Gist still holds pre-mutation content (rate_store not cleared).
+    retrieved = layer2.read_plan(plan_id)
+
+    task_t1 = next(t for t in retrieved["tasks"] if t["id"] == "T1")
+    assert task_t1["status"] == "in-progress", (
+        "Fresh GistTaskLayer must serve mutated local state via .stale sidecar, not stale Gist content"
+    )
+    assert layer2.last_read_source == "local", (
+        "Fresh GistTaskLayer must annotate source='local' when .stale sidecar triggers the bypass"
+    )
+
+
+def test_rate_limit_stale_sidecar_cleared_on_successful_upload(tmp_path: Path) -> None:
+    """Rate-limit: .stale sidecar is removed when a subsequent write-through succeeds.
+
+    After a rate-limited skip writes the .stale sidecar, the next mutation that
+    succeeds must delete it so future read_plan calls resume normal Gist-first
+    behaviour (the local YAML and Gist are in sync after the successful upload).
+    """
+    layer, rate_store = _make_rate_limit_layer(tmp_path)
+    tasks = _two_tasks()
+    plan_data = layer.create_plan(
+        slug="stale-sidecar-cleared",
+        goal="Verify .stale sidecar is removed on successful write-through",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Step 1: rate-limited mutation — .stale sidecar is written.
+    rate_store.force_rate_limit = True
+    layer.update_task_status(plan_id, "T1", "in-progress")
+
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+
+    plan_dir = tmp_path / "plan"
+    local_path = LocalYamlTaskProvider(plan_dir)._resolve_path(plan_id)  # noqa: SLF001
+    stale_sidecar = local_path.with_suffix(".stale")
+    assert stale_sidecar.exists(), ".stale sidecar must exist after rate-limited skip"
+
+    # Step 2: successful mutation — .stale sidecar must be removed.
+    rate_store.force_rate_limit = False
+    layer.update_task_status(plan_id, "T2", "in-progress")
+
+    assert not stale_sidecar.exists(), ".stale sidecar must be deleted after successful Gist upload"
+
+
 def test_rate_limit_emits_warning_log(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Rate-limit degrade: a WARNING log is emitted when _write_through absorbs a rate limit.
 

@@ -167,6 +167,31 @@ class GistTaskLayer:
         self._local_authoritative_plans: set[str] = set()
 
     # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _is_local_authoritative(self, plan_id: str) -> bool:
+        """Return ``True`` when local YAML is known to be ahead of the Gist copy.
+
+        Checks the in-memory set first (fast path), then falls back to the
+        ``.stale`` sidecar file on disk.  The sidecar check is necessary
+        because ``_get_backend()`` in ``server.py`` constructs a fresh
+        ``GistTaskLayer`` per MCP tool call — the in-memory set resets to
+        empty each time, so the sidecar is the only durable signal that
+        survives across calls.
+        """
+        if plan_id in self._local_authoritative_plans:
+            return True
+        try:
+            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+            if local_path.with_suffix(".stale").exists():
+                self._local_authoritative_plans.add(plan_id)
+                return True
+        except (PlanNotFoundError, OSError):
+            pass
+        return False
+
+    # ------------------------------------------------------------------
     # Plan lifecycle — create_plan has write-through logic; others delegate
     # ------------------------------------------------------------------
 
@@ -342,7 +367,10 @@ class GistTaskLayer:
         # Skip Gist-first read when local YAML is known to be ahead of Gist because a
         # rate-limited _write_through skipped the upload.  Fetching stale Gist content
         # here would overwrite the in-flight local mutation via _write_local_cache.
-        if plan_id in self._local_authoritative_plans:
+        # _is_local_authoritative checks both the in-memory set (same-call fast path)
+        # and a .stale sidecar file (cross-call persistence — _get_backend constructs
+        # a fresh GistTaskLayer per MCP call, so the in-memory set alone is not enough).
+        if self._is_local_authoritative(plan_id):
             _log.debug(
                 "GistTaskLayer.read_plan: %s is local-authoritative (pending Gist sync), serving from local", plan_id
             )
@@ -612,12 +640,20 @@ class GistTaskLayer:
         yaml_content = self._read_local_yaml_for_plan(plan_id)
         content_hash = hashlib.sha256(yaml_content.encode()).hexdigest()
 
-        # Resolve sidecar path best-effort — _resolve_path should not fail here
+        # Resolve sidecar paths best-effort — _resolve_path should not fail here
         # since _read_local_yaml_for_plan just succeeded, but guard against races.
+        # hash_sidecar (.sha256) — content-hash dedup to skip unchanged Gist PATCHes.
+        # stale_sidecar (.stale) — durable marker that local YAML is ahead of Gist after
+        #   a rate-limited write-through skip.  Persists across GistTaskLayer instances
+        #   (a fresh instance is created per MCP call) so read_plan bypasses Gist-first
+        #   in subsequent calls even though the in-memory _local_authoritative_plans set
+        #   resets to empty.
         hash_sidecar: Path | None = None
+        stale_sidecar: Path | None = None
         try:
             local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
             hash_sidecar = local_path.with_suffix(".sha256")
+            stale_sidecar = local_path.with_suffix(".stale")
         except PlanNotFoundError:
             _log.debug(
                 "GistTaskLayer._write_through: path resolution failed for plan %s — skipping hash dedup", plan_id
@@ -646,6 +682,15 @@ class GistTaskLayer:
             self._artifact_client.store(issue=issue, content=yaml_content)
             _log.info("GistTaskLayer._write_through: uploaded plan %s YAML to Gist (issue #%d)", plan_id, issue)
             self._local_authoritative_plans.discard(plan_id)
+            if stale_sidecar is not None:
+                try:
+                    stale_sidecar.unlink(missing_ok=True)
+                except OSError:
+                    _log.debug(
+                        "GistTaskLayer._write_through: failed to clear stale sidecar for plan %s — "
+                        "read_plan will re-check on next call",
+                        plan_id,
+                    )
         except ArtifactWriteError as exc:
             reason_lower = exc.reason.lower()
             if any(signal in reason_lower for signal in RATE_LIMIT_SIGNALS):
@@ -657,6 +702,15 @@ class GistTaskLayer:
                     exc.reason,
                 )
                 self._local_authoritative_plans.add(plan_id)
+                if stale_sidecar is not None:
+                    try:
+                        stale_sidecar.touch()
+                    except OSError:
+                        _log.debug(
+                            "GistTaskLayer._write_through: failed to write stale sidecar for plan %s — "
+                            "local-authoritative bypass will not persist across MCP calls",
+                            plan_id,
+                        )
                 return
             _log.error(
                 "GistTaskLayer._write_through: Gist upload failed for plan %s (issue #%d) — raising", plan_id, issue
