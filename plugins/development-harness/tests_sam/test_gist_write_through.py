@@ -73,6 +73,15 @@ class _InMemoryArtifactStore:
         """Retrieve plan-index YAML for sentinel issue."""
         return self._index_store.get(sentinel_issue)
 
+    def clear_content_store(self) -> None:
+        """Evict all stored artifact content, leaving the index intact.
+
+        Useful in tests that need to force a local-fallback read after a
+        rate-limited write-through: clearing stale Gist content from the
+        in-memory store ensures read_plan falls back to the local YAML file.
+        """
+        self._store.clear()
+
 
 def _make_fake_client(store: _InMemoryArtifactStore) -> ArtifactRegistryClient:
     """Return an ArtifactRegistryClient backed by the given in-memory store.
@@ -1003,3 +1012,229 @@ def test_append_task_raises_on_gist_write_failure(gist_layer: GistTaskLayer, sto
     # Act + Assert: ArtifactWriteError must propagate (no silent swallow).
     with pytest.raises(ArtifactWriteError):
         gist_layer.append_task(plan_id, new_task)
+
+
+# ---------------------------------------------------------------------------
+# Rate-limit graceful degradation: _write_through absorbs secondary rate limits
+# ---------------------------------------------------------------------------
+
+
+class _RateLimitArtifactStore(_InMemoryArtifactStore):
+    """_InMemoryArtifactStore subclass that simulates a GitHub secondary rate-limit response.
+
+    When ``force_rate_limit`` is ``True``, ``store()`` raises
+    :exc:`ArtifactWriteError` with ``"secondary rate limit"`` in the reason
+    string, matching the signal strings checked by
+    ``GistTaskLayer._write_through``.
+
+    Inheriting from ``_InMemoryArtifactStore`` gives access to the same
+    ``read``, ``store_index``, and ``read_index`` methods so fake clients
+    can be constructed with :func:`_make_fake_client` unchanged.
+    """
+
+    def __init__(self) -> None:
+        """Initialise with rate-limit simulation disabled."""
+        super().__init__()
+        #: When True, store() raises ArtifactWriteError simulating a GitHub
+        #: secondary rate-limit response rather than storing content.
+        self.force_rate_limit: bool = False
+
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+        """Raise ArtifactWriteError with secondary rate limit reason when force_rate_limit is set.
+
+        When ``force_rate_limit`` is ``False``, delegates to the parent class,
+        which respects the ``force_store_failure`` flag from
+        :class:`_InMemoryArtifactStore`.
+
+        Args:
+            issue: GitHub issue number keying the artifact.
+            content: YAML content to store.
+            artifact_type: Artifact type key (default ``"task-plan"``).
+
+        Raises:
+            ArtifactWriteError: When ``force_rate_limit`` is ``True``, with a
+                reason containing ``"secondary rate limit"``.
+            ArtifactWriteError: When ``force_store_failure`` is ``True``
+                (inherited behaviour, genuine error path).
+        """
+        if self.force_rate_limit:
+            raise ArtifactWriteError(
+                plan_id="<unknown>",
+                issue=issue,
+                reason="You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+            )
+        super().store(issue, content, artifact_type=artifact_type)
+
+
+def _make_rate_limit_layer(
+    tmp_path: Path,
+) -> tuple[GistTaskLayer, _RateLimitArtifactStore]:
+    """Construct a GistTaskLayer backed by a _RateLimitArtifactStore.
+
+    Returns a (layer, store) pair so tests can toggle ``force_rate_limit``
+    between the create (successful) and mutation (rate-limited) steps.
+
+    Args:
+        tmp_path: pytest ``tmp_path`` fixture providing an isolated plan directory.
+
+    Returns:
+        Tuple of (GistTaskLayer, _RateLimitArtifactStore).
+    """
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    local_backend = LocalYamlTaskProvider(plan_dir)
+    rate_store = _RateLimitArtifactStore()
+    client = _make_fake_client(rate_store)
+    plan_index = _make_fake_plan_index(client, sentinel_issue=_SENTINEL_ISSUE)
+    layer = GistTaskLayer(local_backend=local_backend, artifact_client=client, plan_index=plan_index)
+    return layer, rate_store
+
+
+def test_update_task_status_succeeds_on_rate_limit(tmp_path: Path) -> None:
+    """Rate-limit degrade: update_task_status succeeds (no exception) when Gist is rate-limited.
+
+    Verifies that when ``artifact_client.store()`` raises
+    :exc:`ArtifactWriteError` with ``"secondary rate limit"`` in the reason,
+    ``GistTaskLayer._write_through`` absorbs the error and
+    ``update_task_status`` returns without raising.
+
+    The local YAML state must still reflect the mutation — the task status is
+    committed locally even though the Gist write-back is skipped.
+    """
+    # Arrange: create plan while the store is healthy.
+    layer, rate_store = _make_rate_limit_layer(tmp_path)
+    tasks = _two_tasks()
+    plan_data = layer.create_plan(
+        slug="rate-limit-mutation", goal="Verify rate-limit degrade on update_task_status", tasks=tasks, issue=_PLAN_ISSUE
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable rate-limit simulation before the mutation attempt.
+    rate_store.force_rate_limit = True
+
+    # Act: update_task_status must not raise, even though Gist is rate-limited.
+    layer.update_task_status(plan_id, "T1", "in-progress")  # must not raise
+
+    # Assert: local YAML state reflects the mutation.
+    # Disable rate-limit and clear the stale Gist content so read_plan falls
+    # back to the local file that was just mutated — this verifies the local
+    # write committed even though the Gist upload was skipped.
+    rate_store.force_rate_limit = False
+    rate_store.clear_content_store()  # remove stale pre-mutation content; forces local-fallback read
+
+    retrieved = layer.read_plan(plan_id)
+    task_t1 = next(t for t in retrieved["tasks"] if t["id"] == "T1")
+    assert task_t1["status"] == "in-progress", (
+        "Task status must be committed locally even when Gist write-back is rate-limited"
+    )
+
+
+def test_rate_limit_emits_warning_log(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Rate-limit degrade: a WARNING log is emitted when _write_through absorbs a rate limit.
+
+    Verifies that ``GistTaskLayer._write_through`` logs at WARNING level
+    (not ERROR or DEBUG) when the ``"secondary rate limit"`` signal is detected
+    in the :exc:`ArtifactWriteError` reason, so operators can observe the event
+    without it being surfaced as an error to the MCP caller.
+
+    The log record must be from the ``"sam_schema.core.gist_task_layer"`` logger.
+    """
+    import logging
+
+    layer, rate_store = _make_rate_limit_layer(tmp_path)
+    tasks = _two_tasks()
+    plan_data = layer.create_plan(
+        slug="rate-limit-warn", goal="Verify WARNING log emission on rate-limit degrade", tasks=tasks, issue=_PLAN_ISSUE
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable rate-limit simulation and trigger a write-through mutation.
+    rate_store.force_rate_limit = True
+
+    with caplog.at_level(logging.WARNING, logger="sam_schema.core.gist_task_layer"):
+        layer.update_task_status(plan_id, "T1", "in-progress")
+
+    # Assert: at least one WARNING record from the gist_task_layer logger that
+    # references the rate-limit event.
+    rate_limit_warnings = [
+        r
+        for r in caplog.records
+        if r.name == "sam_schema.core.gist_task_layer"
+        and r.levelno == logging.WARNING
+        and "rate limit" in r.getMessage().lower()
+    ]
+    assert rate_limit_warnings, (
+        "Expected at least one WARNING log from 'sam_schema.core.gist_task_layer' "
+        f"mentioning 'rate limit'; got records: {[r.getMessage() for r in caplog.records]}"
+    )
+
+
+def test_create_plan_raises_on_rate_limit(tmp_path: Path) -> None:
+    """Rate-limit hard-fail: create_plan raises ArtifactWriteError when Gist is rate-limited.
+
+    Verifies that create_plan does NOT absorb rate-limit errors — the
+    ``_write_through`` degradation path applies only to mutations routed
+    through ``_write_through``.  ``create_plan`` calls ``artifact_client.store()``
+    directly and must propagate any :exc:`ArtifactWriteError`, including
+    rate-limit variants, as a hard error.
+
+    This preserves the AC7 contract: a plan that fails to upload to Gist must
+    not appear to succeed.
+    """
+    # Arrange: enable rate-limit simulation before create so the first upload fails.
+    layer, rate_store = _make_rate_limit_layer(tmp_path)
+    rate_store.force_rate_limit = True
+
+    tasks = _two_tasks()
+
+    # Act + Assert: ArtifactWriteError must propagate (no graceful degrade for create).
+    with pytest.raises(ArtifactWriteError) as exc_info:
+        layer.create_plan(
+            slug="rate-limit-create-fail",
+            goal="Verify create_plan hard-fails on rate limit",
+            tasks=tasks,
+            issue=_PLAN_ISSUE,
+        )
+
+    assert exc_info.value.issue == _PLAN_ISSUE, "ArtifactWriteError must reference the target issue"
+    assert "rate limit" in exc_info.value.reason.lower(), (
+        "ArtifactWriteError reason must carry the rate-limit message from the store"
+    )
+
+
+def test_genuine_error_propagates_from_update_task_status(
+    gist_layer: GistTaskLayer, store: _InMemoryArtifactStore
+) -> None:
+    """Genuine-error path: ArtifactWriteError propagates from update_task_status when force_store_failure=True.
+
+    Verifies that the rate-limit degrade path does not accidentally swallow
+    genuine write errors (i.e. errors whose reason does NOT contain the
+    ``"secondary rate limit"`` or ``"abuse detection"`` signal strings).
+
+    The existing ``force_store_failure=True`` path raises with reason
+    ``"forced failure for testing"``, which is NOT a rate-limit signal.
+    ``update_task_status`` must re-raise such errors as :exc:`ArtifactWriteError`.
+
+    This test ensures the pre-existing genuine-error contract (AC7 analog for
+    mutations) is unchanged by the rate-limit degrade feature.
+    """
+    # Arrange: create plan while the store is healthy.
+    tasks = _two_tasks()
+    plan_data = gist_layer.create_plan(
+        slug="genuine-error-mutation",
+        goal="Verify genuine-error propagation from update_task_status",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
+    )
+    plan_id = plan_data["plan_id"]
+
+    # Enable genuine store failure (reason does NOT contain "secondary rate limit").
+    store.force_store_failure = True
+
+    # Act + Assert: ArtifactWriteError must propagate (not absorbed as rate-limit).
+    with pytest.raises(ArtifactWriteError) as exc_info:
+        gist_layer.update_task_status(plan_id, "T1", "in-progress")
+
+    assert "forced failure" in exc_info.value.reason.lower(), (
+        "The genuine-error reason must be carried through ArtifactWriteError unchanged"
+    )
