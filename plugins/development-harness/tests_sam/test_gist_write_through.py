@@ -1066,9 +1066,7 @@ class _RateLimitArtifactStore(_InMemoryArtifactStore):
         super().store(issue, content, artifact_type=artifact_type)
 
 
-def _make_rate_limit_layer(
-    tmp_path: Path,
-) -> tuple[GistTaskLayer, _RateLimitArtifactStore]:
+def _make_rate_limit_layer(tmp_path: Path) -> tuple[GistTaskLayer, _RateLimitArtifactStore]:
     """Construct a GistTaskLayer backed by a _RateLimitArtifactStore.
 
     Returns a (layer, store) pair so tests can toggle ``force_rate_limit``
@@ -1105,7 +1103,10 @@ def test_update_task_status_succeeds_on_rate_limit(tmp_path: Path) -> None:
     layer, rate_store = _make_rate_limit_layer(tmp_path)
     tasks = _two_tasks()
     plan_data = layer.create_plan(
-        slug="rate-limit-mutation", goal="Verify rate-limit degrade on update_task_status", tasks=tasks, issue=_PLAN_ISSUE
+        slug="rate-limit-mutation",
+        goal="Verify rate-limit degrade on update_task_status",
+        tasks=tasks,
+        issue=_PLAN_ISSUE,
     )
     plan_id = plan_data["plan_id"]
 
