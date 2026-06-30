@@ -20,9 +20,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-log()  { echo "[session-init] $*"; }
+log() { echo "[session-init] $*"; }
 warn() { echo "[session-init] WARNING: $*" >&2; }
-ok()   { echo "[session-init] OK: $*"; }
+ok() { echo "[session-init] OK: $*"; }
 
 echo "━━━ session-init: Claude Code sandbox environment setup ━━━"
 echo ""
@@ -49,8 +49,8 @@ fi
 # ─── 3. Proxy connectivity check ─────────────────────────────────────────────
 # Extract port from HTTPS_PROXY=http://127.0.0.1:<port>  using greedy strip to last colon.
 PROXY_PORT="${HTTPS_PROXY##*:}"
-if [[ -n "${PROXY_PORT}" ]] && \
-   curl -sS --max-time 2 "http://127.0.0.1:${PROXY_PORT}/__agentproxy/status" >/dev/null 2>&1; then
+if [[ -n "${PROXY_PORT}" ]] &&
+    curl -sS --max-time 2 "http://127.0.0.1:${PROXY_PORT}/__agentproxy/status" >/dev/null 2>&1; then
     ok "Proxy reachable at port ${PROXY_PORT}"
 else
     warn "Proxy not reachable at port ${PROXY_PORT:-unknown} — all outbound HTTPS will fail"
@@ -69,7 +69,7 @@ if [[ -n "${stale}" ]]; then
     while IFS=' ' read -r key _value; do
         echo "  removing: ${key}"
         git config --global --unset-all "${key}" 2>/dev/null || true
-    done <<< "${stale}"
+    done <<<"${stale}"
     ok "Stale insteadOf entries removed"
 else
     ok "git insteadOf: clean"
@@ -88,7 +88,7 @@ raw_url=$(git -C "${REPO_ROOT}" config --local remote.origin.url 2>/dev/null) ||
 if [[ "${raw_url}" =~ 127\.0\.0\.1 ]] || [[ "${raw_url}" =~ local_proxy ]]; then
     warn "remote.origin.url is a stale local proxy URL: ${raw_url}"
     # Extract owner/repo from the end of the URL (last two path segments)
-    repo_path="${raw_url##*/git/}"     # strip everything up to /git/
+    repo_path="${raw_url##*/git/}" # strip everything up to /git/
     if [[ -n "${repo_path}" && "${repo_path}" == */* ]]; then
         if [[ -n "${GITHUB_TOKEN:-}" ]]; then
             new_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${repo_path}"
@@ -135,7 +135,7 @@ uv self update 2>&1 | tail -1 | sed 's/^/[session-init] /' || true
 echo ""
 log "Installing git hooks via prek..."
 if (cd "${REPO_ROOT}" && uv run prek install \
-        -t pre-commit -t commit-msg -t pre-rebase -t post-merge 2>&1); then
+    -t pre-commit -t commit-msg -t pre-rebase -t post-merge 2>&1); then
     ok "prek: git hook scripts installed"
 else
     warn "prek install failed — hooks may not run on commit"
@@ -167,8 +167,8 @@ fi
 
 # Test 3: PyPI HTTPS via curl (exercises proxy + sandbox cert bundle for pip/uv downloads)
 if curl -sS --max-time 5 \
-        --cacert "${SSL_CERT_FILE:-/root/.ccr/ca-bundle.crt}" \
-        "https://pypi.org/simple/pip/" 2>/dev/null | grep -q 'pip'; then
+    --cacert "${SSL_CERT_FILE:-/root/.ccr/ca-bundle.crt}" \
+    "https://pypi.org/simple/pip/" 2>/dev/null | grep -q 'pip'; then
     ok "PyPI HTTPS:     proxy + SSL ✓"
 else
     warn "PyPI HTTPS FAILED — pip/uv downloads will fail; check SSL_CERT_FILE and proxy"
