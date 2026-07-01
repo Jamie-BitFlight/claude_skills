@@ -71,9 +71,9 @@ fi
 # gitConfigInjection — manual insteadOf entries conflict and break git.
 echo ""
 log "Checking for stale git insteadOf entries in ~/.gitconfig..."
-stale=$(git config --global --get-regexp 'url\..*\.insteadOf' 2>/dev/null || true)
+stale=$(git config --global --get-regexp 'url\..*\.insteadOf' 2>/dev/null | grep -Ei '127\.0\.0\.1|local_proxy' || true)
 if [[ -n "${stale}" ]]; then
-    warn "Found stale insteadOf entries from a previous session:"
+    warn "Found stale insteadOf entries from a previous session (filtered to local-proxy rewrites only):"
     while IFS=' ' read -r key _value; do
         echo "  removing: ${key}"
         git config --global --unset-all "${key}" 2>/dev/null || true
@@ -95,8 +95,19 @@ raw_url=$(git -C "${REPO_ROOT}" config --local remote.origin.url 2>/dev/null) ||
 # or plain http://127.0.0.1:... URLs from previous proxy injection
 if [[ "${raw_url}" =~ 127\.0\.0\.1 ]] || [[ "${raw_url}" =~ local_proxy ]]; then
     warn "remote.origin.url is a stale local proxy URL: ${raw_url}"
-    # Extract owner/repo from the end of the URL (last two path segments)
-    repo_path="${raw_url##*/git/}" # strip everything up to /git/
+    # Extract owner/repo from the end of the URL (last two path segments).
+    # The /git/ prefix form (http://user@127.0.0.1:PORT/git/owner/repo) is stripped
+    # directly. The plain form (http://127.0.0.1:PORT/owner/repo) has no /git/
+    # segment, so ##*/git/ would be a no-op and leave the whole URL in repo_path —
+    # strip scheme, credentials, and host:port instead to isolate owner/repo.
+    if [[ "${raw_url}" == */git/* ]]; then
+        repo_path="${raw_url##*/git/}"
+    else
+        repo_path="${raw_url#*://}" # strip scheme
+        repo_path="${repo_path#*@}" # strip user@ credentials, if present
+        repo_path="${repo_path#*/}" # strip host:port
+    fi
+    repo_path="${repo_path%.git}" # strip trailing .git suffix, if present
     if [[ -n "${repo_path}" && "${repo_path}" == */* ]]; then
         if [[ -n "${GITHUB_TOKEN:-}" ]]; then
             new_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${repo_path}"
