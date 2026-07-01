@@ -1207,25 +1207,24 @@ def test_rate_limit_stale_sidecar_persists_across_layer_instances(tmp_path: Path
     layer1.update_task_status(plan_id, "T1", "in-progress")  # write-through skipped, .stale written
 
     # Verify the .stale sidecar exists on disk.
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 
     plan_dir = tmp_path / "plan"
     local = LocalYamlTaskProvider(plan_dir)
-    local_path = local._resolve_path(plan_id)  # noqa: SLF001
+    local_path = local._resolve_path(plan_id)
     stale_sidecar = local_path.with_suffix(".stale")
     assert stale_sidecar.exists(), ".stale sidecar must be written when rate-limited write-through skips Gist upload"
 
     # Call 2: construct a fresh GistTaskLayer (simulating a new MCP call).
     # The in-memory _local_authoritative_plans set starts empty in this new instance.
-    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-    from sam_schema.core.plan_id_index import PlanIdIndex  # noqa: PLC0415
+    from sam_schema.core.gist_task_layer import GistTaskLayer
+    from sam_schema.core.plan_id_index import PlanIdIndex
 
     client2 = _make_fake_client(rate_store)
     plan_index2 = PlanIdIndex(artifact_client=client2, sentinel_issue=_SENTINEL_ISSUE)
     layer2 = GistTaskLayer(local_backend=local, artifact_client=client2, plan_index=plan_index2)
 
-    assert plan_id not in layer2._local_authoritative_plans, (  # noqa: SLF001
+    assert plan_id not in layer2._local_authoritative_plans, (
         "Fresh GistTaskLayer must start with empty _local_authoritative_plans"
     )
 
@@ -1263,10 +1262,10 @@ def test_rate_limit_stale_sidecar_cleared_on_successful_upload(tmp_path: Path) -
     rate_store.force_rate_limit = True
     layer.update_task_status(plan_id, "T1", "in-progress")
 
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 
     plan_dir = tmp_path / "plan"
-    local_path = LocalYamlTaskProvider(plan_dir)._resolve_path(plan_id)  # noqa: SLF001
+    local_path = LocalYamlTaskProvider(plan_dir)._resolve_path(plan_id)
     stale_sidecar = local_path.with_suffix(".stale")
     assert stale_sidecar.exists(), ".stale sidecar must exist after rate-limited skip"
 

@@ -15,6 +15,13 @@
 # All outbound HTTPS in this sandbox is routed through HTTPS_PROXY — the goal is
 # correct configuration through the proxy, not bypassing it.
 
+# When sourced, save the caller's shell options and restore them on exit so that
+# enabling strict mode here does not permanently alter the caller's session.
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    _session_init_saved_opts="$(set +o)"
+    trap 'eval "${_session_init_saved_opts}"; unset _session_init_saved_opts; trap - RETURN' RETURN
+fi
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
