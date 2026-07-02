@@ -10,7 +10,7 @@ Generated from source: `agents/*.md`, `skills/*/`, `backlog_core/server.py`,
 
 ---
 
-## Agents (31)
+## Agents (30)
 
 Canonical names are the filename without `.md`. Referenced in source as
 `subagent_type="dh:{name}"` or as a TeamCreate member name.
@@ -44,7 +44,6 @@ t0-baseline-capture
 task-worker
 technical-researcher
 tn-verification-gate
-workflow-extractor
 workflow-extractor-reducer
 workflow-extractor-worker
 ```

@@ -48,6 +48,9 @@ SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 BLOCK_START_FIELD = "group"
 # A finding is "corroborated" once at least this many distinct workers report it.
 CORROBORATION_MIN = 2
+# A finding is "cross-group" once it was independently surfaced from at least this
+# many distinct rule groups (a stronger signal than same-group corroboration alone).
+CROSS_GROUP_MIN = 2
 
 
 @dataclass
@@ -71,11 +74,22 @@ class Merged:
     agents: set[str] = field(default_factory=set)
     rules: set[str] = field(default_factory=set)
     severity: str = "low"
+    groups_seen: set[str] = field(default_factory=set)
 
     @property
     def weight(self) -> int:
         """Corroboration weight: the count of distinct workers that reported this finding."""
         return len(self.agents)
+
+    @property
+    def cross_group(self) -> bool:
+        """Whether this finding was corroborated across two or more distinct rule groups.
+
+        A finding corroborated across multiple rule groups is more credible than one
+        found only by workers within the same group, since it was independently
+        surfaced from different rule slices rather than repeated coverage of one slice.
+        """
+        return len(self.groups_seen) >= CROSS_GROUP_MIN
 
 
 def normalize_location(raw: str) -> str:
@@ -86,15 +100,28 @@ def normalize_location(raw: str) -> str:
     directories (e.g. `src/foo/config.py:10` vs `tests/foo/config.py:10`) must NOT
     collapse to one key, or unrelated findings would fabricate a false corroboration.
 
+    When no line number is present (a heading-only location, e.g. a Markdown section
+    reference), the heading portion is slug-normalized so that trivial punctuation
+    differences (em-dash vs hyphen, casing) do not fracture corroboration into
+    separate keys for what is really the same location.
+
     Returns:
-        The `path:line` string with any leading `/` stripped, or the stripped input
-        when no line number is present.
+        The `path:line` string with any leading `/` stripped when a line number is
+        present; the `path:slug` string with the heading slug-normalized when a
+        location string has no line number but does have a `:` separator; or the
+        stripped input unchanged when no `:` is present at all.
     """
     match = LOCATION_LINE_RE.search(raw)
     if match:
         path = match.group(1).lstrip("/")
         return f"{path}:{match.group(2)}"
-    return raw.strip()
+    # No line number: normalize the heading portion
+    raw = raw.strip()
+    if ":" in raw:
+        path_part, heading_part = raw.split(":", 1)
+        slug = re.sub(r"[^a-z0-9]+", "_", heading_part.strip().lower()).strip("_")
+        return f"{path_part}:{slug}"
+    return raw
 
 
 def parse_report(text: str) -> list[Finding]:
@@ -152,6 +179,7 @@ def reduce_findings(reports: dict[str, list[Finding]], keep_threshold: int) -> l
                 entry = Merged(group=finding.group, location=location)
                 merged[key] = entry
             entry.agents.add(agent)
+            entry.groups_seen.add(finding.group)
             if finding.rule:
                 entry.rules.add(finding.rule)
             if SEVERITY_RANK.get(finding.severity, 1) > SEVERITY_RANK.get(entry.severity, 1):
@@ -198,9 +226,10 @@ def format_report(reports: dict[str, list[Finding]], survivors: list[Merged], ke
         tag = "KEEP" if m.weight >= CORROBORATION_MIN else "tail"
         agents = "".join(sorted(m.agents))
         rules = "|".join(sorted(m.rules)) or "?"
-        lines.append(
-            f"[{tag} w={m.weight}] group={m.group} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
-        )
+        line = f"[{tag} w={m.weight}] group={m.group} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
+        if m.cross_group:
+            line += "  cross_group=True"
+        lines.append(line)
     return "\n".join(lines)
 
 

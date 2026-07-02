@@ -13,10 +13,11 @@ consumed by `dh-workflow-explorer.html` via Cytoscape.js.
   "nodes": [ ...Node ],
   "edges": [ ...Edge ],
   "overlays": { ...OverlayConfig },
-  "routes": [ ...RouteManifest ],
-  "gaps": [ ...Gap ]
+  "routes": [ ...RouteManifest ]
 }
 ```
+
+Gap transitions are represented as `gap`-type edges within `edges` (see [gap](#gap) below) — there is no separate top-level `gaps` array.
 
 ---
 
@@ -28,27 +29,42 @@ set `verified: false`.
 
 ### step
 
-One discrete action in a workflow reference file.
+A discrete action performed by an actor within a workflow reference file.
 
 ```json
 {
-  "id": "work.rt-ica-gate.1",
+  "id": "step.groom.wave1.impact-analyst.write-impact-radius",
   "type": "step",
-  "label": "Read RT-ICA section",
-  "route": "work",
-  "phase": 3,
-  "source_file": "skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
-  "source_heading": "## Step 1",
+  "label": "Write Impact Radius section",
+  "actor": "agent.dh-impact-analyst",
+  "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md",
+  "source_heading": "## Wave 1 — impact-analyst",
   "verified": true,
-  "metadata": {
-    "action": "backlog_view(selector, summary=false, section='RT-ICA')",
-    "gate": true,
-    "gate_condition": "Date > 7 days OR metadata.updated_at > Date",
-    "gate_outcome_pass": "proceed",
-    "gate_outcome_fail": "re-run dh:rt-ica"
-  }
+  "conditional": false,
+  "condition": null,
+  "mcp_calls": [
+    "mcp__plugin_dh_backlog__backlog_groom(selector, section='Impact Radius', content=...)"
+  ],
+  "reads_artifacts": [],
+  "writes_artifacts": ["artifact.impact-radius-section"],
+  "dispatches": [],
+  "metadata": {}
 }
 ```
+
+`conditional` and `condition` capture a guard on the step's execution — a step whose
+execution depends on a guard sets `conditional: true` and records the guard text in
+`condition`; unconditional steps set `conditional: false` and `condition: null`.
+
+**Node ID convention:** `step.{route}.{reference-file-slug}.{actor-slug}.{action-slug}`
+All slugs are lowercase, hyphens replaced with dots, special characters stripped.
+
+**Verified-flag semantics:**
+
+- `true` — the sonnet verifier confirmed the step: the source citation resolves to a
+  real heading and the evidence quote matches the source text at ≥80%.
+- `false` — extracted by a worker but not confirmed (verifier voted `PLAUSIBLE`), or a
+  `weight=1` finding from `reduce.py` that no other worker corroborated.
 
 ### agent
 
@@ -211,7 +227,61 @@ A gap edge is rendered differently in the explorer (dashed, amber).
 | `defers_to` | step routes to another reference file |
 | `routes_to` | conditional branch to a step |
 | `stores_in` | MCP tool persists data to backend |
-| `gap` | transition exists but is unattested in source |
+| `next` | sequential transition from one step to the next step |
+| `gap` | transition exists but is unattested in source — see [gap](#gap) below |
+
+### next
+
+Sequential transition between two consecutive step nodes.
+
+```json
+{
+  "id": "e.step.groom.wave1.impact-analyst.1-next-step.groom.wave1.impact-analyst.2",
+  "type": "next",
+  "source": "step.groom.wave1.impact-analyst.write-impact-radius",
+  "target": "step.groom.wave1.impact-analyst.broadcast-result",
+  "label": "",
+  "verified": true,
+  "gap": false,
+  "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md",
+  "source_heading": "## Wave 1 — impact-analyst"
+}
+```
+
+### gap
+
+An unattested transition — a workflow edge that must logically exist (for example,
+between two adjacent steps) but has no direct evidence in the source file. Rendered as
+a dashed, amber edge in the explorer. Required for correct blast-radius analysis: a
+silent gap produces an incorrect impact assessment.
+
+```json
+{
+  "id": "gap.work-prepare-to-feature-request",
+  "type": "gap",
+  "source": "step.work.prepare.orchestrator.last",
+  "target": "step.work.feature-request.orchestrator.first",
+  "label": "Transition from prepare.md terminal step to feature-request.md not explicitly attested in either file",
+  "verified": false,
+  "gap": true,
+  "source_file": "skills/work-backlog-item/references/workflows/work/prepare.md",
+  "source_heading": null
+}
+```
+
+**Fields:**
+
+| Field | Type | Semantics |
+|---|---|---|
+| `id` | string | Unique edge identifier. |
+| `type` | string | Always `"gap"`. |
+| `source` | string | Node ID the transition originates from. |
+| `target` | string | Node ID the transition leads to. |
+| `label` | string | Human-readable description of the missing transition. |
+| `verified` | boolean | Always `false` for gap edges. |
+| `gap` | boolean | Always `true` for gap edges. |
+| `source_file` | string \| null | File where the gap was identified, if applicable. |
+| `source_heading` | string \| null | Heading where the gap was identified, if applicable. |
 
 ---
 
@@ -322,25 +392,106 @@ and to wire inter-route connections.
 
 ---
 
-## Gap list
+## Extraction Pipeline Files
 
-Every unattested transition collected across all routes.
-Rendered as dashed amber edges in the explorer.
+Supporting files produced and consumed by the workflow extraction pipeline
+(`enumerate_scope.py`, `dh-extract-file.js`, `merge_layer.py`). These are inputs to,
+and byproducts of, building the layer JSON files consumed by the assembler — they are
+not part of the assembled `dh-workflow-graph.json` shape itself.
+
+### meta.json — staleness tracking
+
+**Path:** `docs/workflow-layers/meta.json`
 
 ```json
 {
-  "gaps": [
-    {
-      "id": "gap.work-prepare-to-feature-request",
-      "between": "work.prepare.LAST → work.feature-request.1",
-      "description": "Transition from prepare.md terminal step to feature-request.md not explicitly attested in either file",
-      "route": "work",
-      "phase": 3,
-      "severity": "medium"
-    }
-  ]
+  "last_analyzed_commit": "a8a9174f8c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
+  "last_analyzed_at": "2026-06-19T15:30:00Z",
+  "scope_version": "sha256:3a4b5c6d7e8f..."
 }
 ```
+
+| Field | Type | Semantics |
+|---|---|---|
+| `last_analyzed_commit` | string | Full 40-character SHA of the last commit for which extraction ran. Empty string when no extraction has run. |
+| `last_analyzed_at` | string | ISO 8601 timestamp of the last extraction completion. |
+| `scope_version` | string | `sha256:<hex>` of the `SCOPE.md` content at the time of the last extraction. When this changes, the scope set has changed and a full re-crawl is needed. |
+
+The SessionStart staleness hook writes `meta.json` after successful extraction.
+`merge_layer.py` does NOT write `meta.json` — that is the hook's responsibility.
+
+### SCOPE.md — reachable file set
+
+**Path:** `docs/workflow-layers/SCOPE.md`
+
+Markdown table, one row per reachable file, produced by `enumerate_scope.py`.
+
+```markdown
+# DH Workflow Extraction Scope
+
+Generated by enumerate_scope.py. Do not edit manually.
+Last generated: 2026-06-19T15:00:00Z
+Entry points: work-backlog-item, groom-milestone, work-milestone, complete-milestone, create-milestone, start-milestone, group-items-to-milestone
+
+| file_path | entry_point | reference_type | depth |
+|---|---|---|---|
+| skills/work-backlog-item/SKILL.md | work-backlog-item | entry_point | 0 |
+| skills/work-backlog-item/references/workflows/groom/swarm.md | work-backlog-item | mermaid_node | 1 |
+| agents/impact-analyst.md | work-backlog-item | agent_dispatch | 2 |
+```
+
+`reference_type` values: `entry_point`, `mermaid_node`, `prose_skill`, `agent_dispatch`, `prose_file`.
+
+`enumerate_scope.py` produces the same output given the same input files (deterministic
+BFS). The SHA-256 of `SCOPE.md` content serves as `scope_version` in `meta.json`.
+
+### Fragment — per-file ETL intermediate
+
+**Path convention:** `.tmp/fragments/{slug}-{timestamp}.json` (ephemeral, not committed)
+
+```json
+{
+  "meta": {
+    "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md",
+    "layer_type": "step",
+    "extracted_at": "2026-06-19T15:00:00Z",
+    "verified_count": 12,
+    "unverified_count": 2
+  },
+  "items": [],
+  "unverified_items": []
+}
+```
+
+Fragment files are written by `dh-extract-file.js` after the sonnet verifier completes.
+`merge_layer.py` reads them and removes them after a successful merge into the layer file.
+
+### Miss log — extraction quality feedback
+
+**Path convention:** `.tmp/extraction-misses/{YYYY-MM-DD}-{source-slug}.md`
+
+```markdown
+# Extraction Miss Log
+
+Source file: skills/work-backlog-item/references/workflows/groom/swarm.md
+Date: 2026-06-19
+Commit: a8a9174f
+
+## Weight-1 Findings (missed by all workers except one)
+
+### Finding 1
+- group: 5
+- location: groom/swarm.md:wave_1_impact_analyst
+- evidence: "Send result to team-lead via SendMessage"
+- verifier_vote: CONFIRMED
+- rule_slug: agent-dispatch-send-message
+
+Pattern analysis: workers missed `SendMessage` as an agent dispatch because rule group 5 patterns
+focus on `TeamCreate` and `subagent_type`. Add `SendMessage(to=...)` as an explicit dispatch pattern.
+```
+
+Miss logs are never committed. They are read periodically to refine
+`docs/workflow-layers/extraction-rules.json`.
 
 ---
 
@@ -391,8 +542,8 @@ Key rules:
 
 1. Every step node gets `source_file` + `source_heading` from the fragment it came from
 2. Every edge of type `gap` sets `gap: true` and `verified: false`
-3. Agents are extracted from `agents_dispatched[]` arrays in step fragments
-4. MCP tool nodes are extracted from `tool_or_agent` strings starting with `mcp__`
-5. Artifact nodes are extracted from `reads[]` and `writes[]` arrays in step fragments
+3. Agents are extracted from `dispatches[]` arrays in step nodes
+4. MCP tool nodes are extracted from `mcp_calls[]` strings starting with `mcp__`
+5. Artifact nodes are extracted from `reads_artifacts[]` and `writes_artifacts[]` arrays in step nodes
 6. Skills are extracted from agent frontmatter `tools:` field (requires a second pass over agent files)
-7. Reference files are extracted from `defers_to[]` arrays in step fragments
+7. Reference files are extracted from `enumerate_scope.py`'s scope enumeration (see SCOPE.md above), not from step node fields
