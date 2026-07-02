@@ -36,11 +36,12 @@ echo ""
 
 # ─── 1. UV certificate environment ───────────────────────────────────────────
 # UV_NATIVE_TLS is deprecated since uv 0.6.x; UV_SYSTEM_CERTS=true is the replacement.
+# uv itself warns on ANY set value (true/false/1/0/yes — anything boolish), not just
+# the literal string "true", so match on "is it set" rather than "is it == true".
 # This export works when sourced; when run as a subshell it affects child processes only.
-if [[ "${UV_NATIVE_TLS:-}" == "true" ]]; then
+if [[ -n "${UV_NATIVE_TLS:-}" ]]; then
     export UV_SYSTEM_CERTS=true
     log "Exported UV_SYSTEM_CERTS=true (replaces deprecated UV_NATIVE_TLS)"
-    log "Infrastructure fix needed: replace UV_NATIVE_TLS=true with UV_SYSTEM_CERTS=true"
 else
     ok "UV cert env already correct"
 fi
