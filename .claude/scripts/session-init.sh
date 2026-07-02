@@ -194,15 +194,15 @@ else
 fi
 
 # ─── 9. shellcheck availability ──────────────────────────────────────────────
+# Informational only. The pre-commit shellcheck hook installs shellcheck-py from
+# its PyPI wheel (language: python, see .pre-commit-config.yaml) — the wheel
+# bundles the binary, so this does NOT depend on a system shellcheck being
+# present in PATH. A system install is neither required nor used by the hook.
 echo ""
 if command -v shellcheck >/dev/null 2>&1; then
-    ok "shellcheck: $(command -v shellcheck) ($(shellcheck --version | head -2 | tail -1))"
+    ok "shellcheck (system, informational only): $(command -v shellcheck) ($(shellcheck --version | head -2 | tail -1))"
 else
-    warn "shellcheck not in PATH"
-    warn "  Pre-commit hook 'shellcheck-py' will fail: pip downloads a ~2.5MB binary"
-    warn "  from GitHub releases and the proxy drops large streaming downloads."
-    warn "  Commits touching shell files will be blocked until shellcheck is available."
-    warn "  Permanent fix: see infrastructure requirements below."
+    ok "shellcheck: no system install — not required, pre-commit hook installs its own from the PyPI wheel"
 fi
 
 # ─── 10. Infrastructure requirements ─────────────────────────────────────────
@@ -219,37 +219,19 @@ echo "    OK:     NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt"
 echo "    OK:     PIP_CERT=/root/.ccr/ca-bundle.crt"
 echo "    OK:     CARGO_HTTP_CAINFO=/root/.ccr/ca-bundle.crt"
 echo ""
-echo "  Base image packages (proxy cannot stream large binary downloads):"
+echo "  Known proxy quirk (repo-level fix already applied, no action needed here):"
 echo ""
-if command -v shellcheck >/dev/null 2>&1; then
-    echo "    OK: shellcheck already in base image: $(command -v shellcheck)"
-    echo "        Replace shellcheck-py hook in .pre-commit-config.yaml with a local hook"
-    echo "        that calls the system binary — eliminates the binary download on pip install:"
-    echo ""
-    echo "          - repo: local"
-    echo "            hooks:"
-    echo "              - id: shellcheck"
-    echo "                name: shellcheck"
-    echo "                language: system"
-    echo "                entry: shellcheck"
-    echo "                types: [shell]"
-else
-    echo "    MISSING: shellcheck — apt-get install -y shellcheck"
-    echo ""
-    echo "    Root cause: shellcheck-py downloads a ~2.5MB tar.xz from GitHub releases"
-    echo "    during 'pip install'. The proxy drops the connection mid-stream"
-    echo "    (IncompleteRead after ~200KB). This is NOT a certificate issue."
-    echo ""
-    echo "    After adding shellcheck to the base image, replace the pre-commit hook:"
-    echo ""
-    echo "      - repo: local"
-    echo "        hooks:"
-    echo "          - id: shellcheck"
-    echo "            name: shellcheck"
-    echo "            language: system"
-    echo "            entry: shellcheck"
-    echo "            types: [shell]"
-fi
+echo "    Python's stdlib urllib.request/http.client truncates large HTTPS"
+echo "    responses through this proxy's MITM re-termination (IncompleteRead,"
+echo "    at a different byte offset each attempt) — curl and requests/urllib3"
+echo "    are unaffected on the identical URL. This broke the shellcheck-py"
+echo "    pre-commit hook, which cloned the shellcheck-py git repo and ran its"
+echo "    setup.py's urllib.request-based binary download. Fixed in"
+echo "    .pre-commit-config.yaml by installing shellcheck-py from its PyPI"
+echo "    wheel instead (language: python + additional_dependencies) — the"
+echo "    wheel bundles the binary, so no build-time download occurs. If a"
+echo "    similar IncompleteRead surfaces in something else, this proxy quirk"
+echo "    is the first thing to check."
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
