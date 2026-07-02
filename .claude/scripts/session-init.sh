@@ -193,46 +193,4 @@ else
     warn "PyPI HTTPS FAILED — pip/uv downloads will fail; check SSL_CERT_FILE and proxy"
 fi
 
-# ─── 9. shellcheck availability ──────────────────────────────────────────────
-# Informational only. The pre-commit shellcheck hook installs shellcheck-py from
-# its PyPI wheel (language: python, see .pre-commit-config.yaml) — the wheel
-# bundles the binary, so this does NOT depend on a system shellcheck being
-# present in PATH. A system install is neither required nor used by the hook.
-echo ""
-if command -v shellcheck >/dev/null 2>&1; then
-    ok "shellcheck (system, informational only): $(command -v shellcheck) ($(shellcheck --version | head -2 | tail -1))"
-else
-    ok "shellcheck: no system install — not required, pre-commit hook installs its own from the PyPI wheel"
-fi
-
-# ─── 10. Infrastructure requirements ─────────────────────────────────────────
-echo ""
-echo "━━━ Infrastructure requirements (must be fixed at sandbox provisioning) ━━━"
-echo ""
-echo "  Environment variables (set at sandbox creation):"
-echo ""
-echo "    CHANGE: UV_NATIVE_TLS=true  →  UV_SYSTEM_CERTS=true  (deprecated since uv 0.6)"
-echo "    OK:     SSL_CERT_FILE=/root/.ccr/ca-bundle.crt"
-echo "    OK:     REQUESTS_CA_BUNDLE=/root/.ccr/ca-bundle.crt"
-echo "    OK:     GIT_SSL_CAINFO=/root/.ccr/ca-bundle.crt"
-echo "    OK:     NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt"
-echo "    OK:     PIP_CERT=/root/.ccr/ca-bundle.crt"
-echo "    OK:     CARGO_HTTP_CAINFO=/root/.ccr/ca-bundle.crt"
-echo ""
-echo "  Known proxy quirk (repo-level fix already applied, no action needed here):"
-echo ""
-echo "    Python's stdlib urllib.request/http.client truncates large HTTPS"
-echo "    responses through this proxy's MITM re-termination (IncompleteRead,"
-echo "    at a different byte offset each attempt) — curl and requests/urllib3"
-echo "    are unaffected on the identical URL. This broke the shellcheck-py"
-echo "    pre-commit hook, which cloned the shellcheck-py git repo and ran its"
-echo "    setup.py's urllib.request-based binary download. Fixed in"
-echo "    .pre-commit-config.yaml by installing shellcheck-py from its PyPI"
-echo "    wheel instead (language: python + additional_dependencies) — the"
-echo "    wheel bundles the binary, so no build-time download occurs. If a"
-echo "    similar IncompleteRead surfaces in something else, this proxy quirk"
-echo "    is the first thing to check."
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
 log "session-init complete"
