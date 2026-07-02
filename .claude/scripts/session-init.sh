@@ -5,11 +5,10 @@
 # Fixes known environment issues, cleans stale git config, and installs git hooks.
 #
 # Usage:
-#   bash .claude/scripts/session-init.sh        — apply fixes (env vars NOT exported to caller shell)
-#   source .claude/scripts/session-init.sh      — apply fixes AND export env vars to current shell
-#
-# To add to CLAUDE.md session-start instructions:
-#   !`source .claude/scripts/session-init.sh`
+#   Wired as a SessionStart hook in .claude/settings.json — runs automatically,
+#   every session, via CLAUDE_ENV_FILE for env var persistence (see §1 below).
+#   Can also be run manually: bash .claude/scripts/session-init.sh
+#   or sourced in an interactive shell to export vars directly: source .claude/scripts/session-init.sh
 #
 # Validation: the script tests that each critical tool works THROUGH the proxy.
 # All outbound HTTPS in this sandbox is routed through HTTPS_PROXY — the goal is
@@ -38,9 +37,15 @@ echo ""
 # UV_NATIVE_TLS is deprecated since uv 0.6.x; UV_SYSTEM_CERTS=true is the replacement.
 # uv itself warns on ANY set value (true/false/1/0/yes — anything boolish), not just
 # the literal string "true", so match on "is it set" rather than "is it == true".
-# This export works when sourced; when run as a subshell it affects child processes only.
+# `export` only affects this script's own process and its children — it does not
+# reach the session's later Bash tool calls, whether run standalone, sourced, or
+# as a SessionStart hook. CLAUDE_ENV_FILE is the actual persistence mechanism:
+# Claude Code sources it before every subsequent Bash command in the session.
 if [[ -n "${UV_NATIVE_TLS:-}" ]]; then
     export UV_SYSTEM_CERTS=true
+    if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
+        echo 'export UV_SYSTEM_CERTS=true' >>"${CLAUDE_ENV_FILE}"
+    fi
     log "Exported UV_SYSTEM_CERTS=true (replaces deprecated UV_NATIVE_TLS)"
 else
     ok "UV cert env already correct"
@@ -164,34 +169,61 @@ fi
 # ─── 8. Validation: test that tooling works correctly through the proxy ───────
 # All outbound HTTPS goes through HTTPS_PROXY. These tests confirm each tool
 # can reach the internet correctly with the current proxy and cert configuration.
+# Each check retries before reporting failure — a single network blip is not
+# a real proxy/cert problem, and the script (not the reader) is responsible
+# for telling the two apart.
 echo ""
 log "Validating tool connectivity through proxy..."
 
-# Test 1: git fetch (exercises GIT_SSL_CAINFO + proxy HTTPS CONNECT)
-if (cd "${REPO_ROOT}" && git fetch --dry-run origin 2>/dev/null); then
-    ok "git fetch:      proxy + SSL ✓"
-else
-    warn "git fetch FAILED — check GIT_SSL_CAINFO (${GIT_SSL_CAINFO:-unset}) and proxy"
-fi
+retry() {
+    local attempts="$1"
+    shift
+    local i
+    for ((i = 1; i <= attempts; i++)); do
+        if "$@" >/dev/null 2>&1; then
+            return 0
+        fi
+        ((i < attempts)) && sleep 1
+    done
+    return 1
+}
 
-# Test 2: Python HTTPS (exercises SSL_CERT_FILE + HTTPS_PROXY env)
-if uv run python -c "
+check_git_fetch() { (cd "${REPO_ROOT}" && git fetch --dry-run origin); }
+check_python_https() {
+    uv run python -c "
 import urllib.request, ssl, os
 ctx = ssl.create_default_context(cafile=os.environ.get('SSL_CERT_FILE'))
 urllib.request.urlopen('https://pypi.org/simple/', context=ctx, timeout=5)
-" 2>/dev/null; then
-    ok "Python HTTPS:   proxy + SSL ✓"
+"
+}
+check_pypi_https() {
+    # No pipe to grep: curl | grep -q races under `set -o pipefail` — grep exits the
+    # instant it finds a match, closing its end of the pipe, and curl (still writing
+    # remaining body data) gets a write error that poisons the pipeline's exit status
+    # even though grep already found what it was looking for. Checking the HTTP status
+    # code directly avoids the pipe entirely.
+    local code
+    code=$(curl -sS --max-time 5 --cacert "${SSL_CERT_FILE:-/root/.ccr/ca-bundle.crt}" \
+        -o /dev/null -w '%{http_code}' "https://pypi.org/simple/pip/")
+    [[ "${code}" == "200" ]]
+}
+
+if retry 3 check_git_fetch; then
+    ok "git fetch:      proxy + SSL ✓"
 else
-    warn "Python HTTPS FAILED — check SSL_CERT_FILE (${SSL_CERT_FILE:-unset}) and HTTPS_PROXY"
+    warn "git fetch FAILED (3 attempts) — check GIT_SSL_CAINFO (${GIT_SSL_CAINFO:-unset}) and proxy"
 fi
 
-# Test 3: PyPI HTTPS via curl (exercises proxy + sandbox cert bundle for pip/uv downloads)
-if curl -sS --max-time 5 \
-    --cacert "${SSL_CERT_FILE:-/root/.ccr/ca-bundle.crt}" \
-    "https://pypi.org/simple/pip/" 2>/dev/null | grep -q 'pip'; then
+if retry 3 check_python_https; then
+    ok "Python HTTPS:   proxy + SSL ✓"
+else
+    warn "Python HTTPS FAILED (3 attempts) — check SSL_CERT_FILE (${SSL_CERT_FILE:-unset}) and HTTPS_PROXY"
+fi
+
+if retry 3 check_pypi_https; then
     ok "PyPI HTTPS:     proxy + SSL ✓"
 else
-    warn "PyPI HTTPS FAILED — pip/uv downloads will fail; check SSL_CERT_FILE and proxy"
+    warn "PyPI HTTPS FAILED (3 attempts) — pip/uv downloads will fail; check SSL_CERT_FILE and proxy"
 fi
 
 log "session-init complete"
