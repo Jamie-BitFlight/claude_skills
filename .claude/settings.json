@@ -21,6 +21,10 @@
           {
             "command": "bd prime",
             "type": "command"
+          },
+          {
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/session-init.sh\"",
+            "type": "command"
           }
         ],
         "matcher": ""
