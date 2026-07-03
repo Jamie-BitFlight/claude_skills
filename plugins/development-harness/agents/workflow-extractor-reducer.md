@@ -43,13 +43,17 @@ Write the fragment as JSON with this exact shape:
     "source_file": "<source_file>",
     "layer_type": "<layer_type>",
     "extracted_at": "<ISO 8601 timestamp>",
-    "verified_count": "<count of CONFIRMED findings>",
-    "unverified_count": "<count of PLAUSIBLE findings>"
+    "verified_count": 0,
+    "unverified_count": 0
   },
-  "items": ["CONFIRMED and PLAUSIBLE findings, expressed as step nodes"],
-  "unverified_items": ["REFUTED findings"]
+  "items": [{"...": "one JSON object per CONFIRMED/PLAUSIBLE finding, expressed as a step node"}],
+  "unverified_items": [{"...": "one JSON object per REFUTED finding"}]
 }
 ```
+
+`verified_count` and `unverified_count` are integers, not strings — set them to the
+actual counts of CONFIRMED/PLAUSIBLE findings. `items` and `unverified_items` are
+arrays of JSON objects (step nodes), never plain strings.
 
 `verified_count` counts CONFIRMED findings only. `unverified_count` counts PLAUSIBLE findings only. REFUTED findings are not counted in either — they live only in `unverified_items`.
 

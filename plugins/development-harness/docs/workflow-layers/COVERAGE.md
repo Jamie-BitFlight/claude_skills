@@ -98,10 +98,10 @@ re-extracted before re-assembling.
    | New failure mode | G1 |
    | Optionality changed (--quick, --auto) | G5, G6 |
 
-2. **Re-extract the affected layer** using `dh:workflow-extractor` (haiku model).
-   Brief the agent with the specific source file and the layer JSON path to update.
-   See `../workflow-trace-methodology.md` for the full extraction protocol and field
-   definitions per layer type.
+2. **Re-extract the affected layer.** The single-agent `dh:workflow-extractor` has been
+   retired; re-extraction is pending redesign (see the PRD at
+   `../plans/prd-workflow-extractor.md`). See `../workflow-trace-methodology.md` for
+   the extraction protocol and field definitions per layer type.
 
 3. **Run the assembler** (Tier 1 step above).
 
@@ -131,7 +131,7 @@ See `../workflow-trace-methodology.md` for the full methodology:
 - Schema must come AFTER data collection, not before
 - The graph-of-graphs structure (Mermaid nodes expand to referenced files)
 - Two-hop dispatch resolution (orchestrator → task-worker → profile_load → specialist)
-- Phase A/B/C/D collection protocol using `dh:workflow-extractor` (haiku, Read/Grep/Glob/Write/Edit/Bash)
+- Phase A/B/C/D collection protocol (single-agent `dh:workflow-extractor` retired; pending redesign — see `../plans/prd-workflow-extractor.md`)
 
 ## Source provenance
 

@@ -17,8 +17,10 @@ from __future__ import annotations
 import argparse
 import json
 import operator
+import os
 import re
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -144,12 +146,23 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     Returns:
         Parsed dict, or None when the file is missing (with a warning to
         stderr).
+
+    Raises:
+        TypeError: If the file exists but its top-level JSON value is not
+            an object (e.g. a JSON array). Missing files are an
+            anticipated, recoverable condition (see :func:`load_layers`);
+            a malformed existing file is not, and returning the wrong
+            shape here would only surface later as a confusing
+            ``AttributeError`` deep inside a caller instead of a clear
+            error at this boundary.
     """
     if not path.exists():
         print(f"WARNING: Layer file not found: {path}", file=sys.stderr)
         return None
     with path.open(encoding="utf-8") as fh:
-        data: dict[str, Any] = json.load(fh)
+        data = json.load(fh)
+    if not isinstance(data, dict):
+        raise TypeError(f"{path}: expected a JSON object at the top level, got {type(data).__name__}")
     return data
 
 
@@ -203,7 +216,7 @@ def build_decision_nodes(forks: list[dict[str, Any]]) -> dict[str, dict[str, Any
         node_id = f"fork.{slugify(raw_id)}"
         raw_sf, heading = split_source_file(fork.get("source_file"))
         source_file = prefix_source_file(raw_sf)
-        label = fork.get("decision_question", raw_id).strip().strip('"')
+        label = (fork.get("decision_question") or raw_id).strip().strip('"')
         nodes[node_id] = {
             "id": node_id,
             "type": "decision",
@@ -337,7 +350,9 @@ def build_agent_nodes(concurrency_map: list[dict[str, Any]]) -> dict[str, dict[s
     """
     nodes: dict[str, dict[str, Any]] = {}
     for item in concurrency_map:
-        for agent_name in item.get("agents_dispatched", []):
+        for agent_name in item.get("agents_dispatched") or []:
+            if not agent_name:
+                continue
             node_id = _node_id("agent", agent_name)
             if node_id in nodes:
                 continue
@@ -486,9 +501,9 @@ def _process_trace(
     Routes_to edges are only emitted when terminal_target maps to a known
     skill node — phrases that are workflow headings are silently skipped.
     """
-    from_fork_raw = trace.get("from_fork", "")
+    from_fork_raw = trace.get("from_fork") or ""
     source_id = f"fork.{slugify(from_fork_raw)}"
-    condition = trace.get("branch_condition", "")
+    condition = trace.get("branch_condition") or ""
     terminal_type = trace.get("terminal_type", "")
     terminal_target = trace.get("terminal_target") or ""
     raw_sf, heading = split_source_file(trace.get("source_file"))
@@ -496,7 +511,7 @@ def _process_trace(
 
     _ensure_fork_stub(source_id, from_fork_raw, source_file, "source fork not in L0", known_fork_ids, extra_stubs)
 
-    cond_key = slugify(condition)[:40]
+    cond_key = slugify(condition)
     edge_id_base = f"e.{slugify(from_fork_raw)}.{cond_key}"
 
     if terminal_type == "loops_back" and terminal_target:
@@ -651,9 +666,11 @@ def build_dispatches_edges(concurrency_map: list[dict[str, Any]]) -> list[dict[s
         raw_sf, heading = split_source_file(item.get("source_file"))
         source_file = prefix_source_file(raw_sf)
         dispatch_label = (item.get("dispatch_label") or "")[:60]
-        for agent_name in item.get("agents_dispatched", []):
+        for agent_name in item.get("agents_dispatched") or []:
+            if not agent_name:
+                continue
             target_id = _node_id("agent", agent_name)
-            eid = f"e.dispatches.{slugify(item.get('id', ''))}.{slugify(agent_name)}"
+            eid = f"e.dispatches.{slugify(item.get('id') or '')}.{slugify(agent_name)}"
             if eid not in edges:
                 edges[eid] = _edge(
                     eid,
@@ -943,6 +960,40 @@ def _build_graph_dict(sorted_nodes: list[dict[str, Any]], sorted_edges: list[dic
     }
 
 
+def _write_json_atomic(output_path: Path, payload: dict[str, Any]) -> None:
+    """Atomically write a JSON payload to output_path.
+
+    Writes to a uniquely named temporary file in the same directory as
+    ``output_path`` (guaranteeing the final rename is on the same
+    filesystem), flushes and fsyncs it to guarantee durability, then
+    replaces ``output_path`` with it in a single atomic filesystem
+    operation. If any step fails, the temporary file is removed and the
+    original ``output_path`` (if any) is left completely untouched -- no
+    partial or corrupted output file is ever observable. Mirrors the
+    atomic-write pattern used by ``write_layer()`` in
+    ``plugins/development-harness/scripts/merge_layer.py``.
+
+    Raises:
+        OSError: If the temporary file cannot be written, or the atomic
+            replace fails. ``output_path`` is guaranteed unmodified in
+            this case.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(payload)
+
+    fd, tmp_name = tempfile.mkstemp(suffix=".tmp", prefix=f"{output_path.name}.", dir=output_path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            tmp_file.write(serialized)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        tmp_path.replace(output_path)
+    except OSError:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def assemble(layers_dir: Path, output_path: Path) -> None:
     """Load all layer files and write the assembled graph to output_path.
 
@@ -963,9 +1014,7 @@ def assemble(layers_dir: Path, output_path: Path) -> None:
 
     orphans_removed = len(deduped_edges) - len(sorted_edges)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as fh:
-        fh.write(json.dumps(_build_graph_dict(sorted_nodes, sorted_edges)))
+    _write_json_atomic(output_path, _build_graph_dict(sorted_nodes, sorted_edges))
 
     print(f"Built: {len(sorted_nodes)} nodes, {len(sorted_edges)} edges, {orphans_removed} orphans removed")
 

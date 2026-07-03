@@ -47,7 +47,7 @@ A discrete action performed by an actor within a workflow reference file.
   ],
   "reads_artifacts": [],
   "writes_artifacts": ["artifact.impact-radius-section"],
-  "dispatches": [],
+  "agents_dispatched": [],
   "metadata": {}
 }
 ```
@@ -542,7 +542,7 @@ Key rules:
 
 1. Every step node gets `source_file` + `source_heading` from the fragment it came from
 2. Every edge of type `gap` sets `gap: true` and `verified: false`
-3. Agents are extracted from `dispatches[]` arrays in step nodes
+3. Agents are extracted from `agents_dispatched[]` arrays in step nodes (edge type `dispatches`)
 4. MCP tool nodes are extracted from `mcp_calls[]` strings starting with `mcp__`
 5. Artifact nodes are extracted from `reads_artifacts[]` and `writes_artifacts[]` arrays in step nodes
 6. Skills are extracted from agent frontmatter `tools:` field (requires a second pass over agent files)

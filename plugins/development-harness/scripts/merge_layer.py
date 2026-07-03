@@ -280,7 +280,14 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     same ``source_file`` -- see the module docstring's "Edge cleanup
     scope" note) whose ``source_file`` matches ``fragment.source_file``,
     then appends ``fragment.items`` as new nodes, and writes the result
-    atomically via :func:`write_layer`.
+    atomically via :func:`write_layer`. Each appended node is a shallow
+    copy of the corresponding ``fragment.items`` entry with its
+    ``source_file`` field set (or overwritten) to
+    ``str(fragment.source_file)`` -- the fragment's own dict objects are
+    never mutated. This guarantees every node this call appends agrees
+    with the removal filter on the next merge, regardless of what
+    ``source_file`` value (missing, mismatched, or absent) the fragment
+    producer put on the item.
 
     If ``layer_path`` does not exist, it is bootstrapped as an empty layer
     (``{"meta": {...}, "nodes": [], "edges": []}``) before the merge is
@@ -292,11 +299,12 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     both times. This holds because node/edge removal and re-addition are
     both pure functions of ``layer_path``'s current content and
     ``fragment`` -- the second call removes exactly what the first call
-    added and re-adds the identical items, and no wall-clock-dependent
-    field (e.g. a "last modified" timestamp) is touched on every merge --
-    only the bootstrap's one-time ``generated`` timestamp is time-based,
-    and it is written once, before the idempotent portion of the contract
-    applies.
+    added (its ``source_file`` field having been forced to
+    ``str(fragment.source_file)`` on append, as above) and re-adds the
+    identical items, and no wall-clock-dependent field (e.g. a "last
+    modified" timestamp) is touched on every merge -- only the
+    bootstrap's one-time ``generated`` timestamp is time-based, and it is
+    written once, before the idempotent portion of the contract applies.
 
     Path-matching contract (spec Section 4.2): ``fragment.source_file`` is
     compared against each node's/edge's ``source_file`` field as a plain
@@ -327,7 +335,7 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     surviving_nodes = [node for node in layer.nodes if node.get("source_file") != source_file_str]
     removed_count = len(layer.nodes) - len(surviving_nodes)
 
-    new_nodes = list(fragment.items)
+    new_nodes = [{**item, "source_file": source_file_str} for item in fragment.items]
     merged_nodes = [*surviving_nodes, *new_nodes]
 
     surviving_edges = [edge for edge in layer.edges if edge.get("source_file") != source_file_str]

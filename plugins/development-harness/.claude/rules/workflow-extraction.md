@@ -25,7 +25,7 @@ methodology is in `docs/workflow-trace-methodology.md`.
 
 ## Agent roles
 
-Extraction agents are pending redesign (see PRD at `.tmp/scratch/plans/prd-workflow-extractor.md`).
+Extraction agents are pending redesign (see the PRD at [../../docs/plans/prd-workflow-extractor.md](../../docs/plans/prd-workflow-extractor.md)).
 Do not use `general-purpose` for any extraction role.
 Do not write worker output directly to a layer JSON without corroboration.
 

@@ -125,8 +125,9 @@ Glob the source set into a coverage checklist:
 a guess. Data enters the layer JSON only after corroboration weight ≥ 2 from independent
 workers AND a sonnet reducer self-check passes.
 
-The extraction pipeline for each file uses `dh:workflow-extractor` (sonnet orchestrator)
-which runs the 4-phase ensemble internally:
+The single-agent `dh:workflow-extractor` that used to run this pipeline has been
+retired; the replacement pipeline is pending redesign (see the PRD at
+`../plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
 
 ```
 Phase 0 — Plan (deterministic)
