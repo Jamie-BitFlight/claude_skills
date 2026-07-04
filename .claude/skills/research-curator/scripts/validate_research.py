@@ -622,16 +622,30 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
     return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
 
 
+_NON_ENTRY_DIRS = frozenset({"insights"})
+
+
+def _is_research_entry(file: Path) -> bool:
+    """Return whether a markdown file is a research entry subject to the schema.
+
+    Excludes README.md and files under non-entry artifact directories such as
+    ``research/insights/`` (improvement/utilization reports written by
+    ``research-insight-extractor`` and ``research-utilization-assessor``, which
+    intentionally do not follow the research entry template).
+    """
+    return file.name != "README.md" and not _NON_ENTRY_DIRS.intersection(file.parts)
+
+
 def collect_files(path: Path) -> list[Path]:
-    """Collect markdown files to validate, excluding README.md.
+    """Collect markdown files to validate, excluding README.md and non-entry artifacts.
 
     Returns:
         Sorted list of markdown file paths.
     """
     if path.is_file():
-        return [path] if path.suffix == ".md" and path.name != "README.md" else []
+        return [path] if path.suffix == ".md" and _is_research_entry(path) else []
     files = sorted(path.rglob("*.md"))
-    return [f for f in files if f.name != "README.md"]
+    return [f for f in files if _is_research_entry(f)]
 
 
 def _load_backlink_lib() -> types.ModuleType:
