@@ -622,7 +622,7 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
     return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
 
 
-_NON_ENTRY_DIRS = frozenset({"insights"})
+_NON_ENTRY_DIRS = frozenset({"insights", "utilization"})
 
 
 def _is_research_entry(file: Path) -> bool:
