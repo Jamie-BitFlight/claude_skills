@@ -22,7 +22,8 @@ research/
 │   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
 │   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
-│   └── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
+│   ├── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
+│   └── flue.md                       # TypeScript agent harness framework — durable-first execution, sandboxes, skills, MCP, subagent delegation, 20+ channel integrations (Apache-2.0, v1.0.0-beta.9)
 ├── claude-code-plugins/               # Claude Code plugin ecosystems and configuration repositories
 │   └── claude-codex-settings.md      # Battle-tested Claude Code plugin ecosystem: 17 plugins, 9 MCP integrations, multi-LLM backend configs (Z.ai, Kimi K2, ccproxy) (452 stars)
 ├── agent-infrastructure/              # Infrastructure for agentic applications
@@ -535,6 +536,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [kilocode.md](./agent-frameworks/kilocode.md) | Kilocode — open-source agentic engineering platform (TypeScript, 21.2K stars); unified tool for building, shipping, and iterating with AI coding agents; active development since 2025-03-10 | 2026-06-18 |
 | [omnigent.md](./agent-frameworks/omnigent.md) | Omnigent v0.1.0 (Databricks) — Python 3.12+ multi-agent harness for orchestrating Claude Code, Codex, Cursor, Pi without rewriting; unified YAML policy enforcement (ALLOW/DENY/ASK), cross-device session sync via WebSocket, MCP support (Apache 2.0) | 2026-06-18 |
 | [ponytail.md](./agent-frameworks/ponytail.md) | Ponytail v4.7.0 — "lazy senior developer mode" for AI agents; 6-rung decision ladder (YAGNI→stdlib→native→deps→one-liner→minimal code) with benchmark results: 80–94% code reduction, 42–75% cost reduction, 3–6× faster; 13 platform support (MIT) | 2026-06-18 |
+| [flue.md](./agent-frameworks/flue.md) | Flue — TypeScript agent harness framework providing durable-first execution, sandboxes, typed tools, MCP integration, subagent delegation, and 20+ channel adapters (Slack, Teams, Discord, GitHub); deploys to Node.js, Cloudflare Workers, GitHub Actions, GitLab CI/CD, Daytona, Render (Apache-2.0, v1.0.0-beta.9) | 2026-07-03 |
 
 **Key Topics**:
 
