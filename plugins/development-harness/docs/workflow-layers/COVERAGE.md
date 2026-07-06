@@ -7,7 +7,7 @@ a layer: if COLLECTED, query its data; if a GAP, it is a named pending pass — 
 All files live in `plugins/development-harness/docs/workflow-layers/`.
 
 Resolution: **medium-high**. Skeleton + connections + 8 annotation layers collected and
-spot-checked. Graph/explorer not yet rebuilt from this data.
+spot-checked. Graph rebuilt from layer data (224 nodes, 411 edges). Explorer renders all 6 overlays.
 
 ---
 
@@ -55,12 +55,63 @@ means the orchestrator writes instructions inline — fragile to prompt drift.
 
 | Gap | Status |
 |---|---|
-| Graph/explorer rebuild from L0+L1+G1-G8 | PENDING |
+| Graph/explorer rebuild from L0+L1+G1-G8 | COMPLETE — `assemble_graph.py` + `dh-workflow-graph.json` |
 | Phases 3–6 in dh-system-model.html | PENDING |
 | SAM backend routing (sam_plan/sam_task per-backend) | PENDING |
 | Agent-file identity layer (model, tools, skills-loaded, STATUS contract) | PENDING |
+| routes_to edge type — no instances (L1 terminal_targets are intra-skill headings, not cross-skill) | PENDING |
+| 5 skill nodes have unverified source_file (skill names not in SKILL_FILE_MAP in assemble_graph.py) | PENDING |
 | backlog #2619 — issue type routing downstream | LOGGED, needs groom |
 | backlog #2620 — autonomy_mode setter | LOGGED, needs groom |
+
+---
+
+## Update process
+
+Two tiers depending on what changed.
+
+### Tier 1 — Only the assembler output needs refreshing (layer data unchanged)
+
+Run from repo root:
+
+```bash
+uv run plugins/development-harness/docs/assemble_graph.py
+```
+
+That rebuilds `dh-workflow-graph.json` and updates the embedded data in
+`dh-workflow-explorer.html`. Use when you've edited `assemble_graph.py` itself,
+or when you want a clean rebuild without changing source data.
+
+### Tier 2 — Source skill/agent files changed (SKILL.md, reference files, hooks.json)
+
+The layer JSON files are the source of truth for the assembler. They must be
+re-extracted before re-assembling.
+
+1. **Identify which layers are affected** by the change:
+
+   | Change type | Layers to re-extract |
+   |---|---|
+   | Mermaid forks added/changed in a SKILL.md | L0, L1 for that skill |
+   | New agent dispatched or dispatch changed | G4 |
+   | Artifact produced/consumed changed | G2 |
+   | MCP tool call changed | G8 |
+   | New failure mode | G1 |
+   | Optionality changed (--quick, --auto) | G5, G6 |
+
+2. **Re-extract the affected layer.** The single-agent `dh:workflow-extractor` has been
+   retired; re-extraction is pending redesign (see the PRD at
+   `../plans/prd-workflow-extractor.md`). See `../workflow-trace-methodology.md` for
+   the extraction protocol and field definitions per layer type.
+
+3. **Run the assembler** (Tier 1 step above).
+
+### What NOT to do
+
+- Do not edit the layer JSON files by hand — extract from source and let the
+  assembler build the graph.
+- Do not edit `dh-workflow-graph.json` directly — it is an assembler output.
+- Do not restart collection from scratch unless more than 3 layers are affected.
+  The follow-up protocol below applies to targeted gaps.
 
 ---
 
@@ -80,7 +131,7 @@ See `../workflow-trace-methodology.md` for the full methodology:
 - Schema must come AFTER data collection, not before
 - The graph-of-graphs structure (Mermaid nodes expand to referenced files)
 - Two-hop dispatch resolution (orchestrator → task-worker → profile_load → specialist)
-- Phase A/B/C/D collection protocol using `dh:workflow-extractor` (haiku, Read/Grep/Glob/Write/Edit/Bash)
+- Phase A/B/C/D collection protocol (single-agent `dh:workflow-extractor` retired; pending redesign — see `../plans/prd-workflow-extractor.md`)
 
 ## Source provenance
 

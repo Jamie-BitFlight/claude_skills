@@ -1,0 +1,1753 @@
+plan-id: Pe7547575
+feature: dh-workflow-extractor-system
+version: '1.0'
+description: ''
+state: ready
+goal: |-
+  Implement the DH Workflow Extractor System: deterministic scope enumeration + per-file haiku/sonnet ensemble extraction producing a verified actor-step graph, with idempotent fragment ETL, SessionStart staleness detection, an agent-facing query skill, and aligned documentation/config. Source: architect spec plan/architect-dh-workflow-extractor-system.md (#2646).
+issue: '2646'
+autonomy: full_auto
+tasks:
+- id: T01
+  title: Create scripts/enumerate_scope.py — deterministic BFS scope crawl 
+    producing SCOPE.md
+  status: not-started
+  agent: python-engineering:python-cli-architect
+  priority: 1
+  complexity: high
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T02
+  accuracy-risk: medium
+  reason: Root of the dependency spine. SCOPE.md is the contract consumed by the
+    SessionStart hook and the extraction pipeline. Deterministic — no LLM, no 
+    hallucination risk (ADR-1).
+  body: "## Context\nNew producer for the DH Workflow Extractor System. Performs deterministic
+    BFS from entry-point SKILL.md files to compute the full in-scope file set. Source:
+    architect spec plan/architect-dh-workflow-extractor-system.md §1.1, §2.1, §2.9,
+    §3.3, §4.1, ADR-1. This file does NOT exist yet (Codebase Audit: must create).\n\
+    \n## Objective\nProduce a deterministic `enumerate_scope.py` that crawls entry
+    points, resolves 4 reference types, and writes `docs/workflow-layers/SCOPE.md`
+    — one row per reachable file, stable output for identical input.\n\n## Inputs\n\
+    - Architect spec §1.1 (enumerate_scope.py interface), §2.1 (ScopeEntry / _RawScopeRow),
+    §2.9 (ResolvedRef), §3.3 (SCOPE.md format), §4.1 (module boundary)\n- Entry point
+    skill names (hardcoded constants): work-backlog-item, groom-milestone, work-milestone,
+    complete-milestone, create-milestone, start-milestone, group-items-to-milestone\n\
+    - plugin_root resolved from CLAUDE_PLUGIN_ROOT env var or CWD\n\n## Requirements\n\
+    1. Implement `enumerate_scope(entry_points: list[Path], plugin_root: Path, max_depth:
+    int = 15) -> list[ScopeEntry]` per the §1.1 signature.\n2. Implement `extract_references(file_path:
+    Path, plugin_root: Path) -> list[ResolvedRef]` detecting the 4 reference patterns
+    in §1.1: Mermaid node label containing `.md` path (resolve relative to referencing
+    file dir); `/dh:skill-name` or `Skill(skill='dh:...')` → `skills/skill-name/SKILL.md`;
+    `subagent_type=\"dh:agent-name\"` → `agents/agent-name.md`; prose `Load X.md`
+    / `Read references/...` (resolve relative path).\n3. Implement `write_scope_md(entries:
+    list[ScopeEntry], output_path: Path) -> None` writing the §3.3 markdown table
+    (columns: file_path, entry_point, reference_type, depth) with the header block.\n\
+    4. BFS visits each file at most once; stops at max_depth=15 (BFS depth, not file
+    count).\n5. Unresolvable reference paths are logged as warnings (use logging),
+    never raised as exceptions.\n6. Python 3.11+ stdlib-only. Use frozen dataclass
+    with slots for ScopeEntry and ResolvedRef per §2.1, §2.9. No `Any` in internal
+    code; `Any` only at parse boundary with immediate narrowing.\n7. Declare runtime
+    deps (if any beyond stdlib) in PEP 723 inline metadata; if stdlib-only, state
+    so in a comment.\n\n## Constraints\n- Do NOT perform any extraction logic, write
+    any layer JSON, or make any LLM calls — that is owned by other modules (§4.1 Does
+    NOT own).\n- Do NOT hardcode column positions when reading; SCOPE.md consumers
+    use the header row. (Producer side: emit a stable header.)\n- Do NOT edit reduce.py,
+    plan_ensemble.py, or any cross-plugin file.\n\n## Expected Outputs\n- `plugins/development-harness/scripts/enumerate_scope.py`
+    (new file)\n\n## Acceptance Criteria\n1. `enumerate_scope.py` exposes the three
+    functions with the exact §1.1 signatures.\n2. Running the script against the real
+    DH plugin produces `docs/workflow-layers/SCOPE.md` with ≥1 row per entry point
+    and the §3.3 header block present.\n3. All 4 reference types appear in `reference_type`
+    column values across the real output (or a warning explains any type with zero
+    matches).\n4. BFS terminates: a circular reference chain longer than 15 does not
+    produce more than 16 depth levels.\n5. An unresolvable reference produces a logged
+    warning and does not raise.\n6. `uv run ty check plugins/development-harness/scripts/enumerate_scope.py`
+    exits 0.\n7. `uv run prek run --files plugins/development-harness/scripts/enumerate_scope.py`
+    exits 0.\n\n## Verification Steps\n1. `uv run --script plugins/development-harness/scripts/enumerate_scope.py`
+    (or invoke main) and confirm SCOPE.md is written with the header block and a populated
+    table.\n2. `uv run ty check plugins/development-harness/scripts/enumerate_scope.py`
+    — expect exit 0.\n3. `uv run prek run --files plugins/development-harness/scripts/enumerate_scope.py`
+    — expect exit 0.\n4. Run: `git add plugins/development-harness/scripts/enumerate_scope.py`
+    then `git commit -m \"feat(workflow-extractor): add enumerate_scope.py deterministic
+    scope crawl\"`\n\n## Handoff\nReturn: file path, SCOPE.md row count, list of reference_type
+    values observed, ty/prek results, and confirmation that PEP 723 deps (if any)
+    must be mirrored to pyproject.toml in T15."
+  handoff: |-
+    Report SCOPE.md path, row count, and that all 4 reference types resolve. Confirm PEP 723 deps mirrored to pyproject.toml task T15.
+- id: T02
+  title: Create scripts/merge_layer.py — idempotent fragment→layer ETL with 
+    atomic writes and missing-file bootstrap
+  status: not-started
+  agent: python-engineering:python-cli-architect
+  priority: 1
+  complexity: high
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T01
+  accuracy-risk: medium
+  reason: Root of the dependency spine. The idempotent ETL that turns per-file 
+    extraction fragments into the step layer JSON. Required before 
+    dh-extract-file.js step 5 can run (ADR-1, §4.2).
+  body: "## Context\nNew producer for the DH Workflow Extractor System. Performs the
+    idempotent fragment→layer ETL: removes prior nodes from the same source file,
+    appends new verified nodes, writes atomically. Source: architect spec §1.1, §2.4,
+    §2.5, §2.10, §3.1, §3.4, §4.2. This file does NOT exist yet (Codebase Audit: must
+    create).\n\nNOTE (bootstrap gap resolution): §3.1 names step.json the primary
+    new layer file but no task pre-creates it. This task owns the missing-file bootstrap:
+    when the layer path does not exist, merge_layer creates it with an empty `{meta,
+    nodes, edges}` structure before merging. This satisfies the test in §9.2.4 without
+    a separate bootstrap step.\n\n## Objective\nProduce a deterministic, idempotent
+    `merge_layer.py` that merges an ExtractionFragment into a layer JSON file atomically,
+    isolating changes to the fragment's source_file, and bootstrapping the layer file
+    if absent.\n\n## Inputs\n- Architect spec §1.1 (merge_layer interface + MergeResult),
+    §2.4 (ExtractionFragment), §2.5 (LayerJSON), §2.10 (MergeResult), §3.1 (step.json
+    data model), §3.4 (fragment intermediate), §4.2 (module boundary + idempotency
+    invariant)\n\n## Requirements\n1. Implement `merge_fragment(layer_path: Path,
+    fragment: ExtractionFragment) -> MergeResult`, `read_layer(layer_path: Path) ->
+    LayerJSON`, `write_layer(layer_path: Path, layer: LayerJSON) -> None` per §1.1.\n\
+    2. Idempotency: `merge_fragment(layer, fragment)` produces identical output when
+    applied twice (§4.2 invariant). Achieve by removing all existing nodes whose `source_file`
+    matches the fragment's source_file before appending the fragment's items.\n3.
+    Atomicity: write to a `.tmp` path then `os.replace()` to the final path — never
+    leave a partial write (§1.1 contract).\n4. Source isolation: merging a fragment
+    for file A must not remove or alter nodes from file B (§4.2 contract, §9.2.2).\n\
+    5. Missing-file bootstrap: if `layer_path` does not exist, create it with `{\"\
+    meta\": {...}, \"nodes\": [], \"edges\": []}` then merge (resolves §9.2.4).\n\
+    6. Path matching: the fragment's `meta.source_file` is matched against the `source_file`
+    field of existing layer nodes. Mismatched paths produce a no-op removal (caller
+    normalises paths — document this in a docstring per §4.2 contract).\n7. Use frozen
+    dataclasses with slots for ExtractionFragment and MergeResult per §2.4, §2.10.
+    LayerJSON is a mutable @dataclass per §2.5. Python 3.11+ stdlib-only, no `Any`
+    in internal code.\n8. Implement `parse_extraction_fragment` (§2.4) and `parse_layer_json`
+    (§2.5) boundary parsers.\n9. JSON written without indentation (machine-readable;
+    repo rule: `json.dumps(data)` not `indent=N`).\n\n## Constraints\n- Do NOT generate
+    fragments (owned by dh-extract-file.js / reducer agent).\n- Do NOT write meta.json
+    (owned by the hook — §4.2 Does NOT own).\n- Do NOT perform graph assembly.\n-
+    Do NOT call os.replace before the .tmp write succeeds.\n\n## Expected Outputs\n\
+    - `plugins/development-harness/scripts/merge_layer.py` (new file)\n\n## Acceptance
+    Criteria\n1. `merge_fragment` is idempotent: applying the same fragment twice
+    yields byte-identical layer file content (§9.2.1).\n2. Merging a fragment for
+    source A leaves nodes from source B unchanged (§9.2.2 source isolation).\n3. A
+    simulated `os.replace` failure leaves the original layer file byte-identical (§9.2.3
+    atomicity).\n4. Merging into an absent layer_path creates the file and returns
+    removed_count=0 (§9.2.4 bootstrap).\n5. MergeResult carries removed_count, added_count,
+    total_after, layer_path per §2.10.\n6. `uv run ty check plugins/development-harness/scripts/merge_layer.py`
+    exits 0.\n7. `uv run prek run --files plugins/development-harness/scripts/merge_layer.py`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - Idempotency holds for
+    fragments containing both items and unverified_items.\n  - Atomic write never
+    corrupts the existing file on failure.\n- Verification questions:\n  1. After
+    two identical merges, does `read_layer` return the same node set and same total_after?\n\
+    \  2. If `os.replace` raises, is the pre-merge content still present and parseable?\n\
+    \  3. Does removing nodes by source_file accidentally remove edges referencing
+    surviving nodes?\n- Evidence to collect: outputs of the §9.2.1–9.2.4 tests (written
+    in T03), ty/prek exit codes.\n- Revision rule: if any idempotency/atomicity check
+    fails, fix and re-run before marking complete.\n\n## Verification Steps\n1. Run
+    the merge_layer test module (authored in T03) and confirm idempotency, isolation,
+    atomicity, and bootstrap tests pass.\n2. `uv run ty check plugins/development-harness/scripts/merge_layer.py`
+    — expect exit 0.\n3. `uv run prek run --files plugins/development-harness/scripts/merge_layer.py`
+    — expect exit 0.\n4. Run: `git add plugins/development-harness/scripts/merge_layer.py`
+    then `git commit -m \"feat(workflow-extractor): add merge_layer.py idempotent
+    fragment ETL\"`\n\n## Handoff\nReturn: file path, idempotency/atomicity confirmation,
+    bootstrap behaviour confirmation, ty/prek results, and PEP 723 deps to mirror
+    in T15."
+  handoff: |-
+    Report file path, the idempotency invariant test outcome, and confirm missing-layer-file bootstrap behaviour (creates step.json with empty nodes/edges).
+- id: T03
+  title: Write tests/test_enumerate_scope.py and tests/test_merge_layer.py
+  status: not-started
+  agent: python-engineering:python-pytest-architect
+  dependencies:
+  - T01
+  - T02
+  priority: 2
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: low
+  reason: 'Test-authorship independence (CLAUDE.md): the agent implementing the scripts
+    must not author their tests. Architect §9.1 and §9.2 supply the exact test bodies
+    to implement against the desired behaviour.'
+  body: "## Context\nTest tasks for enumerate_scope.py (T01) and merge_layer.py (T02).
+    Written independently of the implementation per the CLAUDE.md test-authorship-independence
+    rule. The architect spec §9.1 and §9.2 provide concrete test bodies (fixtures,
+    parametrize cases, assertions) — implement against those.\n\n## Objective\nProduce
+    two pytest modules that verify enumerate_scope BFS correctness/termination/reference-type
+    detection and merge_layer idempotency/isolation/atomicity/bootstrap, authored
+    against the spec's desired behaviour (not the implementation).\n\n## Inputs\n\
+    - Architect spec §9.1 (test_enumerate_scope.py: mock_plugin fixture, traversal-finds-all,
+    no-revisit, max-depth termination, reference-type parametrize, unresolvable-no-crash)\n\
+    - Architect spec §9.2 (test_merge_layer.py: idempotency, source isolation, atomicity
+    via monkeypatched os.replace, empty-layer bootstrap)\n- The implemented modules
+    from T01, T02\n\n## Requirements\n1. Create `tests/test_enumerate_scope.py` implementing
+    all §9.1 cases: 9.1.1 traversal correctness + no-revisit, 9.1.2 depth-15 termination,
+    9.1.3 each reference type (parametrized over the 4 patterns), 9.1.4 unresolvable-path-logged-not-raised.\n\
+    2. Create `tests/test_merge_layer.py` implementing all §9.2 cases: 9.2.1 idempotency,
+    9.2.2 source isolation, 9.2.3 atomicity (monkeypatch os.replace to raise OSError),
+    9.2.4 empty/missing-layer bootstrap.\n3. Use `tmp_path` fixtures; build synthetic
+    plugin trees as in §9.1.1. No reliance on real repo files.\n4. Follow repo pytest
+    conventions: snake_case names, AAA structure, behavioural test names.\n5. Coverage
+    target: 90% for the critical paths (merge idempotency, scope traversal correctness)
+    per §9 intro.\n\n## Constraints\n- Do NOT modify enumerate_scope.py or merge_layer.py.
+    If a test reveals a behaviour gap, report it as a finding for the implementing
+    task to fix — do not silently edit the implementation.\n- Do NOT use synthetic
+    mocks where the spec specifies real file-tree fixtures.\n\n## Expected Outputs\n\
+    - `tests/test_enumerate_scope.py` (new file)\n- `tests/test_merge_layer.py` (new
+    file)\n\n## Acceptance Criteria\n1. `uv run pytest tests/test_enumerate_scope.py`
+    passes all §9.1 cases.\n2. `uv run pytest tests/test_merge_layer.py` passes all
+    §9.2 cases (idempotency, isolation, atomicity, bootstrap).\n3. The 4 reference
+    types are each covered by a distinct parametrize case (§9.1.3).\n4. Atomicity
+    test monkeypatches os.replace to raise and asserts the original file is intact
+    (§9.2.3).\n5. `uv run prek run --files tests/test_enumerate_scope.py tests/test_merge_layer.py`
+    exits 0.\n\n## Verification Steps\n1. `uv run pytest tests/test_enumerate_scope.py
+    tests/test_merge_layer.py -v` — expect all pass.\n2. `uv run prek run --files
+    tests/test_enumerate_scope.py tests/test_merge_layer.py` — expect exit 0.\n3.
+    Run: `git add tests/test_enumerate_scope.py tests/test_merge_layer.py` then `git
+    commit -m \"test(workflow-extractor): add enumerate_scope and merge_layer tests\"\
+    `\n\n## Handoff\nReturn: both file paths, pass/fail counts, coverage on critical
+    paths, and any spec-vs-impl behaviour gaps discovered (as findings, not silent
+    fixes)."
+  handoff: |-
+    Report both test file paths, pass/fail counts, and any behaviour gaps found between spec and implementation (report as findings, do not patch impl silently).
+- id: T04
+  title: Rewrite docs/graph-schema.md to match the PRD/architect data model (no 
+    old step schema retained)
+  status: not-started
+  agent: dh:service-docs-maintainer
+  priority: 2
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T05
+  - T06
+  accuracy-risk: high
+  reason: 'Schema is the contract for the step layer JSON. Architect concern: the
+    rewrite must NOT retain the old step schema — it is incompatible with the PRD
+    schema. Must precede creating step layer JSON files.'
+  body: "## Context\nThe DH workflow graph schema doc must be rewritten to match the
+    new data model in the architect spec §3 (step.json, gap edges, node ID convention,
+    verified-flag semantics) and §2 (type system). Architect concern (explicit): the
+    rewrite must NOT retain the old step schema — it is incompatible with the PRD
+    schema. Source: architect §1.2 content-only updates table, §3.1–3.5.\n\n## Objective\n\
+    Replace docs/graph-schema.md so it documents exactly the new data model: step
+    node shape (§2.2 / §3.1), gap edge shape (§2.3), next/triggered_by edge types,
+    node ID convention, verified-flag semantics, meta.json, SCOPE.md, fragment, and
+    miss-log formats — with zero residue of the prior incompatible step schema.\n\n\
+    ## Inputs\n- Architect spec §2 (Type System), §3 (Data Model — step.json, meta.json,
+    SCOPE.md, fragment, miss log)\n- Current `plugins/development-harness/docs/graph-schema.md`
+    (to identify and remove the old step schema)\n\n## Requirements\n1. Document the
+    step node schema exactly per §3.1 / §2.2 (_RawStepNode fields: id, type, label,
+    actor, source_file, source_heading, verified, conditional, condition, mcp_calls,
+    reads_artifacts, writes_artifacts, dispatches, metadata).\n2. Document the gap
+    edge schema per §2.3 / §3.1 (type=gap, verified=false, gap=true, source/target,
+    source_file, source_heading) and the `next` edge type.\n3. Document the node ID
+    convention: `step.{route}.{reference-file-slug}.{actor-slug}.{action-slug}` (lowercase,
+    hyphens→dots, special chars stripped).\n4. Document verified-flag semantics (true
+    = sonnet CONFIRMED with ≥80% evidence match; false = PLAUSIBLE or weight-1).\n\
+    5. Document meta.json (§3.2), SCOPE.md (§3.3), fragment (§3.4), and miss-log (§3.5)
+    formats.\n6. Remove ALL content describing the prior/incompatible step schema.
+    The rewrite replaces, it does not append.\n7. Follow repo markdown standards:
+    language-fenced code blocks, `./` relative links, blank lines around fences.\n\
+    \n## Constraints\n- Do NOT retain any field, example, or description from the
+    old step schema that conflicts with §3.1.\n- Do NOT invent fields not present
+    in §2/§3.\n- Do NOT add derived counts (repo No-Derived-Data rule).\n\n## Expected
+    Outputs\n- `plugins/development-harness/docs/graph-schema.md` (rewritten)\n\n\
+    ## Acceptance Criteria\n1. graph-schema.md documents step node, gap edge, and
+    next edge exactly matching §2.2/§2.3/§3.1 field names.\n2. The node ID convention
+    and verified-flag semantics from §3.1 are present.\n3. meta.json, SCOPE.md, fragment,
+    and miss-log formats are documented per §3.2–3.5.\n4. No old step-schema markers
+    remain: a grep for the prior schema's distinctive field names/markers returns
+    zero matches (identify those markers from the current file before rewriting and
+    list them in the handoff).\n5. `uv run prek run --files plugins/development-harness/docs/graph-schema.md`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - Every documented field
+    name matches the architect spec §2/§3 exactly (no drift).\n  - No prior-schema
+    field survives the rewrite.\n- Verification questions:\n  1. Does each field name
+    in the doc appear verbatim in §2.2/§2.3/§3.1?\n  2. Does a grep for the old schema's
+    distinctive markers (enumerated before rewrite) return zero?\n  3. Are gap edges
+    documented as type=gap with verified=false (not omitted)?\n- Evidence to collect:
+    the list of old-schema markers grepped (before/after), the diff between old and
+    new field sets.\n- Revision rule: if any old-schema marker remains or any field
+    name drifts from the spec, revise before completing.\n\n## Verification Steps\n\
+    1. Before rewriting: grep the current graph-schema.md for old step-schema field
+    names; record them.\n2. After rewriting: re-run the same grep; expect zero matches.\n\
+    3. `uv run prek run --files plugins/development-harness/docs/graph-schema.md`
+    — expect exit 0.\n4. Run: `git add plugins/development-harness/docs/graph-schema.md`
+    then `git commit -m \"docs(workflow-extractor): rewrite graph-schema.md for new
+    step data model\"`\n\n## Handoff\nReturn: file path, the list of old-schema markers
+    removed, before/after grep counts, prek result."
+  handoff: |-
+    Report the file path and confirm (via grep) that no old/incompatible step-schema markers remain.
+- id: T05
+  title: Replace docs/workflow-layers/extraction-rules.json with 9 step-centric 
+    rule groups
+  status: not-started
+  agent: dh:service-docs-maintainer
+  priority: 2
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T04
+  - T06
+  accuracy-risk: medium
+  reason: extraction-rules.json is plan_ensemble.py input and the rule source 
+    the worker agent applies. Must precede workflow-extractor-worker.md (T07) 
+    which reads the rules, and is consumed by the plan_ensemble verification 
+    gate.
+  body: "## Context\nReplace the 6 fork-centric extraction rules with the 9 step-centric
+    rule groups defined verbatim in architect spec §1.2 (extraction-rules.json new
+    format). This file is the input to plan_ensemble.py and the rule source the haiku
+    worker applies. Source: architect §1.2, §4.8, §8.1 (window=4 expects exactly 9
+    groups).\n\n## Objective\nProduce extraction-rules.json containing exactly the
+    9 step-centric groups (keys \"1\"–\"9\") from §1.2, valid as plan_ensemble.py
+    input.\n\n## Inputs\n- Architect spec §1.2 (the literal 9-group JSON), §4.8 (inter-module
+    contract: keys 1-9, each non-empty list[str]), §8.1 (window=4, 9 workers)\n- Current
+    `plugins/development-harness/docs/workflow-layers/extraction-rules.json` (6 fork
+    rules to replace)\n\n## Requirements\n1. Write the 9 groups exactly as specified
+    in §1.2: (1) numbered/bulleted steps with actor+action; (2) conditional guards;
+    (3) artifact reads; (4) artifact writes; (5) agent dispatch; (6) file-reference
+    expansion; (7) skill invocations; (8) MCP tool calls full+short form; (9) actor
+    topology.\n2. JSON object with string keys \"1\"–\"9\", each mapping to a non-empty
+    `list[str]` (§4.8 contract).\n3. Remove all 6 prior fork-centric rules — this
+    is a replacement.\n4. JSON without indentation per repo rule (machine-readable
+    consumer plan_ensemble.py).\n\n## Constraints\n- Do NOT keep any of the 6 old
+    fork rules.\n- Do NOT add a 10th group or rename keys — plan_ensemble.py with
+    window=4 expects exactly 9 groups (§8.1).\n- Do NOT alter plan_ensemble.py.\n\n\
+    ## Expected Outputs\n- `plugins/development-harness/docs/workflow-layers/extraction-rules.json`
+    (replaced)\n\n## Acceptance Criteria\n1. The file is a JSON object with exactly
+    keys \"1\" through \"9\", each a non-empty list of strings.\n2. The group contents
+    match §1.2 (step-centric, not fork-centric).\n3. `python3 -c \"import json; d=json.load(open('plugins/development-harness/docs/workflow-layers/extraction-rules.json'));
+    assert set(d)=={str(i) for i in range(1,10)}; assert all(isinstance(v,list) and
+    v for v in d.values())\"` exits 0.\n4. `uv run prek run --files plugins/development-harness/docs/workflow-layers/extraction-rules.json`
+    exits 0.\n\n## Verification Steps\n1. Run the python3 assertion in AC3 — expect
+    exit 0.\n2. `uv run prek run --files plugins/development-harness/docs/workflow-layers/extraction-rules.json`
+    — expect exit 0.\n3. Run: `git add plugins/development-harness/docs/workflow-layers/extraction-rules.json`
+    then `git commit -m \"feat(workflow-extractor): replace fork rules with 9 step-centric
+    groups\"`\n\n## Handoff\nReturn: file path, the AC3 assertion result, prek result,
+    and confirmation that 9 groups are present (feeds the T11 plan_ensemble verification
+    gate)."
+  handoff: |-
+    Report file path and confirm the JSON validates as plan_ensemble.py input (object with keys 1-9, each a non-empty list[str]).
+- id: T06
+  title: Update docs/workflow-layers/KNOWN_ENTITIES.md — retire 
+    workflow-extractor.md, add worker + reducer agents
+  status: not-started
+  agent: dh:service-docs-maintainer
+  priority: 2
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T04
+  - T05
+  accuracy-risk: low
+  reason: KNOWN_ENTITIES.md is the vocabulary oracle the haiku worker reads 
+    before extracting (§5.1 step 3). It must list the two new agents and drop 
+    the retired one before the worker agent is created/used.
+  body: "## Context\nKNOWN_ENTITIES.md is the canonical entity reference the haiku
+    worker validates extracted entities against (architect §5.1 step 3: \"This is
+    your vocabulary oracle\"). It must be updated: remove the retired `workflow-extractor.md`
+    agent entry, add `workflow-extractor-worker.md` and `workflow-extractor-reducer.md`.
+    Source: architect §1.2 (KNOWN_ENTITIES.md CONTENT_UPDATE — no schema change).\n\
+    \n## Objective\nUpdate KNOWN_ENTITIES.md so its agent entries reflect the new
+    extraction ensemble: retired agent removed, two new agents added, no schema change.\n\
+    \n## Inputs\n- Architect spec §1.2 (KNOWN_ENTITIES.md action), §5.1 / §5.2 (the
+    two new agent names and roles)\n- Current `plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md`\n\
+    \n## Requirements\n1. Remove the `workflow-extractor.md` (retired single-agent)
+    entry.\n2. Add `workflow-extractor-worker.md` (haiku worker) and `workflow-extractor-reducer.md`
+    (sonnet verifier) entries, matching the existing entry format for agents.\n3.
+    Preserve all other entries and the file's existing schema/format (no schema change
+    per §1.2).\n\n## Constraints\n- Do NOT change the file schema or reorder unrelated
+    entries.\n- Do NOT add entities not introduced by this feature.\n\n## Expected
+    Outputs\n- `plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md`
+    (updated)\n\n## Acceptance Criteria\n1. `workflow-extractor.md` no longer appears
+    as an agent entry.\n2. `workflow-extractor-worker.md` and `workflow-extractor-reducer.md`
+    both appear, formatted like existing agent entries.\n3. `uv run prek run --files
+    plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md` exits 0.\n\
+    \n## Verification Steps\n1. grep for `workflow-extractor.md` (exact, not the new
+    names) — expect zero standalone matches.\n2. grep for `workflow-extractor-worker`
+    and `workflow-extractor-reducer` — expect ≥1 each.\n3. `uv run prek run --files
+    plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md` — expect exit
+    0.\n4. Run: `git add plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md`
+    then `git commit -m \"docs(workflow-extractor): retire workflow-extractor, add
+    worker+reducer to KNOWN_ENTITIES\"`\n\n## Handoff\nReturn: file path, grep results
+    confirming the swap, prek result."
+  handoff: |-
+    Report file path and confirm workflow-extractor.md removed, workflow-extractor-worker.md and workflow-extractor-reducer.md added.
+- id: T07
+  title: 'reduce.py upstream changes (plugin-creator): slug-normalised heading keys
+    + cross_group signal, behind backward-compat gate'
+  status: in-progress
+  agent: python-engineering:python-cli-architect
+  priority: 2
+  complexity: high
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T01
+  - T02
+  - T04
+  - T05
+  - T06
+  accuracy-risk: high
+  reason: Cross-plugin contribution (ADR-4). reduce.py is owned by 
+    plugin-creator; DH must NOT call it until these changes land behind a 
+    passing backward-compat gate. Required before dh-extract-file.js integration
+    (T10).
+  body: "## Context\nThe ensemble reducer `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`
+    needs 2 changes for the step-extraction use case (architect §8.2, ADR-4). DH does
+    NOT own this file — changes are contributed upstream to plugin-creator. A backward-compat
+    gate (§8.3) decides upstream-edit vs DH-owned wrapper. This file already exists
+    (fact-checked: reduce.py exists).\n\n## Objective\nApply Change 1 (slug-normalised
+    heading keys in normalize_location) and Change 2 (cross_group flag on Merged)
+    to reduce.py, gated by the §8.3 backward-compat protocol; fall back to a DH wrapper
+    (scripts/dh_reduce.py) only if backward-compat breaks.\n\n## Inputs\n- Architect
+    spec §8.2 (exact code for both changes + backward-compat tests), §8.3 (verification
+    protocol + wrapper fallback), ADR-4\n- Current `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`\n\
+    - Load `/plugin-creator:ensemble-rule-review` to understand the reducer design
+    intent before editing.\n\n## Requirements\n1. Change 1 — in `normalize_location()`:
+    when no line-number match, normalise the heading portion. Split on first `:`,
+    apply `re.sub(r'[^a-z0-9]+', '_', heading.strip().lower()).strip('_')` to the
+    heading part, return `f\"{path_part}:{slug}\"`. Preserve existing line-number
+    behaviour unchanged (architect §8.2 Change 1 code).\n2. Change 2 — add `groups_seen:
+    set[str]` field to `Merged` and a `cross_group` property returning `len(self.groups_seen)
+    >= 2`. In `reduce_findings()`, add `finding.group` to `entry.groups_seen` when
+    merging. In `format_report()`, include `cross_group=True` in output lines where
+    `m.cross_group` (architect §8.2 Change 2 code).\n3. Run the §8.3 backward-compat
+    protocol IN ORDER: (a) run existing reduce.py test suite — all pass; (b) run the
+    §8.2 backward-compat tests; (c) run the full ensemble on a real extraction-rules.json
+    sample and confirm output is semantically equivalent (same findings + cross_group
+    annotations).\n4. If backward-compat breaks: do NOT fork reduce.py. Create `plugins/development-harness/scripts/dh_reduce.py`
+    (PEP 723) importing reduce.py functions and applying slug-normalisation + cross-group
+    as post-processing (architect §8.3 fallback). Attempt upstream edit FIRST.\n\n\
+    ## Constraints\n- Do NOT fork/copy reduce.py wholesale.\n- Do NOT change the existing
+    line-number normalisation behaviour.\n- Do NOT create dh_reduce.py proactively
+    — only if the gate fails (ADR-4 consequence).\n- Do NOT break the existing reduce.py
+    public API consumed by other ensemble callers.\n\n## Expected Outputs\n- `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`
+    (edited) OR `plugins/development-harness/scripts/dh_reduce.py` (fallback wrapper)
+    — exactly one path taken\n\n## Acceptance Criteria\n1. `normalize_location('src/foo.md:42')
+    == 'src/foo.md:42'` and `normalize_location('/abs/src/foo.md:42') == 'src/foo.md:42'`
+    (line-number behaviour unchanged).\n2. `normalize_location('groom/swarm.md:##
+    Wave 1 — impact-analyst') == 'groom/swarm.md:wave_1_impact_analyst'` and the em-dash
+    and hyphen variants produce the same key (architect §8.2 Change 1 tests).\n3.
+    cross_group is False for single-group corroboration and True for ≥2 distinct groups
+    at the same location (architect §8.2 Change 2 tests).\n4. The existing reduce.py
+    test suite passes unchanged.\n5. The full-ensemble semantic-equivalence check
+    (§8.3 step 3) passes.\n6. `uv run ty check` and `uv run prek run --files <edited
+    file>` exit 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - Line-number normalisation
+    is byte-for-byte unchanged.\n  - cross_group does not change the set of surviving
+    findings, only annotates them.\n  - format_report does not crash on the prior
+    report format.\n- Verification questions:\n  1. Do all four §8.2 normalize_location
+    assertions hold?\n  2. Do both cross_group assertions hold?\n  3. Does the existing
+    reduce.py suite pass with zero new failures?\n  4. Is the ensemble ranked output
+    semantically equivalent (same findings) before and after?\n- Evidence to collect:
+    existing-suite results, §8.2 doctest/assert outputs, the semantic-equivalence
+    diff.\n- Revision rule: if backward-compat breaks at any step, switch to the dh_reduce.py
+    wrapper path and document why in the handoff.\n\n## Verification Steps\n1. Run
+    the existing reduce.py test suite — expect all pass.\n2. Run the §8.2 backward-compat
+    tests (added in T08) — expect all pass.\n3. Run the full ensemble on a real extraction-rules.json
+    sample; compare findings before/after for semantic equivalence.\n4. `uv run ty
+    check <edited file>` and `uv run prek run --files <edited file>` — expect exit
+    0.\n5. Run: `git add <edited file>` then `git commit -m \"feat(ensemble-rule-review):
+    slug-normalise heading keys and add cross_group signal\"` (scope = ensemble-rule-review
+    for upstream edit, or development-harness for the wrapper).\n\n## Handoff\nReturn:
+    path taken (upstream edit vs wrapper) and why, all backward-compat results, existing-suite
+    result, semantic-equivalence outcome, ty/prek results."
+  handoff: |-
+    Report which path was taken (upstream edit vs dh_reduce.py wrapper), backward-compat test results, and that the existing reduce.py suite still passes.
+  started: '2026-06-20T10:58:42.148120+00:00'
+- id: T08
+  title: Write reduce.py change tests (normalize_location slug, cross_group) per
+    architect §8.2/§9.3
+  status: not-started
+  agent: python-engineering:python-pytest-architect
+  dependencies:
+  - T07
+  priority: 3
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: low
+  reason: 'Test-authorship independence: the reduce.py change author must not author
+    the gate tests. Architect §8.2 and §9.3 supply exact test bodies; these formalise
+    the backward-compat gate.'
+  body: "## Context\nFormalise the backward-compat gate for the reduce.py changes
+    (T07) as a pytest module. Architect §9.3 specifies the location (alongside reduce.py
+    or in a tests/ subdir of plugin-creator) and §8.2/§9.3 give exact test bodies.
+    Written independently of T07's implementation.\n\n## Objective\nProduce a pytest
+    module covering normalize_location slug-normalisation, line-number invariance,
+    em-dash/hyphen equivalence, and cross_group detection, matching architect §9.3
+    exactly.\n\n## Inputs\n- Architect spec §9.3 (the 5 named test functions), §8.2
+    (assertion bodies)\n- The reduce.py changes from T07 (or dh_reduce.py if the wrapper
+    path was taken)\n\n## Requirements\n1. Implement `test_normalize_location_heading_slug`,
+    `test_normalize_location_heading_dash_equivalence`, `test_normalize_location_line_number_unchanged`,
+    `test_cross_group_detected`, `test_single_group_not_cross_group` per §9.3.\n2.
+    Place the test file per §9.3 (alongside reduce.py in ensemble-rule-review/scripts,
+    or that plugin's tests/ subdir). If T07 took the wrapper path, target dh_reduce.py
+    instead and note this.\n3. Follow repo pytest conventions (snake_case, AAA, behavioural
+    names).\n\n## Constraints\n- Do NOT modify reduce.py or dh_reduce.py. Report behaviour
+    gaps as findings.\n- Do NOT weaken the line-number-unchanged assertions — they
+    guard backward-compat.\n\n## Expected Outputs\n- Test file for the reduce.py changes
+    (path per §9.3, e.g. `plugins/plugin-creator/skills/ensemble-rule-review/scripts/test_reduce.py`
+    or a tests/ subdir) — new file\n\n## Acceptance Criteria\n1. All 5 §9.3 test functions
+    are present and pass against the T07 implementation.\n2. Line-number-unchanged
+    tests pass (backward-compat guard).\n3. em-dash and hyphen heading variants assert
+    equal keys.\n4. `uv run pytest <test file>` exits 0.\n5. `uv run prek run --files
+    <test file>` exits 0.\n\n## Verification Steps\n1. `uv run pytest <test file>
+    -v` — expect all 5 pass.\n2. `uv run prek run --files <test file>` — expect exit
+    0.\n3. Run: `git add <test file>` then `git commit -m \"test(ensemble-rule-review):
+    add reduce.py slug-normalise and cross_group tests\"` (scope matches the file
+    location).\n\n## Handoff\nReturn: test file path, per-case pass/fail, any behaviour
+    gap found vs T07."
+  handoff: |-
+    Report test file path/location and pass/fail for each §9.3 case.
+- id: T09
+  title: Create agents/workflow-extractor-worker.md — haiku fleet worker (9 
+    step-centric rule groups)
+  status: not-started
+  agent: plugin-creator:agent-creator
+  dependencies:
+  - T05
+  - T06
+  priority: 3
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T12
+  accuracy-risk: high
+  reason: Haiku extraction worker. Reads extraction-rules.json (T05) and 
+    KNOWN_ENTITIES.md (T06) so both must exist first. Fidelity of the whole 
+    graph depends on this agent's instruction contract.
+  body: "## Context\nCreate the haiku fleet worker agent for the DH workflow ensemble.
+    It reads ONE source file, applies ONE rule-group slice, and emits fixed-schema
+    findings consumed by reduce.py. This file does NOT exist (fact-checked). Source:
+    architect §1.1, §4.4, §5.1 (full body spec). Load `/plugin-creator:agent-creator`
+    for agent authoring conventions.\n\n## Objective\nProduce workflow-extractor-worker.md
+    with the exact frontmatter and the 8-point body instruction contract from §5.1,
+    written as an effective haiku-targeted prompt.\n\n## Inputs\n- Architect spec
+    §5.1 (frontmatter + 8-point body contract + what-NOT-to-include), §4.4 (module
+    boundary), §2.7 (FindingSchema output shape)\n- extraction-rules.json (T05) —
+    the 9 groups the worker applies\n- KNOWN_ENTITIES.md (T06) — the vocabulary oracle
+    the worker validates against\n\n## Requirements\n1. Frontmatter exactly per §5.1:
+    name=workflow-extractor-worker, model=claude-haiku-4-5, tools=Read, Grep, Write,
+    and the specified description (states \"Use only when dispatched by dh-extract-file.js;
+    do not invoke directly\").\n2. Body must contain, in order, all 8 §5.1 points:
+    (1) role declaration (mechanical, one file/one slice, no judgments); (2) input
+    parsing (source_file, rule_group_id, rules, outfile, known_entities_path); (3)
+    pre-extraction read of known_entities_path as vocabulary oracle + alias resolution
+    to canonical names; (4) evidence-source constraint (body content only, NOT frontmatter);
+    (5) fixed output schema (group/rule/location/verdict/severity/evidence YAML, evidence
+    ≤200 chars); (6) PASS verdict when no instances found; (7) write discipline (Write
+    to outfile absolute path, not stdout, not message text); (8) stop condition `STATUS:
+    DONE — wrote N findings to {outfile}`.\n3. Location format must be `relative/path.md:##
+    Exact Section Heading` (§4.4 contract).\n4. Honour the what-NOT-to-include list
+    (§5.1): no skill references, no MCP calls, no agent dispatch, no references to
+    report_dir/reduce.py.\n\n## Constraints\n- Do NOT give the worker tools beyond
+    Read, Grep, Write (frontmatter tools field exact — wildcards silently strip tools).\n\
+    - Do NOT include any instruction that requires the worker to read multiple files
+    or follow references (§4.4 Does NOT own).\n- Do NOT add a STATUS-silent path —
+    explicit STATUS: DONE required (repo agent-output-contracts rule).\n\n## Expected
+    Outputs\n- `plugins/development-harness/agents/workflow-extractor-worker.md` (new
+    file)\n\n## Acceptance Criteria\n1. Frontmatter matches §5.1 exactly (name, description,
+    model=claude-haiku-4-5, tools: Read, Grep, Write).\n2. All 8 body contract points
+    from §5.1 are present and ordered.\n3. The output schema block matches §2.7/§5.1
+    (group, rule, location, verdict, severity, evidence; evidence ≤200 chars).\n4.
+    The what-NOT-to-include items are absent from the body.\n5. `uvx skilllint@latest
+    check plugins/development-harness/agents/workflow-extractor-worker.md` exits 0.\n\
+    6. `uv run prek run --files plugins/development-harness/agents/workflow-extractor-worker.md`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The evidence-source constraint
+    (body only, not frontmatter) is explicit.\n  - The PASS-verdict instruction is
+    present (reducer needs to know the worker ran).\n  - tools field is exactly Read,
+    Grep, Write.\n- Verification questions:\n  1. Does the body instruct the worker
+    to read known_entities_path BEFORE the source file?\n  2. Is the location format
+    `path.md:## Heading` specified verbatim?\n  3. Does the body forbid skill/MCP/dispatch
+    usage?\n- Evidence to collect: skilllint output, a side-by-side of the 8 points
+    vs §5.1.\n- Revision rule: if any of the 8 points is missing or the tools field
+    drifts, revise before completing.\n\n## Verification Steps\n1. `uvx skilllint@latest
+    check plugins/development-harness/agents/workflow-extractor-worker.md` — expect
+    exit 0.\n2. `uv run prek run --files plugins/development-harness/agents/workflow-extractor-worker.md`
+    — expect exit 0.\n3. Confirm by inspection all 8 §5.1 body points present and
+    the what-NOT list absent.\n4. Run: `git add plugins/development-harness/agents/workflow-extractor-worker.md`
+    then `git commit -m \"feat(workflow-extractor): add workflow-extractor-worker
+    haiku agent\"`\n\n## Handoff\nReturn: file path, frontmatter summary, checklist
+    of the 8 §5.1 points, skilllint/prek results."
+  handoff: |-
+    Report agent file path, frontmatter (model=claude-haiku-4-5, tools=Read,Grep,Write), and that all 8 body-spec contract points from §5.1 are present.
+- id: T10
+  title: Create agents/workflow-extractor-reducer.md — sonnet verifier (active 
+    evidence check + miss log)
+  status: not-started
+  agent: plugin-creator:agent-creator
+  priority: 3
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T09
+  accuracy-risk: high
+  reason: Sonnet verifier agent. Reads reduce.py ranked output, verifies 
+    evidence citations, votes CONFIRMED/PLAUSIBLE/REFUTED, writes the fragment 
+    JSON and miss log. The active evidence check is what prevents hallucinated 
+    citations entering the layer.
+  body: "## Context\nCreate the sonnet verifier agent. It does not extract — it verifies
+    findings that survived corroboration (reduce.py output), votes CONFIRMED/PLAUSIBLE/REFUTED
+    against the source citation, writes the fragment JSON and the miss log. This file
+    does NOT exist (fact-checked). Source: architect §1.1, §4.5, §5.2 (full body spec),
+    §2.4 (fragment shape), §3.5 (miss log). Load `/plugin-creator:agent-creator`.\n\
+    \n## Objective\nProduce workflow-extractor-reducer.md with the exact frontmatter
+    and the 8-point body contract from §5.2, including the active evidence check and
+    miss-log protocol.\n\n## Inputs\n- Architect spec §5.2 (frontmatter + 8-point
+    body contract), §4.5 (module boundary + vote semantics), §2.4 (ExtractionFragment),
+    §3.4 (fragment file), §3.5 (miss log format)\n\n## Requirements\n1. Frontmatter
+    exactly per §5.2: name=workflow-extractor-reducer, model=claude-sonnet-4-5, tools=Read,
+    Write, and the specified description (\"Use only when dispatched by dh-extract-file.js\"\
+    ).\n2. Body must contain, in order, all 8 §5.2 points: (1) role declaration (verify,
+    not extract); (2) input parsing (source_file, reduce_output_path, fragment_output_path,
+    miss_log_path, layer_type); (3) per-finding verification protocol (parse location,
+    read source at heading, search evidence ≥80% overlap, vote CONFIRMED/PLAUSIBLE/REFUTED
+    with the exact definitions); (4) fragment JSON output shape per §2.4/§5.2 (meta
+    with verified_count/unverified_count, items, unverified_items); (5) miss-log protocol
+    (weight-1 CONFIRMED findings → miss log with group/location/evidence/rule_slug
+    + one-sentence pattern note); (6) active evidence check (CONFIRM source_file matches,
+    heading exists, evidence appears — else move to unverified_items); (7) write discipline
+    (fragment to fragment_output_path; miss log only if weight-1 CONFIRMED exist);
+    (8) stop condition `STATUS: DONE — verified_count={N} plausible={P} refuted={R}
+    misses={M}`.\n3. REFUTED findings go to unverified_items; weight-1 CONFIRMED go
+    to miss log (§4.5).\n\n## Constraints\n- Do NOT give tools beyond Read, Write
+    (exact frontmatter tools field).\n- Do NOT instruct the reducer to extract new
+    findings or perform corroboration (owned by reduce.py, §4.5 Does NOT own).\n-
+    Do NOT add a silent-completion path — explicit STATUS required.\n\n## Expected
+    Outputs\n- `plugins/development-harness/agents/workflow-extractor-reducer.md`
+    (new file)\n\n## Acceptance Criteria\n1. Frontmatter matches §5.2 exactly (name,
+    description, model=claude-sonnet-4-5, tools: Read, Write).\n2. All 8 body contract
+    points from §5.2 are present and ordered.\n3. The active evidence check (point
+    6) explicitly lists the three CONFIRM conditions and the move-to-unverified_items
+    fallback.\n4. The miss-log protocol (point 5) targets weight-1 CONFIRMED findings
+    only and includes a pattern-analysis note.\n5. Vote definitions (CONFIRMED ≥80%
+    match, PLAUSIBLE section exists no exact quote, REFUTED section missing/fabricated)
+    match §5.2 / §4.5.\n6. `uvx skilllint@latest check plugins/development-harness/agents/workflow-extractor-reducer.md`
+    exits 0.\n7. `uv run prek run --files plugins/development-harness/agents/workflow-extractor-reducer.md`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The active evidence check
+    prevents hallucinated citations (the design purpose).\n  - REFUTED routing and
+    weight-1 miss-log routing are both explicit.\n- Verification questions:\n  1.
+    Does the body require confirming the cited heading exists before writing to items[]?\n\
+    \  2. Are CONFIRMED/PLAUSIBLE/REFUTED defined with the ≥80% threshold?\n  3. Is
+    the fragment JSON shape exactly §2.4/§5.2 (verified_count/unverified_count, items,
+    unverified_items)?\n- Evidence to collect: skilllint output, side-by-side of 8
+    points vs §5.2.\n- Revision rule: if the active evidence check or any vote definition
+    is missing/loose, revise before completing.\n\n## Verification Steps\n1. `uvx
+    skilllint@latest check plugins/development-harness/agents/workflow-extractor-reducer.md`
+    — expect exit 0.\n2. `uv run prek run --files plugins/development-harness/agents/workflow-extractor-reducer.md`
+    — expect exit 0.\n3. Inspect all 8 §5.2 points present, vote definitions and active
+    evidence check explicit.\n4. Run: `git add plugins/development-harness/agents/workflow-extractor-reducer.md`
+    then `git commit -m \"feat(workflow-extractor): add workflow-extractor-reducer
+    sonnet agent\"`\n\n## Handoff\nReturn: file path, frontmatter summary, checklist
+    of the 8 §5.2 points, skilllint/prek results."
+  handoff: |-
+    Report agent file path, frontmatter (model=claude-sonnet-4-5, tools=Read,Write), and that the active-evidence-check (§5.2 point 6) and miss-log protocol (point 5) are present.
+- id: T11
+  title: Verify plan_ensemble.py backward-compat with 9-group 
+    extraction-rules.json (no code change)
+  status: not-started
+  agent: python-engineering:python-cli-architect
+  dependencies:
+  - T05
+  priority: 3
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T09
+  - T10
+  accuracy-risk: high
+  reason: VERIFY_COMPATIBLE gate (§8.1). plan_ensemble.py needs no code change 
+    but the 9-group rules + window=4 contract must be empirically verified 
+    before any DH integration test uses it. Gate for T12 integration.
+  body: "## Context\nplan_ensemble.py (plugin-creator) requires no code change but
+    its compatibility with the new 9-group extraction-rules.json (T05) and the DH
+    caller contract (--window 4, absolute --report-dir) must be empirically verified
+    before any DH integration uses it. Source: architect §1.2 (VERIFY_COMPATIBLE),
+    §8.1 (exact verification gate command). This file exists (fact-checked).\n\n##
+    Objective\nRun the §8.1 verification gate and confirm: 9 workers (one per group),
+    window=4, uniform redundancy=4, each outfile an absolute path. Produce a PASS/FAIL
+    verdict (no code edit).\n\n## Inputs\n- Architect spec §8.1 (the literal verification
+    command + assertions), §4.8 (extraction-rules.json contract)\n- extraction-rules.json
+    from T05 (must exist with 9 groups)\n- `plugins/plugin-creator/skills/ensemble-rule-review/scripts/plan_ensemble.py`\n\
+    \n## Requirements\n1. Run the §8.1 gate command from repo root:\n   `uv run --script
+    plugins/plugin-creator/skills/ensemble-rule-review/scripts/plan_ensemble.py plugins/development-harness/docs/workflow-layers/extraction-rules.json
+    --report-dir /tmp/test-ensemble-verify --window 4 --json`\n   piped to the §8.1
+    python assertion (window==4, len(workers)==9, redundancy=={4}).\n2. Confirm each
+    worker `outfile` is an absolute path.\n3. If the gate fails, report the exact
+    failure — do NOT modify plan_ensemble.py (it is VERIFY_COMPATIBLE; a failure is
+    a finding that blocks T12, not a code-change trigger here).\n\n## Constraints\n\
+    - Do NOT edit plan_ensemble.py.\n- Do NOT proceed to mark PASS if any assertion
+    fails.\n- Use `--report-dir` as an absolute path (DH caller contract, §8.1).\n\
+    \n## Expected Outputs\n- A PASS/FAIL verdict registered as a TN-style verification
+    note (no file edit). Register via artifact_register(item_id=2646, artifact_type=\"\
+    research\", artifact_id=\"plan-ensemble-verify-dh-workflow-extractor\", content=<verdict
+    + command output>).\n\n## Acceptance Criteria\n1. The §8.1 assertion prints `PASS:
+    plan_ensemble.py backward-compat verified` (window=4, 9 workers, uniform redundancy
+    4).\n2. Each worker outfile in the JSON output is an absolute path.\n3. The verdict
+    (PASS + captured command output) is registered as a research artifact on #2646.\n\
+    \n## CoVe Checks\n- Key claims to verify:\n  - The 9-group rules produce exactly
+    9 workers at window=4.\n  - Redundancy is uniform 4 across all workers.\n- Verification
+    questions:\n  1. Does `len(d['workers']) == 9` hold?\n  2. Does `set(d['redundancy'].values())
+    == {4}` hold?\n  3. Are all `outfile` values absolute paths?\n- Evidence to collect:
+    the full JSON output and the assertion stdout.\n- Revision rule: a failed assertion
+    blocks T12; report the failure as a finding (do not fix plan_ensemble.py).\n\n\
+    ## Verification Steps\n1. Run the §8.1 gate command + assertion — expect `PASS`.\n\
+    2. Inspect worker outfiles are absolute.\n3. Register the verdict via artifact_register
+    (research type) on #2646.\n\n## Handoff\nReturn: PASS/FAIL, the assertion stdout,
+    confirmation outfiles are absolute, and the registered artifact action."
+  handoff: |-
+    Report the assertion output (window=4, 9 workers, uniform redundancy=4) and PASS/FAIL. This is a verdict artifact, not a file edit.
+- id: T12
+  title: Create workflows/dh-extract-file.js — per-file extraction pipeline 
+    orchestrator (cross-plugin path resolution verified first)
+  status: not-started
+  agent: dh:task-worker
+  dependencies:
+  - T01
+  - T02
+  - T05
+  - T07
+  - T09
+  - T10
+  - T11
+  priority: 3
+  complexity: high
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: high
+  reason: 'Convergence point of the spine. Orchestrates plan_ensemble.py → haiku workers
+    → reduce.py → sonnet verifier → merge_layer.py. Architect concern: cross-plugin
+    path to plan_ensemble.py and reduce.py MUST be verified empirically before coding.'
+  body: "## Context\nCreate the saved dynamic workflow script that orchestrates the
+    5-step per-file extraction pipeline. NOT a Claude agent — a JS workflow keeping
+    intermediates in script variables. This file does NOT exist (Codebase Audit: must
+    create). Source: architect §1.1, §4.3, §8.1 (caller contract). It is invoked by
+    the SessionStart hook (T13), not by Claude Code plugin auto-discovery (see plugin.json
+    verification T17).\n\nARCHITECT CONCERN (blocking, encode as first step): the
+    cross-plugin path to plan_ensemble.py and reduce.py must be VERIFIED EMPIRICALLY
+    before coding. Resolve ENSEMBLE_SCRIPTS_DIR via §8.1 strategy 2 (explicit DH_ENSEMBLE_SCRIPTS_DIR
+    env var populated by the hook) preferred over strategy 1 (relative `${CLAUDE_PLUGIN_ROOT}/../plugin-creator/...`).
+    Confirm the actual installed cache path before hardcoding any relative path.\n\
+    \n## Objective\nProduce dh-extract-file.js orchestrating steps 1–5 (plan_ensemble
+    → N haiku workers → reduce.py → sonnet verifier → merge_layer), with all subprocess
+    paths absolute and the cross-plugin script dir resolved by a verified strategy.\n\
+    \n## Inputs\n- Architect spec §1.1 (pipeline + return value + invocation path),
+    §4.3 (module boundary + fragment lifecycle), §8.1 (plan_ensemble caller contract:
+    --window 4, absolute --report-dir)\n- enumerate_scope.py (T01), merge_layer.py
+    (T02), reduce.py changes (T07), extraction-rules.json (T05), worker (T09), reducer
+    (T10)\n- T11 verdict (plan_ensemble compatibility confirmed)\n- `-p` mode constraint
+    (feature-context Open Implementation Decision 5): all agent dispatch via agentType
+    parameter, NOT Skill() calls\n\n## Requirements\n1. FIRST: empirically resolve
+    ENSEMBLE_SCRIPTS_DIR. Prefer reading `DH_ENSEMBLE_SCRIPTS_DIR` env var; fall back
+    to a path constructed from `__dirname`/`CLAUDE_PLUGIN_ROOT`. Verify the resolved
+    path actually contains plan_ensemble.py and reduce.py before proceeding (log and
+    fail loudly if not).\n2. Accept input args `{ source_file, layer_type, report_dir?
+    }` (paths relative to plugin root; resolve to absolute internally).\n3. Step 1
+    (deterministic): call plan_ensemble.py with extraction-rules.json, `--report-dir
+    <absolute>`, `--window 4`, `--json` → worker_assignments.\n4. Step 2 (LLM): spawn
+    N haiku workers (workflow-extractor-worker) in parallel via agentType dispatch,
+    one per assignment → N output files in report_dir.\n5. Step 3 (deterministic):
+    call reduce.py (or dh_reduce.py if T07 used the wrapper) → ranked report.\n6.
+    Step 4 (LLM): dispatch one sonnet verifier (workflow-extractor-reducer) → fragment
+    JSON + miss log.\n7. Step 5 (deterministic): call merge_layer.py with the fragment
+    → updated layer JSON; delete the fragment file after success.\n8. Return `{ layer_path,
+    verified_count, unverified_count, miss_log_path }` (§1.1).\n9. All subprocess
+    paths absolute (§4.3 contract). Write fragment to `.tmp/fragments/` before merge;
+    remove after.\n10. Do NOT update meta.json or COVERAGE.md (owned by hook, §4.3
+    Does NOT own).\n\n## Constraints\n- Do NOT use Skill() calls — `-p`/hook context
+    cannot load skills; dispatch agents via agentType only.\n- Do NOT hardcode a cross-plugin
+    path without the runtime existence check.\n- Do NOT pass relative paths to subprocesses.\n\
+    - Do NOT own scope enumeration, meta.json, or COVERAGE.md updates.\n\n## Expected
+    Outputs\n- `plugins/development-harness/workflows/dh-extract-file.js` (new file)\n\
+    \n## Acceptance Criteria\n1. The script resolves ENSEMBLE_SCRIPTS_DIR and verifies
+    plan_ensemble.py + reduce.py exist there before running (fails loudly otherwise).\n\
+    2. plan_ensemble.py is invoked with `--window 4` and an absolute `--report-dir`
+    (§8.1 contract).\n3. The pipeline runs steps 1–5 in order; haiku workers and sonnet
+    verifier are dispatched via agentType (not Skill()).\n4. The script returns `{
+    layer_path, verified_count, unverified_count, miss_log_path }`.\n5. The fragment
+    file is written to .tmp/fragments/ and deleted after a successful merge.\n6. A
+    smoke run against one real in-scope file (from SCOPE.md) produces a layer JSON
+    update and a non-error return object.\n7. `uv run prek run --files plugins/development-harness/workflows/dh-extract-file.js`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The cross-plugin script
+    path resolves to the ACTUAL installed location (not an assumed one).\n  - plan_ensemble.py
+    and reduce.py are invoked with the exact contract from §8.1.\n  - Agent dispatch
+    uses agentType, never Skill().\n- Verification questions:\n  1. Does the resolved
+    ENSEMBLE_SCRIPTS_DIR contain plan_ensemble.py and reduce.py at runtime?\n  2.
+    Is `--window 4` passed and `--report-dir` absolute?\n  3. Does a smoke run complete
+    steps 1–5 and return the documented shape?\n- Evidence to collect: the resolved
+    path + existence-check output, the plan_ensemble invocation line, the smoke-run
+    return object.\n- Revision rule: if the path does not resolve empirically, switch
+    to the DH_ENSEMBLE_SCRIPTS_DIR env-var strategy and document the resolution; do
+    not hardcode an unverified path.\n\n## Verification Steps\n1. Run the path-resolution
+    existence check standalone — confirm both scripts found.\n2. Smoke-run the pipeline
+    on one real in-scope file — confirm layer JSON updates and the return shape.\n\
+    3. `uv run prek run --files plugins/development-harness/workflows/dh-extract-file.js`
+    — expect exit 0.\n4. Run: `git add plugins/development-harness/workflows/dh-extract-file.js`
+    then `git commit -m \"feat(workflow-extractor): add dh-extract-file.js pipeline
+    orchestrator\"`\n\n## Handoff\nReturn: file path, the empirically verified ENSEMBLE_SCRIPTS_DIR
+    and how it was resolved, plan_ensemble invocation line, smoke-run return object,
+    prek result."
+  handoff: |-
+    Report file path, the empirically verified ENSEMBLE_SCRIPTS_DIR resolution path, and the return shape {layer_path, verified_count, unverified_count, miss_log_path}.
+- id: T13
+  title: Create docs/workflow-layers/meta.json + bootstrap step.json with 
+    staleness-tracking schema
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T04
+  priority: 3
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: low
+  reason: meta.json defines the staleness record the SessionStart hook 
+    reads/writes; its schema must exist before the hook (T14). Also bootstraps 
+    the empty step.json layer file matching the rewritten schema (T04).
+  body: "## Context\nCreate the staleness-tracking meta.json and bootstrap the empty
+    step.json layer file. meta.json is the staleness record the SessionStart hook
+    (T14) reads and writes; its schema must be defined first. step.json is the primary
+    new layer (§3.1) — bootstrap it empty so consumers (workflow-query T16, assemble_graph
+    review T18) have a real file to read even before first extraction. Source: architect
+    §2.6, §3.1, §3.2. Depends on T04 so step.json matches the rewritten schema.\n\n\
+    ## Objective\nProduce meta.json (with the §3.2 fields, empty/initial values) and
+    an empty step.json (with §3.1 meta + empty nodes/edges) conforming to the rewritten
+    graph-schema.md.\n\n## Inputs\n- Architect spec §2.6 (MetaJson + META_JSON_PATH),
+    §3.2 (meta.json fields/semantics), §3.1 (step.json structure)\n- Rewritten graph-schema.md
+    (T04) — the authoritative schema\n\n## Requirements\n1. Create `docs/workflow-layers/meta.json`
+    with fields `last_analyzed_commit` (empty string initial), `last_analyzed_at`
+    (empty string), `scope_version` (empty string) per §3.2/§2.6.\n2. Create `docs/workflow-layers/step.json`
+    with `meta` (layer_type=step, total_nodes=0, total_edges=0, plus the §3.1 meta
+    fields), empty `nodes`, empty `edges`. Match the rewritten graph-schema.md exactly.\n\
+    3. JSON without indentation (machine-readable, repo rule).\n\n## Constraints\n\
+    - Do NOT populate meta.json with a real commit SHA — initial state is empty strings
+    (first-run semantics, §7.1 error handling).\n- Do NOT invent step.json fields
+    beyond §3.1.\n- Do NOT add indentation.\n\n## Expected Outputs\n- `plugins/development-harness/docs/workflow-layers/meta.json`
+    (new file)\n- `plugins/development-harness/docs/workflow-layers/step.json` (new
+    file, empty layer)\n\n## Acceptance Criteria\n1. meta.json parses and contains
+    exactly last_analyzed_commit, last_analyzed_at, scope_version (§3.2).\n2. step.json
+    parses and has meta (layer_type=step, total_nodes=0), nodes=[], edges=[] matching
+    the rewritten schema (T04).\n3. `python3 -c \"import json; json.load(open('plugins/development-harness/docs/workflow-layers/meta.json'));
+    json.load(open('plugins/development-harness/docs/workflow-layers/step.json'))\"\
+    ` exits 0.\n4. `uv run prek run --files plugins/development-harness/docs/workflow-layers/meta.json
+    plugins/development-harness/docs/workflow-layers/step.json` exits 0.\n\n## Verification
+    Steps\n1. Run the AC3 json.load assertion — expect exit 0.\n2. Confirm step.json
+    field set matches the rewritten graph-schema.md (T04).\n3. `uv run prek run --files
+    <both files>` — expect exit 0.\n4. Run: `git add plugins/development-harness/docs/workflow-layers/meta.json
+    plugins/development-harness/docs/workflow-layers/step.json` then `git commit -m
+    \"feat(workflow-extractor): bootstrap meta.json staleness record and empty step.json\"\
+    `\n\n## Handoff\nReturn: both file paths, the field sets, json.load result, prek
+    result."
+  handoff: |-
+    Report both file paths and confirm meta.json fields (last_analyzed_commit, last_analyzed_at, scope_version) and the empty step.json structure.
+- id: T14
+  title: Create hooks/session-start-workflow-staleness.cjs — staleness detection
+    + extraction dispatch
+  status: not-started
+  agent: dh:task-worker
+  dependencies:
+  - T12
+  - T13
+  priority: 4
+  complexity: high
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: medium
+  reason: The hook SCRIPT owns the orchestration logic (staleness detection, 
+    git-diff enumeration, dispatch, meta.json + COVERAGE.md updates). Distinct 
+    from hooks.json registration (T15). Depends on dh-extract-file.js (T12, it 
+    dispatches it) and meta.json schema (T13).
+  body: "## Context\nCreate the SessionStart hook SCRIPT that detects workflow-graph
+    staleness and dispatches incremental extraction. This is where the orchestration
+    logic lives — it is a substantial JS file, distinct from the hooks.json registration
+    (T15). Source: architect §4.6 (module boundary + 7-step contract), §7.1 (full
+    algorithm, timeout, error handling), ADR-5. Load `/plugin-creator:hook-creator`
+    for hook conventions.\n\n## Objective\nProduce session-start-workflow-staleness.cjs
+    implementing the §7.1 algorithm: read meta.json, diff against HEAD, intersect
+    with SCOPE.md, dispatch dh-extract-file.js (background) per changed in-scope file,
+    update meta.json and regenerate COVERAGE.md — non-blocking, never exits non-zero.\n\
+    \n## Inputs\n- Architect spec §4.6 (7-step inter-module contract), §7.1 (algorithm
+    pseudocode, timeout 30000ms, SCOPE.md dependency, error handling, env access),
+    ADR-5\n- dh-extract-file.js (T12) — the workflow it dispatches\n- meta.json +
+    step.json (T13), enumerate_scope.py (T01, invoked if SCOPE.md missing)\n\n## Requirements\n\
+    1. JavaScript (Node.js CJS) per repo language conventions.\n2. Implement the §4.6/§7.1
+    algorithm: (1) read meta.json → last_analyzed_commit (empty=first run); (2) `git
+    diff {last_analyzed_commit} HEAD --name-only` (or treat all SCOPE files as changed
+    on first run); (3) read SCOPE.md → in-scope set; (4) intersect changed ∩ in-scope;
+    (5) for each: dispatch dh-extract-file.js as a background process; (6) on first
+    run if SCOPE.md missing, invoke enumerate_scope.py synchronously first; (7) print
+    a notification per file being re-extracted.\n3. Read CLAUDE_PLUGIN_ROOT to locate
+    meta.json, SCOPE.md, dh-extract-file.js.\n4. Background dispatch: hook prints
+    what will extract and exits (does not block the session); extraction runs in background.
+    meta.json is updated by dh-extract-file.js per file OR by the hook after dispatch
+    — follow §7.1 (the pseudocode notes meta.json updated by dh-extract-file.js; honour
+    whichever the §4.6 contract states, and document the choice).\n5. Error handling
+    (§7.1): malformed meta.json → treat as first run; git command failure → log warning
+    and exit 0; SCOPE.md missing and enumerate_scope.py fails → warn and exit 0. NEVER
+    exit non-zero (a failing hook blocks the session).\n6. Preserve the COVERAGE.md
+    regeneration step if assigned to the hook (§4.6 step 7) — regenerate from layer
+    JSON files.\n\n## Constraints\n- Do NOT block the session: no synchronous wait
+    on extraction; never exit non-zero.\n- Do NOT own extraction logic (delegate to
+    dh-extract-file.js) or scope crawl logic (delegate to enumerate_scope.py).\n-
+    Do NOT use Skill() calls.\n- Do NOT register the hook in hooks.json here — that
+    is T15.\n\n## Expected Outputs\n- `plugins/development-harness/hooks/session-start-workflow-staleness.cjs`
+    (new file)\n\n## Acceptance Criteria\n1. The script implements all 7 §4.6 contract
+    steps.\n2. First-run behaviour (empty last_analyzed_commit) treats all SCOPE files
+    as changed; invokes enumerate_scope.py if SCOPE.md is absent.\n3. The intersection
+    (changed ∩ in-scope) is computed from `git diff --name-only` and SCOPE.md.\n4.
+    Each in-scope changed file triggers a background dispatch of dh-extract-file.js
+    with `{ source_file, layer_type: 'step' }`.\n5. Malformed meta.json, git failure,
+    and enumerate_scope failure all result in exit 0 (non-blocking).\n6. The script
+    never exits non-zero.\n7. `uv run prek run --files plugins/development-harness/hooks/session-start-workflow-staleness.cjs`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The hook is strictly
+    non-blocking and never exits non-zero.\n  - First-run and malformed-meta.json
+    paths both behave per §7.1.\n  - Dispatch targets dh-extract-file.js with the
+    documented args.\n- Verification questions:\n  1. With empty meta.json, does it
+    dispatch for all SCOPE files (or run enumerate_scope first if SCOPE.md absent)?\n\
+    \  2. On a simulated git failure, does it log and exit 0?\n  3. Is extraction
+    dispatched in background (no synchronous wait)?\n- Evidence to collect: a dry-run
+    invocation with a stubbed env showing dispatch decisions and exit 0 on each error
+    branch.\n- Revision rule: if any error branch can exit non-zero, fix before completing.\n\
+    \n## Verification Steps\n1. Dry-run with CLAUDE_PLUGIN_ROOT set and a controlled
+    meta.json/SCOPE.md; confirm dispatch decisions and exit 0.\n2. Simulate malformed
+    meta.json and git failure; confirm exit 0 each time.\n3. `uv run prek run --files
+    plugins/development-harness/hooks/session-start-workflow-staleness.cjs` — expect
+    exit 0.\n4. Run: `git add plugins/development-harness/hooks/session-start-workflow-staleness.cjs`
+    then `git commit -m \"feat(workflow-extractor): add session-start staleness hook
+    script\"`\n\n## Handoff\nReturn: script path, 7-step coverage checklist, error-branch
+    exit-code confirmation, where meta.json gets updated (hook vs dh-extract-file.js)
+    and why, prek result."
+  handoff: |-
+    Report script path, the 7-step algorithm coverage, non-blocking error handling, and that it dispatches dh-extract-file.js per changed in-scope file.
+- id: T15
+  title: Register SessionStart staleness hook in hooks/hooks.json (preserve 
+    existing session-start-session-id entry)
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T14
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: medium
+  reason: 'Registers the T14 hook script as a new SessionStart entry. Architect concern:
+    the existing session-start-session-id.cjs entry must be preserved; the new entry
+    is appended to the existing SessionStart array.'
+  body: "## Context\nRegister the staleness hook script (T14) in hooks.json. This
+    is the VERIFY_COMPATIBLE config change — add a new SessionStart entry, do not
+    disturb existing hooks. Source: architect §1.2 (hooks.json VERIFY_COMPATIBLE),
+    §7.1 (registration JSON), §7.2 (existing-hooks table). Load `/plugin-creator:hook-creator`.\n\
+    \n## Objective\nAppend the new SessionStart hook entry (node session-start-workflow-staleness.cjs,
+    timeout 30000) to hooks.json while preserving the existing session-start-session-id.cjs
+    entry and all other hooks.\n\n## Inputs\n- Architect spec §7.1 (the exact registration
+    JSON), §7.2 (existing hooks that must remain unchanged)\n- Current `plugins/development-harness/hooks/hooks.json`\n\
+    - session-start-workflow-staleness.cjs (T14) — the script being registered\n\n\
+    ## Requirements\n1. Add the new SessionStart entry per §7.1: `{ \"type\": \"command\"\
+    , \"command\": \"node \\\"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-workflow-staleness.cjs\\\
+    \"\", \"timeout\": 30000 }` appended to the existing SessionStart array.\n2. Preserve
+    the existing `session-start-session-id.cjs` SessionStart entry (architect concern,
+    §7.1/§7.2).\n3. Preserve all other hooks unchanged (TaskCompleted, PostToolUse,
+    SubagentStop, SessionEnd per §7.2 table).\n4. hooks.json remains valid JSON.\n\
+    \n## Constraints\n- Do NOT remove or reorder existing hooks.\n- Do NOT change
+    the existing session-start-session-id.cjs command or timeout.\n- Do NOT add the
+    entry as a git hook — it is a Claude Code SessionStart lifecycle entry (ADR-5).\n\
+    \n## Expected Outputs\n- `plugins/development-harness/hooks/hooks.json` (updated)\n\
+    \n## Acceptance Criteria\n1. hooks.json contains both SessionStart entries: existing
+    session-start-session-id.cjs AND new session-start-workflow-staleness.cjs.\n2.
+    The new entry has timeout 30000 and the §7.1 command string.\n3. All hooks listed
+    in §7.2 (TaskCompleted, PostToolUse, SubagentStop, SessionEnd) remain present
+    and unchanged.\n4. `python3 -c \"import json; json.load(open('plugins/development-harness/hooks/hooks.json'))\"\
+    ` exits 0.\n5. `uv run prek run --files plugins/development-harness/hooks/hooks.json`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The existing session-start-session-id.cjs
+    entry is untouched.\n  - Both SessionStart entries coexist in the same array.\n\
+    - Verification questions:\n  1. After the edit, does the SessionStart array contain
+    both hook commands?\n  2. Are all §7.2 non-SessionStart hooks byte-identical to
+    before?\n  3. Is the file valid JSON?\n- Evidence to collect: a diff of hooks.json
+    showing only the appended entry, the json.load result.\n- Revision rule: if any
+    existing hook changed, revert that change and re-apply only the append.\n\n##
+    Verification Steps\n1. Run the AC4 json.load assertion — expect exit 0.\n2. Diff
+    hooks.json: confirm only the new SessionStart entry was added.\n3. `uv run prek
+    run --files plugins/development-harness/hooks/hooks.json` — expect exit 0.\n4.
+    Run: `git add plugins/development-harness/hooks/hooks.json` then `git commit -m
+    \"feat(workflow-extractor): register session-start staleness hook\"`\n\n## Handoff\n\
+    Return: file path, confirmation both SessionStart entries present and other hooks
+    unchanged, json.load + prek results."
+  handoff: |-
+    Report that the new entry is appended, the existing entry preserved, and hooks.json is valid JSON.
+- id: T16
+  title: Create /dh:workflow-query skill — agent-facing step-graph query 
+    interface (4 query patterns + freshness check)
+  status: not-started
+  agent: plugin-creator:skill-creator
+  dependencies:
+  - T04
+  - T13
+  priority: 4
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T17
+  - T18
+  accuracy-risk: medium
+  reason: Agent query interface (ADR-3). Reads step.json so the bootstrap (T13) 
+    and rewritten schema (T04) must exist. Implementable on partial step layer 
+    data. Lowest-criticality consumer of the spine.
+  body: "## Context\nCreate the agent-facing query skill that reads the step layer
+    JSON for blast-radius analysis, component inventory, downstream traversal, and
+    coverage gaps. Loaded on demand by agents (not session-injected). This skill does
+    NOT exist. Source: architect §4.7, §6 (full spec), ADR-3. Load `/plugin-creator:skill-creator`.\n\
+    \n## Objective\nProduce workflow-query/SKILL.md with the §6 frontmatter and the
+    4 query-pattern contracts plus the required freshness check.\n\n## Inputs\n- Architect
+    spec §6 (frontmatter, 4 query patterns, data sources, freshness check, no-session-injection
+    rationale), §4.7 (module boundary)\n- step.json (T13 bootstrap) and rewritten
+    graph-schema.md (T04)\n\n## Requirements\n1. Frontmatter per §6: name=workflow-query,
+    the specified description, `user-invocable: false`, tools: Read.\n2. Body defines
+    the 4 query patterns with their input context and output contracts: (1) Blast-Radius
+    (file → affected step nodes, downstream actors, MCP calls, artifacts, gap edges);
+    (2) Component inventory (agent/skill → step nodes where actor=component, grouped
+    by source); (3) Downstream traversal (start_node → BFS over next/dispatches/defers_to,
+    includes gap edges with gap:true); (4) Coverage gap (all verified:false nodes
+    + all gap edges).\n3. Data sources read: step.json, dh-workflow-graph.json (enrichment),
+    COVERAGE.md (freshness) per §6.\n4. Freshness check (required): before answering,
+    read meta.json, compare last_analyzed_commit with current HEAD; if different,
+    prefix answer with the §6 stale warning.\n5. No session-start injection (ADR-3
+    / anti-instruction-bloat). The skill is loaded on demand only.\n6. Stateless:
+    every invocation reads fresh from disk; no MCP calls, no writes (§4.7).\n\n##
+    Constraints\n- Do NOT make the skill user-invocable (§6: user-invocable: false).\n\
+    - Do NOT add write/MCP operations (§4.7 Does NOT own).\n- Do NOT add session-start
+    injection (ADR-3 prohibits).\n- Do NOT grant tools beyond Read.\n\n## Expected
+    Outputs\n- `plugins/development-harness/skills/workflow-query/SKILL.md` (new skill)\n\
+    \n## Acceptance Criteria\n1. Frontmatter matches §6 (name, description, user-invocable:
+    false, tools: Read).\n2. All 4 query patterns are present with the §6 output contracts.\n\
+    3. The freshness check (read meta.json, compare HEAD, conditional stale prefix)
+    is present.\n4. The skill reads step.json/dh-workflow-graph.json/COVERAGE.md and
+    performs no writes or MCP calls.\n5. `uvx skilllint@latest check plugins/development-harness/skills/workflow-query/SKILL.md`
+    exits 0.\n6. `uv run prek run --files plugins/development-harness/skills/workflow-query/SKILL.md`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - All 4 query output contracts
+    match §6 exactly.\n  - The freshness check is mandatory before any answer.\n \
+    \ - The skill is read-only.\n- Verification questions:\n  1. Does each query pattern
+    enumerate the exact output fields from §6?\n  2. Does the freshness check compare
+    last_analyzed_commit to current HEAD?\n  3. Is user-invocable: false set and tools
+    limited to Read?\n- Evidence to collect: skilllint output, a checklist of the
+    4 patterns vs §6.\n- Revision rule: if any query contract or the freshness check
+    is missing, revise before completing.\n\n## Verification Steps\n1. `uvx skilllint@latest
+    check plugins/development-harness/skills/workflow-query/SKILL.md` — expect exit
+    0.\n2. `uv run prek run --files plugins/development-harness/skills/workflow-query/SKILL.md`
+    — expect exit 0.\n3. Inspect the 4 query patterns and freshness check against
+    §6.\n4. Run: `git add plugins/development-harness/skills/workflow-query/SKILL.md`
+    then `git commit -m \"feat(workflow-query): add agent-facing step-graph query
+    skill\"`\n\n## Handoff\nReturn: SKILL.md path, frontmatter summary, 4-pattern
+    checklist, freshness-check confirmation, skilllint/prek results."
+  handoff: |-
+    Report SKILL.md path, frontmatter (user-invocable: false, tools: Read), the 4 query patterns, and the freshness-check presence.
+- id: T17
+  title: Verify/update plugin.json for workflows/ discovery and workflow-query 
+    skill registration
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T16
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T18
+  accuracy-risk: medium
+  reason: 'Architect concern: workflows/dh-extract-file.js is not auto-discovered
+    — plugin.json must be verified/updated. Also confirm the new workflow-query skill
+    registers (skills/ is auto-discovered, but verify the new skill is picked up).'
+  body: "## Context\nVerify the plugin manifest correctly handles the new components.
+    Architect concern (§1.2 plugin.json VERIFY_COMPATIBLE): the `workflows/` directory
+    is non-standard — Claude Code auto-discovers agents/, skills/, commands/, hooks/
+    but NOT workflows/. dh-extract-file.js is invoked by the SessionStart hook (T14),
+    not by plugin auto-discovery, so no plugin.json change is needed for it IF the
+    hook holds the path. The new workflow-query skill (T16) lives under skills/ and
+    should auto-register — verify. Source: architect §1.2 (plugin.json + workflows/
+    resolution). Load `/plugin-creator:claude-plugins-reference-2026`.\n\n## Objective\n\
+    Confirm (and only if necessary, update) plugin.json so: dh-extract-file.js is
+    reachable via the hook (no auto-discovery needed), and the workflow-query skill
+    registers correctly.\n\n## Inputs\n- Architect spec §1.2 (plugin.json VERIFY_COMPATIBLE
+    + workflows/ resolution)\n- `plugins/development-harness/.claude-plugin/plugin.json`\n\
+    - T14 hook (holds the dh-extract-file.js path), T16 skill\n\n## Requirements\n\
+    1. Confirm Claude Code does NOT auto-discover workflows/ and that dh-extract-file.js
+    is invoked only via the hook (§1.2 resolution). Document the finding.\n2. Confirm
+    the workflow-query skill under skills/ is auto-discovered (skills/ is a standard
+    auto-discovered dir). If a manifest entry is required by this plugin's conventions,
+    add it; otherwise document that no change is needed.\n3. If plugin.json requires
+    no change, state so explicitly (VERIFY_COMPATIBLE outcome). Do NOT make speculative
+    edits.\n4. If a change IS required, make the minimal edit and preserve the auto-version-bump
+    behaviour (do not manually edit version fields — the pre-commit hook handles that).\n\
+    \n## Constraints\n- Do NOT manually edit plugin.json version fields (auto-bumped
+    by pre-commit hook).\n- Do NOT add a non-standard workflows discovery mechanism
+    not supported by Claude Code.\n- Do NOT make changes \"just in case\" — only if
+    verification shows a real gap.\n\n## Expected Outputs\n- A VERIFY_COMPATIBLE verdict
+    registered via artifact_register(item_id=2646, artifact_type=\"research\", artifact_id=\"\
+    plugin-json-verify-dh-workflow-extractor\", content=<finding>). If a change was
+    needed: `plugins/development-harness/.claude-plugin/plugin.json` (updated).\n\n\
+    ## Acceptance Criteria\n1. A documented finding states whether workflows/ auto-discovery
+    is needed and confirms dh-extract-file.js is reachable via the hook path.\n2.
+    The workflow-query skill registration is confirmed (auto-discovered or manifest
+    entry added).\n3. If no change was needed, plugin.json is unmodified and the verdict
+    says so. If changed, the edit is minimal and version fields are untouched.\n4.
+    `python3 -c \"import json; json.load(open('plugins/development-harness/.claude-plugin/plugin.json'))\"\
+    ` exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - workflows/ is genuinely
+    not auto-discovered by Claude Code (verify against the plugins reference, not
+    memory).\n  - The hook actually holds a working path to dh-extract-file.js.\n\
+    - Verification questions:\n  1. Does the claude-plugins-reference-2026 confirm
+    workflows/ is not an auto-discovered component dir?\n  2. Is dh-extract-file.js
+    path resolution owned by the hook (T14)?\n  3. Does the new skill appear when
+    the plugin is loaded?\n- Evidence to collect: the reference passage on auto-discovered
+    dirs, the hook's path-resolution line.\n- Revision rule: if workflows/ IS discoverable
+    or the skill does NOT register, make the minimal manifest correction and document
+    it.\n\n## Verification Steps\n1. Confirm against claude-plugins-reference-2026
+    which component dirs are auto-discovered.\n2. Confirm the hook (T14) holds the
+    dh-extract-file.js path.\n3. Run the AC4 json.load assertion — expect exit 0.\n\
+    4. Register the VERIFY_COMPATIBLE verdict via artifact_register (research) on
+    #2646. If plugin.json changed: `git add plugins/development-harness/.claude-plugin/plugin.json`
+    then `git commit -m \"fix(workflow-extractor): register workflow components in
+    plugin manifest\"`\n\n## Handoff\nReturn: VERIFY_COMPATIBLE verdict, whether plugin.json
+    was changed and why, the auto-discovery finding, registered artifact action."
+  handoff: |-
+    Report whether any plugin.json change was needed, and confirm dh-extract-file.js invocation path is held by the hook (not plugin auto-discovery).
+- id: T18
+  title: Review docs/assemble_graph.py — verify step-node/next-edge handling; 
+    extend or document gap
+  status: not-started
+  agent: python-engineering:python-cli-architect
+  dependencies:
+  - T04
+  - T13
+  priority: 4
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T16
+  - T17
+  accuracy-risk: medium
+  reason: 'Architect: assemble_graph.py reads layer JSON; step nodes live in layer
+    JSON so no change may be needed, but the known gap is that it may not handle the
+    new step node type and next/gap edge types. Verify empirically by running it after
+    a (bootstrap) extraction.'
+  body: "## Context\nReview the existing graph assembler. Architect §1.2 (assemble_graph.py
+    VERIFY_COMPATIBLE): it reads only layer JSON, and step nodes written by merge_layer.py
+    live in the layer JSON, so it may need no change. KNOWN GAP: it may not handle
+    the new `step` node type and `next`/`gap` edge types — verify by running it after
+    the first (or bootstrap) extraction and checking the output JSON for step nodes.
+    Source: architect §1.2. This file exists.\n\n## Objective\nDetermine empirically
+    whether assemble_graph.py correctly assembles step nodes and next/gap edges from
+    step.json; if it drops or mishandles them, extend it minimally OR document the
+    gap as a scoped follow-up.\n\n## Inputs\n- Architect spec §1.2 (assemble_graph.py
+    action + known gap)\n- `plugins/development-harness/docs/assemble_graph.py`\n\
+    - step.json (T13 bootstrap; ideally with at least one step node after a smoke
+    extraction) and rewritten graph-schema.md (T04)\n\n## Requirements\n1. Run assemble_graph.py
+    against the current layer files (including step.json) and inspect the assembled
+    output for step nodes and next/gap edges.\n2. If step nodes and next/gap edges
+    pass through correctly: document VERIFY_COMPATIBLE — no change needed.\n3. If
+    they are dropped or mishandled: make the MINIMAL extension to handle the `step`
+    node type and `next`/`gap` edge types, preserving all existing layer handling.
+    Add/adjust a test if the assembler has a test suite.\n4. Do NOT deprecate the
+    assembler unless verification shows it is fully superseded — prefer extend over
+    replace (the task brief allows \"extend for step assembly or deprecate\"; choose
+    based on evidence).\n\n## Constraints\n- Do NOT rewrite the assembler wholesale.\n\
+    - Do NOT change handling of existing layers (L0, G1-G8).\n- Do NOT deprecate without
+    evidence it is superseded.\n\n## Expected Outputs\n- Either: `plugins/development-harness/docs/assemble_graph.py`
+    (minimal extension) OR a VERIFY_COMPATIBLE verdict registered via artifact_register(item_id=2646,
+    artifact_type=\"research\", artifact_id=\"assemble-graph-review-dh-workflow-extractor\"\
+    , content=<finding>).\n\n## Acceptance Criteria\n1. A documented finding states
+    whether assemble_graph.py handles step nodes and next/gap edges (with the actual
+    run output as evidence).\n2. If extended: step nodes and next/gap edges appear
+    in the assembled output; existing layer handling is unchanged; `uv run ty check`
+    and prek pass on the edited file.\n3. If no change: the VERIFY_COMPATIBLE verdict
+    is registered with the run output showing step nodes pass through.\n\n## CoVe
+    Checks\n- Key claims to verify:\n  - Whether the assembler actually preserves
+    the step node type and next/gap edges (run it, do not assume).\n- Verification
+    questions:\n  1. After running the assembler, do step nodes from step.json appear
+    in the output?\n  2. Are next and gap edges preserved?\n  3. Does existing-layer
+    output remain unchanged?\n- Evidence to collect: the assembler run output before/after,
+    the node/edge type counts.\n- Revision rule: extend only if the run shows step
+    nodes/edges are dropped; otherwise document VERIFY_COMPATIBLE.\n\n## Verification
+    Steps\n1. Run assemble_graph.py against current layer files; inspect output for
+    step nodes + next/gap edges.\n2. If extended: re-run and confirm step nodes/edges
+    present and existing layers unchanged; `uv run ty check` + prek on the file.\n\
+    3. Register the verdict (research) on #2646, or commit the extension: `git add
+    plugins/development-harness/docs/assemble_graph.py` then `git commit -m \"fix(workflow-extractor):
+    extend assemble_graph.py for step nodes and next/gap edges\"`\n\n## Handoff\n\
+    Return: the run-output evidence, the decision (no-change vs extend vs follow-up),
+    and the registered verdict or committed change."
+  handoff: |-
+    Report whether assemble_graph.py handles step nodes and next/gap edges; if it does not, state the minimal extension made or the documented gap + follow-up.
+  context-notes: |-
+    ## Out-of-Scope Note (workflow-result.json)
+
+    Impact Radius lists `docs/workflow-result.json` as "may be legacy — should be verified before implementation begins" (MAYBE/LOW). It is NOT a producer/consumer in the architect spec data model (§3 defines step.json, meta.json, SCOPE.md, fragments, miss logs — not workflow-result.json). As part of this assemble_graph.py review, add a one-line verification: confirm whether workflow-result.json is read or written by assemble_graph.py or any layer file. If it is unreferenced, record it as legacy/out-of-scope in the handoff (no change). If assemble_graph.py does consume it, report that as a finding for follow-up. This resolves the one uncovered Impact Radius item without expanding scope.
+- id: T19
+  title: Update docs/workflow-layers/COVERAGE.md — fix model error (haiku/sonnet
+    split), add step layer + verified/unverified fields
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T04
+  - T09
+  - T10
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T20
+  - T21
+  - T22
+  accuracy-risk: medium
+  reason: 'Architect concern: COVERAGE.md has a model error (dh:workflow-extractor
+    listed as haiku) — must reference workflow-extractor-worker.md (haiku) and workflow-extractor-reducer.md
+    (sonnet) separately. Also add the step layer entry and verified_count/unverified_count
+    fields.'
+  body: "## Context\nUpdate COVERAGE.md to fix the model-attribution error and add
+    step-layer coverage. Architect concern (explicit): the current entry lists `dh:workflow-extractor`
+    as haiku — wrong. Reference workflow-extractor-worker.md (haiku) and workflow-extractor-reducer.md
+    (sonnet) SEPARATELY. Add the step layer entry and the new verified_count/unverified_count
+    fields. Source: architect §1.2 (COVERAGE.md change), §2.8 (CoverageEntry).\n\n\
+    ## Objective\nProduce a COVERAGE.md that correctly attributes the two-agent ensemble
+    (worker=haiku, reducer=sonnet), includes a step-layer row, and carries verified_count/unverified_count
+    fields per the new schema.\n\n## Inputs\n- Architect spec §1.2 (COVERAGE.md fixes),
+    §2.8 (CoverageEntry: layer_id, label, what_it_captures, file, status, verification,
+    last_extracted_at, last_analyzed_commit)\n- Current `plugins/development-harness/docs/workflow-layers/COVERAGE.md`\n\
+    - Agent names from T09 (worker), T10 (reducer)\n\n## Requirements\n1. Replace
+    the single `dh:workflow-extractor` (haiku) attribution with separate references:
+    workflow-extractor-worker.md (haiku) for extraction and workflow-extractor-reducer.md
+    (sonnet) for verification.\n2. Add a step layer entry (layer_id=step) with what_it_captures,
+    file=step.json, status, verification per §2.8.\n3. Add verified_count and unverified_count
+    fields to the coverage representation (architect: \"new verified_count/unverified_count
+    fields\").\n4. Keep last_extracted_at/last_analyzed_commit fields (updated by
+    the hook at runtime, §2.8).\n5. No derived counts hardcoded where they would drift
+    (repo No-Derived-Data rule) — represent counts as runtime-updated fields, not
+    static prose.\n\n## Constraints\n- Do NOT leave any haiku-only attribution for
+    the verification stage.\n- Do NOT remove existing layer rows (L0, G1-G8).\n- Do
+    NOT hardcode static counts that will drift.\n\n## Expected Outputs\n- `plugins/development-harness/docs/workflow-layers/COVERAGE.md`
+    (updated)\n\n## Acceptance Criteria\n1. COVERAGE.md references workflow-extractor-worker.md
+    (haiku) and workflow-extractor-reducer.md (sonnet) separately — no single mislabelled
+    haiku extractor entry.\n2. A step layer entry exists with the §2.8 fields.\n3.
+    verified_count and unverified_count fields are present.\n4. Existing L0/G1-G8
+    rows are preserved.\n5. `uv run prek run --files plugins/development-harness/docs/workflow-layers/COVERAGE.md`
+    exits 0.\n\n## CoVe Checks\n- Key claims to verify:\n  - The verification stage
+    is attributed to sonnet, extraction to haiku.\n  - No residual `dh:workflow-extractor`
+    haiku entry remains.\n- Verification questions:\n  1. Does grep for the old `dh:workflow-extractor`
+    haiku attribution return zero?\n  2. Are both new agent names present with correct
+    models?\n  3. Are verified_count/unverified_count fields present?\n- Evidence
+    to collect: before/after grep for the mislabelled entry.\n- Revision rule: if
+    any haiku-only verification attribution remains, fix before completing.\n\n##
+    Verification Steps\n1. grep for the old `dh:workflow-extractor` haiku attribution
+    — expect zero after edit.\n2. Confirm worker(haiku)/reducer(sonnet) both present
+    and step layer entry exists.\n3. `uv run prek run --files plugins/development-harness/docs/workflow-layers/COVERAGE.md`
+    — expect exit 0.\n4. Run: `git add plugins/development-harness/docs/workflow-layers/COVERAGE.md`
+    then `git commit -m \"docs(workflow-extractor): fix COVERAGE model split and add
+    step layer\"`\n\n## Handoff\nReturn: file path, before/after grep results for
+    the mislabelled entry, confirmation of step layer entry and verified/unverified
+    fields, prek result."
+  handoff: |-
+    Report COVERAGE.md path, confirm the haiku/sonnet split is correct, the step layer entry exists, and verified/unverified fields are present.
+- id: T20
+  title: Update .claude/rules/workflow-extraction.md for SessionStart + 
+    dh-extract-file.js approach
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T12
+  - T14
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T19
+  - T21
+  - T22
+  accuracy-risk: low
+  reason: 'The rule file must reflect the adopted approach: SessionStart staleness
+    check (not post-commit) and dh-extract-file.js dispatch, with the new agent names
+    and dispatch-via-agentType mechanism.'
+  body: "## Context\nUpdate the workflow-extraction rule to match the adopted architecture:
+    SessionStart staleness detection (ADR-5, NOT git post-commit), dh-extract-file.js
+    dispatch, and the two new agents (worker/reducer). Source: architect §1.2 (.claude/rules/workflow-extraction.md:
+    update agent names and dispatch mechanism), ADR-5.\n\n## Objective\nProduce a
+    workflow-extraction.md that describes the SessionStart-triggered, dh-extract-file.js-orchestrated,
+    worker+reducer ensemble — with no stale post-commit or single-agent references.\n\
+    \n## Inputs\n- Architect spec §1.2 (rule update scope), ADR-5 (SessionStart over
+    post-commit), §5.1/§5.2 (agent names), §4.3/§4.6 (dispatch mechanism)\n- Current
+    `plugins/development-harness/.claude/rules/workflow-extraction.md`\n\n## Requirements\n\
+    1. Replace any post-commit-hook trigger description with the SessionStart staleness-check
+    trigger (ADR-5).\n2. Update agent references to workflow-extractor-worker (haiku)
+    and workflow-extractor-reducer (sonnet); remove the retired single workflow-extractor.\n\
+    3. Describe dispatch via dh-extract-file.js and the agentType mechanism (no Skill()
+    in -p/hook context).\n4. Use `./` relative links and language-fenced code blocks
+    per repo standards.\n\n## Constraints\n- Do NOT describe a git post-commit hook
+    as the trigger (superseded).\n- Do NOT reference the retired single-agent workflow-extractor.\n\
+    - Do NOT add derived counts.\n\n## Expected Outputs\n- `plugins/development-harness/.claude/rules/workflow-extraction.md`
+    (updated). NOTE: this path is under a plugin .claude/ dir — use the `./` prefix
+    convention and verify it is the intended in-plugin rule file (not the repo root
+    .claude/rules).\n\n## Acceptance Criteria\n1. The trigger is described as SessionStart
+    staleness check, not post-commit.\n2. Both new agent names appear; the retired
+    single agent does not.\n3. dh-extract-file.js + agentType dispatch is described.\n\
+    4. `uv run prek run --files <rule file path>` exits 0.\n\n## Verification Steps\n\
+    1. grep for `post-commit` and the retired `workflow-extractor` single-agent reference
+    — expect zero stale matches.\n2. grep for `SessionStart`, `dh-extract-file.js`,
+    worker, reducer — expect ≥1 each.\n3. `uv run prek run --files <rule file path>`
+    — expect exit 0.\n4. Run: `git add <rule file path>` then `git commit -m \"docs(workflow-extractor):
+    update workflow-extraction rule for SessionStart approach\"`\n\n## Handoff\nReturn:
+    file path, before/after grep for stale post-commit/single-agent references, prek
+    result."
+  handoff: |-
+    Report the rule file path and confirm it describes SessionStart + dh-extract-file.js + the two new agent names, with no stale post-commit/single-agent references.
+- id: T21
+  title: Mirror PEP 723 deps from enumerate_scope.py + merge_layer.py into root 
+    pyproject.toml dev group
+  status: not-started
+  agent: python-engineering:python-cli-architect
+  dependencies:
+  - T01
+  - T02
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T19
+  - T20
+  - T22
+  accuracy-risk: low
+  reason: 'Repo rule (python-development.md): PEP 723 script deps must be mirrored
+    into the root [dependency-groups] dev so ty/ruff/IDE resolve imports. Architect
+    §1.2 lists pyproject.toml mirroring. Skip-if-stdlib-only.'
+  body: "## Context\nMirror the PEP 723 runtime deps declared in enumerate_scope.py
+    (T01) and merge_layer.py (T02) into the root pyproject.toml `[dependency-groups]
+    dev` so static analysis (ty, ruff) and the IDE resolve imports. The architect
+    spec §1.2 lists pyproject.toml: \"Mirror PEP 723 deps from enumerate_scope.py
+    and merge_layer.py\". Both scripts are specified as stdlib-only (§2 type system
+    lane) — if confirmed stdlib-only, no change is needed and that must be stated
+    explicitly. Source: repo rule .claude/rules/python-development.md, architect §1.2.
+    Load `/python-engineering:uv` and `/python-engineering:toml-python`.\n\n## Objective\n\
+    Ensure every PEP 723 dependency in the two new scripts also appears in the root
+    pyproject.toml dev group; or confirm stdlib-only and document no-op.\n\n## Inputs\n\
+    - Repo rule python-development.md (PEP 723 dual-install), architect §1.2 (pyproject.toml
+    mirror)\n- enumerate_scope.py (T01), merge_layer.py (T02) — read their PEP 723
+    blocks\n- Root `pyproject.toml`\n\n## Requirements\n1. Read the PEP 723 inline
+    metadata blocks of both scripts.\n2. For each declared dependency not already
+    in `[dependency-groups] dev`, add it via `uv add --dev <pkg>` (preserves lockfile;
+    do NOT hand-edit version pins incorrectly).\n3. If both scripts are stdlib-only
+    (no PEP 723 deps), make no change and state so explicitly.\n4. Use tomlkit/uv
+    tooling — do not hand-corrupt the TOML.\n\n## Constraints\n- Do NOT create a per-plugin
+    pyproject.toml or uv.lock (repo invariant: only root uv.lock).\n- Do NOT add deps
+    the scripts do not actually import.\n- Do NOT add a [tool.uv.workspace] entry
+    (repo has no workspace).\n\n## Expected Outputs\n- Root `pyproject.toml` (updated)
+    IF the scripts declare deps; otherwise a no-op documented in the handoff (no file
+    change).\n\n## Acceptance Criteria\n1. Every PEP 723 dep in enumerate_scope.py
+    and merge_layer.py is present in the root dev group (or both are stdlib-only and
+    no change was made).\n2. `git ls-files | grep uv.lock` returns only the root uv.lock
+    (invariant preserved).\n3. `uv run ty check plugins/development-harness/scripts/enumerate_scope.py
+    plugins/development-harness/scripts/merge_layer.py` resolves all imports (exit
+    0).\n4. If changed: `uv run prek run --files pyproject.toml` exits 0.\n\n## Verification
+    Steps\n1. Read both scripts' PEP 723 blocks; list deps.\n2. Diff against root
+    dev group; add any missing via `uv add --dev`.\n3. `uv run ty check` both scripts
+    — expect imports resolve (exit 0).\n4. Confirm the uv.lock invariant. If changed:
+    `git add pyproject.toml uv.lock` then `git commit -m \"build(deps): mirror workflow-extractor
+    PEP 723 deps to dev group\"`\n\n## Handoff\nReturn: the deps mirrored (or stdlib-only
+    no-op), ty import-resolution result, uv.lock invariant confirmation."
+  handoff: |-
+    Report which deps (if any) were mirrored, or that both scripts are stdlib-only and no change was needed.
+- id: T22
+  title: Update docs/workflow-trace-methodology.md and 
+    development-harness/CLAUDE.md trigger table for the new approach
+  status: not-started
+  agent: dh:service-docs-maintainer
+  dependencies:
+  - T09
+  - T10
+  - T16
+  priority: 4
+  complexity: low
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  parallelize-with:
+  - T19
+  - T20
+  - T21
+  accuracy-risk: low
+  reason: 'Architect §1.2 content-only updates: workflow-trace-methodology.md (update
+    orchestrator references) and development-harness/CLAUDE.md (update trigger table
+    for step-node changes). Documentation-with-code rule — these are part of the feature,
+    not a separate effort.'
+  body: "## Context\nTwo content-only documentation updates from architect §1.2: docs/workflow-trace-methodology.md
+    (update orchestrator references) and plugins/development-harness/CLAUDE.md (update
+    the trigger table for step-node changes). These align the developer-facing docs
+    with the new ensemble and query skill. Source: architect §1.2 content-only updates
+    table.\n\n## Objective\nUpdate workflow-trace-methodology.md orchestrator references
+    and the development-harness CLAUDE.md trigger table to reflect the worker/reducer
+    ensemble and the /dh:workflow-query skill.\n\n## Inputs\n- Architect spec §1.2
+    (the two content-only update rows)\n- Agent names (T09, T10), workflow-query skill
+    (T16)\n- Current `plugins/development-harness/docs/workflow-trace-methodology.md`
+    and `plugins/development-harness/CLAUDE.md`\n\n## Requirements\n1. In workflow-trace-methodology.md:
+    update orchestrator references to the new ensemble (worker/reducer) and dh-extract-file.js
+    where the prior single-agent or old flow is described.\n2. In development-harness/CLAUDE.md:
+    update the trigger table so step-node/graph changes route correctly (e.g., reference
+    /dh:workflow-query for impact analysis; reflect the new agents). Make the minimal
+    accurate change — do not restructure the whole file.\n3. Use `./` relative links,
+    language-fenced code blocks, no derived counts.\n\n## Constraints\n- Do NOT reference
+    the retired single workflow-extractor agent.\n- Do NOT add derived counts or speculative
+    triggers.\n- Do NOT restructure CLAUDE.md beyond the trigger-table row(s) affected.\n\
+    \n## Expected Outputs\n- `plugins/development-harness/docs/workflow-trace-methodology.md`
+    (updated)\n- `plugins/development-harness/CLAUDE.md` (updated)\n\n## Acceptance
+    Criteria\n1. workflow-trace-methodology.md orchestrator references reflect the
+    worker/reducer ensemble and dh-extract-file.js; no retired single-agent reference
+    remains.\n2. development-harness/CLAUDE.md trigger table reflects step-node changes
+    and references /dh:workflow-query for impact analysis.\n3. `uv run prek run --files
+    plugins/development-harness/docs/workflow-trace-methodology.md plugins/development-harness/CLAUDE.md`
+    exits 0.\n\n## Verification Steps\n1. grep both files for the retired single-agent
+    name — expect zero.\n2. grep for worker/reducer/workflow-query references — expect
+    ≥1 in the relevant file.\n3. `uv run prek run --files <both files>` — expect exit
+    0.\n4. Run: `git add plugins/development-harness/docs/workflow-trace-methodology.md
+    plugins/development-harness/CLAUDE.md` then `git commit -m \"docs(workflow-extractor):
+    align trace methodology and trigger table with ensemble\"`\n\n## Handoff\nReturn:
+    both file paths, grep results, prek result."
+  handoff: |-
+    Report both file paths and confirm orchestrator references and the trigger table reflect the worker/reducer agents and workflow-query skill.
+- id: T23
+  title: Update docs/dh-workflow-explorer.html — step/hook node type support + 
+    gap edge rendering (dashed amber)
+  status: not-started
+  agent: dh:task-worker
+  dependencies:
+  - T04
+  - T13
+  priority: 5
+  complexity: medium
+  skills:
+  - python-engineering:python3-typing
+  - python-engineering:python3-testing
+  - plugin-creator:claude-plugins-reference-2026
+  accuracy-risk: low
+  reason: 'Lowest-priority task (architect: scoped separately, not blocking extraction).
+    Satisfies AC5 (step/hook node types + new edge rendering) only. Human-visualization
+    layer; non-blocking for all other acceptance criteria.'
+  body: "## Context\nUpdate the human-facing graph explorer to render the new node
+    and edge types. Architect §1.2 (dh-workflow-explorer.html CODE_CHANGE): step nodes,
+    hook nodes, and new edge types (next, triggered_by) require CSS class additions
+    and overlay updates; gap edges render as dashed amber (feature-context Expected
+    Behavior). Explicitly scoped to a separate task; NOT blocking extraction — lowest
+    priority. Source: architect §1.2, feature-context Expected Behavior (gap edges
+    dashed amber), ADR-2/ADR-3 (explorer remains for human visualization).\n\n## Objective\n\
+    Add step-node and hook-node type support and render next/triggered_by edges and
+    gap edges (dashed amber) in dh-workflow-explorer.html, without breaking existing
+    layer rendering.\n\n## Inputs\n- Architect spec §1.2 (explorer CODE_CHANGE: step/hook
+    nodes, next/triggered_by edges), feature-context Expected Behavior (gap edges
+    = dashed amber, not silently omitted)\n- Rewritten graph-schema.md (T04), step.json
+    (T13)\n- Current `plugins/development-harness/docs/dh-workflow-explorer.html`\n\
+    \n## Requirements\n1. Add CSS classes / rendering for the `step` node type and
+    `hook` node type.\n2. Render the `next` and `triggered_by` edge types.\n3. Render
+    gap edges (type=gap) as dashed amber lines — visible, not omitted (feature-context
+    Expected Behavior).\n4. Preserve existing rendering for current layer node/edge
+    types (L0, G1-G8 decision forks).\n\n## Constraints\n- Do NOT remove or alter
+    existing decision-fork rendering.\n- Do NOT silently omit gap edges — they must
+    render distinctly (dashed amber).\n- Keep the change scoped to rendering the new
+    types.\n\n## Expected Outputs\n- `plugins/development-harness/docs/dh-workflow-explorer.html`
+    (updated)\n\n## Acceptance Criteria\n1. step and hook node types render with distinct
+    CSS classes.\n2. next and triggered_by edges render.\n3. gap edges render as dashed
+    amber (distinct from verified edges).\n4. Existing decision-fork rendering is
+    unchanged (load the explorer with current data and confirm prior layers still
+    render).\n5. `uv run prek run --files plugins/development-harness/docs/dh-workflow-explorer.html`
+    exits 0.\n\n## Verification Steps\n1. Load the explorer against step.json (+ existing
+    layers); confirm step/hook nodes, next/triggered_by edges, and dashed-amber gap
+    edges render, and existing layers still render.\n2. `uv run prek run --files plugins/development-harness/docs/dh-workflow-explorer.html`
+    — expect exit 0.\n3. Run: `git add plugins/development-harness/docs/dh-workflow-explorer.html`
+    then `git commit -m \"feat(workflow-explorer): render step/hook nodes and dashed-amber
+    gap edges\"`\n\n## Handoff\nReturn: HTML path, confirmation of step/hook node
+    classes, next/triggered_by edges, dashed-amber gap edges, and that existing layers
+    still render; prek result."
+  handoff: |-
+    Report the HTML path and confirm step/hook node CSS classes and gap-edge dashed-amber rendering were added.
+context: |-
+  Generated by context-gathering agent on 2026-06-19
+
+  ### How This Currently Works: DH Workflow Extractor System
+
+  The DH plugin's existing workflow documentation lacks machine-readable, step-granular extraction. Current state: `docs/dh-workflow-graph.json` exists with 224 nodes and 7 types, but it captures decision forks (Mermaid diamonds) rather than execution steps — insufficient granularity for impact-radius analysis and agent test generation. The graph has no incremental update mechanism, no quality verification, and no automatic staleness detection.
+
+  When a user or agent needs to understand "if I modify skill X, what actors, steps, MCP calls, and artifacts does that affect?", they must manually trace through reference files, Mermaid diagrams, and prose instructions. No machine-readable index exists to answer this query. The graph does not stay synchronized with repo changes; it is maintained manually and drifts.
+
+  The workflow extraction system will solve this by implementing a deterministic, verified, incrementally-updateable step-granular actor-step graph with automated staleness detection and an agent-facing query skill.
+
+  **How the new system works:**
+
+  1. **Scope Enumeration (enumerate_scope.py)**: Deterministic BFS crawl from entry-point skills (`work-backlog-item`, `*-milestone` family). Follows four reference types: Mermaid node labels containing `.md` paths, slash-command skill invocations (`/dh:skill-name`), agent dispatch declarations (`subagent_type="dh:agent-name"`), and prose file references. Max depth 15 prevents infinite loops. Produces `docs/workflow-layers/SCOPE.md` — flat list of reachable files with entry point, reference type, and depth metadata. Deterministic output enables reproducible file sets. No LLM involved.
+
+  2. **Per-File Extraction Pipeline (dh-extract-file.js)**: Saved dynamic workflow orchestrating five steps for each source file:
+     - Step 1 (deterministic): `plan_ensemble.py` reads `extraction-rules.json` (9 step-centric rule groups), assigns uniform worker coverage (window=4 → 9 workers with 4× overlap)
+     - Step 2 (LLM): Spawn N haiku workers in parallel. Each reads the same source file, applies one rule-group slice (e.g., group 3 finds artifact reads, group 5 finds agent dispatch). Workers emit fixed-schema findings: `{group, rule, location, verdict, severity, evidence}`
+     - Step 3 (deterministic): `reduce.py` merges worker output, denoises via corroboration (weight≥2 threshold default), applies two new enhancements: slug-normalised heading keys (minor text variations no longer break deduplication) and cross_group signal (findings from ≥2 different rule groups elevated in ranking)
+     - Step 4 (LLM): One sonnet verifier reads reduce.py output, confirms each finding by searching source file at cited heading for evidence quote (≥80% match acceptable), votes CONFIRMED/PLAUSIBLE/REFUTED. Logs weight=1 CONFIRMED findings to `.tmp/extraction-misses/{date}-{slug}.md` to drive extraction rule refinement
+     - Step 5 (deterministic): `merge_layer.py` idempotent fragment→layer ETL: reads existing layer JSON, removes all nodes where `source_file` matches fragment, appends new verified nodes, writes atomically via `.tmp` + `os.replace()`. Idempotent: running twice with same fragment produces same result
+
+  3. **Fragment Storage and ETL**: Each extraction run produces a fragment JSON file (not direct layer write), containing verified and unverified items scoped to one source file. `merge_layer.py` merges fragments incrementally. A change to one skill file triggers re-extraction of only that file's contribution to each affected layer, not the entire graph.
+
+  4. **Staleness Detection (session-start-workflow-staleness.cjs hook)**: Post-SessionStart, hook reads `meta.json` fingerprints (last-analyzed commit hash and per-file SHA-256). Compares against HEAD. Detects changed files. Dispatches `dh-extract-file` workflow for each changed file (if changed), updating the graph. Session sees fresh graph from the start.
+
+  5. **Graph Query Skill (/dh:workflow-query)**: Agent-facing skill providing four query patterns: (1) step/node by actor or source file, (2) affected nodes when source file changes, (3) artifact dependencies (reads/writes), (4) dispatch topology and team composition. Includes freshness check: compares graph staleness-tracking timestamp against HEAD; if graph is stale, returns a `stale: true` flag with guidance to run extraction. Enables AI agents to query the graph with confidence about currency.
+
+  **Data model and node types:**
+
+  Nodes: `step` (discrete action by an actor, carries optional guard condition), `decision` (conditional fork with named branches, extracted from Mermaid diamonds), `agent` (actor from `agents/*.md`), `skill` (loaded by step or agent), `reference_file` (workflow reference loaded via expansion), `mcp_tool` (single MCP capability), `artifact` (document/data produced/consumed), `backend` (storage layer: GitHub, beads, sqlite, memory), `hook` (lifecycle event handler).
+
+  Edges: `branch` (decision → next), `next` (step → next step, sequential), `defers_to` (step/skill → reference file), `dispatches` (step → agent), `calls` (step → mcp_tool), `reads`/`writes` (step ↔ artifact), `loads` (agent → skill/reference_file), `stores_in` (mcp_tool → backend), `triggered_by` (hook → event), `gap` (transition exists but unattested, rendered as dashed amber — required for correct impact analysis).
+
+  **Extraction rules (9 step-centric groups):**
+
+  Group 1: Numbered/bulleted steps with actor and action text. Group 2: Conditional guards ("If --quick", "When BACKLOG_BACKEND=", "Skip when:", "Only if:"). Group 3: Artifact reads (`artifact_read()`, `backlog_view(..., section=...)`, `sam_plan(action='status')`). Group 4: Artifact writes (`artifact_register(content=...)`, `backlog_groom(section=..., content=...)`, `sam_plan(action='create')`). Group 5: Agent dispatch (`subagent_type="dh:..."`, `TeamCreate(team_name=...)`, named wave members). Group 6: File-reference expansion (Mermaid nodes with `.md` paths, prose references to `references/...`). Group 7: Skill invocations (`/dh:skill-name`, `Skill(skill='dh:...')`). Group 8: MCP tool calls full and short form (`mcp__plugin_dh_backlog__*`, `backlog_groom()`, `sam_task()`, `artifact_list()`). Group 9: Actor topology (orchestrator inline, subagent via Agent tool, team-member via TeamCreate, hook via lifecycle event).
+
+  **Cross-plugin architecture:**
+
+  `plan_ensemble.py` and `reduce.py` live in `plugins/plugin-creator/skills/ensemble-rule-review/scripts/`. DH imports and uses these for extraction automation. DH's `dh-extract-file.js` workflow orchestrates calls to both scripts. `reduce.py` requires two upstream code changes (Section 8 of architect spec): (1) slug-normalised heading keys — apply `re.sub(r'[^a-z0-9]+', '_', heading.lower())` to headings before keying when no line number present, (2) `cross_group: bool` flag on merged findings — set True when workers from ≥2 different rule groups corroborate the same location. Both changes are backward-compatible (old callers get default behavior). Changes gated behind a feature flag or version check to preserve existing ensemble consumers.
+
+  **Agents and skills:**
+
+  New agents start from scratch: `workflow-extractor-worker.md` (haiku fleet, reads one source file, applies one rule-group slice, emits findings) and `workflow-extractor-reducer.md` (sonnet verifier, confirms findings against source, logs misses). New skill: `/dh:workflow-query` (agent-facing step-graph query with 4 patterns and freshness check). Domain-wide skills for all tasks: `python-engineering:python3-typing`, `python-engineering:python3-testing`, `plugin-creator:claude-plugins-reference-2026` (for plugin.json and schema updates).
+
+  **Hook integration:**
+
+  `session-start-workflow-staleness.cjs` hook executes post-SessionStart. Checks `meta.json` staleness tracking, detects changed files, dispatches extraction. Registered in `hooks/hooks.json` alongside existing `session-start-session-id` entry (no conflicts). Hook preserves prior entries and adds new staleness-detection entry.
+
+  **Verification and quality:**
+
+  Every extracted node carries `verified: bool` flag. Haiku workers produce candidates; sonnet verifier confirms via evidence-quote grounding (≥80% match acceptable). Unconfirmed findings go to `unverified_items` array. Weight=1 CONFIRMED misses logged for rule refinement. Graph quality is observable and improvable via the miss log and unverified items array.
+
+  **Scope and entry points:**
+
+  Entry points: `work-backlog-item` skill + its full reference tree (40+ files in `references/workflows/`), and six `*-milestone` skills (`groom-milestone`, `work-milestone`, `complete-milestone`, `create-milestone`, `start-milestone`, `group-items-to-milestone`). Reachability: file is in scope if reachable from entry point via one of four reference types, max depth 15. Stub skills (`groom-backlog-item`, `create-backlog-item`) are NOT entry points — they delegate to `work-backlog-item`. Scope is deterministic and reproducible.
+
+  **Vocabulary oracle:**
+
+  `docs/workflow-layers/KNOWN_ENTITIES.md` is the canonical reference for all agent names, skill names, MCP tool names (canonical and short-form aliases), artifact type keys, and backlog section names. Extraction workers validate every extracted entity against this list. New entities discovered during extraction are added to the file following the Living Document Protocol before findings are emitted — keeps the file current as the plugin grows. KNOWN_ENTITIES.md is maintained and read by extraction workers, not by agents.
+
+  ### For New Feature Implementation: What Needs to Connect
+
+  **Code modules to create:**
+  - `scripts/enumerate_scope.py`: BFS crawl with 4 reference-type patterns, max depth 15, SCOPE.md writer
+  - `scripts/merge_layer.py`: idempotent fragment→layer ETL with atomic writes
+  - `agents/workflow-extractor-worker.md`: haiku worker reading PRD §9.2 spec
+  - `agents/workflow-extractor-reducer.md`: sonnet verifier reading PRD §9.3 spec
+  - `workflows/dh-extract-file.js`: 5-step pipeline orchestrator (deterministic + LLM + deterministic + LLM + deterministic)
+  - Skills: `/dh:workflow-query` agent-facing interface with 4 query patterns + freshness check
+
+  **Code modules to modify:**
+  - `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`: add slug-normalised keys and cross_group flag (2 changes, backward-compatible)
+  - `docs/workflow-layers/extraction-rules.json`: replace 6 fork-centric rules with 9 step-centric groups
+  - `docs/workflow-layers/KNOWN_ENTITIES.md`: add worker + reducer agents (already contains canonical entity names)
+  - `hooks/hooks.json`: add `session-start-workflow-staleness` entry, preserve existing `session-start-session-id`
+  - `hooks/session-start-workflow-staleness.cjs`: new hook script implementing staleness detection
+  - `plugin.json`: register `workflow-query` skill, `dh-extract-file.js` workflow, workers + reducer agents
+
+  **Documentation and config:**
+  - `docs/workflow-layers/meta.json`: new file tracking staleness (last-analyzed commit hash, per-file SHA-256)
+  - `docs/workflow-layers/step.json`: new graph file (initially bootstrap with zero nodes, populated by extractions)
+  - `docs/graph-schema.md`: rewrite to match PRD/architect data model (retire step nodes from old schema if present)
+  - `docs/workflow-layers/COVERAGE.md`: update to fix model error (haiku/sonnet split), add step layer + verified/unverified fields
+  - `docs/workflow-trace-methodology.md` and `development-harness/CLAUDE.md` trigger table: update for SessionStart hook + dh-extract-file.js approach
+  - `docs/dh-workflow-explorer.html`: update to support step/hook node types + gap edge rendering (dashed amber)
+  - `docs/assemble_graph.py`: verify step-node/next-edge handling; extend or document any gaps
+  - `docs/workflow-layers/extraction-rules.json` bootstrap: 9 rule groups (text blocks, not code lists)
+
+  **Testing:**
+  - `tests/test_enumerate_scope.py`: entry-point discovery, BFS termination, reference resolution for all 4 patterns, max-depth enforcement, cyclic reference handling, unresolvable path logging
+  - `tests/test_merge_layer.py`: idempotency (same fragment twice = same output), atomic writes (no partial state on failure), fragment scoping (only nodes from matching source_file removed)
+  - Test coverage for both scripts at python-engineering domain skill level (python3-testing)
+
+  **Integration and verification:**
+  - `T11`: Verify `plan_ensemble.py` backward-compat with 9-group extraction-rules.json (no code change to ensemble script itself)
+  - `T07`: Test `reduce.py` changes (slug-normalised heading keys, cross_group flag) before integration
+  - `T14`: Hook registration verified — `session-start-workflow-staleness` + existing `session-start-session-id` coexist
+  - `T16`: Skill registration verified — `/dh:workflow-query` discoverable and callable
+  - `T12`: Cross-plugin path resolution verified — `dh-extract-file.js` correctly resolves `${CLAUDE_PLUGIN_ROOT}/../plugin-creator/...` paths at runtime or via `DH_ENSEMBLE_SCRIPTS_DIR` env var
+
+  **Patterns to follow:**
+  - CLI argument parsing: use `argparse` in enumerate_scope.py and merge_layer.py (deterministic Python scripts, not agents)
+  - MCP tool calls: use short-form aliases where they exist (backlog_groom instead of full mcp__plugin_dh_backlog__backlog_groom)
+  - Agent prompts: read architect spec §5.1 and §5.2 for exact worker/verifier prompt requirements
+  - Workflow scripts: use `<input>` and `<key/>` labels for JSON-based arguments (Claude Code dynamic workflow convention)
+  - File references: use plugin-relative paths (not absolute, not CLAUDE_SKILL_DIR-relative) so scope keys are stable across environments
+  - Error handling: unresolvable file paths logged as warnings, not errors (enumerate_scope.py BFS continues on missing files)
+  - Atomicity: merge_layer.py writes to `.tmp`, then `os.replace()` to final path — never leaves partial state
+
+  **Shared utilities and existing patterns:**
+  - CLAUDE.md conventions: SESSION.md patterns for hook staleness tracking already exist in DH plugin
+  - Testing: `pytest` fixtures for file I/O and temporary directories (existing DH test patterns)
+  - Skill loading: reference existing `/dh:*` skills to understand how to structure the query skill (e.g., `/dh:backlog` for reference structure)
+  - Agent configuration: study existing DH agents (impact-analyst, t0-baseline-capture) for frontmatter and prompt structure
+
+  **Assumptions and constraints:**
+  - `CLAUDE_PLUGIN_ROOT` env var always available at runtime (set by Claude Code plugin system)
+  - Entry-point skills are stable (work-backlog-item, *-milestone family); new skills will not become entry points without explicit scope redefinition
+  - Headings in source files are unique within file (used as location keys in extraction findings)
+  - Max recursion depth 15 sufficient for DH plugin's reference tree (verified via enumerate_scope.py test on actual DH plugin)
+  - Haiku workers are reliable enough for mechanical pattern matching when rule slices are thin and rigid (verified via prior ensemble extraction work in plugin-creator)
+  - Sonnet verifier can locate evidence quotes with ≥80% match accuracy (lower threshold than exact match, accommodates minor formatting variations)
+
+  **Risk factors:**
+  - Cross-plugin imports: `plan_ensemble.py` lives in plugin-creator cache; DH must resolve the installed path at runtime. Backward-compat gate required to preserve existing ensemble callers.
+  - Hook lifecycle: `session-start-workflow-staleness` must not block SessionStart if extraction is slow. Design: dispatch extraction asynchronously or rate-limit to changed-file count. (See architect spec §7 for hook timing constraints.)
+  - Graph staleness: false negatives possible if hook fails silently. Mitigation: `freshness: false` flag returned by query skill when staleness is detected.
+  - Haiku miss rate: extraction-rules.json must evolve as new patterns are discovered. Miss log feeds continuous improvement cycle.
+
+  ### Technical Reference Details
+
+  **Function signatures (enumerate_scope.py):**
+  ```python
+  def enumerate_scope(
+      entry_points: list[str],  # e.g., ['work-backlog-item', 'groom-milestone', ...]
+      plugin_root: Path,
+      max_depth: int = 15,
+  ) -> list[ScopeEntry]: ...
+
+  def extract_references(
+      file_path: Path,
+      plugin_root: Path,
+  ) -> list[ResolvedRef]: ...
+
+  def write_scope_md(
+      entries: list[ScopeEntry],
+      output_path: Path,
+  ) -> None: ...
+  ```
+
+  **Data models (enumerate_scope.py):**
+  ```python
+  @dataclass
+  class ScopeEntry:
+      file_path: str  # relative to plugin root
+      entry_point: str
+      reference_type: Literal['mermaid_node', 'skill_invocation', 'agent_dispatch', 'prose_reference']
+      depth: int
+
+  @dataclass
+  class ResolvedRef:
+      file_path: str  # resolved path, relative to plugin root
+      reference_type: str
+      source_heading: str  # optional, where reference was found
+  ```
+
+  **Function signatures (merge_layer.py):**
+  ```python
+  def merge_fragment(
+      layer_path: Path,
+      fragment: ExtractionFragment,
+  ) -> MergeResult: ...
+
+  def read_layer(layer_path: Path) -> LayerJSON: ...
+
+  def write_layer(layer_path: Path, layer: LayerJSON) -> None: ...
+  ```
+
+  **Data models (merge_layer.py):**
+  ```python
+  @dataclass(frozen=True)
+  class ExtractionFragment:
+      meta: dict  # {source_file, layer_type, extracted_at, verified_count, unverified_count}
+      items: list[dict]  # step/decision nodes with verified=true
+      unverified_items: list[dict]  # nodes with verified=false
+
+  @dataclass(frozen=True)
+  class MergeResult:
+      removed_count: int
+      added_count: int
+      total_after: int
+      layer_path: Path
+  ```
+
+  **File locations:**
+  - PRD: `plugins/development-harness/docs/plans/prd-workflow-extractor.md` (source of truth for goals, scope, extraction rules, non-goals)
+  - Architect spec: `plan/architect-dh-workflow-extractor-system.md` (source of truth for component design, type system, agent specs, ADRs)
+  - Extraction rules: `docs/workflow-layers/extraction-rules.json` (9 step-centric groups, input to plan_ensemble.py)
+  - Known entities: `docs/workflow-layers/KNOWN_ENTITIES.md` (canonical entity names, maintained by extraction workers)
+  - Scope output: `docs/workflow-layers/SCOPE.md` (reachable file list, produced by enumerate_scope.py)
+  - Graph layers: `docs/workflow-layers/step.json` (extracted steps, produced by dh-extract-file.js → merge_layer.py)
+  - Staleness tracking: `docs/workflow-layers/meta.json` (last-analyzed commit, per-file SHA-256, produced by hook)
+  - Misses log: `.tmp/extraction-misses/{date}-{slug}.md` (weight=1 CONFIRMED findings for rule refinement)
+
+  **Domain skills for all tasks:**
+  - `python-engineering:python3-typing` — type hints in Python scripts
+  - `python-engineering:python3-testing` — pytest fixtures and test patterns
+  - `plugin-creator:claude-plugins-reference-2026` — plugin.json schema, agent frontmatter, skill registration
+
+  **Related architect decisions:**
+  - Deterministic outer loop (enumerate_scope) + LLM ensemble per file: ensures reproducible scope and incremental updates
+  - Haiku workers + sonnet verifier: cost-effective with verified fidelity (evidence-quote grounding required)
+  - Fragment storage model: enables idempotent ETL and incremental updates
+  - Gap edges: required for correct impact-radius analysis (silent gaps produce wrong blast-radius assessments)
+  - Slug-normalised heading keys: minor text variations no longer break deduplication (backward-compat gated)
+  - Cross_group signal: findings from ≥2 rule groups elevated in ranking (improves credibility)
+  - SessionStart hook for staleness detection: ensures agents always see current graph without manual triggering
+  - Agent-facing query skill: shields agents from direct graph access, provides fresh-check semantics
+
+  **Backward compatibility (cross-plugin contract §8):**
+  - `reduce.py` changes: slug-normalisation and cross_group flag gated behind version check or feature flag. Existing callers get old behavior; DH passes explicit flag to enable new behavior.
+  - `plan_ensemble.py`: no code changes required; DH passes `--window 4` to match 9-group extraction-rules.json layout.
+  - Graph format: new step nodes added; old decision nodes retained. Both coexist in same layer JSON files.
+
+  **Query skill patterns (/dh:workflow-query):**
+  1. Find steps/nodes by actor or source file — e.g., "all steps performed by @dh:impact-analyst" or "all nodes extracted from groom/swarm.md"
+  2. Affected nodes when source file changes — e.g., "if groom/swarm.md changes, what other nodes depend on it?"
+  3. Artifact dependencies — e.g., "what steps read the impact-radius artifact?"
+  4. Dispatch topology — e.g., "what team composition does this skill dispatch?"
+  All patterns include freshness check: compares graph timestamp against HEAD; if stale, returns `freshness: false`.

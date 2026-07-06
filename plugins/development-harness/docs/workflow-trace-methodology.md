@@ -119,18 +119,48 @@ Glob the source set into a coverage checklist:
 - `@mcp.tool` in server code — tool behavior
 - `hooks/hooks.json` — hook actors
 
-### Phase B — Extract per file (parallel, one `dh:workflow-extractor` per file)
+### Phase B — Extract per file (ensemble, 3 workers + sonnet reducer per file)
 
-Each agent reads ONE file and extracts into fragments. The agent file is
-`agents/workflow-extractor.md` — haiku model, `Read, Grep, Glob, Write, Edit, Bash` only.
+**Single haiku worker output is not trusted.** Unvalidated extraction is equivalent to
+a guess. Data enters the layer JSON only after corroboration weight ≥ 2 from independent
+workers AND a sonnet reducer self-check passes.
 
-**Hard rule in every extraction prompt:** fill only what the file literally attests.
-Uncited fields → `null` + `unverified: true`. Never default topology.
+The single-agent `dh:workflow-extractor` that used to run this pipeline has been
+retired; the replacement pipeline is pending redesign (see the PRD at
+`../plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
 
-Three extraction families (different target fields per source type):
-- B1 skill/reference files: steps, dispatch points, topology, waves, barriers, prompt templates
+```
+Phase 0 — Plan (deterministic)
+  plan_ensemble.py extraction-rules.json --window 4 --json
+  → 3 worker assignments, each covering 4 of 6 rule groups (2x uniform overlap)
+  Rule groups: (1) Mermaid diamonds, (2) branch conditions, (3) file-reference links,
+               (4) agent dispatch, (5) MCP tool calls, (6) artifact flow
+
+Phase 1 — Fan-out (parallel haiku workers)
+  3 × workflow-extractor-worker (haiku, rigid, partial rule slice each)
+  All 3 read the SAME file; only their rule slice differs.
+  Each emits: group / rule / location / verdict / evidence (fixed schema for reduce.py)
+
+Phase 2 — Reduce (deterministic script)
+  reduce.py --keep-threshold 2
+  Items found by 2+ workers → retained (corroborated)
+  Items found by 1 worker  → isolated as unverified, never silently promoted
+
+Phase 3 — Assemble (sonnet reducer)
+  workflow-extractor-reducer reads reduce.py output + re-reads source file
+  Fills derived schema fields (fork_id, branches array, evaluated_by, etc.)
+  Self-checks: source_file paths exist, source_headings found in file
+  Writes verified layer JSON fragment + isolated unverified_items array
+```
+
+Three extraction families (same as before, now ensemble-validated):
+- B1 skill/reference files: forks, branches, dispatch points, topology, waves, barriers
 - B2 agent files: actor identity, model, tools, skills-loaded, STATUS contract, responds-to
 - B3 MCP server code: tool name, params, backend routing (reuse existing verified traces)
+
+**Unverified items:** the reducer writes these to a separate `unverified_items` array in
+the layer JSON. They are present for inspection. They do not flow into the assembler's
+main data arrays and do not appear in the graph.
 
 ### Phase C — Join (one agent per route)
 

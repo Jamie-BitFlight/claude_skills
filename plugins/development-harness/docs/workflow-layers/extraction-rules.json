@@ -1,0 +1,21 @@
+{
+  "1": ["numbered or bulleted step with actor + action text", "wave headers with step lists"],
+  "2": ["conditional guards: If --quick, When BACKLOG_BACKEND=, Skip when:, Only if:"],
+  "3": [
+    "artifact reads: artifact_read(...), backlog_view(..., section=...), sam_plan(action='status')"
+  ],
+  "4": [
+    "artifact writes: artifact_register(content=...), backlog_groom(section=..., content=...), sam_plan(action='create')"
+  ],
+  "5": ["agent dispatch: subagent_type='dh:...', TeamCreate(team_name=...), named wave members"],
+  "6": [
+    "file-reference expansion: Mermaid node 'Load X.md', '→ groom/swarm.md', prose 'Read references/...'"
+  ],
+  "7": ["skill invocations: /dh:skill-name, Skill(skill='dh:...')"],
+  "8": [
+    "MCP tool calls full and short form: mcp__plugin_dh_backlog__*, backlog_groom(...), sam_task(...)"
+  ],
+  "9": [
+    "actor topology: orchestrator inline, subagent via Agent tool, team-member via TeamCreate, hook via lifecycle event"
+  ]
+}

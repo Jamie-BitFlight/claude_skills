@@ -1,0 +1,3002 @@
+{
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dh_config.py": {
+    "mtime": 1779121999.3209996,
+    "ast_hash": "29be82329e2287eaa56eccb2de800cbe",
+    "semantic_hash": "29be82329e2287eaa56eccb2de800cbe"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dh_paths.py": {
+    "mtime": 1774881202.3668833,
+    "ast_hash": "3889641e9ea9b0f1d81c02aae7f56109",
+    "semantic_hash": "3889641e9ea9b0f1d81c02aae7f56109"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.codex-plugin/plugin.json": {
+    "mtime": 1781097618.467167,
+    "ast_hash": "051fc60ef6f895474f5e9440521cf5db",
+    "semantic_hash": "051fc60ef6f895474f5e9440521cf5db"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agent_profile/parser.py": {
+    "mtime": 1774902111.4673445,
+    "ast_hash": "1a617c433251641035e6757e3c2fb790",
+    "semantic_hash": "1a617c433251641035e6757e3c2fb790"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agent_profile/discovery.py": {
+    "mtime": 1779693505.9072766,
+    "ast_hash": "9352f4cea5ae83446f3bc0ce5399ce57",
+    "semantic_hash": "9352f4cea5ae83446f3bc0ce5399ce57"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agent_profile/models.py": {
+    "mtime": 1779551530.233423,
+    "ast_hash": "29e9af7bba9cc8fa4270d9153bc67911",
+    "semantic_hash": "29e9af7bba9cc8fa4270d9153bc67911"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agent_profile/__init__.py": {
+    "mtime": 1774182378.2021286,
+    "ast_hash": "2380b9458e0634b82cf06194e8695193",
+    "semantic_hash": "2380b9458e0634b82cf06194e8695193"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agent_profile/server.py": {
+    "mtime": 1779551530.233423,
+    "ast_hash": "500d8db691fb6e560b29eb4dbb63b78f",
+    "semantic_hash": "500d8db691fb6e560b29eb4dbb63b78f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_create_backend_factory_beads.py": {
+    "mtime": 1779119610.7077682,
+    "ast_hash": "b5a9e497d9b36f1efadfe9fa2ef41807",
+    "semantic_hash": "b5a9e497d9b36f1efadfe9fa2ef41807"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_sections_index_consistency.py": {
+    "mtime": 1778808220.570363,
+    "ast_hash": "6ea9e79849b3970b2c44535e512d118d",
+    "semantic_hash": "6ea9e79849b3970b2c44535e512d118d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_backlog_update_artifact_registration.py": {
+    "mtime": 1775421624.3135757,
+    "ast_hash": "b5fe69892693b5f9c9510517f0ba04d6",
+    "semantic_hash": "b5fe69892693b5f9c9510517f0ba04d6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_beads_artifact_provider.py": {
+    "mtime": 1780495655.5970197,
+    "ast_hash": "2d33edc6eb10bf2734f522e691dddb20",
+    "semantic_hash": "2d33edc6eb10bf2734f522e691dddb20"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_bd_runner.py": {
+    "mtime": 1779551530.2484226,
+    "ast_hash": "67f45e5d8ce2f0c2bed6169e5d486a05",
+    "semantic_hash": "67f45e5d8ce2f0c2bed6169e5d486a05"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_backlog_backend_capability_contract.py": {
+    "mtime": 1780148581.8561578,
+    "ast_hash": "b7fc3778b6bb5f1c8de792d66f5dccf8",
+    "semantic_hash": "b7fc3778b6bb5f1c8de792d66f5dccf8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_artifact_provider.py": {
+    "mtime": 1781540304.7419488,
+    "ast_hash": "105bfe6aaa7473a58b49bfd99a2de86c",
+    "semantic_hash": "105bfe6aaa7473a58b49bfd99a2de86c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_linear_artifact_provider.py": {
+    "mtime": 1775422112.4527931,
+    "ast_hash": "cbee73edeb8070a59d1da3a9b95010c0",
+    "semantic_hash": "cbee73edeb8070a59d1da3a9b95010c0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_github_gist_artifact_provider.py": {
+    "mtime": 1780668756.5679371,
+    "ast_hash": "d9fee86c959815d9995bb05083ec030e",
+    "semantic_hash": "d9fee86c959815d9995bb05083ec030e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_artifact_registry.py": {
+    "mtime": 1775422176.9012742,
+    "ast_hash": "8af387a6147154776c8f6cb76a986872",
+    "semantic_hash": "8af387a6147154776c8f6cb76a986872"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_task_status_hook_beads.py": {
+    "mtime": 1779551530.2494226,
+    "ast_hash": "ef170916cd99531deb0bff5e0bc22599",
+    "semantic_hash": "ef170916cd99531deb0bff5e0bc22599"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_beads_models.py": {
+    "mtime": 1780148581.7301607,
+    "ast_hash": "b8992f7683d53d433807a3c3cbfd61d8",
+    "semantic_hash": "b8992f7683d53d433807a3c3cbfd61d8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/__init__.py": {
+    "mtime": 1774141836.591893,
+    "ast_hash": "7587743f15eff495593695e71ef82dee",
+    "semantic_hash": "7587743f15eff495593695e71ef82dee"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_gitlab_artifact_provider.py": {
+    "mtime": 1775394727.7105784,
+    "ast_hash": "01d9cde614708940ca14f9b0008e929e",
+    "semantic_hash": "01d9cde614708940ca14f9b0008e929e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_backlog/test_beads_backend.py": {
+    "mtime": 1780148581.929156,
+    "ast_hash": "85993da04163df2504150db3189e6a49",
+    "semantic_hash": "85993da04163df2504150db3189e6a49"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/dispatch_helper.py": {
+    "mtime": 1773247107.5381722,
+    "ast_hash": "d10881a41c6397d981bdcb35223a8b02",
+    "semantic_hash": "d10881a41c6397d981bdcb35223a8b02"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/dh_migrate.py": {
+    "mtime": 1779570571.0576892,
+    "ast_hash": "7e46170556675c938b9f5563297bd211",
+    "semantic_hash": "7e46170556675c938b9f5563297bd211"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/manifest_resolver.py": {
+    "mtime": 1775150415.9459758,
+    "ast_hash": "f5211a51530d6caec5941c3fade96253",
+    "semantic_hash": "f5211a51530d6caec5941c3fade96253"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/dh_mcp_preinit.py": {
+    "mtime": 1774534261.7384408,
+    "ast_hash": "abf2a0af979c6b13800ff35ae148676c",
+    "semantic_hash": "abf2a0af979c6b13800ff35ae148676c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/verify_migration_fidelity.py": {
+    "mtime": 1775150415.9469757,
+    "ast_hash": "69a99ffebabe66fa1302b7ac07713c37",
+    "semantic_hash": "69a99ffebabe66fa1302b7ac07713c37"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/migrate_tasks_to_github.py": {
+    "mtime": 1775537964.4201899,
+    "ast_hash": "3266186cd6e36385f5983f9480064ff5",
+    "semantic_hash": "3266186cd6e36385f5983f9480064ff5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/live_validation_step.py": {
+    "mtime": 1779551530.2434227,
+    "ast_hash": "5ea6cd193414a7c23f8240b2a60c1b68",
+    "semantic_hash": "5ea6cd193414a7c23f8240b2a60c1b68"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/manifest_merge.py": {
+    "mtime": 1777312983.8109746,
+    "ast_hash": "ba9779e95ed5fb662d1198612a08962e",
+    "semantic_hash": "ba9779e95ed5fb662d1198612a08962e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/run_backlog_server.py": {
+    "mtime": 1780272428.1067834,
+    "ast_hash": "ccf6d167355f13cee6dee8c50cac96fd",
+    "semantic_hash": "ccf6d167355f13cee6dee8c50cac96fd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/migrate_backlog_to_yaml.py": {
+    "mtime": 1780605751.6679993,
+    "ast_hash": "2db4dca345720f31064fcb53858fdce9",
+    "semantic_hash": "2db4dca345720f31064fcb53858fdce9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/manifest_schema.py": {
+    "mtime": 1775366783.1386826,
+    "ast_hash": "5806bef0e40e6e7ae207474937730eb5",
+    "semantic_hash": "5806bef0e40e6e7ae207474937730eb5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/run_live_validation_skill.py": {
+    "mtime": 1775394727.7255783,
+    "ast_hash": "a979614e371958776d5185b460c8840b",
+    "semantic_hash": "a979614e371958776d5185b460c8840b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/manifest_discovery.py": {
+    "mtime": 1773321708.7725935,
+    "ast_hash": "2874b90c2c6d9f2978e03e4cf6acdcc1",
+    "semantic_hash": "2874b90c2c6d9f2978e03e4cf6acdcc1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/prepare_clean_worktree.sh": {
+    "mtime": 1777314782.9641438,
+    "ast_hash": "d548fe5d476e3799aa38f0652b918ee0",
+    "semantic_hash": "d548fe5d476e3799aa38f0652b918ee0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/close_test_issues.py": {
+    "mtime": 1779148638.758187,
+    "ast_hash": "8033e45f12f82a04c0361b94c1b98891",
+    "semantic_hash": "8033e45f12f82a04c0361b94c1b98891"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/run_sam_server.py": {
+    "mtime": 1780272428.1067834,
+    "ast_hash": "a2f920b99a5b6a0f474ce3fd95c951c6",
+    "semantic_hash": "a2f920b99a5b6a0f474ce3fd95c951c6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/scripts/migrate_plan_artifacts.py": {
+    "mtime": 1780605751.6679993,
+    "ast_hash": "590854aa3e1644187e4141e38e50a9c5",
+    "semantic_hash": "590854aa3e1644187e4141e38e50a9c5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.cursor-plugin/plugin.json": {
+    "mtime": 1774539967.5757384,
+    "ast_hash": "8178989493a0c1e0202356217e471173",
+    "semantic_hash": "8178989493a0c1e0202356217e471173"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.claude-plugin/plugin.json": {
+    "mtime": 1781540511.175051,
+    "ast_hash": "e54a25b77e8bfd5c5bdec3b7bad05c8a",
+    "semantic_hash": "e54a25b77e8bfd5c5bdec3b7bad05c8a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/yaml_io.py": {
+    "mtime": 1779121999.3209996,
+    "ast_hash": "9fcb5ef815e2a8932b03aa2bce18226d",
+    "semantic_hash": "9fcb5ef815e2a8932b03aa2bce18226d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/artifact_provider.py": {
+    "mtime": 1781540304.739949,
+    "ast_hash": "ae554eb94899044cd4776d1c7c9b1112",
+    "semantic_hash": "ae554eb94899044cd4776d1c7c9b1112"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/sync_engine.py": {
+    "mtime": 1780495655.5950198,
+    "ast_hash": "e4fabdecb974d6cea8636c84148b55e3",
+    "semantic_hash": "e4fabdecb974d6cea8636c84148b55e3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/disclosure_types.py": {
+    "mtime": 1780401388.3579762,
+    "ast_hash": "ea5fd8f7233ef0721a8b0dff86665051",
+    "semantic_hash": "ea5fd8f7233ef0721a8b0dff86665051"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/github_branches.py": {
+    "mtime": 1775047521.6428585,
+    "ast_hash": "779be5c9a79c638d816bfd422a856f59",
+    "semantic_hash": "779be5c9a79c638d816bfd422a856f59"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/_branch_delegates.py": {
+    "mtime": 1775150415.9399757,
+    "ast_hash": "5a981463096c879ea30084e74b01951a",
+    "semantic_hash": "5a981463096c879ea30084e74b01951a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/rendering.py": {
+    "mtime": 1778835583.9385903,
+    "ast_hash": "21a7b9e61464217ee955bda83d39b75e",
+    "semantic_hash": "21a7b9e61464217ee955bda83d39b75e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/parsing.py": {
+    "mtime": 1780605751.636,
+    "ast_hash": "308b373486c1cdef884491afe0596ea4",
+    "semantic_hash": "308b373486c1cdef884491afe0596ea4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/artifact_registry.py": {
+    "mtime": 1779570571.0536895,
+    "ast_hash": "f865870783f63c2b52f6b01814f9f70a",
+    "semantic_hash": "f865870783f63c2b52f6b01814f9f70a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/disclosure_handler.py": {
+    "mtime": 1780401388.3579762,
+    "ast_hash": "25bbb6dae14148c8a671d9ebc6871433",
+    "semantic_hash": "25bbb6dae14148c8a671d9ebc6871433"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/jsonl_utils.py": {
+    "mtime": 1777312983.8069746,
+    "ast_hash": "2c0c0c6f27f7c81a5fb2c67a22b5ba11",
+    "semantic_hash": "2c0c0c6f27f7c81a5fb2c67a22b5ba11"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/transcript_reader.py": {
+    "mtime": 1777312983.8089745,
+    "ast_hash": "ac3b7a36f5a5f10e3223d0c9d8d1cc2f",
+    "semantic_hash": "ac3b7a36f5a5f10e3223d0c9d8d1cc2f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/content_normalizer.py": {
+    "mtime": 1780605751.6010005,
+    "ast_hash": "2ef9828106c15f9d66028db89d41ab88",
+    "semantic_hash": "2ef9828106c15f9d66028db89d41ab88"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/github_sync.py": {
+    "mtime": 1779551530.2384229,
+    "ast_hash": "19599100276ba479dba593e9c9d8f5b0",
+    "semantic_hash": "19599100276ba479dba593e9c9d8f5b0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/ordinal_mapper.py": {
+    "mtime": 1780401388.3579762,
+    "ast_hash": "22c72845c1d9160a174ac6ec048dbb7b",
+    "semantic_hash": "22c72845c1d9160a174ac6ec048dbb7b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/models.py": {
+    "mtime": 1780605751.6010005,
+    "ast_hash": "e5f90ed560c2b04d9c0f6e8f78712d6c",
+    "semantic_hash": "e5f90ed560c2b04d9c0f6e8f78712d6c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/dispatch_state.py": {
+    "mtime": 1779119610.6977687,
+    "ast_hash": "9b3a2f8f608cab5e9ed9e267fbec6ba4",
+    "semantic_hash": "9b3a2f8f608cab5e9ed9e267fbec6ba4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/sync_state.py": {
+    "mtime": 1780495655.5950198,
+    "ast_hash": "32d1bd537f08962b34cec0085e3e6f56",
+    "semantic_hash": "32d1bd537f08962b34cec0085e3e6f56"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/operations.py": {
+    "mtime": 1780672726.2701247,
+    "ast_hash": "2d569328648c3aae302d0115aaaae5db",
+    "semantic_hash": "2d569328648c3aae302d0115aaaae5db"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/__init__.py": {
+    "mtime": 1775150415.9389758,
+    "ast_hash": "2fade5c6322a908b2e10f16d5304935a",
+    "semantic_hash": "2fade5c6322a908b2e10f16d5304935a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/gh_client.py": {
+    "mtime": 1780672726.2691245,
+    "ast_hash": "13e28f018f51dcfbd9b6822fde8fa282",
+    "semantic_hash": "13e28f018f51dcfbd9b6822fde8fa282"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/server.py": {
+    "mtime": 1780672726.2711246,
+    "ast_hash": "17204bc53770c45137fc11734bcbd95c",
+    "semantic_hash": "17204bc53770c45137fc11734bcbd95c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/gitlab_client.py": {
+    "mtime": 1779121999.3189998,
+    "ast_hash": "ee84690a2eb14c730ad15cc342035ee6",
+    "semantic_hash": "ee84690a2eb14c730ad15cc342035ee6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/linear_client.py": {
+    "mtime": 1780668756.561937,
+    "ast_hash": "0082ce07934313633a129185248a7098",
+    "semantic_hash": "0082ce07934313633a129185248a7098"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/artifact_provider_local.py": {
+    "mtime": 1779570571.0536895,
+    "ast_hash": "a9d640f672805e9dce35ee47ac05fedb",
+    "semantic_hash": "a9d640f672805e9dce35ee47ac05fedb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backend_protocol.py": {
+    "mtime": 1780605751.633,
+    "ast_hash": "fdc609618146eead6cbe49bf4fe8ea51",
+    "semantic_hash": "fdc609618146eead6cbe49bf4fe8ea51"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/entry_blocks.py": {
+    "mtime": 1779551530.237423,
+    "ast_hash": "b35e11ea02fec175a6d3294066140b64",
+    "semantic_hash": "b35e11ea02fec175a6d3294066140b64"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/memory_backend.py": {
+    "mtime": 1780605751.633,
+    "ast_hash": "2c0b437c4ebb217a386b2f52ecfe815a",
+    "semantic_hash": "2c0b437c4ebb217a386b2f52ecfe815a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/github_backend.py": {
+    "mtime": 1780605751.633,
+    "ast_hash": "8d8c160d2c3b8a7a4f5e08bc794d049f",
+    "semantic_hash": "8d8c160d2c3b8a7a4f5e08bc794d049f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/beads_models.py": {
+    "mtime": 1780148581.7291608,
+    "ast_hash": "0e91d796f8e1030e9ccf710494fdc593",
+    "semantic_hash": "0e91d796f8e1030e9ccf710494fdc593"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/bd_runner.py": {
+    "mtime": 1779551530.236423,
+    "ast_hash": "f0534f381ebe8643be4c95ca90a335aa",
+    "semantic_hash": "f0534f381ebe8643be4c95ca90a335aa"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/__init__.py": {
+    "mtime": 1775150415.9399757,
+    "ast_hash": "bc1cb24cad7e1965465ca314f0f4be7f",
+    "semantic_hash": "bc1cb24cad7e1965465ca314f0f4be7f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/beads_backend.py": {
+    "mtime": 1780605751.633,
+    "ast_hash": "c78d8c9413630220ead88733da5b15b4",
+    "semantic_hash": "c78d8c9413630220ead88733da5b15b4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/beads_artifact_provider.py": {
+    "mtime": 1780668756.561937,
+    "ast_hash": "d87afd43167d618ca10c4b6f60ba6c11",
+    "semantic_hash": "d87afd43167d618ca10c4b6f60ba6c11"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/backends/sqlite_backend.py": {
+    "mtime": 1780605751.6339998,
+    "ast_hash": "d1a6baf02302c8c778b484fb7367b777",
+    "semantic_hash": "d1a6baf02302c8c778b484fb7367b777"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_pagination_offset_signal.py": {
+    "mtime": 1780163727.0285518,
+    "ast_hash": "ea0a05d98821823eb895eed3451cfb56",
+    "semantic_hash": "ea0a05d98821823eb895eed3451cfb56"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_entry_owning_headers.py": {
+    "mtime": 1780163727.0285518,
+    "ast_hash": "0ed2cfe503d29da831edf5b4daff01f3",
+    "semantic_hash": "0ed2cfe503d29da831edf5b4daff01f3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_live_sections.py": {
+    "mtime": 1779693505.8882751,
+    "ast_hash": "940166a7e91abdf77cd6ba0e421d6760",
+    "semantic_hash": "940166a7e91abdf77cd6ba0e421d6760"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_sections_metadata_sync.py": {
+    "mtime": 1780605751.6050005,
+    "ast_hash": "2d37ada7355c6ffa303864314716b15d",
+    "semantic_hash": "2d37ada7355c6ffa303864314716b15d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_sync_groomed_entry_block_roundtrip.py": {
+    "mtime": 1780672726.2711246,
+    "ast_hash": "bc8559f3564a1c27681290cc9a54315c",
+    "semantic_hash": "bc8559f3564a1c27681290cc9a54315c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_rendering.py": {
+    "mtime": 1779551530.241423,
+    "ast_hash": "0be712e92723d02836af86cff7c41aea",
+    "semantic_hash": "0be712e92723d02836af86cff7c41aea"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_blank_section_normalization.py": {
+    "mtime": 1780163727.0285518,
+    "ast_hash": "8a93729046108de103e5f03802d44add",
+    "semantic_hash": "8a93729046108de103e5f03802d44add"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_sync_scope.py": {
+    "mtime": 1779693505.8682737,
+    "ast_hash": "1cda5ae7462160df6a107843f0a7fd6d",
+    "semantic_hash": "1cda5ae7462160df6a107843f0a7fd6d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_apply_body_section_filter_forms.py": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "8c6b58bcdb6733881789c396c6775b6a",
+    "semantic_hash": "8c6b58bcdb6733881789c396c6775b6a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_pagination_section_index.py": {
+    "mtime": 1780163727.0295517,
+    "ast_hash": "71b0a8efc64bcb14f4573ad1e8717879",
+    "semantic_hash": "71b0a8efc64bcb14f4573ad1e8717879"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_backlog_list_divergence.py": {
+    "mtime": 1781540304.739949,
+    "ast_hash": "0e00ef8330874dcff41f3b3f22c79c67",
+    "semantic_hash": "0e00ef8330874dcff41f3b3f22c79c67"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_groom_mark_groomed.py": {
+    "mtime": 1777488843.4006572,
+    "ast_hash": "6071d701a9ea73a400b932d4b2d3242a",
+    "semantic_hash": "6071d701a9ea73a400b932d4b2d3242a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_startup_sync.py": {
+    "mtime": 1781540304.740949,
+    "ast_hash": "f1ecd9d6df911eb2e1c4ec574507eb11",
+    "semantic_hash": "f1ecd9d6df911eb2e1c4ec574507eb11"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_find_item.py": {
+    "mtime": 1780148581.9261563,
+    "ast_hash": "2c6adcc3cdc636e372768059f63e7e14",
+    "semantic_hash": "2c6adcc3cdc636e372768059f63e7e14"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_section_filter.py": {
+    "mtime": 1780163727.0305517,
+    "ast_hash": "ae68dd646a84126cbad02a47882e543f",
+    "semantic_hash": "ae68dd646a84126cbad02a47882e543f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_section_form_resolution.py": {
+    "mtime": 1780163727.0305517,
+    "ast_hash": "12d31de33903f827ed0cd8f8213ef7ca",
+    "semantic_hash": "12d31de33903f827ed0cd8f8213ef7ca"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_view_over_budget_gate.py": {
+    "mtime": 1780163727.0295517,
+    "ast_hash": "dcfc4f9834feb862b5f241a35430c208",
+    "semantic_hash": "dcfc4f9834feb862b5f241a35430c208"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_entry_id_zero_timestamp_bug.py": {
+    "mtime": 1780672726.2711246,
+    "ast_hash": "a63bf1753521630395b8688d91c4cea9",
+    "semantic_hash": "a63bf1753521630395b8688d91c4cea9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/__init__.py": {
+    "mtime": 1774833045.598784,
+    "ast_hash": "0c7664f1284a665243b4de7c469444f8",
+    "semantic_hash": "0c7664f1284a665243b4de7c469444f8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_backlog_config.py": {
+    "mtime": 1775322685.8422585,
+    "ast_hash": "f596941fff03f53175e82c6207dfe882",
+    "semantic_hash": "f596941fff03f53175e82c6207dfe882"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_artifact_provider_item_id_coercion.py": {
+    "mtime": 1781540304.739949,
+    "ast_hash": "10c9335bc2b7d96bc81d9268a1ea5ad3",
+    "semantic_hash": "10c9335bc2b7d96bc81d9268a1ea5ad3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/conftest.py": {
+    "mtime": 1780401388.3579762,
+    "ast_hash": "5df94ab97200e27761ac8c4a42991827",
+    "semantic_hash": "5df94ab97200e27761ac8c4a42991827"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/_view_test_helpers.py": {
+    "mtime": 1780163727.0285518,
+    "ast_hash": "2e1982ea3aee288a4d6bec389da90e74",
+    "semantic_hash": "2e1982ea3aee288a4d6bec389da90e74"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_concurrent_writes.py": {
+    "mtime": 1779693505.8822749,
+    "ast_hash": "023aa56b7636bd2f79adcd6ec9d90939",
+    "semantic_hash": "023aa56b7636bd2f79adcd6ec9d90939"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_tiktoken_offline_safe.py": {
+    "mtime": 1780163727.0285518,
+    "ast_hash": "682d5378b1b688a452d94509d6bf1db4",
+    "semantic_hash": "682d5378b1b688a452d94509d6bf1db4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_section_filter_error_dict.py": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "61c195afebf8e55b85f3ddbc6643292a",
+    "semantic_hash": "61c195afebf8e55b85f3ddbc6643292a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/test_section_filter_miss.py": {
+    "mtime": 1779854783.8561122,
+    "ast_hash": "4784457c482548a6b2ced85631e36763",
+    "semantic_hash": "4784457c482548a6b2ced85631e36763"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/integration/__init__.py": {
+    "mtime": 1780332651.0355084,
+    "ast_hash": "3628277c33a927ecc564a8eb2a5e5c3a",
+    "semantic_hash": "3628277c33a927ecc564a8eb2a5e5c3a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/integration/test_backlog_view_disclosure_tool.py": {
+    "mtime": 1780672726.2711246,
+    "ast_hash": "851d1b0efd332ca47be897dae12d88c6",
+    "semantic_hash": "851d1b0efd332ca47be897dae12d88c6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/issue-recursive-nav.json": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "506c8279b85a1edc455dc31f5a0bc2b1",
+    "semantic_hash": "506c8279b85a1edc455dc31f5a0bc2b1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/issue-996-full.json": {
+    "mtime": 1780605751.6679993,
+    "ast_hash": "b7c8c6ed96c1eb2ac259818369bf54d1",
+    "semantic_hash": "b7c8c6ed96c1eb2ac259818369bf54d1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/regenerate_fixtures.py": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "705551f362e8c278f88ae9b838d11e72",
+    "semantic_hash": "705551f362e8c278f88ae9b838d11e72"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/issue-2515-full.json": {
+    "mtime": 1780605751.666999,
+    "ast_hash": "10622d47af6a5f3d68309a25877ae87f",
+    "semantic_hash": "10622d47af6a5f3d68309a25877ae87f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/__init__.py": {
+    "mtime": 1780332650.890727,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/issue-1857-full.json": {
+    "mtime": 1780605751.6659992,
+    "ast_hash": "c022d7b2c39d3f63d5448c0eb6068814",
+    "semantic_hash": "c022d7b2c39d3f63d5448c0eb6068814"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/fixtures/issue-2521-full.json": {
+    "mtime": 1780605751.666999,
+    "ast_hash": "fa63988dd0ad85ca2b6f74e98261690c",
+    "semantic_hash": "fa63988dd0ad85ca2b6f74e98261690c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/test_ordinal_mapper.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "77d999517fc21ba97a57f460951b0de9",
+    "semantic_hash": "77d999517fc21ba97a57f460951b0de9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/test_disclosure_request_parser.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "1318ccf6a04f5ac196af6d8ad932ae4b",
+    "semantic_hash": "1318ccf6a04f5ac196af6d8ad932ae4b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/__init__.py": {
+    "mtime": 1780332650.88452,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/test_content_normalizer.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "6d68a8c9deb75d59a8f2f21ece5eef6f",
+    "semantic_hash": "6d68a8c9deb75d59a8f2f21ece5eef6f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/test_disclosure_handler.py": {
+    "mtime": 1780495655.5960197,
+    "ast_hash": "0786c35ef8a0628f1f2b4823a0b13636",
+    "semantic_hash": "0786c35ef8a0628f1f2b4823a0b13636"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/progressive_markdown/test_navigation_result_unification.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "0b39355578a5819e4614ce6e0614d97c",
+    "semantic_hash": "0b39355578a5819e4614ce6e0614d97c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/progressive_markdown/test_indexer_decomposition.py": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "e46966c4ec89cc7c6ccde31055444071",
+    "semantic_hash": "e46966c4ec89cc7c6ccde31055444071"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/progressive_markdown/__init__.py": {
+    "mtime": 1780332650.88452,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/progressive_markdown/test_ambiguous_section_ref.py": {
+    "mtime": 1780401388.3599763,
+    "ast_hash": "760bd694d6ed147c0a4dd4ca46278ca4",
+    "semantic_hash": "760bd694d6ed147c0a4dd4ca46278ca4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/tests/unit/progressive_markdown/test_init_docstring.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "b5748b51683834d6b94f79a6d4c8c0ce",
+    "semantic_hash": "b5748b51683834d6b94f79a6d4c8c0ce"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-result.json": {
+    "mtime": 1780686343.232002,
+    "ast_hash": "aad98570424f043a2d102da945414433",
+    "semantic_hash": "aad98570424f043a2d102da945414433"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/assemble_graph.py": {
+    "mtime": 1781540304.7769485,
+    "ast_hash": "047d79dd90289c882bd5a903f905d62d",
+    "semantic_hash": "047d79dd90289c882bd5a903f905d62d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/dh-workflow-graph.json": {
+    "mtime": 1780950529.9644463,
+    "ast_hash": "9acf1172161d619c72f99ebb0e81bbb5",
+    "semantic_hash": "9acf1172161d619c72f99ebb0e81bbb5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G7-complexity-routing.json": {
+    "mtime": 1780950529.929447,
+    "ast_hash": "438b21b5dd75d60f3771d15e147c5105",
+    "semantic_hash": "438b21b5dd75d60f3771d15e147c5105"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/extraction-rules.json": {
+    "mtime": 1781540304.7689486,
+    "ast_hash": "07bc6da00ea9ab9eb2f753655bef75ba",
+    "semantic_hash": "07bc6da00ea9ab9eb2f753655bef75ba"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/L0-forks.json": {
+    "mtime": 1780950529.9434466,
+    "ast_hash": "861ee5ea2238f69380d61149caa2e270",
+    "semantic_hash": "861ee5ea2238f69380d61149caa2e270"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/L1-trace-work-backlog-item.json": {
+    "mtime": 1780950529.9384468,
+    "ast_hash": "74fd372a81df96c0cf30e6cffc3a7e52",
+    "semantic_hash": "74fd372a81df96c0cf30e6cffc3a7e52"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G3-actor-types.json": {
+    "mtime": 1780950529.929447,
+    "ast_hash": "844199198df09fb3f5371e347e75ea12",
+    "semantic_hash": "844199198df09fb3f5371e347e75ea12"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G1-failure-modes.json": {
+    "mtime": 1780950529.9274468,
+    "ast_hash": "0e521144683609329e72d1eaea400a72",
+    "semantic_hash": "0e521144683609329e72d1eaea400a72"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/L1-trace-work-milestone.json": {
+    "mtime": 1780950529.9374468,
+    "ast_hash": "e2f1a30e1c584a6ddb38eeeb30c7c3bb",
+    "semantic_hash": "e2f1a30e1c584a6ddb38eeeb30c7c3bb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/L1-trace-feature-skills.json": {
+    "mtime": 1780950529.933447,
+    "ast_hash": "8cdca337ac5234f8ca26811621ce4a62",
+    "semantic_hash": "8cdca337ac5234f8ca26811621ce4a62"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G8-backend-routing.json": {
+    "mtime": 1780950529.9354467,
+    "ast_hash": "e3fa6101ed0d95c5def44ddf6df77d33",
+    "semantic_hash": "e3fa6101ed0d95c5def44ddf6df77d33"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G6-task-types.json": {
+    "mtime": 1780950529.933447,
+    "ast_hash": "02cae16245d64a4de5700ead16a293dd",
+    "semantic_hash": "02cae16245d64a4de5700ead16a293dd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/L1-trace-complete-implementation.json": {
+    "mtime": 1780950529.9354467,
+    "ast_hash": "6c6b468f21625249f96df29294f28f04",
+    "semantic_hash": "6c6b468f21625249f96df29294f28f04"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G2-artifacts.json": {
+    "mtime": 1780950529.9274468,
+    "ast_hash": "f1d78c0ac076d0c16a82a6690f9fbb31",
+    "semantic_hash": "f1d78c0ac076d0c16a82a6690f9fbb31"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G4-concurrency.json": {
+    "mtime": 1780950529.928447,
+    "ast_hash": "f598818059ab84ba2ce7683800aa90ba",
+    "semantic_hash": "f598818059ab84ba2ce7683800aa90ba"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/G5-optionality.json": {
+    "mtime": 1780950529.9304469,
+    "ast_hash": "0c1b1549aab7d2fd95b13b169f1cd6a1",
+    "semantic_hash": "0c1b1549aab7d2fd95b13b169f1cd6a1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/__main__.py": {
+    "mtime": 1773546677.4609852,
+    "ast_hash": "26ec032065352639e73a3949c57d9ceb",
+    "semantic_hash": "26ec032065352639e73a3949c57d9ceb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/task_format.py": {
+    "mtime": 1774128618.2927935,
+    "ast_hash": "6276bcb55728829d7f16b9cb2745ec4d",
+    "semantic_hash": "6276bcb55728829d7f16b9cb2745ec4d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/cli.py": {
+    "mtime": 1779121999.3209996,
+    "ast_hash": "00b4cfcb5b330bb08977ac506da99533",
+    "semantic_hash": "00b4cfcb5b330bb08977ac506da99533"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/__init__.py": {
+    "mtime": 1773588327.1215043,
+    "ast_hash": "a10d5635e4c6d4b865f152b78d6c4e64",
+    "semantic_hash": "a10d5635e4c6d4b865f152b78d6c4e64"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/server.py": {
+    "mtime": 1780181907.600635,
+    "ast_hash": "d4503d35ea0ca08e07ab7acedc97e427",
+    "semantic_hash": "d4503d35ea0ca08e07ab7acedc97e427"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/context_backend.py": {
+    "mtime": 1778848831.9163988,
+    "ast_hash": "4c98ee3948905fc4bb7350b70c191b8a",
+    "semantic_hash": "4c98ee3948905fc4bb7350b70c191b8a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/artifact_registry_client.py": {
+    "mtime": 1780672726.2821243,
+    "ast_hash": "55edb9149875378336e4566e19f95a9a",
+    "semantic_hash": "55edb9149875378336e4566e19f95a9a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/task_backend.py": {
+    "mtime": 1777312983.8109746,
+    "ast_hash": "4200f4b41ad2fdd9d4b732df22c2b382",
+    "semantic_hash": "4200f4b41ad2fdd9d4b732df22c2b382"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/quality_gates.py": {
+    "mtime": 1779854783.8471124,
+    "ast_hash": "160ac7e478588ba95875994b868f3dc0",
+    "semantic_hash": "160ac7e478588ba95875994b868f3dc0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/plan_id_index.py": {
+    "mtime": 1780181850.7303076,
+    "ast_hash": "b2c47f98a90064f969f01235a18fbe09",
+    "semantic_hash": "b2c47f98a90064f969f01235a18fbe09"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/task_backend_types.py": {
+    "mtime": 1779158412.3424764,
+    "ast_hash": "fb3594f5c7daf4b195e2ac2b9204201e",
+    "semantic_hash": "fb3594f5c7daf4b195e2ac2b9204201e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/context_config.py": {
+    "mtime": 1778867829.6547794,
+    "ast_hash": "05eaee7137300897826c2ce27dab3094",
+    "semantic_hash": "05eaee7137300897826c2ce27dab3094"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/addressing.py": {
+    "mtime": 1780687855.5829427,
+    "ast_hash": "2c214f2db24c644ccabf6c5c4c5fb9e2",
+    "semantic_hash": "2c214f2db24c644ccabf6c5c4c5fb9e2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/gist_task_layer.py": {
+    "mtime": 1780672726.2821243,
+    "ast_hash": "6718839129beee378fbc3ea2530fd676",
+    "semantic_hash": "6718839129beee378fbc3ea2530fd676"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/models.py": {
+    "mtime": 1778848865.5738404,
+    "ast_hash": "ac84876135eb77b1ca7255c3c8e6101c",
+    "semantic_hash": "ac84876135eb77b1ca7255c3c8e6101c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/exceptions.py": {
+    "mtime": 1780174609.23567,
+    "ast_hash": "aefbb6f5c3ec53b95659921960c27fdd",
+    "semantic_hash": "aefbb6f5c3ec53b95659921960c27fdd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/query.py": {
+    "mtime": 1779201907.932682,
+    "ast_hash": "c224366c0c5f54256ad36b264498abda",
+    "semantic_hash": "c224366c0c5f54256ad36b264498abda"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/__init__.py": {
+    "mtime": 1774191294.0255709,
+    "ast_hash": "8d367dc14de930edf13f8e5c3dfddeeb",
+    "semantic_hash": "8d367dc14de930edf13f8e5c3dfddeeb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/action_models.py": {
+    "mtime": 1778848885.7077732,
+    "ast_hash": "6cfc2ffb5be8a26131d703c6d7f78034",
+    "semantic_hash": "6cfc2ffb5be8a26131d703c6d7f78034"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/dependencies.py": {
+    "mtime": 1779693505.9162772,
+    "ast_hash": "1e27610af735be3c9c6136e11f36aaff",
+    "semantic_hash": "1e27610af735be3c9c6136e11f36aaff"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/task_config.py": {
+    "mtime": 1779119610.700187,
+    "ast_hash": "843a06c1ebc657ad41a3e423c03ecffb",
+    "semantic_hash": "843a06c1ebc657ad41a3e423c03ecffb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/local_context_backend.py": {
+    "mtime": 1778848831.9163709,
+    "ast_hash": "d638fe9520c28bb6829884ef5db62755",
+    "semantic_hash": "d638fe9520c28bb6829884ef5db62755"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/github_context_backend.py": {
+    "mtime": 1778849013.6071432,
+    "ast_hash": "a8e33001c29a57c2c3b9a098bf70a5d4",
+    "semantic_hash": "a8e33001c29a57c2c3b9a098bf70a5d4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/memory.py": {
+    "mtime": 1778160686.1369593,
+    "ast_hash": "bdb33b8020f577c32b2eecffd3d91277",
+    "semantic_hash": "bdb33b8020f577c32b2eecffd3d91277"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/_utils.py": {
+    "mtime": 1776172262.5645502,
+    "ast_hash": "daca59c933ba7581f1bc93629f0b5c64",
+    "semantic_hash": "daca59c933ba7581f1bc93629f0b5c64"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/local_yaml.py": {
+    "mtime": 1779854783.7751143,
+    "ast_hash": "d3ee46215c6c6585d8ea1288880bb792",
+    "semantic_hash": "d3ee46215c6c6585d8ea1288880bb792"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/beads.py": {
+    "mtime": 1780148581.9941547,
+    "ast_hash": "72e8072608f39b5ae308dead239f28fb",
+    "semantic_hash": "72e8072608f39b5ae308dead239f28fb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/github_task.py": {
+    "mtime": 1778160686.1359591,
+    "ast_hash": "f21e28299e68419fbb2c313bbccd3901",
+    "semantic_hash": "f21e28299e68419fbb2c313bbccd3901"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/__init__.py": {
+    "mtime": 1775354116.7730465,
+    "ast_hash": "dff62054b7e7e1fe2cd6ed1da33abab8",
+    "semantic_hash": "dff62054b7e7e1fe2cd6ed1da33abab8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/core/backends/memory_context_backend.py": {
+    "mtime": 1778848831.9163988,
+    "ast_hash": "e41e5a42d0794402eda6599f4c8a8997",
+    "semantic_hash": "e41e5a42d0794402eda6599f4c8a8997"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/writers/yaml_writer.py": {
+    "mtime": 1779202418.4820895,
+    "ast_hash": "e0e699f6757bc4a0f294e598d05288c9",
+    "semantic_hash": "e0e699f6757bc4a0f294e598d05288c9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/writers/__init__.py": {
+    "mtime": 1773542449.3224354,
+    "ast_hash": "c1138884ab6703756944e20993e0258a",
+    "semantic_hash": "c1138884ab6703756944e20993e0258a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/yaml_reader.py": {
+    "mtime": 1773545463.652804,
+    "ast_hash": "89f93c9167aa55bc89c08449ae1f448c",
+    "semantic_hash": "89f93c9167aa55bc89c08449ae1f448c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/_yaml_utils.py": {
+    "mtime": 1773624145.45912,
+    "ast_hash": "427e8bab227437f8412c994947068e06",
+    "semantic_hash": "427e8bab227437f8412c994947068e06"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/legacy_reader.py": {
+    "mtime": 1773549716.6530702,
+    "ast_hash": "0f42247635d608de2e558abebf928a62",
+    "semantic_hash": "0f42247635d608de2e558abebf928a62"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/normalize.py": {
+    "mtime": 1780190362.8488579,
+    "ast_hash": "f5ad831b2c72ee0b12fa2904dff7613f",
+    "semantic_hash": "f5ad831b2c72ee0b12fa2904dff7613f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/manifest_reader.py": {
+    "mtime": 1779121999.3219995,
+    "ast_hash": "b663921aebc30a603e019d841d8bfb98",
+    "semantic_hash": "b663921aebc30a603e019d841d8bfb98"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/frontmatter_reader.py": {
+    "mtime": 1773624145.45912,
+    "ast_hash": "fbfa1fcf4176e6a11e6e94bc3a4d6ae6",
+    "semantic_hash": "fbfa1fcf4176e6a11e6e94bc3a4d6ae6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/__init__.py": {
+    "mtime": 1773542392.04374,
+    "ast_hash": "fb5e60ff626ba8fc988875effa3ec8c3",
+    "semantic_hash": "fb5e60ff626ba8fc988875effa3ec8c3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/readers/detect.py": {
+    "mtime": 1774444909.7611036,
+    "ast_hash": "140ad16e51eaca0a5637815215e4b700",
+    "semantic_hash": "140ad16e51eaca0a5637815215e4b700"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/test_beads_task_provider.py": {
+    "mtime": 1780148581.9941547,
+    "ast_hash": "93b0a8834ea21e3c9efecf9081a7f55c",
+    "semantic_hash": "93b0a8834ea21e3c9efecf9081a7f55c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/test_beads_context_backend.py": {
+    "mtime": 1778859025.3520832,
+    "ast_hash": "8a3ab1e208058616ccf825dfe7567cfb",
+    "semantic_hash": "8a3ab1e208058616ccf825dfe7567cfb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/test_parent_issue_number_widening.py": {
+    "mtime": 1778858842.1197963,
+    "ast_hash": "2bf8e1f78f1c4396404e30c33def355a",
+    "semantic_hash": "2bf8e1f78f1c4396404e30c33def355a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/test_create_task_backend_factory_beads.py": {
+    "mtime": 1779119610.700187,
+    "ast_hash": "e21def8f44e1a78f0366c5bd03dd2679",
+    "semantic_hash": "e21def8f44e1a78f0366c5bd03dd2679"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/__init__.py": {
+    "mtime": 1778858361.6014664,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/sam_schema/tests/conftest.py": {
+    "mtime": 1780148581.9941547,
+    "ast_hash": "ac6bc3e0c0229638237128ae340e9ae3",
+    "semantic_hash": "ac6bc3e0c0229638237128ae340e9ae3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_helper.py": {
+    "mtime": 1773247107.538648,
+    "ast_hash": "0194018594fbc92f034f3229d3a7fda8",
+    "semantic_hash": "0194018594fbc92f034f3229d3a7fda8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_implementation_manager.py": {
+    "mtime": 1780148581.542165,
+    "ast_hash": "3e1b2f374af496063c95da2a32c882e0",
+    "semantic_hash": "3e1b2f374af496063c95da2a32c882e0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_server_sam.py": {
+    "mtime": 1779119610.7067683,
+    "ast_hash": "ad84736b4079b86686eb30f38ca15c97",
+    "semantic_hash": "ad84736b4079b86686eb30f38ca15c97"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dh_migrate.py": {
+    "mtime": 1774189064.7767272,
+    "ast_hash": "54db91f07b188059026b1d12e7524543",
+    "semantic_hash": "54db91f07b188059026b1d12e7524543"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_scenarios.py": {
+    "mtime": 1780148581.9281561,
+    "ast_hash": "dbae530f981f06a7d8d03c42e74062f8",
+    "semantic_hash": "dbae530f981f06a7d8d03c42e74062f8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_tools_milestones.py": {
+    "mtime": 1779119610.7047684,
+    "ast_hash": "1d9f8b67e439735a572b6b118d7eaf8a",
+    "semantic_hash": "1d9f8b67e439735a572b6b118d7eaf8a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_models.py": {
+    "mtime": 1775005762.6452045,
+    "ast_hash": "8a5d5736fa58037c04ad81ef0cdc4250",
+    "semantic_hash": "8a5d5736fa58037c04ad81ef0cdc4250"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_artifact_content_storage.py": {
+    "mtime": 1780668756.565937,
+    "ast_hash": "31342c4618fa3270b3183bb4d0076ecf",
+    "semantic_hash": "31342c4618fa3270b3183bb4d0076ecf"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_paginate_body.py": {
+    "mtime": 1775049663.8723145,
+    "ast_hash": "c1595df1489c2b5a4b3ea9fb482f3a0f",
+    "semantic_hash": "c1595df1489c2b5a4b3ea9fb482f3a0f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/graphql_factories.py": {
+    "mtime": 1775033512.636088,
+    "ast_hash": "aa160e9bf6069d143f85dbd156b15016",
+    "semantic_hash": "aa160e9bf6069d143f85dbd156b15016"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_entry_blocks.py": {
+    "mtime": 1775045294.2821722,
+    "ast_hash": "a77d3501b68625bf3c36f128d756f1b5",
+    "semantic_hash": "a77d3501b68625bf3c36f128d756f1b5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_tools_prs.py": {
+    "mtime": 1779119610.7047684,
+    "ast_hash": "44c9e147e08d2101c6667c8d0bb7f0c4",
+    "semantic_hash": "44c9e147e08d2101c6667c8d0bb7f0c4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_manifest_resolver.py": {
+    "mtime": 1773248575.2860894,
+    "ast_hash": "271dd88619a98bebcddbe4118a03a582",
+    "semantic_hash": "271dd88619a98bebcddbe4118a03a582"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_comment_operations.py": {
+    "mtime": 1775004942.0463915,
+    "ast_hash": "4953f625690636a26574079f7510ab73",
+    "semantic_hash": "4953f625690636a26574079f7510ab73"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_server.py": {
+    "mtime": 1780672726.2731245,
+    "ast_hash": "501b96a8b2ef31c27200b4743046fee6",
+    "semantic_hash": "501b96a8b2ef31c27200b4743046fee6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_operations.py": {
+    "mtime": 1780148581.9281561,
+    "ast_hash": "8b6dd75077c3550118fb7d2ac369a357",
+    "semantic_hash": "8b6dd75077c3550118fb7d2ac369a357"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_artifact_provider_fallback.py": {
+    "mtime": 1779570571.0606892,
+    "ast_hash": "9b7288eac2fbfcbfc8e57347fa2098f1",
+    "semantic_hash": "9b7288eac2fbfcbfc8e57347fa2098f1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_manifest_discovery.py": {
+    "mtime": 1773247107.5387504,
+    "ast_hash": "70d6cc3210fbe2c5045e131649ac86ee",
+    "semantic_hash": "70d6cc3210fbe2c5045e131649ac86ee"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_sync.py": {
+    "mtime": 1775033490.1143186,
+    "ast_hash": "0fd25a5bad4fad605367076dde8e16a9",
+    "semantic_hash": "0fd25a5bad4fad605367076dde8e16a9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_impact_radius_conflicts.py": {
+    "mtime": 1774128618.2927935,
+    "ast_hash": "3809d1d2195d4ae59d29269b9d4e9063",
+    "semantic_hash": "3809d1d2195d4ae59d29269b9d4e9063"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_cross_backend.py": {
+    "mtime": 1779119610.7037685,
+    "ast_hash": "caf32ee35d39601974e5a0f65a7a75ab",
+    "semantic_hash": "caf32ee35d39601974e5a0f65a7a75ab"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_epoch_timestamp_bug.py": {
+    "mtime": 1779551530.2484226,
+    "ast_hash": "90814b943768270f4854c5658363c593",
+    "semantic_hash": "90814b943768270f4854c5658363c593"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_lazy_migration.py": {
+    "mtime": 1778867829.6551008,
+    "ast_hash": "00583b007e88c4fc47aa7b3814e447c9",
+    "semantic_hash": "00583b007e88c4fc47aa7b3814e447c9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_models.py": {
+    "mtime": 1775046539.0934858,
+    "ast_hash": "4b726590a7494b9202f5945df4a30fe2",
+    "semantic_hash": "4b726590a7494b9202f5945df4a30fe2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_batch_section_writes.py": {
+    "mtime": 1777312983.8119745,
+    "ast_hash": "eb25c4ec6b32b913056cbf800a61f2d1",
+    "semantic_hash": "eb25c4ec6b32b913056cbf800a61f2d1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_sync_issues_graphql.py": {
+    "mtime": 1775004962.410968,
+    "ast_hash": "1c57063f702003579e0eaaf3e42481cf",
+    "semantic_hash": "1c57063f702003579e0eaaf3e42481cf"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/helpers.py": {
+    "mtime": 1779119610.7017686,
+    "ast_hash": "7cad6a377e4f7e36b6fa5dd54a4075d4",
+    "semantic_hash": "7cad6a377e4f7e36b6fa5dd54a4075d4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_paths.py": {
+    "mtime": 1774795770.1445503,
+    "ast_hash": "a6b0442792190902632f07bed88d9bcd",
+    "semantic_hash": "a6b0442792190902632f07bed88d9bcd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_tools_labels.py": {
+    "mtime": 1779119610.7047684,
+    "ast_hash": "b938c3eb133c3d9746d5e29dee16e335",
+    "semantic_hash": "b938c3eb133c3d9746d5e29dee16e335"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_task_status_hook.py": {
+    "mtime": 1780925275.8415463,
+    "ast_hash": "bc4869ecf115e581c17c77af6a60c820",
+    "semantic_hash": "bc4869ecf115e581c17c77af6a60c820"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_reconciliation.py": {
+    "mtime": 1774374626.878416,
+    "ast_hash": "654f1c654bd04d77d6cb89cb043ee73b",
+    "semantic_hash": "654f1c654bd04d77d6cb89cb043ee73b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_entry_blocks_integration.py": {
+    "mtime": 1775050821.873582,
+    "ast_hash": "cb02b4c4a013f1980cbce5a156837ad2",
+    "semantic_hash": "cb02b4c4a013f1980cbce5a156837ad2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_tools_issues.py": {
+    "mtime": 1779119610.7037685,
+    "ast_hash": "c397328efa93ddc434c0d6a9606d0725",
+    "semantic_hash": "c397328efa93ddc434c0d6a9606d0725"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backend_toml_search.py": {
+    "mtime": 1779119610.7017686,
+    "ast_hash": "4e19b9e86899261a2239a80db5788542",
+    "semantic_hash": "4e19b9e86899261a2239a80db5788542"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_md_migration.py": {
+    "mtime": 1775045711.7438526,
+    "ast_hash": "90937772d0946f34fb1e355d316f4edb",
+    "semantic_hash": "90937772d0946f34fb1e355d316f4edb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_integration_reconciliation.py": {
+    "mtime": 1779119610.7057683,
+    "ast_hash": "773c4b2b44754ccb14946f9095b98393",
+    "semantic_hash": "773c4b2b44754ccb14946f9095b98393"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_quality_gates.py": {
+    "mtime": 1779203832.5605428,
+    "ast_hash": "cdf72ad33271e6b87a9772c690e5f81d",
+    "semantic_hash": "cdf72ad33271e6b87a9772c690e5f81d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_artifact_provider_local.py": {
+    "mtime": 1779570571.0606892,
+    "ast_hash": "c2c3a0467e97b34af03e8fcca9b87040",
+    "semantic_hash": "c2c3a0467e97b34af03e8fcca9b87040"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_migrate_tasks_to_github.py": {
+    "mtime": 1777312983.8129745,
+    "ast_hash": "2a37d3e9ac829ae2a392910f4947bb4e",
+    "semantic_hash": "2a37d3e9ac829ae2a392910f4947bb4e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_yaml_io.py": {
+    "mtime": 1775013059.530547,
+    "ast_hash": "295c537d26962b8b7253f4944a3e1cf4",
+    "semantic_hash": "295c537d26962b8b7253f4944a3e1cf4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_section_index_and_filter.py": {
+    "mtime": 1775152905.6097488,
+    "ast_hash": "6170cd58473d8315f8ad0c60fd777e97",
+    "semantic_hash": "6170cd58473d8315f8ad0c60fd777e97"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dh_config.py": {
+    "mtime": 1779119610.7037685,
+    "ast_hash": "95f1932e8841bdbc686dca1b4a4c56eb",
+    "semantic_hash": "95f1932e8841bdbc686dca1b4a4c56eb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_branches.py": {
+    "mtime": 1774059582.9223487,
+    "ast_hash": "c742652051932f443dcbb57fb1431379",
+    "semantic_hash": "c742652051932f443dcbb57fb1431379"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_graphql_helpers.py": {
+    "mtime": 1780605751.636,
+    "ast_hash": "9c58738df8916f0d1072e006e9e82eaa",
+    "semantic_hash": "9c58738df8916f0d1072e006e9e82eaa"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_tools.py": {
+    "mtime": 1776109857.8059583,
+    "ast_hash": "90e38918338458f3071bfb99df058b5c",
+    "semantic_hash": "90e38918338458f3071bfb99df058b5c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/__init__.py": {
+    "mtime": 1774188645.5649467,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_ac_overlap_warning.py": {
+    "mtime": 1775044690.9999745,
+    "ast_hash": "629000c3c371e676c65511bf83f4ede1",
+    "semantic_hash": "629000c3c371e676c65511bf83f4ede1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dh_paths_integration.py": {
+    "mtime": 1775528299.5439906,
+    "ast_hash": "7d8600c399d0beb64fdbfcf1df5e830d",
+    "semantic_hash": "7d8600c399d0beb64fdbfcf1df5e830d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backend_status.py": {
+    "mtime": 1779119610.7017686,
+    "ast_hash": "8945a0531e286c706be89970d70faef6",
+    "semantic_hash": "8945a0531e286c706be89970d70faef6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_server_sam_taskbackend.py": {
+    "mtime": 1779570571.0616891,
+    "ast_hash": "7e37bdc06869d3cf4929b452794c3783",
+    "semantic_hash": "7e37bdc06869d3cf4929b452794c3783"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_state.py": {
+    "mtime": 1775045294.2811723,
+    "ast_hash": "694fbc82c535616e9bbb67f99076a0db",
+    "semantic_hash": "694fbc82c535616e9bbb67f99076a0db"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_parsing.py": {
+    "mtime": 1775045077.1724627,
+    "ast_hash": "328ffbefcd3f5d0fce9e50ec91d87658",
+    "semantic_hash": "328ffbefcd3f5d0fce9e50ec91d87658"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_proof_of_concept.py": {
+    "mtime": 1774541521.8947225,
+    "ast_hash": "a8ff12a7b33e32ff34c8edb5a0ea2c40",
+    "semantic_hash": "a8ff12a7b33e32ff34c8edb5a0ea2c40"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_manifest_merge.py": {
+    "mtime": 1777312983.8129745,
+    "ast_hash": "9a545795d08688750d79f04f0cb09d09",
+    "semantic_hash": "9a545795d08688750d79f04f0cb09d09"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_require_int_item_id.py": {
+    "mtime": 1781540304.7419488,
+    "ast_hash": "9c0896fb0e7e37d3698a8036ad99b38d",
+    "semantic_hash": "9c0896fb0e7e37d3698a8036ad99b38d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_feature_verifier_live_validation.py": {
+    "mtime": 1775394727.6655796,
+    "ast_hash": "5b6c399e4ad4abed7c984c73c38f5155",
+    "semantic_hash": "5b6c399e4ad4abed7c984c73c38f5155"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_core_github.py": {
+    "mtime": 1780605751.636,
+    "ast_hash": "060636284096f19d33aa016f716dffd6",
+    "semantic_hash": "060636284096f19d33aa016f716dffd6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/conftest.py": {
+    "mtime": 1780605751.636,
+    "ast_hash": "5d0561a2e5841bfe16e6a486506ea363",
+    "semantic_hash": "5d0561a2e5841bfe16e6a486506ea363"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_live_validation.py": {
+    "mtime": 1780668756.5669372,
+    "ast_hash": "90f47de55609ecf7c0664401fdd7ff81",
+    "semantic_hash": "90f47de55609ecf7c0664401fdd7ff81"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_backlog_groom_sections.py": {
+    "mtime": 1779119610.7027686,
+    "ast_hash": "11d6bc6e68504c9d5ee6bf18108b3c29",
+    "semantic_hash": "11d6bc6e68504c9d5ee6bf18108b3c29"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dh_paths.py": {
+    "mtime": 1780605751.6689992,
+    "ast_hash": "a34a75bbf1883ddc6aca006e71652e45",
+    "semantic_hash": "a34a75bbf1883ddc6aca006e71652e45"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_repo_discovery.py": {
+    "mtime": 1775044266.956871,
+    "ast_hash": "89c9a00b7882939354b4b05de27dc3d0",
+    "semantic_hash": "89c9a00b7882939354b4b05de27dc3d0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_task_backend_conformance.py": {
+    "mtime": 1778867829.6551528,
+    "ast_hash": "453466a663fffaa67da340a190f37a22",
+    "semantic_hash": "453466a663fffaa67da340a190f37a22"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_prepare_clean_worktree.py": {
+    "mtime": 1777995879.3488503,
+    "ast_hash": "8c2d4ba3380bc45e77dea0285d64f451",
+    "semantic_hash": "8c2d4ba3380bc45e77dea0285d64f451"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_github_tools_projects.py": {
+    "mtime": 1779119610.7047684,
+    "ast_hash": "bb8acf101989eb6b1ee823ad48c11ff3",
+    "semantic_hash": "bb8acf101989eb6b1ee823ad48c11ff3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_manifest_schema.py": {
+    "mtime": 1774541972.9903936,
+    "ast_hash": "e0c44224a0cc6151fe6eb52792afeb5b",
+    "semantic_hash": "e0c44224a0cc6151fe6eb52792afeb5b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_operations_sam.py": {
+    "mtime": 1774204689.350636,
+    "ast_hash": "afc8c881d34db793523a3855578a534b",
+    "semantic_hash": "afc8c881d34db793523a3855578a534b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/test_models.py": {
+    "mtime": 1774128618.2927935,
+    "ast_hash": "7cb21442559f979a155fa8d9719ebdaa",
+    "semantic_hash": "7cb21442559f979a155fa8d9719ebdaa"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/__init__.py": {
+    "mtime": 1774055159.766279,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/conftest.py": {
+    "mtime": 1774055884.3906038,
+    "ast_hash": "c31859e020db4896080ca938ebb8569a",
+    "semantic_hash": "c31859e020db4896080ca938ebb8569a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/test_gates.py": {
+    "mtime": 1777312983.8129745,
+    "ast_hash": "92c854e3d1a7d9fd4dd2b1eecfe3019c",
+    "semantic_hash": "92c854e3d1a7d9fd4dd2b1eecfe3019c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/test_validator.py": {
+    "mtime": 1775333072.6012402,
+    "ast_hash": "efba7119298c0db7c30d5300edc3a2e6",
+    "semantic_hash": "efba7119298c0db7c30d5300edc3a2e6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/test_yaml_reader.py": {
+    "mtime": 1774055872.01387,
+    "ast_hash": "cbbcb7a91c8ee407febc966b210084e8",
+    "semantic_hash": "cbbcb7a91c8ee407febc966b210084e8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/test_yaml_writer.py": {
+    "mtime": 1774055243.4664557,
+    "ast_hash": "d67a5910563d15dd5fe7ba9139f62411",
+    "semantic_hash": "d67a5910563d15dd5fe7ba9139f62411"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_agent_profile/test_parser.py": {
+    "mtime": 1774182615.9028563,
+    "ast_hash": "e78c059a580c04779a2de20d28feb3da",
+    "semantic_hash": "e78c059a580c04779a2de20d28feb3da"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_agent_profile/test_discovery.py": {
+    "mtime": 1779693505.9072766,
+    "ast_hash": "e3c716501a206ecbf3326f1df13da8d4",
+    "semantic_hash": "e3c716501a206ecbf3326f1df13da8d4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_agent_profile/test_server.py": {
+    "mtime": 1780083478.1811614,
+    "ast_hash": "3926190bfa113740e7bc9d8a462c1806",
+    "semantic_hash": "3926190bfa113740e7bc9d8a462c1806"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_agent_profile/__init__.py": {
+    "mtime": 1774182368.0813959,
+    "ast_hash": "afa2ef1ae5dc72b423175b8ae0f7d6a0",
+    "semantic_hash": "afa2ef1ae5dc72b423175b8ae0f7d6a0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_agent_profile/conftest.py": {
+    "mtime": 1779693505.9072766,
+    "ast_hash": "39784d70ebb1be7a702bb65dee159d06",
+    "semantic_hash": "39784d70ebb1be7a702bb65dee159d06"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_update_metadata.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "0dadc7af9bb3eb517f6e41c7c0ff8ea8",
+    "semantic_hash": "0dadc7af9bb3eb517f6e41c7c0ff8ea8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_create_task_success.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "132225d08ecbc86071c268e23f1d44fb",
+    "semantic_hash": "132225d08ecbc86071c268e23f1d44fb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_list_epic_children.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "cbc2e3bf796d2782eb68ea97947c27c1",
+    "semantic_hash": "cbc2e3bf796d2782eb68ea97947c27c1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_close_success.json": {
+    "mtime": 1778851373.1930614,
+    "ast_hash": "3e5dcf9134eaaa3b1a0ae62e611307a1",
+    "semantic_hash": "3e5dcf9134eaaa3b1a0ae62e611307a1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_list_remember.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "cda23309c54868a25c3194f00412b395",
+    "semantic_hash": "cda23309c54868a25c3194f00412b395"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_claim_success.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "e93f6773f04327593fa84ea89083b86a",
+    "semantic_hash": "e93f6773f04327593fa84ea89083b86a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_show_v1_0_4.json": {
+    "mtime": 1780148581.7301607,
+    "ast_hash": "7d06e47493204afc24fe4b1b6d14494b",
+    "semantic_hash": "7d06e47493204afc24fe4b1b6d14494b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_list_v1_0_4.json": {
+    "mtime": 1780148581.7291608,
+    "ast_hash": "61268fb2351aa71ba3bcdc59319a665d",
+    "semantic_hash": "61268fb2351aa71ba3bcdc59319a665d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_show_issue.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "a580363f564713af35e29e119e5918e3",
+    "semantic_hash": "a580363f564713af35e29e119e5918e3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_ready_parent.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "38f425eb667c1d9a637a48dcfc0bc3a1",
+    "semantic_hash": "38f425eb667c1d9a637a48dcfc0bc3a1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_create_epic_success.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "30364f6fca01b485c1729725062ec0da",
+    "semantic_hash": "30364f6fca01b485c1729725062ec0da"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_remember_value.json": {
+    "mtime": 1778851373.1920612,
+    "ast_hash": "61cdd9cd46106191cd3e8e87bc059d94",
+    "semantic_hash": "61cdd9cd46106191cd3e8e87bc059d94"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_writers_new.py": {
+    "mtime": 1774028946.2625458,
+    "ast_hash": "8c8cd7fcd1a155d59153ac5a422b2a30",
+    "semantic_hash": "8c8cd7fcd1a155d59153ac5a422b2a30"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_models.py": {
+    "mtime": 1777995879.3498502,
+    "ast_hash": "c8ceba82ce1ebde2ba82d3266c4fbba7",
+    "semantic_hash": "c8ceba82ce1ebde2ba82d3266c4fbba7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_addressing.py": {
+    "mtime": 1780687855.5839427,
+    "ast_hash": "3edebc6fec0e85554adc590e1cfb0eec",
+    "semantic_hash": "3edebc6fec0e85554adc590e1cfb0eec"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_query.py": {
+    "mtime": 1775528299.5449908,
+    "ast_hash": "04a23b63cefccb4c4c9ef88c57947215",
+    "semantic_hash": "04a23b63cefccb4c4c9ef88c57947215"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_progressive_markdown.py": {
+    "mtime": 1780332650.8695211,
+    "ast_hash": "25ef758d94be2cbcf6b10db41a1af89e",
+    "semantic_hash": "25ef758d94be2cbcf6b10db41a1af89e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_paginate_results_boundary.py": {
+    "mtime": 1780685113.9268038,
+    "ast_hash": "6b830201f1e814b30c600fdabe41edba",
+    "semantic_hash": "6b830201f1e814b30c600fdabe41edba"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_dependencies.py": {
+    "mtime": 1779693505.9162772,
+    "ast_hash": "ac4d8ba92044ba4b6af639c2f90025ab",
+    "semantic_hash": "ac4d8ba92044ba4b6af639c2f90025ab"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli_migrate_fallback.py": {
+    "mtime": 1774796478.2435389,
+    "ast_hash": "ed9e76253ecc7d5dec12596d7dd1cb38",
+    "semantic_hash": "ed9e76253ecc7d5dec12596d7dd1cb38"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_server.py": {
+    "mtime": 1780175609.1900458,
+    "ast_hash": "3bfd4764f5f498ee315c986cb6c0a9ff",
+    "semantic_hash": "3bfd4764f5f498ee315c986cb6c0a9ff"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli.py": {
+    "mtime": 1774106910.6308537,
+    "ast_hash": "889e0ea16308a974c9d98b7130e2540a",
+    "semantic_hash": "889e0ea16308a974c9d98b7130e2540a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_addressing_pnnn.py": {
+    "mtime": 1774382262.1904316,
+    "ast_hash": "9388589e4095851ed895c42e2fb8ebc1",
+    "semantic_hash": "9388589e4095851ed895c42e2fb8ebc1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_consolidated_tools.py": {
+    "mtime": 1777995879.3498502,
+    "ast_hash": "f5bd737b1e5a63a139462479bf1f3289",
+    "semantic_hash": "f5bd737b1e5a63a139462479bf1f3289"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_large_document_write.py": {
+    "mtime": 1779551530.2494226,
+    "ast_hash": "b13ee797757a42aba09dbeff67ef66a9",
+    "semantic_hash": "b13ee797757a42aba09dbeff67ef66a9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli_create.py": {
+    "mtime": 1776109857.8069582,
+    "ast_hash": "e39e5789cb2a8df181ddc8893a594a92",
+    "semantic_hash": "e39e5789cb2a8df181ddc8893a594a92"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/__init__.py": {
+    "mtime": 1774028349.753446,
+    "ast_hash": "91629298f2730251d5983d1aeb2e96b7",
+    "semantic_hash": "91629298f2730251d5983d1aeb2e96b7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_gist_write_through.py": {
+    "mtime": 1780495655.5970197,
+    "ast_hash": "e011fd687a440f0a212608a391e14965",
+    "semantic_hash": "e011fd687a440f0a212608a391e14965"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli_update.py": {
+    "mtime": 1773582460.187225,
+    "ast_hash": "058bb2a624b3bf1cbec7e4f10d5ac144",
+    "semantic_hash": "058bb2a624b3bf1cbec7e4f10d5ac144"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_drafting_state.py": {
+    "mtime": 1779551530.2494226,
+    "ast_hash": "6133edaf0be4de7a6d9b10525c6b0d6e",
+    "semantic_hash": "6133edaf0be4de7a6d9b10525c6b0d6e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_reader_bugfixes.py": {
+    "mtime": 1774796064.4123645,
+    "ast_hash": "4ab0810cff83701294d50292da91bfcf",
+    "semantic_hash": "4ab0810cff83701294d50292da91bfcf"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/conftest.py": {
+    "mtime": 1780332650.9735131,
+    "ast_hash": "951a1585b805e9d07eb4bbf6876a7224",
+    "semantic_hash": "951a1585b805e9d07eb4bbf6876a7224"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli_migrate_all.py": {
+    "mtime": 1774128618.260794,
+    "ast_hash": "03f0a25f212be552aef24ef7d0727500",
+    "semantic_hash": "03f0a25f212be552aef24ef7d0727500"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_backward_compat_local_plans.py": {
+    "mtime": 1780495655.5970197,
+    "ast_hash": "9c92add1e4c09829d43fbe08900096a6",
+    "semantic_hash": "9c92add1e4c09829d43fbe08900096a6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_cli_claim.py": {
+    "mtime": 1773582460.187225,
+    "ast_hash": "9b15da5b5c20375bdd79817b97a6b81f",
+    "semantic_hash": "9b15da5b5c20375bdd79817b97a6b81f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_server_mcp.py": {
+    "mtime": 1777312983.8139744,
+    "ast_hash": "15959ec714cae9be3e9fba7646b736ba",
+    "semantic_hash": "15959ec714cae9be3e9fba7646b736ba"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_manifest_reader.py": {
+    "mtime": 1780605751.6689992,
+    "ast_hash": "afb3224b5fed5d5508facb183e9a74bb",
+    "semantic_hash": "afb3224b5fed5d5508facb183e9a74bb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_legacy_reader.py": {
+    "mtime": 1774027980.9753673,
+    "ast_hash": "3f4e23433dba0a58299e50806a157cc9",
+    "semantic_hash": "3f4e23433dba0a58299e50806a157cc9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_normalize.py": {
+    "mtime": 1774027980.9753673,
+    "ast_hash": "e29acd8612facb0e0ed850fb6a962aa4",
+    "semantic_hash": "e29acd8612facb0e0ed850fb6a962aa4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_detect.py": {
+    "mtime": 1780605751.6689992,
+    "ast_hash": "01dd4d46afc50bf1d245fe5dbecc2e4e",
+    "semantic_hash": "01dd4d46afc50bf1d245fe5dbecc2e4e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/__init__.py": {
+    "mtime": 1773543079.6642067,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_frontmatter_reader.py": {
+    "mtime": 1780605751.6689992,
+    "ast_hash": "8a46d6dc7d08d62bc5ae2990137592a0",
+    "semantic_hash": "8a46d6dc7d08d62bc5ae2990137592a0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_readers/test_yaml_reader.py": {
+    "mtime": 1774027980.9663675,
+    "ast_hash": "b6865a811fb947839c614dc037df0c15",
+    "semantic_hash": "b6865a811fb947839c614dc037df0c15"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_writers/__init__.py": {
+    "mtime": 1773543080.1081967,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/test_writers/test_yaml_writer.py": {
+    "mtime": 1773547475.4302297,
+    "ast_hash": "a12b3dff8378584f70a90784dc2c5b0e",
+    "semantic_hash": "a12b3dff8378584f70a90784dc2c5b0e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/paths.py": {
+    "mtime": 1774067996.9817333,
+    "ast_hash": "6bb509a3b23296553b9909f4189c8649",
+    "semantic_hash": "6bb509a3b23296553b9909f4189c8649"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/__init__.py": {
+    "mtime": 1774067996.9817333,
+    "ast_hash": "31b71bb4d0fd4fd337b78a644d562907",
+    "semantic_hash": "31b71bb4d0fd4fd337b78a644d562907"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/gates.py": {
+    "mtime": 1774128618.2477942,
+    "ast_hash": "7a218a5c82db8f3e09a445be16f395b2",
+    "semantic_hash": "7a218a5c82db8f3e09a445be16f395b2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/core/constants.py": {
+    "mtime": 1778770145.2810078,
+    "ast_hash": "d202eeb4a2159bcf6b938ed5302e54b5",
+    "semantic_hash": "d202eeb4a2159bcf6b938ed5302e54b5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/core/validator.py": {
+    "mtime": 1778770145.2820077,
+    "ast_hash": "844462cd86cef04c54b12b99322dd16d",
+    "semantic_hash": "844462cd86cef04c54b12b99322dd16d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/core/models.py": {
+    "mtime": 1774067996.9817333,
+    "ast_hash": "baad7c86cabc3a962a4ceacceaa95c53",
+    "semantic_hash": "baad7c86cabc3a962a4ceacceaa95c53"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/core/__init__.py": {
+    "mtime": 1774054914.8696482,
+    "ast_hash": "97cc45389f638f3e5adfa522edf5635b",
+    "semantic_hash": "97cc45389f638f3e5adfa522edf5635b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/writers/yaml_writer.py": {
+    "mtime": 1774055243.4664557,
+    "ast_hash": "6c4a6460b45d04d79cab202cdc06ec9e",
+    "semantic_hash": "6c4a6460b45d04d79cab202cdc06ec9e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/writers/__init__.py": {
+    "mtime": 1774054920.2855287,
+    "ast_hash": "23e444282ea53165ba24759f9b46f9e6",
+    "semantic_hash": "23e444282ea53165ba24759f9b46f9e6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/readers/yaml_reader.py": {
+    "mtime": 1774055150.4044833,
+    "ast_hash": "1a7c6fd086c16ca547500b60cdf434af",
+    "semantic_hash": "1a7c6fd086c16ca547500b60cdf434af"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/dispatch_schema/readers/__init__.py": {
+    "mtime": 1774054917.4285917,
+    "ast_hash": "cb91f0b321f7efc6c3661d0155b0f0a3",
+    "semantic_hash": "cb91f0b321f7efc6c3661d0155b0f0a3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/hooks/hooks.json": {
+    "mtime": 1780687855.5967865,
+    "ast_hash": "fc4c6bcc05cc824d2f8f473f3a5eae9b",
+    "semantic_hash": "fc4c6bcc05cc824d2f8f473f3a5eae9b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/tokenizer.py": {
+    "mtime": 1780332650.8695211,
+    "ast_hash": "5c8030f3256a4385a4d0201c20cccaf1",
+    "semantic_hash": "5c8030f3256a4385a4d0201c20cccaf1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/parser.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "34585eaf378259798e35e2582bbd5595",
+    "semantic_hash": "34585eaf378259798e35e2582bbd5595"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/links.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "c0eedf286347fb02cde63c5f352feea0",
+    "semantic_hash": "c0eedf286347fb02cde63c5f352feea0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/indexer.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "58479f864986fe61912225b4c34062b7",
+    "semantic_hash": "58479f864986fe61912225b4c34062b7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/providers.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "505a92e6ca4bc488fd297544b451f10d",
+    "semantic_hash": "505a92e6ca4bc488fd297544b451f10d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/navigator.py": {
+    "mtime": 1780332650.9185174,
+    "ast_hash": "3885c604da86ac21cec6f53cba99982d",
+    "semantic_hash": "3885c604da86ac21cec6f53cba99982d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/models.py": {
+    "mtime": 1780332650.9595141,
+    "ast_hash": "f2eaff8bcc25e2b1fd5d28539bdce3a5",
+    "semantic_hash": "f2eaff8bcc25e2b1fd5d28539bdce3a5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/pagination.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "414ccef9027a947eabae58f1da785d16",
+    "semantic_hash": "414ccef9027a947eabae58f1da785d16"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/codeblocks.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "0f7c37600dd1b2cb1f345edfe26d1313",
+    "semantic_hash": "0f7c37600dd1b2cb1f345edfe26d1313"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/exceptions.py": {
+    "mtime": 1780272428.1057835,
+    "ast_hash": "8e41187b49037155f2d2ddb7e71351ef",
+    "semantic_hash": "8e41187b49037155f2d2ddb7e71351ef"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/__init__.py": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "5759580d6c2201e2459243f640a40704",
+    "semantic_hash": "5759580d6c2201e2459243f640a40704"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/renderers.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "fd7b956e170e29657485ecdd5c063cad",
+    "semantic_hash": "fd7b956e170e29657485ecdd5c063cad"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/progressive_markdown/list_navigator.py": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "e06620ae9cdc58d244382462cf993c85",
+    "semantic_hash": "e06620ae9cdc58d244382462cf993c85"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py": {
+    "mtime": 1780925275.8415463,
+    "ast_hash": "a0571017c277ed23412cbda69b96bfee",
+    "semantic_hash": "a0571017c277ed23412cbda69b96bfee"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_format.py": {
+    "mtime": 1774715910.9261265,
+    "ast_hash": "379bf9145d777e69c4fa8e51dbb8085f",
+    "semantic_hash": "379bf9145d777e69c4fa8e51dbb8085f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/implementation_manager.py": {
+    "mtime": 1780148581.4901662,
+    "ast_hash": "a147860fea95fdfa1cbdf257995b8a96",
+    "semantic_hash": "a147860fea95fdfa1cbdf257995b8a96"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/test_task_parsing.py": {
+    "mtime": 1772747954.4586658,
+    "ast_hash": "91913a990cd635b8072599546a366134",
+    "semantic_hash": "91913a990cd635b8072599546a366134"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/get_task_context.py": {
+    "mtime": 1775528299.5379908,
+    "ast_hash": "ed0488909979b590b2c488f33c2ea34f",
+    "semantic_hash": "ed0488909979b590b2c488f33c2ea34f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs": {
+    "mtime": 1780401388.3619761,
+    "ast_hash": "7cf507cddd0525ec0bae996a05a3e0da",
+    "semantic_hash": "7cf507cddd0525ec0bae996a05a3e0da"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.json": {
+    "mtime": 1775528299.5419908,
+    "ast_hash": "74c5b75ec051026eb2ffc697e8bae551",
+    "semantic_hash": "74c5b75ec051026eb2ffc697e8bae551"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.schema.json": {
+    "mtime": 1775528299.5431209,
+    "ast_hash": "be7524042fcdf738fa28aeed8cebb380",
+    "semantic_hash": "be7524042fcdf738fa28aeed8cebb380"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.schema.json": {
+    "mtime": 1775528299.5431209,
+    "ast_hash": "dbd510ed858978bf767af5fae43f93c9",
+    "semantic_hash": "dbd510ed858978bf767af5fae43f93c9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/scripts/health.py": {
+    "mtime": 1779121999.3219995,
+    "ast_hash": "ea68a6eb59f2ca4d159e6e0e2f4d2710",
+    "semantic_hash": "ea68a6eb59f2ca4d159e6e0e2f4d2710"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/scripts/monitor.py": {
+    "mtime": 1779121999.3219995,
+    "ast_hash": "0f67541c4a9aa98a14f975009319e691",
+    "semantic_hash": "0f67541c4a9aa98a14f975009319e691"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/scripts/spawn.py": {
+    "mtime": 1777312983.8119745,
+    "ast_hash": "0e905e393a74be5fb8bf6ed70e3173ac",
+    "semantic_hash": "0e905e393a74be5fb8bf6ed70e3173ac"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/tests/test_spawn.py": {
+    "mtime": 1776109857.8039582,
+    "ast_hash": "d04b297a34bd859ad159c474d0ed3283",
+    "semantic_hash": "d04b297a34bd859ad159c474d0ed3283"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/README.md": {
+    "mtime": 1779570571.0926886,
+    "ast_hash": "9ec2eae130d5d74cac28a1fc246cb3be",
+    "semantic_hash": "9ec2eae130d5d74cac28a1fc246cb3be"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/CLAUDE.md": {
+    "mtime": 1781540304.7929482,
+    "ast_hash": "a975855920fa06aaa498518200f9655a",
+    "semantic_hash": "a975855920fa06aaa498518200f9655a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.claude/rules/workflow-extraction.md": {
+    "mtime": 1781540498.0749805,
+    "ast_hash": "a8cfb3aace24fd1e0a4a474bbaafbd0e",
+    "semantic_hash": "a8cfb3aace24fd1e0a4a474bbaafbd0e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.claude/agent-memory/python-engineering-python-cli-architect/project_progressive_markdown.md": {
+    "mtime": 1780401388.3578963,
+    "ast_hash": "ab843a8d4d46b4b5ce0c1fcb93325c5c",
+    "semantic_hash": "ab843a8d4d46b4b5ce0c1fcb93325c5c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/.claude/agent-memory/python-engineering-python-cli-architect/MEMORY.md": {
+    "mtime": 1780401388.3572667,
+    "ast_hash": "710695187a698f30e4e6b3ccddd29cd4",
+    "semantic_hash": "710695187a698f30e4e6b3ccddd29cd4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/templates/language-manifest-template.md": {
+    "mtime": 1775360357.8758156,
+    "ast_hash": "48c6c7246ca43d9f605121302dd75f84",
+    "semantic_hash": "48c6c7246ca43d9f605121302dd75f84"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/integration-checker.md": {
+    "mtime": 1779570571.0516894,
+    "ast_hash": "8849d340e97199383fb411c2c2a10ea2",
+    "semantic_hash": "8849d340e97199383fb411c2c2a10ea2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/rtica-assessor.md": {
+    "mtime": 1778879212.9108744,
+    "ast_hash": "1abc7419a31d6700ed38fbe2ca2dd609",
+    "semantic_hash": "1abc7419a31d6700ed38fbe2ca2dd609"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/dh-context-gathering.md": {
+    "mtime": 1778879140.8777585,
+    "ast_hash": "10e4c546ae80b2c9f63808839e7d9725",
+    "semantic_hash": "10e4c546ae80b2c9f63808839e7d9725"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/fact-checker.md": {
+    "mtime": 1778879152.3676252,
+    "ast_hash": "4ab61337f9a567523d7619ac642c6dc3",
+    "semantic_hash": "4ab61337f9a567523d7619ac642c6dc3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/reviewer-accessibility.md": {
+    "mtime": 1779570571.0526893,
+    "ast_hash": "22a4d744e2a1b09237e60ae044f0297d",
+    "semantic_hash": "22a4d744e2a1b09237e60ae044f0297d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/plan-validator.md": {
+    "mtime": 1779570571.0526893,
+    "ast_hash": "650308fe8e68e62f62588c95f2e301fc",
+    "semantic_hash": "650308fe8e68e62f62588c95f2e301fc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/reviewer-performance.md": {
+    "mtime": 1779570571.0526893,
+    "ast_hash": "ef8a6cc63c9f145e118f82168160d53a",
+    "semantic_hash": "ef8a6cc63c9f145e118f82168160d53a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/backlog-item-groomer.md": {
+    "mtime": 1779551530.233423,
+    "ast_hash": "589fdb2e351fc84e68a51f27b2cc7d6a",
+    "semantic_hash": "589fdb2e351fc84e68a51f27b2cc7d6a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/feature-verifier.md": {
+    "mtime": 1779570571.0516894,
+    "ast_hash": "be03065edaede6b3be671a0d78c87ef9",
+    "semantic_hash": "be03065edaede6b3be671a0d78c87ef9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/tn-verification-gate.md": {
+    "mtime": 1779570571.0536895,
+    "ast_hash": "d6d49a1ff709d2f611a8e9e92cc97501",
+    "semantic_hash": "d6d49a1ff709d2f611a8e9e92cc97501"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/alignment-analyst.md": {
+    "mtime": 1778879121.9729712,
+    "ast_hash": "fcebf949c5da6c0103a756a1099eb563",
+    "semantic_hash": "fcebf949c5da6c0103a756a1099eb563"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/impact-analyst.md": {
+    "mtime": 1780605751.6659992,
+    "ast_hash": "ce811cddf7949fa0cb0b1b24ab9d950d",
+    "semantic_hash": "ce811cddf7949fa0cb0b1b24ab9d950d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/codebase-analyzer.md": {
+    "mtime": 1779570571.0516894,
+    "ast_hash": "73ccdf0feff31ec8f00596d3b2379b92",
+    "semantic_hash": "73ccdf0feff31ec8f00596d3b2379b92"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/technical-researcher.md": {
+    "mtime": 1779655737.7057106,
+    "ast_hash": "841ee708113544e5c7a2d5c7955f0495",
+    "semantic_hash": "841ee708113544e5c7a2d5c7955f0495"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/swarm-task-planner.md": {
+    "mtime": 1779570571.0526893,
+    "ast_hash": "e2c1915aee425e87c119b213dab4c8ac",
+    "semantic_hash": "e2c1915aee425e87c119b213dab4c8ac"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/code-reviewer.md": {
+    "mtime": 1779855014.6691923,
+    "ast_hash": "731e036475b7a6dbc24a26275ac7011f",
+    "semantic_hash": "731e036475b7a6dbc24a26275ac7011f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/reviewer-quality.md": {
+    "mtime": 1779570571.0526893,
+    "ast_hash": "8864baf11f053de82b567837d4f1d2d4",
+    "semantic_hash": "8864baf11f053de82b567837d4f1d2d4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/feature-researcher.md": {
+    "mtime": 1780200892.7120252,
+    "ast_hash": "8f872362825a589f1d08f6f515694677",
+    "semantic_hash": "8f872362825a589f1d08f6f515694677"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/service-docs-maintainer.md": {
+    "mtime": 1780605751.6659992,
+    "ast_hash": "54cf2a727ec721be168aab68c404dd67",
+    "semantic_hash": "54cf2a727ec721be168aab68c404dd67"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/reviewer-security.md": {
+    "mtime": 1779551530.235423,
+    "ast_hash": "1642894c50b30d926d723926b0aa8630",
+    "semantic_hash": "1642894c50b30d926d723926b0aa8630"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/doc-drift-auditor.md": {
+    "mtime": 1779570571.0516894,
+    "ast_hash": "6725cfc37b1df6996586da1412fc9fbe",
+    "semantic_hash": "6725cfc37b1df6996586da1412fc9fbe"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/generic-stage-agent.md": {
+    "mtime": 1778879159.55554,
+    "ast_hash": "7da011bc877a8146ac29a42a897b8d3a",
+    "semantic_hash": "7da011bc877a8146ac29a42a897b8d3a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/t0-baseline-capture.md": {
+    "mtime": 1780163727.0245519,
+    "ast_hash": "9ca6260ff8b9501e686a7a561b431fdd",
+    "semantic_hash": "9ca6260ff8b9501e686a7a561b431fdd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/context-refinement.md": {
+    "mtime": 1778879136.3318105,
+    "ast_hash": "d5a7c28b2d21034fb179f8cbae6c5068",
+    "semantic_hash": "d5a7c28b2d21034fb179f8cbae6c5068"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/ecosystem-researcher.md": {
+    "mtime": 1778879150.0386524,
+    "ast_hash": "54fb495eb3be522a18f4de03060b760b",
+    "semantic_hash": "54fb495eb3be522a18f4de03060b760b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/contract-verification.md": {
+    "mtime": 1779119660.0224345,
+    "ast_hash": "23a0e42a69ef77104215783b7c42bfb9",
+    "semantic_hash": "23a0e42a69ef77104215783b7c42bfb9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/task-worker.md": {
+    "mtime": 1779551530.235423,
+    "ast_hash": "17ecd92ab31fa3389cd706fe219ab05e",
+    "semantic_hash": "17ecd92ab31fa3389cd706fe219ab05e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/agents/classifier.md": {
+    "mtime": 1778879127.1879134,
+    "ast_hash": "897ce17de058ecc998c1d1f40d35c8dc",
+    "semantic_hash": "897ce17de058ecc998c1d1f40d35c8dc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/DOCUMENTATION_DRIFT_AUDIT.md": {
+    "mtime": 1775005010.1509187,
+    "ast_hash": "bed8649be2e803a3bcbaf94a5166bc03",
+    "semantic_hash": "bed8649be2e803a3bcbaf94a5166bc03"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/backlog_core/ARCHITECTURE.md": {
+    "mtime": 1780401388.3579762,
+    "ast_hash": "6ec01cdf79a4d1a0571ee9f39724c4fc",
+    "semantic_hash": "6ec01cdf79a4d1a0571ee9f39724c4fc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/poc-validation-guide.md": {
+    "mtime": 1773876938.0075872,
+    "ast_hash": "6c653523ffd0a40523c0c561db4adeab",
+    "semantic_hash": "6c653523ffd0a40523c0c561db4adeab"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/dh-system-model.html": {
+    "mtime": 1780687292.8955135,
+    "ast_hash": "11e65a7a68b432cf534e2e5dc89f35af",
+    "semantic_hash": "11e65a7a68b432cf534e2e5dc89f35af"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/process-audit-backlog-lifecycle-2026-03-02.md": {
+    "mtime": 1774191294.0254831,
+    "ast_hash": "fe1424aaf3eef70c72238e8028cd57ee",
+    "semantic_hash": "fe1424aaf3eef70c72238e8028cd57ee"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/unified-section-layer-brief.md": {
+    "mtime": 1780685113.9378035,
+    "ast_hash": "99229ad8737f0b4a0e458129fe8a0d01",
+    "semantic_hash": "99229ad8737f0b4a0e458129fe8a0d01"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/graph-schema.md": {
+    "mtime": 1780685113.9378035,
+    "ast_hash": "c25b114cf305181e1ec24cb44a08a62d",
+    "semantic_hash": "c25b114cf305181e1ec24cb44a08a62d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-architecture-diagram.md": {
+    "mtime": 1779119610.6987686,
+    "ast_hash": "ef2964899c13cee12378d259d171f349",
+    "semantic_hash": "ef2964899c13cee12378d259d171f349"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/mcp-progressive-disclosure-contract.md": {
+    "mtime": 1780401388.3609762,
+    "ast_hash": "d83b65a3dda5de0244a74dd680a0c340",
+    "semantic_hash": "d83b65a3dda5de0244a74dd680a0c340"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/backlog-item-lifecycle.md": {
+    "mtime": 1780605751.6060004,
+    "ast_hash": "8caac358f93c7ecf698ffd9924e86721",
+    "semantic_hash": "8caac358f93c7ecf698ffd9924e86721"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/complexity-fit-and-economics-of-agents.md": {
+    "mtime": 1780605751.6679993,
+    "ast_hash": "d174d9ebfd7656fcf1e6a17719959249",
+    "semantic_hash": "d174d9ebfd7656fcf1e6a17719959249"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/TASK_FILE_FORMAT.md": {
+    "mtime": 1779570571.0566893,
+    "ast_hash": "4e5882d8c4034203fdd4fca180e596b4",
+    "semantic_hash": "4e5882d8c4034203fdd4fca180e596b4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/backlog-lifecycle.draft.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "c25aeaf75add5ce31227ed82494a50ef",
+    "semantic_hash": "c25aeaf75add5ce31227ed82494a50ef"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/adr-9-close-resolve-semantics.md": {
+    "mtime": 1774191294.0253003,
+    "ast_hash": "0c84d82f0f7264e923fddb5e094731f8",
+    "semantic_hash": "0c84d82f0f7264e923fddb5e094731f8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/complexity-fit-adoption-conditions.md": {
+    "mtime": 1774795770.209549,
+    "ast_hash": "8e683ed6754103b406dfee04003bb85e",
+    "semantic_hash": "8e683ed6754103b406dfee04003bb85e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/backlog-item-groomed-schema.md": {
+    "mtime": 1778853181.150255,
+    "ast_hash": "93710b2442bb559cc6497a28aa834cac",
+    "semantic_hash": "93710b2442bb559cc6497a28aa834cac"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-trace-methodology.md": {
+    "mtime": 1781540304.7599487,
+    "ast_hash": "c9e3f977d1a8f07f6e0c5c071430f844",
+    "semantic_hash": "c9e3f977d1a8f07f6e0c5c071430f844"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/dh-workflow-explorer.html": {
+    "mtime": 1780950461.254912,
+    "ast_hash": "e3e811f12a32abe1ace0a337ab6ec481",
+    "semantic_hash": "e3e811f12a32abe1ace0a337ab6ec481"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/backlog-lifecycle.md": {
+    "mtime": 1779570571.0576892,
+    "ast_hash": "728769d6c3d504554760dd861ff41935",
+    "semantic_hash": "728769d6c3d504554760dd861ff41935"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-change-process.md": {
+    "mtime": 1779655737.7057106,
+    "ast_hash": "bc116afb198787fa6ba546deab3dafdd",
+    "semantic_hash": "bc116afb198787fa6ba546deab3dafdd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/graphql-usage-guide.md": {
+    "mtime": 1775004906.8910737,
+    "ast_hash": "9005ed48c45be1165cc43e9e5bb38b7b",
+    "semantic_hash": "9005ed48c45be1165cc43e9e5bb38b7b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/plugin-deployment-model.md": {
+    "mtime": 1779693505.8162699,
+    "ast_hash": "4d7cda768036004ce2af57e438086fe6",
+    "semantic_hash": "4d7cda768036004ce2af57e438086fe6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/backend-providers.md": {
+    "mtime": 1780179911.9382012,
+    "ast_hash": "0477a4967f69a446b7457016d835becf",
+    "semantic_hash": "0477a4967f69a446b7457016d835becf"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/plan-artifact-lifecycle.md": {
+    "mtime": 1779570571.0576892,
+    "ast_hash": "815a1cf7cf0a19ba190e4a7828a2762f",
+    "semantic_hash": "815a1cf7cf0a19ba190e4a7828a2762f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/adrs/ADR-1770-1-single-writer-task-backend.md": {
+    "mtime": 1776172262.5625503,
+    "ast_hash": "09b3c622ca6e7fee4e983a6b961cae68",
+    "semantic_hash": "09b3c622ca6e7fee4e983a6b961cae68"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/README.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "5d2c9a84eda8b5ce2bb1236d17434d22",
+    "semantic_hash": "5d2c9a84eda8b5ce2bb1236d17434d22"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/arl-meta-layer.md": {
+    "mtime": 1772379002.8397498,
+    "ast_hash": "7827311781e00543e2a0a7a1565a4aae",
+    "semantic_hash": "7827311781e00543e2a0a7a1565a4aae"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/arl-human-probing-design.md": {
+    "mtime": 1771944333.4089391,
+    "ast_hash": "fe040e60900bfde7151501186c917cf6",
+    "semantic_hash": "fe040e60900bfde7151501186c917cf6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/orchestrator-discipline.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "45c82e4e4a7bdc7b615efe2284a59a2f",
+    "semantic_hash": "45c82e4e4a7bdc7b615efe2284a59a2f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/context-fit-complexity.md": {
+    "mtime": 1774468121.3100455,
+    "ast_hash": "77da7c40f6b128b3b7612e212ef2ed0f",
+    "semantic_hash": "77da7c40f6b128b3b7612e212ef2ed0f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/evidence-discipline.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "58e14b7ac8e2c7a72f27fff798009469",
+    "semantic_hash": "58e14b7ac8e2c7a72f27fff798009469"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/README.md": {
+    "mtime": 1774470212.7623441,
+    "ast_hash": "96b137a97f8820eb3e54db434c3be2d2",
+    "semantic_hash": "96b137a97f8820eb3e54db434c3be2d2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/artifact-conventions.md": {
+    "mtime": 1775012844.735825,
+    "ast_hash": "069444d4f05a7cd9a93ae3e16a15218c",
+    "semantic_hash": "069444d4f05a7cd9a93ae3e16a15218c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/rt-ica-gate.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "51693239058a340bcf951cb50342e983",
+    "semantic_hash": "51693239058a340bcf951cb50342e983"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/arl-touchpoints.md": {
+    "mtime": 1775012844.7348251,
+    "ast_hash": "82097617b9c99564950ebc8a3395bd2d",
+    "semantic_hash": "82097617b9c99564950ebc8a3395bd2d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/sam-pipeline.md": {
+    "mtime": 1775012844.735825,
+    "ast_hash": "9437cef79cf1f5b5274acdf759c56a43",
+    "semantic_hash": "9437cef79cf1f5b5274acdf759c56a43"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/verification-protocol.md": {
+    "mtime": 1778853181.151255,
+    "ast_hash": "afa70e54c4ca5024e1c1e4c20bc7313b",
+    "semantic_hash": "afa70e54c4ca5024e1c1e4c20bc7313b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-0/task-file-format.md": {
+    "mtime": 1775012844.735825,
+    "ast_hash": "31c098dfc5c8c4cb1c88c2d1fdaf8a79",
+    "semantic_hash": "31c098dfc5c8c4cb1c88c2d1fdaf8a79"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/README.md": {
+    "mtime": 1771944334.401755,
+    "ast_hash": "25fddb53b3e33c4d0dc77f5d3c6c724f",
+    "semantic_hash": "25fddb53b3e33c4d0dc77f5d3c6c724f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/stack-profile-template.md": {
+    "mtime": 1771944334.4019325,
+    "ast_hash": "d23945ce9899afc7d410e332af68c608",
+    "semantic_hash": "d23945ce9899afc7d410e332af68c608"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/layer-2-overview.md": {
+    "mtime": 1771944334.4019325,
+    "ast_hash": "e7c5e70464d117223f7c7c3492c617d0",
+    "semantic_hash": "e7c5e70464d117223f7c7c3492c617d0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/stack-profile-schema.md": {
+    "mtime": 1771944334.4019325,
+    "ast_hash": "6227d951a49db00379995ce01a5abfc8",
+    "semantic_hash": "6227d951a49db00379995ce01a5abfc8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/stack-profiles/python-cli.md": {
+    "mtime": 1771944334.4019325,
+    "ast_hash": "ec5e029cd5dd96406e12cf11a51d9971",
+    "semantic_hash": "ec5e029cd5dd96406e12cf11a51d9971"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-2/stack-profiles/python-fastapi.md": {
+    "mtime": 1771944334.4030402,
+    "ast_hash": "f44dc07b90a890888a4d9a4ab0635979",
+    "semantic_hash": "f44dc07b90a890888a4d9a4ab0635979"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/layer-1-overview.md": {
+    "mtime": 1771944333.4419384,
+    "ast_hash": "7896c478be323e107f966898798504dd",
+    "semantic_hash": "7896c478be323e107f966898798504dd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/workflow-pattern-taxonomy.md": {
+    "mtime": 1771944333.4419384,
+    "ast_hash": "d633c89ff566e0f9d934eec3e0ce8dbc",
+    "semantic_hash": "d633c89ff566e0f9d934eec3e0ce8dbc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/README.md": {
+    "mtime": 1772379002.84075,
+    "ast_hash": "aaa023a764bf02dc17ebe93e409598ad",
+    "semantic_hash": "aaa023a764bf02dc17ebe93e409598ad"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/language-manifest-template.md": {
+    "mtime": 1772379002.84075,
+    "ast_hash": "ed2d0640429a5d1c60be12a7a2ede7d6",
+    "semantic_hash": "ed2d0640429a5d1c60be12a7a2ede7d6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/linting-discovery-protocol.md": {
+    "mtime": 1771944333.4419384,
+    "ast_hash": "c4caf443de192134e6988e78a0cd9e5a",
+    "semantic_hash": "c4caf443de192134e6988e78a0cd9e5a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/sdlc-layers/layer-1/harness-role-mapping.md": {
+    "mtime": 1775528299.531991,
+    "ast_hash": "de1459706a1baedc4b9f3c06530a0f96",
+    "semantic_hash": "de1459706a1baedc4b9f3c06530a0f96"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/KNOWN_ENTITIES.md": {
+    "mtime": 1781540304.816948,
+    "ast_hash": "29b98d14ae80192f75dc3b96acec2a0d",
+    "semantic_hash": "29b98d14ae80192f75dc3b96acec2a0d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/docs/workflow-layers/COVERAGE.md": {
+    "mtime": 1781540304.7599487,
+    "ast_hash": "3b2f62ead5a857575a63b8b52e2eb197",
+    "semantic_hash": "3b2f62ead5a857575a63b8b52e2eb197"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/fixtures/valid-plan.yaml": {
+    "mtime": 1774055080.4420118,
+    "ast_hash": "ae9c5db90970c54ddf391198109ddeb9",
+    "semantic_hash": "ae9c5db90970c54ddf391198109ddeb9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/fixtures/invalid-plan-bad-ref.yaml": {
+    "mtime": 1774055566.9364464,
+    "ast_hash": "9b37c167d24ba0fa15dac1d0092071cc",
+    "semantic_hash": "9b37c167d24ba0fa15dac1d0092071cc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/test_dispatch_schema/fixtures/stale-plan.yaml": {
+    "mtime": 1774055086.1208878,
+    "ast_hash": "b34178a2180aba45bab4124cd73d4fe4",
+    "semantic_hash": "b34178a2180aba45bab4124cd73d4fe4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/sample_item_entries.yaml": {
+    "mtime": 1774889423.1013777,
+    "ast_hash": "6a43ae1eb25610922dd95b9da845d570",
+    "semantic_hash": "6a43ae1eb25610922dd95b9da845d570"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/sample_github_body.md": {
+    "mtime": 1774889432.6001894,
+    "ast_hash": "8b2854734f7de46afd79045420a6eb53",
+    "semantic_hash": "8b2854734f7de46afd79045420a6eb53"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/sample_item.yaml": {
+    "mtime": 1774889399.328849,
+    "ast_hash": "22f75c14c83baebfd7787669fda05aa9",
+    "semantic_hash": "22f75c14c83baebfd7787669fda05aa9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/sample_item_groomed.yaml": {
+    "mtime": 1774889412.545587,
+    "ast_hash": "278dbb22c657d8e51a44b762968506b3",
+    "semantic_hash": "278dbb22c657d8e51a44b762968506b3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_invalid_json_stdout.txt": {
+    "mtime": 1778851190.711263,
+    "ast_hash": "949580d97d25470433d193365a7d2f9e",
+    "semantic_hash": "949580d97d25470433d193365a7d2f9e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_invocation_error_stderr.txt": {
+    "mtime": 1778851187.316342,
+    "ast_hash": "1ac3bd6b8c58ff441630ea8ccfcb93f0",
+    "semantic_hash": "1ac3bd6b8c58ff441630ea8ccfcb93f0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_dep_add_success.txt": {
+    "mtime": 1778851178.787541,
+    "ast_hash": "b19df5072e7cf719638e335c5c16d71f",
+    "semantic_hash": "b19df5072e7cf719638e335c5c16d71f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests/fixtures/beads/bd_not_installed_stderr.txt": {
+    "mtime": 1778851183.3544345,
+    "ast_hash": "9e297bdfc74bc9c5535dcab0dd77f05f",
+    "semantic_hash": "9e297bdfc74bc9c5535dcab0dd77f05f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/plan_with_bookends.yaml": {
+    "mtime": 1773560598.0787992,
+    "ast_hash": "941145befbac1273a4114c3cba30dc25",
+    "semantic_hash": "941145befbac1273a4114c3cba30dc25"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/yaml_frontmatter_multi.md": {
+    "mtime": 1773543144.1397598,
+    "ast_hash": "72d6c16f5eb7e6d099af6504a501138e",
+    "semantic_hash": "72d6c16f5eb7e6d099af6504a501138e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/nonstandard_frontmatter_tasks.md": {
+    "mtime": 1774128861.0517337,
+    "ast_hash": "e6a86dbe30f3f8deee837ff1fb745fc5",
+    "semantic_hash": "e6a86dbe30f3f8deee837ff1fb745fc5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/global_manifest.md": {
+    "mtime": 1773543171.6891415,
+    "ast_hash": "68a4a7e74282d7f36755bd78d481ca6f",
+    "semantic_hash": "68a4a7e74282d7f36755bd78d481ca6f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/yaml_frontmatter_single.md": {
+    "mtime": 1773543133.2190046,
+    "ast_hash": "60579313844adf892e8503e441c0beaf",
+    "semantic_hash": "60579313844adf892e8503e441c0beaf"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/global_manifest_with_bold_fields.md": {
+    "mtime": 1773897286.942871,
+    "ast_hash": "382def62db1398fff4fb775554e42463",
+    "semantic_hash": "382def62db1398fff4fb775554e42463"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/legacy_markdown.md": {
+    "mtime": 1773543155.7954981,
+    "ast_hash": "3368baaf758e5253ecddc6f0bf22781e",
+    "semantic_hash": "3368baaf758e5253ecddc6f0bf22781e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_yaml_single.yaml": {
+    "mtime": 1773543113.8494394,
+    "ast_hash": "6b02984a39cf15f53f48e9e322f88d5b",
+    "semantic_hash": "6b02984a39cf15f53f48e9e322f88d5b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_markdown_checklist.md": {
+    "mtime": 1774128734.0319612,
+    "ast_hash": "3c5223905d854ba04815e5970e187a1e",
+    "semantic_hash": "3c5223905d854ba04815e5970e187a1e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/yaml_frontmatter_tasks_list.md": {
+    "mtime": 1773547472.4442894,
+    "ast_hash": "2e81d0ec08ea7f919832d27a231a6128",
+    "semantic_hash": "2e81d0ec08ea7f919832d27a231a6128"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/t0_baseline_sample.yaml": {
+    "mtime": 1773560598.0787992,
+    "ast_hash": "4c0f22e6bd2f14f112b10061f4daba88",
+    "semantic_hash": "4c0f22e6bd2f14f112b10061f4daba88"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/tn_verification_sample.yaml": {
+    "mtime": 1773560598.0787992,
+    "ast_hash": "040156285c89b92ac8f98074efd10a99",
+    "semantic_hash": "040156285c89b92ac8f98074efd10a99"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_yaml_directory/task-T1.yaml": {
+    "mtime": 1773543119.790306,
+    "ast_hash": "86f5a0071930cf893049b067337cceeb",
+    "semantic_hash": "86f5a0071930cf893049b067337cceeb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_yaml_directory/task-T3.yaml": {
+    "mtime": 1773543124.921191,
+    "ast_hash": "aa45d4c3ef37675e11bddce96f913b86",
+    "semantic_hash": "aa45d4c3ef37675e11bddce96f913b86"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_yaml_directory/task-T2.yaml": {
+    "mtime": 1773543122.5172448,
+    "ast_hash": "5e8b864a0ab7e06b2c3f404ff49ff62d",
+    "semantic_hash": "5e8b864a0ab7e06b2c3f404ff49ff62d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/pure_yaml_directory/plan.yaml": {
+    "mtime": 1773543117.0663671,
+    "ast_hash": "00217be44ac1c13fe624c23b90329557",
+    "semantic_hash": "00217be44ac1c13fe624c23b90329557"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/malformed/circular_deps.yaml": {
+    "mtime": 1773543180.67494,
+    "ast_hash": "cb1e357c629994635a276eb93936e56f",
+    "semantic_hash": "cb1e357c629994635a276eb93936e56f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/malformed/invalid_status.yaml": {
+    "mtime": 1773543178.674985,
+    "ast_hash": "1f200e710bd6f39739f0f0c29424e380",
+    "semantic_hash": "1f200e710bd6f39739f0f0c29424e380"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/tests_sam/fixtures/malformed/missing_required.yaml": {
+    "mtime": 1773543176.0060449,
+    "ast_hash": "69c03891930a58bb0dd65523716f0679",
+    "semantic_hash": "69c03891930a58bb0dd65523716f0679"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/comprehensive-test-review/SKILL.md": {
+    "mtime": 1774299393.1674433,
+    "ast_hash": "b0199aadaf1afe59eed4f79469a3e4c8",
+    "semantic_hash": "b0199aadaf1afe59eed4f79469a3e4c8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/api-state/SKILL.md": {
+    "mtime": 1779655737.7057106,
+    "ast_hash": "e4d87431f5e5969f8dff200b3d10feeb",
+    "semantic_hash": "e4d87431f5e5969f8dff200b3d10feeb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/create-artifact/SKILL.md": {
+    "mtime": 1779570571.0586894,
+    "ast_hash": "6bd11007d5a08cae49f2385e17dd3d05",
+    "semantic_hash": "6bd11007d5a08cae49f2385e17dd3d05"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/test-failure-mindset/SKILL.md": {
+    "mtime": 1774299393.1688929,
+    "ast_hash": "5c40da7668d46b0e474bd3254f6746dd",
+    "semantic_hash": "5c40da7668d46b0e474bd3254f6746dd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/planning/SKILL.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "918ea135630febd4106c70c83e25785a",
+    "semantic_hash": "918ea135630febd4106c70c83e25785a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-architecture/SKILL.md": {
+    "mtime": 1779570571.0586894,
+    "ast_hash": "f2fa54dfb587c92de6900c18a02f006a",
+    "semantic_hash": "f2fa54dfb587c92de6900c18a02f006a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/validation-protocol/SKILL.md": {
+    "mtime": 1776172262.57355,
+    "ast_hash": "eb5969c8bbf870c62e1fd0a54b6931ae",
+    "semantic_hash": "eb5969c8bbf870c62e1fd0a54b6931ae"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/analyze-test-failures/SKILL.md": {
+    "mtime": 1774299393.1664433,
+    "ast_hash": "5e54f1a470e65106254136d305a269a2",
+    "semantic_hash": "5e54f1a470e65106254136d305a269a2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/create-backlog-item/SKILL.md": {
+    "mtime": 1776172262.56955,
+    "ast_hash": "1e5219b35323c25aef932862dfeb440e",
+    "semantic_hash": "1e5219b35323c25aef932862dfeb440e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/ecosystem-research/SKILL.md": {
+    "mtime": 1779655737.7067108,
+    "ast_hash": "305a2af190250550c26612ddbce5a90b",
+    "semantic_hash": "305a2af190250550c26612ddbce5a90b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-web/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "5dae213fe2fa698d3d3d092ef0f33c02",
+    "semantic_hash": "5dae213fe2fa698d3d3d092ef0f33c02"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/generate-task/SKILL.md": {
+    "mtime": 1779551530.2444227,
+    "ast_hash": "c36980528978ef3622c69936244ed783",
+    "semantic_hash": "c36980528978ef3622c69936244ed783"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/dh-meta-docs/SKILL.md": {
+    "mtime": 1776172262.57055,
+    "ast_hash": "850d21b0844a9553ccb3a05260ece595",
+    "semantic_hash": "850d21b0844a9553ccb3a05260ece595"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-milestone/SKILL.md": {
+    "mtime": 1778852706.0595784,
+    "ast_hash": "064f2e94f557012b489f1e6f3fe1df88",
+    "semantic_hash": "064f2e94f557012b489f1e6f3fe1df88"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/rt-ica/SKILL.md": {
+    "mtime": 1781097618.4681668,
+    "ast_hash": "9ac060b20dceea2b53f53713220d634e",
+    "semantic_hash": "9ac060b20dceea2b53f53713220d634e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/rt-ica/references/instruction-reviewing.md": {
+    "mtime": 1775528299.5379908,
+    "ast_hash": "9f17c9803ab32530d8eb7248711c45a0",
+    "semantic_hash": "9f17c9803ab32530d8eb7248711c45a0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implement-feature/SKILL.md": {
+    "mtime": 1779976690.979684,
+    "ast_hash": "75cf49a69c714505a8e7213e952c61f9",
+    "semantic_hash": "75cf49a69c714505a8e7213e952c61f9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-claude-skills/SKILL.md": {
+    "mtime": 1776175242.688618,
+    "ast_hash": "d8727e59a9399a353413e95673417b36",
+    "semantic_hash": "d8727e59a9399a353413e95673417b36"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/file-classification/SKILL.md": {
+    "mtime": 1779551530.2444227,
+    "ast_hash": "318ba4110dd4197f2c5143751fdc8c36",
+    "semantic_hash": "318ba4110dd4197f2c5143751fdc8c36"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/evaluate-sdlc-layers/SKILL.md": {
+    "mtime": 1778853633.1838646,
+    "ast_hash": "7160e4e8c8c3b4f85397e729abcfc729",
+    "semantic_hash": "7160e4e8c8c3b4f85397e729abcfc729"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/planner-rt-ica/SKILL.md": {
+    "mtime": 1781097618.4681668,
+    "ast_hash": "fb1ac4925cdc24ba3519b36b6be80956",
+    "semantic_hash": "fb1ac4925cdc24ba3519b36b6be80956"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/start-task/SKILL.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "d8ebc804833e8fc0071f5fcea50a793e",
+    "semantic_hash": "d8ebc804833e8fc0071f5fcea50a793e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/verify-done/SKILL.md": {
+    "mtime": 1779202664.478011,
+    "ast_hash": "62cd97b622dbaad948618a47b1814566",
+    "semantic_hash": "62cd97b622dbaad948618a47b1814566"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/clear-cove-task-design/SKILL.md": {
+    "mtime": 1779551530.2444227,
+    "ast_hash": "f1bc29b599c88733c520551ad3e5794b",
+    "semantic_hash": "f1bc29b599c88733c520551ad3e5794b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/final-verification/SKILL.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "65d7dd0138d005bf89d8831366b2e72f",
+    "semantic_hash": "65d7dd0138d005bf89d8831366b2e72f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/research-note/SKILL.md": {
+    "mtime": 1779655737.7067108,
+    "ast_hash": "504c73c5638d0c3a3d09fec7638de0c5",
+    "semantic_hash": "504c73c5638d0c3a3d09fec7638de0c5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/implementation-manager/SKILL.md": {
+    "mtime": 1780148581.6611621,
+    "ast_hash": "5317bb0c4ef87c75afd296acacd39f1f",
+    "semantic_hash": "5317bb0c4ef87c75afd296acacd39f1f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/gate-push/SKILL.md": {
+    "mtime": 1778833306.073739,
+    "ast_hash": "4a2495391877ce2eabd3bb642e159ccb",
+    "semantic_hash": "4a2495391877ce2eabd3bb642e159ccb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/SKILL.md": {
+    "mtime": 1779551530.2454226,
+    "ast_hash": "0166a989d2426000bcbc854fd186e981",
+    "semantic_hash": "0166a989d2426000bcbc854fd186e981"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/scripts/parser/parser-guide.md": {
+    "mtime": 1775528299.5431209,
+    "ast_hash": "071dcfe6dbf9d5ad38d8cdcd34ec63f0",
+    "semantic_hash": "071dcfe6dbf9d5ad38d8cdcd34ec63f0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/error.md": {
+    "mtime": 1775528393.0928836,
+    "ast_hash": "b04203c0985363703c5469251e2a5bec",
+    "semantic_hash": "b04203c0985363703c5469251e2a5bec"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md": {
+    "mtime": 1779693505.897276,
+    "ast_hash": "7405545bd9875efcd82d690ee1d642a7",
+    "semantic_hash": "7405545bd9875efcd82d690ee1d642a7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/analyze.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "72c987db2734b9c4112e778f7aed49b3",
+    "semantic_hash": "72c987db2734b9c4112e778f7aed49b3"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/scope.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "e3b790549f04d8f94ca07a8ad4b39d32",
+    "semantic_hash": "e3b790549f04d8f94ca07a8ad4b39d32"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finalize.md": {
+    "mtime": 1779655737.7067108,
+    "ast_hash": "1c05a49296179fbc34eaf452b67380e1",
+    "semantic_hash": "1c05a49296179fbc34eaf452b67380e1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md": {
+    "mtime": 1779655737.7067108,
+    "ast_hash": "8c5827689333526eb718e611c58cadf7",
+    "semantic_hash": "8c5827689333526eb718e611c58cadf7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/intake.md": {
+    "mtime": 1775528299.5401688,
+    "ast_hash": "36b9e16dccaea4985491e65da60516e1",
+    "semantic_hash": "36b9e16dccaea4985491e65da60516e1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/groom-drift.md": {
+    "mtime": 1775664728.757849,
+    "ast_hash": "c811ee02b432920c991c90634099a593",
+    "semantic_hash": "c811ee02b432920c991c90634099a593"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finally.md": {
+    "mtime": 1779693505.8602731,
+    "ast_hash": "24b23911736e52de41d224fce7ddfe7e",
+    "semantic_hash": "24b23911736e52de41d224fce7ddfe7e"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/resume/start.md": {
+    "mtime": 1775664728.758849,
+    "ast_hash": "4746029726f66837fda7cba9cebabfa8",
+    "semantic_hash": "4746029726f66837fda7cba9cebabfa8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/create/start.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "9c599258139fece8f9bb0c85f28ced0d",
+    "semantic_hash": "9c599258139fece8f9bb0c85f28ced0d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/create/scope.md": {
+    "mtime": 1779551530.2454226,
+    "ast_hash": "437ddde5484ea92556e7f96311b61c7c",
+    "semantic_hash": "437ddde5484ea92556e7f96311b61c7c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/groom-check.md": {
+    "mtime": 1776109857.804958,
+    "ast_hash": "6f59c623aa58c650067106c9746e33f0",
+    "semantic_hash": "6f59c623aa58c650067106c9746e33f0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/post-planning.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "86608652b2aec26057535a8406d026cd",
+    "semantic_hash": "86608652b2aec26057535a8406d026cd"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/find-item.md": {
+    "mtime": 1778851293.9870322,
+    "ast_hash": "57ea803c0198bcb716d9df0df2a2daef",
+    "semantic_hash": "57ea803c0198bcb716d9df0df2a2daef"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "fa880c2a86caabe0cdd29ca5468ff8b1",
+    "semantic_hash": "fa880c2a86caabe0cdd29ca5468ff8b1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/auto-mode.md": {
+    "mtime": 1779199993.5010695,
+    "ast_hash": "59e4890d23ad77640d185a447ff5a315",
+    "semantic_hash": "59e4890d23ad77640d185a447ff5a315"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/commit-conventions.md": {
+    "mtime": 1775528299.5413988,
+    "ast_hash": "3d97f366f1aa2e00e1c70ce461d1aa28",
+    "semantic_hash": "3d97f366f1aa2e00e1c70ce461d1aa28"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/error-handling.md": {
+    "mtime": 1775529173.2270236,
+    "ast_hash": "7e63e89657320804f616a720d5a49ac0",
+    "semantic_hash": "7e63e89657320804f616a720d5a49ac0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/locate.md": {
+    "mtime": 1776109857.804958,
+    "ast_hash": "7a73f0c0e5c5aa915c18fe3fa4d2e483",
+    "semantic_hash": "7a73f0c0e5c5aa915c18fe3fa4d2e483"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/examples.md": {
+    "mtime": 1775529213.2231781,
+    "ast_hash": "f685f396bea7faa8c23daff9e7a56d87",
+    "semantic_hash": "f685f396bea7faa8c23daff9e7a56d87"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/scope.md": {
+    "mtime": 1776109857.8059583,
+    "ast_hash": "1b665d58b2e1a267774cdc297b3cf2ad",
+    "semantic_hash": "1b665d58b2e1a267774cdc297b3cf2ad"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/already-implemented.md": {
+    "mtime": 1775528299.5401688,
+    "ast_hash": "365414d58fd063e19bc4e2ec7ebcbd14",
+    "semantic_hash": "365414d58fd063e19bc4e2ec7ebcbd14"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "f77cc08be6f67e72567fe01403375f2a",
+    "semantic_hash": "f77cc08be6f67e72567fe01403375f2a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/prepare.md": {
+    "mtime": 1775528299.5419908,
+    "ast_hash": "8c82b71337a8f3b2fecb40f639209ed4",
+    "semantic_hash": "8c82b71337a8f3b2fecb40f639209ed4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md": {
+    "mtime": 1776109857.8059583,
+    "ast_hash": "1f0e62e5f4087d6805314a3f23e3d683",
+    "semantic_hash": "1f0e62e5f4087d6805314a3f23e3d683"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/sam-definition.md": {
+    "mtime": 1780925275.8415463,
+    "ast_hash": "fb81e061917c86e6e496b4fa633bf8c5",
+    "semantic_hash": "fb81e061917c86e6e496b4fa633bf8c5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/feature-request.md": {
+    "mtime": 1775529217.7460825,
+    "ast_hash": "9198f75cbe19cb62d3c61d0b55532a01",
+    "semantic_hash": "9198f75cbe19cb62d3c61d0b55532a01"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/field-mapping.md": {
+    "mtime": 1775529188.0337105,
+    "ast_hash": "1730232780cbf9bbf7d9575ffa10b5e9",
+    "semantic_hash": "1730232780cbf9bbf7d9575ffa10b5e9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "7599b75b369eb4b4f68c3c737dc7fb92",
+    "semantic_hash": "7599b75b369eb4b4f68c3c737dc7fb92"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/interactive-browser.md": {
+    "mtime": 1775528299.5413988,
+    "ast_hash": "264e4ac1ed548ee97977c14ecc9510aa",
+    "semantic_hash": "264e4ac1ed548ee97977c14ecc9510aa"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/validation.md": {
+    "mtime": 1775529198.5204887,
+    "ast_hash": "9266332ba42b6ce908675e3ef2ca2ade",
+    "semantic_hash": "9266332ba42b6ce908675e3ef2ca2ade"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/github-sync.md": {
+    "mtime": 1777312983.8119745,
+    "ast_hash": "45c3ab22c4c648c2400e7c9bcfb4826f",
+    "semantic_hash": "45c3ab22c4c648c2400e7c9bcfb4826f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/issue-first.md": {
+    "mtime": 1779693505.8492723,
+    "ast_hash": "6a1bffe79cc783f562da1ce8b52fde7b",
+    "semantic_hash": "6a1bffe79cc783f562da1ce8b52fde7b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/work/plan.md": {
+    "mtime": 1779202858.4540122,
+    "ast_hash": "2509de1e75a26210c75d55319bca19a9",
+    "semantic_hash": "2509de1e75a26210c75d55319bca19a9"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/quick/start.md": {
+    "mtime": 1779551530.2464225,
+    "ast_hash": "44bc3e88c584f824b16673d9de87cd2f",
+    "semantic_hash": "44bc3e88c584f824b16673d9de87cd2f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/setup-github/start.md": {
+    "mtime": 1775528299.5401688,
+    "ast_hash": "a36ad59146abeb62a143cfdcf227af7f",
+    "semantic_hash": "a36ad59146abeb62a143cfdcf227af7f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/close/start.md": {
+    "mtime": 1778853181.1532547,
+    "ast_hash": "20f07b57f7bea9c84c5ff50d8010be78",
+    "semantic_hash": "20f07b57f7bea9c84c5ff50d8010be78"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/close/examples.md": {
+    "mtime": 1777995879.3488503,
+    "ast_hash": "02c699df3faac0aae7bae2cf4ff560fe",
+    "semantic_hash": "02c699df3faac0aae7bae2cf4ff560fe"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-backlog-item/references/workflows/progress/start.md": {
+    "mtime": 1775528299.5401688,
+    "ast_hash": "2954ea4450310c35c114d6096359a590",
+    "semantic_hash": "2954ea4450310c35c114d6096359a590"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-milestone/SKILL.md": {
+    "mtime": 1779976690.9797945,
+    "ast_hash": "99d04e1ec70ae27cf641a764ed3c4a6f",
+    "semantic_hash": "99d04e1ec70ae27cf641a764ed3c4a6f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-milestone/references/merge-queue-protocol.md": {
+    "mtime": 1778853181.154255,
+    "ast_hash": "3c1a12bafb690bea7db64b3e60534dd4",
+    "semantic_hash": "3c1a12bafb690bea7db64b3e60534dd4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/work-milestone/references/worktree-worker-protocol.md": {
+    "mtime": 1775664728.7608488,
+    "ast_hash": "8d8654ca9f750ab5e7f838e8a0706ade",
+    "semantic_hash": "8d8654ca9f750ab5e7f838e8a0706ade"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/find-cause/SKILL.md": {
+    "mtime": 1778852034.4687946,
+    "ast_hash": "59150ec2c0e1c4615518397475586b0a",
+    "semantic_hash": "59150ec2c0e1c4615518397475586b0a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/group-items-to-milestone/SKILL.md": {
+    "mtime": 1778853633.8728516,
+    "ast_hash": "fcfd9530da95ef5830263505666e786a",
+    "semantic_hash": "fcfd9530da95ef5830263505666e786a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-llm/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "1e6e51f0e64141e2070578330e3aa404",
+    "semantic_hash": "1e6e51f0e64141e2070578330e3aa404"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-typescript/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "9106e63a28e4760cbb2eb5b713ee1f19",
+    "semantic_hash": "9106e63a28e4760cbb2eb5b713ee1f19"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/fact-check/SKILL.md": {
+    "mtime": 1778853634.648837,
+    "ast_hash": "e0e3660b1ff632ec6b5ff52842ddf148",
+    "semantic_hash": "e0e3660b1ff632ec6b5ff52842ddf148"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/CLI_TO_MCP_MIGRATION.md": {
+    "mtime": 1778853181.1522548,
+    "ast_hash": "62c3532f0c18571e58187ed15fd6e48a",
+    "semantic_hash": "62c3532f0c18571e58187ed15fd6e48a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/README.md": {
+    "mtime": 1779570571.0926886,
+    "ast_hash": "98f6533b57af37c8ab9d9e3f64c0fd9b",
+    "semantic_hash": "98f6533b57af37c8ab9d9e3f64c0fd9b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/SKILL.md": {
+    "mtime": 1778853181.1522548,
+    "ast_hash": "a44889525d80da738bdc68949730807c",
+    "semantic_hash": "a44889525d80da738bdc68949730807c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/templates/milestone-archive.md": {
+    "mtime": 1774022430.3037143,
+    "ast_hash": "a274da25681c2f004deaef9bfe6f4323",
+    "semantic_hash": "a274da25681c2f004deaef9bfe6f4323"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/templates/item.md": {
+    "mtime": 1776109857.8019583,
+    "ast_hash": "4e57618f8acdb5dc18d5272a19285d03",
+    "semantic_hash": "4e57618f8acdb5dc18d5272a19285d03"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/references/mcp-connection-check.md": {
+    "mtime": 1776109857.8019583,
+    "ast_hash": "b95a36d0d4a41cad3387871a5935bed2",
+    "semantic_hash": "b95a36d0d4a41cad3387871a5935bed2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/references/state-machine.md": {
+    "mtime": 1779551530.2444227,
+    "ast_hash": "9bff96133af92995a6302cb4bd6277ef",
+    "semantic_hash": "9bff96133af92995a6302cb4bd6277ef"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/references/item-schema.md": {
+    "mtime": 1776109857.8019583,
+    "ast_hash": "93dbdae9d96573ff8040dbd997f798d7",
+    "semantic_hash": "93dbdae9d96573ff8040dbd997f798d7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/references/known-patterns.md": {
+    "mtime": 1776109857.8019583,
+    "ast_hash": "3d8ecbb7029f3da6b3930e61c9d329b7",
+    "semantic_hash": "3d8ecbb7029f3da6b3930e61c9d329b7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/subagent-contract/SKILL.md": {
+    "mtime": 1774120005.2841787,
+    "ast_hash": "882048b1c570eeb020b09c64c0c9a5ba",
+    "semantic_hash": "882048b1c570eeb020b09c64c0c9a5ba"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/dispatch/SKILL.md": {
+    "mtime": 1776172262.57055,
+    "ast_hash": "0ff00bada275b77d70269b0db224cff0",
+    "semantic_hash": "0ff00bada275b77d70269b0db224cff0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/forensic-review/SKILL.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "0b92cf71b600fab9be2b357c1342f6c5",
+    "semantic_hash": "0b92cf71b600fab9be2b357c1342f6c5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/codebase-auditor/SKILL.md": {
+    "mtime": 1779693505.8162699,
+    "ast_hash": "41ecd6caf6381f0f3558777ca0aeaa7f",
+    "semantic_hash": "41ecd6caf6381f0f3558777ca0aeaa7f"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/task-decomposition/SKILL.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "eb0ca4eebb6c609c25cca1fff3bc1da2",
+    "semantic_hash": "eb0ca4eebb6c609c25cca1fff3bc1da2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/codemod-runner/SKILL.md": {
+    "mtime": 1779551530.2444227,
+    "ast_hash": "62ed103f95fa0bba1ea9b5b2b2469319",
+    "semantic_hash": "62ed103f95fa0bba1ea9b5b2b2469319"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-cli/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "dcb43a18826d4f4cdff5e2c4cdfe3d2b",
+    "semantic_hash": "dcb43a18826d4f4cdff5e2c4cdfe3d2b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/interop/SKILL.md": {
+    "mtime": 1778249103.6141105,
+    "ast_hash": "a955ee22135e7c336961a5a923deb060",
+    "semantic_hash": "a955ee22135e7c336961a5a923deb060"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/SKILL.md": {
+    "mtime": 1776109857.8039582,
+    "ast_hash": "d496c86a057764fd73f04cc38d9a3c38",
+    "semantic_hash": "d496c86a057764fd73f04cc38d9a3c38"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/kage-bunshin/references/stream-json-protocol.md": {
+    "mtime": 1774217428.9668045,
+    "ast_hash": "15db4ba76e6a427ba3a3497022fb6c1b",
+    "semantic_hash": "15db4ba76e6a427ba3a3497022fb6c1b"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/setup-skill-discovery/SKILL.md": {
+    "mtime": 1776172262.57355,
+    "ast_hash": "470c21582427f3e8b00f784f9e6b28db",
+    "semantic_hash": "470c21582427f3e8b00f784f9e6b28db"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/setup-skill-discovery/references/skill_discovery-schema.md": {
+    "mtime": 1775150427.6826208,
+    "ast_hash": "4d475535b4bd53b61232b3b53e4c7d24",
+    "semantic_hash": "4d475535b4bd53b61232b3b53e4c7d24"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/setup-skill-discovery/references/wizard-questions.md": {
+    "mtime": 1775150427.6826208,
+    "ast_hash": "9b61a11f563313e689308501b43927ae",
+    "semantic_hash": "9b61a11f563313e689308501b43927ae"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/setup-skill-discovery/references/skill-marketplace-search.md": {
+    "mtime": 1775152905.6297486,
+    "ast_hash": "5fba5f874dd2e2a0da9dca376cc09bcc",
+    "semantic_hash": "5fba5f874dd2e2a0da9dca376cc09bcc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/setup-skill-discovery/references/repo-inference-patterns.md": {
+    "mtime": 1775150427.6824813,
+    "ast_hash": "855d3987208a88e7c43dad850221e245",
+    "semantic_hash": "855d3987208a88e7c43dad850221e245"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-milestone/SKILL.md": {
+    "mtime": 1778853181.1532547,
+    "ast_hash": "f71a5d80ed265d81bd834a0bcadb1bd7",
+    "semantic_hash": "f71a5d80ed265d81bd834a0bcadb1bd7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-milestone/references/dispatch-plan-schema.md": {
+    "mtime": 1776109857.8029583,
+    "ast_hash": "dc9d7f2f9ec9990a0b480359aac7ba68",
+    "semantic_hash": "dc9d7f2f9ec9990a0b480359aac7ba68"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/context-integration/SKILL.md": {
+    "mtime": 1779570571.0586894,
+    "ast_hash": "367a4ff5e558d61a4cf553f25d34d91a",
+    "semantic_hash": "367a4ff5e558d61a4cf553f25d34d91a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-python/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "0c788459be11b2669ce5184530be54f1",
+    "semantic_hash": "0c788459be11b2669ce5184530be54f1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/multi-perspective-review/SKILL.md": {
+    "mtime": 1779198050.159577,
+    "ast_hash": "89520f79f9433a214156a4608a99b9fc",
+    "semantic_hash": "89520f79f9433a214156a4608a99b9fc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/multi-perspective-review/references/verdict-schema.md": {
+    "mtime": 1779551530.2454226,
+    "ast_hash": "ce3d45dedaf891d48afdef816d3d9686",
+    "semantic_hash": "ce3d45dedaf891d48afdef816d3d9686"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/multi-perspective-review/references/acceptance-test-guide.md": {
+    "mtime": 1779202033.5300667,
+    "ast_hash": "14e7474a12fed9398cc45bcf7b7fccd8",
+    "semantic_hash": "14e7474a12fed9398cc45bcf7b7fccd8"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/impact-measurement/SKILL.md": {
+    "mtime": 1779655737.7067108,
+    "ast_hash": "ae5d8e3e89873580c53c9966e47ee459",
+    "semantic_hash": "ae5d8e3e89873580c53c9966e47ee459"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-implementation/SKILL.md": {
+    "mtime": 1780672726.2721245,
+    "ast_hash": "56d59b7c2759bb6fe31155db4ba93417",
+    "semantic_hash": "56d59b7c2759bb6fe31155db4ba93417"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-implementation/references/final-handoff.md": {
+    "mtime": 1779858147.2017725,
+    "ast_hash": "07353e6b00899492f5ed3ad7f275d36d",
+    "semantic_hash": "07353e6b00899492f5ed3ad7f275d36d"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-implementation/references/concerns-processing.md": {
+    "mtime": 1779202052.426674,
+    "ast_hash": "afc3c8ecac2cf30ed2f55a825477a9c6",
+    "semantic_hash": "afc3c8ecac2cf30ed2f55a825477a9c6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md": {
+    "mtime": 1779976690.979577,
+    "ast_hash": "717a3b02d4ce356704c5fdef9f32ad22",
+    "semantic_hash": "717a3b02d4ce356704c5fdef9f32ad22"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/complete-implementation/references/migration-fidelity-gate.md": {
+    "mtime": 1779976690.979506,
+    "ast_hash": "b5c0d7a3d6c3b6f15c0a4da9874626c5",
+    "semantic_hash": "b5c0d7a3d6c3b6f15c0a4da9874626c5"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/add-new-feature/SKILL.md": {
+    "mtime": 1781540304.8249478,
+    "ast_hash": "f0c8bc0ad0702a691531ce4cd57ebcf4",
+    "semantic_hash": "f0c8bc0ad0702a691531ce4cd57ebcf4"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/discovery/SKILL.md": {
+    "mtime": 1780200892.7120252,
+    "ast_hash": "f36d1574b944f863ebdec66231cc942a",
+    "semantic_hash": "f36d1574b944f863ebdec66231cc942a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/meta-workflow-graph-refresh/SKILL.md": {
+    "mtime": 1781540304.808948,
+    "ast_hash": "05ae32ec9f68a038980fb02541523cf0",
+    "semantic_hash": "05ae32ec9f68a038980fb02541523cf0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/code-review-nodejs/SKILL.md": {
+    "mtime": 1776172262.56855,
+    "ast_hash": "d9f1a6b58ce21b62c76056da77298222",
+    "semantic_hash": "d9f1a6b58ce21b62c76056da77298222"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/execution/SKILL.md": {
+    "mtime": 1776172262.57055,
+    "ast_hash": "98463c45291e0a551f4d393dfa2070fc",
+    "semantic_hash": "98463c45291e0a551f4d393dfa2070fc"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/SKILL.md": {
+    "mtime": 1779202018.2323847,
+    "ast_hash": "178ba1e695f545bbc7322ae0cc31e24a",
+    "semantic_hash": "178ba1e695f545bbc7322ae0cc31e24a"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/default-development-flow.md": {
+    "mtime": 1775664728.751849,
+    "ast_hash": "73b0607bc2fb6256be60a6d6f5af9e1c",
+    "semantic_hash": "73b0607bc2fb6256be60a6d6f5af9e1c"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/role-resolution-protocol.md": {
+    "mtime": 1775528299.535991,
+    "ast_hash": "0bd2f242bcc9712eb4e1c3606d16ef29",
+    "semantic_hash": "0bd2f242bcc9712eb4e1c3606d16ef29"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/artifact-conventions.md": {
+    "mtime": 1779570571.0586894,
+    "ast_hash": "07559d071bd8457d926bfc70ecb72177",
+    "semantic_hash": "07559d071bd8457d926bfc70ecb72177"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/human-touchpoint-model.md": {
+    "mtime": 1775012844.7378252,
+    "ast_hash": "93450758991bc83c39f9ce4661a4f8c7",
+    "semantic_hash": "93450758991bc83c39f9ce4661a4f8c7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/sdlc-stage-taxonomy.md": {
+    "mtime": 1779570571.0596893,
+    "ast_hash": "f72872a57fcbe8a4a8280208cb4ccdf7",
+    "semantic_hash": "f72872a57fcbe8a4a8280208cb4ccdf7"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/development-harness/references/language-manifest-schema.md": {
+    "mtime": 1778853181.1532547,
+    "ast_hash": "e9e98c966e7e371d802e20118d6dd552",
+    "semantic_hash": "e9e98c966e7e371d802e20118d6dd552"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog-tools-administrator/SKILL.md": {
+    "mtime": 1779327245.9145467,
+    "ast_hash": "02ec089863fd21ed0f6a28498ce5f563",
+    "semantic_hash": "02ec089863fd21ed0f6a28498ce5f563"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog-tools-administrator/references/domain-registry.md": {
+    "mtime": 1775528299.526113,
+    "ast_hash": "863062ae41b2eee30e608e6d814801f2",
+    "semantic_hash": "863062ae41b2eee30e608e6d814801f2"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-backlog-item/SKILL.md": {
+    "mtime": 1776172262.57255,
+    "ast_hash": "07b0483510e2144bf538b095ea937beb",
+    "semantic_hash": "07b0483510e2144bf538b095ea937beb"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-backlog-item/references/groomer-output-validation.md": {
+    "mtime": 1777488843.402657,
+    "ast_hash": "36b7aa013c6dbe73e7030a3ff0deed61",
+    "semantic_hash": "36b7aa013c6dbe73e7030a3ff0deed61"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-backlog-item/references/issue-classification.md": {
+    "mtime": 1778853181.1532547,
+    "ast_hash": "1b98148d221bf9bc0e8a9d7c9bad8df1",
+    "semantic_hash": "1b98148d221bf9bc0e8a9d7c9bad8df1"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-backlog-item/references/groomer-agent.md": {
+    "mtime": 1775528299.536991,
+    "ast_hash": "3023bedb6d711a6df319f37ea09c4ab6",
+    "semantic_hash": "3023bedb6d711a6df319f37ea09c4ab6"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/groom-backlog-item/references/drift-check.md": {
+    "mtime": 1775528299.536991,
+    "ast_hash": "61ffcafa6ab397c541e5f0bae44b97d0",
+    "semantic_hash": "61ffcafa6ab397c541e5f0bae44b97d0"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/assets/hero.png": {
+    "mtime": 1772546504.156094,
+    "ast_hash": "43555b04e735dd7d524f9739ff793f21",
+    "semantic_hash": "43555b04e735dd7d524f9739ff793f21"
+  },
+  "/home/ubuntulinuxqa2/repos/claude_skills/plugins/development-harness/skills/backlog/IMG_9309.png": {
+    "mtime": 1772546504.0813646,
+    "ast_hash": "9f26f6adcd994fd976b8852dd1c1c453",
+    "semantic_hash": "9f26f6adcd994fd976b8852dd1c1c453"
+  }
+}
