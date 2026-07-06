@@ -695,6 +695,21 @@ def _process_trace(
                 source_heading=heading,
             )
 
+    elif terminal_type == "completes_workflow":
+        # terminal_target is null/empty — emit a terminal completion edge
+        # so the branch outcome is visible rather than silently dropped.
+        target_id = f"terminal.completion.{slugify(from_fork_raw)}"
+        eid = f"{edge_id_base}.branch"
+        edges[eid] = _edge(
+            eid,
+            "branch",
+            source_id,
+            target_id,
+            label=f"completes_workflow: {condition or '(no condition)'}"[:80],
+            source_file=source_file,
+            source_heading=heading,
+        )
+
     elif terminal_type == "hands_off_to_skill" and terminal_target:
         _emit_skill_handoff(
             trace_ctx={
@@ -1208,10 +1223,12 @@ def _build_all_nodes(ld: LayerData) -> dict[str, dict[str, Any]]:
 def _build_all_edges(
     ld: LayerData, all_nodes: dict[str, dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Build and deduplicate all edges; collect loop stub nodes.
+    """Build and deduplicate all edges; collect stub nodes.
 
     Returns:
-        Two-tuple of (deduped_edges, loop_stubs).
+        Two-tuple of (deduped_edges, stub_nodes) where stub_nodes includes
+        loop stubs and terminal stubs (terminal.skill.*, terminal.completion.*)
+        created by _process_trace for branches that don't target a known node.
     """
     known_fork_ids = {nid for nid in all_nodes if nid.startswith("fork.")}
     known_skill_ids = {nid for nid in all_nodes if nid.startswith("skill.")}
@@ -1224,7 +1241,34 @@ def _build_all_edges(
         + build_calls_edges(ld.backend_routing)
         + build_stores_in_edges(ld.backend_routing)
     )
-    return list({e["id"]: e for e in raw}.values()), loop_stubs
+    deduped = list({e["id"]: e for e in raw}.values())
+
+    # Collect terminal stubs for edges that target terminal.* nodes not
+    # already in the node set (e.g. terminal.skill.*, terminal.completion.*).
+    node_ids = set(all_nodes)
+    node_ids.update(loop_stubs)
+    terminal_stubs: dict[str, dict[str, Any]] = {}
+    for edge in deduped:
+        for endpoint in (edge["source"], edge["target"]):
+            if (
+                endpoint
+                and endpoint.startswith("terminal.")
+                and endpoint != "terminal.stop"
+                and endpoint not in node_ids
+                and endpoint not in terminal_stubs
+            ):
+                terminal_stubs[endpoint] = {
+                    "id": endpoint,
+                    "type": "decision",
+                    "label": endpoint.removeprefix("terminal.").replace("_", " "),
+                    "route": None,
+                    "source_file": None,
+                    "source_heading": None,
+                    "verified": False,
+                    "metadata": {"stub": True, "reason": "terminal target not in node set"},
+                }
+    all_stubs = {**loop_stubs, **terminal_stubs}
+    return deduped, all_stubs
 
 
 def _build_graph_dict(sorted_nodes: list[dict[str, Any]], sorted_edges: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1303,8 +1347,60 @@ def _write_json_atomic(output_path: Path, payload: dict[str, Any]) -> None:
         raise
 
 
+def _refresh_explorer_html(graph_json: dict[str, Any], explorer_path: Path) -> None:
+    """Replace the inline GRAPH_DATA blob in the explorer HTML.
+
+    The explorer uses an inline ``const GRAPH_DATA = {...};`` line rather
+    than fetching the JSON at runtime (necessary for ``file://`` protocol).
+    This function replaces that line with the freshly assembled graph so
+    the explorer never renders stale data after a rebuild.
+
+    If the explorer file does not exist or the GRAPH_DATA line is not found,
+    a warning is printed and the function returns without error — the JSON
+    output is the source of truth.
+    """
+    if not explorer_path.exists():
+        print(f"Warning: explorer HTML not found at {explorer_path}, skipping refresh")
+        return
+
+    serialized = json.dumps(graph_json)
+    lines = explorer_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    graph_data_line = f"  const GRAPH_DATA = {serialized};\n"
+
+    found = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("const GRAPH_DATA ="):
+            lines[i] = graph_data_line
+            found = True
+            break
+
+    if not found:
+        print(f"Warning: GRAPH_DATA line not found in {explorer_path}, skipping refresh")
+        return
+
+    explorer_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(suffix=".tmp", prefix=f"{explorer_path.name}.", dir=explorer_path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            tmp_file.writelines(lines)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        tmp_path.replace(explorer_path)
+    except OSError:
+        tmp_path.unlink(missing_ok=True)
+        raise
+    print(f"Refreshed explorer HTML: {explorer_path}")
+
+
 def assemble(layers_dir: Path, output_path: Path) -> None:
     """Load all layer files and write the assembled graph to output_path.
+
+    Also refreshes the inline ``GRAPH_DATA`` blob in
+    ``dh-workflow-explorer.html`` (in the same directory as ``output_path``)
+    so the explorer renders the freshly assembled graph rather than a stale
+    embedded copy.
 
     Idempotent: running twice with the same inputs produces identical output.
     """
@@ -1328,6 +1424,7 @@ def assemble(layers_dir: Path, output_path: Path) -> None:
 
     graph_dict = _build_graph_dict(sorted_nodes, sorted_edges)
     _write_json_atomic(output_path, graph_dict)
+    _refresh_explorer_html(graph_dict, output_path.parent / "dh-workflow-explorer.html")
 
     print(
         f"Built: {len(sorted_nodes)} nodes, {len(sorted_edges)} edges, "
