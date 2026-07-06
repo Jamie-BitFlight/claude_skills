@@ -1,10 +1,5 @@
-# Utilization Assessment: mcpskills-cli
-
-**Research entry**: ./research/mcp-ecosystem/mcpskills-cli.md
-**Generated**: 2026-03-13
-**Assessment**: No utilization surface identified in current codebase
-**Status**: COMPLETE — No proposals written
-
+---
+title: "Utilization Assessment: mcpskills-cli"
 ---
 
 ## Surface Analysis
@@ -148,4 +143,3 @@ None of these are natural extensions of the fastmcp-creator plugin's current res
 | **Suitable local callers** | None identified |
 | **Proposals written** | 0 |
 | **Reason** | No local system has responsibility or need to invoke mcpskills-cli; workflow sits between fastmcp-creator output and skill-creator input as a manual, user-driven step |
-

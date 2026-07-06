@@ -1,11 +1,13 @@
-# Fly.io
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://fly.io/>
-**GitHub Repository**: <https://github.com/superfly> (organization)
-**Version at Research**: flyctl v0.4.14 (latest at research date)
-**License**: Apache-2.0 (open-source components: flyctl, fly-go) / Proprietary (platform)
-
+---
+title: "Fly.io"
+research_date: "2026-02-23"
+source_url: "https://fly.io/"
+github_url: "<https://github.com/superfly> (organization)"
+version_at_research: "flyctl v0.4.14 (latest at research date)"
+license: "Apache-2.0 (open-source components: flyctl, fly-go) / Proprietary (platform)"
+last_verified: "2026-02-23"
+version_at_verification: "flyctl v0.4.14"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -240,11 +242,3 @@ fly wireguard create personal my-peer > peer.conf
 - [WireGuard private network access](https://fly.io/docs/blueprints/connect-private-network-wireguard/) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | flyctl v0.4.14 |
-| Next Review Recommended | 2026-05-23 |

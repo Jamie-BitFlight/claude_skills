@@ -1,16 +1,5 @@
-# Claude Skills Library — 205 Production-Ready AI Agent Skills & Plugins
-
-## Identity and Metadata
-
-**Official Name:** Claude Code Skills & Plugins (alirezarezvani/claude-skills)
-**Repository:** <https://github.com/alirezarezvani/claude-skills>
-**Latest Version:** 2.1.2 (released March 10, 2026)
-**License:** MIT (source: LICENSE file)
-**GitHub Statistics:** 7,452 stars, 900 forks (as of March 28, 2026)
-**Author:** Alireza Rezvani (<https://alirezarezvani.com>)
-**Created:** October 19, 2025
-**Last Updated:** March 28, 2026
-
+---
+title: "Claude Skills Library — 205 Production-Ready AI Agent Skills & Plugins"
 ---
 
 ## Problem Addressed
@@ -138,6 +127,7 @@ AI coding agents (Claude Code, Codex, Cursor, Aider, Windsurf) ship with general
 **Feature:** Skills published to ClawHub marketplace and Claude Code plugin marketplace. Plugin registry in `.claude-plugin/marketplace.json` coordinates distribution across multiple tools.
 
 **Registry Format** (source: `.claude-plugin/marketplace.json` excerpt):
+
 ```json
 {
   "name": "claude-code-skills",
@@ -445,29 +435,3 @@ The conversion system (one skill format → 11 tool-native formats via `scripts/
 | [HumanCompiler](./human-compiler.md) | skill-generation-tools | Interview-driven plugin generation from behavioral profiles parallels skill authoring as knowledge codification |
 
 ---
-
-## Freshness Tracking
-
-**Content Last Verified:** March 28, 2026
-**Next Review Recommended:** June 28, 2026 (3 months)
-
-### Confidence by Section
-
-| Section | Confidence | Basis |
-|---------|-----------|-------|
-| **Identity/Metadata** | high | Official README, GitHub API, CHANGELOG, license file read directly |
-| **Problem Addressed** | high | README.md Problem Addressed section (lines 2-7); specific gaps documented with folder references |
-| **Key Statistics** | high | README.md line counts; CHANGELOG.md v2.1.2 script verification statement; GitHub API for stars/forks |
-| **Key Features** | high | README.md feature descriptions lines 105-257; CHANGELOG.md feature additions; marketplace.json registry examined |
-| **Technical Architecture** | high | CLAUDE.md, SKILL-AUTHORING-STANDARD.md, SKILL_PIPELINE.md read directly; component names verified in folder structure |
-| **Installation & Usage** | high | README.md installation sections (lines 44-102) and examples (lines 275-319); scripts examined |
-| **Limitations** | medium | Inferred from documentation (CLAUDE.md anti-patterns, SKILL_PIPELINE.md phases, CONTRIBUTING.md absence of test framework). No explicit "Limitations" section in README. Confidence reduced because limitations are implied rather than explicitly stated. |
-| **Relevance to Claude Code** | high | Direct architectural and quality standard relevance; multi-platform portability and marketplace patterns documented |
-
-**Changes Since Last Review:** This is the initial research entry.
-
-**Known Data Gaps:**
-- Individual skill quality scores (only aggregate metrics from Tessl review available)
-- User adoption metrics beyond star/fork counts
-- Failure modes or support issues (no issues.md or known issues documented)
-- Detailed performance benchmarks for Python tools

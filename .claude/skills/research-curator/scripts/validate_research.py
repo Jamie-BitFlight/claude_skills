@@ -1,9 +1,16 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marko>=2.2.2", "typer>=0.21.0"]
+# dependencies = ["marko>=2.2.2", "ruamel.yaml>=0.18.0", "typer>=0.21.0"]
 # ///
-"""Validate research entries against the research-curator quality standard."""
+"""Validate research entries against the research-curator quality standard.
+
+Supports two entry formats:
+- ``text_header``: bold key-value pairs before the first ``---`` separator
+- ``yaml_frontmatter``: standard YAML block between opening and closing ``---``
+
+Both formats are valid. The ``format`` key in each result reports which was detected.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +20,12 @@ import os
 import re
 import sys
 from datetime import UTC, date, datetime, timedelta
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 import typer
+from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     import types
@@ -33,7 +42,10 @@ class Issue(TypedDict):
 
 app = typer.Typer(add_completion=False)
 
-REQUIRED_SECTIONS = [
+# Sections required in the body for all formats.
+# For yaml_frontmatter entries, freshness data lives in the frontmatter, so
+# the Freshness Tracking body section is not required.
+REQUIRED_BODY_SECTIONS = [
     "Overview",
     "Problem Addressed",
     "Key Statistics",
@@ -42,8 +54,11 @@ REQUIRED_SECTIONS = [
     "Installation & Usage",
     "Relevance to Claude Code Development",
     "References",
-    "Freshness Tracking",
 ]
+
+# Additional body section required only for text-header format entries.
+# YAML frontmatter entries satisfy freshness via frontmatter keys instead.
+_REQUIRED_SECTIONS_TEXT_HEADER_ONLY = ["Freshness Tracking"]
 
 # Alternative accepted spellings for section headings
 SECTION_ALIASES: dict[str, list[str]] = {"Installation & Usage": ["Installation and Usage"]}
@@ -58,9 +73,92 @@ FRESHNESS_ALIASES: dict[str, list[str]] = {
     "Next Review Recommended": ["Next Review"],
 }
 
+# YAML frontmatter key aliases mapping canonical requirement name → accepted YAML keys
+_YAML_HEADER_ALIASES: dict[str, list[str]] = {
+    "Research Date": ["research_date", "date"],
+    "Source URL": ["source_url", "url"],
+    "Version at Research": ["version_at_research", "version"],
+    "License": ["license"],
+}
+
+_YAML_FRESHNESS_ALIASES: dict[str, list[str]] = {
+    "Last Verified": ["last_verified"],
+    "Version at Verification": ["version_at_verification"],
+    "Next Review Recommended": ["next_review", "next_review_recommended"],
+}
+
 URL_PATTERN = re.compile(r"https?://[^\s>)\]]+")
 ACCESS_DATE_PATTERN = re.compile(r"(?:accessed\s+\d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))")
 DATE_PATTERN = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+
+_yaml = YAML()
+_yaml.preserve_quotes = True
+
+
+# ---------------------------------------------------------------------------
+# Format detection and YAML parsing
+# ---------------------------------------------------------------------------
+
+
+def detect_format(lines: list[str]) -> str:
+    """Detect whether a file uses YAML frontmatter or text-header format.
+
+    Args:
+        lines: All lines of the file, including line endings stripped.
+
+    Returns:
+        ``"yaml_frontmatter"`` when the file starts with ``---``, otherwise
+        ``"text_header"``.
+    """
+    return "yaml_frontmatter" if lines and lines[0].strip() == "---" else "text_header"
+
+
+def parse_yaml_frontmatter(lines: list[str]) -> dict[str, Any]:
+    """Parse the YAML block from a file that starts with ``---``.
+
+    Reads from the opening ``---`` to the next ``---`` and returns the parsed
+    mapping. Returns an empty dict on any parse error so callers can still
+    produce validation issues rather than crashing.
+
+    Args:
+        lines: All lines of the file (first line must be ``---``).
+
+    Returns:
+        Parsed YAML mapping, or an empty dict on failure.
+    """
+    closing = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            closing = i
+            break
+    if closing is None:
+        return {}
+    yaml_text = "\n".join(lines[1:closing])
+    try:
+        result = _yaml.load(StringIO(yaml_text))
+        return result if isinstance(result, dict) else {}
+    except Exception:  # noqa: BLE001 — ruamel raises internal exc types not in public API
+        return {}
+
+
+def _yaml_body_lines(lines: list[str]) -> list[str]:
+    """Return the body lines after the closing ``---`` of YAML frontmatter.
+
+    Args:
+        lines: All file lines; first line must be ``---``.
+
+    Returns:
+        Lines after the closing ``---``, or all lines when no closing found.
+    """
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return lines[i + 1 :]
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# Section parsing (shared by both formats)
+# ---------------------------------------------------------------------------
 
 
 def _parse_sections(lines: list[str]) -> dict[str, tuple[int, int]]:
@@ -109,50 +207,34 @@ def _section_content(lines: list[str], start: int, end: int) -> str:
     return "\n".join(content_lines).strip()
 
 
-def _check_section_completeness(sections: dict[str, tuple[int, int]]) -> list[Issue]:
+# ---------------------------------------------------------------------------
+# Checks shared by both formats
+# ---------------------------------------------------------------------------
+
+
+def _check_section_completeness(sections: dict[str, tuple[int, int]], required: list[str]) -> list[Issue]:
     """Check that all required sections exist.
 
+    Args:
+        sections: Section heading → (start_line, end_line) mapping.
+        required: List of section headings that must be present.
+
     Returns:
-        List of ``Issue`` dicts, one per missing required section. Empty list
-        when all required sections (including accepted aliases) are present.
+        List of ``Issue`` dicts, one per missing required section.
     """
     issues: list[Issue] = []
     section_names = set(sections.keys())
 
-    for required in REQUIRED_SECTIONS:
-        found = required in section_names
+    for section in required:
+        found = section in section_names
         if not found:
-            aliases = SECTION_ALIASES.get(required, [])
+            aliases = SECTION_ALIASES.get(section, [])
             found = any(alias in section_names for alias in aliases)
         if not found:
             issues.append({
                 "check": "section_completeness",
                 "severity": "error",
-                "message": f"Missing section: {required}",
-                "line": None,
-            })
-    return issues
-
-
-def _check_header_fields(header_lines: list[str]) -> list[Issue]:
-    """Check that required header fields exist.
-
-    Returns:
-        List of ``Issue`` dicts, one per missing required header field. Empty
-        list when all required fields are found in the header block.
-    """
-    issues: list[Issue] = []
-    header_text = "\n".join(header_lines)
-
-    for field in REQUIRED_HEADER_FIELDS:
-        # Match both **Field** and Field patterns
-        patterns = [f"**{field}**", f"{field}:", f"{field}**:"]
-        found = any(p in header_text for p in patterns)
-        if not found:
-            issues.append({
-                "check": "header_fields",
-                "severity": "error",
-                "message": f"Missing header field: {field}",
+                "message": f"Missing section: {section}",
                 "line": None,
             })
     return issues
@@ -201,36 +283,6 @@ def _check_access_dates(lines: list[str], sections: dict[str, tuple[int, int]]) 
                 "severity": "warning",
                 "message": f"Reference without access date on line {i + 1}",
                 "line": i + 1,
-            })
-    return issues
-
-
-def _check_freshness_tracking(lines: list[str], sections: dict[str, tuple[int, int]]) -> list[Issue]:
-    """Check that Freshness Tracking section has required fields.
-
-    Returns:
-        List of ``Issue`` dicts, one per missing required field.
-    """
-    issues: list[Issue] = []
-
-    ft_section = sections.get("Freshness Tracking")
-    if ft_section is None:
-        return issues
-
-    start, end = ft_section
-    section_text = "\n".join(lines[start - 1 : end])
-
-    for field in FRESHNESS_REQUIRED_FIELDS:
-        found = field in section_text
-        if not found:
-            aliases = FRESHNESS_ALIASES.get(field, [])
-            found = any(alias in section_text for alias in aliases)
-        if not found:
-            issues.append({
-                "check": "freshness_tracking",
-                "severity": "warning",
-                "message": f"Freshness Tracking missing field: {field}",
-                "line": start,
             })
     return issues
 
@@ -329,45 +381,271 @@ def _check_url_format(lines: list[str]) -> list[Issue]:
     return issues
 
 
+# ---------------------------------------------------------------------------
+# Format-specific header / freshness checks
+# ---------------------------------------------------------------------------
+
+
+def _check_header_fields_text(header_lines: list[str]) -> list[Issue]:
+    """Check that required header fields exist in a text-header block.
+
+    Args:
+        header_lines: Lines before the first ``---`` separator.
+
+    Returns:
+        List of ``Issue`` dicts, one per missing required header field.
+    """
+    issues: list[Issue] = []
+    header_text = "\n".join(header_lines)
+
+    for field in REQUIRED_HEADER_FIELDS:
+        patterns = [f"**{field}**", f"{field}:", f"{field}**:"]
+        found = any(p in header_text for p in patterns)
+        if not found:
+            issues.append({
+                "check": "header_fields",
+                "severity": "error",
+                "message": f"Missing header field: {field}",
+                "line": None,
+            })
+    return issues
+
+
+def _check_header_fields_yaml(frontmatter: dict[str, Any]) -> list[Issue]:
+    """Check that required header fields exist in a YAML frontmatter block.
+
+    Uses ``_YAML_HEADER_ALIASES`` to accept alternative key spellings.
+
+    Args:
+        frontmatter: Parsed YAML frontmatter dict.
+
+    Returns:
+        List of ``Issue`` dicts, one per missing required field.
+    """
+    issues: list[Issue] = []
+    # Flatten nested keys (e.g. metadata.source_url) into a single lookup set
+    flat_keys = _flatten_yaml_keys(frontmatter)
+
+    for field, yaml_keys in _YAML_HEADER_ALIASES.items():
+        found = any(k in flat_keys for k in yaml_keys)
+        if not found:
+            issues.append({
+                "check": "header_fields",
+                "severity": "error",
+                "message": f"Missing header field: {field} (expected YAML key: {yaml_keys[0]})",
+                "line": None,
+            })
+    return issues
+
+
+def _check_freshness_tracking_text(lines: list[str], sections: dict[str, tuple[int, int]]) -> list[Issue]:
+    """Check Freshness Tracking section in a text-header entry.
+
+    Args:
+        lines: All body lines of the file.
+        sections: Section name → (start, end) mapping from ``_parse_sections``.
+
+    Returns:
+        List of ``Issue`` dicts, one per missing required field.
+    """
+    issues: list[Issue] = []
+
+    ft_section = sections.get("Freshness Tracking")
+    if ft_section is None:
+        return issues
+
+    start, end = ft_section
+    section_text = "\n".join(lines[start - 1 : end])
+
+    for field in FRESHNESS_REQUIRED_FIELDS:
+        found = field in section_text
+        if not found:
+            aliases = FRESHNESS_ALIASES.get(field, [])
+            found = any(alias in section_text for alias in aliases)
+        if not found:
+            issues.append({
+                "check": "freshness_tracking",
+                "severity": "warning",
+                "message": f"Freshness Tracking missing field: {field}",
+                "line": start,
+            })
+    return issues
+
+
+def _check_freshness_tracking_yaml(frontmatter: dict[str, Any]) -> list[Issue]:
+    """Check freshness fields in a YAML frontmatter block.
+
+    Uses ``_YAML_FRESHNESS_ALIASES`` to accept alternative key spellings.
+
+    Args:
+        frontmatter: Parsed YAML frontmatter dict.
+
+    Returns:
+        List of ``Issue`` dicts, one per missing required freshness field.
+    """
+    issues: list[Issue] = []
+    flat_keys = _flatten_yaml_keys(frontmatter)
+
+    for field, yaml_keys in _YAML_FRESHNESS_ALIASES.items():
+        found = any(k in flat_keys for k in yaml_keys)
+        if not found:
+            issues.append({
+                "check": "freshness_tracking",
+                "severity": "warning",
+                "message": f"Freshness Tracking missing field: {field} (expected YAML key: {yaml_keys[0]})",
+                "line": None,
+            })
+    return issues
+
+
+def _flatten_yaml_keys(data: dict[str, Any], prefix: str = "") -> set[str]:
+    """Recursively collect all leaf keys from a nested dict, with dotted paths.
+
+    Also includes bare leaf keys (without prefix) to allow matching ``source_url``
+    whether it lives at the root or nested under ``metadata.source_url``.
+
+    Args:
+        data: Dict to flatten.
+        prefix: Dot-separated key prefix accumulated by recursive calls.
+
+    Returns:
+        Set of all key strings (bare and dotted).
+    """
+    keys: set[str] = set()
+    for k, v in data.items():
+        bare = str(k)
+        dotted = f"{prefix}.{bare}" if prefix else bare
+        keys.add(bare)
+        keys.add(dotted)
+        if isinstance(v, dict):
+            keys.update(_flatten_yaml_keys(v, dotted))
+    return keys
+
+
+# ---------------------------------------------------------------------------
+# Top-level validation
+# ---------------------------------------------------------------------------
+
+
+def _infer_research_root(resolved: list[Path]) -> Path:
+    """Infer the research root as the common ancestor of all input paths.
+
+    When all inputs share a common directory ancestor (e.g. ``research/``),
+    that ancestor is returned and used as the base for relative path display.
+    If only a single path is provided and it is a directory, that directory is
+    the root. Falls back to the current working directory when the common
+    ancestor cannot be determined from the input set alone.
+
+    Args:
+        resolved: Non-empty list of file or directory paths to validate.
+
+    Returns:
+        A ``Path`` that is an ancestor of every path in ``resolved``.
+    """
+    # Resolve all paths to absolute so commonpath works across relative inputs.
+    absolute_paths = [p.resolve() for p in resolved]
+
+    # Directories contribute themselves; files contribute their parent.
+    # This means a lone directory arg returns that directory as the root,
+    # and a set of files returns their deepest common directory ancestor.
+    candidate_dirs = [p if p.is_dir() else p.parent for p in absolute_paths]
+
+    if len(candidate_dirs) == 1:
+        return candidate_dirs[0]
+
+    # os.path.commonpath returns the longest common sub-path string.
+    return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
+
+
 def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str, Any]:
     """Validate a single research markdown file.
 
+    Detects format automatically and applies the appropriate header/freshness
+    checks. Shared checks (sections, empty sections, access dates, statistics
+    currency, URL format, formatting) run for both formats.
+
+    Args:
+        filepath: Absolute path to the markdown file to validate.
+        research_root: Root directory used to produce a relative file path.
+        today: Reference date for freshness and currency checks.
+
     Returns:
-        Dict with keys ``file``, ``status`` (pass/fail), and ``issues``.
+        Dict with keys ``file``, ``format``, ``status`` (pass/fail), and ``issues``.
     """
-    relative = str(filepath.relative_to(research_root))
+    # Use absolute paths for the relative_to call to guarantee both sides match.
+    abs_filepath = filepath.resolve()
+    abs_root = research_root.resolve()
+    try:
+        relative = str(abs_filepath.relative_to(abs_root))
+    except ValueError:
+        # filepath is outside research_root (e.g. an absolute path to a
+        # completely different tree). Fall back to the bare filename so the
+        # report is still readable rather than crashing.
+        relative = str(abs_filepath)
+
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines()
 
-    header_lines, _ = _get_header_block(lines)
-    sections = _parse_sections(lines)
+    fmt = detect_format(lines)
 
-    all_issues: list[Issue] = []
-    all_issues.extend(_check_section_completeness(sections))
-    all_issues.extend(_check_header_fields(header_lines))
-    all_issues.extend(_check_empty_sections(lines, sections))
-    all_issues.extend(_check_access_dates(lines, sections))
-    all_issues.extend(_check_freshness_tracking(lines, sections))
-    all_issues.extend(_check_statistics_currency(lines, sections, today))
-    all_issues.extend(_check_url_format(lines))
-    all_issues.extend(_check_formatting_suggestions(lines))
+    if fmt == "yaml_frontmatter":
+        frontmatter = parse_yaml_frontmatter(lines)
+        body_lines = _yaml_body_lines(lines)
+        sections = _parse_sections(body_lines)
+        all_issues: list[Issue] = []
+        all_issues.extend(_check_section_completeness(sections, REQUIRED_BODY_SECTIONS))
+        all_issues.extend(_check_header_fields_yaml(frontmatter))
+        all_issues.extend(_check_empty_sections(body_lines, sections))
+        all_issues.extend(_check_access_dates(body_lines, sections))
+        all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
+        all_issues.extend(_check_statistics_currency(body_lines, sections, today))
+        all_issues.extend(_check_url_format(body_lines))
+        all_issues.extend(_check_formatting_suggestions(body_lines))
+    else:
+        header_lines, _ = _get_header_block(lines)
+        sections = _parse_sections(lines)
+        all_issues = []
+        all_issues.extend(
+            _check_section_completeness(sections, REQUIRED_BODY_SECTIONS + _REQUIRED_SECTIONS_TEXT_HEADER_ONLY)
+        )
+        all_issues.extend(_check_header_fields_text(header_lines))
+        all_issues.extend(_check_empty_sections(lines, sections))
+        all_issues.extend(_check_access_dates(lines, sections))
+        all_issues.extend(_check_freshness_tracking_text(lines, sections))
+        all_issues.extend(_check_statistics_currency(lines, sections, today))
+        all_issues.extend(_check_url_format(lines))
+        all_issues.extend(_check_formatting_suggestions(lines))
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
     status = "fail" if has_errors else "pass"
 
-    return {"file": relative, "status": status, "issues": all_issues}
+    return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
+
+
+_NON_ENTRY_DIRS = frozenset({"insights", "utilization"})
+
+
+def _is_research_entry(file: Path) -> bool:
+    """Return whether a markdown file is a research entry subject to the schema.
+
+    Excludes README.md and files under non-entry artifact directories such as
+    ``research/insights/`` (improvement/utilization reports written by
+    ``research-insight-extractor`` and ``research-utilization-assessor``, which
+    intentionally do not follow the research entry template).
+    """
+    return file.name != "README.md" and not _NON_ENTRY_DIRS.intersection(file.parts)
 
 
 def collect_files(path: Path) -> list[Path]:
-    """Collect markdown files to validate, excluding README.md.
+    """Collect markdown files to validate, excluding README.md and non-entry artifacts.
 
     Returns:
         Sorted list of markdown file paths.
     """
     if path.is_file():
-        return [path] if path.suffix == ".md" and path.name != "README.md" else []
+        return [path] if path.suffix == ".md" and _is_research_entry(path) else []
     files = sorted(path.rglob("*.md"))
-    return [f for f in files if f.name != "README.md"]
+    return [f for f in files if _is_research_entry(f)]
 
 
 def _load_backlink_lib() -> types.ModuleType:
@@ -420,7 +698,6 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
 
     target_md = target.read_text(encoding="utf-8")
     source_category: str = bl.category_of(source, vault_path)
-    # os.path.relpath supports walking above the start directory on all Python 3.11+
     backlink_str = os.path.relpath(source, target.parent).replace("\\", "/")
     if not backlink_str.startswith(".."):
         backlink_str = "./" + backlink_str
@@ -447,18 +724,67 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
     return modified
 
 
-_PATH_ARG = typer.Argument(Path("./research/"), help="File or directory to validate")
-_JSON_OPT = typer.Option(False, "--json", help="Output machine-readable JSON")
-_VERBOSE_OPT = typer.Option(False, "--verbose", help="Show per-file detail")
+def _collect_deduped_files(paths: list[Path]) -> list[Path]:
+    """Collect files from all paths, preserving order and deduplicating.
+
+    Args:
+        paths: Files or directories to collect from.
+
+    Returns:
+        Ordered, deduplicated list of matching research files.
+    """
+    seen: set[Path] = set()
+    files: list[Path] = []
+    for p in paths:
+        for f in collect_files(p):
+            if f not in seen:
+                seen.add(f)
+                files.append(f)
+    return files
+
+
+def _print_text_report(entries: list[dict[str, Any]], total_errors: int, total_warnings: int, verbose: bool) -> None:
+    """Print a human-readable validation report.
+
+    Args:
+        entries: Validated entry results.
+        total_errors: Count of error-severity issues across all entries.
+        total_warnings: Count of warning-severity issues across all entries.
+        verbose: When True, print per-file issue detail.
+    """
+    total = len(entries)
+    passed = sum(1 for e in entries if e["status"] == "pass")
+    failed = total - passed
+    print(f"Research Validation: {total} entries scanned")
+    print(f"  ✓ {passed} passed")
+    if failed > 0:
+        print(f"  ✗ {failed} failed ({total_errors} errors, {total_warnings} warnings)")
+    else:
+        print(f"  {total_warnings} warnings")
+    if verbose:
+        print()
+        for entry in entries:
+            marker = "✓" if entry["status"] == "pass" else "✗"
+            print(f"{marker} {entry['file']} [{entry['format']}]")
+            for issue in entry["issues"]:
+                severity_label = issue["severity"].upper()
+                print(f"  {severity_label}: {issue['message']}")
 
 
 @app.command()
-def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = _VERBOSE_OPT) -> None:
+def main(
+    paths: Annotated[
+        list[Path] | None, typer.Argument(help="Files or directories to validate. Defaults to ./research/")
+    ] = None,
+    output_json: Annotated[bool, typer.Option("--json", help="Output machine-readable JSON")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", help="Show per-file detail")] = False,
+) -> None:
     """Validate research entries against quality standards."""
-    research_root = path if path.is_dir() else path.parent
+    resolved = paths or [Path("./research/")]
+    research_root = _infer_research_root(resolved)
     today = datetime.now(tz=UTC).date()
 
-    files = collect_files(path)
+    files = _collect_deduped_files(resolved)
     if not files:
         if output_json:
             print(
@@ -489,22 +815,7 @@ def main(path: Path = _PATH_ARG, output_json: bool = _JSON_OPT, verbose: bool = 
         }
         print(json.dumps(result, indent=2))
     else:
-        failed = total - passed
-        print(f"Research Validation: {total} entries scanned")
-        print(f"  \u2713 {passed} passed")
-        if failed > 0:
-            print(f"  \u2717 {failed} failed ({total_errors} errors, {total_warnings} warnings)")
-        else:
-            print(f"  {total_warnings} warnings")
-
-        if verbose:
-            print()
-            for entry in entries:
-                marker = "\u2713" if entry["status"] == "pass" else "\u2717"
-                print(f"{marker} {entry['file']}")
-                for issue in entry["issues"]:
-                    severity_label = issue["severity"].upper()
-                    print(f"  {severity_label}: {issue['message']}")
+        _print_text_report(entries, total_errors, total_warnings, verbose)
 
     if total_errors > 0:
         sys.exit(1)
@@ -537,14 +848,12 @@ def check_backlinks(
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
             except (OSError, ValueError):
-                # Log to stderr and continue — do not abort the entire fix pass
                 typer.echo(
                     f"warning: could not repair {source.relative_to(vault_path)} -> {target.relative_to(vault_path)}",
                     err=True,
                 )
 
         print(f"backlinks_repaired: {repaired}")
-        # After fix, re-check asymmetries to set exit code correctly
         graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
         remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph_after)
         if remaining:

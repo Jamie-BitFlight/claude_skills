@@ -1,13 +1,5 @@
-# Composure
-
-**Quick Summary:** A Claude Code plugin enforcing code quality and architectural discipline across 7 languages (TypeScript/JavaScript, Python, Go, Rust, C/C++, Swift, Kotlin) through automated hooks, skills, a code knowledge graph, and a severity-tracked task queue.
-
-**Category:** agent-frameworks
-**Latest Version:** 1.2.20
-**Repository:** <https://github.com/hrconsultnj/composure>
-**Author:** Helder Rodrigues
-**License:** PolyForm Noncommercial 1.0.0 (free for personal/educational use; Pro license $39 one-time)
-
+---
+title: "Composure"
 ---
 
 ## Overview
@@ -307,6 +299,7 @@ claude plugin install composure@composure
 ```
 
 For Pro Patterns (private submodule):
+
 ```bash
 git submodule update --init --recursive
 ```
@@ -457,22 +450,3 @@ Composure is a reference implementation for several Claude Code agent patterns:
 | [Gstack](./gstack.md) | agent-frameworks | specialized code review skills with language-aware analysis patterns |
 
 ---
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|------------|---------------|-------------|
-| Overview | high | 2026-03-23 | 2026-06-23 |
-| Key Statistics | high | 2026-03-23 | 2026-06-23 |
-| Key Features | high | 2026-03-23 | 2026-06-23 |
-| Technical Architecture | high | 2026-03-23 | 2026-06-23 |
-| Installation & Usage | high | 2026-03-23 | 2026-06-23 |
-| Relevance to Claude Code | medium | 2026-03-23 | 2026-06-23 |
-| Limitations | medium | 2026-03-23 | 2026-06-23 |
-
-**Confidence assessment rationale:**
-
-- **High confidence sections:** Overview, features, architecture, and installation sourced directly from official README.md, plugin.json manifest, and source code inspection. All version numbers and counts verified from repository state (v1.2.20, 8 hooks, 7 languages, 7 MCP tools).
-- **Medium confidence sections:** Relevance and limitations are interpretive. Relevance is based on reading features but not hands-on testing. Limitations sourced from README constraints section and inferred from architecture (some limitations not explicitly documented).
-
-**Data freshness:** README.md last updated 2026-03-19 (contributing guide added). Plugin version stable at 1.2.20 as of 2026-03-23.

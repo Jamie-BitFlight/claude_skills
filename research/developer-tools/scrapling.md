@@ -1,11 +1,13 @@
-# Scrapling
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/D4Vinci/Scrapling>
-**GitHub Repository**: <https://github.com/D4Vinci/Scrapling>
-**Version at Research**: v0.4
-**License**: BSD-3-Clause
-
+---
+title: "Scrapling"
+research_date: "2026-02-26"
+source_url: "https://github.com/D4Vinci/Scrapling"
+github_url: "https://github.com/D4Vinci/Scrapling"
+version_at_research: "v0.4"
+license: "BSD-3-Clause"
+last_verified: "2026-02-26"
+version_at_verification: "v0.4"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -252,11 +254,3 @@ scrapling extract stealthy-fetch 'https://nopecha.com/demo/cloudflare' out.html 
 - [Official Documentation](https://scrapling.readthedocs.io/en/latest/) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v0.4 |
-| Next Review Recommended | 2026-05-26 |

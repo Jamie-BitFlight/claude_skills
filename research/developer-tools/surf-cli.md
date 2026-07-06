@@ -1,11 +1,13 @@
-# surf-cli
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/nicobailon/surf-cli>
-**GitHub Repository**: <https://github.com/nicobailon/surf-cli>
-**Version at Research**: v2.6.0
-**License**: MIT
-
+---
+title: "surf-cli"
+research_date: "2026-02-26"
+source_url: "https://github.com/nicobailon/surf-cli"
+github_url: "https://github.com/nicobailon/surf-cli"
+version_at_research: "v2.6.0"
+license: "MIT"
+last_verified: "2026-02-26"
+version_at_verification: "v2.6.0"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -249,11 +251,3 @@ surf install <extension-id>
 - [npm Downloads API](https://api.npmjs.org/downloads/point/last-month/surf-cli) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v2.6.0 |
-| Next Review Recommended | 2026-05-26 |

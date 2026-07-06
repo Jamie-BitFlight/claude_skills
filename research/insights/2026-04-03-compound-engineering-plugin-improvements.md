@@ -1,12 +1,5 @@
-# Improvement Proposals: Compound Engineering Plugin
-
-**Research entry**: ./research/skill-generation-tools/compound-engineering-plugin.md
-**Generated**: 2026-04-03
-**Patterns assessed**: 6
-**Backlog items created**: 1 (issues: #1430)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Compound Engineering Plugin"
 ---
 
 ## Improvement 1: Confidence gating and deduplication pipeline for multi-agent review findings

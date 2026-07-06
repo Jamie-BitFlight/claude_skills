@@ -1,3 +1,8 @@
+---
+title: "Solace Agent Mesh"
+next_review: "2026-06-28 (3 months)"
+---
+
 # Solace Agent Mesh
 
 ## Overview
@@ -258,20 +263,3 @@ The project provides hands-on tutorials for:
 | [LiteAgents](./liteagents.md) | agent-frameworks | Multi-agent toolkit with 11 specialized agents and orchestrator agent; shares task delegation and agent-to-agent workflow patterns |
 | [CopilotKit](./copilotkit.md) | agent-frameworks | React frontend framework with AG-UI protocol for bi-directional agent-UI state sync; complements SAM's Gateway architecture for user interaction |
 | [Plano](../agent-infrastructure/plano.md) | agent-infrastructure | AI-native proxy with unified agent orchestration and model routing; addresses similar infrastructure concerns for multi-agent coordination |
-
-## Freshness Tracking
-
-**Last Researched**: 2026-03-28
-**Next Review**: 2026-06-28 (3 months)
-**Repository Last Updated**: 2026-03-27
-
-### Confidence Levels
-
-- **Identity/Metadata**: high — Official pyproject.toml, README, and LICENSE files read in full
-- **Key Features**: high — Extracted from README feature section and official architecture documentation
-- **Technical Architecture**: high — Comprehensive architecture.md document read, core dependencies verified from pyproject.toml
-- **Installation & Usage**: high — Quick start guide extracted verbatim from README with version verification
-- **Limitations**: medium — Documented limitations extracted from README and pyproject.toml; performance characteristics inferred from architecture
-- **Relevance to Claude Code**: medium — Based on alignment with Claude Code's multi-agent and MCP ecosystem; specific use case validation would require implementation experience
-
-**Sources Inaccessible**: None — all primary sources successfully accessed and read.

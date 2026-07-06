@@ -1,3 +1,7 @@
+---
+title: "Ensemble Subagent Port Checklist"
+---
+
 # Ensemble Subagent Port Checklist
 
 Date: 2026-06-07

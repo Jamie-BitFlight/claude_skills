@@ -1,11 +1,13 @@
-# Tabz — Browser Console to Terminal Forwarder
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://github.com/GGPrompts/Tabz>
-**GitHub Repository**: <https://github.com/GGPrompts/Tabz>
-**Version at Research**: v1.0.0 (package.json); CLAUDE.md documents internal version as v1.2.0; latest commit 2025-12-27 (no tagged releases)
-**License**: MIT
-
+---
+title: "Tabz — Browser Console to Terminal Forwarder"
+research_date: "2026-03-01"
+source_url: "https://github.com/GGPrompts/Tabz"
+github_url: "https://github.com/GGPrompts/Tabz"
+version_at_research: "v1.0.0 (package.json); CLAUDE.md documents internal version as v1.2.0; latest commit 2025-12-27 (no tagged releases)"
+license: "MIT"
+last_verified: "2026-03-01"
+version_at_verification: "v1.0.0 (package.json) / v1.2.0 (CLAUDE.md internal)"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -235,11 +237,3 @@ router.post('/console-log', asyncHandler(async (req, res) => {
 - [GGPrompts/Opustrator — parent project](https://github.com/GGPrompts/opustrator) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v1.0.0 (package.json) / v1.2.0 (CLAUDE.md internal) |
-| Next Review Recommended | 2026-06-01 |

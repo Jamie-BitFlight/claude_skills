@@ -1,12 +1,5 @@
-# Improvement Proposals: tori-cli
-
-**Research entry**: ./research/developer-tools/tori-cli.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 11
-**Backlog items created**: 2 (issues: #781, #782)
-**Deferred (low confidence)**: 5
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: tori-cli"
 ---
 
 ## Improvement 1: Declarative condition syntax for task readiness and acceptance criteria

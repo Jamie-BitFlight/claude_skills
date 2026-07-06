@@ -583,19 +583,29 @@ class GitHubGistArtifactProvider:
                 Not used in the Gist filename — *path* is the unique key.
             path: Repo-relative artifact path, e.g. ``plan/architect-foo.md``.
             content: Full artifact content to store.
+
+        Raises:
+            backlog_core.models.GitHubUnavailableError: When ``GITHUB_TOKEN``
+                is not set.
+            backlog_core.models.BacklogError: On GraphQL API or gist-scope
+                failures.
         """
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
-        repo = get_github(self._repo)
-        owner, repo_name = self._repo.split("/", 1)
-        issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
-        body = issue.get("body") or ""
+        try:
+            repo = get_github(self._repo)
+            owner, repo_name = self._repo.split("/", 1)
+            issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
+            body = issue.get("body") or ""
 
-        gist = self._get_gist(item_id, body)
-        if gist is None:
-            gist = self._create_and_link_gist(item_id, issue["id"], body, {"manifest.json": InputFileContent("{}")})
+            gist = self._get_gist(item_id, body)
+            if gist is None:
+                gist = self._create_and_link_gist(item_id, issue["id"], body, {"manifest.json": InputFileContent("{}")})
 
-        filename = _sanitize_gist_filename(path)
-        gist.edit(files={filename: InputFileContent(content)})
+            filename = _sanitize_gist_filename(path)
+            gist.edit(files={filename: InputFileContent(content)})
+        except GithubException as exc:
+            msg = f"GitHub API error storing artifact content for item #{item_id}: {exc}"
+            raise BacklogError(msg) from exc
 
     def read_artifact_content_from_remote(self, item_id: ItemId, artifact_type: str, path: str) -> str | None:
         """Read artifact content from the linked Gist.

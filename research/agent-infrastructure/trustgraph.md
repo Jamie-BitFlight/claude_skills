@@ -1,11 +1,6 @@
-# TrustGraph: Context Development Platform
-
-**Project**: TrustGraph AI
-**Repository**: <https://github.com/trustgraph-ai/trustgraph>
-**License**: Apache License 2.0
-**Language**: Python
-**Latest Update**: 2026-03-28
-
+---
+title: "TrustGraph: Context Development Platform"
+license: "Apache License 2.0"
 ---
 
 ## Overview
@@ -438,22 +433,3 @@ TrustGraph handles images, videos, and audio alongside text. Agents building vis
 - **Blog**: <https://blog.trustgraph.ai/subscribe>
 
 ---
-
-## Freshness Tracking
-
-| Section | Confidence | Last Verified | Next Review |
-|---------|-----------|---------------|------------|
-| **Identity/Metadata** | high | 2026-03-28 | 2026-06-28 |
-| **Key Features** | high | 2026-03-28 | 2026-06-28 |
-| **Technical Architecture** | high | 2026-03-28 | 2026-06-28 |
-| **Installation & Usage** | high | 2026-03-28 | 2026-06-28 |
-| **Relevance to Claude Code** | high | 2026-03-28 | 2026-06-28 |
-| **Limitations** | medium | 2026-03-28 | 2026-06-28 |
-
-**Confidence Rationale**:
-- Identity/Metadata: GitHub API + live repository inspection (high)
-- Key Features: README and tech specs read in full (high)
-- Architecture: Foundation document fully read, design decisions explicit in source (high)
-- Installation: Quickstart and Python API docs fully read (high)
-- Relevance: Assessed from feature set and primary documentation (high)
-- Limitations: Source specifications and performance optimization docs reviewed; some edge cases explicitly noted as undocumented (medium)

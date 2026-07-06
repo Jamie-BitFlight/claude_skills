@@ -1,11 +1,13 @@
-# psmux
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://github.com/marlocarlo/psmux>
-**GitHub Repository**: <https://github.com/marlocarlo/psmux>
-**Version at Research**: v0.4.7
-**License**: MIT
-
+---
+title: "psmux"
+research_date: "2026-03-01"
+source_url: "https://github.com/marlocarlo/psmux"
+github_url: "https://github.com/marlocarlo/psmux"
+version_at_research: "v0.4.7"
+license: "MIT"
+last_verified: "2026-03-01"
+version_at_verification: "v0.4.7"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -213,11 +215,3 @@ psmux capture-pane -t build:0.0 -p
 - [tppanel — Tmux Plugin Panel](https://github.com/marlocarlo/tppanel) (referenced in README, accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v0.4.7 |
-| Next Review Recommended | 2026-06-01 |

@@ -1,12 +1,5 @@
-# Improvement Proposals: Emqutiti
-
-**Research entry**: ./research/developer-tools/emqutiti.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: Emqutiti"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

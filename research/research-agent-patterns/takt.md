@@ -1,11 +1,13 @@
-# TAKT (TAKT Agent Koordination Topology)
-
-**Research Date**: 2026-03-28
-**Source URL**: <https://github.com/nrslib/takt>
-**GitHub Repository**: <https://github.com/nrslib/takt>
-**Version at Research**: 0.33.2
-**License**: MIT
-
+---
+title: "TAKT (TAKT Agent Koordination Topology)"
+research_date: "2026-03-28"
+source_url: "https://github.com/nrslib/takt"
+github_url: "https://github.com/nrslib/takt"
+version_at_research: "0.33.2"
+license: "MIT"
+last_verified: "2026-03-28"
+version_at_verification: "0.33.2"
+next_review: "2026-06-28"
 ---
 
 ## Overview
@@ -402,17 +404,6 @@ movements:
 - [TAKT CHANGELOG](https://raw.githubusercontent.com/nrslib/takt/main/CHANGELOG.md) (accessed 2026-03-28)
 - [TAKT package.json](https://raw.githubusercontent.com/nrslib/takt/main/package.json) (accessed 2026-03-28)
 - [TAKT LICENSE (MIT)](https://raw.githubusercontent.com/nrslib/takt/main/LICENSE) (accessed 2026-03-28)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-28 |
-| Version at Verification | 0.33.2 |
-| Next Review Recommended | 2026-06-28 |
-| Confidence Map | Overview: high (doc read) • Problem Addressed: high (doc + README) • Key Statistics: high (GitHub API) • Key Features: high (doc + code-read) • Technical Architecture: high (CLAUDE.md + code-read) • Installation & Usage: high (README + code read) • Relevance: medium (inferred from architecture) |
 
 ---
 

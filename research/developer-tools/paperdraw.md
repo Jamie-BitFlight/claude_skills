@@ -1,11 +1,13 @@
-# PaperDraw
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://paperdraw.dev/>
-**GitHub Repository**: Not publicly available (closed-source / proprietary)
-**Version at Research**: Unknown (side project / active development)
-**License**: Proprietary (free to use, no open-source license identified)
-
+---
+title: "PaperDraw"
+research_date: "2026-02-23"
+source_url: "https://paperdraw.dev/"
+github_url: "Not publicly available (closed-source / proprietary)"
+version_at_research: "Unknown (side project / active development)"
+license: "Proprietary (free to use, no open-source license identified)"
+last_verified: "2026-02-23"
+version_at_verification: "Unknown (active development, no versioning scheme identified)"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -151,11 +153,3 @@ Scenario 4: Latency injection  → understand why timeouts, circuit breakers, an
 - [Top 7 Tools for Creating System Design Diagrams — designgurus.io](https://www.designgurus.io/blog/top-7-tools-for-creating-system-design-diagrams) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | Unknown (active development, no versioning scheme identified) |
-| Next Review Recommended | 2026-05-23 |

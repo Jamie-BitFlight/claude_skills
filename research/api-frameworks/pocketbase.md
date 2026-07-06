@@ -1,11 +1,13 @@
-# PocketBase
-
-**Research Date**: 2026-04-11
-**Source URL**: <https://pocketbase.io>
-**GitHub Repository**: <https://github.com/pocketbase/pocketbase>
-**Version at Research**: v0.36.9
-**License**: MIT
-
+---
+title: "PocketBase"
+research_date: "2026-04-11"
+source_url: "https://pocketbase.io"
+github_url: "https://github.com/pocketbase/pocketbase"
+version_at_research: "v0.36.9"
+license: "MIT"
+last_verified: "2026-04-11"
+version_at_verification: "v0.36.9"
+next_review: "2026-07-11"
 ---
 
 ## Overview
@@ -252,40 +254,3 @@ func main() {
 **Research Method**: Information gathered from official website, GitHub repository README and go.mod source, GitHub API (stars, forks, language, creation date, latest release), official documentation (collections, authentication), and latest release page. Shallow clone of repository at ./.worktrees/pocketbase used for version verification.
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-11 |
-| Version at Verification | v0.36.9 |
-| GitHub Stars | 57,533 (as of 2026-04-11) |
-| Next Review Recommended | 2026-07-11 |
-
-**Confidence Summary**:
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Identity/Metadata | high | Official sources, exact version and date from GitHub API |
-| Key Statistics | high | GitHub API — stars, forks, version, release date verified 2026-04-11 |
-| Features | high | Official documentation and README, no breaking changes since last review |
-| Technical Architecture | high | Source code inspection (go.mod, main.go examples), Go version 1.25+ confirmed |
-| Installation & Usage | high | Official examples from repository and release pages, tested against v0.36.9 |
-| Limitations | high | Documented in official README warning note, source code patterns confirmed |
-
-**What Changed Since 2026-02-23**:
-
-- Version: v0.36.5 → v0.36.9 (minor patch releases, 2 months of incremental improvements)
-- GitHub Stars: 56,299 → 57,533 (+1,234 stars, 2.2% growth)
-- GitHub Forks: 3,141 → 3,277 (+136 forks)
-- Go requirement: 1.23+ → 1.25.0 (updated in latest version)
-- SQLite library: modernc.org/sqlite (previous version not documented) → modernc.org/sqlite 1.48.2 (security/stability updates)
-- Content: No API changes, architecture unchanged, Limitations section added (depth requirement)
-
-**Review Triggers**:
-
-- v1.0 stable release (currently pre-1.0 with active development)
-- Major auth or collection API breaking changes
-- GitHub stars milestone (60K, 70K)
-- New official SDK language support
-- S3-compatible storage provider changes

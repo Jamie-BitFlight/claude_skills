@@ -1,13 +1,7 @@
-# Boneyard — Pixel-Perfect Skeleton Loading Screens
-
-**Version**: 1.5.1
-**Repository**: <https://github.com/0xGF/boneyard>
-**NPM**: <https://www.npmjs.org/package/boneyard-js>
-**License**: MIT
-**Research Date**: 2026-04-03
-**Last Updated**: 2026-04-03
-**Next Review Recommended**: 2026-07-03
-
+---
+title: "Boneyard — Pixel-Perfect Skeleton Loading Screens"
+research_date: "2026-04-03"
+license: "MIT"
 ---
 
 ## Overview
@@ -52,6 +46,7 @@ Boneyard solves this by:
 **Mechanism**: The `snapshotBones()` function walks the rendered DOM tree, reads `getBoundingClientRect()` on every visible leaf element and container, and stores positions as a flat array.
 
 **Example usage**:
+
 ```typescript
 import { snapshotBones } from 'boneyard-js'
 const bones = snapshotBones(document.querySelector('.my-card'))
@@ -73,6 +68,7 @@ const bones = snapshotBones(document.querySelector('.my-card'))
 **Mechanism**: The `<Skeleton>` component conditionally renders either the skeleton (gray bone rectangles with pulse animation) or the real content based on the `loading` prop. It auto-detects dark mode, tracks container resize, and picks the correct breakpoint from pre-generated bones.
 
 **Example usage**:
+
 ```tsx
 import { Skeleton } from 'boneyard-js/react'
 
@@ -103,6 +99,7 @@ function BlogCard({ post, isLoading }) {
 **Mechanism**: The `npx boneyard-js build` command launches a dev server, uses Playwright to navigate to each component route, injects the snapshot function into the page, and writes bones to `./src/bones/registry.ts`.
 
 **Usage**:
+
 ```bash
 npx boneyard-js build                           # Auto-detect dev server
 npx boneyard-js build http://localhost:3000    # Explicit URL
@@ -114,6 +111,7 @@ npx boneyard-js build --breakpoints 390,820,1440 --out ./public/bones
 - `src/bones/registry.ts` — auto-generated import of all bone files
 
 **App setup** (one-time):
+
 ```tsx
 // app/layout.tsx
 import './bones/registry'  // Populates the bones registry
@@ -128,6 +126,7 @@ import './bones/registry'  // Populates the bones registry
 **Default breakpoints**: 375px (mobile), 768px (tablet), 1024px (desktop)
 
 **Example**:
+
 ```typescript
 const descriptor = extractResponsive(element, [375, 768, 1280])
 // Returns: { 375: SkeletonDescriptor, 768: SkeletonDescriptor, 1280: SkeletonDescriptor }
@@ -147,6 +146,7 @@ const descriptor = extractResponsive(element, [375, 768, 1280])
 **Use case**: Pre-compute bones at build time without a DOM or browser.
 
 **Example**:
+
 ```typescript
 import { computeLayout, renderBones } from 'boneyard-js'
 
@@ -233,6 +233,7 @@ const html = renderBones(bones)  // Render to HTML string
 - `captureRoundedBorders` — include containers with visible rounded borders even if background is white (default: true)
 
 Pass via:
+
 ```tsx
 <Skeleton snapshotConfig={{ excludeTags: ['nav'], excludeSelectors: ['.icon'] }}>
   <MyComponent />
@@ -245,6 +246,7 @@ Pass via:
 - `animate` — enable/disable pulse animation (default: true)
 
 **Manual Bone Supply** via `initialBones` prop:
+
 ```tsx
 import bones from './src/bones/blog-card.bones.json'
 <Skeleton loading={isLoading} initialBones={bones}>
@@ -424,28 +426,3 @@ Boneyard is relevant to Claude Code in the following scenarios:
 | [CopilotKit](../agent-frameworks/copilotkit.md) | agent-frameworks | React-first framework with bi-directional state sync; skeleton screens complement Copilot UI for loading state visualization during agent operations |
 
 ---
-
-## Freshness Tracking
-
-**Last researched**: 2026-04-03
-**Next review**: 2026-07-03
-
-### Confidence Summary
-
-| Section | Confidence | Notes |
-|---------|------------|-------|
-| Identity/Metadata | high | npm registry and local package.json read in full; version, license, description confirmed |
-| Key Features | high | All features extracted from source code with exact line references; algorithms traced through implementation |
-| Technical Architecture | high | Core components and data flow reverse-engineered from source; types and function signatures exact |
-| Installation & Usage | high | Examples extracted from README and official source code; commands and patterns verified |
-| Limitations | medium | Documented limitations are minimal; inferred limitations based on code inspection (not explicitly stated in docs) |
-| Relevance to Claude Code | medium | Use cases are plausible but not validated against actual Claude Code workflows; relevance is inferred from feature set |
-
-### Data Changes Since Last Research
-
-N/A — first research entry.
-
----
-
-**Research completed by Research Curator Agent**
-**Methodology**: Shallow repository clone, Phase 1 extractive read (README, package.json, core source files), no Phase 1b code analysis required (doc sufficiency check passed: features and architecture named with specific components and data flow).

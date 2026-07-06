@@ -177,11 +177,13 @@ See [Build from Source Documentation](https://esp-claw.com/en/reference-project/
 ### Example: Creating an Automation via Chat
 
 **User types on Telegram**:
+
 ```
 @MyDeviceBot turn on the LED when someone walks in
 ```
 
 **Device response**:
+
 ```
 I've set up a motion sensor automation. When movement is detected, the LED turns on.
 The LED will stay on for 2 minutes without new motion. Say "adjust the timeout to 5 minutes" to change it.
@@ -190,6 +192,7 @@ The LED will stay on for 2 minutes without new motion. Say "adjust the timeout t
 **Behind the scenes**:
 1. LLM receives user message + system prompt with hardware tools + lightweight memory summary
 2. LLM generates Lua script:
+
    ```lua
    local motion_sensor = GPIO:new(17)
    local led = PWM:new(pin=16, freq=1000)
@@ -201,6 +204,7 @@ The LED will stay on for 2 minutes without new motion. Say "adjust the timeout t
 
    motion_sensor:on_rising_edge(on_motion_detected)
    ```
+
 3. LLM returns script + explanation to device
 4. Device persists script to flash under a unique ID
 5. Script executes immediately; motion events trigger `on_motion_detected()` locally

@@ -1,11 +1,13 @@
-# Superset
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://superset.sh>
-**GitHub Repository**: <https://github.com/superset-sh/superset>
-**Version at Research**: v1.0.5 (desktop-v1.0.5)
-**License**: Apache 2.0
-
+---
+title: "Superset"
+research_date: "2026-03-04"
+source_url: "https://superset.sh"
+github_url: "https://github.com/superset-sh/superset"
+version_at_research: "v1.0.5 (desktop-v1.0.5)"
+license: "Apache 2.0"
+last_verified: "2026-03-04"
+version_at_verification: "desktop-v1.0.5"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -209,11 +211,3 @@ SOURCE: [Superset Installation Docs](https://superset.sh/docs) (accessed 2026-03
 - [GitHub Releases — superset-sh/superset](https://github.com/superset-sh/superset/releases) (accessed 2026-03-04)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | desktop-v1.0.5 |
-| Next Review Recommended | 2026-06-04 |

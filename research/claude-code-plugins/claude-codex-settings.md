@@ -1,11 +1,13 @@
-# claude-codex-settings
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://github.com/fcakyon/claude-codex-settings>
-**GitHub Repository**: <https://github.com/fcakyon/claude-codex-settings>
-**Version at Research**: v2.2.0
-**License**: Apache-2.0
-
+---
+title: "claude-codex-settings"
+research_date: "2026-03-06"
+source_url: "https://github.com/fcakyon/claude-codex-settings"
+github_url: "https://github.com/fcakyon/claude-codex-settings"
+version_at_research: "v2.2.0"
+license: "Apache-2.0"
+last_verified: "2026-03-06"
+version_at_verification: "v2.2.0"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -195,11 +197,3 @@ export ANTHROPIC_MODEL=kimi-k2-thinking-turbo
 - Local worktree at `.worktrees/claude-codex-settings/` — files: `README.md`, `.claude/settings.json`, `.claude/settings-zai.json`, `.codex/config.toml`, `.claude-plugin/marketplace.json`
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | v2.2.0 |
-| Next Review Recommended | 2026-06-06 |

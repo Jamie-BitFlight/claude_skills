@@ -1,7 +1,5 @@
-# CUA Utilization Assessment
-**Date:** 2026-05-03
-**Subject:** Computer-Use Agents (CUA) Integration Opportunities for Claude Skills Repository
-
+---
+title: "CUA Utilization Assessment"
 ---
 
 ## STATUS: has_utilization_surface

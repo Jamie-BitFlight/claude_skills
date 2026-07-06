@@ -1,12 +1,5 @@
-# Improvement Proposals: Anything About Game AI Resources
-
-**Research entry**: ./research/developer-tools/anything_about_game_ai_resources.md
-**Generated**: 2026-03-24
-**Patterns assessed**: 9
-**Backlog items created**: 0
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 7
-
+---
+title: "Improvement Proposals: Anything About Game AI Resources"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

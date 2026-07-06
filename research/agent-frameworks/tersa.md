@@ -1,11 +1,13 @@
-# Tersa
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://vercel.com/templates/next.js/tersa-ai-workflow-canvas>
-**GitHub Repository**: <https://github.com/vercel-labs/tersa>
-**Version at Research**: v2.0.0
-**License**: MIT
-
+---
+title: "Tersa"
+research_date: "2026-03-06"
+source_url: "https://vercel.com/templates/next.js/tersa-ai-workflow-canvas"
+github_url: "https://github.com/vercel-labs/tersa"
+version_at_research: "v2.0.0"
+license: "MIT"
+last_verified: "2026-03-06"
+version_at_verification: "v2.0.0"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -189,16 +191,6 @@ const { text } = await generateText({
 - [Tersa Agent PR #111 — feat: add Tersa Agent](https://github.com/vercel-labs/tersa/pull/111) (accessed 2026-03-06)
 - [Tersa v2.0.0 Release Notes](https://github.com/vercel-labs/tersa/releases/tag/v2.0.0) (accessed 2026-03-06)
 - [BrightCoding — Tersa: The Visual AI Playground Every Developer Needs](https://www.blog.brightcoding.dev/2026/02/15/tersa-the-visual-ai-playground-every-developer-needs) (accessed 2026-03-06)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | v2.0.0 |
-| Next Review Recommended | 2026-06-06 |
 
 ---
 

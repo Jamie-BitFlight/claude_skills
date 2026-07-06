@@ -1,12 +1,5 @@
-# Improvement Proposals: Obsidian Skills
-
-**Research entry**: ./research/skill-generation-tools/obsidian-skills.md
-**Generated**: 2026-03-12
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Obsidian Skills"
 ---
 
 ## Improvement 1: Explicit Assumed Knowledge Declaration in Skill Template

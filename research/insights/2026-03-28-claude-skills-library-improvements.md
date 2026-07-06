@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Skills Library (alirezarezvani/claude-skills)
-
-**Research entry**: ./research/skill-generation-tools/claude-skills-library.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 4
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: Claude Skills Library (alirezarezvani/claude-skills)"
 ---
 
 ## Improvement 1: Formal skill quality scoring pipeline

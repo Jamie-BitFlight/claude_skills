@@ -1,12 +1,5 @@
-# Improvement Proposals: Huashu Design
-
-**Research entry**: ./research/ai-design-tools/huashu-design.md
-**Generated**: 2026-05-03
-**Patterns assessed**: 7
-**Backlog items created**: 2 (issues: #2102, #2103)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or out of scope)**: 2
-
+---
+title: "Improvement Proposals: Huashu Design"
 ---
 
 ## Improvement 1: Add proactive WebSearch trigger when prompts mention specific named products/technologies/versions

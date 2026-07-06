@@ -1,12 +1,12 @@
-# OpenSpec MCP (openspec-mcp)
-
-**Research Date**: 2026-04-29
-**Source URL**: <https://github.com/iflow-mcp/lumiaqian-openspec-mcp>
-**Upstream Repository**: <https://github.com/Lumiaqian/openspec-mcp>
-**npm Package**: <https://www.npmjs.com/package/openspec-mcp>
-**Version at Research**: v0.4.2
-**License**: MIT
-
+---
+title: "OpenSpec MCP (openspec-mcp)"
+research_date: "2026-04-29"
+source_url: "https://github.com/iflow-mcp/lumiaqian-openspec-mcp"
+version_at_research: "v0.4.2"
+license: "MIT"
+last_verified: "2026-04-29"
+version_at_verification: "v0.4.2"
+next_review: "2026-07-29"
 ---
 
 ## Overview
@@ -209,22 +209,6 @@ SOURCE: [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main
 - [GitHub API repo metadata](https://api.github.com/repos/Lumiaqian/openspec-mcp) (accessed 2026-04-29)
 - [GitHub releases v0.4.2](https://github.com/Lumiaqian/openspec-mcp/releases/tag/v0.4.2) (accessed 2026-04-29)
 - [npm downloads API](https://api.npmjs.org/downloads/point/last-week/openspec-mcp) (accessed 2026-04-29)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-29 |
-| Version at Verification | v0.4.2 |
-| Days Since Last Release | 107 days (latest: 2026-01-12) |
-| Confidence: Statistics | high |
-| Confidence: Features | high |
-| Confidence: Architecture | high |
-| Confidence: Usage Examples | high |
-| Confidence: Limitations | medium |
-| Next Review Recommended | 2026-07-29 |
 
 ---
 

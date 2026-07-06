@@ -133,6 +133,7 @@ or
 ### Usage Example
 
 **User Request:**
+
 ```
 Write a 3P update for the Platform team covering the week of May 3-9.
 Progress: shipped async task queuing, fixed 3 critical bugs.

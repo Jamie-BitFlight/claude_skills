@@ -1,11 +1,5 @@
-# Utilization Proposals: DuckDB Python Client
-
-**Research entry**: ./research/database-libraries/duckdb-python-client.md
-**Generated**: 2026-04-12
-**Integration surfaces found**: 1 (SDK — pip package)
-**Proposals written**: 0
-**Skipped**: 7 — no overlap with analytical data processing workflows
-
+---
+title: "Utilization Proposals: DuckDB Python Client"
 ---
 
 ## Integration Surface Identified
@@ -106,4 +100,3 @@ No workflow scripts discovered that process CSV, Parquet, JSON data sources or e
 - An integration between backlog analytics and DuckDB queries on milestone/issue data
 
 These capabilities do not currently exist in the repository.
-

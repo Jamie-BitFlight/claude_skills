@@ -59,17 +59,21 @@ The DuckDB Python client solves several pain points in analytical data processin
 The Python client exposes two primary entry points:
 
 **Global default connection** (via `duckdb.sql()`):
+
 ```python
 import duckdb
 duckdb.sql("SELECT 42").show()
 ```
+
 Executes queries on an in-memory database stored globally within the Python module. Suitable for ad-hoc queries and prototyping.
 
 **Persistent database connections** (via `duckdb.connect()`):
+
 ```python
 conn = duckdb.connect('my_database.duckdb')
 result = conn.execute("SELECT * FROM my_table").fetchall()
 ```
+
 Creates a connection to a persistent database file. Data written through the connection is immediately persisted and can be reloaded by reconnecting to the same file from any DuckDB client.
 
 ### 2. Relational API
@@ -91,6 +95,7 @@ The client natively reads and writes:
 ### 4. Python User-Defined Functions (UDFs)
 
 The `@duckdb.create_function` decorator allows users to define custom functions in Python that execute within the SQL engine:
+
 ```python
 @duckdb.create_function
 def my_custom_function(x):
@@ -150,6 +155,7 @@ Represents a relation (table, query result, or DataFrame). Supports:
 
 **4. DB-API 2.0 Compliance (`cursor` API)**
 The `connection.cursor()` method returns a cursor object that implements PEP 249 (DB-API 2.0), allowing compatibility with existing Python database tooling:
+
 ```python
 cursor = conn.cursor()
 cursor.execute("SELECT * FROM table")
@@ -169,6 +175,7 @@ rows = cursor.fetchall()
 ### Extension Mechanism
 
 Extensions are loaded via SQL:
+
 ```sql
 INSTALL json;
 LOAD json;
@@ -187,6 +194,7 @@ pip install duckdb
 ```
 
 For optional dependencies (e.g., Polars integration, community extensions):
+
 ```bash
 pip install 'duckdb[all]'
 ```
@@ -194,6 +202,7 @@ pip install 'duckdb[all]'
 ### Basic Usage
 
 **1. Simple query execution:**
+
 ```python
 import duckdb
 
@@ -204,6 +213,7 @@ duckdb.sql("SELECT 42 AS answer").show()
 ```
 
 **2. Persistent database:**
+
 ```python
 conn = duckdb.connect('my_database.duckdb')
 conn.execute("CREATE TABLE numbers (id INTEGER, value DOUBLE)")
@@ -212,6 +222,7 @@ conn.execute("SELECT * FROM numbers WHERE value > 3").show()
 ```
 
 **3. Working with DataFrames:**
+
 ```python
 import pandas as pd
 
@@ -221,6 +232,7 @@ print(result)
 ```
 
 **4. Reading remote Parquet files:**
+
 ```python
 result = duckdb.sql(
     "SELECT COUNT(*) FROM 's3://my-bucket/data.parquet'"
@@ -228,6 +240,7 @@ result = duckdb.sql(
 ```
 
 **5. User-defined function:**
+
 ```python
 @duckdb.create_function
 def double(x):
@@ -237,6 +250,7 @@ duckdb.sql("SELECT double(5)").show()
 ```
 
 **6. Exception handling:**
+
 ```python
 from duckdb import ParserException, CatalogException
 
@@ -318,6 +332,7 @@ Claude Code workflows can use DuckDB's in-memory mode for:
 ### 4. Data Validation Automation
 
 Agents can build validation pipelines:
+
 ```python
 conn = duckdb.connect(':memory:')
 conn.execute("CREATE TABLE raw_data AS SELECT * FROM 'input.csv'")

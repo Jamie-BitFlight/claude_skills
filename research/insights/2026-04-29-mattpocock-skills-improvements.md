@@ -1,12 +1,5 @@
-# Improvement Proposals: mattpocock/skills
-
-**Research entry**: ./research/skill-generation-tools/mattpocock-skills.md
-**Generated**: 2026-04-29
-**Patterns assessed**: 5
-**Backlog items created**: 4 (to be created via /dh:create-backlog-item)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 0
-
+---
+title: "Improvement Proposals: mattpocock/skills"
 ---
 
 ## Improvement 1: Add Anti-Pattern section to skill template and training

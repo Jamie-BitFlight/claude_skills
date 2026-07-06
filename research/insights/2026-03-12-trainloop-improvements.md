@@ -1,12 +1,5 @@
-# Improvement Proposals: TrainLoop
-
-**Research entry**: ./research/ml-infrastructure/trainloop.md
-**Generated**: 2026-03-12
-**Patterns assessed**: 6
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 6
-
+---
+title: "Improvement Proposals: TrainLoop"
 ---
 
 ## Skipped Patterns

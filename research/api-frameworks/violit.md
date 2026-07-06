@@ -58,6 +58,7 @@ Violit solves this by inverting the architecture: instead of rerunning the entir
 Violit's core innovation is replacing Streamlit's full-rerun model with a reactive state system inspired by frontend frameworks like SolidJS and Signals.
 
 **Extract from `src/violit/state.py` (lines 106-139)**:
+
 ```python
 class State:
     def __init__(self, name: str, default_value: Any):
@@ -163,6 +164,7 @@ The reactive foundation consists of two primary classes:
 - **`ComputedState`**: Derived state computed from one or more `State` objects. Automatically recalculates when dependencies change. Example: `computed_total = count * 2` creates a `ComputedState` that updates whenever `count` changes.
 
 **Session Storage Model** (from `state.py` lines 34-81):
+
 ```python
 STATIC_STORE = {}  # Static components (built once at app init)
 GLOBAL_STORE = TTLCache(maxsize=1000, ttl=1800)  # User sessions (1800s TTL)
@@ -289,6 +291,7 @@ pip install git+https://github.com/violit-dev/violit.git
 **Python Version**: Requires Python 3.10+. Tested on 3.10, 3.11, 3.12.
 
 From `pyproject.toml`:
+
 ```toml
 requires-python = ">=3.10"
 ```
@@ -546,6 +549,7 @@ For autonomous agents that need to deliver standalone tools to users, the `--nat
 - Community plugin ecosystem is nascent (no third-party widget packages found).
 
 From `pyproject.toml`:
+
 ```python
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",

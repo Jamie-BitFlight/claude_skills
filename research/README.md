@@ -22,7 +22,8 @@ research/
 │   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
 │   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
 │   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
-│   └── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
+│   ├── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
+│   └── flue.md                       # TypeScript agent harness framework — durable-first execution, sandboxes, skills, MCP, subagent delegation, 20+ channel integrations (Apache-2.0, v1.0.0-beta.9)
 ├── claude-code-plugins/               # Claude Code plugin ecosystems and configuration repositories
 │   └── claude-codex-settings.md      # Battle-tested Claude Code plugin ecosystem: 17 plugins, 9 MCP integrations, multi-LLM backend configs (Z.ai, Kimi K2, ccproxy) (452 stars)
 ├── agent-infrastructure/              # Infrastructure for agentic applications
@@ -316,6 +317,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | [mcpskills-cli.md](./mcp-ecosystem/mcpskills-cli.md)         | mcpskills-cli — CLI converting MCP server tools to static SKILL.md files in bash/python/node/go/rust; credential storage, Jinja2 templates, single or per-tool output (14 stars) | 2026-03-13   |
 | [gitnexus.md](./mcp-ecosystem/gitnexus.md)                   | GitNexus — graph-based code intelligence MCP server with 7 tools (query, context, impact, detect_changes, rename, cypher), 13-language support, precomputed clustering, Claude Code hooks integration (17.5K stars) | 2026-03-19   |
 | [codegraphcontext.md](./mcp-ecosystem/codegraphcontext.md)   | CodeGraphContext (CGC) — repository-to-graph tool with 20+ MCP tools, Tree-Sitter AST parsing, Cypher queries, KùzuDB default, 14-language support, CLI + MCP server dual mode, caller/callee analysis, dead code detection (v0.4.0 alpha) | 2026-04-08   |
+| [repowise.md](./mcp-ecosystem/repowise.md) | Repowise v0.20.0 — Python 3.11+ code intelligence MCP with 9 task-shaped tools; 25-biomarker code-health scoring (AUC 0.731 defect prediction), 5 intelligence layers (graph/git/docs/decisions/health), −96% tokens vs raw exploration; Claude Code marketplace plugin available (AGPL-3.0) | 2026-06-18 |
 
 **Key Topics**:
 
@@ -400,7 +402,7 @@ Tools and services that automate the creation of AI skills from documentation, c
 | [composio-codebase-migrate.md](./skill-generation-tools/composio-codebase-migrate.md) | Composio Codebase Migrate — Codex skill for large-scale multi-file refactors batched into ~25-file PRs with Composio CLI issue tracking, checkpoint validation, and parallel reviewable batches | 2026-05-10   |
 | [awesome-codex-skills-issue-triage.md](./skill-generation-tools/awesome-codex-skills-issue-triage.md) | Awesome Codex Skills Issue Triage — Codex skill for bulk issue triage and deduplication across Linear and Jira via Composio CLI; supports relabeling, reassignment, and summary posting | 2026-05-10   |
 | [codebase-recon-skill.md](./skill-generation-tools/codebase-recon-skill.md) | Codebase Recon Skill — git history analysis across seven dimensions (health, risk, team structure, momentum) before reading any code; multi-agent compatible, agent-skills-spec compliant | 2026-05-10   |
-| [agent-skills.md](./skill-generation-tools/agent-skills.md) | Agent Skills (Addy Osmani) — 37K-star production-grade skills library for AI coding agents; structured workflows following Google software engineering culture with senior engineer practices (MIT, v1.0.0) | 2026-05-10   |
+| [agent-skills.md](./skill-generation-tools/agent-skills.md) | Agent Skills (Addy Osmani) — 62K-star production-grade skills library for AI coding agents; 24 skills, 4 specialist personas, 8 platform integrations, `/build auto` autonomous execution (MIT, v0.6.2) | 2026-06-18   |
 | [claude-night-market.md](./skill-generation-tools/claude-night-market.md) | Claude Night Market — Claude Code plugin marketplace with 16 plugins, 126 skills, 114 commands, and 41 agents for software engineering workflows. | 2026-01-31 |
 | [compound-engineering-plugin.md](./skill-generation-tools/compound-engineering-plugin.md) | Compound Engineering Plugin — AI development toolkit emphasizing planning, review, and systematic execution across Claude Code and other coding assistants. | 2026-05-12 |
 | [frontend-slides.md](./skill-generation-tools/frontend-slides.md) | Frontend Slides — Claude Code skill for generating polished single-file HTML presentations and PowerPoint-to-HTML conversions. | 2026-02-26 |
@@ -531,6 +533,10 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [json-render.md](./agent-frameworks/json-render.md) | json-render is a TypeScript Generative UI framework by Vercel Labs that enables AI to generate dynamic, personalized user interfaces from natural language prompts while constraining output to a developer-defined component catalog. The framework uses a flat JSON spec format (element map keyed by ID) as the interface con | 2026-02-26 |
 | [mission-control.md](./agent-frameworks/mission-control.md) | **Mission Control**, publicly branded as **Autensa**, is an open-source autonomous product improvement engine that orchestrates AI agents to research, ideate, build, test, review, and deploy features end-to-end. It provides a full-stack platform for continuous product evolution with human oversight at the decision boun | 2026-05-12 |
 | [ra-aid.md](./agent-frameworks/ra-aid.md) | RA.Aid (pronounced "raid") is a standalone autonomous software development assistant built on LangGraph's agent-based task execution framework. It implements a three-stage architecture (Research,... | 2026-01-31 |
+| [kilocode.md](./agent-frameworks/kilocode.md) | Kilocode — open-source agentic engineering platform (TypeScript, 21.2K stars); unified tool for building, shipping, and iterating with AI coding agents; active development since 2025-03-10 | 2026-06-18 |
+| [omnigent.md](./agent-frameworks/omnigent.md) | Omnigent v0.1.0 (Databricks) — Python 3.12+ multi-agent harness for orchestrating Claude Code, Codex, Cursor, Pi without rewriting; unified YAML policy enforcement (ALLOW/DENY/ASK), cross-device session sync via WebSocket, MCP support (Apache 2.0) | 2026-06-18 |
+| [ponytail.md](./agent-frameworks/ponytail.md) | Ponytail v4.7.0 — "lazy senior developer mode" for AI agents; 6-rung decision ladder (YAGNI→stdlib→native→deps→one-liner→minimal code) with benchmark results: 80–94% code reduction, 42–75% cost reduction, 3–6× faster; 13 platform support (MIT) | 2026-06-18 |
+| [flue.md](./agent-frameworks/flue.md) | Flue — TypeScript agent harness framework providing durable-first execution, sandboxes, typed tools, MCP integration, subagent delegation, and 20+ channel adapters (Slack, Teams, Discord, GitHub); deploys to Node.js, Cloudflare Workers, GitHub Actions, GitLab CI/CD, Daytona, Render (Apache-2.0, v1.0.0-beta.9) | 2026-07-03 |
 
 **Key Topics**:
 
@@ -596,6 +602,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [cmux.md](./agent-infrastructure/cmux.md) | cmux — Ghostty-based macOS terminal for AI coding agents: sidebar vertical tabs, visual notification rings, in-app browser with scriptable API, CLI socket for pane automation (11.1K stars, AGPL-3.0, v0.63.0) | 2026-03-28   |
 | [empirica.md](./agent-infrastructure/empirica.md) | Empirica v1.7.7 — epistemic measurement and Sentinel gating system for autonomous AI agents: 13-vector assessment, 4-layer memory architecture, noetic-praxic gating enforces understanding before code modification, Claude Code native hooks integration | 2026-04-05   |
 | [trigger-dev.md](./agent-infrastructure/trigger-dev.md) | Trigger.dev v3 — open-source TypeScript platform for AI agents and long-running workflows: durable checkpoint-resume execution, human-in-the-loop waitpoints, real-time streaming, batch ops, concurrency control, multi-environment isolation (14.5K stars, Apache-2.0) | 2026-04-11   |
+| [iii.md](./agent-infrastructure/iii.md) | iii v0.19.4 (Motia LLC) — unified backend composition engine with "zero integration" via Worker/Function/Trigger primitives; 12 built-in modules, multi-language SDKs (Node.js/Python/Rust/Go), runtime-extensible capabilities, WebSocket protocol (18.3K stars, ELv2 engine / Apache-2.0 SDKs) | 2026-06-18 |
 
 **Key Topics**:
 
@@ -676,6 +683,7 @@ High-performance API frameworks for building backend services, tool endpoints, a
 | [modelence.md](./api-frameworks/modelence.md) | Modelence - AI-native TypeScript/Node.js backend framework with MongoDB, auth, real-time stores, WebSockets, observability, cron, rate limiting, and managed cloud deploy (YC-backed, Apache 2.0) | 2026-03-04   |
 | [violit.md](./api-frameworks/violit.md) | Violit - reactive Python web framework replacing Streamlit's full-script reruns with fine-grained state reactivity; WebSocket + HTMX dual engine; Streamlit-compatible API; desktop mode via pywebview (368 stars, MIT, v0.5.2) | 2026-04-10   |
 | [robyn.md](./api-frameworks/robyn.md) | Robyn — high-performance async Python web framework combining Python expressiveness with Rust runtime (PyO3 bindings); WebSockets, SSE, Pydantic validation, GraphQL, CORS; multi-process/multi-threaded execution model; built-in Rust server (no ASGI required) (7.2K stars) | 2026-04-12   |
+| [omniroute.md](./api-frameworks/omniroute.md) | OmniRoute — unified AI proxy aggregating 227 providers (50+ free, ~1.5B free tokens/month) into single OpenAI-compatible endpoint; 15 routing strategies, 9-engine stacked compression (78–95% token reduction), 87 MCP tools, A2A agent protocol, AES-256-GCM credential encryption (Node.js 22+, TypeScript 6.0) | 2026-06-18 |
 
 **Key Topics**:
 
@@ -962,6 +970,7 @@ Autonomous AI coding agent platforms and SDKs for building software development 
 | [soulforge.md](./coding-agents/soulforge.md) | SoulForge is a graph-powered multi-agent coding assistant that builds a live SQLite-backed dependency graph of entire codebases on startup. Instead of performing naive file reads and grep operations like traditional AI coding tools, SoulForge indexes every file, symbol, import, and export with PageRank importance ranki | 2026-04-05 |
 | [pilot-shell.md](./coding-agents/pilot-shell.md) | Pilot Shell v9.0.5 — commercial spec-driven development framework for Claude Code: `/spec` TDD workflow, `/fix` bugfix automation, `pilot bot` 24/7 background agent, RTK compression (60–90% token reduction), 7 preconfigured MCP servers, Solo/Team/Enterprise tiers (source-available) | 2026-05-25 |
 | [claude-codepro.md](./coding-agents/claude-codepro.md) | Claude CodePro v3.3.8 (maxritter) — dev environment framework for Claude Code: Alpine Linux container, Python 3.12, 5 MCP servers (Claude Mem, Claude Context, Tavily, Ref, MCP Lazy Loading), modular rules management, two-phase install, AGPL-3.0 | 2026-05-25 |
+| [opencut.md](./coding-agents/opencut.md) | OpenCut — open-source video editor (TypeScript 6.0, React 19, Cloudflare Workers, 56.4K stars); undergoing complete rewrite with planned MCP server, plugin system, Rust cross-platform core, and headless mode for AI agent integration | 2026-06-18 |
 
 **Key Topics**:
 
@@ -1008,6 +1017,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [polars-documentation.md](./data-infrastructure/polars-documentation.md) | Polars — Rust-native DataFrame engine with lazy API, expression-based parallelism, SIMD vectorization, streaming for out-of-core processing; Python/Rust/Node.js/R bindings; 70ms import time; Apache Arrow columnar format (38.1K stars, MIT) | 2026-04-12   |
 | [cocoindex.md](./data-infrastructure/cocoindex.md) | CocoIndex is an ultra-performant real-time data transformation framework for AI, with its core engine written in Rust. It makes it effortless to transform data with AI and keep source data and targets in sync, supporting incremental processing and data lineage out-of-the-box. Whether building vector indexes, knowledge  | 2026-02-23 |
 | [honker.md](./data-infrastructure/honker.md) | Honker is a SQLite extension and multi-language binding library that adds PostgreSQL-style `NOTIFY`/`LISTEN` semantics, durable pub/sub, task queues, and event streams to SQLite — without client polling, daemon/broker overhead, or separate datastore. By replacing application-level polling with a single-digit-microsecon | 2026-04-25 |
+| [helix-db.md](./data-infrastructure/helix-db.md) | HelixDB v3.0.6 — graph-vector database built in Rust; unified relational/vector/graph/KV/document storage; dynamic query builder DSL; TypeScript/Rust/Go/Python SDKs; ACID cloud deployment with 3+ node HA; MCP server via `helix chef`; containerized local dev on port 6969 (Apache-2.0) | 2026-06-18 |
 
 **Key Topics**:
 
@@ -1070,6 +1080,7 @@ Memory systems, context window optimization tools, and RAG solutions for maintai
 | [simplemem-cross.md](./context-management/simplemem-cross.md) | SimpleMem-Cross — persistent cross-conversation memory for LLM agents; SQLite + LanceDB storage, 8 MCP tools, 8 REST endpoints, automatic observation extraction, 3-tier secret redaction, memory consolidation; LoCoMo score 48 (64% over Claude-Mem); MIT License | 2026-03-19   |
 | [mempalace.md](./context-management/mempalace.md) | MemPalace — AI memory system storing verbatim transcripts in navigable palace structure; 96.6% LongMemEval recall, zero API calls, local ChromaDB + semantic search; CLI and MCP server interfaces; ~170 token wake-up context; MIT License (v3.0.0) | 2026-04-08   |
 | [microsoft-graphrag.md](./context-management/microsoft-graphrag.md) | GraphRAG is a modular graph-based Retrieval-Augmented Generation (RAG) system developed by Microsoft Research. It extracts meaningful, structured data from unstructured text using LLMs to create a... | 2026-01-31 |
+| [mex.md](./context-management/mex.md) | mex v0.6.1 — TypeScript CLI for persistent AI agent memory; ROUTER.md task-specific context routing, 11 drift checkers with 0–100 scoring, append-only event log; 100% pass rate and ~60% token savings validated on OpenClaw (Claude Code, Cursor, Windsurf, Copilot support) | 2026-06-18 |
 
 **Key Topics**:
 
@@ -1138,6 +1149,7 @@ ML compute engines, model serving platforms, and distributed computing infrastru
 | [trainloop.md](./ml-infrastructure/trainloop.md) | TrainLoop - managed RL fine-tuning platform: 3-line SDK for production signal collection, reward model training (DPO/GRPO), OpenAI-compatible deployment; 50x error reduction reported (YC W25) | 2026-03-12   |
 | [zvec.md](./ml-infrastructure/zvec.md) | zvec - Alibaba's embedded vector database built on Proxima engine; in-process SQLite-style deployment, dense+sparse vectors, Python/Node.js/C++, Apache 2.0 (8.9K stars) | 2026-03-15   |
 | [jax.md](./ml-infrastructure/jax.md) | JAX 0.9.2 — Composable transformations for Python+NumPy: JIT compilation (XLA), automatic differentiation (grad), vectorization (vmap), distributed execution (pmap); CPU/GPU/TPU/Apple Silicon support; Python 3.11+; 35.3K stars | 2026-04-12   |
+| [slime.md](./ml-infrastructure/slime.md) | slime - THUDM LLM post-training framework for RL scaling; Megatron training + SGLang rollout, Ray orchestration, agentic customization hooks, Apache 2.0 (7.1K stars) | 2026-06-29   |
 
 **Key Topics**:
 
@@ -1341,6 +1353,8 @@ Self-hosted LLM inference servers, multi-provider gateways, and LLMOps platforms
 | [glm5-exacto.md](./llm-infrastructure/glm5-exacto.md) | GLM-5:exacto — Z.ai's 744B-parameter open-source model (40B active MoE) via OpenRouter Exacto routing for tool-calling accuracy, 77.8% SWE-bench Verified, MIT license | 2026-03-18 |
 | [openbao.md](./llm-infrastructure/openbao.md) | OpenBao v2.5.2 — MPL-2.0 fork of HashiCorp Vault: centralized identity-based secrets management, 9 auth methods (JWT/Kubernetes/LDAP/AppRole), 9 secret engines (KV/PKI/Database/Transit/SSH), sdk/v2 + api/v2 for plugins (Go 1.25.6) | 2026-03-28 |
 | [bifrost.md](./llm-infrastructure/bifrost.md) | Bifrost is a high-performance open-source AI gateway written in Go that unifies access to 20+ LLM providers through a single OpenAI-compatible API. Benchmarked at <100 µs overhead per request at 5,000 RPS, it provides automatic failover, adaptive load balancing, semantic caching, MCP gateway support, and enterprise-gra | 2026-02-26 |
+| [airllm.md](./llm-infrastructure/airllm.md) | AirLLM v2.11.0 — layer-sharded streaming for 70B+ LLM inference on 4GB GPU; AutoModel dispatcher for 8 architectures (Llama/Qwen/Mistral/Mixtral etc.); optional block-wise quantization for 3× speedup; Apple Silicon MLX support; no quantization or distillation required | 2026-06-18 |
+| [quantum-free-router.md](./llm-infrastructure/quantum-free-router.md) | quantum-free-router — professional free-tier LLM router aggregating 9 providers into single OpenAI-compatible endpoint (127.0.0.1:4000); 4-tier reliability model, 14-model certified fallback chain (2026-06-11), built on Bifrost 1.5.11, systemd service with SHA256 verification | 2026-06-18 |
 
 **Key Topics**:
 
@@ -1371,6 +1385,7 @@ Interactive prompt development platforms and tools for iterating on LLM prompts,
 | [prompt-engine.md](./prompt-engineering/prompt-engine.md) | Prompt Engine — SaaS prompt generator and optimizer that converts plain-language descriptions into professional-grade prompts in < 15 seconds; includes library/tagging for reuse ($19/month) | 2026-02-23 |
 | [ctxforge.md](./prompt-engineering/ctxforge.md)           | ctxforge — protocol-based context engineering framework; 16 markdown workflows auto-loaded via intent detection (~95% accuracy); 30+ performance/quality directives; project.md cross-session memory; ~15K token overhead (7.5%); v3.1.2, 22 stars | 2026-03-17 |
 | [system-prompts-ai-tools.md](./prompt-engineering/system-prompts-ai-tools.md) | x1xhlol/system-prompts-and-models-of-ai-tools — 30,000+ lines of leaked system prompts and model configs for 30+ AI tools including Claude Code, Cursor, Windsurf, Devin AI, Copilot, v0, Replit (117.9K stars, GPL-3.0) | 2026-02-23 |
+| [prompt-optimizer.md](./prompt-engineering/prompt-optimizer.md) | prompt-optimizer v2.11.6 — TypeScript monorepo (31K stars); dual-mode optimization (system + user prompts), multi-model adapters (OpenAI/Gemini/DeepSeek/Grok/Zhipu), MCP server, 4 deployment paths (Vercel/Electron/Chrome extension/Docker), structured evaluation with compare, image generation T2I/I2I | 2026-06-18 |
 
 **Key Topics**:
 
@@ -1910,6 +1925,26 @@ When adding new research:
 - [Harness Engineering (Fowler/Böckeler)](https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html) - Harness engineering discipline for constraining AI coding agents via deterministic + LLM infrastructure
 - [Harness Engineering (OpenAI)](https://openai.com/index/harness-engineering/) - OpenAI Codex team's harness engineering practices: 1M lines, 3.5 PRs/engineer/day, agent-first architecture
 - [Unlocking the Codex Harness (OpenAI)](https://openai.com/index/unlocking-the-codex-harness/) - Codex App Server bidirectional JSON-RPC protocol and Rust core library (61,233 stars)
+
+---
+
+### 33. Security Tools
+
+**Location**: [./security-tools/](./security-tools/)
+
+Access control, zero-trust networking, and security infrastructure tools relevant to agentic application deployment.
+
+| Document | Description | Last Updated |
+| -------- | ----------- | ------------ |
+| [tessera.md](./security-tools/tessera.md) | Tessera — minimal Go terminal access broker; just-in-time human-approved access via Coordinator/Agent/Client three-tier architecture; zero standing privileges, time-limited sessions, 4-byte length-prefixed JSON wire protocol, complete audit trails (Go 1.26, MIT) | 2026-06-18 |
+
+**Key Topics**:
+
+- Just-in-time access control with human approval gate
+- Zero standing privileges pattern for remote host access
+- Lightweight alternative to enterprise PAM/bastion solutions
+
+---
 
 ### Internal References
 

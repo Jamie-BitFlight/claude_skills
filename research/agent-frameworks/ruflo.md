@@ -1,20 +1,6 @@
-# Ruflo: Enterprise AI Agent Orchestration Platform
-
-## Overview
-
-Ruflo (formerly Claude Flow) is a production-ready multi-agent AI orchestration framework that enables deployment of 100+ specialized agents working in coordinated swarms. Distributed as an npm package (`ruflo@3.5.0`), it integrates natively with Claude Code via MCP (Model Context Protocol) and provides a comprehensive CLI with 26 commands and 215+ MCP tools. The system includes self-learning capabilities via the RuVector intelligence layer, fault-tolerant consensus mechanisms, and enterprise-grade security hardening.
-
-**Primary Resource Identifier**: GitHub repository at `https://github.com/ruvnet/ruflo` (shallow clone successful at commit f547cec, dated 2026-03-25)
-
-**License**: MIT
-
-**Latest Version**: 3.5.0 (released 2026-02-27) — First major stable release after 5,900+ commits and 55 alpha iterations
-
-**NPM Packages**:
-- `@claude-flow/cli@3.5.0` — CLI and command router
-- `claude-flow@3.5.0` — Umbrella package
-- `ruflo@3.5.0` — CLI alias (thin wrapper)
-
+---
+title: "Ruflo: Enterprise AI Agent Orchestration Platform"
+license: "MIT"
 ---
 
 ## Problem Addressed
@@ -333,40 +319,6 @@ The `service-docs-maintainer` agent (part of quality gate pipeline) auto-generat
 **5. HNSW Index Rebuild**: Vector search uses HNSW, which requires periodic index rebuilds (not incremental). Large knowledge bases (>100k patterns) may experience temporary search latency during rebuilds.
 
 **6. Clustering Overhead for Small Swarms**: Mesh topology with full peer-to-peer connectivity has O(n²) connection overhead. Recommended for <20 agents; larger swarms should use hierarchical topology.
-
----
-
-## Freshness Tracking
-
-**Last Updated**: 2026-03-28 (research entry creation date)
-
-**Repository Last Commit**: 2026-03-25 20:44:10 UTC (docs: update README to match actual implementation #1444)
-
-**Version Verified**: 3.5.0 (stable release from 2026-02-27)
-
-**Sources Current as of**: 2026-03-28
-
-### Confidence by Section
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Overview & Identity | high | Official README, package.json, CHANGELOG all match; verified stable release |
-| Key Statistics | high | CHANGELOG and README directly quoted; commit count verified via git |
-| Features (swarms, learning, security) | high | Technical diagrams in README match source code structure (CLAUDE.md); RuVector components described in detail |
-| Architecture | medium-high | Architecture diagrams in README provided; actual source code not fully read (depth limit on worktree) |
-| Installation & Usage | high | Official install script and CLI commands documented in README and CLAUDE.md |
-| Limitations | medium | No formal limitations doc exists; derived from architecture constraints and CHANGELOG fixes |
-| Relevance to Claude Code | medium | Based on advertised integration points; actual integration depth not verified against Claude Code SDK docs |
-
-### Next Review Date
-
-2026-06-28 (3 months from research date)
-
-**Triggers for Early Re-research**:
-- Major version release (v4.0.0)
-- Security advisory (CVE discovery)
-- New RuVector component release
-- Breaking changes to MCP tool count or CLI commands
 
 ---
 

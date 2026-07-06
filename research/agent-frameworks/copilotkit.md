@@ -1,13 +1,13 @@
-# CopilotKit
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://copilotkit.ai/>
-**GitHub Repository**: <https://github.com/CopilotKit/CopilotKit>
-**npm**: <https://www.npmjs.com/package/@copilotkit/runtime>
-**Version at Research**: v1.51.4 (released 2026-02-17)
-**License**: MIT
-**Docs**: <https://docs.copilotkit.ai>
-
+---
+title: "CopilotKit"
+research_date: "2026-02-23"
+source_url: "https://copilotkit.ai/"
+github_url: "https://github.com/CopilotKit/CopilotKit"
+version_at_research: "v1.51.4 (released 2026-02-17)"
+license: "MIT"
+last_verified: "2026-02-23"
+version_at_verification: "v1.51.4"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -245,25 +245,6 @@ export const POST = copilotRuntimeNextJSAppRouterEndpoint({
 - [LogRocket — Build agentic frontend applications with CopilotKit](https://blog.logrocket.com/build-agentic-frontend-applications-copilotkit/) (accessed 2026-02-23)
 
 **Research Method**: Information gathered from GitHub API (stars, forks, issues, releases, contributors), npm downloads API, official documentation, and web search for architecture and feature details.
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v1.51.4 |
-| Next Review Recommended | 2026-05-23 |
-
-**Review Triggers**:
-
-- Major version release (v2.x)
-- AG-UI protocol specification changes
-- New agent framework integrations (beyond LangChain, CrewAI, Google ADK)
-- GitHub stars milestone (30K, 35K)
-- New generative UI patterns or components
-- Breaking changes to `useCopilotAction` or `useCopilotReadable` API
 
 ---
 

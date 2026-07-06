@@ -173,6 +173,7 @@ Open `http://localhost:5173`.
 
 ### File Format
 Projects are saved as `.tui` files (JSON):
+
 ```json
 {
   "version": "1",

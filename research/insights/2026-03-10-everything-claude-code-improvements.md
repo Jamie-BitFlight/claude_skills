@@ -1,12 +1,5 @@
-# Improvement Proposals: Everything Claude Code
-
-**Research entry**: ./research/agent-frameworks/everything-claude-code.md
-**Generated**: 2026-03-10
-**Patterns assessed**: 12
-**Backlog items created**: 2 (issues: #576, #577)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: Everything Claude Code"
 ---
 
 ## Improvement 1: SubagentStop hook should capture a structured summary of subagent work

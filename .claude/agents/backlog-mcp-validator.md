@@ -92,7 +92,7 @@ appear. The `type` and `topic` fields are always present in each returned item d
 
 ```text
 Parameters:
-  selector     str      required  GitHub issue URL | "#N" | bare number | title substring
+  selector     str      required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   offset       int      optional  Skip N lines from body  (default: 0)
   limit        int      optional  Max lines to return (0 = all)  (default: 0)
   map          bool     optional  Return structured TOC map of item sections with ordinals
@@ -124,7 +124,7 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py sync [--dry-run]
 
 ```text
 Parameters:
-  selector       str   required  Title substring | "#N" | bare number | GitHub issue URL
+  selector       str   required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   plan           str   required  Plan path or completion summary
   checklist_pass bool  optional  Must be true to close  (default: false)
   cleanup        bool  optional  Remove local file after close  (default: false)
@@ -138,7 +138,7 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py close "<title>" --plan
 
 ```text
 Parameters:
-  selector  str   required  Title substring | "#N" | bare number | GitHub issue URL
+  selector  str   required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   reason    str   required  Reason for resolving
   cleanup   bool  optional  Remove local file after resolve  (default: false)
   force     bool  optional  Resolve even with open PRs  (default: false)
@@ -151,7 +151,7 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py resolve "<title>" --re
 
 ```text
 Parameters:
-  selector        str       required  Title substring | "#N" | bare number | GitHub issue URL
+  selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   plan            str|null  optional  Plan file path to attach
   status          str|null  optional  "in-progress" | "groomed" | etc.
   create_issue    bool      optional  Create GitHub issue if missing  (default: false)
@@ -169,7 +169,7 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py update "<title>" [--pl
 
 ```text
 Parameters:
-  selector        str       required  Title substring | "#N" | bare number | GitHub issue URL
+  selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   groomed_content str|null  optional  Full groomed content
   section         str|null  optional  Section name for incremental update
   content         str|null  optional  Content for named section
@@ -192,12 +192,51 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py normalize [--dry-run]
 
 ```text
 Parameters:
-  dry_run  bool  optional  Preview without modifying local files  (default: false)
-  force    bool  optional  Overwrite even if local version is newer  (default: false)
+  selector  str|null  optional  Pull a single issue: GitHub URL | "#N" | bare number | title substring
+                                | beads nanoid (e.g. bd-a3f8). When omitted, pulls all issues.
+  dry_run   bool      optional  Preview without modifying local files  (default: false)
+  force     bool      optional  Overwrite even if local version is newer  (default: false)
 
 Returns: {pulled, messages, warnings}
 CLI:     uv run .claude/skills/backlog/scripts/backlog.py pull [--dry-run] [--force]
 ```
+
+### backlog_strike_entry
+
+```text
+Parameters:
+  selector   str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
+  entry_id   str       required  Timestamp ID of the entry to strike
+  reason     str       required  Human-readable reason for striking the entry
+  section    str|null  optional  Section name to scope the search within  (default: null)
+
+Returns: {title, section, entry_id, messages, warnings}
+CLI:     (no direct CLI equivalent — backlog_strike_entry is MCP-only)
+```
+
+---
+
+## Beads Backend Notes
+
+### Selector Format (PR #2656, 2026-06-19)
+
+Five beads-capable tools (`backlog_view`, `backlog_resolve`, `backlog_update`, `backlog_groom`,
+`backlog_strike_entry`) accept a beads nanoid (e.g. `bd-a3f8`) as the `selector` value. This
+was added in commit `f6438cac` to the `selector` `Field(description=...)` strings; no runtime
+logic was changed.
+
+`backlog_close` and `backlog_pull` do NOT support beads nanoid selectors — their selector Field
+descriptions were deliberately left without the nanoid clause because the underlying operations
+have no beads code path (`backlog_close` raises `ValueError` for non-numeric issue refs;
+`backlog_pull` calls `get_github()` with no beads equivalent).
+
+Resolution is handled by `find_item` in `parsing.py`. When the selector is not a URL, `#N`, or
+bare integer, `find_item` performs a string-ID exact match against `item.issue`. A beads nanoid
+stored as `item.issue` will match on this path.
+
+**Validator implication**: When validating against a beads-backed project, pass a nanoid as the
+selector to the five supported tools and confirm each returns the item (not an `"error"` key).
+Do not test `backlog_close` or `backlog_pull` with nanoid selectors — both will fail by design.
 
 ---
 

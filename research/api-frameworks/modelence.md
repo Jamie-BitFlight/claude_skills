@@ -1,11 +1,13 @@
-# Modelence
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://modelence.com>
-**GitHub Repository**: <https://github.com/modelence/modelence>
-**Version at Research**: v0.12.7
-**License**: Apache License 2.0
-
+---
+title: "Modelence"
+research_date: "2026-03-04"
+source_url: "https://modelence.com"
+github_url: "https://github.com/modelence/modelence"
+version_at_research: "v0.12.7"
+license: "Apache License 2.0"
+last_verified: "2026-03-04"
+version_at_verification: "v0.12.7"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -265,11 +267,3 @@ SOURCE: [Modelence Docs — Stores](https://docs.modelence.com/stores) (accessed
 - [Modelence Docs — Quickstart](https://docs.modelence.com/quickstart) (accessed 2026-03-04)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | v0.12.7 |
-| Next Review Recommended | 2026-06-04 |

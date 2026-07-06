@@ -1,12 +1,5 @@
-# Improvement Proposals: Rope
-
-**Research entry**: ./research/code-auditing/rope.md
-**Generated**: 2026-03-29
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Rope"
 ---
 
 ## Improvement 1: AST-Based Static Analysis in Code Review Quality Gates

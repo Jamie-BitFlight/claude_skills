@@ -1,11 +1,5 @@
-# Utilization Proposals: MemPalace
-
-**Research entry**: ./research/context-management/mempalace.md
-**Generated**: 2026-04-08
-**Integration surfaces found**: 3 (Python SDK | MCP Server | CLI)
-**Proposals written**: 3
-**Skipped**: 0
-
+---
+title: "Utilization Proposals: MemPalace"
 ---
 
 > **Review note (2026-04-08)**: All three proposals below need comparing against Claude Code's built-in `memory: project` agent frontmatter field before proceeding. Sub-agents are normally disposable — their context is discarded after task completion. When persistence is needed, agents can be given `memory: project` which provides persistent storage at `.claude/agent-memory/{agent-name}/`. Agents with this field can be instructed on what to track in project memory via their prompt. This native mechanism addresses the same gap MemPalace targets (cross-session knowledge retention) without an external dependency. Evaluate whether MemPalace offers capabilities beyond what `memory: project` provides (e.g., semantic search across all agent memories, palace-structured retrieval, cross-agent knowledge sharing) before adopting.
@@ -167,6 +161,7 @@ with open(diary_path, "a") as f:
 ```
 
 On agent startup:
+
 ```python
 # In agent initialization:
 from pathlib import Path

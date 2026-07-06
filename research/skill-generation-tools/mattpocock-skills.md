@@ -1,13 +1,7 @@
-# mattpocock/skills
-
-**Resource**: Agent Skills for Real Engineers (Matt Pocock's Claude Code Skills Collection)
-
-**Repository**: <https://github.com/mattpocock/skills>
-
-**Primary Language**: Shell (distribution scripts)
-
-**License**: MIT (Copyright 2026 Matt Pocock)
-
+---
+title: "mattpocock/skills"
+license: "MIT (Copyright 2026 Matt Pocock)"
+last_verified: "2026-04-29 (v1.1.0 — re-researched)"
 ---
 
 ## Overview
@@ -127,6 +121,7 @@ Each skill is a directory containing:
 - **Support files** (optional): ADR templates, context format guides, agent briefs
 
 Example (tdd skill):
+
 ```
 tdd/
 ├── SKILL.md           # Core skill with philosophy and workflow
@@ -208,6 +203,7 @@ npx skills@latest add mattpocock/skills/tdd
 4. Workflow produces artifacts (code, tests, GitHub issues, architectural plans)
 
 Example TDD workflow:
+
 ```
 Planning → Review requirements with user, list behaviors to test, get approval
 Tracer Bullet → RED: one test, GREEN: minimal code, REFACTOR: improve
@@ -329,43 +325,3 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 | [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
 
 ---
-
-## Freshness Tracking
-
-**Entry Created**: 2026-04-27 (v1.0.0)
-
-**Last Verified**: 2026-04-29 (v1.1.0 — re-researched)
-
-**Next Review Due**: 2026-07-29 (90 days)
-
-### Confidence Assessment
-
-| Section | Confidence | Notes |
-|---------|-----------|-------|
-| Overview | high | Official README and skill descriptions read in full; recent repository (created 2026-02-03) |
-| Key Statistics | high | GitHub API data verified (stars, forks, dates) with authentication |
-| Key Features | high | All skill descriptions and workflows extracted from primary source SKILL.md files; anti-patterns and examples verified verbatim |
-| Technical Architecture | high | Skill file structure, frontmatter, and reference material organization observed directly from filesystem; distribution mechanism (npx skills) documented in README |
-| Installation & Usage | medium | Installation commands verified from README; actual behavior not tested in live Claude Code environment; newsletter URL sourced from README |
-| Limitations | medium | Limitations inferred from skill scope (no Python/Rust/Go skills present) and design choices (depth-is-good philosophy); not explicitly documented by author |
-| Relevance to Claude Code | high | Applicability assessed by comparing skill structure to Claude Code skill conventions and architectural patterns used in this repository |
-
-### Changes Since Last Review
-
-**Verified 2026-04-29** — substantial growth in 2 days:
-
-1. **Star count**: 23,883 → 43,829 (+20,146 stars, +82% increase)
-2. **Fork count**: 1,936 → 3,467 (+1,531 forks, +79% increase)
-3. **New skills added**: `diagnose` and `grill-with-docs` (engineering category)
-4. **Skill status changes**: `triage-issue` renamed to `triage`; 4 skills now marked deprecated (design-an-interface, qa, request-refactor-plan, ubiquitous-language)
-5. **Repository updates**: Out-of-scope clarification added (2026-04-29 commit: "Add out-of-scope note: issue trackers must be mainstream")
-6. **Maintenance status**: Actively maintained with recent commits addressing out-of-scope documentation
-
-### Data Drift Monitoring
-
-Monitor for:
-1. Star count drift (refresh quarterly via GitHub API)
-2. New skills added (README updates)
-3. License changes
-4. Newsletter subscriber count (if accessible)
-5. Major refactors to skill philosophy or structure

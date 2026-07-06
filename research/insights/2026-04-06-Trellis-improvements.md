@@ -1,12 +1,5 @@
-# Improvement Proposals: Trellis -- Multi-Platform AI Coding Framework
-
-**Research entry**: ./research/agent-frameworks/Trellis.md
-**Generated**: 2026-04-06
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Trellis -- Multi-Platform AI Coding Framework"
 ---
 
 ## Skipped Patterns

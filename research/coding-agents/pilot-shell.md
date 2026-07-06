@@ -215,6 +215,7 @@ Source is a **git repo** (team-wide) or **local directory** (personal, no git).
 ### Headless Mode
 
 Run Pilot non-interactively in CI/CD with `-p` flag:
+
 ```bash
 pilot -p "Run tests and fix failures" --allowedTools "Bash,Read,Edit"
 pilot -p "Summarize this project" --output-format json
@@ -349,12 +350,14 @@ Installs in ~2 minutes. Idempotent — re-running applies only new steps.
 ### Usage
 
 **Interactive development**:
+
 ```bash
 cd <any-project>
 pilot
 ```
 
 Then:
+
 ```bash
 /spec "Add user authentication with OAuth and JWT tokens"
 /fix "annotation persistence drops fields between save and reload"
@@ -365,17 +368,20 @@ Then:
 ```
 
 **Headless (CI/CD)**:
+
 ```bash
 pilot -p "Run tests and fix failures"
 pilot --model opus -p "Summarize this project"
 ```
 
 **Background automation**:
+
 ```bash
 pilot bot
 ```
 
 **Management**:
+
 ```bash
 pilot update                    # Check and apply updates
 pilot activate <license-key>    # Activate license

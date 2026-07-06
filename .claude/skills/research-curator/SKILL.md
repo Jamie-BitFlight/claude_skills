@@ -116,8 +116,25 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    ```
 
 3. **Wait** for structured result (status, file path, category, key findings)
-4. **Apply relay rules** -- verify pre-relay checklist before proceeding
-5. **Spawn four tasks concurrently** -- if research status is not `failed`:
+4. **Validate** -- if research status is not `failed`, run the validation gate on the created file:
+
+   a. Run fix script:
+
+   ```bash
+   uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file-path-from-agent-result}
+   ```
+
+   b. Run validator:
+
+   ```bash
+   uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file-path-from-agent-result}
+   ```
+
+   c. If validator returns errors: mark entry as "created with issues", skip steps 5–6, report to user with exact error text from validator JSON
+
+   d. If validator passes: proceed to step 5
+
+6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
    ```text
    a. Agent tool parameters:
@@ -135,13 +152,13 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    d. Update ./research/README.md -- add new entry to category table
    ```
 
-6. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
+7. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-7. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+8. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -166,7 +183,14 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry spawn three concurrent agents: `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each). See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry:
+
+1. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
+2. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
+3. If validator returns errors: mark entry as "created with issues", skip analysis agents for that entry, include in output report with exact error text
+4. If validator passes: spawn three concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each)
+
+See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
 ### Duplicate Detection
 
@@ -250,7 +274,17 @@ flowchart TD
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
 5. Update README with refreshed date
-6. Concurrently spawn three analysis agents:
+6. **Validate** -- run the validation gate on the updated file:
+
+   a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py ./research/{category}/{name}.md`
+
+   b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{category}/{name}.md`
+
+   c. If validator returns errors: mark entry as "refreshed with issues", skip step 7, report to user with exact error text from validator JSON
+
+   d. If validator passes: proceed to step 7
+
+7. Concurrently spawn three analysis agents:
 
    ```text
    - @research-insight-extractor — "Extract improvements from ./research/{category}/{name}.md"
@@ -258,7 +292,7 @@ flowchart TD
    - @research-cross-referencer — "Add cross-references to ./research/{category}/{name}.md"
    ```
 
-7. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
+8. Wait for all three; surface `IMMEDIATE_ATTENTION` items from insight result; report utilization proposal count; report cross-references added count
 
 ### All Entries Rerun
 
@@ -267,6 +301,17 @@ flowchart TD
 3. Each agent receives `--rerun ./research/{category}/{name}.md`
 4. Apply pre-relay quality checklist after each wave
 5. Update README once after all waves complete
+6. **Validate** -- for each successfully updated entry, run the validation gate before spawning analysis agents:
+
+   a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
+
+   b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
+
+   c. If validator returns errors: mark entry as "refreshed with issues", skip analysis agents for that entry
+
+   d. If validator passes: include in analysis agent dispatch (step 7)
+
+7. For each entry that passed validation: spawn three concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
 
 </rerun_mode>
 

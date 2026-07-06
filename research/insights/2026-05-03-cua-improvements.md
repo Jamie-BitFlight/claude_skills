@@ -1,9 +1,5 @@
-# CUA (Computer-Use Agents) — Improvement Proposals
-
-**Research Entry Date:** 2026-05-03
-**Source:** ./research/agent-infrastructure/cua.md
-**Extracted By:** Research-Insight-Extractor
-
+---
+title: "CUA (Computer-Use Agents) — Improvement Proposals"
 ---
 
 ## 1. Integration Opportunity: Claude-CUA Agent Framework

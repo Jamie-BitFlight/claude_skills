@@ -1,11 +1,13 @@
-# Architecting Efficient, Context-Aware Multi-Agent Frameworks for Production (Google ADK)
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://developers.googleblog.com/architecting-efficient-context-aware-multi-agent-framework-for-production/>
-**GitHub Repository**: <https://github.com/google/adk-python>
-**Version at Research**: v1.25.1
-**License**: Apache-2.0
-
+---
+title: "Architecting Efficient, Context-Aware Multi-Agent Frameworks for Production (Google ADK)"
+research_date: "2026-02-23"
+source_url: "https://developers.googleblog.com/architecting-efficient-context-aware-multi-agent-framework-for-production/"
+github_url: "https://github.com/google/adk-python"
+version_at_research: "v1.25.1"
+license: "Apache-2.0"
+last_verified: "2026-02-23"
+version_at_verification: "v1.25.1"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -249,11 +251,3 @@ agent = LlmAgent(
 - [Google ADK in AI Agents Frameworks Benchmark](./../../agent-frameworks/ai-agents-frameworks.md) — existing research entry
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | v1.25.1 |
-| Next Review Recommended | 2026-05-23 |

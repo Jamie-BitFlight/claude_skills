@@ -3784,10 +3784,7 @@ def close_item(
     issue_ref = item.issue
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
-        if issue_num_val is None:
-            msg_0 = f"Invalid issue ref: {issue_ref!r}"
-            raise ValueError(msg_0)
-        open_prs = check_open_prs_for_issue(issue_num_val, repo)
+        open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
             for pr in open_prs:

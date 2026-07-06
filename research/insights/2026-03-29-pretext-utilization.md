@@ -1,11 +1,5 @@
-# Utilization Proposals: Pretext
-
-**Research entry**: ./research/developer-tools/pretext.md
-**Generated**: 2026-03-29
-**Integration surfaces found**: 1 (npm package + TypeScript API)
-**Proposals written**: 0
-**Skipped**: 1 — no current layout constraints requiring text measurement optimization
-
+---
+title: "Utilization Proposals: Pretext"
 ---
 
 ## Surface Analysis

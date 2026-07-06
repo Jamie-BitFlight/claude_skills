@@ -1,15 +1,13 @@
-# Vercel Chatbot (vercel/chatbot)
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/vercel/chatbot>
-**Redirect**: `https://github.com/vercel/chat` redirects to `https://github.com/vercel/chatbot`
-**Live Demo**: <https://chat.vercel.ai/>
-**Documentation**: <https://chatbot.dev> (redirects to chatbot.com/docs)
-**Version at Research**: v3.1.0 (package.json, no GitHub releases published)
-**License**: Other (proprietary template license, not OSI-approved)
-**Primary Language**: TypeScript
-**Template**: Available via [Vercel Template](https://vercel.com/templates/next.js/chatbot)
-
+---
+title: "Vercel Chatbot (vercel/chatbot)"
+research_date: "2026-02-26"
+source_url: "https://github.com/vercel/chatbot"
+documentation_url: "<https://chatbot.dev> (redirects to chatbot.com/docs)"
+version_at_research: "v3.1.0 (package.json, no GitHub releases published)"
+license: "Other (proprietary template license, not OSI-approved)"
+last_verified: "2026-02-26"
+version_at_verification: "v3.1.0 (package.json)"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -266,21 +264,3 @@ The `entitlements.ts` pattern (per-user-type rate limits stored as config) is a 
 **Research Method**: GitHub API for metadata (stars, forks, contributors, file contents). Repository source files read directly via `gh api repos/vercel/chatbot/contents/{path}`. README, `package.json`, `lib/ai/models.ts`, `lib/ai/providers.ts`, `lib/db/schema.ts`, `lib/ai/entitlements.ts`, `artifacts/code/server.ts`, and `app/(chat)/api/chat/route.ts` inspected directly.
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v3.1.0 (package.json) |
-| Next Review Recommended | 2026-05-26 |
-
-**Review Triggers**:
-
-- AI SDK v7 release or breaking changes to `createUIMessageStream` / message parts format
-- Addition of new artifact types beyond text, code, image, sheet
-- Switch away from Vercel AI Gateway to direct provider integrations
-- New model providers added to `lib/ai/models.ts`
-- GitHub stars milestone (25K)
-- Next.js major version bump (currently Next.js 16)
-- Auth.js v5 stable release (currently on beta.25)

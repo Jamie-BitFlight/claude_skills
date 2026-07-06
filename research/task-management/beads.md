@@ -1,11 +1,13 @@
-# Beads (bd)
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/steveyegge/beads>
-**GitHub Repository**: <https://github.com/steveyegge/beads>
-**Version at Research**: v0.56.1
-**License**: MIT
-
+---
+title: "Beads (bd)"
+research_date: "2026-02-26"
+source_url: "https://github.com/steveyegge/beads"
+github_url: "https://github.com/steveyegge/beads"
+version_at_research: "v0.56.1"
+license: "MIT"
+last_verified: "2026-02-26"
+version_at_verification: "v0.56.1"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -250,11 +252,3 @@ SOURCE: [INSTALLING.md](https://github.com/steveyegge/beads/blob/main/docs/INSTA
 - [PyPI package beads-mcp](https://pypi.org/project/beads-mcp/) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v0.56.1 |
-| Next Review Recommended | 2026-05-26 |

@@ -1,10 +1,5 @@
-# Utilization Assessment: Merly Mentor
-
-**Research entry**: ./research/ai-research-tools/merly-mentor.md
-**Assessment date**: 2026-03-18
-**Integration surface found**: Yes — REST API + Docker/Kubernetes deployment
-**Callable from local systems**: No — requires external infrastructure
-
+---
+title: "Utilization Assessment: Merly Mentor"
 ---
 
 ## Surface Analysis

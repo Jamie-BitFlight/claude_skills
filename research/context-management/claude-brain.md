@@ -234,11 +234,13 @@ SOURCE: src/hooks/post-tool-use.ts lines 1-80, src/hooks/session-start.ts, src/c
 ### Plugin Installation (30 seconds)
 
 1. Ensure git is configured (one-time setup):
+
    ```bash
    git config --global url."https://github.com/".insteadOf "git@github.com:"
    ```
 
 2. In Claude Code, run:
+
    ```bash
    /plugin add marketplace memvid/claude-brain
    ```
@@ -266,6 +268,7 @@ SOURCE: README.md lines 94-100 (accessed 2026-05-02)
 ### Reset Memory
 
 To clear all memories and start fresh:
+
 ```bash
 rm .claude/mind.mv2
 ```

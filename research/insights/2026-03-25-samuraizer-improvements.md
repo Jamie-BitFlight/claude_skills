@@ -1,12 +1,5 @@
-# Improvement Proposals: Samuraizer
-
-**Research entry**: ./research/ai-research-tools/samuraizer.md
-**Generated**: 2026-03-25
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Samuraizer"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

@@ -1,12 +1,5 @@
-# Improvement Proposals: oh-my-claudecode
-
-**Research entry**: ./research/agent-orchestration/oh-my-claudecode.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 7
-**Backlog items created**: 0 (no backlog MCP tools available in this session)
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 3
-
+---
+title: "Improvement Proposals: oh-my-claudecode"
 ---
 
 ## Improvement 1: Verify-fix loop for failed tasks in implement-feature

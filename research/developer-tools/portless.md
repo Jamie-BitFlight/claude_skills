@@ -1,11 +1,13 @@
-# Portless
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/vercel-labs/portless>
-**GitHub Repository**: <https://github.com/vercel-labs/portless>
-**Version at Research**: v0.4.2
-**License**: Apache-2.0
-
+---
+title: "Portless"
+research_date: "2026-02-26"
+source_url: "https://github.com/vercel-labs/portless"
+github_url: "https://github.com/vercel-labs/portless"
+version_at_research: "v0.4.2"
+license: "Apache-2.0"
+last_verified: "2026-02-26"
+version_at_verification: "v0.4.2"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -194,11 +196,3 @@ export PORTLESS_STATE_DIR=/tmp/custom-portless  # Override state directory
 - [npm downloads API: portless](https://api.npmjs.org/downloads/point/last-month/portless) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v0.4.2 |
-| Next Review Recommended | 2026-05-26 |

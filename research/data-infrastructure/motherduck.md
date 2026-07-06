@@ -1,11 +1,13 @@
-# MotherDuck
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://motherduck.com/docs/getting-started/>
-**GitHub Repository**: <https://github.com/motherduckdb/mcp-server-motherduck> (local MCP server)
-**Version at Research**: DuckDB 1.4.4 (supported client), MCP server v1.0.1
-**License**: Proprietary (SaaS); MCP server: MIT License
-
+---
+title: "MotherDuck"
+research_date: "2026-02-23"
+source_url: "https://motherduck.com/docs/getting-started/"
+github_url: "<https://github.com/motherduckdb/mcp-server-motherduck> (local MCP server)"
+version_at_research: "DuckDB 1.4.4 (supported client), MCP server v1.0.1"
+license: "Proprietary (SaaS); MCP server: MIT License"
+last_verified: "2026-02-23"
+version_at_verification: "DuckDB 1.4.4 (client), MCP server v1.0.1"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -202,11 +204,3 @@ con.sql("""
 - [MotherDuck CIDR 2024 Paper](https://www.cidrdb.org/cidr2024/papers/p46-atwal.pdf) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | DuckDB 1.4.4 (client), MCP server v1.0.1 |
-| Next Review Recommended | 2026-05-23 |

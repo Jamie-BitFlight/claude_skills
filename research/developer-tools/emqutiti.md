@@ -1,11 +1,13 @@
-# Emqutiti
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://github.com/marang/emqutiti>
-**GitHub Repository**: <https://github.com/marang/emqutiti>
-**Version at Research**: v0.7.7
-**License**: MIT License
-
+---
+title: "Emqutiti"
+research_date: "2026-03-18"
+source_url: "https://github.com/marang/emqutiti"
+github_url: "https://github.com/marang/emqutiti"
+version_at_research: "v0.7.7"
+license: "MIT License"
+last_verified: "2026-03-18"
+version_at_verification: "v0.7.7"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -349,12 +351,3 @@ git push origin main --tags
 | [Yume](./yume.md) | developer-tools | Multi-modal interface design (interactive TUI + headless mode) mirrors emqutiti's dual interactive/trace operation modes |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | v0.7.7 |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | `Overview: high` `Problem Addressed: high` `Key Statistics: high` `Key Features: high (doc + code-read)` `Technical Architecture: medium (code-read)` `Installation & Usage: high` `Development: high` `Relevance: medium` |

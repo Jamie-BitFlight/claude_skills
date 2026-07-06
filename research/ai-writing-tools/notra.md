@@ -1,11 +1,13 @@
-# Notra
-
-**Research Date**: 2026-03-04
-**Source URL**: <https://www.usenotra.com>
-**GitHub Repository**: Not publicly available (SaaS product)
-**Version at Research**: Not versioned (SaaS, continuously deployed)
-**License**: Proprietary (commercial SaaS)
-
+---
+title: "Notra"
+research_date: "2026-03-04"
+source_url: "https://www.usenotra.com"
+github_url: "Not publicly available (SaaS product)"
+version_at_research: "Not versioned (SaaS, continuously deployed)"
+license: "Proprietary (commercial SaaS)"
+last_verified: "2026-03-04"
+version_at_verification: "N/A (SaaS, continuously deployed)"
+next_review: "2026-06-04"
 ---
 
 ## Overview
@@ -159,11 +161,3 @@ SOURCE: [Notra pricing](https://www.usenotra.com/pricing) (accessed 2026-03-04)
 - [Notra changelog/showcase](https://www.usenotra.com/changelog) (linked from site nav; not fully indexed)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-04 |
-| Version at Verification | N/A (SaaS, continuously deployed) |
-| Next Review Recommended | 2026-06-04 |

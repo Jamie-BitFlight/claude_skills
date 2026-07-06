@@ -1,11 +1,13 @@
-# Frontend Slides
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://github.com/zarazhangrui/frontend-slides>
-**GitHub Repository**: <https://github.com/zarazhangrui/frontend-slides>
-**Version at Research**: No tagged releases — latest commit 2026-02-02
-**License**: MIT
-
+---
+title: "Frontend Slides"
+research_date: "2026-02-26"
+source_url: "https://github.com/zarazhangrui/frontend-slides"
+github_url: "https://github.com/zarazhangrui/frontend-slides"
+version_at_research: "No tagged releases — latest commit 2026-02-02"
+license: "MIT"
+last_verified: "2026-02-26"
+version_at_verification: "No tagged releases — commit `2026-02-02`"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -179,11 +181,3 @@ pip install python-pptx
 - [GitHub API — repository metadata](https://api.github.com/repos/zarazhangrui/frontend-slides) (accessed 2026-02-26)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | No tagged releases — commit `2026-02-02` |
-| Next Review Recommended | 2026-05-26 |

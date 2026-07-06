@@ -1,12 +1,5 @@
-# Improvement Proposals: Codebase Recon Skill
-
-**Research entry**: ./research/skill-generation-tools/codebase-recon-skill.md
-**Generated**: 2026-05-10
-**Patterns assessed**: 5
-**Backlog items created**: 2 (issues: #2246, #2249)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Codebase Recon Skill"
 ---
 
 ## Improvement 1: Add probe-phase auto-calibration to linear-walkthrough based on repository size

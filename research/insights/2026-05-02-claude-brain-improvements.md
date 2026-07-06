@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Brain
-
-**Research entry**: ./research/context-management/claude-brain.md
-**Generated**: 2026-05-02
-**Patterns assessed**: 10
-**Backlog items created**: 2 (issues: #2095, #2096)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 7
-
+---
+title: "Improvement Proposals: Claude Brain"
 ---
 
 ## Improvement 1: Project-portable session memory file committable to git

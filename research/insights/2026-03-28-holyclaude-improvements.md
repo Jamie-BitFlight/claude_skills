@@ -1,12 +1,5 @@
-# Improvement Proposals: HolyClaude
-
-**Research entry**: ./research/agent-infrastructure/holyclaude.md
-**Generated**: 2026-03-28
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: HolyClaude"
 ---
 
 ## Skipped Patterns

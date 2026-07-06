@@ -63,11 +63,13 @@ team-plan → team-prd → team-exec → team-verify → team-fix (loop)
 ```
 
 **Activation:**
+
 ```bash
 /team 3:executor "fix all TypeScript errors"
 ```
 
 Requires Claude Code native teams enabled in `~/.claude/settings.json`:
+
 ```json
 {
   "env": {
@@ -129,6 +131,7 @@ Saves 30-50% on tokens through intelligent model assignment.
 - **Lower priority** (fallback)
 
 **Example project-scoped skill:**
+
 ```yaml
 ---
 name: Fix Proxy Crash
@@ -192,6 +195,7 @@ The `/learner` command extracts hard-won debugging knowledge into portable skill
 
 #### Provider Advisor (`omc ask`)
 Run local provider CLIs and save markdown artifacts:
+
 ```bash
 omc ask claude "review migration plan"
 omc ask codex --prompt "identify architecture risks"
@@ -200,6 +204,7 @@ omc ask gemini --prompt "propose UI ideas"
 
 #### Rate Limit Wait
 Auto-resume Claude Code when rate limits reset:
+
 ```bash
 omc wait               # Check status
 omc wait --start       # Enable auto-resume daemon
@@ -213,6 +218,7 @@ omc wait --stop        # Disable daemon
 
 #### Notification Tags (Telegram/Discord/Slack)
 Configure team notifications when sessions stop:
+
 ```bash
 omc config-stop-callback telegram --enable --token <bot_token> --chat <id> --tag-list "@alice,bob"
 omc config-stop-callback discord --enable --webhook <url> --tag-list "@here,role:987654321098765432"
@@ -220,6 +226,7 @@ omc config-stop-callback discord --enable --webhook <url> --tag-list "@here,role
 
 #### OpenClaw Integration
 Forward Claude Code events to OpenClaw gateway for automated responses:
+
 ```bash
 /oh-my-claudecode:configure-notifications
 # → Type "openclaw" → select "OpenClaw Gateway"
@@ -325,12 +332,14 @@ Integrates directly with Claude Code's plugin system via Node.js hooks.
 ```bash
 /oh-my-claudecode:omc-setup --local
 ```
+
 Creates `./.claude/CLAUDE.md` in current project. Configuration applies only to this project.
 
 #### Global Configuration
 ```bash
 /oh-my-claudecode:omc-setup
 ```
+
 Creates `~/.claude/CLAUDE.md` globally. Configuration applies to all projects. **Warning**: Overwrites existing `~/.claude/CLAUDE.md`.
 
 ### Requirements
@@ -431,12 +440,14 @@ Project-scoped configuration takes precedence over global.
 ### Updating
 
 **Via marketplace (recommended):**
+
 ```bash
 /plugin marketplace update omc
 /omc-setup
 ```
 
 **Via npm (legacy):**
+
 ```bash
 npm i -g oh-my-claude-sisyphus@latest
 ```
@@ -444,6 +455,7 @@ npm i -g oh-my-claude-sisyphus@latest
 ### Troubleshooting
 
 **Check plugin health:**
+
 ```bash
 /omc-doctor
 ```

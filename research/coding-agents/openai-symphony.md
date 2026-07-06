@@ -1,11 +1,13 @@
-# OpenAI Symphony
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://github.com/openai/symphony>
-**GitHub Repository**: <https://github.com/openai/symphony>
-**Version at Research**: Draft v1 (language-agnostic spec); no tagged releases
-**License**: Apache License 2.0
-
+---
+title: "OpenAI Symphony"
+research_date: "2026-03-06"
+source_url: "https://github.com/openai/symphony"
+github_url: "https://github.com/openai/symphony"
+version_at_research: "Draft v1 (language-agnostic spec); no tagged releases"
+license: "Apache License 2.0"
+last_verified: "2026-03-06"
+version_at_verification: "Draft v1 spec; no tagged releases"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -259,22 +261,3 @@ codex:
 - GitHub API: `repos/openai/symphony/releases/latest` — HTTP 404, no tagged releases (accessed 2026-03-06)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | Draft v1 spec; no tagged releases |
-| Next Review Recommended | 2026-06-06 |
-
-### Confidence Map
-
-| Section | Confidence | Basis |
-|---------|------------|-------|
-| Identity/Metadata | high | Full GitHub API read; exact star/fork counts extracted |
-| Features | high | Full read of SPEC.md (language-agnostic spec) and elixir/README.md |
-| Architecture | high | Full read of SPEC.md Sections 3, 7, 8, 9, 10 with exact component names |
-| Usage Examples | high | Verbatim commands from elixir/README.md; WORKFLOW.md from elixir/ directory |
-| Limitations | high | Stated explicitly in README.md (WARNING callouts) and SPEC.md non-goals section |
-| Statistics | medium | Stars/forks from GitHub API at a single point in time; contributor count not available from paginated header response |

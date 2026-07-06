@@ -1,12 +1,5 @@
-# Improvement Proposals: Waza — Engineering Habits as Claude Skills
-
-**Research entry**: ./research/skill-generation-tools/waza.md
-**Generated**: 2026-05-04
-**Patterns assessed**: 6
-**Backlog items created**: 3 (issues: #2124, #2125, #2126)
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Waza — Engineering Habits as Claude Skills"
 ---
 
 ## Improvement 1: Marketplace ↔ skill directory cross-reference validation

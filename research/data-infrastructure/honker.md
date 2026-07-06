@@ -1,12 +1,13 @@
-# Honker
-
-**Research Date**: 2026-04-25
-**Source URL**: <https://github.com/russellromney/honker>
-**Documentation**: <https://honker.dev>
-**Primary Language**: Rust (core), Python/Node.js/Go/Ruby/Bun/Elixir/C++ (bindings)
-**Version at Research**: 0.2.1
-**License**: Apache 2.0
-
+---
+title: "Honker"
+research_date: "2026-04-25"
+source_url: "https://github.com/russellromney/honker"
+documentation_url: "https://honker.dev"
+version_at_research: "0.2.1"
+license: "Apache 2.0"
+last_verified: "2026-04-25"
+version_at_verification: "0.2.1 (honker-core, honker-extension)"
+next_review: "2026-07-25"
 ---
 
 ## Overview
@@ -374,12 +375,3 @@ Source: README.md lines 308–320.
 | [Trigger.dev](../agent-infrastructure/trigger-dev.md) | agent-infrastructure | Task orchestration and durable job execution; honker's at-least-once queue provides an embedded SQLite alternative to Trigger's cloud broker model |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-25 |
-| Version at Verification | 0.2.1 (honker-core, honker-extension) |
-| Next Review Recommended | 2026-07-25 |
-| Confidence Map | Overview: high (README), Problem Addressed: high (README + design rationale), Key Statistics: low (version only; star count not accessible), Key Features: high (README + CHANGELOG code examples), Technical Architecture: high (README architecture section + in-code patterns), Installation & Usage: high (README code examples verbatim), Performance Characteristics: medium (benchmarks exist but not run; latency claims from README design section), Crash Recovery: high (documented in README + test references), Limitations: high (explicitly stated in README + source constraints), Relevance to Claude Code: medium (speculative application; not yet integrated) |

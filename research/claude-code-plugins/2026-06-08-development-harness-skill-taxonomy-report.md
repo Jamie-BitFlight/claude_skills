@@ -1,3 +1,7 @@
+---
+title: "Development-Harness Skill Taxonomy Report"
+---
+
 # Development-Harness Skill Taxonomy Report
 
 Date: 2026-06-08

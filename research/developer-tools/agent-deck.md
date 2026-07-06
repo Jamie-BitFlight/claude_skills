@@ -1,11 +1,13 @@
-# Agent Deck
-
-**Research Date**: 2026-03-17
-**Source URL**: <https://github.com/asheshgoplani/agent-deck>
-**GitHub Repository**: <https://github.com/asheshgoplani/agent-deck>
-**Version at Research**: v0.26.3 (latest at 2026-03-17)
-**License**: MIT
-
+---
+title: "Agent Deck"
+research_date: "2026-03-17"
+source_url: "https://github.com/asheshgoplani/agent-deck"
+github_url: "https://github.com/asheshgoplani/agent-deck"
+version_at_research: "v0.26.3 (latest at 2026-03-17)"
+license: "MIT"
+last_verified: "2026-03-17"
+version_at_verification: "v0.26.3"
+next_review: "2026-06-17"
 ---
 
 ## Overview
@@ -340,12 +342,3 @@ auto_update = true              # Optional: auto-check for updates
 | [Everything Claude Code](./everything-claude-code.md) | developer-tools | Complementary harness approach: ECC provides 15 specialized sub-agents and hooks pipeline; Agent Deck enables running multiple agents in parallel with resource pooling |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-17 |
-| Version at Verification | v0.26.3 |
-| Next Review Recommended | 2026-06-17 |
-| Confidence Map | `Overview: high`, `Problem Addressed: high`, `Key Statistics: high`, `Key Features: high`, `Technical Architecture: high (code-read)`, `Installation & Usage: high`, `Relevance to Claude Code Development: high` |

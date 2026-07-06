@@ -128,6 +128,7 @@ SOURCE: SKILL.md lines 37-48 (accessed 2026-05-07).
 SOURCE: SKILL.md lines 51-81 (accessed 2026-05-07).
 
 **Linear filter syntax** (nested objects):
+
 ```javascript
 {
   filter: {
@@ -139,6 +140,7 @@ SOURCE: SKILL.md lines 51-81 (accessed 2026-05-07).
 ```
 
 **Jira filter syntax** (JQL string):
+
 ```
 project = APP AND statusCategory != Done AND assignee is EMPTY ORDER BY updated DESC
 ```
@@ -241,6 +243,7 @@ await execute("SLACK_SEND_MESSAGE", {
 ```
 
 Run with:
+
 ```bash
 composio run --file scripts/triage-linear.ts
 ```

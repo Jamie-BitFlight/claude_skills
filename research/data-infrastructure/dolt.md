@@ -1,11 +1,13 @@
-# Dolt
-
-**Research Date**: 2026-03-01
-**Source URL**: <https://www.dolthub.com>
-**GitHub Repository**: <https://github.com/dolthub/dolt>
-**Version at Research**: v1.83.0
-**License**: Apache License 2.0
-
+---
+title: "Dolt"
+research_date: "2026-03-01"
+source_url: "https://www.dolthub.com"
+github_url: "https://github.com/dolthub/dolt"
+version_at_research: "v1.83.0"
+license: "Apache License 2.0"
+last_verified: "2026-03-01"
+version_at_verification: "v1.83.0"
+next_review: "2026-06-01"
 ---
 
 ## Overview
@@ -423,11 +425,3 @@ For most Go use cases, the recommended approach is spawning `dolt sql-server` an
 - [GitHub Release v1.83.0](https://github.com/dolthub/dolt/releases/tag/v1.83.0) (accessed 2026-03-01)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-01 |
-| Version at Verification | v1.83.0 |
-| Next Review Recommended | 2026-06-01 |

@@ -1,11 +1,13 @@
-# OpenFang
-
-**Research Date**: 2026-02-27
-**Source URL**: <https://www.openfang.sh/>
-**GitHub Repository**: <https://github.com/RightNow-AI/openfang>
-**Version at Research**: v0.1.7
-**License**: Apache-2.0 OR MIT (dual-licensed)
-
+---
+title: "OpenFang"
+research_date: "2026-02-27"
+source_url: "https://www.openfang.sh/"
+github_url: "https://github.com/RightNow-AI/openfang"
+version_at_research: "v0.1.7"
+license: "Apache-2.0 OR MIT (dual-licensed)"
+last_verified: "2026-02-27"
+version_at_verification: "v0.1.7"
+next_review: "2026-05-27"
 ---
 
 ## Overview
@@ -294,11 +296,3 @@ cargo clippy              # 0 warnings enforced
 - [OpenFang Cargo.toml](https://github.com/RightNow-AI/openfang/blob/main/Cargo.toml) (accessed 2026-02-27)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-27 |
-| Version at Verification | v0.1.7 |
-| Next Review Recommended | 2026-05-27 |

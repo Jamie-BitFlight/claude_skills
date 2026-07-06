@@ -1,12 +1,5 @@
-# Improvement Proposals: Arxitect
-
-**Research entry**: ./research/agent-frameworks/arxitect.md
-**Generated**: 2026-04-08
-**Patterns assessed**: 4
-**Backlog items created**: 0 (backlog MCP tools unavailable — GITHUB_TOKEN not set)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Arxitect"
 ---
 
 ## Improvement 1: Add software design principle dimensions to code-reviewer quality checks

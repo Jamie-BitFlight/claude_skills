@@ -1,12 +1,5 @@
-# Improvement Proposals: Tabularis
-
-**Research entry**: ./research/developer-tools/tabularis.md
-**Generated**: 2026-04-11
-**Patterns assessed**: 3
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 2
-
+---
+title: "Improvement Proposals: Tabularis"
 ---
 
 ## Improvement 1: Database MCP server real-world pattern for fastmcp-creator

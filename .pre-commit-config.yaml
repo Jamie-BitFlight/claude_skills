@@ -126,10 +126,22 @@ repos:
           - "4"
           - -ci
 
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
+  # Installs shellcheck-py from its published PyPI wheel (which bundles the
+  # prebuilt binary) instead of the upstream git-repo hook, which clones the
+  # repo and does a source install. The source install's setup.py downloads
+  # the binary via stdlib urllib.request, which truncates large GitHub
+  # release downloads through some HTTPS proxies (IncompleteRead). PyPI
+  # ships wheels for linux (manylinux), macOS (both arches), and Windows
+  # (win_amd64), so this works cross-platform without assuming a
+  # pre-installed system shellcheck binary.
+  - repo: local
     hooks:
       - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: python
+        additional_dependencies: ["shellcheck-py==0.11.0.1"]
+        types: [shell]
 
   # Local hooks for type checking
   - repo: local
@@ -173,6 +185,22 @@ repos:
         types: [python]
         pass_filenames: true
         exclude: 'plugins/development-harness/skills/implementation-manager/.*|plugins/uv/skills/uv/.*|examples/solid-review-ab/corpus/.*'
+
+      - id: fix-research-formatting
+        name: Fix MD031 and trailing whitespace in research entries
+        entry: uv run .claude/skills/research-curator/scripts/fix_research_formatting.py
+        language: system
+        stages: [pre-commit]
+        pass_filenames: true
+        files: ^research/.*\.md$
+
+      - id: validate-research-entries
+        name: Validate research entry structure and completeness
+        entry: uv run .claude/skills/research-curator/scripts/validate_research.py main
+        language: system
+        stages: [pre-commit]
+        pass_filenames: true
+        files: ^research/.*\.md$
 
       - id: enable-rerere
         name: Enable git rerere (auto-replay conflict resolutions)

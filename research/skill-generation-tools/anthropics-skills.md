@@ -1,11 +1,13 @@
-# Anthropic Agent Skills Repository
-
-**Research Date**: 2026-03-06
-**Source URL**: <https://github.com/anthropics/skills>
-**GitHub Repository**: <https://github.com/anthropics/skills>
-**Version at Research**: 1.0.0 (marketplace metadata version; no tagged releases)
-**License**: Apache 2.0 (example skills); source-available only (document skills: docx, pdf, pptx, xlsx)
-
+---
+title: "Anthropic Agent Skills Repository"
+research_date: "2026-03-06"
+source_url: "https://github.com/anthropics/skills"
+github_url: "https://github.com/anthropics/skills"
+version_at_research: "1.0.0 (marketplace metadata version; no tagged releases)"
+license: "Apache 2.0 (example skills); source-available only (document skills: docx, pdf, pptx, xlsx)"
+last_verified: "2026-03-06"
+version_at_verification: "1.0.0 (marketplace metadata)"
+next_review: "2026-06-06"
 ---
 
 ## Overview
@@ -259,11 +261,3 @@ SOURCE: Analysis of repository contents (2026-03-06); [Equipping agents for the 
 | [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-06 |
-| Version at Verification | 1.0.0 (marketplace metadata) |
-| Next Review Recommended | 2026-06-06 |

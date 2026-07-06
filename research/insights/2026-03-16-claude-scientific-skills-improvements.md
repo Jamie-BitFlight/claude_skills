@@ -1,12 +1,5 @@
-# Improvement Proposals: Claude Scientific Skills
-
-**Research entry**: ./research/skill-generation-tools/claude-scientific-skills.md
-**Generated**: 2026-03-16
-**Patterns assessed**: 7
-**Backlog items created**: 1 (issues: #750)
-**Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: Claude Scientific Skills"
 ---
 
 ## Improvement 1: Add skill composition templates to skill-creator

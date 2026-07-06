@@ -392,6 +392,7 @@ Result: Analytical solution with reasoning (optional strip_thinking=true)
 **Problem**: Some MCP clients fail when `npx` writes installation messages to stdout
 
 **Solution**: Use `-yq` flag instead of `-y`
+
 ```json
 "args": ["-yq", "@perplexity-ai/mcp-server"]
 ```
@@ -401,6 +402,7 @@ Result: Analytical solution with reasoning (optional strip_thinking=true)
 **Problem**: Corporate proxies require username/password
 
 **Solution**: Embed credentials in proxy URL
+
 ```bash
 export PERPLEXITY_PROXY="https://user:pass@proxy:8080"
 ```
@@ -410,6 +412,7 @@ export PERPLEXITY_PROXY="https://user:pass@proxy:8080"
 **Problem**: `sonar-deep-research` may exceed default 5-minute timeout
 
 **Solution**: Increase timeout for research-heavy workloads
+
 ```bash
 export PERPLEXITY_TIMEOUT_MS=900000  # 15 minutes
 ```

@@ -1,12 +1,5 @@
-# Improvement Proposals: msgspec
-
-**Research entry**: ./research/serialization-libraries/msgspec.md
-**Generated**: 2026-03-13
-**Patterns assessed**: 5
-**Backlog items created**: 0
-**Deferred (low confidence)**: 1
-**Skipped (already covered or tracked)**: 4
-
+---
+title: "Improvement Proposals: msgspec"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

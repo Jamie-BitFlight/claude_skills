@@ -1,11 +1,6 @@
-# Ghost Desk — Invisible AI Overlay for Windows
-
-**Status**: Active (launched 2026)
-**Platform**: Windows 10 (build 19041+) and Windows 11
-**License**: Proprietary (free during launch, paid tiers available)
-**Repository**: Closed source
-**Official Site**: <https://www.ghost-desk.app>
-
+---
+title: "Ghost Desk — Invisible AI Overlay for Windows"
+license: "Proprietary (free during launch, paid tiers available)"
 ---
 
 ## Identity and Metadata

@@ -288,6 +288,7 @@ The Rust backend (src-tauri/) handles:
 ### Desktop Installation
 
 **Via Homebrew (macOS)**:
+
 ```bash
 brew install --cask tolaria
 ```
@@ -316,12 +317,14 @@ On first launch, users can optionally clone the [getting started vault](https://
 **Linux system dependencies** (Tauri 2 requires WebKit2GTK and GTK):
 
 For Arch/Manjaro:
+
 ```bash
 sudo pacman -S --needed webkit2gtk-4.1 base-devel curl wget file openssl \
   appmenu-gtk-module libappindicator-gtk3 librsvg
 ```
 
 For Debian/Ubuntu 22.04+:
+
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
   libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
@@ -329,6 +332,7 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
 ```
 
 For Fedora 38+:
+
 ```bash
 sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
   libappindicator-gtk3-devel librsvg2-devel
@@ -351,6 +355,7 @@ pnpm tauri dev
 ```
 
 **Testing**:
+
 ```bash
 # Unit and integration tests (Vitest)
 pnpm test
@@ -366,6 +371,7 @@ pnpm test:coverage
 ```
 
 **Build for production**:
+
 ```bash
 pnpm build        # TypeScript check + Vite build
 pnpm tauri build  # Full desktop app binary

@@ -1,12 +1,13 @@
-# GLM-5:exacto via OpenRouter
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://openrouter.ai/z-ai/glm-5:exacto>
-**Model Provider**: Z.ai (via OpenRouter)
-**GitHub Repository**: <https://github.com/zai-org/GLM-5>
-**Version at Research**: GLM-5 (released 2026-02-11)
-**License**: MIT (open-source)
-
+---
+title: "GLM-5:exacto via OpenRouter"
+research_date: "2026-03-18"
+source_url: "https://openrouter.ai/z-ai/glm-5:exacto"
+github_url: "https://github.com/zai-org/GLM-5"
+version_at_research: "GLM-5 (released 2026-02-11)"
+license: "MIT (open-source)"
+last_verified: "2026-03-18"
+version_at_verification: "GLM-5 (2026-02-11 release)"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -287,13 +288,3 @@ response = client.chat.completions.create(
 | [TensorZero](./tensorzero.md) | llm-infrastructure | LLMOps platform for optimization and evaluation; complementary infrastructure for benchmarking GLM-5 in production workflows |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | GLM-5 (2026-02-11 release) |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | Overview: high (official docs + multiple sources) \| Key Statistics: high (official release notes + benchmarks) \| Architecture: high (Z.ai technical docs + GitHub model card) \| Features: high (official docs + benchmarks) \| Usage Examples: high (tested against OpenRouter API docs + OpenAI SDK compatibility) \| Relevance: medium (inferred from benchmark performance, not validated in Claude Code integration) |
-

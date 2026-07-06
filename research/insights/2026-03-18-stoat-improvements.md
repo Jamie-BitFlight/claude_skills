@@ -1,12 +1,5 @@
-# Improvement Proposals: Stoat
-
-**Research entry**: ./research/developer-tools/stoat.md
-**Generated**: 2026-03-18
-**Patterns assessed**: 7
-**Backlog items created**: 0
-**Deferred (low confidence)**: 0
-**Skipped (already covered or tracked)**: 7
-
+---
+title: "Improvement Proposals: Stoat"
 ---
 
 ## Skipped Patterns

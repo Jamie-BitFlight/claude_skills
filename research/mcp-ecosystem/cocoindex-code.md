@@ -1,11 +1,13 @@
-# CocoIndex Code
-
-**Research Date**: 2026-03-10
-**Source URL**: <https://github.com/cocoindex-io/cocoindex-code>
-**GitHub Repository**: <https://github.com/cocoindex-io/cocoindex-code>
-**Version at Research**: 0.1.0
-**License**: Apache-2.0
-
+---
+title: "CocoIndex Code"
+research_date: "2026-03-10"
+source_url: "https://github.com/cocoindex-io/cocoindex-code"
+github_url: "https://github.com/cocoindex-io/cocoindex-code"
+version_at_research: "0.1.0"
+license: "Apache-2.0"
+last_verified: "2026-03-10"
+version_at_verification: "0.1.0 (pyproject.toml) / cocoindex dependency 1.0.0a26"
+next_review: "2026-06-10"
 ---
 
 ## Overview
@@ -301,27 +303,6 @@ The project documentation references large codebase and enterprise scenarios han
 - [CocoIndex Code pyproject.toml](https://github.com/cocoindex-io/cocoindex-code/blob/main/pyproject.toml) (accessed 2026-03-10)
 - [CocoIndex Parent Project](https://github.com/cocoindex-io/cocoindex) (referenced as parent data transformation engine, accessed 2026-03-10)
 - [GitHub API: cocoindex-io/cocoindex-code Repository](https://api.github.com/repos/cocoindex-io/cocoindex-code) (accessed 2026-03-10)
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-10 |
-| Version at Verification | 0.1.0 (pyproject.toml) / cocoindex dependency 1.0.0a26 |
-| Next Review Recommended | 2026-06-10 |
-| Confidence: Identity/Metadata | high |
-| Confidence: Features | high |
-| Confidence: Architecture | high |
-| Confidence: Installation/Usage | high |
-| Confidence: Limitations | medium |
-
-**Confidence Rationale**:
-
-- **High confidence** for identity, features, and installation: Full README read, pyproject.toml specifications verified, official documentation accessed
-- **High confidence** for architecture: Source code structure examined (`server.py`, core module organization) and MCP protocol documentation available
-- **Medium confidence** for limitations: SQLite issue on macOS documented; enterprise-scale limitations referenced but not detailed. Absence of documented limitations for other scenarios does not confirm absence of limitations
 
 ---
 

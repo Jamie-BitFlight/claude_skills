@@ -1,11 +1,13 @@
-# Anything About Game — AI Tools and Resources
-
-**Research Date**: 2026-03-24
-**Source URL**: <https://github.com/killop/anything_about_game>
-**GitHub Repository**: <https://github.com/killop/anything_about_game>
-**Version at Research**: master branch (878 lines, 2026-03-23 last commit)
-**License**: Apache License 2.0
-
+---
+title: "Anything About Game — AI Tools and Resources"
+research_date: "2026-03-24"
+source_url: "https://github.com/killop/anything_about_game"
+github_url: "https://github.com/killop/anything_about_game"
+version_at_research: "master branch (878 lines, 2026-03-23 last commit)"
+license: "Apache License 2.0"
+last_verified: "2026-03-24"
+version_at_verification: "master branch (878 lines, 2026-03-23 last commit)"
+next_review: "2026-06-24"
 ---
 
 ## Overview
@@ -219,17 +221,6 @@ git clone https://github.com/Donchitos/Claude-Code-Game-Studios
 | [Dify](../agent-frameworks/dify.md) | agent-frameworks | Open-source LLM application platform with visual workflow builder and 100+ model providers for agent orchestration |
 | [Get Shit Done](../agent-frameworks/get-shit-done.md) | agent-frameworks | Meta-prompting and context engineering system with 11 agents for multi-agent orchestration in Claude Code workflows |
 | [Claude Quickstarts](./claude-quickstarts.md) | developer-tools | Official Anthropic reference implementations including autonomous multi-session agents; patterns applicable to game automation |
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-24 |
-| Version at Verification | master branch (878 lines, 2026-03-23 last commit) |
-| Next Review Recommended | 2026-06-24 |
-| Confidence Map | Overview: high (GitHub API metadata); Key Features: high (source file direct read); Problem Addressed: medium (inferred from link organization); Technical Architecture: medium (organizational structure, not software architecture); Relevance to Claude Code: medium (game dev patterns applicable but require deeper analysis per domain) |
 
 ---
 

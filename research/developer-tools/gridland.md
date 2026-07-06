@@ -1,11 +1,13 @@
-# Gridland
-
-**Research Date**: 2026-03-24
-**Source URL**: <https://gridland.io>
-**GitHub Repository**: <https://github.com/thoughtfulllc/gridland>
-**Version at Research**: 0.2.53 (@gridland/web)
-**License**: Not declared in repository
-
+---
+title: "Gridland"
+research_date: "2026-03-24"
+source_url: "https://gridland.io"
+github_url: "https://github.com/thoughtfulllc/gridland"
+version_at_research: "0.2.53 (@gridland/web)"
+license: "Not declared in repository"
+last_verified: "2026-03-24"
+version_at_verification: "0.2.53 (@gridland/web)"
+next_review: "2026-06-24"
 ---
 
 ## Overview
@@ -292,22 +294,3 @@ Source: README.md — Sandboxed Execution.
 | [Using tmux with Claude Code](./using-tmux-with-claude-code.md) | developer-tools | Terminal UI orchestration patterns applicable to Gridland's TUI rendering context |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-24 |
-| Version at Verification | 0.2.53 (@gridland/web) |
-| Next Review Recommended | 2026-06-24 |
-| Confidence Map | `Identity: high` `Features: high (code-read)` `Architecture: high (code-read)` `Usage Examples: high` `Limitations: medium (license status inferred from absence)` |
-
----
-
-**Confidence Notes**:
-
-- Identity section: High confidence — version strings extracted from package.json, most recent commit date from git log.
-- Features section: High confidence with code-read qualifier — component list extracted from directory structure, exports inferred from index.ts files, architecture patterns from source inspection.
-- Architecture section: High confidence with code-read qualifier — data flow and component relationships inferred from react-reconciler integration, render-pipeline, and browser-renderer source files.
-- Usage Examples: High confidence — installation and compilation commands extracted verbatim from README.md.
-- Limitations: Medium confidence on license status — absence of LICENSE file and license field is observed fact, but does not confirm the absence of an external license declaration; legal status should be verified with repository maintainers.

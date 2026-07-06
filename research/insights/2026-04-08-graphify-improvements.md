@@ -1,12 +1,5 @@
-# Improvement Proposals: graphify
-
-**Research entry**: ./research/skill-generation-tools/graphify.md
-**Generated**: 2026-04-08
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: graphify"
 ---
 
 ## Improvement 1: Add claim-level provenance tags to research entries

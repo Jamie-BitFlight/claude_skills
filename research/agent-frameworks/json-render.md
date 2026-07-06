@@ -1,12 +1,13 @@
-# json-render
-
-**Research Date**: 2026-02-26
-**Source URL**: <https://json-render.dev>
-**GitHub Repository**: <https://github.com/vercel-labs/json-render>
-**npm (core)**: <https://www.npmjs.com/package/@json-render/core>
-**Version at Research**: v0.10.0 (all packages, released 2026-02-25)
-**License**: Apache-2.0
-
+---
+title: "json-render"
+research_date: "2026-02-26"
+source_url: "https://json-render.dev"
+github_url: "https://github.com/vercel-labs/json-render"
+version_at_research: "v0.10.0 (all packages, released 2026-02-25)"
+license: "Apache-2.0"
+last_verified: "2026-02-26"
+version_at_verification: "v0.10.0"
+next_review: "2026-05-26"
 ---
 
 ## Overview
@@ -309,20 +310,3 @@ const systemPrompt = catalog.prompt();
 **Research Method**: GitHub API (stars, forks, issues, contributors, releases, file contents), npm downloads API, documentation site fetch, README and AGENTS.md source analysis.
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-26 |
-| Version at Verification | v0.10.0 |
-| Next Review Recommended | 2026-05-26 |
-
-**Review Triggers**:
-
-- Release of v1.0.0 (currently at v0.10.0 — pre-stable)
-- New platform renderers beyond React, Vue, React Native, Remotion, React PDF
-- GitHub stars milestone (15K, 20K)
-- shadcn/ui component count changes beyond 39
-- Breaking changes to `defineCatalog` or `SpecStream` API
-- New state management adapter packages

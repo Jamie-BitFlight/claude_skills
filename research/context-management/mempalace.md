@@ -76,21 +76,27 @@ SOURCE: README.md lines 180–262 (palace structure description and hierarchy di
 MemPalace automatically detects and organizes content from three types of inputs:
 
 **Projects mode** — parses code and documentation:
+
 ```bash
 mempalace mine ~/projects/myapp
 ```
+
 Extracts code structure, documentation, notes into rooms inferred from directory structure or manually specified.
 
 **Conversations mode** — normalizes 5 chat export formats:
+
 ```bash
 mempalace mine ~/chats/ --mode convos
 ```
+
 Handles Claude, ChatGPT, Slack, Gemini CLI, and custom JSON formats. Chunks by exchange pair (user message + assistant response).
 
 **General mode** — auto-classifies conversations into memory types:
+
 ```bash
 mempalace mine ~/chats/ --mode convos --extract general
 ```
+
 Runs auto-extraction that categorizes each exchange into decisions, milestones, problems, preferences, or emotional context without using an LLM.
 
 SOURCE: README.md lines 87–108 (quick start and three modes), mempalace/cli.py lines 66–100 (cmd_mine implementation), mempalace/convo_miner.py line 1.

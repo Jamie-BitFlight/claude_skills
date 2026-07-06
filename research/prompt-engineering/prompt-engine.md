@@ -1,11 +1,13 @@
-# Prompt Engine
-
-**Research Date**: 2026-02-23
-**Source URL**: <https://www.promptengine.cc>
-**GitHub Repository**: N/A (proprietary SaaS)
-**Version at Research**: Web service – no versioning
-**License**: Proprietary (SaaS); subscription-based
-
+---
+title: "Prompt Engine"
+research_date: "2026-02-23"
+source_url: "https://www.promptengine.cc"
+github_url: "N/A (proprietary SaaS)"
+version_at_research: "Web service – no versioning"
+license: "Proprietary (SaaS); subscription-based"
+last_verified: "2026-02-23"
+version_at_verification: "Web service"
+next_review: "2026-05-23"
 ---
 
 ## Overview
@@ -121,11 +123,3 @@ Prompt Engine is a web-only SaaS; no installation is required.
 - [Prompt Engine](https://www.promptengine.cc) (accessed 2026-02-23)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-23 |
-| Version at Verification | Web service |
-| Next Review Recommended | 2026-05-23 |

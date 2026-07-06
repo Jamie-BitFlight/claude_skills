@@ -1,11 +1,5 @@
-# Utilization Proposals: Awesome Codex Skills — Issue Triage
-
-**Research entry**: ./research/skill-generation-tools/awesome-codex-skills-issue-triage.md
-**Generated**: 2026-05-10
-**Integration surfaces found**: 3 (CLI | SDK | Cross-tool integrations)
-**Proposals written**: 1
-**Skipped**: 2 — incomplete coverage, incompatible scope
-
+---
+title: "Utilization Proposals: Awesome Codex Skills — Issue Triage"
 ---
 
 ## Utilization 1: complete-milestone skill → Composio Issue Triage

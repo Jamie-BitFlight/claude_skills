@@ -113,6 +113,7 @@ SOURCE: README.md line 43 (accessed 2026-04-08)
 SOURCE: build.py lines 1-21, ARCHITECTURE.md (accessed 2026-04-08)
 
 **Extraction output schema** (normalized across all extractors):
+
 ```json
 {
   "nodes": [
@@ -149,6 +150,7 @@ SOURCE: README.md line 221, CHANGELOG.md line 86 (accessed 2026-04-08)
 ## Installation & Usage
 
 **PyPI installation**:
+
 ```bash
 pip install graphifyy && graphify install
 ```
@@ -158,6 +160,7 @@ Note: The PyPI package is named `graphifyy` (temporary) while the `graphify` nam
 SOURCE: README.md lines 52-55 (accessed 2026-04-08)
 
 **Basic usage**:
+
 ```bash
 /graphify .                           # run on current directory (skill command)
 /graphify ./raw                       # run on specific folder
@@ -174,6 +177,7 @@ SOURCE: README.md lines 52-55 (accessed 2026-04-08)
 SOURCE: README.md lines 124-133 (accessed 2026-04-08)
 
 **URL ingestion**:
+
 ```bash
 /graphify add https://arxiv.org/abs/1706.03762  # fetch paper, save, update graph
 /graphify add https://x.com/karpathy/status/... # fetch tweet
@@ -184,6 +188,7 @@ SOURCE: README.md lines 124-133 (accessed 2026-04-08)
 SOURCE: README.md lines 134-137 (accessed 2026-04-08)
 
 **Query commands** (offline, no LLM cost):
+
 ```bash
 /graphify query "what connects attention to the optimizer?"
 /graphify query "..." --dfs              # depth-first for specific path
@@ -195,6 +200,7 @@ SOURCE: README.md lines 134-137 (accessed 2026-04-08)
 SOURCE: README.md lines 139-144 (accessed 2026-04-08)
 
 **Git hooks** (platform-agnostic):
+
 ```bash
 graphify hook install                  # post-commit, post-checkout hooks
 graphify hook uninstall
@@ -204,6 +210,7 @@ graphify hook status
 SOURCE: README.md lines 154-156 (accessed 2026-04-08)
 
 **Always-on assistant integration** (platform-specific):
+
 ```bash
 graphify claude install                # CLAUDE.md + PreToolUse hook (Claude Code)
 graphify codex install                 # AGENTS.md (Codex)

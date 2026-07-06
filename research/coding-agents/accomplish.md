@@ -1,11 +1,13 @@
-# Accomplish
-
-**Research Date**: 2026-02-27
-**Source URL**: <https://www.accomplish.ai/>
-**GitHub Repository**: <https://github.com/accomplish-ai/accomplish>
-**Version at Research**: @accomplish_ai/agent-core@0.4.0 / Desktop 0.3.10
-**License**: MIT License
-
+---
+title: "Accomplish"
+research_date: "2026-02-27"
+source_url: "https://www.accomplish.ai/"
+github_url: "https://github.com/accomplish-ai/accomplish"
+version_at_research: "@accomplish_ai/agent-core@0.4.0 / Desktop 0.3.10"
+license: "MIT License"
+last_verified: "2026-02-27"
+version_at_verification: "@accomplish_ai/agent-core@0.4.0 / Desktop 0.3.10"
+next_review: "2026-05-27"
 ---
 
 ## Overview
@@ -205,11 +207,3 @@ const task = await taskManager.startAgent({
 - [OpenCode CLI — upstream dependency](https://github.com/sst/opencode) (accessed 2026-02-27)
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-02-27 |
-| Version at Verification | @accomplish_ai/agent-core@0.4.0 / Desktop 0.3.10 |
-| Next Review Recommended | 2026-05-27 |

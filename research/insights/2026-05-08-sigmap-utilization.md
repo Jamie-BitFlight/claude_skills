@@ -1,11 +1,5 @@
-# Utilization Proposals: SigMap
-
-**Research entry**: ./research/developer-tools/sigmap.md
-**Generated**: 2026-05-08
-**Integration surfaces found**: 3 (CLI | MCP | Adapters)
-**Proposals written**: 2
-**Skipped**: 3 — existing context retrieval patterns sufficient, hook complexity not justified
-
+---
+title: "Utilization Proposals: SigMap"
 ---
 
 ## Utilization 1: context-gathering agent → SigMap MCP server

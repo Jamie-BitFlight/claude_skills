@@ -1,12 +1,5 @@
-# Improvement Proposals: SigMap
-
-**Research entry**: ./research/developer-tools/sigmap.md
-**Generated**: 2026-05-08
-**Patterns assessed**: 8
-**Backlog items created**: 0
-**Deferred (low confidence)**: 3
-**Skipped (already covered or tracked)**: 5
-
+---
+title: "Improvement Proposals: SigMap"
 ---
 
 ## Deferred Proposals (confidence too low to backlog)

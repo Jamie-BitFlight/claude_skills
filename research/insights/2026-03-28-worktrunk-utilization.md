@@ -1,11 +1,5 @@
-# Utilization Proposals: Worktrunk
-
-**Research entry**: ./research/developer-tools/worktrunk.md
-**Generated**: 2026-03-28
-**Integration surfaces found**: 2 (CLI tool, configuration system)
-**Proposals written**: 1
-**Skipped**: 1 — existing implementation handles scope well
-
+---
+title: "Utilization Proposals: Worktrunk"
 ---
 
 ## Utilization 1: /work-milestone → Worktrunk worktree management

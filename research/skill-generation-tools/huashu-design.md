@@ -178,11 +178,13 @@ Extracted from SKILL.md §"异常处理": "5 维度评审——哲学一致性 /
 ## Installation & Usage
 
 **Installation**:
+
 ```bash
 npx skills add alchaincyf/huashu-design
 ```
 
 **In Claude Code or compatible agent**, describe what you need:
+
 ```
 「做一份 AI 心理学的演讲 PPT，推荐 3 个风格方向让我选」
 (Make a psychology-of-AI presentation deck, recommend 3 style directions for me to pick)

@@ -1,11 +1,5 @@
-# Utilization Proposals: Composio Codebase Migrate
-
-**Research entry**: ./research/skill-generation-tools/composio-codebase-migrate.md
-**Generated**: 2026-05-10
-**Integration surfaces found**: 1 (CLI + executor API)
-**Proposals written**: 0
-**Skipped**: 3 — no suitable caller identified
-
+---
+title: "Utilization Proposals: Composio Codebase Migrate"
 ---
 
 ## Integration Surfaces Identified

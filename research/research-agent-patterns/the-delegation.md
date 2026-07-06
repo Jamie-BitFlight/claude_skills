@@ -1,11 +1,13 @@
-# The Delegation
-
-**Research Date**: 2026-03-18
-**Source URL**: <https://arturitu.github.io/the-delegation/>
-**GitHub Repository**: <https://github.com/arturitu/the-delegation>
-**Version at Research**: v0.1.0
-**License**: Dual-licensed — Source Code (MIT) | 3D Models & Assets (CC BY-NC 4.0)
-
+---
+title: "The Delegation"
+research_date: "2026-03-18"
+source_url: "https://arturitu.github.io/the-delegation/"
+github_url: "https://github.com/arturitu/the-delegation"
+version_at_research: "v0.1.0"
+license: "Dual-licensed — Source Code (MIT) | 3D Models & Assets (CC BY-NC 4.0)"
+last_verified: "2026-03-18"
+version_at_verification: "v0.1.0"
+next_review: "2026-06-18"
 ---
 
 ## Overview
@@ -226,12 +228,3 @@ The demo includes a default team (Designer, Developer, Copywriter, Analyst). To 
 | [OpenHands](../coding-agents/openhands.md) | coding-agents | Multi-agent platform with task decomposition and cloud deployment; provides architectural contrast showing alternative approaches to agent coordination and workspace isolation |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-03-18 |
-| Version at Verification | v0.1.0 |
-| Next Review Recommended | 2026-06-18 |
-| Confidence Map | `Overview: high (official README + demo accessible)`, `Problem Addressed: high (derived from README feature list)`, `Key Statistics: medium (v0.1.0 is very early release; star count not yet significant)`, `Key Features: high (extracted from README and package.json dependency list)`, `Technical Architecture: medium (code-read — source files inspected but entry is early-stage and architecture may evolve)`, `Installation & Usage: high (verified via README and package.json scripts)`, `Relevance to Claude Code: medium (patterns inferred from architecture; actual integration testing not yet performed)` |

@@ -1,3 +1,8 @@
+---
+title: "Vibium"
+next_review: "2026-06-24 (3 months)"
+---
+
 # Vibium
 
 ## Overview
@@ -59,6 +64,7 @@ The `map` command returns an interactive element reference set (`@e1`, `@e2`, et
 Vibium provides client libraries for three languages, each with both async and sync APIs:
 
 **JavaScript/TypeScript**:
+
 ```javascript
 import { browser } from 'vibium'
 const bro = await browser.start()
@@ -69,6 +75,7 @@ await bro.stop()
 ```
 
 Or synchronous version:
+
 ```javascript
 const { browser } = require('vibium/sync')
 const bro = browser.start()
@@ -77,6 +84,7 @@ vibe.go('https://example.com')
 ```
 
 **Python** (async and sync):
+
 ```python
 from vibium.async_api import browser
 bro = await browser.start()
@@ -85,6 +93,7 @@ await vibe.go("https://example.com")
 ```
 
 **Java**:
+
 ```java
 var bro = Vibium.start();
 var vibe = bro.page();
@@ -124,6 +133,7 @@ The browser cache is platform-specific:
 - Windows: `%LOCALAPPDATA%\vibium\`
 
 Users can skip the download if managing Chrome separately:
+
 ```bash
 VIBIUM_SKIP_BROWSER_DOWNLOAD=1 npm install vibium
 ```
@@ -261,6 +271,7 @@ node hello.js  # Run script using sync API
 ```
 
 Full script:
+
 ```javascript
 const fs = require('fs')
 const { browser } = require('vibium/sync')
@@ -422,20 +433,3 @@ No official documentation explicitly lists performance limitations, browser comp
 | [claude-quickstarts.md](../developer-tools/claude-quickstarts.md) | developer-tools | reference implementation for browser automation with Claude; overlapping use case in agent workflows |
 | [retio-pagemap.md](../mcp-ecosystem/retio-pagemap.md) | mcp-ecosystem | complements browser automation: token-efficient page representation for LLM processing |
 | [gstack.md](../agent-frameworks/gstack.md) | agent-frameworks | similar element selection pattern: accessibility-based vs semantic text/label finding for agent browser QA |
-
-## Freshness Tracking
-
-**Last Reviewed**: 2026-03-24
-**Next Review**: 2026-06-24 (3 months)
-
-### Confidence by Section
-
-- **Overview**: high — Full repository read, official documentation
-- **Problem Addressed**: high — Detailed explanation in webdriver-bidi.md with historical context
-- **Key Statistics**: high — Retrieved from GitHub API, dated 2026-03-24
-- **Key Features**: high — Extracted directly from README CLI quick reference, code examples verified in documentation
-- **Technical Architecture**: high — Full diagram and component structure from README, Go source structure confirmed via Glob
-- **Installation & Usage**: high — Official tutorials read (getting-started-js.md)
-- **Platform Support**: high — Official matrix from README
-- **Relevance to Claude Code**: medium-high — Inferred from problem statement and architecture, explicit MCP reference in README
-- **Limitations and Caveats**: medium — Roadmap deferred features are explicit, but GitHub issue list (29 items) not fully examined; early project status confirmed from release date

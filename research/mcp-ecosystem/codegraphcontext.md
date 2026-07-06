@@ -1,11 +1,13 @@
-# CodeGraphContext (CGC)
-
-**Research Date**: 2026-04-08
-**Source URL**: <https://github.com/CodeGraphContext/CodeGraphContext>
-**GitHub Repository**: <https://github.com/CodeGraphContext/CodeGraphContext>
-**Version at Research**: v0.4.0
-**License**: MIT License
-
+---
+title: "CodeGraphContext (CGC)"
+research_date: "2026-04-08"
+source_url: "https://github.com/CodeGraphContext/CodeGraphContext"
+github_url: "https://github.com/CodeGraphContext/CodeGraphContext"
+version_at_research: "v0.4.0"
+license: "MIT License"
+last_verified: "2026-04-08"
+version_at_verification: "v0.4.0"
+next_review: "2026-07-08"
 ---
 
 ## Overview
@@ -518,22 +520,3 @@ Matching patterns prevent files and directories from being indexed.
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 
 ---
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-04-08 |
-| Version at Verification | v0.4.0 |
-| Next Review Recommended | 2026-07-08 |
-| Confidence Map | Identity/Metadata: high \| Features: high \| Architecture: high (code-read) \| MCP Tools: high \| Usage Examples: high \| Limitations: high \| Relevance: medium |
-
-**Confidence Qualifiers**:
-- **Identity/Metadata**: high — version, license, language support extracted directly from `pyproject.toml` and README
-- **Features**: high — documentation-based, verified against multiple source files (`docs/MCP_TOOLS.md`, CLI reference, README)
-- **Architecture**: high (code-read) — architectural claims sourced from `docs/docs/architecture.md` and `docs/docs/concepts/how_it_works.md`; component structure verified by reading directory layout and key source files (`server.py`, `graph_builder.py`, `database.py`)
-- **MCP Tools**: high — official MCP tools reference document provided
-- **Usage Examples**: high — extracted verbatim from official documentation and README
-- **Limitations**: high — derived from documentation and observed limitations of static analysis approaches
-- **Relevance**: medium — integration points and pattern adoption are informed speculation based on CGC's design; actual integration would require prototyping
-

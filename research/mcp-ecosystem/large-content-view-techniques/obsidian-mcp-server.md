@@ -1,13 +1,5 @@
-# Research: cyanheads/obsidian-mcp-server — Patterns for Section-Indexed, Paginated MCP Views
-
-**Date:** 2026-05-30
-**Sources:**
-- README (raw): `https://raw.githubusercontent.com/cyanheads/obsidian-mcp-server/main/README.md` (fetched 2026-05-30)
-- GitHub repo page: `https://github.com/cyanheads/obsidian-mcp-server` (fetched 2026-05-30)
-- `server.json` manifest: `https://raw.githubusercontent.com/cyanheads/obsidian-mcp-server/main/server.json` (fetched 2026-05-30)
-- `package.json`: `https://raw.githubusercontent.com/cyanheads/obsidian-mcp-server/main/package.json` (fetched 2026-05-30)
-- Source tree API: GitHub API rate-limited (unauthenticated). TypeScript source files could not be read directly; all tool behaviour documented here is sourced from the README and server.json.
-
+---
+title: "Research: cyanheads/obsidian-mcp-server — Patterns for Section-Indexed, Paginated MCP Views"
 ---
 
 ## 1. All 14 MCP Tools — Names, Parameters, and What Each Returns
