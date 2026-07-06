@@ -18,7 +18,8 @@
       "!**/.claude-plugin/plugin.json",
       "!.claude-plugin/marketplace.json",
       "!**/*.lock",
-      "!**/dist"
+      "!**/dist",
+      "!**/graphify-out"
     ]
   },
   "formatter": {
