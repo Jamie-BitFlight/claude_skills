@@ -428,7 +428,10 @@ flowchart TD
    If ALL answers are YES: record working note "Architecture depth requirements satisfied from docs" and skip Phase 1b.
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
 6. Update sections where source data has changed. Preserve sections where source data is unchanged.
-7. Update the Freshness Tracking section with today's date and new confidence assessments.
+7. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
+   (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
+   `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
+   entry already uses; do not convert one to the other during a refresh.
 8. In the result, list what changed and what was confirmed unchanged.
 
 ### `--fix` Mode (fix validation issues)

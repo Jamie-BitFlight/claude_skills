@@ -262,7 +262,7 @@ Agent Skills directly addresses the Claude Code ecosystem's need for agent disci
 - **CLAUDE.md**: Project structure and contribution guidelines
 - **CONTRIBUTING.md**: Pre-flight checks and PR workflow
 - **LICENSE**: MIT License, Copyright (c) 2025 Addy Osmani
-- **Related frameworks**: [Superpowers](https://github.com/obra/superpowers), [Matt Pocock's skills](https://github.com/mattpocock/skills) — comparison in docs/comparison.md
+- **Related frameworks**: [Superpowers](https://github.com/obra/superpowers), [Matt Pocock's skills](https://github.com/mattpocock/skills) (accessed 2026-07-07) — comparison in docs/comparison.md
 - **Embedded principles**: Software Engineering at Google (abseil.io/resources/swe-book), Google engineering practices guide (google.github.io/eng-practices/)
 
 ## Freshness Tracking
