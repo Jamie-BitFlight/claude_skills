@@ -1,18 +1,14 @@
 # Repository Access Procedure — Tested
 
-Verified end-to-end against an out-of-session-scope public repository (tested 2026-07-07). Follow
-this sequence verbatim. Each numbered step exists because a specific alternative was tried and
-confirmed broken in this session type — do not re-derive these through trial and error.
+Verified end-to-end against an out-of-session-scope public repository, 2026-07-07. Every step
+below exists because a specific alternative was tried and failed in this session type — follow
+the sequence instead of re-deriving it through trial and error.
 
-**This scoping matters — do not over-generalize it.** Steps 3 and 4 (the `gh api` 403 and the
-`add_repo` restriction) are properties of *sandboxed/remote Claude Code execution environments
-with a GitHub-scope-enforcing proxy* — the environment this was tested in. They are not a
-universal fact about `gh` or about Claude Code generally. A session with a full, unrestricted
-`gh`/`GITHUB_TOKEN` (a local CLI session, for example) will not hit these walls, and `gh api`
-may simply succeed there. Steps 1 and 2 (plain `git clone`, never standalone `cd`) are good
-practice regardless of environment and don't depend on this scoping. If `gh api` succeeds on
-the first attempt in your session, use it — this document exists to stop wasted retries after
-a failure is observed, not to preemptively forbid a tool that might work fine.
+**Scope**: steps 3-4 (the `gh api` 403, the `add_repo` restriction) hold for sandboxed/remote
+Claude Code sessions behind a GitHub-scope-enforcing proxy — where this was tested. A session
+with an unrestricted `gh`/`GITHUB_TOKEN` (e.g. local CLI) won't hit these walls; if `gh api`
+succeeds on the first attempt, use it. Steps 1-2 (plain `git clone`, never standalone `cd`) hold
+regardless of environment.
 
 ## 1. Clone with plain `git clone` only
 
@@ -37,30 +33,21 @@ is not enabled for this session — only the pinned set of PR-review operations 
 Use REST via `gh api repos/{owner}/{repo}/...` instead. (https://api.github.com/graphql)
 ```
 
-The failure is in `gh`'s wrapper logic, not in git itself, so it does not indicate the repo is
-inaccessible — plain `git clone` on the identical URL succeeds (verified same session, same
-repo, exit 0).
+The failure is in `gh`'s wrapper logic, not in git itself — plain `git clone` on the identical
+URL succeeds (same session, same repo, exit 0).
 
 ## 2. Explore the clone with `Read`/`Grep`/`Glob` directly — never `cd`
 
-Pass the worktree path as the tool's `path`/`file_path` argument on every call:
-
-```text
-Read(file_path="./.worktrees/{repo-name}/README.md")
-Glob(pattern="**/*.py", path="./.worktrees/{repo-name}/")
-Grep(pattern="class .*Plugin", path="./.worktrees/{repo-name}/")
-```
+Pass the worktree path as the tool's `path`/`file_path` argument on every call, e.g.
+`Read(file_path="./.worktrees/{repo-name}/README.md")`.
 
 A standalone `cd ./.worktrees/{repo-name}` Bash call does not persist — each Bash call in this
-session resets to the original working directory before the next call runs (confirmed by direct
-test: a compound command ending in `cd` printed "Shell cwd was reset to {original-dir}"
-immediately after, before the next Bash call executed). If a raw directory listing is
-unavoidable, chain it into ONE Bash call — `cd DIR && ls -la` — never issue `cd` as its own
-call; it accomplishes nothing and wastes a turn.
+session resets to the original working directory before the next one runs (a compound command
+ending in `cd` printed "Shell cwd was reset to {original-dir}" immediately after, before the
+next Bash call executed). If a raw directory listing is unavoidable, chain it into ONE Bash
+call — `cd DIR && ls -la` — never issue `cd` as its own call; it accomplishes nothing.
 
-## 3. Do NOT call `gh api` or any `api.github.com` endpoint for an out-of-scope repo
-
-Tested failure mode, reproducible on any repo outside this session's authorized GitHub scope:
+## 3. Treat a `gh api` 403 on an out-of-scope repo as final — go straight to step 5
 
 ```text
 $ gh api repos/{owner}/{repo}
@@ -69,22 +56,20 @@ request access."} (HTTP 403)
 ```
 
 This is a hard scope restriction, not a missing `-R` flag or an auth glitch — it applies
-identically to unauthenticated `curl https://api.github.com/repos/{owner}/{repo}` (also proxied
-and blocked, verified same test, same message, same HTTP 403). No retry, flag change, or
-alternate endpoint will succeed for a repo the session hasn't been granted access to. Do not
-spend a second tool call confirming this once it has failed once for a given repo.
+identically to unauthenticated `curl https://api.github.com/repos/{owner}/{repo}` (same proxy,
+same message, same HTTP 403). No retry, flag change, or alternate endpoint succeeds for a repo
+the session hasn't been granted access to. Once it fails for a given repo, move to step 5.
 
-## 4. Do NOT call `add_repo` (or any session-scope-expansion tool) to route around step 3
+## 4. Reserve `add_repo` for explicit user requests — never as a step-3 workaround
 
 `add_repo`'s own tool description states: "Invoke ONLY when the user explicitly asks to add a
-repo... Do NOT invoke autonomously." A URL supplied as a research target is not a user request
-to add that repo to the session's GitHub scope. Calling `add_repo` here is a contract violation
-of that tool, not a valid fallback — and it still doesn't get you the metadata any faster than
-step 5.
+repo... Do NOT invoke autonomously." A URL supplied as a research target is not that request.
+Using `add_repo` to route around a step-3 403 breaks that tool's own contract and doesn't reach
+the metadata any faster than step 5 does.
 
-This exact mistake was observed in a live session: after `git clone` succeeded and a bare `cd`
-was blocked, the agent tried `gh api` twice (both 403), then called the session's `add_repo` tool
-as a last resort — six tool calls spent reaching the answer that steps 1 and 5 give directly.
+Observed cost of skipping straight to steps 3/4 instead of 5: one live session spent six tool
+calls (clone, blocked `cd`, two `gh api` attempts, then `add_repo`) to reach the answer steps 1
+and 5 give directly.
 
 ## 5. Fallback for stars/forks/contributor counts/latest release
 

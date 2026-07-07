@@ -75,15 +75,20 @@ Create the category directory if it does not exist.
 File location: `./research/{category}/{resource-name}.md`
 
 ````markdown
-# {Resource Name}
-
-**Research Date**: YYYY-MM-DD
-**Source URL**: <https://...>
-**GitHub Repository**: <https://github.com/...> (if applicable)
-**Version at Research**: vX.Y.Z
-**License**: {License type}
-
 ---
+research_date: YYYY-MM-DD
+source_url: https://...
+github_repository: https://github.com/... # if applicable
+version_at_research: vX.Y.Z
+license: {License type}
+freshness_tracking:
+  last_verified: YYYY-MM-DD
+  version_at_verification: vX.Y.Z
+  next_review: YYYY-MM-DD
+  confidence_map: "section: level (qualifier)"
+---
+
+# {Resource Name}
 
 ## Overview
 
@@ -170,17 +175,6 @@ How the resource works internally. Include diagrams if helpful.
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | YYYY-MM-DD |
-| Version at Verification | vX.Y.Z |
-| Next Review Recommended | YYYY-MM-DD |
-| Confidence Map | `section: level (qualifier)` |
 ````
 
 > **Confidence qualifiers**: When a section's claims derive from code analysis rather than
@@ -208,10 +202,10 @@ How the resource works internally. Include diagrams if helpful.
 > after the fact. This section is optional for entries created before 2026-03-12; the
 > validator emits a warning (not error) if absent on newer entries.
 
-> **Note**: "Next Review Recommended" is a suggestion, not a gate. When a user or
-> orchestrator explicitly requests re-research for this entry — via `--rerun`, via
-> `--batch` URL resubmission, or via `--all` — the refresh proceeds regardless of this
-> date. This field provides context ("how stale is this?") and informs scheduling
+> **Note**: The frontmatter's `freshness_tracking.next_review` field is a suggestion, not a
+> gate. When a user or orchestrator explicitly requests re-research for this entry — via
+> `--rerun`, via `--batch` URL resubmission, or via `--all` — the refresh proceeds regardless
+> of this date. This field provides context ("how stale is this?") and informs scheduling
 > decisions. It does not block operations.
 
 ---
