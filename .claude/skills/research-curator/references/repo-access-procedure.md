@@ -71,12 +71,13 @@ Observed cost of skipping straight to steps 3/4 instead of 5: one live session s
 calls (clone, blocked `cd`, two `gh api` attempts, then `add_repo`) to reach the answer steps 1
 and 5 give directly.
 
-## 5. Fallback for stars/forks/contributor counts/latest release
+## 5. Fallback for latest-release/version data blocked by step 3
 
-This is the only data step 3 actually blocks. Look for equivalent data already inside the clone
-from step 1 before concluding it's unavailable:
+Stars, forks, and contributor counts are never gathered at all -- see
+`research-curator.md`'s Fidelity Rule 2a -- so step 3 blocking them is not a gap to fill.
+The only functional data step 3 can block is release/version currency. Look for it
+already inside the clone from step 1 before concluding it's unavailable:
 
-- README badges — the shields.io badge URL or its alt text often embeds the count directly
 - `CITATION.cff`
 - `CHANGELOG.md`
 - `package.json` / `pyproject.toml` version fields
@@ -84,4 +85,4 @@ from step 1 before concluding it's unavailable:
 
 If genuinely absent from the clone, apply Fidelity Rule 3 verbatim: write "Unable to access via
 GitHub API — repository outside this session's authorized scope" in the entry's References
-section. Do not infer the number, and do not attempt steps 3 or 4 again to get it.
+section. Do not infer the value, and do not attempt steps 3 or 4 again to get it.

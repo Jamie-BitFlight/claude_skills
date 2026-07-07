@@ -58,7 +58,6 @@ Create the category directory if it does not exist.
 - Key features (categorized, detailed)
 - Technical architecture or workflow
 - Installation/usage patterns
-- Statistics (stars, downloads, contributors) with date gathered
 
 **Relevance**:
 
@@ -103,17 +102,6 @@ freshness_tracking:
 |---------|----------|
 | {Problem 1} | {How this resource solves it} |
 | {Problem 2} | {How this resource solves it} |
-
----
-
-## Key Statistics
-
-| Metric | Value | Date Gathered |
-|--------|-------|---------------|
-| GitHub Stars | N | YYYY-MM-DD |
-| Downloads/month | N | YYYY-MM-DD |
-| Contributors | N | YYYY-MM-DD |
-| Latest Release | vX.Y.Z | YYYY-MM-DD |
 
 ---
 
@@ -215,8 +203,8 @@ How the resource works internally. Include diagrams if helpful.
 
 - **Next Review**: Set to 3 months from research date. This is a conservative baseline
   appropriate for stable or slow-moving projects. High-activity repositories — those with
-  frequent major or minor releases, rapidly growing star or fork counts, or active breaking
-  API changes — benefit from shorter intervals (4–6 weeks). The agent setting this date
-  should calibrate to the observed activity level of the resource at time of research.
+  frequent major or minor releases or active breaking API changes — benefit from shorter
+  intervals (4–6 weeks). The agent setting this date should calibrate to the observed
+  release cadence of the resource at time of research.
 - **Stale threshold**: 6 months without verification
-- **Review required**: Version change, significant star/fork growth, breaking API changes
+- **Review required**: Version change, breaking API changes

@@ -94,7 +94,7 @@ Tested procedure — environment-scope caveat and full reproduced evidence in [r
 2. Explore via `Read`/`Grep`/`Glob` with the worktree path — never `cd` (doesn't persist between Bash calls in this environment).
 3. A `gh api`/`curl api.github.com` 403 on an out-of-scope repo is final — go to step 5, don't retry.
 4. Never call `add_repo` to route around step 3 — it's reserved for explicit user requests.
-5. Blocked metadata (stars/forks/etc.): pull from in-clone data (badges, `CITATION.cff`, manifests) or mark unavailable per Fidelity Rule 3.
+5. Blocked metadata that's still needed (e.g. latest release version): pull from in-clone data (`CITATION.cff`, manifests, `CHANGELOG.md`) or mark unavailable per Fidelity Rule 3. Do NOT chase stars/forks/contributor counts via any fallback — see Rule 2a, that data is never gathered.
 
 </repo_access_procedure>
 
@@ -102,10 +102,12 @@ After cloning, `./.worktrees/{repo-name}/` is the primary source entry point for
 
 **GitHub repository metadata (only when the target IS in this session's authorized scope — e.g., researching claude_skills itself, not an external research subject)**:
 
-- `gh api repos/{owner}/{repo}` via Bash -- stars, forks, license, description, language
+- `gh api repos/{owner}/{repo}` via Bash -- license, description, language
 - `gh api repos/{owner}/{repo}/releases/latest` via Bash -- latest release version and date
-- `gh api repos/{owner}/{repo}/contributors?per_page=1&anon=true` via Bash -- contributor count (check response headers for total)
 - When interacting with THIS repo (claude_skills), always use `-R Jamie-BitFlight/claude_skills` flag
+
+Do NOT query stars, forks, or contributor counts — see Rule 2a. That data is out of scope
+regardless of whether the repo is in-session or out-of-scope.
 
 **Fallback**:
 
@@ -142,7 +144,7 @@ EXTRACTED PASSAGES — {resource-name}
 
 Apply this to EVERY section: features, architecture, installation steps, usage examples, limitations. Numbers, version strings, benchmark figures, and configuration values MUST be quoted verbatim from source — never paraphrased or estimated.
 
-**Relevance values**: Use the exact section names from the entry template — Overview, Problem Addressed, Key Statistics, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
+**Relevance values**: Use the exact section names from the entry template — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
 
 ### Doc-Sufficiency Check (run immediately after Phase 1 completes)
 
@@ -236,7 +238,6 @@ REQUIRED verification step: Before finalizing a section, confirm that every fact
 ### What Counts as a Claim Requiring a Source
 
 - Version numbers ("v2.3.1")
-- Star counts, download counts, contributor counts
 - Performance figures ("processes 10k events/sec")
 - Feature descriptions ("supports async/await")
 - License type
@@ -264,14 +265,24 @@ If a source cannot be accessed: write "Unable to access [source]: [reason]" in t
 
 ### Rule 2: Preserve Counts and Specifics
 
-Write exact numbers as found in primary sources. NEVER substitute vague quantifiers.
+Write exact numbers as found in primary sources when the number describes what the resource
+does or how well it does it. NEVER substitute vague quantifiers for a capability figure.
+Popularity metrics (stars, downloads, forks) are out of scope entirely — see Rule 2a.
 
 | Source Says | Write | NEVER Write |
 |-------------|-------|-------------|
-| "14,823 GitHub stars" | "14,823 stars (as of {date})" | "popular" or "widely used" |
 | "supports 12 languages" | "supports 12 languages" | "many languages" |
 | "v0.8.2, released 2025-11-03" | "v0.8.2 (released 2025-11-03)" | "recent release" |
 | "benchmark: 45ms p99 latency" | "45ms p99 latency" | "low latency" |
+
+### Rule 2a: No Popularity Statistics
+
+Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
+These describe how popular a resource is, not what it does, how it does it, or why it's
+valuable — they don't inform the review or utility judgments this entry exists to support,
+and a reader can query them programmatically at any time via `gh api repos/{owner}/{repo}`
+if genuinely needed. There is no "Key Statistics" section in the entry template; do not
+add one, and do not fold this data into another section.
 
 ### Rule 3: Distinguish Absence from Nonexistence
 
@@ -402,8 +413,7 @@ flowchart TD
     ShallowClone --> Fetch[Fetch all available primary sources<br>using .worktrees/repo-name/ as primary entry point]
     Fetch --> Extract[Extract key passages per source with source references]
     Extract --> Metadata[Gather identity -- name, exact version string, license, URLs]
-    Metadata --> Stats[Gather statistics -- exact stars, downloads, contributor count with date]
-    Stats --> Features[Document features with mechanism and examples, not just names]
+    Metadata --> Features[Document features with mechanism and examples, not just names]
     Features --> Architecture[Describe architecture with component names and data flow]
     Architecture --> Usage[Write installation and usage examples verified against official docs]
     Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
@@ -418,7 +428,7 @@ flowchart TD
 ### `--rerun` Mode (re-research existing entry)
 
 1. READ the existing entry file first.
-2. Re-gather fresh data for statistics, versions, features from primary sources.
+2. Re-gather fresh data for versions and features from primary sources.
 3. Re-extract passages. Note where data has changed vs. the existing entry.
 4. Run the Doc-Sufficiency Check on the re-extracted passages (same three binary questions):
    - Q1: Do any extracts name at least 2 specific component, module, or class names (not generic descriptions like "has a plugin system")?

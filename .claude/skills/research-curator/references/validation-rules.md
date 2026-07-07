@@ -8,7 +8,7 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 
 ### Error Severity (must fix)
 
-- **section_completeness**: All 9 required `##`-level sections must exist — Overview, Problem Addressed, Key Statistics, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. Header fields (Research Date, Source URL, etc.) are checked separately via **header_fields**.
+- **section_completeness**: All required `##`-level sections (defined in `entry-template.md`'s Entry File Template) must exist — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. Header fields (Research Date, Source URL, etc.) are checked separately via **header_fields**.
 - **header_fields**: Header block must contain Research Date, Source URL, Version at Research, License
 - **empty_sections**: Section heading exists but contains no content below it before the next heading
 
@@ -16,7 +16,6 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 
 - **access_dates**: Every URL in the References section must have an access date in format `(accessed YYYY-MM-DD)` or `(YYYY-MM-DD)`
 - **freshness_tracking**: Freshness Tracking section must contain Last Verified, Version at Verification, Next Review Recommended fields
-- **statistics_currency**: Dates in Key Statistics section older than 6 months from today trigger a staleness warning
 - **url_format**: All URLs must be valid `http://` or `https://` format
 - **cross_references_absent**: Entry does not contain a `## Cross-References` section. Expected for entries created or last verified on or after 2026-03-12. Entries with Research Date or Last Verified before this date are exempt. Note for `validate_research.py` implementers: gate this warning on the Research Date or Last Verified field value — exempt entries with dates before 2026-03-12.
 
@@ -41,7 +40,6 @@ flowchart TD
 
 **Agent handles fixes** that require:
 
-- Gathering fresh statistics (re-research)
 - Writing missing section content
 - Updating stale references with current URLs
 - Refreshing version numbers from upstream

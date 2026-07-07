@@ -19,7 +19,6 @@ import json
 import os
 import re
 import sys
-from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict
@@ -48,7 +47,6 @@ app = typer.Typer(add_completion=False)
 REQUIRED_BODY_SECTIONS = [
     "Overview",
     "Problem Addressed",
-    "Key Statistics",
     "Key Features",
     "Technical Architecture",
     "Installation & Usage",
@@ -89,7 +87,6 @@ _YAML_FRESHNESS_ALIASES: dict[str, list[str]] = {
 
 URL_PATTERN = re.compile(r"https?://[^\s>)\]]+")
 ACCESS_DATE_PATTERN = re.compile(r"(?:accessed\s+\d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))")
-DATE_PATTERN = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 
 _yaml = YAML()
 _yaml.preserve_quotes = True
@@ -284,40 +281,6 @@ def _check_access_dates(lines: list[str], sections: dict[str, tuple[int, int]]) 
                 "message": f"Reference without access date on line {i + 1}",
                 "line": i + 1,
             })
-    return issues
-
-
-def _check_statistics_currency(lines: list[str], sections: dict[str, tuple[int, int]], today: date) -> list[Issue]:
-    """Check for stale dates in Key Statistics section.
-
-    Returns:
-        List of ``Issue`` dicts, one per stale date found.
-    """
-    issues: list[Issue] = []
-    cutoff = today - timedelta(days=180)
-
-    ks_section = sections.get("Key Statistics")
-    if ks_section is None:
-        return issues
-
-    start, end = ks_section
-    for i in range(start - 1, end):
-        if i >= len(lines):
-            break
-        line = lines[i]
-        for match in DATE_PATTERN.finditer(line):
-            date_str = match.group(1)
-            try:
-                d = date.fromisoformat(date_str)
-            except ValueError:
-                continue
-            if d < cutoff:
-                issues.append({
-                    "check": "statistics_currency",
-                    "severity": "warning",
-                    "message": f"Stale date {date_str} in Key Statistics (older than 6 months)",
-                    "line": i + 1,
-                })
     return issues
 
 
@@ -557,17 +520,16 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
 
 
-def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str, Any]:
+def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
     """Validate a single research markdown file.
 
     Detects format automatically and applies the appropriate header/freshness
-    checks. Shared checks (sections, empty sections, access dates, statistics
-    currency, URL format, formatting) run for both formats.
+    checks. Shared checks (sections, empty sections, access dates, URL format,
+    formatting) run for both formats.
 
     Args:
         filepath: Absolute path to the markdown file to validate.
         research_root: Root directory used to produce a relative file path.
-        today: Reference date for freshness and currency checks.
 
     Returns:
         Dict with keys ``file``, ``format``, ``status`` (pass/fail), and ``issues``.
@@ -598,7 +560,6 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
         all_issues.extend(_check_empty_sections(body_lines, sections))
         all_issues.extend(_check_access_dates(body_lines, sections))
         all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
-        all_issues.extend(_check_statistics_currency(body_lines, sections, today))
         all_issues.extend(_check_url_format(body_lines))
         all_issues.extend(_check_formatting_suggestions(body_lines))
     else:
@@ -612,7 +573,6 @@ def validate_file(filepath: Path, research_root: Path, today: date) -> dict[str,
         all_issues.extend(_check_empty_sections(lines, sections))
         all_issues.extend(_check_access_dates(lines, sections))
         all_issues.extend(_check_freshness_tracking_text(lines, sections))
-        all_issues.extend(_check_statistics_currency(lines, sections, today))
         all_issues.extend(_check_url_format(lines))
         all_issues.extend(_check_formatting_suggestions(lines))
 
@@ -782,7 +742,6 @@ def main(
     """Validate research entries against quality standards."""
     resolved = paths or [Path("./research/")]
     research_root = _infer_research_root(resolved)
-    today = datetime.now(tz=UTC).date()
 
     files = _collect_deduped_files(resolved)
     if not files:
@@ -794,7 +753,7 @@ def main(
             print("No research files found.")
         sys.exit(0)
 
-    entries = [validate_file(f, research_root, today) for f in files]
+    entries = [validate_file(f, research_root) for f in files]
 
     total = len(entries)
     passed = sum(1 for e in entries if e["status"] == "pass")
