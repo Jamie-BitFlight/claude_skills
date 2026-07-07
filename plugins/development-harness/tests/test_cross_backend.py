@@ -992,7 +992,7 @@ class TestBeadsBackendConformance:
         bd_runner.run_text.assert_not_called()
 
     def test_view_enrich_populates_status_and_source(self, beads_backend, bd_runner, bd_show_fixture) -> None:
-        """view_enrich_from_github populates status, state, source, and title."""
+        """view_enrich_from_github populates status, state, source, title, and body."""
         bd_runner.run_json.return_value = bd_show_fixture
         result = ViewItemResult(title="", status="", state="", source="")
 
@@ -1003,3 +1003,29 @@ class TestBeadsBackendConformance:
         assert result.state == "open"
         assert result.source == "beads"
         assert result.title == "Fix authentication bug"
+        assert result.body == "The authentication module fails on expired tokens."
+
+    def test_view_enrich_appends_notes_to_body(self, beads_backend, bd_runner, bd_show_fixture) -> None:
+        """view_enrich_from_github appends notes as a Notes section after the description."""
+        bd_show_fixture["notes"] = "Escalated by support team."
+        bd_runner.run_json.return_value = bd_show_fixture
+        result = ViewItemResult(title="", status="", state="", source="")
+
+        ok = beads_backend.view_enrich_from_github(result, "bd-a3f8")
+
+        assert ok is True
+        assert result.body == (
+            "The authentication module fails on expired tokens.\n\n## Notes\n\nEscalated by support team."
+        )
+
+    def test_view_enrich_notes_only_no_description(self, beads_backend, bd_runner, bd_show_fixture) -> None:
+        """view_enrich_from_github uses notes as the body when description is absent."""
+        bd_show_fixture["description"] = None
+        bd_show_fixture["notes"] = "Escalated by support team."
+        bd_runner.run_json.return_value = bd_show_fixture
+        result = ViewItemResult(title="", status="", state="", source="")
+
+        ok = beads_backend.view_enrich_from_github(result, "bd-a3f8")
+
+        assert ok is True
+        assert result.body == "Escalated by support team."

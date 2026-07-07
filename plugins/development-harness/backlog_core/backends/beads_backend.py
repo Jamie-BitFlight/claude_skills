@@ -464,8 +464,9 @@ class BeadsBackend:
         """Enrich a ViewItemResult with live data from beads via ``bd show``.
 
         Populates ``result.status``, ``result.state``, ``result.title``,
-        and ``result.source`` from the beads issue.  Returns ``False`` when the
-        issue cannot be found or the data is malformed.
+        ``result.source``, and ``result.body`` (from the issue description
+        and notes) from the beads issue.  Returns ``False`` when the issue
+        cannot be found or the data is malformed.
 
         Args:
             result: ViewItemResult to enrich in place.
@@ -493,6 +494,10 @@ class BeadsBackend:
         result.source = "beads"
         if parsed.title:
             result.title = parsed.title
+        if parsed.description:
+            result.body = parsed.description
+        if parsed.notes:
+            result.body = f"{result.body}\n\n## Notes\n\n{parsed.notes}" if result.body else parsed.notes
         return True
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
