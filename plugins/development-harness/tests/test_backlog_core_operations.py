@@ -3246,10 +3246,14 @@ class TestRenameItemTitleBeadsNanoid:
         Tests: _rename_item_title early-return path for string-ID backends.
         How: Configure a BeadsBackend (issue_id_type='string'); write an item with
              issue='bd-a3f8'; call update_item(title=); verify no exception is raised,
-             the local file is renamed, and _update_issue_graphql is NOT called.
+             the local file is renamed, and try_get_github is NOT called.
         Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
              The fix adds an issue_id_type guard before try_get_github, so no GitHub
-             sync is attempted — the local update completes cleanly.
+             sync is attempted — the local update completes cleanly. try_get_github
+             is mocked and asserted not-called (rather than relying on
+             _update_issue_graphql not being reached) because an empty default_repo
+             in this test's config makes an unmocked try_get_github return None on
+             its own, which would let this test pass even if the guard were removed.
         """
         from unittest.mock import MagicMock
 
@@ -3268,11 +3272,13 @@ class TestRenameItemTitleBeadsNanoid:
             fake_dir: Path = models.get_backlog_dir()
             _write_item(fake_dir, title="Beads Title Item", topic="beads-title-item", issue="bd-a3f8")
 
+            mock_try_get_github = mocker.patch("backlog_core.operations.try_get_github")
             mock_update_issue = mocker.patch("backlog_core.operations._update_issue_graphql")
 
             result = update_item(selector="Beads Title Item", title="Beads Title Renamed")
 
             assert result.get("renamed_to") == "Beads Title Renamed"
+            mock_try_get_github.assert_not_called()
             mock_update_issue.assert_not_called()
         finally:
             reset_config()
@@ -3291,11 +3297,15 @@ class TestApplyPlanToItemBeadsNanoid:
 
         Tests: _apply_plan_to_item early-return path for string-ID backends.
         How: Configure a BeadsBackend (issue_id_type='string'); write an item with
-             issue='bd-c9d1'; call update_item(plan=); verify no exception is raised
+             issue='bd-c9d1'; call update_item(plan=); verify no exception is raised,
              and _add_comment_graphql is NOT called.
         Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
              The fix adds an issue_id_type guard before try_get_github, so no GitHub
-             plan comment is attempted — the local update completes cleanly.
+             plan comment is attempted — the local update completes cleanly. try_get_github
+             is mocked and asserted not-called (rather than relying on
+             _add_comment_graphql not being reached) because an empty default_repo
+             in this test's config makes an unmocked try_get_github return None on
+             its own, which would let this test pass even if the guard were removed.
         """
         from unittest.mock import MagicMock
 
@@ -3314,11 +3324,13 @@ class TestApplyPlanToItemBeadsNanoid:
             fake_dir: Path = models.get_backlog_dir()
             _write_item(fake_dir, title="Beads Plan Item", topic="beads-plan-item", issue="bd-c9d1")
 
+            mock_try_get_github = mocker.patch("backlog_core.operations.try_get_github")
             mock_add_comment = mocker.patch("backlog_core.operations._add_comment_graphql")
 
             result = update_item(selector="Beads Plan Item", plan="plan/tasks-beads.yaml")
 
             assert result.get("errors", []) == []
+            mock_try_get_github.assert_not_called()
             mock_add_comment.assert_not_called()
         finally:
             reset_config()
