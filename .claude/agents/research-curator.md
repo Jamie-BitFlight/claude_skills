@@ -27,7 +27,7 @@ flowchart TD
     CheckFlags -->|No flags| New[New research mode]
 
     New --> DetectRepo{Is target a repo, or does the<br>target site have an associated repo?}
-    DetectRepo -->|"Yes — repo URL known"| Clone["Shallow clone to .worktrees/repo-name/<br>git clone --depth 1 URL .worktrees/repo-name/<br>or: gh repo clone owner/repo .worktrees/repo-name/ -- --depth 1"]
+    DetectRepo -->|"Yes — repo URL known"| Clone["Shallow clone to .worktrees/repo-name/<br>git clone --depth 1 URL .worktrees/repo-name/<br>(plain git clone ONLY — see repo_access_procedure)"]
     DetectRepo -->|"No repo detected"| Identify{Resource type?}
     Clone --> Identify{Resource type?}
 
@@ -84,21 +84,25 @@ Check the `<functions>` list in your system prompt for current MCP tool availabi
 - `mcp__exa__web_search_exa` -- web search for resources, articles, comparisons
 - `mcp__exa__get_code_context_exa` -- find code examples and API usage patterns
 
-**Repository shallow clone (preferred for repos and sites with associated repos)**:
+**Repository shallow clone (preferred for repos and sites with associated repos) — TESTED PROCEDURE, follow verbatim**:
 
-When the target is a GitHub/GitLab/Codeberg repository, or when a website has an associated public repository, shallow clone it before gathering data. Local reads are faster and more complete than API calls for deep content analysis.
+<repo_access_procedure>
 
-```bash
-# Via git (any host)
-git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/
+**Environment scope**: steps 3-4 below (the `gh api` 403 and the `add_repo` restriction) are properties of sandboxed/remote Claude Code execution environments with a GitHub-scope-enforcing proxy — the kind this was tested in. A session running with a full, unrestricted `gh`/`GITHUB_TOKEN` (e.g., a local CLI session) will not hit these walls and `gh api` may simply work. Steps 1-2 (plain `git clone`, never `cd`) are good practice regardless of environment. If `gh api` succeeds on the first try, use it — do not preemptively avoid it because this procedure exists.
 
-# Via gh CLI (GitHub — preferred when available)
-gh repo clone {owner}/{repo} ./.worktrees/{repo-name}/ -- --depth 1
-```
+Full tested procedure with reproduced failure output: [repo-access-procedure.md](./../skills/research-curator/references/repo-access-procedure.md). Read it before the first clone of a session — it replaces trial-and-error with five sequential rules, each proven by direct test in this sandboxed environment (2026-07-07):
 
-After cloning, use `Read`, `Grep`, and `Glob` on `./.worktrees/{repo-name}/` as the primary source entry point. This enables access to the full README, source files, config, CHANGELOG, `docs/`, and any spec files — content that the GitHub contents API only returns file-by-file. Repo name for the worktree path: sanitize to `[A-Za-z0-9._-]` only (replace other characters with `_`).
+1. Clone with plain `git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/` only. `gh repo clone` is confirmed broken (blocked GraphQL preflight, HTTP 403) even though the repo itself is clonable via plain git.
+2. Explore the clone with `Read`/`Grep`/`Glob` passing the worktree path directly — never `cd`. A standalone `cd` call does not persist to the next Bash call in this session (confirmed by direct test).
+3. Do NOT call `gh api` or `curl api.github.com` for a repo outside this session's authorized GitHub scope — confirmed hard 403 ("GitHub access to this repository is not enabled for this session"), not a flag or auth issue. Do not retry.
+4. Do NOT call `add_repo` (or any session-scope-expansion tool) to route around a 403 from step 3 — its own description restricts it to explicit user-initiated repo additions; a research URL is not that.
+5. For stars/forks/contributors/latest-release blocked by step 3: extract equivalent data already in the clone (README badges, `CITATION.cff`, `CHANGELOG.md`, manifest version fields) or apply Fidelity Rule 3 and mark it "Unable to access via GitHub API — repository outside this session's authorized scope".
 
-**GitHub repository metadata**:
+</repo_access_procedure>
+
+After cloning, `./.worktrees/{repo-name}/` is the primary source entry point for the full README, source files, config, CHANGELOG, `docs/`, and any spec files — content the GitHub contents API only returns file-by-file even when accessible.
+
+**GitHub repository metadata (only when the target IS in this session's authorized scope — e.g., researching claude_skills itself, not an external research subject)**:
 
 - `gh api repos/{owner}/{repo}` via Bash -- stars, forks, license, description, language
 - `gh api repos/{owner}/{repo}/releases/latest` via Bash -- latest release version and date
@@ -520,6 +524,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
 - Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree)
+- Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it
