@@ -369,9 +369,12 @@ def migrate_file(filepath: Path, research_root: Path, *, dry_run: bool) -> tuple
     while body_stripped and not body_stripped[0].strip():
         body_stripped.pop(0)
 
-    # Build the new file: frontmatter + blank line + body
+    # Build the new file: frontmatter + blank line + # Title + blank line + body
     new_lines = frontmatter.splitlines()
     new_lines.append("")
+    if title:
+        new_lines.append(f"# {title}")
+        new_lines.append("")
     new_lines.extend(body_stripped)
 
     # Ensure single trailing newline
@@ -418,9 +421,9 @@ def _collect_files(paths: list[Path]) -> list[Path]:
     for p in paths:
         if p.is_file():
             if p.suffix == ".md" and p.name != "README.md":
-                collected.append(p)
+                collected.append(p.resolve())
         elif p.is_dir():
-            collected.extend(f for f in sorted(p.rglob("*.md")) if f.name != "README.md")
+            collected.extend(f.resolve() for f in sorted(p.rglob("*.md")) if f.name != "README.md")
     seen: set[Path] = set()
     result: list[Path] = []
     for f in collected:
