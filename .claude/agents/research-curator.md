@@ -88,15 +88,13 @@ Check the `<functions>` list in your system prompt for current MCP tool availabi
 
 <repo_access_procedure>
 
-**Environment scope**: steps 3-4 below (the `gh api` 403 and the `add_repo` restriction) are properties of sandboxed/remote Claude Code execution environments with a GitHub-scope-enforcing proxy — the kind this was tested in. A session running with a full, unrestricted `gh`/`GITHUB_TOKEN` (e.g., a local CLI session) will not hit these walls and `gh api` may simply work. Steps 1-2 (plain `git clone`, never `cd`) are good practice regardless of environment. If `gh api` succeeds on the first try, use it — do not preemptively avoid it because this procedure exists.
+Tested procedure — environment-scope caveat and full reproduced evidence in [repo-access-procedure.md](./../skills/research-curator/references/repo-access-procedure.md); load it before the first clone of a session:
 
-Full tested procedure with reproduced failure output: [repo-access-procedure.md](./../skills/research-curator/references/repo-access-procedure.md). Read it before the first clone of a session — it replaces trial-and-error with five sequential rules, each proven by direct test in this sandboxed environment (2026-07-07):
-
-1. Clone with plain `git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/` only. `gh repo clone` is confirmed broken (blocked GraphQL preflight, HTTP 403) even though the repo itself is clonable via plain git.
-2. Explore the clone with `Read`/`Grep`/`Glob` passing the worktree path directly — never `cd`. A standalone `cd` call does not persist to the next Bash call in this session (confirmed by direct test).
-3. Do NOT call `gh api` or `curl api.github.com` for a repo outside this session's authorized GitHub scope — confirmed hard 403 ("GitHub access to this repository is not enabled for this session"), not a flag or auth issue. Do not retry.
-4. Do NOT call `add_repo` (or any session-scope-expansion tool) to route around a 403 from step 3 — its own description restricts it to explicit user-initiated repo additions; a research URL is not that.
-5. For stars/forks/contributors/latest-release blocked by step 3: extract equivalent data already in the clone (README badges, `CITATION.cff`, `CHANGELOG.md`, manifest version fields) or apply Fidelity Rule 3 and mark it "Unable to access via GitHub API — repository outside this session's authorized scope".
+1. `git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/` — not `gh repo clone` (blocked for out-of-scope repos).
+2. Explore via `Read`/`Grep`/`Glob` with the worktree path — never `cd` (doesn't persist between Bash calls in this environment).
+3. A `gh api`/`curl api.github.com` 403 on an out-of-scope repo is final — go to step 5, don't retry.
+4. Never call `add_repo` to route around step 3 — it's reserved for explicit user requests.
+5. Blocked metadata (stars/forks/etc.): pull from in-clone data (badges, `CITATION.cff`, manifests) or mark unavailable per Fidelity Rule 3.
 
 </repo_access_procedure>
 

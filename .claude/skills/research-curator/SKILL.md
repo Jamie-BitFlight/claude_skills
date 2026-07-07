@@ -106,22 +106,12 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 ### Duplicate Detection
 
-Before spawning, check if `./research/` already contains an entry for the URL's resource.
-If found:
-
-1. Read the entry's Freshness Tracking section.
-2. Compute days since Last Verified (integer: today minus Last Verified date).
-3. Emit: `Entry is N days old (last verified: YYYY-MM-DD, vX.Y.Z). Proceeding with refresh.`
-4. Pass `--rerun ./research/{category}/{name}.md` to the agent instead of a fresh-URL prompt.
-
-If the Freshness Tracking section is absent or Last Verified is unreadable, emit:
-`Entry exists but freshness data unavailable. Proceeding with refresh.`
-and pass `--rerun ./research/{category}/{name}.md` to the agent instead of a fresh-URL prompt.
+Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Batch Mode) before spawning.
 
 ### Workflow
 
 1. **Parse** -- extract the URL from `<mode_args/>`
-2. **Duplicate Detection** -- apply the [Duplicate Detection](#duplicate-detection) check above before spawning
+2. **Duplicate Detection** -- apply the [Duplicate Detection](./references/duplicate-detection.md) check before spawning
 3. **Spawn agent** -- invoke `@research-curator` via Agent tool:
 
    ```text
@@ -213,17 +203,7 @@ See [Batch Mode reference](./references/batch-mode.md) for the complete wave spa
 
 ### Duplicate Detection
 
-Before spawning, check if `./research/` already contains an entry for the URL's resource.
-If found:
-
-1. Read the entry's Freshness Tracking section.
-2. Compute days since Last Verified (integer: today minus Last Verified date).
-3. Emit: `Entry is N days old (last verified: YYYY-MM-DD, vX.Y.Z). Proceeding with refresh.`
-4. Pass `--rerun ./research/{category}/{name}.md` to the agent instead of skipping.
-
-If the Freshness Tracking section is absent or Last Verified is unreadable, emit:
-`Entry exists but freshness data unavailable. Proceeding with refresh.`
-and pass `--rerun ./research/{category}/{name}.md` to the agent.
+Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Default Mode) before spawning.
 
 ### Progress Reporting
 
