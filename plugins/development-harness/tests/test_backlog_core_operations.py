@@ -3337,6 +3337,59 @@ class TestApplyPlanToItemBeadsNanoid:
 
 
 # ---------------------------------------------------------------------------
+# _auto_register_plan_artifact — beads nanoid safe-skip
+# ---------------------------------------------------------------------------
+
+
+class TestAutoRegisterPlanArtifactBeadsNanoid:
+    """_auto_register_plan_artifact skips artifact registration for beads nanoid issue refs."""
+
+    def test_auto_register_plan_artifact_no_warning_for_beads_nanoid(self, mocker: MockerFixture) -> None:
+        """update_item(plan=...) on a beads item emits no 'Could not parse issue number' warning.
+
+        Tests: _auto_register_plan_artifact early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-f7a2'; call update_item(plan=...); verify no exception is raised
+             and no "Could not parse issue number" warning is emitted.
+        Why: _auto_register_plan_artifact is called unconditionally after
+             _apply_plan_to_item, with no issue_id_type guard. Without the guard it
+             calls parse_issue_number('bd-f7a2'), which returns None, and emits a
+             spurious "Could not parse issue number from 'bd-f7a2'" warning even
+             though the plan update itself succeeded cleanly — a fully-supported
+             beads operation reported as degraded.
+        """
+        from unittest.mock import MagicMock
+
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+        from backlog_core.operations import update_item
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Artifact Item", topic="beads-artifact-item", issue="bd-f7a2")
+
+            mocker.patch("backlog_core.operations.try_get_github")
+            mocker.patch("backlog_core.operations._add_comment_graphql")
+            mock_create_provider = mocker.patch("backlog_core.operations.create_artifact_provider")
+
+            result = update_item(selector="Beads Artifact Item", plan="plan/tasks-beads-artifact.yaml")
+
+            raw_warnings = result.get("warnings")
+            warnings_text = " ".join(raw_warnings) if isinstance(raw_warnings, list) else ""
+            assert "Could not parse issue number" not in warnings_text
+            mock_create_provider.assert_not_called()
+        finally:
+            reset_config()
+
+
+# ---------------------------------------------------------------------------
 # backlog_view — beads nanoid uncached (issue #2664)
 # ---------------------------------------------------------------------------
 
