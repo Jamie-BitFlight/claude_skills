@@ -3230,3 +3230,243 @@ class TestViewItemUnknownSections:
         assert "num_entries" in unknown_meta
         assert unknown_meta["num_entries"] == 2
         assert len(unknown_meta["entries"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# _rename_item_title — beads nanoid safe-skip (issue #2665)
+# ---------------------------------------------------------------------------
+
+
+class TestRenameItemTitleBeadsNanoid:
+    """_rename_item_title skips GitHub title update for beads nanoid issue refs."""
+
+    def test_rename_item_title_skips_github_for_beads_nanoid(self, mocker: MockerFixture) -> None:
+        """_rename_item_title with a beads nanoid issue_ref returns without raising.
+
+        Tests: _rename_item_title early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-a3f8'; call update_item(title=); verify no exception is raised,
+             the local file is renamed, and try_get_github is NOT called.
+        Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
+             The fix adds an issue_id_type guard before try_get_github, so no GitHub
+             sync is attempted — the local update completes cleanly. try_get_github
+             is mocked and asserted not-called (rather than relying on
+             _update_issue_graphql not being reached) because an empty default_repo
+             in this test's config makes an unmocked try_get_github return None on
+             its own, which would let this test pass even if the guard were removed.
+        """
+        from unittest.mock import MagicMock
+
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+        from backlog_core.operations import update_item
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Title Item", topic="beads-title-item", issue="bd-a3f8")
+
+            mock_try_get_github = mocker.patch("backlog_core.operations.try_get_github")
+            mock_update_issue = mocker.patch("backlog_core.operations._update_issue_graphql")
+
+            result = update_item(selector="Beads Title Item", title="Beads Title Renamed")
+
+            assert result.get("renamed_to") == "Beads Title Renamed"
+            mock_try_get_github.assert_not_called()
+            mock_update_issue.assert_not_called()
+        finally:
+            reset_config()
+
+
+# ---------------------------------------------------------------------------
+# _apply_plan_to_item — beads nanoid safe-skip (issue #2665)
+# ---------------------------------------------------------------------------
+
+
+class TestApplyPlanToItemBeadsNanoid:
+    """_apply_plan_to_item skips GitHub plan comment for beads nanoid issue refs."""
+
+    def test_apply_plan_to_item_skips_github_for_beads_nanoid(self, mocker: MockerFixture) -> None:
+        """_apply_plan_to_item with a beads nanoid issue_ref returns without raising.
+
+        Tests: _apply_plan_to_item early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-c9d1'; call update_item(plan=); verify no exception is raised,
+             and _add_comment_graphql is NOT called.
+        Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
+             The fix adds an issue_id_type guard before try_get_github, so no GitHub
+             plan comment is attempted — the local update completes cleanly. try_get_github
+             is mocked and asserted not-called (rather than relying on
+             _add_comment_graphql not being reached) because an empty default_repo
+             in this test's config makes an unmocked try_get_github return None on
+             its own, which would let this test pass even if the guard were removed.
+        """
+        from unittest.mock import MagicMock
+
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+        from backlog_core.operations import update_item
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Plan Item", topic="beads-plan-item", issue="bd-c9d1")
+
+            mock_try_get_github = mocker.patch("backlog_core.operations.try_get_github")
+            mock_add_comment = mocker.patch("backlog_core.operations._add_comment_graphql")
+
+            result = update_item(selector="Beads Plan Item", plan="plan/tasks-beads.yaml")
+
+            assert result.get("errors", []) == []
+            mock_try_get_github.assert_not_called()
+            mock_add_comment.assert_not_called()
+        finally:
+            reset_config()
+
+
+# ---------------------------------------------------------------------------
+# _auto_register_plan_artifact — beads nanoid safe-skip
+# ---------------------------------------------------------------------------
+
+
+class TestAutoRegisterPlanArtifactBeadsNanoid:
+    """_auto_register_plan_artifact skips artifact registration for beads nanoid issue refs."""
+
+    def test_auto_register_plan_artifact_no_warning_for_beads_nanoid(self, mocker: MockerFixture) -> None:
+        """update_item(plan=...) on a beads item emits no 'Could not parse issue number' warning.
+
+        Tests: _auto_register_plan_artifact early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-f7a2'; call update_item(plan=...); verify no exception is raised
+             and no "Could not parse issue number" warning is emitted.
+        Why: _auto_register_plan_artifact is called unconditionally after
+             _apply_plan_to_item, with no issue_id_type guard. Without the guard it
+             calls parse_issue_number('bd-f7a2'), which returns None, and emits a
+             spurious "Could not parse issue number from 'bd-f7a2'" warning even
+             though the plan update itself succeeded cleanly — a fully-supported
+             beads operation reported as degraded.
+        """
+        from unittest.mock import MagicMock
+
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+        from backlog_core.operations import update_item
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Artifact Item", topic="beads-artifact-item", issue="bd-f7a2")
+
+            mocker.patch("backlog_core.operations.try_get_github")
+            mocker.patch("backlog_core.operations._add_comment_graphql")
+            mock_create_provider = mocker.patch("backlog_core.operations.create_artifact_provider")
+
+            result = update_item(selector="Beads Artifact Item", plan="plan/tasks-beads-artifact.yaml")
+
+            raw_warnings = result.get("warnings")
+            warnings_text = " ".join(raw_warnings) if isinstance(raw_warnings, list) else ""
+            assert "Could not parse issue number" not in warnings_text
+            mock_create_provider.assert_not_called()
+        finally:
+            reset_config()
+
+
+# ---------------------------------------------------------------------------
+# backlog_view — beads nanoid uncached (issue #2664)
+# ---------------------------------------------------------------------------
+
+
+class TestViewItemBeadsNanoidUncached:
+    """backlog_view routes to view_enrich_from_github for uncached beads nanoid selectors."""
+
+    def test_view_item_beads_nanoid_uncached_calls_enrich(self, mocker: MockerFixture) -> None:
+        """backlog_view calls view_enrich_from_github for an uncached beads nanoid selector.
+
+        Tests: backlog_view string-ID backend fallback path.
+        How: Configure a BeadsBackend (issue_id_type='string'); write NO local item;
+             mock view_enrich_from_github to return True; call view_item with nanoid.
+        Why: parse_issue_selector returns None for beads nanoids, so the original
+             if issue_num: gate was never entered — enrichment was never attempted for
+             uncached items. The fix adds a fallback branch for string-ID backends.
+        """
+        from unittest.mock import MagicMock
+
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        try:
+            view_item("bd-e2f4")
+        finally:
+            reset_config()
+
+        mock_enrich.assert_called_once()
+        selector_arg = mock_enrich.call_args.args[1]
+        assert selector_arg == "bd-e2f4"
+
+    def test_view_item_beads_nanoid_uncached_raises_when_enrich_fails(self, mocker: MockerFixture) -> None:
+        """backlog_view raises ItemNotFoundError when view_enrich_from_github returns False.
+
+        Tests: backlog_view string-ID backend fallback — enrichment failure path.
+        How: Configure BeadsBackend; mock view_enrich_from_github to return False;
+             call view_item with a beads nanoid; expect ItemNotFoundError.
+        Why: If the backend cannot find the item either, ItemNotFoundError is the
+             correct outcome — the selector resolves to nothing.
+        """
+        from unittest.mock import MagicMock
+
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
+
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+
+        try:
+            with pytest.raises(ItemNotFoundError):
+                view_item("bd-g3h5")
+        finally:
+            reset_config()
+
+    def test_view_item_github_backend_unknown_nanoid_still_raises(self, mocker: MockerFixture) -> None:
+        """backlog_view with a GitHub backend raises ItemNotFoundError for a beads-style selector.
+
+        Tests: backlog_view non-string-ID backend — unchanged behavior.
+        How: Default config (GitHub backend, issue_id_type='integer'); mock
+             view_enrich_from_github to return False; call view_item with a beads nanoid.
+        Why: The fallback path must only activate for string-ID backends. GitHub users
+             passing nonsense selectors should still get ItemNotFoundError.
+        """
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+
+        with pytest.raises(ItemNotFoundError):
+            view_item("bd-h4i6")

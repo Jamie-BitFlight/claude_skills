@@ -714,12 +714,16 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
     issue_ref = item.issue
     if issue_ref:
+        if get_config().backend.issue_id_type == "string":
+            # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
+            # Local title was already updated above; no GitHub sync needed.
+            return True
         repository = try_get_github(repo)
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    msg = f"Invalid issue ref: {issue_ref!r}"
+                    msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
                     raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
@@ -763,12 +767,16 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
     if issue_ref:
+        if get_config().backend.issue_id_type == "string":
+            # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
+            # Local plan metadata was already updated above; no GitHub sync needed.
+            return True
         repository = try_get_github(repo)
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    msg = f"Invalid issue ref: {issue_ref!r}"
+                    msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
                     raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
@@ -785,7 +793,8 @@ def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", o
 
     Best-effort: logs a warning on any failure but never raises.  Called
     after :func:`_apply_plan_to_item` when the backlog item has a linked
-    GitHub Issue.
+    GitHub Issue.  No-ops silently for string-ID backends (e.g. beads) —
+    artifact registration targets GitHub issue manifests only.
 
     Args:
         item: Backlog item whose linked issue will receive the artifact entry.
@@ -796,6 +805,11 @@ def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", o
     out = output or Output()
     issue_ref = item.issue
     if not issue_ref:
+        return
+    if get_config().backend.issue_id_type == "string":
+        # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub
+        # issue number — artifact registration targets GitHub issue manifests
+        # only, so there is nothing to register against for this backend.
         return
     issue_number = parse_issue_number(issue_ref)
     if issue_number is None:
@@ -3424,7 +3438,12 @@ def view_item(
         if item:
             result.groomed = item.metadata.groomed
     elif not item:
-        raise ItemNotFoundError(selector)
+        if get_config().backend.issue_id_type == "string":
+            enriched = view_enrich_from_github(result, selector.strip(), repo)
+            if not enriched:
+                raise ItemNotFoundError(selector)
+        else:
+            raise ItemNotFoundError(selector)
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show
