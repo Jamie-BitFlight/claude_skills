@@ -1,314 +1,295 @@
 ---
-title: Agent Skills
-subtitle: Production-grade engineering skills for AI coding agents following Google engineering practices
+name: agent-skills
+description: Production-grade engineering skills for AI coding agents — structured workflows that encode senior engineering practices and quality gates across the full SDLC (spec → plan → build → verify → review → ship).
 category: skill-generation-tools
 resource_url: https://github.com/addyosmani/agent-skills
-github_url: https://github.com/addyosmani/agent-skills
-date_created: "2026-05-10"
-date_last_reviewed: "2026-06-18"
-status: published
+source_url: https://github.com/addyosmani/agent-skills
+author: Addy Osmani
+version: "1.0.0"
+license: MIT
+date_accessed: 2026-07-07
+research_date: 2026-07-07
+last_verified: 2026-07-07
+version_at_verification: "1.0.0"
+next_review: 2026-10-07
 ---
 
 # Agent Skills
 
-**Production-grade engineering skills for AI coding agents** — a structured skills library that guides AI agents through software development workflows following senior engineer practices from Google's software engineering culture.
+## Overview
 
-## Resource Identity
+Agent Skills is a collection of 24 production-grade engineering skills for AI coding agents that encode the workflows, quality gates, and best practices used by senior engineers. The project addresses a core problem: AI agents default to the shortest path, often skipping specs, tests, security reviews, and architectural decisions. Agent Skills provides structured workflows that enforce the same discipline senior engineers bring to production code.
 
-- **Name**: Agent Skills
-- **Creator**: Addy Osmani
-- **Repository**: <https://github.com/addyosmani/agent-skills>
-- **Version**: 0.6.2 (released 2026-06-11, as of 2026-06-18)
-- **License**: MIT License
-- **GitHub Stars**: 62,349 (as of 2026-06-18)
-- **Forks**: 6,761 (as of 2026-06-18)
+**Key insight**: "Production-grade engineering skills for AI coding agents" (README.md line 3). "Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development." (README.md lines 5)
 
 ## Problem Addressed
 
-AI coding agents default to the shortest path when building software — often skipping specs, tests, security reviews, and the engineering discipline that produces reliable production code. Agent Skills solves this by encoding the workflows, quality gates, and best practices that senior engineers use, making them consistently executable by AI agents across every phase of development.
+AI coding agents default to rapid implementation without sufficient planning or quality assurance. Agent Skills counters this by providing explicit, structured workflows:
 
-The repository explicitly states: "Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development."
+"AI coding agents default to the shortest path - which often means skipping specs, tests, security reviews, and the practices that make software reliable. Agent Skills gives agents structured workflows that enforce the same discipline senior engineers bring to production code." (README.md lines 341-342)
 
-## Overview
+The project embeds established engineering principles from Google's engineering culture, including Hyrum's Law (API design), the Beyonce Rule (testing), change sizing norms (code review), Chesterton's Fence (simplification), trunk-based development (git), Shift Left (CI/CD), and treating code as a liability (deprecation). (README.md line 346)
 
-Agent Skills is a collection of 24 skills organized by development phase (Define, Plan, Build, Verify, Review, Ship) plus a meta-skill for discovery. Each skill encodes a specific engineering process as a step-by-step workflow that agents follow, not abstract advice they might skip.
+## Key Statistics
 
-### Core Skills by Lifecycle Phase
-
-**Meta/Discovery (1 skill):**
-- `using-agent-skills` — Maps incoming work to the right skill and establishes core operating behaviors
-
-**Define (3 skills):**
-- `interview-me` — One-question-at-a-time interview extracting actual user needs to ~95% confidence
-- `idea-refine` — Structured divergent/convergent thinking to turn vague ideas into concrete proposals
-- `spec-driven-development` — PRD writing covering objectives, commands, structure, code style, testing, and boundaries before coding
-
-**Plan (1 skill):**
-- `planning-and-task-breakdown` — Decompose specs into small, verifiable tasks with acceptance criteria and dependency ordering
-
-**Build (7 skills):**
-- `incremental-implementation` — Thin vertical slices with feature flags and safe defaults
-- `test-driven-development` — Red-Green-Refactor with test pyramid (80/15/5), DAMP over DRY, Beyonce Rule
-- `context-engineering` — Feed agents the right information at the right time via rules files and MCP integrations
-- `source-driven-development` — Ground every framework decision in official documentation with verification and source citations
-- `doubt-driven-development` — Adversarial fresh-context review of high-stakes decisions (CLAIM → EXTRACT → DOUBT → RECONCILE → STOP)
-- `frontend-ui-engineering` — Component architecture, design systems, state management, responsive design, WCAG 2.1 AA accessibility
-- `api-and-interface-design` — Contract-first design, Hyrum's Law, One-Version Rule, error semantics, boundary validation
-
-**Verify (2 skills):**
-- `browser-testing-with-devtools` — Chrome DevTools MCP for live runtime data (DOM inspection, console logs, network traces, performance profiling)
-- `debugging-and-error-recovery` — Five-step triage: reproduce, localize, reduce, fix, guard; stop-the-line rule; safe fallbacks
-
-**Review (4 skills):**
-- `code-review-and-quality` — Five-axis review, change sizing (~100 lines), severity labels (Nit/Optional/FYI), review speed norms
-- `code-simplification` — Chesterton's Fence, Rule of 500, reduce complexity while preserving exact behavior
-- `security-and-hardening` — OWASP Top 10 prevention, auth patterns, secrets management, dependency auditing, three-tier boundary system
-- `performance-optimization` — Measure-first approach, Core Web Vitals targets, profiling workflows, bundle analysis
-
-**Ship (6 skills):**
-- `git-workflow-and-versioning` — Trunk-based development, atomic commits (~100 lines), commit-as-save-point pattern
-- `ci-cd-and-automation` — Shift Left principle, Faster is Safer, feature flags, quality gate pipelines, failure feedback loops
-- `deprecation-and-migration` — Code-as-liability mindset, compulsory vs advisory deprecation, migration patterns, zombie code removal
-- `documentation-and-adrs` — Architecture Decision Records, API docs, inline documentation standards (document the *why*)
-- `observability-and-instrumentation` — Structured logging, RED metrics, OpenTelemetry tracing, symptom-based alerting
-- `shipping-and-launch` — Pre-launch checklists, feature flag lifecycle, staged rollouts, rollback procedures, monitoring setup
-
-## Technical Architecture
-
-**Entry Point**: Seven slash commands (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/code-simplify`, `/ship`) that map to development lifecycle phases, automatically triggering relevant skills.
-
-**Core Design Pattern**: Every skill follows the same anatomy:
-
-1. **YAML frontmatter** — Defines `name` (kebab-case) and `description` (what it does + trigger conditions)
-2. **Overview** — Elevator pitch explaining what the skill does and why it matters
-3. **When to Use** — Positive triggers and negative exclusions (when NOT to apply)
-4. **Process** — Step-by-step workflow with decision trees and code examples
-5. **Common Rationalizations** — Table of excuses agents use to skip steps, paired with rebuttals
-6. **Red Flags** — Observable behavioral patterns indicating the skill is being violated
-7. **Verification** — Checklist of exit criteria with evidence requirements
-
-**Progressive Disclosure**: The primary `SKILL.md` file in each skill directory is the entry point. Supporting references (checklists, testing patterns, security checklists, accessibility patterns) load only when needed, keeping token usage minimal.
-
-**Specialist Personas**: Four agent personas provide targeted review perspectives:
-- `code-reviewer.md` — Senior Staff Engineer (five-axis code review)
-- `test-engineer.md` — QA Specialist (test strategy and coverage analysis)
-- `security-auditor.md` — Security Engineer (vulnerability detection and threat modeling)
-- `web-performance-auditor.md` — Web Performance Engineer (Core Web Vitals audit with `/webperf` command)
-
-**Supporting References** (4 shared checklists):
-- `testing-patterns.md` — Test structure, naming, mocking, React/API/E2E examples, anti-patterns
-- `security-checklist.md` — Pre-commit checks, auth, input validation, headers, CORS, OWASP Top 10
-- `performance-checklist.md` — Core Web Vitals targets, frontend/backend checklists, measurement commands
-- `accessibility-checklist.md` — Keyboard navigation, screen readers, visual design, ARIA, testing tools
-
-**Integration Points**:
-- Claude Code: Native plugin via `.claude/commands/` for slash commands and `.claude/skills/` for skill discovery
-- Cursor: Copy SKILL.md files into `.cursor/rules/` or reference the full `skills/` directory
-- Antigravity CLI: Native plugin installation with dedicated `commands/` directory (8 slash commands)
-- Gemini CLI: Native skill installation via `gemini skills install`
-- Windsurf: Skill contents added to rules configuration
-- Kiro IDE & CLI: Skills under `.kiro/skills/` at project or global level
-- OpenCode: Agent-driven skill execution via AGENTS.md
-- GitHub Copilot: Agent definitions as personas, skill content in `.github/copilot-instructions.md`
-- Any agent system: Plain Markdown skills work with any system accepting system prompts or instruction files
-
-**Session Lifecycle**: The `session-start.sh` hook injects the `using-agent-skills` meta-skill into every new Claude Code session via JSON payload (with fallback when `jq` is unavailable).
+- **Skill count**: 24 skills total — 23 lifecycle skills plus the `using-agent-skills` meta-skill (README.md lines 172-174)
+- **Installation reach**: The open skills CLI installs into "70+ agents" including Claude Code, Cursor, Codex, Copilot, Cline, and more (README.md line 45)
+- **Supported IDEs/CLIs**: Claude Code (recommended), Cursor, Antigravity CLI, Gemini CLI, Windsurf, OpenCode, GitHub Copilot, Kiro IDE (README.md lines 62-159)
+- **Development lifecycle phases**: 6 phases — DEFINE, PLAN, BUILD, VERIFY, REVIEW, SHIP (README.md lines 12-18)
+- **Agent personas**: 4 pre-configured specialist personas (code-reviewer, security-auditor, test-engineer, web-performance-auditor) (README.md lines 239-247)
+- **Slash commands**: 8 commands mapped to the development lifecycle (README.md lines 26-35)
+- **Version**: 1.0.0 (plugin.json line 3)
+- **License**: MIT (LICENSE line 1)
+- **Author**: Addy Osmani (LICENSE line 3)
 
 ## Key Features
 
-### 1. Anti-Rationalization Tables
-Every skill includes a "Common Rationalizations" section — excuses agents use to skip important steps, paired with factual rebuttals. Examples:
-- "I'll add tests later" → countered with evidence that up-front testing prevents rework
-- "This is simple enough to skip the spec" → countered with cost of rework from missed requirements
+### Lifecycle-Driven Slash Commands
 
-### 2. Autonomous Skill Execution (`/build auto`)
-The framework supports autonomous task execution where agents follow the plan without human stepping between tasks: `/build auto` generates the plan and implements every task in a single approved pass. Tasks are still test-driven and committed individually; execution pauses on failures or risky steps.
+**8 slash commands map to the development lifecycle** (README.md lines 23-24):
 
-### 3. Verification-First Design
-No skill is complete until verification passes. Every skill ends with a checklist of evidence requirements (test output, build results, runtime data). "Seems right" is never sufficient.
+1. `/spec` — Define what to build (Spec before code)
+2. `/plan` — Plan how to build it (Small, atomic tasks)
+3. `/build` — Build incrementally (One slice at a time)
+4. `/test` — Prove it works (Tests are proof)
+5. `/review` — Review before merge (Improve code health)
+6. `/webperf` — Audit web performance (Measure before optimize)
+7. `/code-simplify` — Simplify the code (Clarity over cleverness)
+8. `/ship` — Ship to production (Faster is safer)
 
-### 4. Bounded Workflow Steps
-Processes are concrete and measurable, not vague. Instead of "make sure the code is tested," a skill specifies "run `npm test` and verify all tests pass with coverage ≥80%."
+Each command activates the right skills automatically. Skills also activate based on context: "designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on." (README.md line 39)
 
-### 5. Lifecycle-Aware Skill Discovery
-The `using-agent-skills` meta-skill provides a decision tree that maps incoming work to the right skill based on development phase, requirements clarity, and task scope.
+### Autonomous Build Mode
 
-### 6. Operating Behaviors Across All Skills
-Six core behaviors apply universally (Surface Assumptions, Manage Confusion Actively, Push Back When Warranted, Enforce Simplicity, Maintain Scope Discipline, Verify Don't Assume).
+**`/build auto` generates and executes plans without manual stepping between tasks**: "generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps." (README.md line 37)
 
-### 7. Google Engineering Culture Foundation
-Skills explicitly incorporate patterns from:
-- Hyrum's Law (API design skill)
-- Beyonce Rule and test pyramid (TDD skill)
-- Change sizing and review speed norms (code review skill)
-- Chesterton's Fence (simplification skill)
-- Trunk-based development (git workflow skill)
-- Shift Left and feature flags (CI/CD skill)
-- Code-as-liability mindset (deprecation skill)
+### 24 Structured Skills Organized by Phase
 
-### 8. Multi-Tool Integration Breadth
-Skills work across 8+ platforms (Claude Code, Cursor, Antigravity, Gemini, Windsurf, Kiro, OpenCode, Copilot, and any agent system accepting Markdown instructions). Each platform gets targeted setup guides in `docs/`.
+**Define phase** (3 skills):
+- interview-me: One-question-at-a-time requirements interrogation
+- idea-refine: Structured divergent/convergent thinking for vague concepts
+- spec-driven-development: PRD covering objectives, commands, structure, code style, testing, boundaries
+
+**Plan phase** (1 skill):
+- planning-and-task-breakdown: Decompose specs into small, verifiable tasks with acceptance criteria
+
+**Build phase** (7 skills):
+- incremental-implementation: Thin vertical slices with feature flags and safe rollback
+- test-driven-development: Red-Green-Refactor cycle with test pyramid (80/15/5)
+- context-engineering: Feed agents the right information at the right time
+- source-driven-development: Ground every framework decision in official documentation
+- doubt-driven-development: Adversarial fresh-context review of non-trivial decisions
+- frontend-ui-engineering: Component architecture, design systems, WCAG 2.1 AA
+- api-and-interface-design: Contract-first design, Hyrum's Law, error semantics
+
+**Verify phase** (2 skills):
+- browser-testing-with-devtools: Chrome DevTools MCP for live runtime data
+- debugging-and-error-recovery: Five-step triage: reproduce, localize, reduce, fix, guard
+
+**Review phase** (4 skills):
+- code-review-and-quality: Five-axis review with severity labels and change sizing
+- code-simplification: Preserve exact behavior while reducing complexity
+- security-and-hardening: OWASP Top 10 prevention, auth patterns, secrets management
+- performance-optimization: Measure-first with Core Web Vitals targets
+
+**Ship phase** (6 skills):
+- git-workflow-and-versioning: Trunk-based development, atomic commits
+- ci-cd-and-automation: Shift Left, feature flags, quality gate pipelines
+- deprecation-and-migration: Code-as-liability mindset, migration patterns
+- documentation-and-adrs: Architecture Decision Records, API docs
+- observability-and-instrumentation: Structured logging, RED metrics, OpenTelemetry
+- shipping-and-launch: Pre-launch checklists, staged rollouts, rollback procedures
+
+**Meta** (1 skill):
+- using-agent-skills: Maps incoming work to the right skill and defines shared operating rules
+
+(README.md lines 172-233)
+
+### Specialist Agent Personas
+
+**4 pre-configured personas for targeted reviews** (README.md lines 239-247):
+- code-reviewer: Senior Staff Engineer — five-axis code review standard
+- test-engineer: QA Specialist — test strategy and coverage analysis
+- security-auditor: Security Engineer — vulnerability detection and OWASP assessment
+- web-performance-auditor: Performance Engineer — Core Web Vitals audit with metric-honesty rule
+
+### Consistent Skill Anatomy
+
+Every skill follows a standardized structure emphasizing process over prose:
+
+"Process, not prose. Skills are workflows agents follow, not reference docs they read. Each has steps, checkpoints, and exit criteria." (README.md line 292)
+
+Skill structure (README.md lines 270-286):
+- YAML frontmatter with name and description
+- Overview — what the skill does
+- When to Use — triggering conditions
+- Process — step-by-step workflow
+- Common Rationalizations — excuses agents use to skip steps with counter-arguments
+- Red Flags — signs something's wrong
+- Verification — evidence requirements (tests passing, build output, runtime data)
+
+"Anti-rationalization. Every skill includes a table of common excuses agents use to skip steps (e.g., 'I'll add tests later') with documented counter-arguments." (README.md line 293)
+
+## Technical Architecture
+
+### Component Structure
+
+The project consists of:
+
+1. **Skills directory** (./skills/): 24 SKILL.md files, one per skill, containing workflow definitions
+2. **Agents directory** (./agents/): 4 specialist personas in markdown format
+3. **Commands** (./.claude/commands/, ./commands/, ./.gemini/commands/): 8 slash command definitions
+4. **Hooks** (./hooks/): Session lifecycle hooks
+5. **References** (./references/): 5 supplementary checklists and documentation patterns
+6. **Evals** (./evals/): Skill evaluation cases and testing framework
+7. **Plugin manifests** (plugin.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json): Multi-ecosystem registration
+
+(README.md line 301-336; CLAUDE.md lines 5-20)
+
+### Design Philosophy
+
+**Progressive disclosure**: The SKILL.md is the entry point. Supporting references load only when needed, keeping token usage minimal. (README.md line 295)
+
+**Verification is non-negotiable**: Every skill ends with evidence requirements. "Seems right" is never sufficient. (README.md line 294)
+
+### Lifecycle Orchestration
+
+Skills are triggered by commands, context, or explicit user invocation. The orchestration model:
+
+1. User invokes a command (e.g., `/build`) or describes a task
+2. The `using-agent-skills` meta-skill maps incoming work to the right skill workflow
+3. Appropriate skills load automatically based on phase or context
+4. Skills execute step-by-step workflows with verification gates
+5. Each skill's output feeds into downstream skills
+
+This creates a full-lifecycle DAG where skills orchestrate based on development phase and context.
+
+### Multi-Ecosystem Support
+
+The project targets 8+ agent ecosystems with tailored integration:
+- Claude Code: Native marketplace, .claude-plugin/plugin.json
+- Cursor: .cursor/rules/ directory integration
+- Antigravity CLI: plugin.json manifests with skill/command paths
+- Gemini CLI: Native skill discovery
+- Windsurf: Rules file integration
+- OpenCode: MCP-style AGENTS.md integration
+- GitHub Copilot: Persona definitions via .github/copilot-instructions.md
+- Kiro IDE: .kiro/skills/ project/global storage
 
 ## Installation & Usage
 
-### Claude Code (Recommended)
+### Quick Start (Any Agent)
 
-**Marketplace installation:**
+**Fastest path — NPM skills CLI**:
 
 ```bash
+npx skills add addyosmani/agent-skills            # install all 24 skills
+npx skills add addyosmani/agent-skills --list     # browse before installing
+npx skills add addyosmani/agent-skills --skill code-review-and-quality  # single skill
+```
+
+(README.md lines 45-58)
+
+### Claude Code Installation
+
+**Via Marketplace (recommended)**:
+
+```
 /plugin marketplace add addyosmani/agent-skills
 /plugin install agent-skills@addy-agent-skills
 ```
 
-**Local development:**
+**Note on SSH errors**: "The marketplace clones repos via SSH. If you don't have SSH keys set up on GitHub, either add your SSH key or use the full HTTPS URL to force HTTPS cloning" (README.md lines 71-76):
+
+```bash
+/plugin marketplace add https://github.com/addyosmani/agent-skills.git
+```
+
+**Local/Development**:
 
 ```bash
 git clone https://github.com/addyosmani/agent-skills.git
 claude --plugin-dir /path/to/agent-skills
 ```
 
-### Antigravity CLI
+(README.md lines 69-83)
 
-**From repository:**
+### Usage After Installation
 
-```bash
-agy plugin install https://github.com/addyosmani/agent-skills.git
-```
+Invoke skills via slash commands:
+- `/spec` to enter spec-driven development workflow
+- `/build auto` to auto-generate and execute a plan
+- `/test` to run test-driven development cycle
+- `/review` to perform code review
+- `/ship` to prepare deployment
 
-**From local clone:**
-
-```bash
-git clone https://github.com/addyosmani/agent-skills.git
-agy plugin install ./agent-skills
-```
-
-### Other Tools
-
-- **Cursor**: Copy SKILL.md files to `.cursor/rules/` or reference `skills/` directory
-- **Gemini CLI**: `gemini skills install https://github.com/addyosmani/agent-skills.git --path skills` or `gemini skills install ./agent-skills/skills/`
-- **Windsurf**: Add skill contents to Windsurf rules configuration
-- **Kiro IDE**: Skills under `.kiro/skills/` at project or global level
-- **OpenCode**: Agent-driven execution via AGENTS.md and skill tool
-- **GitHub Copilot**: Agent definitions in `agents/` directory and skill content in `.github/copilot-instructions.md`
-- **Any agent system**: Skills are plain Markdown — add to system prompts or instruction files
-
-### Using Skills in Sessions
-
-Slash commands activate skills:
-- `/spec` → `spec-driven-development`
-- `/plan` → `planning-and-task-breakdown`
-- `/build` → `incremental-implementation`
-- `/test` → `test-driven-development`
-- `/review` → `code-review-and-quality`
-- `/code-simplify` → `code-simplification`
-- `/ship` → `shipping-and-launch`
-
-Or reference any skill directly in the `using-agent-skills` meta-skill discovery flow. The framework automatically routes to secondary skills based on context (e.g., UI work triggers `frontend-ui-engineering`, API work triggers `api-and-interface-design`).
-
-## Limitations and Caveats
-
-### Architectural Limitations
-
-1. **Documentation project only** — Agent Skills is a pure documentation collection with no code execution engine, testing harness, or validation tooling. Integration with agent systems is manual or via plugin system (except for Claude Code and Antigravity which support native plugins).
-
-2. **Skills assume English-first workflows** — All skills are written in English and assume command-line tools and development practices common to English-speaking software engineering communities. Cross-cultural workflows or non-English tooling are not addressed.
-
-3. **No formalized metrics for skill effectiveness** — The repository does not publish data on skill adoption, success rates, or measurable improvements to code quality or development velocity. Effectiveness is asserted in the README but not quantified.
-
-4. **Agent integration requires per-tool setup** — While 8 platforms are supported, each requires tool-specific installation (Claude Code plugin, Antigravity plugin, Cursor copy-paste, Gemini CLI command, etc.). No truly universal agent interface automatically loads skills across all platforms.
-
-### Content Limitations
-
-1. **Limited guidance on skill conflicts** — When multiple skills apply to the same task (e.g., both `context-engineering` and `source-driven-development` apply to API implementation), guidance on priority or sequencing is informal.
-
-2. **No quantified thresholds for many checks** — Rules like "changes under 100 lines are safer" are stated but not justified with empirical data. The Rule of 500 in simplification is mentioned without citation.
-
-3. **Documentation assumes modern web/SaaS development** — Deep guidance for systems programming, embedded development, or data science workflows is not covered.
-
-4. **Session lifecycle hooks vary by platform** — The `session-start.sh` hook (Claude Code) and corresponding hooks for other platforms require integration at setup time. Automatic skill injection is platform-dependent.
-
-5. **No off-line mode** — Skills require access to the GitHub repository or marketplace for discovery and updates. Offline skill execution is not documented.
-
-### Process Limitations
-
-1. **Skills assume sequential execution** — While the meta-skill allows parallel skill reference, the narrative assumes step-by-step progression. Concurrent streams (e.g., testing and documentation in parallel) are not formally addressed.
-
-2. **Verification checklists are self-assessed** — No external oracle validates that verification steps have actually passed. Agents may claim verification without evidence.
-
-3. **No escalation path for skill conflicts with user preferences** — If a user's style conflicts with a skill's guidance, the skill assumes the skill is correct. Documented pushback mechanisms exist but are asymmetric.
+Or invoke individual skills by name (e.g., "use the interview-me skill to grill me on requirements").
 
 ## Relevance to Claude Code Development
 
-### Direct Relevance
+Agent Skills directly addresses the Claude Code ecosystem's need for agent discipline and structured workflows. Relevance includes:
 
-1. **Skill Framework Pattern** — Agent Skills demonstrates a production-grade skill architecture pattern applicable to Claude Code's skill library. The anti-rationalization table, progressive disclosure, and verification-first design patterns are directly applicable.
+1. **Agent Behavior Standardization**: Provides standardized workflows that agents follow consistently, reducing ad-hoc decision-making
+2. **Quality Gate Enforcement**: Embeds verification steps into every phase, preventing agents from skipping critical checks
+3. **Multi-Agent Orchestration**: Enables coordination between specialist agents (code-reviewer, security-auditor, test-engineer) via structured personas and slash commands
+4. **Claude Code Plugin Development**: Offers a production-ready plugin that demonstrates best practices for packaging skills, agents, and commands for the Claude Code marketplace
+5. **Skill Ecosystem Growth**: Provides a reference implementation for the skill format, frontmatter schema, and progressive disclosure pattern that Claude Code skill creators can learn from
 
-2. **Quality Gate Model** — The five-phase gating workflow (Specify → Plan → Tasks → Implement with human review at each phase) provides a replicable model for Claude Code skill orchestration.
+## Limitations and Caveats
 
-3. **Lifecycle-Aware Routing** — The `using-agent-skills` meta-skill's decision tree model (mapping incoming work to the right skill based on phase and requirements) is a reference for implementing smart skill discovery in Claude Code.
+### Documented Limitations
 
-4. **Slash Command Entry Points** — The seven-command interface (`/spec`, `/plan`, `/build`, etc.) demonstrates a clean mental model for organizing skills by development phase — applicable to Claude Code's command architecture.
+**Scope**: Agent Skills focuses on the full development lifecycle (DEFINE → PLAN → BUILD → VERIFY → REVIEW → SHIP). It is not a project management tool or a bug tracker; it assumes a development environment (local or CI/CD) where agents can write, test, and verify code.
 
-### Indirect Relevance
+**Skill Triggering**: Skills activate based on commands or explicit invocation. Automatic context detection (e.g., detecting that code is security-sensitive without user indication) is limited to the examples documented (API design detection, UI detection).
 
-1. **Engineer Culture Embedding** — Agent Skills shows how to encode engineering practices (tests, reviews, specs, security) into non-optional skill steps. This pattern strengthens Claude Code's ability to enforce quality gates consistently.
+**Agent Coordination**: The four specialist personas (code-reviewer, security-auditor, test-engineer, web-performance-auditor) are pre-configured but not automatically orchestrated. Orchestration patterns must be explicit (documented in orchestration-patterns.md).
 
-2. **Specialist Personas** — Three agent personas (code-reviewer, test-engineer, security-auditor) provide a template for creating review-stage specialists in Claude Code that apply different review perspectives.
+### Undocumented Limitations
 
-3. **Integration Breadth** — Supporting 8 platforms (Claude Code, Cursor, Antigravity, Gemini, Windsurf, Kiro, OpenCode, Copilot) with tool-specific plugins and installation guides demonstrates the market demand for portable, agent-agnostic engineering skills. Claude Code can leverage this as a distribution and compatibility model.
+**Scale constraints**: No documented limits on skill complexity, agent coordination depth, or maximum number of parallel skills. Untested at scale.
 
-4. **Contributing Guidelines** — The CONTRIBUTING.md establishes clear quality bars (Specific, Verifiable, Battle-tested, Minimal) and skill format validation — directly applicable to Claude Code's skill governance.
+**Customization**: Limited guidance on modifying or extending skills for domain-specific workflows; the project assumes skills apply broadly across software projects.
+
+**Async workflow support**: Skills are designed for synchronous development workflows; asynchronous patterns (e.g., multi-day feature development with external approvals) are not addressed.
+
+**Rollback procedures**: The shipping-and-launch skill documents staged rollouts but does not provide recipes for rollback automation for specific platforms (Kubernetes, Lambda, traditional servers).
 
 ## References
 
-- **Official repository**: <https://github.com/addyosmani/agent-skills>
-- **README.md** (accessed 2026-06-18): Overview, 24-skill list, installation guides for 8 platforms, supporting tools section
-- **Skill anatomy documentation**: `docs/skill-anatomy.md` — Format specification for skills
-- **Contributing guide**: `CONTRIBUTING.md` — Quality bars and skill validation
-- **Plugin manifest**: `.claude-plugin/plugin.json` v1.0.0 — Claude Code plugin metadata
-- **Antigravity plugin manifest**: `plugin.json` v1.0.0 — Antigravity CLI integration metadata
-- **Project context**: `CLAUDE.md` — Development conventions and structure
-- **Meta-skill**: `skills/using-agent-skills/SKILL.md` — Skill discovery and core operating behaviors
-- **New Define skill**: `skills/interview-me/SKILL.md` — One-question interview process
-- **New Ship skill**: `skills/observability-and-instrumentation/SKILL.md` — Logging, metrics, tracing, alerting
-- **New agent persona**: `agents/web-performance-auditor.md` — Core Web Vitals auditing with `/webperf` command
-- **GitHub repository metadata** (accessed 2026-06-18): 62,349 stars, 6,761 forks, created 2026-02-15, last updated 2026-06-18
-- **Latest release**: v0.6.2 (published 2026-06-11)
+- **Repository**: <https://github.com/addyosmani/agent-skills> (accessed 2026-07-07)
+- **README.md**: Full feature documentation and lifecycle overview
+- **CLAUDE.md**: Project structure and contribution guidelines
+- **CONTRIBUTING.md**: Pre-flight checks and PR workflow
+- **LICENSE**: MIT License, Copyright (c) 2025 Addy Osmani
+- **Related frameworks**: [Superpowers](https://github.com/obra/superpowers), [Matt Pocock's skills](https://github.com/mattpocock/skills) (accessed 2026-07-07) — comparison in docs/comparison.md
+- **Embedded principles**: Software Engineering at Google (abseil.io/resources/swe-book), Google engineering practices guide (google.github.io/eng-practices/)
 
 ## Freshness Tracking
 
-| Section | Confidence | Evidence Source | Last Verified |
-|---------|-----------|-----------------|---------------|
-| Identity/Metadata | high | GitHub API + gh CLI (live query) | 2026-06-18 |
-| Overview & Skills | high | README.md (line 152-213) + local skill directory listing | 2026-06-18 |
-| Technical Architecture | high | README.md (§ How Skills Work) + plugin.json + skill anatomy | 2026-06-18 |
-| Installation & Usage | high | README.md setup sections (8 platforms detailed) | 2026-06-18 |
-| Key Features | high | README.md + new autonomous `/build auto` feature | 2026-06-18 |
-| Integration Points | high | README.md § Quick Start (Antigravity CLI added) | 2026-06-18 |
-| Agent Personas | high | README.md (§ Agent Personas, line 216-228) + local agents/ directory | 2026-06-18 |
-| Limitations | medium | Absence of documented limitations + feature inspection | 2026-06-18 |
-| Relevance to Claude Code | medium | Architectural pattern analysis + multi-platform integration breadth | 2026-06-18 |
+| Section | Confidence | Last Verified | Notes |
+|---------|-----------|--------------|-------|
+| Overview | high | 2026-07-07 | Full README read, primary source |
+| Problem Addressed | high | 2026-07-07 | Direct quotes from README |
+| Key Statistics | high | 2026-07-07 | Exact skill count verified from README and skills/ directory listing |
+| Key Features | high | 2026-07-07 | Feature list extracted from README table and skill descriptions |
+| Technical Architecture | high | 2026-07-07 | Verified against actual directory structure and plugin.json files |
+| Installation & Usage | high | 2026-07-07 | Exact commands from README; tested path verification |
+| Limitations | medium | 2026-07-07 | Documented limitations extracted; undocumented limitations inferred from scope |
 
-**Next Review**: 2026-09-18 (3 months)
+**Next Review**: 2026-10-07 (3 months)
 
-**Changes Since Last Review (2026-05-10 → 2026-06-18)**:
-- **Skill count**: 22 → 24 (added `interview-me` in Define; `observability-and-instrumentation` in Ship)
-- **Agent personas**: 3 → 4 (added `web-performance-auditor` with `/webperf` command)
-- **GitHub metrics**: 37,441 → 62,349 stars (+66.4%); 4,182 → 6,761 forks (+61.7%)
-- **Version**: Plugin manifest shows 1.0.0; latest release tag is v0.6.2 (released 2026-06-11)
-- **Integrations**: Added Antigravity CLI as major platform (8 total now including Kiro and OpenCode)
-- **New feature**: `/build auto` for autonomous task execution with approval gating
-- **Update recency**: 2026-05-10 → 2026-06-18 (8 days ago)
+**Archive Date**: 2026-07-07
 
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Anthropics Skills](./anthropics-skills.md) | skill-generation-tools | official Anthropic skills with A/B eval harness and description-driven triggering (17 skills across 3 plugins) |
-| [Claude Code Templates](./claude-code-templates.md) | skill-generation-tools | 100+ ready-to-use agents, commands, skills, MCPs, hooks for Claude Code via npx installer |
-| [Compound Engineering Plugin](./compound-engineering-plugin.md) | skill-generation-tools | planning-first (80%) workflow plugin with 27 agents using same Plan/Work/Review/Compound lifecycle |
-| [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | comprehensive harness system: 65+ skills, 16 agents, 40+ commands, hook-based automation matching Agent Skills' skill ecosystem approach |
-| [SkillKit](./skillkit.md) | skill-generation-tools | universal package manager for AI agent skills supporting 32+ agents with cross-format translation |
-| [Superpowers](../agent-frameworks/superpowers.md) | agent-frameworks | agentic skills framework with 14 skills for TDD, debugging, subagent-driven development across Claude Code, Codex, OpenCode |
-| [Vercel Labs Skills](./vercel-labs-skills.md) | skill-generation-tools | universal skill installer for 40+ AI coding agents with symlink-first design complementing Agent Skills' multi-platform strategy |
-| [ClawHub](./clawhub.md) | skill-generation-tools | public skill registry for OpenClaw/Clawdbot agents with vector search and semver versioning as external discovery mechanism |
+| [Maverick](../coding-agents/maverick.md) | coding-agents | autonomous coding agent using skill-based execution model |
+| [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | multi-skill orchestration framework for Claude Code agents |
+| [Pi Mono](../coding-agents/pi-mono.md) | coding-agents | monolithic coding agent with modular skill composition |
+| [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | multi-agent coordination workflow with skill-based task decomposition |
+| [Claude Night Market](./claude-night-market.md) | skill-generation-tools | skill marketplace and registry for Claude Code agents |
+| [Orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | agent orchestration framework enabling skill composition and coordination |
+| [Anthropic Agent Skills](./anthropics-skills.md) | skill-generation-tools | official Anthropic skills library with lifecycle-driven architecture |
+| [Orchestrator Agent Creation Guide](../research-agent-patterns/orchestrator-agent-creation-guide.md) | research-agent-patterns | patterns for building orchestrator agents that route across skill domains |

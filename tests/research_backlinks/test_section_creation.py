@@ -76,6 +76,33 @@ Entry with neither Freshness Tracking nor Cross-References.
 Test.
 """
 
+_FRONTMATTER_FRESHNESS_NO_BODY_SECTION = """\
+---
+name: target-entry
+research_date: 2026-01-01
+source_url: https://example.com/target
+version_at_research: 1.0.0
+license: MIT
+freshness_tracking:
+  last_verified: 2026-01-01
+  version_at_verification: 1.0.0
+  next_review: 2026-07-01
+---
+
+## Overview
+
+Entry with freshness tracking in frontmatter only. No body freshness heading or
+cross-reference section exists yet.
+
+## Problem Addressed
+
+Test.
+
+## References
+
+- [Example](https://example.com) (accessed 2026-01-01)
+"""
+
 
 class TestSectionCreatedAfterFreshnessTracking:
     """Entry with Freshness Tracking but no Cross-References gets a new section."""
@@ -140,12 +167,45 @@ class TestSectionCreatedAfterFreshnessTracking:
         assert first_md == second_md
 
     def test_no_freshness_no_cross_ref_raises_value_error(self) -> None:
-        """Entry with no Freshness Tracking and no Cross-References raises ValueError."""
+        """Entry with no Freshness Tracking, no References, and no Cross-References raises ValueError."""
         row = bl.CrossRefRow(
             entry_name="DeltaEntry", link_path="../tools/delta.md", category="tools", relationship="calls API"
         )
         with pytest.raises(ValueError, match="Cannot insert Cross-References section"):
             bl.append_backlink_row(_NO_FRESHNESS_NO_CROSS_REF, row)
+
+
+class TestSectionCreatedAfterReferencesFallback:
+    """Entry with frontmatter-only freshness tracking (no body Freshness Tracking
+    heading) falls back to anchoring after ## References instead of raising."""
+
+    def test_new_section_is_created_not_raised(self) -> None:
+        """append_backlink_row succeeds via the References fallback instead of raising."""
+        row = bl.CrossRefRow(
+            entry_name="EpsilonEntry", link_path="../tools/epsilon.md", category="tools", relationship="feeds data to"
+        )
+        new_md, modified = bl.append_backlink_row(_FRONTMATTER_FRESHNESS_NO_BODY_SECTION, row)
+        assert modified, "modified should be True when a new section is created"
+        assert "## Cross-References" in new_md
+
+    def test_new_section_appears_after_references(self) -> None:
+        """Cross-References section appears after ## References when no Freshness Tracking heading exists."""
+        row = bl.CrossRefRow(
+            entry_name="ZetaEntry", link_path="../tools/zeta.md", category="tools", relationship="consumes output"
+        )
+        new_md, _ = bl.append_backlink_row(_FRONTMATTER_FRESHNESS_NO_BODY_SECTION, row)
+        references_idx = new_md.index("## References")
+        cross_ref_idx = new_md.index("## Cross-References")
+        assert cross_ref_idx > references_idx, "Cross-References section must appear after References"
+
+    def test_new_section_contains_row(self) -> None:
+        """The newly created section contains the appended row."""
+        row = bl.CrossRefRow(
+            entry_name="EtaEntry", link_path="../tools/eta.md", category="tools", relationship="shares schema with"
+        )
+        new_md, _ = bl.append_backlink_row(_FRONTMATTER_FRESHNESS_NO_BODY_SECTION, row)
+        assert "EtaEntry" in new_md
+        assert "../tools/eta.md" in new_md
 
     def test_append_to_existing_table_not_create_section(self) -> None:
         """When Cross-References already exists, row is appended (not a new section)."""

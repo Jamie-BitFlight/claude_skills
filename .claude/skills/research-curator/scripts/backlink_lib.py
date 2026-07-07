@@ -432,22 +432,25 @@ def append_backlink_row(
     original markdown unchanged with modified=False.
 
     If ## Cross-References exists: appends the new table row at the end of the table.
-    If ## Cross-References is absent: creates the section after freshness_anchor,
-    matching the canonical format from research-cross-referencer.md.
+    If ## Cross-References is absent: creates the section after freshness_anchor when
+    that heading exists (legacy text-header entries), falling back to inserting after
+    "## References" when it does not (frontmatter-only entries have no body Freshness
+    Tracking heading) — matching the same fallback used by research-cross-referencer.md.
 
     Args:
         target_entry_markdown: Full text of the target entry markdown file.
         row: CrossRefRow to append.
-        freshness_anchor: Heading line (with ## prefix) marking the insertion point
-            when the Cross-References section does not yet exist.
+        freshness_anchor: Heading line (with ## prefix) marking the preferred insertion
+            point when the Cross-References section does not yet exist. Falls back to
+            "## References" when this heading is absent.
 
     Returns:
         Tuple of (new_markdown, modified) where modified is False when no change was
         made (row already present) and True when the markdown was updated.
 
     Raises:
-        ValueError: When freshness_anchor is not found and no Cross-References section
-            exists — insertion point cannot be determined.
+        ValueError: When neither freshness_anchor nor "## References" is found and no
+            Cross-References section exists — insertion point cannot be determined.
     """
     # Idempotency check
     if backlink_exists(target_entry_markdown, row.link_path):
@@ -469,7 +472,7 @@ def append_backlink_row(
         new_lines = [*lines_stripped[:insert_idx], new_table_row, *lines_stripped[insert_idx:]]
         return ("\n".join(new_lines) + ("\n" if ends_with_newline else ""), True)
 
-    # ## Cross-References absent — insert after freshness_anchor
+    # ## Cross-References absent — insert after freshness_anchor, falling back to ## References
     anchor_idx: int | None = None
     for i, line in enumerate(lines_stripped):
         if line.strip() == freshness_anchor:
@@ -477,9 +480,15 @@ def append_backlink_row(
             break
 
     if anchor_idx is None:
+        for i, line in enumerate(lines_stripped):
+            if line.strip() == "## References":
+                anchor_idx = i
+                break
+
+    if anchor_idx is None:
         raise ValueError(
-            f"Cannot insert Cross-References section: '{freshness_anchor}' not found in entry "
-            "and no existing Cross-References section present."
+            f"Cannot insert Cross-References section: neither '{freshness_anchor}' nor "
+            "'## References' found in entry, and no existing Cross-References section present."
         )
 
     insert_idx = _find_freshness_insert_index(lines_stripped, anchor_idx)

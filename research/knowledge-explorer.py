@@ -1242,6 +1242,79 @@ def _from_research_curator_meta(top: Any, path: Path) -> KBEntry:
     )
 
 
+def _from_entry_template_meta(top: Any, path: Path) -> KBEntry:
+    """Parse a KBEntry from the current entry-template.md frontmatter schema.
+
+    Handles entries written to the schema documented in research-curator's
+    entry-template.md as of 2026-07-07: top-level name/category/research_date/
+    source_url (or resource_url), with freshness data either nested under a
+    ``freshness_tracking`` mapping (the documented shape) or present as flat
+    top-level last_verified/version_at_verification/next_review keys (entries
+    written before that nesting was introduced still parse correctly).
+
+    Field mapping to KBEntry:
+        name                                    -> name  (topic defaults to file stem)
+        description                             -> description
+        category                                -> category
+        source_url (falls back to resource_url) -> source_url
+        freshness_tracking.last_verified, or
+        flat last_verified                      -> verified
+        freshness_tracking.next_review, or
+        flat next_review                        -> next_review
+        freshness_tracking.version_at_verification,
+        flat version_at_verification, or
+        version_at_research                     -> version
+        license                                 -> license
+
+    Args:
+        top: Full parsed frontmatter metadata dict.
+        path: File path for error reporting.
+
+    Returns:
+        KBEntry populated from entry-template.md format.
+
+    Raises:
+        FrontmatterValidationError: If required fields are missing.
+        ParseError: If date fields cannot be parsed.
+    """
+    freshness = top.get("freshness_tracking")
+    freshness = freshness if isinstance(freshness, dict) else {}
+
+    missing = [f for f in ("name", "research_date") if f not in top]
+    if "source_url" not in top and "resource_url" not in top:
+        missing.append("source_url")
+    if "last_verified" not in freshness and "last_verified" not in top:
+        missing.append("freshness_tracking.last_verified")
+    if "next_review" not in freshness and "next_review" not in top:
+        missing.append("freshness_tracking.next_review")
+    if missing:
+        raise FrontmatterValidationError(path=path, missing_fields=missing, invalid_fields=[])
+
+    category = str(top.get("category") or path.parent.name)
+    source_url_raw = top.get("source_url") or top.get("resource_url")
+    last_verified_raw = freshness.get("last_verified", top.get("last_verified"))
+    next_review_raw = freshness.get("next_review", top.get("next_review"))
+    version_raw = (
+        freshness.get("version_at_verification") or top.get("version_at_verification") or top.get("version_at_research")
+    )
+    license_raw = top.get("license")
+
+    return KBEntry(
+        topic=path.stem,
+        name=str(top["name"]),
+        description=str(top.get("description") or ""),
+        category=category,
+        source_url=str(source_url_raw),
+        verified=_parse_date_field(last_verified_raw),
+        next_review=_parse_date_field(next_review_raw),
+        version=str(version_raw) if version_raw is not None else None,
+        license=str(license_raw) if license_raw is not None else None,
+        file_path=path,
+        body="",
+        has_frontmatter=True,
+    )
+
+
 def _from_skill_spec_meta(top: Any, path: Path) -> KBEntry:
     """Parse a KBEntry from new skill-spec frontmatter (metadata sub-mapping).
 
@@ -1342,12 +1415,16 @@ def _from_flat_meta(meta: Any, path: Path) -> KBEntry:
 def parse_frontmatter_entry(text: str, path: Path) -> KBEntry:
     """Parse an entry in YAML frontmatter format.
 
-    Handles three formats:
+    Handles four formats:
     - Skill-spec format: top-level ``name``, ``description``, ``license``; KB
       fields inside a ``metadata`` mapping.
-    - Research-curator format: top-level ``title``, ``resource_url``,
-      ``date_created``, ``date_last_reviewed`` (produced by the research-curator
-      skill's frontmatter generation procedure).
+    - Research-curator format (legacy): top-level ``title``, ``resource_url``,
+      ``date_created``, ``date_last_reviewed`` (the research-curator skill's
+      original frontmatter shape).
+    - Entry-template format (current): top-level ``name``, ``research_date``,
+      ``source_url``, with freshness data in a ``freshness_tracking`` mapping
+      or flat top-level keys (the research-curator skill's frontmatter shape
+      as of 2026-07-07 -- see entry-template.md).
     - Flat format: all KB fields at top level (topic, name, category, …).
 
     Args:
@@ -1371,6 +1448,8 @@ def parse_frontmatter_entry(text: str, path: Path) -> KBEntry:
         entry = _from_skill_spec_meta(top, path)
     elif "title" in top and "resource_url" in top:
         entry = _from_research_curator_meta(top, path)
+    elif "research_date" in top and "name" in top:
+        entry = _from_entry_template_meta(top, path)
     else:
         entry = _from_flat_meta(top, path)
     entry.body = post.content

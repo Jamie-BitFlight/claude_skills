@@ -58,7 +58,6 @@ Create the category directory if it does not exist.
 - Key features (categorized, detailed)
 - Technical architecture or workflow
 - Installation/usage patterns
-- Statistics (stars, downloads, contributors) with date gathered
 
 **Relevance**:
 
@@ -75,15 +74,21 @@ Create the category directory if it does not exist.
 File location: `./research/{category}/{resource-name}.md`
 
 ````markdown
-# {Resource Name}
-
-**Research Date**: YYYY-MM-DD
-**Source URL**: <https://...>
-**GitHub Repository**: <https://github.com/...> (if applicable)
-**Version at Research**: vX.Y.Z
-**License**: {License type}
-
 ---
+name: {resource-name-slug}
+research_date: YYYY-MM-DD
+source_url: https://...
+github_repository: https://github.com/... # if applicable
+version_at_research: vX.Y.Z
+license: {License type}
+freshness_tracking:
+  last_verified: YYYY-MM-DD
+  version_at_verification: vX.Y.Z
+  next_review: YYYY-MM-DD
+  confidence_map: "section: level (qualifier)"
+---
+
+# {Resource Name}
 
 ## Overview
 
@@ -97,17 +102,6 @@ File location: `./research/{category}/{resource-name}.md`
 |---------|----------|
 | {Problem 1} | {How this resource solves it} |
 | {Problem 2} | {How this resource solves it} |
-
----
-
-## Key Statistics
-
-| Metric | Value | Date Gathered |
-|--------|-------|---------------|
-| GitHub Stars | N | YYYY-MM-DD |
-| Downloads/month | N | YYYY-MM-DD |
-| Contributors | N | YYYY-MM-DD |
-| Latest Release | vX.Y.Z | YYYY-MM-DD |
 
 ---
 
@@ -170,17 +164,6 @@ How the resource works internally. Include diagrams if helpful.
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | YYYY-MM-DD |
-| Version at Verification | vX.Y.Z |
-| Next Review Recommended | YYYY-MM-DD |
-| Confidence Map | `section: level (qualifier)` |
 ````
 
 > **Confidence qualifiers**: When a section's claims derive from code analysis rather than
@@ -208,10 +191,10 @@ How the resource works internally. Include diagrams if helpful.
 > after the fact. This section is optional for entries created before 2026-03-12; the
 > validator emits a warning (not error) if absent on newer entries.
 
-> **Note**: "Next Review Recommended" is a suggestion, not a gate. When a user or
-> orchestrator explicitly requests re-research for this entry — via `--rerun`, via
-> `--batch` URL resubmission, or via `--all` — the refresh proceeds regardless of this
-> date. This field provides context ("how stale is this?") and informs scheduling
+> **Note**: The frontmatter's `freshness_tracking.next_review` field is a suggestion, not a
+> gate. When a user or orchestrator explicitly requests re-research for this entry — via
+> `--rerun`, via `--batch` URL resubmission, or via `--all` — the refresh proceeds regardless
+> of this date. This field provides context ("how stale is this?") and informs scheduling
 > decisions. It does not block operations.
 
 ---
@@ -220,8 +203,8 @@ How the resource works internally. Include diagrams if helpful.
 
 - **Next Review**: Set to 3 months from research date. This is a conservative baseline
   appropriate for stable or slow-moving projects. High-activity repositories — those with
-  frequent major or minor releases, rapidly growing star or fork counts, or active breaking
-  API changes — benefit from shorter intervals (4–6 weeks). The agent setting this date
-  should calibrate to the observed activity level of the resource at time of research.
+  frequent major or minor releases or active breaking API changes — benefit from shorter
+  intervals (4–6 weeks). The agent setting this date should calibrate to the observed
+  release cadence of the resource at time of research.
 - **Stale threshold**: 6 months without verification
-- **Review required**: Version change, significant star/fork growth, breaking API changes
+- **Review required**: Version change, breaking API changes

@@ -27,7 +27,7 @@ flowchart TD
     CheckFlags -->|No flags| New[New research mode]
 
     New --> DetectRepo{Is target a repo, or does the<br>target site have an associated repo?}
-    DetectRepo -->|"Yes — repo URL known"| Clone["Shallow clone to .worktrees/repo-name/<br>git clone --depth 1 URL .worktrees/repo-name/<br>or: gh repo clone owner/repo .worktrees/repo-name/ -- --depth 1"]
+    DetectRepo -->|"Yes — repo URL known"| Clone["Shallow clone to .worktrees/repo-name/<br>git clone --depth 1 URL .worktrees/repo-name/<br>(plain git clone ONLY — see repo_access_procedure)"]
     DetectRepo -->|"No repo detected"| Identify{Resource type?}
     Clone --> Identify{Resource type?}
 
@@ -84,26 +84,30 @@ Check the `<functions>` list in your system prompt for current MCP tool availabi
 - `mcp__exa__web_search_exa` -- web search for resources, articles, comparisons
 - `mcp__exa__get_code_context_exa` -- find code examples and API usage patterns
 
-**Repository shallow clone (preferred for repos and sites with associated repos)**:
+**Repository shallow clone (preferred for repos and sites with associated repos) — TESTED PROCEDURE, follow verbatim**:
 
-When the target is a GitHub/GitLab/Codeberg repository, or when a website has an associated public repository, shallow clone it before gathering data. Local reads are faster and more complete than API calls for deep content analysis.
+<repo_access_procedure>
 
-```bash
-# Via git (any host)
-git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/
+Tested procedure — environment-scope caveat and full reproduced evidence in [repo-access-procedure.md](./../skills/research-curator/references/repo-access-procedure.md); load it before the first clone of a session:
 
-# Via gh CLI (GitHub — preferred when available)
-gh repo clone {owner}/{repo} ./.worktrees/{repo-name}/ -- --depth 1
-```
+1. `git clone --depth 1 {repo-url} ./.worktrees/{repo-name}/` — not `gh repo clone` (blocked for out-of-scope repos).
+2. Explore via `Read`/`Grep`/`Glob` with the worktree path — never `cd` (doesn't persist between Bash calls in this environment).
+3. A `gh api`/`curl api.github.com` 403 on an out-of-scope repo is final — go to step 5, don't retry.
+4. Never call `add_repo` to route around step 3 — it's reserved for explicit user requests.
+5. Blocked metadata that's still needed (e.g. latest release version): pull from in-clone data (`CITATION.cff`, manifests, `CHANGELOG.md`) or mark unavailable per Fidelity Rule 3. Do NOT chase stars/forks/contributor counts via any fallback — see Rule 2a, that data is never gathered.
 
-After cloning, use `Read`, `Grep`, and `Glob` on `./.worktrees/{repo-name}/` as the primary source entry point. This enables access to the full README, source files, config, CHANGELOG, `docs/`, and any spec files — content that the GitHub contents API only returns file-by-file. Repo name for the worktree path: sanitize to `[A-Za-z0-9._-]` only (replace other characters with `_`).
+</repo_access_procedure>
 
-**GitHub repository metadata**:
+After cloning, `./.worktrees/{repo-name}/` is the primary source entry point for the full README, source files, config, CHANGELOG, `docs/`, and any spec files — content the GitHub contents API only returns file-by-file even when accessible.
 
-- `gh api repos/{owner}/{repo}` via Bash -- stars, forks, license, description, language
+**GitHub repository metadata (only when the target IS in this session's authorized scope — e.g., researching claude_skills itself, not an external research subject)**:
+
+- `gh api repos/{owner}/{repo}` via Bash -- license, description, language
 - `gh api repos/{owner}/{repo}/releases/latest` via Bash -- latest release version and date
-- `gh api repos/{owner}/{repo}/contributors?per_page=1&anon=true` via Bash -- contributor count (check response headers for total)
 - When interacting with THIS repo (claude_skills), always use `-R Jamie-BitFlight/claude_skills` flag
+
+Do NOT query stars, forks, or contributor counts — see Rule 2a. That data is out of scope
+regardless of whether the repo is in-session or out-of-scope.
 
 **Fallback**:
 
@@ -140,7 +144,7 @@ EXTRACTED PASSAGES — {resource-name}
 
 Apply this to EVERY section: features, architecture, installation steps, usage examples, limitations. Numbers, version strings, benchmark figures, and configuration values MUST be quoted verbatim from source — never paraphrased or estimated.
 
-**Relevance values**: Use the exact section names from the entry template — Overview, Problem Addressed, Key Statistics, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
+**Relevance values**: Use the exact section names from the entry template — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
 
 ### Doc-Sufficiency Check (run immediately after Phase 1 completes)
 
@@ -234,7 +238,6 @@ REQUIRED verification step: Before finalizing a section, confirm that every fact
 ### What Counts as a Claim Requiring a Source
 
 - Version numbers ("v2.3.1")
-- Star counts, download counts, contributor counts
 - Performance figures ("processes 10k events/sec")
 - Feature descriptions ("supports async/await")
 - License type
@@ -262,14 +265,24 @@ If a source cannot be accessed: write "Unable to access [source]: [reason]" in t
 
 ### Rule 2: Preserve Counts and Specifics
 
-Write exact numbers as found in primary sources. NEVER substitute vague quantifiers.
+Write exact numbers as found in primary sources when the number describes what the resource
+does or how well it does it. NEVER substitute vague quantifiers for a capability figure.
+Popularity metrics (stars, downloads, forks) are out of scope entirely — see Rule 2a.
 
 | Source Says | Write | NEVER Write |
 |-------------|-------|-------------|
-| "14,823 GitHub stars" | "14,823 stars (as of {date})" | "popular" or "widely used" |
 | "supports 12 languages" | "supports 12 languages" | "many languages" |
 | "v0.8.2, released 2025-11-03" | "v0.8.2 (released 2025-11-03)" | "recent release" |
 | "benchmark: 45ms p99 latency" | "45ms p99 latency" | "low latency" |
+
+### Rule 2a: No Popularity Statistics
+
+Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
+These describe how popular a resource is, not what it does, how it does it, or why it's
+valuable — they don't inform the review or utility judgments this entry exists to support,
+and a reader can query them programmatically at any time via `gh api repos/{owner}/{repo}`
+if genuinely needed. There is no "Key Statistics" section in the entry template; do not
+add one, and do not fold this data into another section.
 
 ### Rule 3: Distinguish Absence from Nonexistence
 
@@ -400,8 +413,7 @@ flowchart TD
     ShallowClone --> Fetch[Fetch all available primary sources<br>using .worktrees/repo-name/ as primary entry point]
     Fetch --> Extract[Extract key passages per source with source references]
     Extract --> Metadata[Gather identity -- name, exact version string, license, URLs]
-    Metadata --> Stats[Gather statistics -- exact stars, downloads, contributor count with date]
-    Stats --> Features[Document features with mechanism and examples, not just names]
+    Metadata --> Features[Document features with mechanism and examples, not just names]
     Features --> Architecture[Describe architecture with component names and data flow]
     Architecture --> Usage[Write installation and usage examples verified against official docs]
     Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
@@ -416,7 +428,7 @@ flowchart TD
 ### `--rerun` Mode (re-research existing entry)
 
 1. READ the existing entry file first.
-2. Re-gather fresh data for statistics, versions, features from primary sources.
+2. Re-gather fresh data for versions and features from primary sources.
 3. Re-extract passages. Note where data has changed vs. the existing entry.
 4. Run the Doc-Sufficiency Check on the re-extracted passages (same three binary questions):
    - Q1: Do any extracts name at least 2 specific component, module, or class names (not generic descriptions like "has a plugin system")?
@@ -426,7 +438,10 @@ flowchart TD
    If ALL answers are YES: record working note "Architecture depth requirements satisfied from docs" and skip Phase 1b.
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
 6. Update sections where source data has changed. Preserve sections where source data is unchanged.
-7. Update the Freshness Tracking section with today's date and new confidence assessments.
+7. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
+   (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
+   `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
+   entry already uses; do not convert one to the other during a refresh.
 8. In the result, list what changed and what was confirmed unchanged.
 
 ### `--fix` Mode (fix validation issues)
@@ -520,6 +535,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
 - Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree)
+- Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it

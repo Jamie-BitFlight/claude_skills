@@ -38,9 +38,12 @@ flowchart TD
     WriteSection --> CheckExists
     Top8 --> CheckExists
     CheckExists -->|"Yes — section exists"| Replace["Replace the existing ## Cross-References section<br>(do not append duplicate)"]
-    CheckExists -->|"No — section absent"| Append["Append ## Cross-References section<br>after ## Freshness Tracking"]
+    CheckExists -->|"No — section absent"| AnchorCheck{Does the entry have a body<br>## Freshness Tracking heading?}
+    AnchorCheck -->|"Yes — legacy text-header entry"| Append["Append ## Cross-References section<br>after ## Freshness Tracking"]
+    AnchorCheck -->|"No — freshness lives in frontmatter"| AppendRefs["Append ## Cross-References section<br>after ## References"]
     Replace --> EditFile[Edit the entry file]
     Append --> EditFile
+    AppendRefs --> EditFile
     EditFile --> Return([Return structured result])
 ```
 
@@ -48,8 +51,9 @@ flowchart TD
 
 ## Section Format
 
-The section is appended after `## Freshness Tracking`. Use relative paths from the entry's
-own directory:
+The section is appended after `## Freshness Tracking` for legacy text-header entries, or after
+`## References` when the entry has no body Freshness Tracking heading (freshness data lives in
+frontmatter instead). Use relative paths from the entry's own directory:
 
 - Same-category entries: `./other-entry.md`
 - Different-category entries: `../other-category/filename.md`

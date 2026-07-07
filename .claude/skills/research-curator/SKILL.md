@@ -104,19 +104,28 @@ Before reporting results to the user after any mode completes, verify:
 
 Trigger: `<mode_args/>` contains a URL with no flags.
 
+### Duplicate Detection
+
+Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Batch Mode) before spawning.
+
 ### Workflow
 
 1. **Parse** -- extract the URL from `<mode_args/>`
-2. **Spawn agent** -- invoke `@research-curator` via Agent tool with the URL
+2. **Duplicate Detection** -- apply the [Duplicate Detection](./references/duplicate-detection.md) check before spawning
+3. **Spawn agent** -- invoke `@research-curator` via Agent tool:
 
    ```text
-   Agent tool parameters:
+   Agent tool parameters (new entry -- no existing entry found in step 2):
      agent: .claude/agents/research-curator.md
      prompt: "Research and create an entry for: {URL}"
+
+   Agent tool parameters (existing entry found in step 2):
+     agent: .claude/agents/research-curator.md
+     prompt: "--rerun ./research/{category}/{name}.md"
    ```
 
-3. **Wait** for structured result (status, file path, category, key findings)
-4. **Validate** -- if research status is not `failed`, run the validation gate on the created file:
+4. **Wait** for structured result (status, file path, category, key findings)
+5. **Validate** -- if research status is not `failed`, run the validation gate on the created or refreshed file:
 
    a. Run fix script:
 
@@ -130,9 +139,9 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file-path-from-agent-result}
    ```
 
-   c. If validator returns errors: mark entry as "created with issues", skip steps 5–6, report to user with exact error text from validator JSON
+   c. If validator returns errors: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, report to user with exact error text from validator JSON
 
-   d. If validator passes: proceed to step 5
+   d. If validator passes: proceed to step 6
 
 6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
@@ -149,7 +158,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
         agent: .claude/agents/research-cross-referencer.md
         prompt: "Add cross-references to {file-path-from-agent-result}"
 
-   d. Update ./research/README.md -- add new entry to category table
+   d. Update ./research/README.md -- add new entry to category table, or refresh the freshness date for an existing entry when step 2 routed to `--rerun`
    ```
 
 7. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
@@ -194,17 +203,7 @@ See [Batch Mode reference](./references/batch-mode.md) for the complete wave spa
 
 ### Duplicate Detection
 
-Before spawning, check if `./research/` already contains an entry for the URL's resource.
-If found:
-
-1. Read the entry's Freshness Tracking section.
-2. Compute days since Last Verified (integer: today minus Last Verified date).
-3. Emit: `Entry is N days old (last verified: YYYY-MM-DD, vX.Y.Z). Proceeding with refresh.`
-4. Pass `--rerun ./research/{category}/{name}.md` to the agent instead of skipping.
-
-If the Freshness Tracking section is absent or Last Verified is unreadable, emit:
-`Entry exists but freshness data unavailable. Proceeding with refresh.`
-and pass `--rerun ./research/{category}/{name}.md` to the agent.
+Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Default Mode) before spawning.
 
 ### Progress Reporting
 

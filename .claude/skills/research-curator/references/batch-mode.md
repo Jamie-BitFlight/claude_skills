@@ -67,7 +67,7 @@ flowchart TD
 
 - **Individual failure**: Log the error, continue with remaining URLs. Do not abort the batch.
 - **Agent timeout**: If an agent does not return within reasonable time, mark as failed and continue.
-- **Duplicate detection**: Before spawning, check if `./research/` already contains an entry for the URL's resource. If found, skip with info message suggesting `--rerun` instead.
+- **Duplicate detection**: see [Duplicate Detection](./duplicate-detection.md) — applied before spawning, per URL.
 
 ---
 
