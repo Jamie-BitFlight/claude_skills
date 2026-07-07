@@ -76,6 +76,7 @@ File location: `./research/{category}/{resource-name}.md`
 
 ````markdown
 ---
+name: {resource-name-slug}
 research_date: YYYY-MM-DD
 source_url: https://...
 github_repository: https://github.com/... # if applicable
