@@ -464,9 +464,10 @@ class BeadsBackend:
         """Enrich a ViewItemResult with live data from beads via ``bd show``.
 
         Populates ``result.status``, ``result.state``, ``result.title``,
-        ``result.source``, and ``result.body`` (from the issue description
-        and notes) from the beads issue.  Returns ``False`` when the issue
-        cannot be found or the data is malformed.
+        ``result.source``, ``result.issue`` (the beads nanoid), and
+        ``result.body`` (from the issue description and notes) from the
+        beads issue.  Returns ``False`` when the issue cannot be found or
+        the data is malformed.
 
         Args:
             result: ViewItemResult to enrich in place.
@@ -492,6 +493,7 @@ class BeadsBackend:
         result.status = str(parsed.status)
         result.state = "closed" if parsed.status == BeadsStatus.CLOSED else "open"
         result.source = "beads"
+        result.issue = parsed.id
         if parsed.title:
             result.title = parsed.title
         if parsed.description:

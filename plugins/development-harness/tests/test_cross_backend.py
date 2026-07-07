@@ -992,7 +992,7 @@ class TestBeadsBackendConformance:
         bd_runner.run_text.assert_not_called()
 
     def test_view_enrich_populates_status_and_source(self, beads_backend, bd_runner, bd_show_fixture) -> None:
-        """view_enrich_from_github populates status, state, source, title, and body."""
+        """view_enrich_from_github populates status, state, source, title, issue, and body."""
         bd_runner.run_json.return_value = bd_show_fixture
         result = ViewItemResult(title="", status="", state="", source="")
 
@@ -1003,6 +1003,7 @@ class TestBeadsBackendConformance:
         assert result.state == "open"
         assert result.source == "beads"
         assert result.title == "Fix authentication bug"
+        assert result.issue == "bd-a3f8"
         assert result.body == "The authentication module fails on expired tokens."
 
     def test_view_enrich_appends_notes_to_body(self, beads_backend, bd_runner, bd_show_fixture) -> None:
