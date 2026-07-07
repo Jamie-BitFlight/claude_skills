@@ -309,20 +309,14 @@ class FinalizePlanConfig(_ActionConfigBase):
     plan review completes (no-more-changes), making the plan available for
     execution by ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
 
+    The backend resolves the issue association internally from the plan index —
+    no caller-provided issue number is needed at finalize time. Establish the
+    association at ``create`` time via ``issue=`` on the ``create`` action.
+
     See #1770 for the architectural decision record.
     """
 
     action: Literal["finalize"] = "finalize"
-    issue: int | None = Field(
-        default=None,
-        description=(
-            "Optional GitHub issue number for late-binding artifact registration. "
-            "Use when the plan was created with action='create' and tasks=[] but "
-            "without an issue number. Providing it here uploads the finalized plan "
-            "YAML to Gist and registers the task-plan artifact, identical to plans "
-            "created with issue= on the create action."
-        ),
-    )
 
 
 # Discriminated union for sam_plan — discriminator is the ``action`` field.

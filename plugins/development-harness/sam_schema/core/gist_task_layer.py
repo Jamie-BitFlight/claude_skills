@@ -1064,8 +1064,14 @@ class GistTaskLayer:
 
         1. Delegate to ``local_backend.finalize_plan()`` to set ``state=ready``.
         2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
-        3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
-        4. If issue is ``None``: log warning; local-only write.
+        3. If issue is set: upload finalized YAML to Gist (raises ``ArtifactWriteError``
+           on failure).
+        4. If issue is ``None`` (local-only plan): log warning; local-only write.
+
+        The issue association is established at ``create_plan`` time.  Callers that
+        omit ``issue`` at create time have a local-only plan and should re-create the
+        plan with ``issue=`` to enable portability.
+
 
         Args:
             plan_id: Plan identifier.

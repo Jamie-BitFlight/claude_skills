@@ -498,21 +498,18 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
     return backend.append_task(plan, config.task)
 
 
-def _sam_plan_finalize(plan: str, config: FinalizePlanConfig, plan_dir: str) -> dict:
+def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     """Transition a plan from drafting state to ready state.
 
     See FinalizePlanConfig and #1770 for the ADR.
 
-    When ``config.issue`` is set and the backend is a ``GistTaskLayer``, passes
-    the issue for late-binding artifact registration — enabling plans created
-    without ``issue=`` to upload their finalized YAML to Gist retroactively.
+    The backend resolves the issue association internally from the plan index;
+    no caller-provided issue is needed at finalize time.
 
     Returns:
         Result dict from ``backend.finalize_plan`` — shape: ``{"finalized": True, "state": "ready"}``.
     """
     backend = _get_backend(plan_dir)
-    if isinstance(backend, GistTaskLayer):
-        return backend.finalize_plan(plan, issue=config.issue)
     return backend.finalize_plan(plan)
 
 
@@ -628,7 +625,7 @@ def sam_plan(
         case "finalize":
             if not isinstance(config, FinalizePlanConfig):
                 raise TypeError(f"Expected FinalizePlanConfig, got {type(config).__name__}")
-            return _sam_plan_finalize(_require_plan(plan, "finalize"), config, plan_dir)
+            return _sam_plan_finalize(_require_plan(plan, "finalize"), plan_dir)
         case _:  # pragma: no cover
             msg = f"sam_plan: unhandled action '{config.action}'"
             raise ValueError(msg)
