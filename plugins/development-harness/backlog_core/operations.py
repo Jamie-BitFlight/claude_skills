@@ -714,13 +714,17 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
     issue_ref = item.issue
     if issue_ref:
+        if get_config().backend.issue_id_type == "string":
+            # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
+            # Local title was already updated above; no GitHub sync needed.
+            return True
         repository = try_get_github(repo)
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    out.warn(f"  WARNING: {issue_ref!r} is not a numeric GitHub issue ref; skipping title update")
-                    return True
+                    msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
+                    raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
@@ -763,13 +767,17 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
     if issue_ref:
+        if get_config().backend.issue_id_type == "string":
+            # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
+            # Local plan metadata was already updated above; no GitHub sync needed.
+            return True
         repository = try_get_github(repo)
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
                 if num is None:
-                    out.warn(f"  WARNING: {issue_ref!r} is not a numeric GitHub issue ref; skipping plan comment")
-                    return True
+                    msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
+                    raise ValueError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")

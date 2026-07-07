@@ -3243,55 +3243,39 @@ class TestRenameItemTitleBeadsNanoid:
     def test_rename_item_title_skips_github_for_beads_nanoid(self, mocker: MockerFixture) -> None:
         """_rename_item_title with a beads nanoid issue_ref returns without raising.
 
-        Tests: _rename_item_title safe-skip path for non-numeric issue refs.
-        How: Write an item with issue='bd-a3f8'; mock try_get_github to return a real
-             Repository mock so the code enters the github block; call update_item(title=);
-             verify no exception is raised, the local file is renamed, and
-             _update_issue_graphql is NOT called.
-        Why: parse_issue_number returns None for beads nanoids; the original code raised
-             ValueError (not caught by except (GithubException, BacklogError)); the fix
-             replaces the raise with warn+return so beads users can rename items safely.
+        Tests: _rename_item_title early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-a3f8'; call update_item(title=); verify no exception is raised,
+             the local file is renamed, and _update_issue_graphql is NOT called.
+        Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
+             The fix adds an issue_id_type guard before try_get_github, so no GitHub
+             sync is attempted — the local update completes cleanly.
         """
+        from unittest.mock import MagicMock
+
         import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.operations import update_item
 
-        fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Beads Title Item", topic="beads-title-item", issue="bd-a3f8")
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
 
-        mock_repo = mocker.Mock()
-        mock_repo.full_name = "owner/repo"
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mock_update_issue = mocker.patch("backlog_core.operations._update_issue_graphql")
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Title Item", topic="beads-title-item", issue="bd-a3f8")
 
-        result = update_item(selector="Beads Title Item", title="Beads Title Renamed")
+            mock_update_issue = mocker.patch("backlog_core.operations._update_issue_graphql")
 
-        assert result.get("renamed_to") == "Beads Title Renamed"
-        mock_update_issue.assert_not_called()
+            result = update_item(selector="Beads Title Item", title="Beads Title Renamed")
 
-    def test_rename_item_title_beads_nanoid_emits_warning(self, mocker: MockerFixture) -> None:
-        """_rename_item_title with a beads nanoid emits a warning containing the issue ref.
-
-        Tests: warning emission in the safe-skip path.
-        How: Call update_item with a beads-nanoid item; check warnings in result.
-        Why: Silent skips hide behavior — a warning ensures the caller knows the
-             GitHub title update was intentionally skipped.
-        """
-        import backlog_core.models as models
-        from backlog_core.operations import update_item
-
-        fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Beads Warn Title", topic="beads-warn-title", issue="bd-b5c7")
-
-        mock_repo = mocker.Mock()
-        mock_repo.full_name = "owner/repo"
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations._update_issue_graphql")
-
-        result = update_item(selector="Beads Warn Title", title="Beads Warn Renamed")
-
-        raw_warnings = result.get("warnings")
-        warnings_text = " ".join(raw_warnings) if isinstance(raw_warnings, list) else ""
-        assert "bd-b5c7" in warnings_text
+            assert result.get("renamed_to") == "Beads Title Renamed"
+            mock_update_issue.assert_not_called()
+        finally:
+            reset_config()
 
 
 # ---------------------------------------------------------------------------
@@ -3305,54 +3289,39 @@ class TestApplyPlanToItemBeadsNanoid:
     def test_apply_plan_to_item_skips_github_for_beads_nanoid(self, mocker: MockerFixture) -> None:
         """_apply_plan_to_item with a beads nanoid issue_ref returns without raising.
 
-        Tests: _apply_plan_to_item safe-skip path for non-numeric issue refs.
-        How: Write an item with issue='bd-c9d1'; mock try_get_github to return a real
-             Repository mock; call update_item(plan=); verify no exception is raised
+        Tests: _apply_plan_to_item early-return path for string-ID backends.
+        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
+             issue='bd-c9d1'; call update_item(plan=); verify no exception is raised
              and _add_comment_graphql is NOT called.
-        Why: parse_issue_number returns None for beads nanoids; the original code raised
-             ValueError (not caught by except (GithubException, BacklogError)); the fix
-             replaces the raise with warn+return so beads users can set plans safely.
+        Why: String-ID backends (e.g. beads) use nanoids, not GitHub issue numbers.
+             The fix adds an issue_id_type guard before try_get_github, so no GitHub
+             plan comment is attempted — the local update completes cleanly.
         """
+        from unittest.mock import MagicMock
+
         import backlog_core.models as models
+        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backends.bd_runner import BdRunner
+        from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.operations import update_item
 
-        fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Beads Plan Item", topic="beads-plan-item", issue="bd-c9d1")
+        mock_runner = MagicMock(spec=BdRunner)
+        mock_runner.is_available.return_value = True
+        beads_backend = BeadsBackend(runner=mock_runner)
+        set_config(BacklogConfig(backend=beads_backend))
 
-        mock_repo = mocker.Mock()
-        mock_repo.full_name = "owner/repo"
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mock_add_comment = mocker.patch("backlog_core.operations._add_comment_graphql")
+        try:
+            fake_dir: Path = models.get_backlog_dir()
+            _write_item(fake_dir, title="Beads Plan Item", topic="beads-plan-item", issue="bd-c9d1")
 
-        result = update_item(selector="Beads Plan Item", plan="plan/tasks-beads.yaml")
+            mock_add_comment = mocker.patch("backlog_core.operations._add_comment_graphql")
 
-        assert result.get("errors", []) == []
-        mock_add_comment.assert_not_called()
+            result = update_item(selector="Beads Plan Item", plan="plan/tasks-beads.yaml")
 
-    def test_apply_plan_to_item_beads_nanoid_emits_warning(self, mocker: MockerFixture) -> None:
-        """_apply_plan_to_item with a beads nanoid emits a warning containing the issue ref.
-
-        Tests: warning emission in the safe-skip path.
-        How: Call update_item(plan=) with a beads-nanoid item; check warnings in result.
-        Why: Silent skips hide behavior — a warning ensures the caller knows the
-             plan comment was intentionally skipped.
-        """
-        import backlog_core.models as models
-        from backlog_core.operations import update_item
-
-        fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Beads Plan Warn", topic="beads-plan-warn", issue="bd-d0e2")
-
-        mock_repo = mocker.Mock()
-        mock_repo.full_name = "owner/repo"
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations._add_comment_graphql")
-
-        result = update_item(selector="Beads Plan Warn", plan="plan/tasks-warn.yaml")
-
-        raw_warnings = result.get("warnings")
-        warnings_text = " ".join(raw_warnings) if isinstance(raw_warnings, list) else ""
-        assert "bd-d0e2" in warnings_text
+            assert result.get("errors", []) == []
+            mock_add_comment.assert_not_called()
+        finally:
+            reset_config()
 
 
 # ---------------------------------------------------------------------------
@@ -3388,8 +3357,6 @@ class TestViewItemBeadsNanoidUncached:
 
         try:
             view_item("bd-e2f4")
-        except Exception:  # noqa: BLE001
-            pass
         finally:
             reset_config()
 
