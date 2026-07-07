@@ -369,6 +369,18 @@ def migrate_file(filepath: Path, research_root: Path, *, dry_run: bool) -> tuple
     while body_stripped and not body_stripped[0].strip():
         body_stripped.pop(0)
 
+    # When no "---" separator exists, _get_body_after_header returns the whole
+    # file unchanged, so body_stripped still starts with the original "# Title"
+    # line. Drop it here so the title isn't duplicated by the unconditional
+    # "# {title}" insertion below. Match on title text, not any leading "#"
+    # heading, so an unrelated section heading is never dropped by mistake.
+    if title and body_stripped:
+        match = _TITLE_PATTERN.match(body_stripped[0].strip())
+        if match and match.group(1).strip() == title:
+            body_stripped.pop(0)
+            while body_stripped and not body_stripped[0].strip():
+                body_stripped.pop(0)
+
     # Build the new file: frontmatter + blank line + # Title + blank line + body
     new_lines = frontmatter.splitlines()
     new_lines.append("")
