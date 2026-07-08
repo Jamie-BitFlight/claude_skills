@@ -92,8 +92,9 @@ root = ["./"]
 include = ["plugins/agentskill-kaizen/**"]
 
 [tool.ty.overrides.rules]
-call-non-callable = "warn"    # prefixspan has incomplete type stubs
-unresolved-attribute = "warn" # lazy import pattern: `import mod; mod.Attr` — ty sees ModuleType, not resolved class
+call-non-callable = "warn"             # prefixspan has incomplete type stubs
+unresolved-attribute = "warn"          # lazy import pattern: `import mod; mod.Attr` — ty sees ModuleType, not resolved class
+too-many-positional-arguments = "warn" # hv.extension stubs model __init__(**params) but public API is extension(*backends)
 
 [[tool.ty.overrides]]
 include = ["**/test_*.py", "**/conftest.py", "**/tests/**", "tests/**"]

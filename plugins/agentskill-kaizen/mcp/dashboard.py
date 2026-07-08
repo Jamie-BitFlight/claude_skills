@@ -21,18 +21,17 @@ import socket
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import holoviews as hv
 import hvplot.pandas  # noqa: F401
 import pandas as pd
 import panel as pn
 import tornado.web
+from panel.io.server import StoppableThread
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from panel.io.server import StoppableThread
 
 
 logger = logging.getLogger(__name__)
@@ -389,7 +388,7 @@ def _create_app(csv_path: Path) -> pn.template.FastListTemplate:
     Returns:
         A Panel FastListTemplate ready to be served.
     """
-    cast("Callable[..., Any]", hv.extension)("bokeh")
+    hv.extension("bokeh")
     pn.extension("tabulator")
 
     # Track file modification time for change detection
@@ -464,6 +463,25 @@ def _allocate_port() -> int:
     finally:
         sock.close()
     return port
+
+
+def _require_stoppable_thread(result: object) -> StoppableThread:
+    """Validate and narrow pn.serve(threaded=True) result to StoppableThread.
+
+    pn.serve returns StoppableThread | Server.  When threaded=True the only
+    valid result is StoppableThread.  This helper raises TypeError at the call
+    site rather than inside a try block (TRY301) so the OSError handler in
+    _serve() does not swallow unexpected type mismatches from panel internals.
+
+    Returns:
+        The result narrowed to StoppableThread.
+
+    Raises:
+        TypeError: If result is not a StoppableThread instance.
+    """
+    if not isinstance(result, StoppableThread):
+        raise TypeError(f"pn.serve(threaded=True) must return StoppableThread, got {type(result).__name__}")
+    return result
 
 
 def _reset_dashboard_state() -> None:
@@ -650,8 +668,7 @@ def start_dashboard(csv_path: Path | None = None) -> threading.Thread | None:
             # StoppableThread inherits daemon status from its creator thread
             # (this daemon thread), so it is also a daemon thread — the
             # process will not be kept alive by it.
-            panel_thread = cast(
-                "StoppableThread",
+            panel_thread = _require_stoppable_thread(
                 pn.serve(
                     {"/": _app_factory},
                     address="localhost",
@@ -661,7 +678,7 @@ def start_dashboard(csv_path: Path | None = None) -> threading.Thread | None:
                     threaded=True,
                     verbose=False,
                     extra_patterns=[("/health", HealthHandler, health_state_kwargs)],
-                ),
+                )
             )
             panel_thread.join()
         except OSError as exc:
