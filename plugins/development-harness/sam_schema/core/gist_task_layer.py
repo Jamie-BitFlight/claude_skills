@@ -471,7 +471,11 @@ class GistTaskLayer:
             pass  # Glob failure — proceed with computed path.
 
         if not cache_path.resolve().is_relative_to(self._local.plan_dir.resolve()):
-            raise ValueError(f"Slug produces unsafe cache path: {cache_path}")
+            _log.warning(
+                "GistTaskLayer._write_local_cache: slug produces unsafe cache path for plan %s — skipping cache write",
+                plan_id,
+            )
+            return
 
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)

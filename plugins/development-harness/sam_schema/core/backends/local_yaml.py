@@ -195,8 +195,11 @@ class LocalYamlTaskProvider:
             RuntimeError: If plan_dir is None and dh_paths is not importable.
         """
         if plan_dir is None:
-            import dh_paths
-
+            try:
+                import dh_paths
+            except ImportError as exc:
+                msg = "plan_dir is None and dh_paths is not importable — install dh_paths or pass plan_dir explicitly"
+                raise RuntimeError(msg) from exc
             plan_dir = dh_paths.plan_dir()
         self._plan_dir: Path = plan_dir
         # Per-plan task-ID cache — avoids repeated YAML parse+deserialize when
