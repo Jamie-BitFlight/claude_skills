@@ -37,12 +37,9 @@ _BD_SHOW_METADATA_NO_DH_ARTIFACTS: list[dict] = [
 
 def _provider_with_mock_runner(raw_json: object) -> BeadsArtifactProvider:
     """Return a BeadsArtifactProvider whose runner returns *raw_json* from run_json."""
-    provider = BeadsArtifactProvider.__new__(BeadsArtifactProvider)
-    provider._root_worktree = None  # type: ignore[attr-defined]
     runner_mock = MagicMock()
     runner_mock.run_json.return_value = raw_json
-    provider._runner_instance = runner_mock  # type: ignore[attr-defined]
-    return provider
+    return BeadsArtifactProvider(runner=runner_mock)
 
 
 class TestGetManifestBdIssueNumberPreservation:
