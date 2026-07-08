@@ -298,6 +298,21 @@ def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[s
 _SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update", "append_task", "finalize"})
 
 
+def _require_plan(plan: str | None, action: str) -> str:
+    """Return *plan* as str, raising ToolError when it is None.
+
+    Used by ``sam_plan`` to narrow ``plan: str | None`` to ``str`` for
+    actions that require it, without relying on ``cast()`` or assert.
+    """
+    if plan is None:
+        msg = (
+            f"sam_plan: action='{action}' requires the 'plan' parameter "
+            f"(e.g., plan='P1'). Actions that do not need 'plan': list, create."
+        )
+        raise ToolError(msg)
+    return plan
+
+
 def _sam_plan_read(plan: str, plan_dir: str) -> dict:
     """Return Plan fields for the given plan address.
 

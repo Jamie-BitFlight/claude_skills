@@ -35,7 +35,7 @@ import sys
 from datetime import UTC, datetime
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated, TypeGuard
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -46,6 +46,12 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 if TYPE_CHECKING:
     from backlog_core.artifact_provider import GitHubArtifactProvider
+
+
+def _is_str_dict(obj: object) -> TypeGuard[dict[str, object]]:
+    """Return True when *obj* is a dict with exclusively string keys."""
+    return isinstance(obj, dict) and all(isinstance(k, str) for k in obj)
+
 
 # ---------------------------------------------------------------------------
 # Bootstrap: make the development-harness package importable from within the
@@ -606,7 +612,7 @@ def _extract_issue_int_from_backlog_data(data: dict[str, object]) -> int | None:
         Positive integer issue number, or ``None``.
     """
     meta_raw = data.get("metadata")
-    meta: dict[str, object] = cast("dict[str, object]", meta_raw) if isinstance(meta_raw, dict) else {}
+    meta: dict[str, object] = meta_raw if _is_str_dict(meta_raw) else {}
     issue_raw: object = meta.get("issue") or data.get("issue")
     if issue_raw is None:
         return None
@@ -634,7 +640,7 @@ def _extract_plan_field_slug(data: dict[str, object]) -> str | None:
         Extracted slug string, or ``None`` when not derivable.
     """
     meta_raw = data.get("metadata")
-    meta: dict[str, object] = cast("dict[str, object]", meta_raw) if isinstance(meta_raw, dict) else {}
+    meta: dict[str, object] = meta_raw if _is_str_dict(meta_raw) else {}
     plan_raw = meta.get("plan") or data.get("plan")
     if plan_raw is None:
         return None
