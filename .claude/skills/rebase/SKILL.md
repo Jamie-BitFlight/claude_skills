@@ -7,7 +7,7 @@ description: "Strategic rebase with mandatory pre-analysis. Use when asked to re
 
 ## Mandatory Pre-Rebase Analysis
 
-Complete all steps before running `git rebase`. Do not skim commit messages as a proxy for file-level changes — read the actual diffs.
+Complete all 5 steps before running `git rebase`.
 
 ### Step 1 — Identify the merge base and branch files
 
@@ -19,25 +19,24 @@ git diff "${MERGE_BASE}..<target>" --name-only  # files changed on target since 
 
 ### Step 2 — Diff overlapping files
 
-For every file that appears in BOTH lists (changed on branch AND changed on target since divergence), run:
+For each file appearing in both lists above, read both sides:
 
 ```bash
 git diff "${MERGE_BASE}..<target>" -- <file>    # what target changed
 git diff "${MERGE_BASE}..<branch>" -- <file>    # what the branch changed
 ```
 
-Read both diffs. Determine what each side changed and in which regions.
+Determine what each side changed and in which regions.
 
 ### Step 3 — Assign a disposition to every overlapping file
 
 | Disposition | When to use |
 |---|---|
-| KEEP | Branch version wins; target change is irrelevant or already superseded by the branch |
+| KEEP | Branch version wins; target change is irrelevant or already superseded |
 | MERGE | Both sides changed different regions — list which regions each side owns |
-| DROP | Branch change is superseded by what target already landed; discard it |
-| REWRITE | Semantic intent of the branch change survives, but the implementation must change to account for what target did |
-
-Files touched only by the branch (no overlap with target) — mark as NO_CONFLICT.
+| DROP | Branch change superseded by what target already landed; discard it |
+| REWRITE | Branch intent survives, but implementation must change to account for target's changes |
+| NO_CONFLICT | File touched only by the branch — no overlap with target |
 
 ### Step 4 — State the plan before executing
 
@@ -61,13 +60,14 @@ git rebase <target>
 ```
 
 On each conflict:
+
 1. Resolve according to the plan.
-2. If the conflict deviates from the plan (e.g., a region marked NO_CONFLICT has an unexpected conflict), stop, explain the deviation, update the plan entry, then resolve.
+2. When a conflict deviates from the plan (e.g., a region marked NO_CONFLICT has an unexpected conflict): stop, explain the deviation, update the plan entry, then resolve.
 
 After completing, verify with `git log --oneline` and run the test suite.
 
 ## Rules
 
-- Do not run `git rebase` before writing the Step 4 plan.
-- Do not resolve conflicts by accepting one side wholesale without checking the plan.
-- Do not use commit message titles as a substitute for reading file-level diffs.
+- Write the Step 4 plan before running `git rebase`.
+- Resolve each conflict according to the plan — check before accepting either side.
+- Read file-level diffs (Step 2); commit message titles are not a substitute.
