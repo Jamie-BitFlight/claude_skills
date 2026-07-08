@@ -354,10 +354,6 @@ unfixable = ["F401"]
 "plugins/development-harness/sam_schema/core/backends/local_yaml.py" = [
     "PLC0415",
 ]
-# panel.io.server import is deferred to _require_stoppable_thread() body so that
-# the module can be imported in environments where panel is not installed as a real
-# package (e.g. CI test runners that shadow it with a panel.py stub file).
-"plugins/agentskill-kaizen/mcp/dashboard.py" = ["PLC0415"]
 # Executable bit is set at runtime via uv run (PEP 723 shebang)
 "plugins/development-harness/scripts/verify_migration_fidelity.py" = ["EXE001"]
 # live_validation_step: S105 false-positive (enum value "PASS" ≠ password),

@@ -21,7 +21,7 @@ import socket
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 import holoviews as hv
 import hvplot.pandas  # noqa: F401
@@ -466,6 +466,21 @@ def _allocate_port() -> int:
     return port
 
 
+def _is_stoppable_thread(result: object) -> TypeGuard[StoppableThread]:
+    """Return True when result exposes the StoppableThread interface.
+
+    Checks for callable ``join`` and ``stop`` attributes — the only two
+    methods ``_serve()`` uses on the returned object.  Duck-typing avoids
+    a runtime import of ``panel.io.server`` that would fail in test
+    environments where panel is stubbed as a flat module rather than a
+    package.
+
+    Returns:
+        True if result is structurally compatible with StoppableThread.
+    """
+    return callable(getattr(result, "join", None)) and callable(getattr(result, "stop", None))
+
+
 def _require_stoppable_thread(result: object) -> StoppableThread:
     """Validate and narrow pn.serve(threaded=True) result to StoppableThread.
 
@@ -474,19 +489,13 @@ def _require_stoppable_thread(result: object) -> StoppableThread:
     site rather than inside a try block (TRY301) so the OSError handler in
     _serve() does not swallow unexpected type mismatches from panel internals.
 
-    panel is an optional runtime dependency — imported locally so the module
-    can be imported in environments where panel is not installed (e.g. CI test
-    runners that have a panel.py stub but no real panel package).
-
     Returns:
         The result narrowed to StoppableThread.
 
     Raises:
-        TypeError: If result is not a StoppableThread instance.
+        TypeError: If result does not expose the StoppableThread interface.
     """
-    from panel.io.server import StoppableThread as _StoppableThread  # PLC0415: optional runtime dep
-
-    if not isinstance(result, _StoppableThread):
+    if not _is_stoppable_thread(result):
         raise TypeError(f"pn.serve(threaded=True) must return StoppableThread, got {type(result).__name__}")
     return result
 
