@@ -52,7 +52,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
 from .exceptions import ArtifactWriteError, ConcurrentClaimUnsupportedError, PlanIndexError, PlanNotFoundError
 
@@ -166,6 +166,11 @@ class GistTaskLayer:
         #: cleared when a subsequent successful write-through syncs the plan.
         self._local_authoritative_plans: set[str] = set()
 
+    @property
+    def local(self) -> LocalYamlTaskProvider:
+        """The wrapped local YAML backend."""
+        return self._local
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -183,7 +188,7 @@ class GistTaskLayer:
         if plan_id in self._local_authoritative_plans:
             return True
         try:
-            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+            local_path = self._local.resolve_path(plan_id)
             if local_path.with_suffix(".stale").exists():
                 self._local_authoritative_plans.add(plan_id)
                 return True
@@ -426,7 +431,7 @@ class GistTaskLayer:
         """
         try:
             data = _yaml_safe.load(StringIO(yaml_content))
-        except Exception:  # noqa: BLE001 — ruamel raises many internal types
+        except YAMLError:
             _log.warning(
                 "GistTaskLayer._write_local_cache: failed to parse YAML for plan %s — skipping cache write", plan_id
             )
@@ -453,19 +458,19 @@ class GistTaskLayer:
             )
             return
 
-        cache_path = self._local._plan_dir / f"{plan_id}-{slug}.yaml"  # noqa: SLF001
+        cache_path = self._local.plan_dir / f"{plan_id}-{slug}.yaml"
 
         # If a file already exists for this plan_id (possibly with a different slug),
         # prefer the existing path to avoid creating a duplicate.
         try:
-            existing = self._local._plan_dir.glob(f"{plan_id}-*.yaml")  # noqa: SLF001
+            existing = self._local.plan_dir.glob(f"{plan_id}-*.yaml")
             for existing_path in existing:
                 cache_path = existing_path
                 break
         except OSError:
             pass  # Glob failure — proceed with computed path.
 
-        if not cache_path.resolve().is_relative_to(self._local._plan_dir.resolve()):  # noqa: SLF001
+        if not cache_path.resolve().is_relative_to(self._local.plan_dir.resolve()):
             raise ValueError(f"Slug produces unsafe cache path: {cache_path}")
 
         try:
@@ -604,8 +609,8 @@ class GistTaskLayer:
             ArtifactWriteError: When the local file cannot be found or read.
         """
         try:
-            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
-        except Exception as exc:
+            local_path = self._local.resolve_path(plan_id)
+        except PlanNotFoundError as exc:
             msg = f"cannot resolve local path for plan {plan_id}: {exc}"
             _log.error("GistTaskLayer._read_local_yaml_for_plan: %s", msg)
             raise ArtifactWriteError(plan_id=plan_id, issue=None, reason=msg) from exc
@@ -627,7 +632,7 @@ class GistTaskLayer:
             callers must tolerate both being absent.
         """
         try:
-            local_path = self._local._resolve_path(plan_id)  # noqa: SLF001
+            local_path = self._local.resolve_path(plan_id)
         except PlanNotFoundError:
             _log.debug(
                 "GistTaskLayer._write_through: path resolution failed for plan %s — skipping hash dedup", plan_id
@@ -1071,7 +1076,6 @@ class GistTaskLayer:
         The issue association is established at ``create_plan`` time.  Callers that
         omit ``issue`` at create time have a local-only plan and should re-create the
         plan with ``issue=`` to enable portability.
-
 
         Args:
             plan_id: Plan identifier.
