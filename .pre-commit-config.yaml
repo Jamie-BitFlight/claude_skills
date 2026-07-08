@@ -100,7 +100,11 @@ repos:
         additional_dependencies: ["@biomejs/biome@2.4.16"]
         types_or: [javascript, jsx, ts, tsx, json, css]
         pass_filenames: true
-        exclude: graphify-out/
+        # Mirror biome.json's own `files.includes` excludes — pre-commit's
+        # types_or filter is unaware of biome's internal ignore list, so an
+        # excluded file passed explicitly makes the biome CLI report "no
+        # files processed" and exit non-zero instead of a benign no-op.
+        exclude: (graphify-out/|.*/\.claude-plugin/plugin\.json$|\.claude-plugin/marketplace\.json$)
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.0
