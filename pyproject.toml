@@ -348,6 +348,11 @@ unfixable = ["F401"]
 ]
 # Lazy import for optional duckdb dependency in _write_duckdb
 "plugins/agentskill-kaizen/scripts/sentiment-score.py" = ["PLC0415"]
+# dh_paths is an optional runtime dependency — imported only when plan_dir=None to defer the
+# ImportError to call time rather than module load time (test and CI environments may lack it)
+"plugins/development-harness/sam_schema/core/backends/local_yaml.py" = [
+    "PLC0415",
+]
 # Executable bit is set at runtime via uv run (PEP 723 shebang)
 "plugins/development-harness/scripts/verify_migration_fidelity.py" = ["EXE001"]
 # live_validation_step: S105 false-positive (enum value "PASS" ≠ password),

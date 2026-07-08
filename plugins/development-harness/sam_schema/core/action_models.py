@@ -309,6 +309,10 @@ class FinalizePlanConfig(_ActionConfigBase):
     plan review completes (no-more-changes), making the plan available for
     execution by ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
 
+    The backend resolves the issue association internally from the plan index —
+    no caller-provided issue number is needed at finalize time. Establish the
+    association at ``create`` time via ``issue=`` on the ``create`` action.
+
     See #1770 for the architectural decision record.
     """
 

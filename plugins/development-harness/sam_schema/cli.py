@@ -78,6 +78,7 @@ except ImportError:
 app = typer.Typer(name="sam", help="SAM task/plan file interface.", no_args_is_help=True)
 
 _OUTPUT_FORMATS = ("json", "yaml", "rich")
+_YAML_FRONTMATTER_PARTS = 3
 
 
 def _coerce_plan_dir(plan_dir: Path | None) -> Path:
@@ -622,6 +623,8 @@ def create(
         from_stdin: If ``True``, read task YAML from stdin.
         output_format: Output format (only ``json`` is supported).
     """
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
     plan_dir = _coerce_plan_dir(plan_dir)
     tasks: list[dict[str, object]] = []
 
@@ -661,7 +664,7 @@ def create(
 def update(
     address: Annotated[str, typer.Argument(help="Plan address (P{N}) or task address (P{N}/T{M})")],
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir", help="Plan directory")] = None,
-    set_field: Annotated[list[str], typer.Option("--set", help="field=value pairs to update")] = [],  # noqa: B006
+    set_field: Annotated[list[str] | None, typer.Option("--set", help="field=value pairs to update")] = None,
     context: Annotated[str | None, typer.Option("--context", help="Set plan-level context field")] = None,
     append_section_name: Annotated[
         str | None, typer.Option("--append-section", help="Heading for the section to append")
@@ -689,6 +692,10 @@ def update(
         section_content: Body text for the appended section.
         output_format: Output format (only ``json`` is supported).
     """
+    if set_field is None:
+        set_field = []
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
     plan_dir = _coerce_plan_dir(plan_dir)
     try:
         plan_ref, task_ref = parse_address(address)
@@ -749,6 +756,8 @@ def claim(
         plan_dir: Directory to search for plan files.
         output_format: Output format (only ``json`` is supported).
     """
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
     plan_dir = _coerce_plan_dir(plan_dir)
     try:
         plan_ref, task_ref = parse_address(address)
@@ -798,6 +807,8 @@ def validate(
         plan_dir: Directory to search for plan files.
         output_format: Output format (only ``json`` is supported).
     """
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
     plan_dir = _coerce_plan_dir(plan_dir)
     try:
         plan_ref, _ = parse_address(address)
@@ -1058,7 +1069,7 @@ def _update_backlog_refs(old_path: Path, new_path: Path, backlog_dir: Path) -> i
         if not raw.startswith("---"):
             continue
         parts = raw.split("---", 2)
-        if len(parts) < 3:  # noqa: PLR2004
+        if len(parts) < _YAML_FRONTMATTER_PARTS:
             continue
         _, fm_text, body = parts
         try:

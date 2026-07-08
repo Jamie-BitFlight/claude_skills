@@ -60,6 +60,7 @@ from sam_schema.core.exceptions import (
     TaskValidationError,
 )
 from sam_schema.core.models import ActiveTaskContext, PlanState
+from sam_schema.core.query import _new_plan_id
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -182,7 +183,7 @@ def _task_to_beads_status(s: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _issue_to_task_data(issue: BeadsIssueRaw, task_id: str, plan_id: str) -> TaskData:
+def _issue_to_task_data(issue: BeadsIssueRaw, task_id: str) -> TaskData:
     """Build a minimal TaskData from a BeadsIssueRaw instance.
 
     Only fields derivable from the bd issue are populated.  Rich content
@@ -192,7 +193,6 @@ def _issue_to_task_data(issue: BeadsIssueRaw, task_id: str, plan_id: str) -> Tas
     Args:
         issue: Parsed BeadsIssueRaw instance.
         task_id: SAM task identifier (e.g. ``'T01'``).
-        plan_id: SAM plan identifier (e.g. ``'Pabc123'``).
 
     Returns:
         Minimal TaskData dict with status, title, id, and timestamps.
@@ -510,7 +510,7 @@ class BeadsTaskProvider:
                 bookend_type=str(task.bookend_type) if task.bookend_type is not None else None,
             )
             self._wire_task_dependencies(plan_id, task, bd_issue.id)
-            td = _issue_to_task_data(bd_issue, task.id, plan_id)
+            td = _issue_to_task_data(bd_issue, task.id)
             if task.is_bookend:
                 td["is_bookend"] = task.is_bookend
             if task.bookend_type is not None:
@@ -553,8 +553,6 @@ class BeadsTaskProvider:
             PlanExistsError: When the generated plan_id already has an index entry.
             TaskValidationError: When any task definition is invalid.
         """
-        from sam_schema.core.query import _new_plan_id  # noqa: PLC0415
-
         plan_id = _new_plan_id()
 
         existing = self._remember_get(f"{_PLAN_IDX_PREFIX}{plan_id}")
@@ -636,7 +634,7 @@ class BeadsTaskProvider:
                 bd_id = meta["bd_id"]
                 try:
                     issue = parse_show_issue(self._runner.run_json(["show", bd_id]))
-                    td = _issue_to_task_data(issue, task_id, plan_id)
+                    td = _issue_to_task_data(issue, task_id)
                     if meta.get("is_bookend"):
                         td["is_bookend"] = meta["is_bookend"]
                     if meta.get("bookend_type") is not None:
@@ -656,7 +654,7 @@ class BeadsTaskProvider:
             bd_id = meta["bd_id"]
             if (issue := children_by_bd_id.get(bd_id)) is None:
                 continue  # issue deleted in bd but index entry survives; skip
-            td = _issue_to_task_data(issue, task_id, plan_id)
+            td = _issue_to_task_data(issue, task_id)
             if meta.get("is_bookend"):
                 td["is_bookend"] = meta["is_bookend"]
             if meta.get("bookend_type") is not None:
@@ -784,7 +782,7 @@ class BeadsTaskProvider:
         """
         bd_id, is_bookend, bookend_type = self._bd_id_for_task(plan_id, task_id)
         issue = parse_show_issue(self._runner.run_json(["show", bd_id]))
-        td = _issue_to_task_data(issue, task_id, plan_id)
+        td = _issue_to_task_data(issue, task_id)
         if is_bookend:
             td["is_bookend"] = is_bookend
         if bookend_type is not None:
@@ -997,7 +995,7 @@ class BeadsTaskProvider:
             bd_id = meta["bd_id"]
             try:
                 issue = parse_show_issue(self._runner.run_json(["show", bd_id]))
-                td = _issue_to_task_data(issue, task_id, plan_id)
+                td = _issue_to_task_data(issue, task_id)
                 status_by_task_id[task_id] = td["status"]
                 task_data_by_id[task_id] = td
             except (BdInvocationError, ValueError):
