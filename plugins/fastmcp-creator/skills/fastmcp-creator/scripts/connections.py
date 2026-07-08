@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 
 from anthropic.types import ToolParam
 from mcp import ClientSession, StdioServerParameters
@@ -152,10 +152,7 @@ class MCPConnectionStdio(MCPConnection):
         Returns:
             Async context manager for stdio transport.
         """
-        return cast(
-            "AbstractAsyncContextManager[Any]",
-            stdio_client(StdioServerParameters(command=self.command, args=self.args, env=self.env)),
-        )
+        return stdio_client(StdioServerParameters(command=self.command, args=self.args, env=self.env))
 
 
 class MCPConnectionSSE(MCPConnection):
@@ -178,7 +175,7 @@ class MCPConnectionSSE(MCPConnection):
         Returns:
             Async context manager for SSE transport.
         """
-        return cast("AbstractAsyncContextManager[Any]", sse_client(url=self.url, headers=self.headers))
+        return sse_client(url=self.url, headers=self.headers)
 
 
 class MCPConnectionHTTP(MCPConnection):
@@ -201,7 +198,7 @@ class MCPConnectionHTTP(MCPConnection):
         Returns:
             Async context manager for HTTP transport.
         """
-        return cast("AbstractAsyncContextManager[Any]", streamablehttp_client(url=self.url, headers=self.headers))
+        return streamablehttp_client(url=self.url, headers=self.headers)
 
 
 def create_connection(
