@@ -565,10 +565,13 @@ class BeadsArtifactProvider:
             issue_id: Beads issue ID string (e.g. ``"bd-a3f8"``).
 
         Returns:
-            Tuple of ``(ArtifactManifest, BeadsIssueRaw)``.  When no manifest
-            data is stored on the issue the manifest is an empty
-            ``ArtifactManifest(issue_number=issue_id)`` so callers always
-            receive the actual beads ID in ``manifest.issue_number``.
+            Tuple of ``(ArtifactManifest, BeadsIssueRaw)``.  The manifest
+            always carries ``issue_number == issue_id`` — when no manifest
+            data is stored, an empty ``ArtifactManifest(issue_number=issue_id)``
+            is returned; when a manifest is stored but was persisted by a
+            pre-fix version with a stale ``issue_number`` (e.g. the old ``0``
+            sentinel), it is normalized to *issue_id* before being returned so
+            callers never observe the stale value.
 
         Raises:
             bd_runner.BdNotInstalledError: When ``bd`` is not on ``PATH``.
@@ -581,6 +584,8 @@ class BeadsArtifactProvider:
             return ArtifactManifest(issue_number=issue_id), issue
         if (manifest := _extract_manifest_from_metadata(issue.metadata)) is None:
             return ArtifactManifest(issue_number=issue_id), issue
+        if manifest.issue_number != issue_id:
+            manifest = manifest.model_copy(update={"issue_number": issue_id})
         return manifest, issue
 
     @property
