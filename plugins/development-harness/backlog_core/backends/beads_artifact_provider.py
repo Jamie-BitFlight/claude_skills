@@ -385,8 +385,8 @@ class BeadsArtifactProvider:
             issue_id: Beads issue ID string (e.g. ``"bd-a3f8"``).
 
         Returns:
-            ``ArtifactManifest``.  ``issue_number`` is ``0`` for manifests
-            returned from the beads backend (no integer ID applies).
+            ``ArtifactManifest``.  ``issue_number`` is always *issue_id*
+            (the beads nanoid string, e.g. ``"bd-a3f8"``).
 
         Raises:
             bd_runner.BdNotInstalledError: When ``bd`` is not on ``PATH``.
@@ -565,9 +565,10 @@ class BeadsArtifactProvider:
             issue_id: Beads issue ID string (e.g. ``"bd-a3f8"``).
 
         Returns:
-            Tuple of ``(ArtifactManifest, BeadsIssueRaw)``.  The manifest is
-            an empty ``ArtifactManifest(issue_number=0)`` when no manifest
-            data is stored on the issue.
+            Tuple of ``(ArtifactManifest, BeadsIssueRaw)``.  When no manifest
+            data is stored on the issue the manifest is an empty
+            ``ArtifactManifest(issue_number=issue_id)`` so callers always
+            receive the actual beads ID in ``manifest.issue_number``.
 
         Raises:
             bd_runner.BdNotInstalledError: When ``bd`` is not on ``PATH``.
@@ -577,9 +578,9 @@ class BeadsArtifactProvider:
         raw = self._runner.run_json(["show", issue_id])
         issue = parse_show_issue(raw)
         if issue.metadata is None:
-            return ArtifactManifest(issue_number=0), issue
+            return ArtifactManifest(issue_number=issue_id), issue
         if (manifest := _extract_manifest_from_metadata(issue.metadata)) is None:
-            return ArtifactManifest(issue_number=0), issue
+            return ArtifactManifest(issue_number=issue_id), issue
         return manifest, issue
 
     @property
