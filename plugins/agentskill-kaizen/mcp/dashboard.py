@@ -28,10 +28,11 @@ import hvplot.pandas  # noqa: F401
 import pandas as pd
 import panel as pn
 import tornado.web
-from panel.io.server import StoppableThread
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from panel.io.server import StoppableThread
 
 
 logger = logging.getLogger(__name__)
@@ -473,13 +474,19 @@ def _require_stoppable_thread(result: object) -> StoppableThread:
     site rather than inside a try block (TRY301) so the OSError handler in
     _serve() does not swallow unexpected type mismatches from panel internals.
 
+    panel is an optional runtime dependency — imported locally so the module
+    can be imported in environments where panel is not installed (e.g. CI test
+    runners that have a panel.py stub but no real panel package).
+
     Returns:
         The result narrowed to StoppableThread.
 
     Raises:
         TypeError: If result is not a StoppableThread instance.
     """
-    if not isinstance(result, StoppableThread):
+    from panel.io.server import StoppableThread as _StoppableThread  # PLC0415: optional runtime dep
+
+    if not isinstance(result, _StoppableThread):
         raise TypeError(f"pn.serve(threaded=True) must return StoppableThread, got {type(result).__name__}")
     return result
 
