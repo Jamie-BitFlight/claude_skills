@@ -470,10 +470,10 @@ def _is_stoppable_thread(result: object) -> TypeGuard[StoppableThread]:
     """Return True when result exposes the StoppableThread interface.
 
     Checks for callable ``join`` and ``stop`` attributes — the only two
-    methods ``_serve()`` uses on the returned object.  Duck-typing avoids
-    a runtime import of ``panel.io.server`` that would fail in test
-    environments where panel is stubbed as a flat module rather than a
-    package.
+    methods ``_serve()`` uses on the returned object.  Duck-typing against
+    the structural contract avoids a runtime import of ``panel.io.server``
+    (which is only imported under ``TYPE_CHECKING``) while correctly
+    accepting any object that satisfies the interface.
 
     Returns:
         True if result is structurally compatible with StoppableThread.

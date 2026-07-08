@@ -8,11 +8,21 @@ Tests cover:
 - start_dashboard() integration (mock-based, no real server)
 
 Strategy:
-    Heavy third-party dependencies (panel, holoviews, hvplot, tornado) are
-    stubbed at the module level before ``dashboard`` is imported.  This
-    allows the test suite to exercise the port allocation, state management,
-    health endpoint, and start_dashboard logic without requiring a live
-    Panel/Bokeh server.
+    panel, holoviews, hvplot, and tornado are required production dependencies
+    declared in server.py's PEP 723 block.  Tests mock at function-call
+    boundaries (patch.object) rather than replacing packages in sys.modules.
+    This exercises the real import graph and reveals integration issues that
+    module-level stubs would hide.
+
+    HealthHandler tests create instances via __new__ and inject instance-level
+    set_header/write shims so the HTTP response fields are inspectable without
+    a running Tornado event loop.
+
+    _serve() tests capture the closure via a patched threading.Thread, then
+    invoke it directly in the test thread with pn.serve mocked.
+
+    _create_app() tests patch pn.state, pn.extension, hv.extension, and the
+    Panel widget constructors so the factory can execute without a Bokeh server.
 """
 
 from __future__ import annotations
@@ -21,85 +31,11 @@ import json
 import os
 import sys
 import time
-import types
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Stub third-party modules that are not installed in the test venv.
-# Must happen before ``import dashboard``.
-# ---------------------------------------------------------------------------
-
-# --- tornado stubs ---
-_tornado_mod = types.ModuleType("tornado")
-_tornado_web_mod = types.ModuleType("tornado.web")
-
-
-class _StubRequestHandler:
-    """Minimal tornado.web.RequestHandler stand-in for testing."""
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        self._headers: dict[str, str] = {}
-        self._body: str = ""
-
-    def set_header(self, name: str, value: str) -> None:
-        self._headers[name] = value
-
-    def write(self, chunk: str | bytes) -> None:
-        if isinstance(chunk, bytes):
-            chunk = chunk.decode("utf-8")
-        self._body += chunk
-
-    def initialize(self, **kwargs: object) -> None:
-        pass
-
-
-vars(_tornado_web_mod).update({"RequestHandler": _StubRequestHandler})
-vars(_tornado_mod).update({"web": _tornado_web_mod})
-
-# --- holoviews stubs ---
-_hv_mod = types.ModuleType("holoviews")
-vars(_hv_mod).update({"extension": MagicMock(), "HLine": MagicMock(), "VLine": MagicMock(), "Text": MagicMock()})
-
-# --- hvplot stubs ---
-_hvplot_mod = types.ModuleType("hvplot")
-_hvplot_pandas_mod = types.ModuleType("hvplot.pandas")
-vars(_hvplot_mod).update({"pandas": _hvplot_pandas_mod})
-
-# --- panel stubs ---
-_pn_mod = types.ModuleType("panel")
-vars(_pn_mod).update({"extension": MagicMock(), "serve": MagicMock(), "Tabs": MagicMock(), "Column": MagicMock()})
-
-_pn_pane = types.ModuleType("panel.pane")
-vars(_pn_pane).update({"Markdown": MagicMock(), "HoloViews": MagicMock()})
-vars(_pn_mod).update({"pane": _pn_pane})
-
-_pn_widgets = types.ModuleType("panel.widgets")
-vars(_pn_widgets).update({"Tabulator": MagicMock()})
-vars(_pn_mod).update({"widgets": _pn_widgets})
-
-_pn_state = MagicMock()
-_pn_state.add_periodic_callback = MagicMock()
-_pn_state.onload = MagicMock()
-vars(_pn_mod).update({"state": _pn_state})
-
-_pn_template = types.ModuleType("panel.template")
-vars(_pn_template).update({"FastListTemplate": MagicMock()})
-vars(_pn_mod).update({"template": _pn_template})
-
-# Install stubs into sys.modules
-sys.modules["tornado"] = _tornado_mod
-sys.modules["tornado.web"] = _tornado_web_mod
-sys.modules["holoviews"] = _hv_mod
-sys.modules["hvplot"] = _hvplot_mod
-sys.modules["hvplot.pandas"] = _hvplot_pandas_mod
-sys.modules["panel"] = _pn_mod
-sys.modules["panel.pane"] = _pn_pane
-sys.modules["panel.widgets"] = _pn_widgets
-sys.modules["panel.template"] = _pn_template
 
 # Add mcp/ to sys.path so ``import dashboard`` resolves
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
@@ -173,6 +109,9 @@ class TestHealthHandler:
     Uses mock-based testing — constructs HealthHandler instances with
     lambda accessors and calls get() directly.  No real Tornado event
     loop or HTTP server is started.
+
+    set_header and write are patched at the instance level so the test
+    can inspect headers and body without the full Tornado response machinery.
     """
 
     def _make_handler(
@@ -186,12 +125,24 @@ class TestHealthHandler:
         """Create a HealthHandler with given state accessors.
 
         Returns an initialised handler instance ready for get() calls.
+        set_header and write are patched at the instance level to capture
+        response headers and body without Tornado's HTTP machinery.
         """
         handler = dashboard.HealthHandler.__new__(dashboard.HealthHandler)
-        # Initialise the stub base class attributes
-        handler._headers = {}
-        handler._body = ""
-        # Call initialize with lambda accessors
+        handler._headers: dict[str, str] = {}  # type: ignore[assignment]
+        handler._body: str = ""  # type: ignore[assignment]
+
+        def _set_header(name: str, value: str) -> None:
+            handler._headers[name] = value  # type: ignore[index]
+
+        def _write(chunk: str | bytes) -> None:
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8")
+            handler._body += chunk  # type: ignore[operator]
+
+        handler.set_header = _set_header  # type: ignore[method-assign]
+        handler.write = _write  # type: ignore[method-assign]
+
         handler.initialize(
             get_port=lambda: port,
             get_start_time=lambda: start_time,
@@ -436,8 +387,8 @@ class TestStateLock:
         assertions remain synchronous and deterministic.
 
         Tests for ``_refresh()`` (a closure inside ``_create_app()``)
-        extract the callback via the ``pn.state.onload`` / ``pn.state
-        .add_periodic_callback`` mock-capture chain.
+        extract the callback via the ``pn.state.onload`` /
+        ``pn.state.add_periodic_callback`` mock-capture chain.
     """
 
     def test_state_lock_exists(self) -> None:
@@ -575,8 +526,19 @@ class TestStateLock:
         csv_file = tmp_path / "s.csv"
         csv_file.write_text("h\nrow\n", encoding="utf-8")
         handler = dashboard.HealthHandler.__new__(dashboard.HealthHandler)
-        handler._headers = {}
-        handler._body = ""
+        handler._headers: dict[str, str] = {}  # type: ignore[assignment]
+        handler._body: str = ""  # type: ignore[assignment]
+
+        def _set_header(name: str, value: str) -> None:
+            handler._headers[name] = value  # type: ignore[index]
+
+        def _write(chunk: str | bytes) -> None:
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8")
+            handler._body += chunk  # type: ignore[operator]
+
+        handler.set_header = _set_header  # type: ignore[method-assign]
+        handler.write = _write  # type: ignore[method-assign]
         handler.initialize(
             get_port=lambda: 7777, get_start_time=lambda: None, get_csv_path=lambda: csv_file, get_csv_rows=lambda: 1
         )
@@ -604,8 +566,8 @@ class TestStateLock:
         How: Patch dashboard.threading.Thread with a MagicMock to capture
              the _serve target callable without starting a real thread.
              Call the captured target directly with a mock pn.serve that
-             returns a mock thread.  Verify threaded=True appears in the
-             pn.serve call kwargs.
+             returns a mock StoppableThread (duck-typed via join+stop).
+             Verify threaded=True appears in the pn.serve call kwargs.
         Why: threaded=True is the critical change that prevents Tornado's
              IOLoop from blocking the daemon thread and hanging MCP operations.
         """
@@ -615,8 +577,7 @@ class TestStateLock:
 
         mock_panel_thread = MagicMock()
         mock_panel_thread.join = MagicMock(return_value=None)
-        _pn_mod.serve.return_value = mock_panel_thread
-        _pn_mod.serve.reset_mock()
+        mock_panel_thread.stop = MagicMock(return_value=None)
 
         with (
             patch.object(dashboard, "_allocate_port", return_value=56789),
@@ -630,12 +591,13 @@ class TestStateLock:
         serve_fn = ctor_kwargs.get("target")
         assert serve_fn is not None, "_serve target was not captured from Thread(...)"
 
-        # Act — invoke _serve directly in the test thread
-        serve_fn()
+        # Act — invoke _serve directly in the test thread with pn.serve mocked
+        with patch.object(dashboard.pn, "serve", return_value=mock_panel_thread) as mock_pn_serve:
+            serve_fn()
 
         # Assert — pn.serve received threaded=True
-        assert _pn_mod.serve.called
-        _, call_kwargs = _pn_mod.serve.call_args
+        assert mock_pn_serve.called
+        _, call_kwargs = mock_pn_serve.call_args
         assert call_kwargs.get("threaded") is True
 
     def test_refresh_write_inside_lock(self, tmp_path: Path) -> None:
@@ -654,22 +616,28 @@ class TestStateLock:
         csv_file = tmp_path / "sentiment.csv"
         csv_file.write_text("", encoding="utf-8")
 
-        # Reset state mocks before calling _create_app
-        _pn_state.onload.reset_mock()
-        _pn_state.add_periodic_callback.reset_mock()
+        mock_pn_state = MagicMock()
 
-        with patch.object(dashboard, "_load_sentiment_data", return_value=None):
-            # Build the app — registers _register_periodic via pn.state.onload
+        with (
+            patch.object(dashboard.hv, "extension"),
+            patch.object(dashboard.pn, "extension"),
+            patch.object(dashboard.pn, "Column", return_value=MagicMock()),
+            patch.object(dashboard.pn.pane, "Markdown", return_value=MagicMock()),
+            patch.object(dashboard.pn.template, "FastListTemplate", return_value=MagicMock()),
+            patch.object(dashboard.pn, "state", mock_pn_state),
+            patch.object(dashboard, "_load_sentiment_data", return_value=None),
+        ):
             dashboard._create_app(csv_file)
 
-        # Extract _register_periodic from onload mock
-        assert _pn_state.onload.called, "pn.state.onload was not called by _create_app"
-        register_periodic_fn = _pn_state.onload.call_args[0][0]
+            # Extract _register_periodic from onload mock — must stay inside patch so
+            # calling register_periodic_fn() still sees mock_pn_state for add_periodic_callback.
+            assert mock_pn_state.onload.called, "pn.state.onload was not called by _create_app"
+            register_periodic_fn = mock_pn_state.onload.call_args[0][0]
 
-        # Call _register_periodic to register _refresh via add_periodic_callback
-        register_periodic_fn()
-        assert _pn_state.add_periodic_callback.called, "pn.state.add_periodic_callback was not called"
-        refresh_fn = _pn_state.add_periodic_callback.call_args[0][0]
+            # Call _register_periodic to register _refresh via add_periodic_callback
+            register_periodic_fn()
+            assert mock_pn_state.add_periodic_callback.called, "pn.state.add_periodic_callback was not called"
+            refresh_fn = mock_pn_state.add_periodic_callback.call_args[0][0]
 
         # _initial_load() already called _refresh() once, which set state["last_mtime"]
         # to csv_file's current mtime.  Advance the mtime so the next _refresh()
@@ -747,22 +715,25 @@ class TestServeBehaviour:
     Strategy:
         ``_serve`` is a closure defined inside ``start_dashboard()``.  It
         cannot be imported directly.  Tests capture it by patching
-        ``threading.Thread.__init__`` to intercept the ``target`` kwarg
-        without starting a real OS thread, then invoke the captured
-        callable directly in the test thread.
+        ``threading.Thread`` to intercept the ``target`` kwarg without
+        starting a real OS thread, then invoke the captured callable
+        directly in the test thread.
+
+        ``pn.serve`` is patched via ``patch.object(dashboard.pn, "serve")``
+        so the test controls what the mock StoppableThread returns.
+        The mock panel thread exposes callable ``join`` and ``stop``
+        attributes to satisfy ``_is_stoppable_thread()``'s duck-type check.
     """
 
-    def _capture_serve_fn(self) -> tuple[Any, MagicMock]:
-        """Helper: call start_dashboard() with Thread patched; return (_serve, mock_pn_serve).
+    def _capture_serve_fn(self) -> Any:
+        """Helper: call start_dashboard() with Thread patched; return _serve callable.
 
         Replaces ``dashboard.threading.Thread`` with a MagicMock to intercept
         the constructor call and extract the ``target`` kwarg without starting a
         real OS thread.
 
         Returns:
-            Tuple of (serve_callable, mock_pn_serve) where serve_callable
-            is the ``_serve`` closure and mock_pn_serve is the patched
-            ``dashboard.pn.serve`` MagicMock.
+            The ``_serve`` closure extracted from the Thread constructor kwargs.
         """
         mock_thread_instance = MagicMock()
         mock_thread_class = MagicMock(return_value=mock_thread_instance)
@@ -777,7 +748,7 @@ class TestServeBehaviour:
         _, ctor_kwargs = mock_thread_class.call_args
         serve_fn = ctor_kwargs.get("target")
         assert serve_fn is not None, "_serve target was not captured from Thread(...)"
-        return serve_fn, _pn_mod.serve
+        return serve_fn
 
     def test_serve_resets_state_after_panel_thread_exits(self) -> None:
         """_serve() calls _reset_dashboard_state() in the else clause after join().
@@ -791,12 +762,11 @@ class TestServeBehaviour:
              running server.
         """
         # Arrange
-        serve_fn, mock_pn_serve = self._capture_serve_fn()
+        serve_fn = self._capture_serve_fn()
 
         mock_panel_thread = MagicMock()
         mock_panel_thread.join = MagicMock(return_value=None)
-        mock_pn_serve.reset_mock()
-        mock_pn_serve.return_value = mock_panel_thread
+        mock_panel_thread.stop = MagicMock(return_value=None)
 
         # Pre-condition: state is set (simulating running dashboard)
         dashboard._dashboard_port = 60001
@@ -805,7 +775,8 @@ class TestServeBehaviour:
         dashboard._dashboard_csv_rows = 3
 
         # Act
-        serve_fn()
+        with patch.object(dashboard.pn, "serve", return_value=mock_panel_thread):
+            serve_fn()
 
         # Assert — else clause fired and reset state
         assert dashboard._dashboard_port is None
@@ -824,10 +795,7 @@ class TestServeBehaviour:
              report a stale URL pointing to a dead server.
         """
         # Arrange
-        serve_fn, mock_pn_serve = self._capture_serve_fn()
-
-        mock_pn_serve.reset_mock()
-        mock_pn_serve.side_effect = OSError("port in use")
+        serve_fn = self._capture_serve_fn()
 
         # Pre-condition: state is set
         dashboard._dashboard_port = 60001
@@ -836,7 +804,8 @@ class TestServeBehaviour:
         dashboard._dashboard_csv_rows = 5
 
         # Act
-        serve_fn()
+        with patch.object(dashboard.pn, "serve", side_effect=OSError("port in use")):
+            serve_fn()
 
         # Assert — except OSError handler fired and reset state
         assert dashboard._dashboard_port is None

@@ -529,9 +529,11 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
         else:
             db = conn
             own_conn = False
-        rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
-        if own_conn:
-            db.close()
+        try:
+            rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
+        finally:
+            if own_conn:
+                db.close()
         for _line_index, msg_type, _timestamp, message, tool_use_result in rows:
             if msg_type != "user" or tool_use_result is not None:
                 continue

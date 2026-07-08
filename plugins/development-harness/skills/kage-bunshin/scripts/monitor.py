@@ -293,7 +293,8 @@ def _load_registry(registry_path: Path) -> list[Any] | None:
         registry_path: Path to the registry JSON file.
 
     Returns:
-        List of session entry dicts, or None if the file cannot be read/parsed.
+        Parsed JSON array (entries not guaranteed to be dicts), or None if the
+        file cannot be read or parsed as JSON.
     """
     try:
         raw = registry_path.read_text(encoding="utf-8")
