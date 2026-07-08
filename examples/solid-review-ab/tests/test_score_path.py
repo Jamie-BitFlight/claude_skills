@@ -63,8 +63,8 @@ from runner.manifest import ArmEntry, ArmType, ModelPrice, ModelRef
 # ---------------------------------------------------------------------------
 
 # Gold positive: one (group, location) pair the arm must find.
-# Location uses path:line format (the canonical form that normalize_location
-# preserves unchanged) so gold keys and normalised reported keys can match.
+# Location uses path:line format — normalize_location strips leading / and ../
+# segments only, so these pass through unchanged.
 _TP_GROUP = "S"
 _TP_LOC = "src/service.py:42"
 

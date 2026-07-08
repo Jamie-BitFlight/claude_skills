@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
+from backlog_core.backend_protocol import BacklogBackend
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 __all__ = ["GitHubBackend"]
 
 
-class GitHubBackend:
+class GitHubBackend(BacklogBackend):
     """BacklogBackend implementation delegating to gh_client, github_sync, and github_branches.
 
     Each method is a 1-3 line delegation.  The constructor accepts an optional

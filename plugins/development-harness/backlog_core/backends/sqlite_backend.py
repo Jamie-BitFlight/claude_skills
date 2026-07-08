@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_protocol import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
+from backlog_core.backend_protocol import BacklogBackend, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -116,7 +116,7 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-class SQLiteBackend:
+class SQLiteBackend(BacklogBackend):
     """SQLite-backed BacklogBackend for offline or local-only operation.
 
     All state lives in a single SQLite database file.  Every method is
