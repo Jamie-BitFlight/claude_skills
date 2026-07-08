@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from runner.scorer import normalize_location
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -72,7 +74,7 @@ def positive_keys(gold: list[GoldEntry]) -> set[tuple[str, str]]:
     Returns:
         Set of (group, normalised_location) tuples representing real defects.
     """
-    return {(e.group, e.location) for e in gold if e.kind in {"true_violation", "systematic_miss"}}
+    return {(e.group, normalize_location(e.location)) for e in gold if e.kind in {"true_violation", "systematic_miss"}}
 
 
 def decoy_keys(gold: list[GoldEntry]) -> set[tuple[str, str]]:
@@ -86,4 +88,4 @@ def decoy_keys(gold: list[GoldEntry]) -> set[tuple[str, str]]:
     Returns:
         Set of (group, normalised_location) tuples representing decoy locations.
     """
-    return {(e.group, e.location) for e in gold if e.kind == "decoy_false_positive"}
+    return {(e.group, normalize_location(e.location)) for e in gold if e.kind == "decoy_false_positive"}
