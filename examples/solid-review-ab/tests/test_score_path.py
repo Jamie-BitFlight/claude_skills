@@ -17,6 +17,10 @@ Single arm (sonnet, input=1000, output=200):
 Ensemble arm (haiku, input=4000, output=800):
   cost = (4000/1000 * 0.00025) + (800/1000 * 0.00125) = 0.001 + 0.001 = 0.002 USD
 
+Gold set: 2 positives.
+  TP (reported): group=S, location=src/service.py:42
+  FN (missed):  group=O, location=src/repository.py:10
+
 Single arm findings: 1 TP, 0 FP, 1 FN (one gold positive not reported):
   P = 1/(1+0) = 1.0
   R = 1/(1+1) = 0.5
@@ -24,6 +28,11 @@ Single arm findings: 1 TP, 0 FP, 1 FN (one gold positive not reported):
 
 Ensemble arm findings (2 workers each report the TP; deduplicated by scorer):
   After dedup: 1 TP, 0 FP, 1 FN -> same P/R/F1 as single arm above.
+
+Note on location format: gold keys and reported locations must both be in
+path:line format (e.g. src/service.py:42) so that normalize_location() is a
+no-op on both sides and the set intersection in compute_metrics() finds matches.
+The ::ClassName notation normalises to a different string and must not be used.
 """
 
 from __future__ import annotations
@@ -54,12 +63,14 @@ from runner.manifest import ArmEntry, ArmType, ModelPrice, ModelRef
 # ---------------------------------------------------------------------------
 
 # Gold positive: one (group, location) pair the arm must find.
+# Location uses path:line format (the canonical form that normalize_location
+# preserves unchanged) so gold keys and normalised reported keys can match.
 _TP_GROUP = "S"
-_TP_LOC = "src/service.py::UserService"
+_TP_LOC = "src/service.py:42"
 
 # Second gold positive that arms deliberately miss → FN.
 _FN_GROUP = "O"
-_FN_LOC = "src/repository.py::DataRepo"
+_FN_LOC = "src/repository.py:10"
 
 _POS_KEYS: set[tuple[str, str]] = {(_TP_GROUP, _TP_LOC), (_FN_GROUP, _FN_LOC)}
 _DEC_KEYS: set[tuple[str, str]] = set()
