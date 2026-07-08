@@ -104,7 +104,11 @@ repos:
         # types_or filter is unaware of biome's internal ignore list, so an
         # excluded file passed explicitly makes the biome CLI report "no
         # files processed" and exit non-zero instead of a benign no-op.
-        exclude: (graphify-out/|.*/\.claude-plugin/plugin\.json$|\.claude-plugin/marketplace\.json$)
+        # biome.json excludes **/.claude-plugin/plugin.json (root or nested,
+        # hence the optional leading path group) but only the ROOT
+        # .claude-plugin/marketplace.json (hence the ^ anchor with no
+        # optional path group) — a nested marketplace.json is not excluded.
+        exclude: (graphify-out/|^(.*/)?\.claude-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$)
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.0
