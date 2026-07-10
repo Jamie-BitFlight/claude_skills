@@ -10,6 +10,16 @@ Usage:
     uv run plugins/development-harness/docs/assemble_graph.py \\
         --layers plugins/development-harness/docs/workflow-layers/ \\
         --output plugins/development-harness/docs/dh-workflow-graph.json
+
+Gap edges (docs/graph-schema.md "gap" edge type): the shipped L0/G1-G8/L1
+layer files carry no per-transition ``verified``/``gap`` field of their own
+-- verification status is derived here from what each L1 trace's
+``terminal_type``/``terminal_target`` combination lets this assembler
+confidently resolve. See :func:`_process_trace` for the exact rules that
+produce a ``gap`` edge (``verified=False``, ``gap=True``). ``meta.gap_count``
+in the assembled output (see :func:`_build_graph_dict`) is always computed
+from the actual assembled edge set, never hardcoded, so it reflects
+whatever the current layer files and extraction rules actually produce.
 """
 
 from __future__ import annotations
@@ -116,6 +126,19 @@ _L1_FILENAMES: tuple[str, ...] = (
     "L1-trace-feature-skills.json",
     "L1-trace-work-milestone.json",
 )
+
+# All terminal_type values this assembler has been taught to interpret into a
+# normal (non-gap) edge, when the trace also carries the data that branch needs.
+# A trace whose terminal_type falls outside this set, or whose terminal_type is
+# in this set but is missing the terminal_target that branch requires, produces
+# a `gap` edge instead of being silently dropped -- see _process_trace.
+_KNOWN_TERMINAL_TYPES: frozenset[str] = frozenset({
+    "loops_back",
+    "hands_off_to_file",
+    "STOP",
+    "completes_workflow",
+    "hands_off_to_skill",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +512,30 @@ def _ensure_fork_stub(
         }
 
 
+def _ensure_skill_stub(
+    skill_id: str, label: str, source_file: str | None, reason: str, known: set[str], stubs: dict[str, dict[str, Any]]
+) -> None:
+    """Add a stub skill node to *stubs* when *skill_id* is absent from *known*.
+
+    Mirrors :func:`_ensure_fork_stub` for skill-typed targets. Used so a
+    ``gap`` edge's target always resolves to a real node -- otherwise
+    :func:`self_check` would remove the gap edge as an orphan, silently
+    re-losing the exact signal this stub exists to preserve. Does nothing if
+    the id is already present in either set.
+    """
+    if skill_id not in known and skill_id not in stubs:
+        stubs[skill_id] = {
+            "id": skill_id,
+            "type": "skill",
+            "label": label,
+            "route": label,
+            "source_file": source_file,
+            "source_heading": None,
+            "verified": False,
+            "metadata": {"stub": True, "reason": reason},
+        }
+
+
 def _process_trace(
     trace: dict[str, Any],
     known_fork_ids: set[str],
@@ -499,7 +546,39 @@ def _process_trace(
     """Emit edges and stub nodes for a single L1 trace into mutable dicts.
 
     Routes_to edges are only emitted when terminal_target maps to a known
-    skill node — phrases that are workflow headings are silently skipped.
+    skill node — phrases that are workflow headings are silently skipped
+    (deliberate: ``completes_workflow.terminal_target`` values are often
+    workflow-internal headings, not skill names -- see
+    :func:`collect_all_skill_names`'s docstring; converting all of them to
+    ``gap`` edges would misrepresent internal step labels as cross-skill
+    transitions).
+
+    ``gap`` edges (``verified=False``, ``gap=True``) are emitted for two
+    cases where source data marks a real transition that this assembler
+    cannot independently attest:
+
+    1. ``terminal_type == "hands_off_to_skill"``: the L1 extractor recorded
+       an explicit hand-off to another skill (e.g. ``Skill(skill='find-cause')``
+       in workflow prose), but that target skill is not independently
+       confirmed by L0/G2/G4/G8 (i.e. not in ``known_skill_ids`` -- it has no
+       ``SKILL_FILE_MAP`` entry or explicit ``skill`` field anywhere in the
+       authoritative layers). The transition is real and attested by the L1
+       trace itself; only the target's own identity/location is unverified.
+    2. A recognized ``terminal_type`` (``loops_back``, ``hands_off_to_file``,
+       ``completes_workflow``) whose branch requires ``terminal_target`` but
+       the trace has none (observed in the shipped L1 traces: 10
+       ``completes_workflow`` traces record the workflow proceeding to a
+       local next step with no extractable cross-file/cross-skill target).
+    3. Any ``terminal_type`` outside ``_KNOWN_TERMINAL_TYPES`` (currently
+       none occur in the shipped layer files — the five known values cover
+       100% of observed traces).
+
+    Cases 2 and 3 both fall through to an explicit final ``else`` that emits
+    a ``gap`` edge rather than silently dropping the trace, per this repo's
+    silent-failure-prevention policy: an incomplete or unrecognized trace is
+    data this assembler cannot fully interpret, not a reason to lose the
+    transition. The two cases are labeled distinctly so the gap edge's
+    ``label`` field states which condition applies.
     """
     from_fork_raw = trace.get("from_fork") or ""
     source_id = f"fork.{slugify(from_fork_raw)}"
@@ -567,6 +646,68 @@ def _process_trace(
                 source_file=source_file,
                 source_heading=heading,
             )
+
+    elif terminal_type == "hands_off_to_skill" and terminal_target:
+        skill_id = _node_id("skill", terminal_target)
+        _ensure_skill_stub(
+            skill_id,
+            terminal_target,
+            source_file,
+            "hands_off_to_skill target not independently confirmed",
+            known_skill_ids,
+            extra_stubs,
+        )
+        eid = f"e.gap.{slugify(from_fork_raw)}.{cond_key}"
+        edges[eid] = _edge(
+            eid,
+            "gap",
+            source_id,
+            skill_id,
+            label=f"hands off to skill '{terminal_target}' — target not independently confirmed",
+            source_file=source_file,
+            source_heading=heading,
+            verified=False,
+            gap=True,
+        )
+
+    elif terminal_type:
+        # Explicit fallback (silent-failure-prevention.md): a trace this
+        # function cannot fully route to a normal edge must still surface as
+        # a transition, not silently vanish. Reaches here for (a) a known
+        # terminal_type missing the terminal_target its branch requires, or
+        # (b) a terminal_type outside _KNOWN_TERMINAL_TYPES.
+        if terminal_type in _KNOWN_TERMINAL_TYPES:
+            reason = f"terminal_type {terminal_type!r} recognized but terminal_target is missing"
+        else:
+            reason = f"unrecognized terminal_type {terminal_type!r}"
+
+        if terminal_target:
+            target_id = _node_id("ref", terminal_target)
+            if target_id not in extra_stubs:
+                extra_stubs[target_id] = {
+                    "id": target_id,
+                    "type": "reference_file",
+                    "label": terminal_target,
+                    "source_file": source_file,
+                    "source_heading": None,
+                    "verified": False,
+                    "metadata": {"stub": True, "reason": reason},
+                }
+        else:
+            target_id = "terminal.stop"
+
+        eid = f"e.gap.{slugify(from_fork_raw)}.{cond_key}.unrecognized"
+        edges[eid] = _edge(
+            eid,
+            "gap",
+            source_id,
+            target_id,
+            label=f"{reason} — transition unattested",
+            source_file=source_file,
+            source_heading=heading,
+            verified=False,
+            gap=True,
+        )
 
 
 def build_branch_edges_from_l1(
@@ -795,7 +936,7 @@ OVERLAYS: dict[str, dict[str, Any]] = {
         "label": "Workflow",
         "description": "Decision forks and routing",
         "node_types": ["decision", "skill"],
-        "edge_types": ["branch", "routes_to"],
+        "edge_types": ["branch", "routes_to", "gap"],
     },
     "agents": {
         "label": "Agents",
@@ -940,9 +1081,20 @@ def _build_all_edges(
 def _build_graph_dict(sorted_nodes: list[dict[str, Any]], sorted_edges: list[dict[str, Any]]) -> dict[str, Any]:
     """Construct the top-level graph output dict from sorted nodes and edges.
 
+    ``meta.gap_count`` is computed as the count of assembled edges with
+    ``gap: True`` -- see :func:`_process_trace` for exactly what produces a
+    gap edge (hands_off_to_skill traces whose target skill isn't
+    independently confirmed, and traces whose terminal_type is recognized
+    but missing its required terminal_target, or is not recognized at all).
+    It is never hardcoded: a hand-authored constant would silently drift
+    from the actual edge set the moment either input data or the extraction
+    rules above change, defeating the whole purpose of a gap-count signal
+    for impact-radius analysis.
+
     Returns:
         Graph dict ready for JSON serialisation.
     """
+    gap_count = sum(1 for e in sorted_edges if e.get("gap") is True)
     return {
         "meta": {
             "generated": datetime.now(tz=UTC).date().isoformat(),
@@ -952,7 +1104,7 @@ def _build_graph_dict(sorted_nodes: list[dict[str, Any]], sorted_edges: list[dic
             "node_type_counts": _count_types(sorted_nodes, "type"),
             "edge_type_counts": _count_types(sorted_edges, "type"),
             "routes": sorted({n["route"] for n in sorted_nodes if n.get("route")}),
-            "gap_count": 0,
+            "gap_count": gap_count,
         },
         "nodes": sorted_nodes,
         "edges": sorted_edges,

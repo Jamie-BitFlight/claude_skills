@@ -72,6 +72,7 @@ extra-paths = [
     "./plugins/frustration-analyzer/tests",
     "./plugins/plugin-creator/tests",
     "./plugins/python3-development/scripts",
+    "./plugins/development-harness/docs",
     "./plugins/development-harness/scripts",
     "./plugins/development-harness/skills/implementation-manager/scripts",
     "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
