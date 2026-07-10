@@ -153,6 +153,10 @@ Files not intended to be loaded into context, but rather used within the output 
 - **Use cases**: Templates, images, icons, boilerplate code, fonts, sample documents that get copied or modified
 - **Benefits**: Separates output resources from documentation, enables Claude to use files without loading them into context
 
+##### Anti-Rationalization Component (optional)
+
+For skills that enforce a multi-step discipline with skippable quality gates, add a two-column table pairing common agent excuses with counter-responses, plus an optional Red Flags list, to defend against agents rationalizing their way past required steps. See [anti-rationalization-pattern.md](./references/anti-rationalization-pattern.md) for the pattern, table shape, and worked examples.
+
 #### What to Not Include in a Skill
 
 A skill should only contain essential files that directly support its functionality. Do NOT create extraneous documentation or auxiliary files, including:
