@@ -20,6 +20,10 @@ Independence test file: `examples/solid-review-ab/tests/test_scorer_independent.
 - Leading `/` stripped only for path+line form: `/path/file.py:12` → `path/file.py:12` — abs == relative
 - No-line input (bare path): regex finds no match → raw.strip() returned unmodified — do NOT test slash stripping on bare paths
 - Same basename in different dirs stays distinct: `src/foo/config.py:10` != `tests/foo/config.py:10`
+- `slug_headings` keyword (default `False`): opt-in heading-slug normalization for `path:heading`
+  locations, used only by the DH workflow-extraction pipeline. The scorer calls positionally, so it
+  always gets the legacy default — heading-style inputs return `raw.strip()` unchanged. Locked by
+  `test_normalize_location_heading_style_returns_stripped_unchanged` in test_scorer.py.
 
 **RUF069:** Float equality comparisons to 0.0 must use `pytest.approx(0.0, abs=1e-9)` not `== 0.0`. Rule fires in preview mode but pyproject.toml enables preview for tests in this repo.
 

@@ -456,6 +456,7 @@ testpaths = [
     "plugins/summarizer/tests",
     "tests",
     "examples/solid-review-ab/tests",
+    "plugins/plugin-creator/skills/ensemble-rule-review/scripts",
 ]
 
 [tool.coverage.run]
