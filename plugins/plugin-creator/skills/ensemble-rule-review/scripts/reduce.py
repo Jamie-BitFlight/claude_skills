@@ -126,9 +126,10 @@ def normalize_location(raw: str, *, slug_headings: bool = False) -> str:
 
     Returns:
         The `path:line` string with any leading `/` stripped when a line number is
-        present; the `path:slug` string with the heading slug-normalized when
-        `slug_headings` is True and the location has no line number but does have a
-        `:` separator; or the stripped input unchanged otherwise.
+        present; the `path:slug` string with any leading `/` stripped from the path
+        and the heading slug-normalized when `slug_headings` is True and the location
+        has no line number but does have a `:` separator; or the stripped input
+        unchanged otherwise.
     """
     match = LOCATION_LINE_RE.search(raw)
     if match:
@@ -139,7 +140,7 @@ def normalize_location(raw: str, *, slug_headings: bool = False) -> str:
     if slug_headings and ":" in raw:
         path_part, heading_part = raw.split(":", 1)
         slug = re.sub(r"[^a-z0-9]+", "_", heading_part.strip().lower()).strip("_")
-        return f"{path_part}:{slug}"
+        return f"{path_part.lstrip('/')}:{slug}"
     return raw
 
 

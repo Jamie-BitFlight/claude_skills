@@ -121,6 +121,14 @@ def test_normalize_location_heading_slug_headings_true_normalizes() -> None:
     assert a == b == c == "docs/README.md:getting_started"
 
 
+def test_normalize_location_slug_headings_strips_leading_slash() -> None:
+    """slug_headings=True strips a leading `/` from the path portion, matching the
+    line-numbered branch, so absolute and repo-relative heading locations corroborate."""
+    absolute = r.normalize_location("/docs/README.md:Getting Started", slug_headings=True)
+    relative = r.normalize_location("docs/README.md:Getting Started", slug_headings=True)
+    assert absolute == relative == "docs/README.md:getting_started"
+
+
 def test_normalize_location_line_number_behavior_unchanged_in_both_modes() -> None:
     """Line-numbered locations normalize identically regardless of slug_headings."""
     assert r.normalize_location("/repo/src/foo/config.py:10") == "repo/src/foo/config.py:10"
