@@ -83,6 +83,10 @@ scorer and gold do too.
 `location` is the repo-relative path plus line (e.g. `corpus/cases/01_srp_god_object.py:12`).
 Normalization for matching MUST match `reduce.py`'s `normalize_location` (strip a leading `/`, trim
 whitespace, PRESERVE the directory) so arm outputs, gold labels, and the reducer all align.
+`normalize_location` also has an opt-in `slug_headings` keyword (default `False`) that
+slug-normalizes `path:heading` locations for the DH workflow-extraction pipeline; the scorer and
+this experiment rely on the default legacy behavior — heading-style locations are returned
+stripped but otherwise unchanged.
 
 ## The corpus and gold set
 

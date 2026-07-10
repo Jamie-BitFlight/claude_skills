@@ -3386,8 +3386,17 @@ def view_item(
 ) -> ViewItemResult:
     """View a backlog item or GitHub issue by URL, #N, bare number, or title.
 
+    For string-ID backends (e.g. beads), ``selector`` also accepts a bare
+    nanoid (e.g. ``"bd-a3f8"``). ``parse_issue_selector`` only recognizes
+    numeric GitHub-style refs, so a nanoid that is not present in the local
+    cache falls through to a direct ``view_enrich_from_github`` call gated on
+    ``get_config().backend.issue_id_type == "string"`` — this lets
+    :class:`~backlog_core.backends.beads_backend.BeadsBackend` resolve the
+    item via ``bd show <id>`` even when it was never synced locally.
+
     Args:
-        selector: Issue URL, #N, bare number, or title substring.
+        selector: Issue URL, #N, bare number, title substring, or (for
+            string-ID backends) a bare nanoid such as ``"bd-a3f8"``.
         repo: GitHub repo in owner/repo format.
         offset: Skip N entry blocks from the start of the body (falls back to
             line-based skipping for plain-text bodies with no entry blocks).

@@ -121,6 +121,23 @@ def test_normalize_location_no_line_returns_stripped() -> None:
     assert normalize_location("  some/path/file.py  ") == "some/path/file.py"
 
 
+def test_normalize_location_heading_style_returns_stripped_unchanged() -> None:
+    """normalize_location must NOT slug-normalize heading-style locations
+    (`path:heading`, no line number) -- reduce.py's heading-slug branch is gated
+    behind normalize_location(..., slug_headings=True) and the scorer never opts
+    in, so this consumer must keep the legacy contract: the stripped input is
+    returned unchanged, punctuation and casing intact.
+
+    Locks the pre-change contract against future drift in reduce.py's default.
+    """
+    from runner.scorer import normalize_location
+
+    assert normalize_location("  docs/README.md:Getting Started  ") == "docs/README.md:Getting Started"
+    assert normalize_location("docs/README.md:Getting-Started") == "docs/README.md:Getting-Started"
+    # Different punctuation/casing must NOT collapse to the same key for this consumer.
+    assert normalize_location("docs/README.md:Getting Started") != normalize_location("docs/README.md:GETTING-STARTED")
+
+
 # ---------------------------------------------------------------------------
 # compute_metrics — precision, recall, F1
 # ---------------------------------------------------------------------------

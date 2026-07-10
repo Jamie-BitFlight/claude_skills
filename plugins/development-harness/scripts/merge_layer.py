@@ -33,15 +33,22 @@ Design notes (decisions not fully spelled out by the architect spec):
   round-trip; ``total_nodes``/``total_edges`` are refreshed by
   :func:`merge_fragment` when present so the file never advertises a stale
   count of its own contents.
-- **Edge cleanup scope**: :func:`merge_fragment` drops edges whose own
-  ``source_file`` field matches the fragment's ``source_file`` (mirroring
-  node removal), because those edges were extracted from the same file
-  revision that is being wholly superseded and the fragment carries no
-  replacement edges for them. It deliberately does NOT prune edges based on
-  whether their endpoints still exist elsewhere in the layer -- this module
-  only has visibility into a single layer file, and a target node id may
-  legitimately live in a different layer file (L0, G1-G8) that this module
-  never reads. Cross-layer edge-endpoint validation belongs to
+- **Edge cleanup + re-add scope**: :func:`merge_fragment` drops every edge
+  whose own ``source_file`` field matches the fragment's ``source_file``
+  (mirroring node removal), because those edges were extracted from the same
+  file revision that is being wholly superseded, then re-adds the fragment's
+  own ``edges`` (if any) with their ``source_file`` field set to
+  ``str(fragment.source_file)`` -- symmetric with how nodes are replaced.
+  Fragments produced before edge extraction was wired up (or for a
+  ``layer_type`` with no edges of its own) simply carry no ``edges``, which
+  correctly leaves that ``source_file`` with zero edges after the merge --
+  this is documented, intentional behavior, not silent data loss: a fragment
+  is the sole source of truth for what its ``source_file`` contributes to the
+  layer, for both nodes and edges. It deliberately does NOT prune edges based
+  on whether their endpoints still exist elsewhere in the layer -- this
+  module only has visibility into a single layer file, and a target node id
+  may legitimately live in a different layer file (L0, G1-G8) that this
+  module never reads. Cross-layer edge-endpoint validation belongs to
   ``docs/assemble_graph.py``, which has full-graph visibility (spec Section
   4.2, "Does NOT own: ... graph assembly").
 """
@@ -95,6 +102,12 @@ class ExtractionFragment:
         unverified_items: Node dicts the verifier could not confirm
             (REFUTED findings). Carried through for caller-side logging;
             :func:`merge_fragment` does not write these into the layer.
+        edges: Graph edge dicts this fragment's ``source_file`` contributes,
+            using the same element schema as layer edges (spec Section 2.5).
+            Defaults to empty -- fragments for layer types with no edges, or
+            produced before edge extraction was wired up, simply omit this.
+            :func:`merge_fragment` replaces the layer's prior edges for this
+            ``source_file`` with these, symmetric with node replacement.
     """
 
     source_file: Path
@@ -102,6 +115,7 @@ class ExtractionFragment:
     extracted_at: str
     items: tuple[dict[str, object], ...]
     unverified_items: tuple[dict[str, object], ...]
+    edges: tuple[dict[str, object], ...] = ()
 
 
 @dataclass
@@ -135,12 +149,20 @@ class MergeResult:
         added_count: Number of nodes appended from the fragment's ``items``.
         total_after: Total node count in the layer after the merge.
         layer_path: The layer file that was written.
+        edges_removed_count: Number of prior edges removed because their
+            ``source_file`` matched the fragment's ``source_file``.
+        edges_added_count: Number of edges appended from the fragment's
+            ``edges``.
+        edges_total_after: Total edge count in the layer after the merge.
     """
 
     removed_count: int
     added_count: int
     total_after: int
     layer_path: Path
+    edges_removed_count: int = 0
+    edges_added_count: int = 0
+    edges_total_after: int = 0
 
 
 def parse_extraction_fragment(raw: object) -> ExtractionFragment:
@@ -166,12 +188,17 @@ def parse_extraction_fragment(raw: object) -> ExtractionFragment:
     unverified_items = _require_list_of_dicts(
         fragment_dict.get("unverified_items"), field_name="fragment.unverified_items"
     )
+    # edges is optional: fragments for edge-less layer types, or produced before
+    # edge extraction was wired up, simply omit the key -- treat as empty.
+    raw_edges = fragment_dict.get("edges")
+    edges = _require_list_of_dicts(raw_edges, field_name="fragment.edges") if raw_edges is not None else []
     return ExtractionFragment(
         source_file=Path(meta["source_file"]),
         layer_type=meta["layer_type"],
         extracted_at=meta["extracted_at"],
         items=tuple(items),
         unverified_items=tuple(unverified_items),
+        edges=tuple(edges),
     )
 
 
@@ -276,15 +303,18 @@ def write_layer(layer_path: Path, layer: LayerJSON) -> None:
 def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResult:
     """Merge one extraction fragment into a layer JSON file.
 
-    Removes every existing node (and every existing edge tagged with the
-    same ``source_file`` -- see the module docstring's "Edge cleanup
-    scope" note) whose ``source_file`` matches ``fragment.source_file``,
-    then appends ``fragment.items`` as new nodes, and writes the result
-    atomically via :func:`write_layer`. Each appended node is a shallow
-    copy of the corresponding ``fragment.items`` entry with its
+    Removes every existing node whose ``source_file`` matches
+    ``fragment.source_file``, then appends ``fragment.items`` as new nodes.
+    Symmetrically, removes every existing edge whose ``source_file`` matches
+    ``fragment.source_file`` and appends ``fragment.edges`` as new edges (see
+    the module docstring's "Edge cleanup + re-add scope" note) -- a fragment
+    with no ``edges`` correctly leaves that ``source_file`` with zero edges,
+    same as a fragment with no ``items`` leaves it with zero nodes. The
+    result is written atomically via :func:`write_layer`. Each appended node
+    and edge is a shallow copy of the corresponding fragment entry with its
     ``source_file`` field set (or overwritten) to
     ``str(fragment.source_file)`` -- the fragment's own dict objects are
-    never mutated. This guarantees every node this call appends agrees
+    never mutated. This guarantees every node/edge this call appends agrees
     with the removal filter on the next merge, regardless of what
     ``source_file`` value (missing, mismatched, or absent) the fragment
     producer put on the item.
@@ -292,7 +322,7 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     If ``layer_path`` does not exist, it is bootstrapped as an empty layer
     (``{"meta": {...}, "nodes": [], "edges": []}``) before the merge is
     applied, per spec Section 3 requirement 5 -- this always yields
-    ``removed_count=0`` for a first run.
+    ``removed_count=0`` and ``edges_removed_count=0`` for a first run.
 
     Idempotency invariant (spec Section 4.2): applying the same fragment
     to the same layer twice in a row produces byte-identical file content
@@ -301,7 +331,7 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     ``fragment`` -- the second call removes exactly what the first call
     added (its ``source_file`` field having been forced to
     ``str(fragment.source_file)`` on append, as above) and re-adds the
-    identical items, and no wall-clock-dependent field (e.g. a "last
+    identical items/edges, and no wall-clock-dependent field (e.g. a "last
     modified" timestamp) is touched on every merge -- only the
     bootstrap's one-time ``generated`` timestamp is time-based, and it is
     written once, before the idempotent portion of the contract applies.
@@ -311,8 +341,8 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     string (``str(fragment.source_file)``). The caller is responsible for
     path normalisation before calling this function -- a mismatched path
     (e.g. absolute vs. plugin-relative) silently produces a no-op removal
-    (nothing removed, fragment items still appended). This is intentional
-    per spec Section 4.2, not a bug to fix here.
+    (nothing removed, fragment items/edges still appended). This is
+    intentional per spec Section 4.2, not a bug to fix here.
 
     Args:
         layer_path: Path to the layer JSON file to merge into.
@@ -339,17 +369,27 @@ def merge_fragment(layer_path: Path, fragment: ExtractionFragment) -> MergeResul
     merged_nodes = [*surviving_nodes, *new_nodes]
 
     surviving_edges = [edge for edge in layer.edges if edge.get("source_file") != source_file_str]
+    edges_removed_count = len(layer.edges) - len(surviving_edges)
+
+    new_edges = [{**edge, "source_file": source_file_str} for edge in fragment.edges]
+    merged_edges = [*surviving_edges, *new_edges]
 
     layer.nodes = merged_nodes
-    layer.edges = surviving_edges
+    layer.edges = merged_edges
     layer.meta["total_nodes"] = len(merged_nodes)
     if "total_edges" in layer.meta:
-        layer.meta["total_edges"] = len(surviving_edges)
+        layer.meta["total_edges"] = len(merged_edges)
 
     write_layer(layer_path, layer)
 
     return MergeResult(
-        removed_count=removed_count, added_count=len(new_nodes), total_after=len(merged_nodes), layer_path=layer_path
+        removed_count=removed_count,
+        added_count=len(new_nodes),
+        total_after=len(merged_nodes),
+        layer_path=layer_path,
+        edges_removed_count=edges_removed_count,
+        edges_added_count=len(new_edges),
+        edges_total_after=len(merged_edges),
     )
 
 

@@ -27,9 +27,16 @@ the orchestrator (the rule-group number from the rotating split) and is therefor
 identical across workers — the only stable corroboration key.
 
 Usage:
-    uv run reduce.py REPORT_DIR [--glob 'review-*.md'] [--keep-threshold N]
+    uv run reduce.py REPORT_DIR [--glob 'review-*.md'] [--keep-threshold N] [--slug-headings]
 
 Worker id is the report filename stem (e.g. review-A.md -> "A").
+
+`--slug-headings` is an explicit opt-in for heading-only locations (Markdown section
+references with no line number): it slug-normalizes the heading portion so trivial
+punctuation/casing differences corroborate. Off by default — `normalize_location`'s
+legacy contract (return the stripped input unchanged when no line number is present)
+is preserved for external consumers that import it directly, notably the
+solid-review-ab scorer (examples/solid-review-ab/runner/scorer.py).
 """
 
 from __future__ import annotations
@@ -92,7 +99,7 @@ class Merged:
         return len(self.groups_seen) >= CROSS_GROUP_MIN
 
 
-def normalize_location(raw: str) -> str:
+def normalize_location(raw: str, *, slug_headings: bool = False) -> str:
     """Normalize a location to `path:line`, preserving the path to avoid false merges.
 
     Strips an absolute-path prefix down to the repo-relative path and trims whitespace,
@@ -101,26 +108,39 @@ def normalize_location(raw: str) -> str:
     collapse to one key, or unrelated findings would fabricate a false corroboration.
 
     When no line number is present (a heading-only location, e.g. a Markdown section
-    reference), the heading portion is slug-normalized so that trivial punctuation
-    differences (em-dash vs hyphen, casing) do not fracture corroboration into
-    separate keys for what is really the same location.
+    reference) and `slug_headings` is True, the heading portion is slug-normalized so
+    that trivial punctuation differences (em-dash vs hyphen, casing) do not fracture
+    corroboration into separate keys for what is really the same location. This is an
+    explicit opt-in: it changes the corroboration key space for every heading-style
+    location, so external consumers that key on the pre-change contract (e.g. the
+    solid-review-ab scorer, which imports this function directly) must not have their
+    keys silently reshaped. `slug_headings` defaults to False and preserves the legacy
+    contract: the stripped input is returned unchanged whenever no line number matches,
+    regardless of whether a `:` separator is present.
+
+    Args:
+        raw: The raw location string to normalize.
+        slug_headings: When True, heading-only locations (no line number) with a `:`
+            separator get their heading portion slug-normalized. Defaults to False
+            (legacy behavior) — callers must opt in explicitly.
 
     Returns:
         The `path:line` string with any leading `/` stripped when a line number is
-        present; the `path:slug` string with the heading slug-normalized when a
-        location string has no line number but does have a `:` separator; or the
-        stripped input unchanged when no `:` is present at all.
+        present; the `path:slug` string with any leading `/` stripped from the path
+        and the heading slug-normalized when `slug_headings` is True and the location
+        has no line number but does have a `:` separator; or the stripped input
+        unchanged otherwise.
     """
     match = LOCATION_LINE_RE.search(raw)
     if match:
         path = match.group(1).lstrip("/")
         return f"{path}:{match.group(2)}"
-    # No line number: normalize the heading portion
+    # No line number: legacy behavior returns the stripped input unchanged.
     raw = raw.strip()
-    if ":" in raw:
+    if slug_headings and ":" in raw:
         path_part, heading_part = raw.split(":", 1)
         slug = re.sub(r"[^a-z0-9]+", "_", heading_part.strip().lower()).strip("_")
-        return f"{path_part}:{slug}"
+        return f"{path_part.lstrip('/')}:{slug}"
     return raw
 
 
@@ -160,8 +180,18 @@ def parse_report(text: str) -> list[Finding]:
     return findings
 
 
-def reduce_findings(reports: dict[str, list[Finding]], keep_threshold: int) -> list[Merged]:
+def reduce_findings(
+    reports: dict[str, list[Finding]], keep_threshold: int, *, slug_headings: bool = False
+) -> list[Merged]:
     """Dedup on (group, normalized-location), count corroboration, rank, cut tail.
+
+    Args:
+        reports: Mapping of worker id to that worker's parsed findings.
+        keep_threshold: Minimum corroboration weight a finding must reach to survive.
+        slug_headings: Passed through to `normalize_location` — when True, heading-only
+            locations are slug-normalized. Defaults to False (legacy behavior), so
+            existing internal and external callers (e.g. the solid-review-ab scorer)
+            keep the pre-change corroboration key space unless they opt in.
 
     Returns:
         The surviving `Merged` findings (weight >= keep_threshold), ranked by
@@ -172,7 +202,7 @@ def reduce_findings(reports: dict[str, list[Finding]], keep_threshold: int) -> l
         for finding in findings:
             if finding.verdict == "PASS":
                 continue
-            location = normalize_location(finding.location)
+            location = normalize_location(finding.location, slug_headings=slug_headings)
             key = (finding.group, location)
             entry = merged.get(key)
             if entry is None:
@@ -248,6 +278,17 @@ def main(argv: list[str] | None = None) -> int:
         default=1,
         help="Minimum corroboration weight to retain (default 1 = keep all, rank only).",
     )
+    parser.add_argument(
+        "--slug-headings",
+        action="store_true",
+        default=False,
+        help=(
+            "Slug-normalize heading-only locations (no line number) so trivial "
+            "punctuation/casing differences corroborate. Off by default (legacy "
+            "behavior) — external consumers importing normalize_location directly "
+            "(e.g. the solid-review-ab scorer) are unaffected unless this is set."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not args.report_dir.is_dir():
@@ -259,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: no reports matched {args.glob} in {args.report_dir}", file=sys.stderr)
         return 2
 
-    survivors = reduce_findings(reports, args.keep_threshold)
+    survivors = reduce_findings(reports, args.keep_threshold, slug_headings=args.slug_headings)
     print(format_report(reports, survivors, args.keep_threshold))
     return 0
 

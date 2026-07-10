@@ -100,6 +100,90 @@ def test_normalize_location_strips_abs_prefix_but_keeps_path() -> None:
     assert r.normalize_location("src/foo/config.py:10") == "src/foo/config.py:10"
 
 
+def test_normalize_location_heading_legacy_default_returns_stripped() -> None:
+    """Default (slug_headings=False): heading-style locations are returned stripped,
+    unchanged -- the pre-change contract external consumers (e.g. the solid-review-ab
+    scorer) rely on."""
+    assert r.normalize_location("  docs/README.md:Getting Started  ") == "docs/README.md:Getting Started"
+    assert r.normalize_location("docs/README.md:Getting-Started") == "docs/README.md:Getting-Started"
+    # Explicit False behaves identically to the default.
+    assert (
+        r.normalize_location("docs/README.md:Getting Started", slug_headings=False) == "docs/README.md:Getting Started"
+    )
+
+
+def test_normalize_location_heading_slug_headings_true_normalizes() -> None:
+    """With slug_headings=True, trivial punctuation/casing differences in the heading
+    portion collapse to the same slug key."""
+    a = r.normalize_location("docs/README.md:Getting Started", slug_headings=True)
+    b = r.normalize_location("docs/README.md:Getting-Started", slug_headings=True)
+    c = r.normalize_location("docs/README.md:GETTING STARTED", slug_headings=True)
+    assert a == b == c == "docs/README.md:getting_started"
+
+
+def test_normalize_location_slug_headings_strips_leading_slash() -> None:
+    """slug_headings=True strips a leading `/` from the path portion, matching the
+    line-numbered branch, so absolute and repo-relative heading locations corroborate."""
+    absolute = r.normalize_location("/docs/README.md:Getting Started", slug_headings=True)
+    relative = r.normalize_location("docs/README.md:Getting Started", slug_headings=True)
+    assert absolute == relative == "docs/README.md:getting_started"
+
+
+def test_normalize_location_line_number_behavior_unchanged_in_both_modes() -> None:
+    """Line-numbered locations normalize identically regardless of slug_headings."""
+    assert r.normalize_location("/repo/src/foo/config.py:10") == "repo/src/foo/config.py:10"
+    assert r.normalize_location("/repo/src/foo/config.py:10", slug_headings=True) == "repo/src/foo/config.py:10"
+
+
+def test_reduce_findings_slug_headings_flag_threads_through() -> None:
+    """reduce_findings passes slug_headings through to normalize_location, so two
+    heading-style locations differing only in punctuation corroborate when the flag
+    is set, but remain distinct findings by default."""
+    report_a = """- group: 1
+  rule: a
+  location: docs/README.md:Getting Started
+  severity: high
+"""
+    report_b = """- group: 1
+  rule: b
+  location: docs/README.md:Getting-Started
+  severity: high
+"""
+    reports = {"A": r.parse_report(report_a), "B": r.parse_report(report_b)}
+
+    # Legacy default: distinct headings do not corroborate.
+    survivors_legacy = r.reduce_findings(reports, keep_threshold=1)
+    assert len(survivors_legacy) == 2
+    assert all(m.weight == 1 for m in survivors_legacy)
+
+    # Opt-in: headings collapse into one corroborated finding.
+    survivors_slugged = r.reduce_findings(reports, keep_threshold=1, slug_headings=True)
+    assert len(survivors_slugged) == 1
+    assert survivors_slugged[0].weight == 2
+
+
+def test_main_slug_headings_cli_flag(tmp_path: Path) -> None:
+    """The --slug-headings CLI flag threads through main() into reduce_findings."""
+    report_a = """- group: 1
+  rule: a
+  location: docs/README.md:Getting Started
+  severity: high
+"""
+    report_b = """- group: 1
+  rule: b
+  location: docs/README.md:Getting-Started
+  severity: high
+"""
+    (tmp_path / "review-A.md").write_text(report_a, encoding="utf-8")
+    (tmp_path / "review-B.md").write_text(report_b, encoding="utf-8")
+
+    code = r.main([str(tmp_path), "--glob", "review-*.md", "--slug-headings"])
+    assert code == 0
+
+    code_legacy = r.main([str(tmp_path), "--glob", "review-*.md"])
+    assert code_legacy == 0
+
+
 def test_same_basename_different_dirs_do_not_corroborate() -> None:
     """Two files sharing a basename must NOT collapse into one weight-2 finding."""
     a = """- group: 1
