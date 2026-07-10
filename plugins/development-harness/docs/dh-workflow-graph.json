@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generated": "2026-06-08",
+    "generated": "2026-07-10",
     "source": "L0+L1+G1-G8 layers from docs/workflow-layers/",
-    "total_nodes": 224,
-    "total_edges": 411,
+    "total_nodes": 231,
+    "total_edges": 436,
     "node_type_counts": {
       "agent": 28,
       "artifact": 14,
@@ -11,13 +11,15 @@
       "decision": 121,
       "mcp_tool": 23,
       "reference_file": 20,
-      "skill": 14
+      "skill": 21
     },
     "edge_type_counts": {
       "branch": 210,
       "calls": 37,
       "dispatches": 39,
+      "gap": 21,
       "reads": 19,
+      "routes_to": 4,
       "stores_in": 92,
       "writes": 14
     },
@@ -25,8 +27,15 @@
       "add-new-feature",
       "close",
       "complete-implementation",
+      "complete-milestone",
       "create",
+      "dh:discovery",
+      "dh:implement-feature -> dh:complete-implementation",
+      "dh:rt-ica",
+      "dh:setup-skill-discovery",
+      "find-cause",
       "groom",
+      "groom-milestone",
       "implement-feature",
       "progress",
       "quick",
@@ -37,7 +46,8 @@
       "work-backlog-item/groom",
       "work-milestone"
     ],
-    "gap_count": 0
+    "gap_count": 21,
+    "orphan_count": 0
   },
   "nodes": [
     {
@@ -2290,6 +2300,19 @@
       "metadata": {}
     },
     {
+      "id": "skill.complete_milestone",
+      "type": "skill",
+      "label": "complete-milestone",
+      "route": "complete-milestone",
+      "source_file": "plugins/development-harness/skills/work-milestone/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
+    },
+    {
       "id": "skill.create",
       "type": "skill",
       "label": "create",
@@ -2298,6 +2321,32 @@
       "source_heading": null,
       "verified": true,
       "metadata": {}
+    },
+    {
+      "id": "skill.discovery",
+      "type": "skill",
+      "label": "dh:discovery",
+      "route": "dh:discovery",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
+    },
+    {
+      "id": "skill.find_cause",
+      "type": "skill",
+      "label": "find-cause",
+      "route": "find-cause",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
     },
     {
       "id": "skill.groom",
@@ -2310,6 +2359,19 @@
       "metadata": {}
     },
     {
+      "id": "skill.groom_milestone",
+      "type": "skill",
+      "label": "groom-milestone",
+      "route": "groom-milestone",
+      "source_file": "plugins/development-harness/skills/work-milestone/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
+    },
+    {
       "id": "skill.implement_feature",
       "type": "skill",
       "label": "implement-feature",
@@ -2318,6 +2380,19 @@
       "source_heading": null,
       "verified": true,
       "metadata": {}
+    },
+    {
+      "id": "skill.implement_feature_dh_complete_implementation",
+      "type": "skill",
+      "label": "dh:implement-feature -> dh:complete-implementation",
+      "route": "dh:implement-feature -> dh:complete-implementation",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
     },
     {
       "id": "skill.progress",
@@ -2350,6 +2425,19 @@
       "metadata": {}
     },
     {
+      "id": "skill.rt_ica",
+      "type": "skill",
+      "label": "dh:rt-ica",
+      "route": "dh:rt-ica",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
+    },
+    {
       "id": "skill.setup_github",
       "type": "skill",
       "label": "setup-github",
@@ -2358,6 +2446,19 @@
       "source_heading": null,
       "verified": false,
       "metadata": {}
+    },
+    {
+      "id": "skill.setup_skill_discovery",
+      "type": "skill",
+      "label": "dh:setup-skill-discovery",
+      "route": "dh:setup-skill-discovery",
+      "source_file": "plugins/development-harness/skills/add-new-feature/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "metadata": {
+        "stub": true,
+        "reason": "hands_off_to_skill target not independently confirmed"
+      }
     },
     {
       "id": "skill.work",
@@ -3446,7 +3547,7 @@
       "gap": false
     },
     {
-      "id": "e.complete_implementation_t6post.yes_divergence_requiring_review_block_pr.branch",
+      "id": "e.complete_implementation_t6post.yes_divergence_requiring_review_block_present.branch",
       "type": "branch",
       "source": "fork.complete_implementation_t6post",
       "target": "fork.sam_dispatch_loop_ready_check",
@@ -3886,6 +3987,237 @@
       "gap": false
     },
     {
+      "id": "e.gap.add_new_feature_j.yes",
+      "type": "gap",
+      "source": "fork.add_new_feature_j",
+      "target": "skill.setup_skill_discovery",
+      "label": "hands off to skill 'dh:setup-skill-discovery' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/add-new-feature/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_absent.no",
+      "type": "gap",
+      "source": "fork.work_backlog_item_absent",
+      "target": "skill.rt_ica",
+      "label": "hands off to skill 'dh:rt-ica' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_check.yes.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_check",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finalize.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_check1.yes",
+      "type": "gap",
+      "source": "fork.work_backlog_item_check1",
+      "target": "skill.rt_ica",
+      "label": "hands off to skill 'dh:rt-ica' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_check2.updated_at_greater_than_d",
+      "type": "gap",
+      "source": "fork.work_backlog_item_check2",
+      "target": "skill.rt_ica",
+      "label": "hands off to skill 'dh:rt-ica' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_createlist.auto",
+      "type": "gap",
+      "source": "fork.work_backlog_item_createlist",
+      "target": "skill.implement_feature_dh_complete_implementation",
+      "label": "hands off to skill 'dh:implement-feature -> dh:complete-implementation' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_datefound.no_date_not_found",
+      "type": "gap",
+      "source": "fork.work_backlog_item_datefound",
+      "target": "skill.rt_ica",
+      "label": "hands off to skill 'dh:rt-ica' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_discoveryconfirmed.yes_artifact_registered.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_discoveryconfirmed",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_fresult.groomed.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_fresult",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_hasdiscovery.no",
+      "type": "gap",
+      "source": "fork.work_backlog_item_hasdiscovery",
+      "target": "skill.discovery",
+      "label": "hands off to skill 'dh:discovery' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_hasdiscovery.yes.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_hasdiscovery",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_hasissue.no.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_hasissue",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_iresult.drift.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_iresult",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_iresult.skip.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_iresult",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_q3_2.yes",
+      "type": "gap",
+      "source": "fork.work_backlog_item_q3_2",
+      "target": "skill.find_cause",
+      "label": "hands off to skill 'find-cause' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_retryconfirmed.yes.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_retryconfirmed",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_backlog_item_typecheck.yes_fix_bug_type.unrecognized",
+      "type": "gap",
+      "source": "fork.work_backlog_item_typecheck",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_milestone_finalresult.pass",
+      "type": "gap",
+      "source": "fork.work_milestone_finalresult",
+      "target": "skill.complete_milestone",
+      "label": "hands off to skill 'complete-milestone' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-milestone/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_milestone_gateresult.pass.unrecognized",
+      "type": "gap",
+      "source": "fork.work_milestone_gateresult",
+      "target": "terminal.stop",
+      "label": "terminal_type 'completes_workflow' recognized but terminal_target is missing \u2014 transition unattested",
+      "source_file": "plugins/development-harness/skills/work-milestone/references/worktree-worker-protocol.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_milestone_validate.items_changed_since_groom",
+      "type": "gap",
+      "source": "fork.work_milestone_validate",
+      "target": "skill.groom_milestone",
+      "label": "hands off to skill 'groom-milestone' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-milestone/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
+      "id": "e.gap.work_milestone_validate.plan_missing",
+      "type": "gap",
+      "source": "fork.work_milestone_validate",
+      "target": "skill.groom_milestone",
+      "label": "hands off to skill 'groom-milestone' \u2014 target not independently confirmed",
+      "source_file": "plugins/development-harness/skills/work-milestone/SKILL.md",
+      "source_heading": null,
+      "verified": false,
+      "gap": true
+    },
+    {
       "id": "e.implement_feature_msgcheck.yes_agent_responds.branch",
       "type": "branch",
       "source": "fork.implement_feature_msgcheck",
@@ -3941,7 +4273,7 @@
       "gap": false
     },
     {
-      "id": "e.implement_feature_verdict.idle_no_tool_calls_for_5_min_br_agent_ap.branch",
+      "id": "e.implement_feature_verdict.idle_no_tool_calls_for_5_min_br_agent_appears_stuck_mid_task.branch",
       "type": "branch",
       "source": "fork.implement_feature_verdict",
       "target": "fork.implement_feature_teamcheck",
@@ -3952,7 +4284,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.add_new_feature.architect.0",
+      "id": "e.reads.add_new_feature.architect",
       "type": "reads",
       "source": "skill.add_new_feature",
       "target": "artifact.architect",
@@ -3963,7 +4295,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.add_new_feature.feature_context.0",
+      "id": "e.reads.add_new_feature.feature_context",
       "type": "reads",
       "source": "skill.add_new_feature",
       "target": "artifact.feature_context",
@@ -3974,7 +4306,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.add_new_feature.feature_context_synthesized.0",
+      "id": "e.reads.add_new_feature.feature_context_synthesized",
       "type": "reads",
       "source": "skill.add_new_feature",
       "target": "artifact.feature_context_synthesized",
@@ -3985,7 +4317,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.add_new_feature.research.0",
+      "id": "e.reads.add_new_feature.research",
       "type": "reads",
       "source": "skill.add_new_feature",
       "target": "artifact.research",
@@ -3996,7 +4328,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.complete_implementation.audit_report.0",
+      "id": "e.reads.complete_implementation.audit_report",
       "type": "reads",
       "source": "skill.complete_implementation",
       "target": "artifact.audit_report",
@@ -4007,7 +4339,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.complete_implementation.concerns_section.0",
+      "id": "e.reads.complete_implementation.concerns_section",
       "type": "reads",
       "source": "skill.complete_implementation",
       "target": "artifact.concerns_section",
@@ -4018,7 +4350,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.complete_implementation.task_plan.1",
+      "id": "e.reads.complete_implementation.task_plan",
       "type": "reads",
       "source": "skill.complete_implementation",
       "target": "artifact.task_plan",
@@ -4029,7 +4361,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.complete_implementation.tn_verification.0",
+      "id": "e.reads.complete_implementation.tn_verification",
       "type": "reads",
       "source": "skill.complete_implementation",
       "target": "artifact.tn_verification",
@@ -4040,7 +4372,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.architect.1",
+      "id": "e.reads.implement_feature.architect",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.architect",
@@ -4051,7 +4383,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.codebase_analysis.0",
+      "id": "e.reads.implement_feature.codebase_analysis",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.codebase_analysis",
@@ -4062,7 +4394,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.feature_context.4",
+      "id": "e.reads.implement_feature.feature_context",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.feature_context",
@@ -4073,7 +4405,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.sam_task_body.0",
+      "id": "e.reads.implement_feature.sam_task_body",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.sam_task_body",
@@ -4084,7 +4416,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.t0_baseline.0",
+      "id": "e.reads.implement_feature.t0_baseline",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.t0_baseline",
@@ -4095,7 +4427,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.implement_feature.task_plan.0",
+      "id": "e.reads.implement_feature.task_plan",
       "type": "reads",
       "source": "skill.implement_feature",
       "target": "artifact.task_plan",
@@ -4106,7 +4438,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.work_backlog_item.feature_context.2",
+      "id": "e.reads.work_backlog_item.feature_context",
       "type": "reads",
       "source": "skill.work_backlog_item",
       "target": "artifact.feature_context",
@@ -4117,7 +4449,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.work_backlog_item.feature_context_synthesized.1",
+      "id": "e.reads.work_backlog_item.feature_context_synthesized",
       "type": "reads",
       "source": "skill.work_backlog_item",
       "target": "artifact.feature_context_synthesized",
@@ -4128,7 +4460,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.work_backlog_item.groomed_sections.0",
+      "id": "e.reads.work_backlog_item.groomed_sections",
       "type": "reads",
       "source": "skill.work_backlog_item",
       "target": "artifact.groomed_sections",
@@ -4139,7 +4471,7 @@
       "gap": false
     },
     {
-      "id": "e.reads.work_backlog_item.impact_radius_section.0",
+      "id": "e.reads.work_backlog_item.impact_radius_section",
       "type": "reads",
       "source": "skill.work_backlog_item",
       "target": "artifact.impact_radius_section",
@@ -4150,12 +4482,56 @@
       "gap": false
     },
     {
-      "id": "e.reads.work_backlog_item.rt_ica_section.0",
+      "id": "e.reads.work_backlog_item.rt_ica_section",
       "type": "reads",
       "source": "skill.work_backlog_item",
       "target": "artifact.rt_ica_section",
       "label": "backlog_view(selector='{item_ref}') \u2014 checks response['secti",
       "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "source_heading": null,
+      "verified": true,
+      "gap": false
+    },
+    {
+      "id": "e.routes_to.add_new_feature_success.all_phases_complete",
+      "type": "routes_to",
+      "source": "fork.add_new_feature_success",
+      "target": "skill.implement_feature",
+      "label": "All phases complete",
+      "source_file": "plugins/development-harness/skills/add-new-feature/SKILL.md",
+      "source_heading": null,
+      "verified": true,
+      "gap": false
+    },
+    {
+      "id": "e.routes_to.implement_feature_completion.all_tasks_show_complete",
+      "type": "routes_to",
+      "source": "fork.implement_feature_completion",
+      "target": "skill.complete_implementation",
+      "label": "All tasks show COMPLETE",
+      "source_file": "plugins/development-harness/skills/implement-feature/SKILL.md",
+      "source_heading": null,
+      "verified": true,
+      "gap": false
+    },
+    {
+      "id": "e.routes_to.work_backlog_item_c4.no_prior_failure_refs_scope_appropriate",
+      "type": "routes_to",
+      "source": "fork.work_backlog_item_c4",
+      "target": "skill.add_new_feature",
+      "label": "No prior failure refs, scope appropriate",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md",
+      "source_heading": null,
+      "verified": true,
+      "gap": false
+    },
+    {
+      "id": "e.routes_to.work_backlog_item_c4.prior_failure_reference_found",
+      "type": "routes_to",
+      "source": "fork.work_backlog_item_c4",
+      "target": "skill.add_new_feature",
+      "label": "Prior failure reference found",
+      "source_file": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md",
       "source_heading": null,
       "verified": true,
       "gap": false
@@ -5272,7 +5648,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_c1.suggested_location_missing_and_no_altern.branch",
+      "id": "e.work_backlog_item_c1.suggested_location_missing_and_no_alternative_identifiable.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_c1",
       "target": "terminal.stop",
@@ -5349,7 +5725,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_c4.impact_radius_1_file_total_and_task_coun.branch",
+      "id": "e.work_backlog_item_c4.impact_radius_1_file_total_and_task_count_4.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_c4",
       "target": "terminal.stop",
@@ -5382,7 +5758,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_check2.updated_at_less_than_or_equal_to_d_or_fi.branch",
+      "id": "e.work_backlog_item_check2.updated_at_less_than_or_equal_to_d_or_field_absent.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_check2",
       "target": "ref.references_workflows_work_feasibility_gate_md",
@@ -5492,7 +5868,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_createitemref.yes_existing_ref_from_input_br_or_github.branch",
+      "id": "e.work_backlog_item_createitemref.yes_existing_ref_from_input_br_or_github_issue_url.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_createitemref",
       "target": "terminal.stop",
@@ -5789,7 +6165,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_q.absent_and_agent_did_not_br_report_statu.branch",
+      "id": "e.work_backlog_item_q.absent_and_agent_did_not_br_report_status_done.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_q",
       "target": "fork.work_backlog_item_a1",
@@ -5800,7 +6176,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_q.absent_and_section_was_not_br_in_orchest.branch",
+      "id": "e.work_backlog_item_q.absent_and_section_was_not_br_in_orchestrator_groomer_prompt.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_q",
       "target": "fork.work_backlog_item_a1",
@@ -5811,7 +6187,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_q.absent_from_sections_index_br_and_agent_.branch",
+      "id": "e.work_backlog_item_q.absent_from_sections_index_br_and_agent_reported_status_done.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_q",
       "target": "fork.work_backlog_item_a1",
@@ -5822,7 +6198,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_q.present_in_sections_index_br_but_shows_0.branch",
+      "id": "e.work_backlog_item_q.present_in_sections_index_br_but_shows_0_entries.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_q",
       "target": "fork.work_backlog_item_a1",
@@ -5877,7 +6253,7 @@
       "gap": false
     },
     {
-      "id": "e.work_backlog_item_q1.hash_n_or_bare_number_or_github_issue_ur.branch",
+      "id": "e.work_backlog_item_q1.hash_n_or_bare_number_or_github_issue_url.branch",
       "type": "branch",
       "source": "fork.work_backlog_item_q1",
       "target": "ref.references_workflows_work_locate_md",
@@ -6625,7 +7001,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity.heavy_file_refactored_br_by_multiple_wor.branch",
+      "id": "e.work_milestone_severity.heavy_file_refactored_br_by_multiple_worktrees.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity",
       "target": "terminal.stop",
@@ -6636,7 +7012,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity.medium_same_function_br_edited_different.branch",
+      "id": "e.work_milestone_severity.medium_same_function_br_edited_differently.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity",
       "target": "fork.work_milestone_autoresult",
@@ -6647,7 +7023,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity.trivial_whitespace_br_import_order_adjac.branch",
+      "id": "e.work_milestone_severity.trivial_whitespace_br_import_order_adjacent_additions.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity",
       "target": "fork.work_milestone_autoresult",
@@ -6658,7 +7034,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity_2.file_restructured_or_br_refactored_diffe.branch",
+      "id": "e.work_milestone_severity_2.file_restructured_or_br_refactored_differently_br_by_both_worktrees.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity_2",
       "target": "terminal.stop",
@@ -6669,7 +7045,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity_2.same_function_block_br_edited_differentl.branch",
+      "id": "e.work_milestone_severity_2.same_function_block_br_edited_differently.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity_2",
       "target": "terminal.stop",
@@ -6680,7 +7056,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_severity_2.whitespace_import_order_br_adjacent_line.branch",
+      "id": "e.work_milestone_severity_2.whitespace_import_order_br_adjacent_line_additions.branch",
       "type": "branch",
       "source": "fork.work_milestone_severity_2",
       "target": "terminal.stop",
@@ -6724,7 +7100,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_status.status_complete_tasks_done_changes_commi.branch",
+      "id": "e.work_milestone_status.status_complete_tasks_done_changes_committed.branch",
       "type": "branch",
       "source": "fork.work_milestone_status",
       "target": "fork.work_milestone_slot",
@@ -6735,7 +7111,7 @@
       "gap": false
     },
     {
-      "id": "e.work_milestone_status.status_partial_some_tasks_done_some_bloc.branch",
+      "id": "e.work_milestone_status.status_partial_some_tasks_done_some_blocked.branch",
       "type": "branch",
       "source": "fork.work_milestone_status",
       "target": "terminal.stop",
@@ -6938,7 +7314,7 @@
       "label": "Workflow",
       "description": "Decision forks and routing",
       "node_types": ["decision", "skill"],
-      "edge_types": ["branch", "routes_to"]
+      "edge_types": ["branch", "routes_to", "gap"]
     },
     "agents": {
       "label": "Agents",

@@ -49,7 +49,11 @@ class TestHandsOffToSkillGapEdges:
         assert stubs["skill.find_cause"]["type"] == "skill"
         assert stubs["skill.find_cause"]["verified"] is False
 
-    def test_no_stub_created_when_target_skill_already_known(self) -> None:
+    def test_known_target_produces_routes_to_not_gap_and_no_stub(self) -> None:
+        """When the target skill IS independently confirmed, hands_off_to_skill
+        must emit a routes_to edge, not a gap -- the hand-off is both real
+        (attested by the L1 trace) and independently confirmed, so there is
+        nothing left unverified about it."""
         edges: dict[str, dict[str, object]] = {}
         stubs: dict[str, dict[str, object]] = {}
         trace = _trace()
@@ -62,11 +66,43 @@ class TestHandsOffToSkillGapEdges:
             extra_stubs=stubs,
         )
 
-        gap_edges = [e for e in edges.values() if e["type"] == "gap"]
-        assert len(gap_edges) == 1
-        assert gap_edges[0]["target"] == "skill.find_cause"
+        assert len(edges) == 1
+        edge = next(iter(edges.values()))
+        assert edge["type"] == "routes_to"
+        assert edge["gap"] is False
+        assert edge["verified"] is True
+        assert edge["target"] == "skill.find_cause"
         # Already known -- no stub needed.
         assert "skill.find_cause" not in stubs
+
+    def test_plugin_prefixed_target_resolves_to_known_skill_node(self) -> None:
+        """A plugin-qualified hands_off_to_skill target (e.g.
+        'dh:add-new-feature', the shape actually recorded in the shipped L1
+        layer files) must resolve to the same node id as the unprefixed
+        known skill ('skill.add_new_feature') -- not spawn a duplicate,
+        unverified stub for the differently-slugged prefixed variant
+        ('skill.dh_add_new_feature'). Regression test for the node-id
+        mismatch between this branch's slugification of the raw L1 target
+        and collect_all_skill_names()'s always-unprefixed skill names."""
+        edges: dict[str, dict[str, object]] = {}
+        stubs: dict[str, dict[str, object]] = {}
+        trace = _trace(terminal_target="dh:add-new-feature")
+
+        _process_trace(
+            trace,
+            known_fork_ids={"fork.work_backlog_item_q3_2"},
+            known_skill_ids={"skill.add_new_feature"},
+            edges=edges,
+            extra_stubs=stubs,
+        )
+
+        assert len(edges) == 1
+        edge = next(iter(edges.values()))
+        assert edge["type"] == "routes_to"
+        assert edge["gap"] is False
+        assert edge["verified"] is True
+        assert edge["target"] == "skill.add_new_feature"
+        assert stubs == {}
 
 
 class TestCompletesWorkflowUnchangedBehavior:
@@ -193,3 +229,104 @@ class TestGapEdgesSurviveSelfCheck:
 
         gap_edges = [e for e in cleaned if e["type"] == "gap"]
         assert len(gap_edges) == 1
+
+
+class TestOrphanEdgesPreservedNotDeleted:
+    """Covers plugins/development-harness/docs/graph-schema.md "Orphan edges":
+    an edge whose source or target node id is absent from the node set (e.g.
+    from renaming a key in a docs/workflow-layers/*.json layer file, which
+    changes the deterministic _node_id slug) must be annotated and kept, not
+    silently deleted -- the pre-fix behavior surfaced only via a stderr
+    "ORPHAN REMOVED" line that no downstream consumer of the output JSON
+    could see."""
+
+    def test_orphan_edge_annotated_not_deleted(self) -> None:
+        nodes = [{"id": "a", "type": "decision"}]
+        edges = [
+            {"id": "e1", "type": "branch", "source": "a", "target": "missing.node", "verified": True, "gap": False}
+        ]
+
+        cleaned = self_check(nodes, edges)
+
+        assert len(cleaned) == 1
+        edge = cleaned[0]
+        assert edge["status"] == "orphan"
+        assert edge["verified"] is False
+        # gap is a distinct concept (unattested-but-real transition) --
+        # an orphan edge must never also claim to be a gap edge.
+        assert edge["gap"] is False
+
+    def test_orphan_edge_missing_source_also_annotated(self) -> None:
+        nodes = [{"id": "b", "type": "skill"}]
+        edges = [
+            {"id": "e1", "type": "calls", "source": "missing.source", "target": "b", "verified": True, "gap": False}
+        ]
+
+        cleaned = self_check(nodes, edges)
+
+        assert len(cleaned) == 1
+        assert cleaned[0]["status"] == "orphan"
+        assert cleaned[0]["verified"] is False
+
+    def test_non_orphan_edge_unchanged(self) -> None:
+        """An edge whose endpoints both exist must come back byte-identical
+        -- no 'status' key added, verified/gap left exactly as given."""
+        nodes = [{"id": "a", "type": "decision"}, {"id": "b", "type": "skill"}]
+        edges = [{"id": "e1", "type": "branch", "source": "a", "target": "b", "verified": True, "gap": False}]
+
+        cleaned = self_check(nodes, edges)
+
+        assert cleaned == edges
+        assert "status" not in cleaned[0]
+
+    def test_self_check_idempotent_on_orphan_edges(self) -> None:
+        """Running self_check twice on its own output must be a no-op --
+        the same edges, re-annotated the same way."""
+        nodes = [{"id": "a", "type": "decision"}]
+        edges = [
+            {"id": "e1", "type": "branch", "source": "a", "target": "missing.node", "verified": True, "gap": False}
+        ]
+
+        once = self_check(nodes, edges)
+        twice = self_check(nodes, once)
+
+        assert once == twice
+
+    def test_self_check_idempotent_on_non_orphan_edges(self) -> None:
+        nodes = [{"id": "a", "type": "decision"}, {"id": "b", "type": "skill"}]
+        edges = [{"id": "e1", "type": "branch", "source": "a", "target": "b", "verified": True, "gap": False}]
+
+        once = self_check(nodes, edges)
+        twice = self_check(nodes, once)
+
+        assert once == twice == edges
+
+
+class TestOrphanCountComputedNotHardcoded:
+    def test_zero_orphan_edges_yields_zero_orphan_count(self) -> None:
+        nodes = [{"id": "a", "type": "decision"}, {"id": "b", "type": "skill"}]
+        edges = [{"id": "e1", "type": "routes_to", "source": "a", "target": "b", "gap": False}]
+        graph = _build_graph_dict(nodes, edges)
+        assert graph["meta"]["orphan_count"] == 0
+
+    def test_orphan_edges_counted_correctly(self) -> None:
+        nodes = [{"id": "a", "type": "decision"}, {"id": "b", "type": "skill"}]
+        edges = [
+            {"id": "e1", "type": "routes_to", "source": "a", "target": "b", "gap": False},
+            {"id": "e2", "type": "branch", "source": "a", "target": "b", "gap": False, "status": "orphan"},
+        ]
+        graph = _build_graph_dict(nodes, edges)
+        assert graph["meta"]["orphan_count"] == 1
+        assert graph["meta"]["total_edges"] == 2
+
+    def test_gap_count_and_orphan_count_are_independent(self) -> None:
+        """A gap edge and an orphan edge are different concepts -- an edge
+        must never be counted in both."""
+        nodes = [{"id": "a", "type": "decision"}, {"id": "b", "type": "skill"}]
+        edges = [
+            {"id": "e1", "type": "gap", "source": "a", "target": "b", "gap": True},
+            {"id": "e2", "type": "branch", "source": "a", "target": "b", "gap": False, "status": "orphan"},
+        ]
+        graph = _build_graph_dict(nodes, edges)
+        assert graph["meta"]["gap_count"] == 1
+        assert graph["meta"]["orphan_count"] == 1

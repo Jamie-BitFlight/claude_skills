@@ -7,7 +7,8 @@ a layer: if COLLECTED, query its data; if a GAP, it is a named pending pass — 
 All files live in `plugins/development-harness/docs/workflow-layers/`.
 
 Resolution: **medium-high**. Skeleton + connections + 8 annotation layers collected and
-spot-checked. Graph rebuilt from layer data (224 nodes, 411 edges). Explorer renders all 6 overlays.
+spot-checked. Graph rebuilt from layer data (231 nodes, 436 edges, 21 gap edges, 0 orphan
+edges). Explorer renders all 6 overlays.
 
 ---
 
@@ -59,7 +60,7 @@ means the orchestrator writes instructions inline — fragile to prompt drift.
 | Phases 3–6 in dh-system-model.html | PENDING |
 | SAM backend routing (sam_plan/sam_task per-backend) | PENDING |
 | Agent-file identity layer (model, tools, skills-loaded, STATUS contract) | PENDING |
-| routes_to edge type — no instances (L1 terminal_targets are intra-skill headings, not cross-skill) | PENDING |
+| routes_to edge type — 4 instances now present (`completes_workflow`/`hands_off_to_skill` targets, after plugin-qualifier normalization, matching a known skill node); most L1 terminal_targets remain intra-skill headings and are still silently skipped, not cross-skill | RESOLVED for the plugin-qualified-hand-off case; PENDING for heading-phrase targets |
 | 5 skill nodes have unverified source_file (skill names not in SKILL_FILE_MAP in assemble_graph.py) | PENDING |
 | backlog #2619 — issue type routing downstream | LOGGED, needs groom |
 | backlog #2620 — autonomy_mode setter | LOGGED, needs groom |

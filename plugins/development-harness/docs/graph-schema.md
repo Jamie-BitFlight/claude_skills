@@ -196,6 +196,8 @@ it's what the MCP server routes to. Shown on the MCP tools overlay.
 
 Every edge carries `verified: true|false` and `gap: true|false`.
 A gap edge is rendered differently in the explorer (dashed, amber).
+An edge may additionally carry `status: "orphan"` — see [Orphan edges](#orphan-edges) below;
+absent on every non-orphan edge.
 
 ```json
 {
@@ -282,6 +284,48 @@ silent gap produces an incorrect impact assessment.
 | `gap` | boolean | Always `true` for gap edges. |
 | `source_file` | string \| null | File where the gap was identified, if applicable. |
 | `source_heading` | string \| null | Heading where the gap was identified, if applicable. |
+
+### Orphan edges
+
+An edge whose `source` or `target` node id is absent from the assembled node set. Node ids
+are deterministic slugs of layer-file keys (see `assemble_graph.py`'s `slugify`/`_node_id`).
+Renaming a key in any `docs/workflow-layers/*.json` layer file changes that slug on
+re-extraction, orphaning every edge that still references the old id.
+
+`self_check()` in `assemble_graph.py` **preserves** orphan edges — it never deletes them.
+Each orphan edge is annotated in place with `status: "orphan"` and `verified: false`; a
+non-orphan edge is returned unchanged (no `status` key added). This replaces the prior
+behavior of silently dropping the edge and printing an `ORPHAN REMOVED` line to stderr, which
+no consumer of the output JSON could observe. `meta.orphan_count` (assembled output, see
+`_build_graph_dict`) is always computed from the actual edge set, never hardcoded, mirroring
+`meta.gap_count`.
+
+`status: "orphan"` is a distinct concept from `gap`: a `gap` edge marks a transition that is
+real but unattested by source data; `status: "orphan"` marks a transition whose recorded
+endpoint no longer exists in the current node set. An orphan edge never also sets `gap: true`.
+
+```json
+{
+  "id": "e.work-backlog-item-q3-2.yes.branch",
+  "type": "branch",
+  "source": "fork.work_backlog_item_q3_2",
+  "target": "fork.renamed_condition",
+  "label": "YES",
+  "status": "orphan",
+  "verified": false,
+  "gap": false,
+  "source_file": "skills/work-backlog-item/references/workflows/work/prepare.md",
+  "source_heading": "## Step 3"
+}
+```
+
+**Explorer rendering:** Cytoscape.js requires every edge's `source`/`target` to reference an
+id already present in the element set it is given — a dangling reference throws and aborts
+the whole render, not just that one edge. `dh-workflow-explorer.html`'s `buildElements()`
+therefore keeps orphan edges (`status === "orphan"`) out of the elements passed to Cytoscape
+while every other edge (including `gap` edges) still renders as before. Orphan edges remain
+fully present in the JSON — `meta.orphan_count` and any offline tooling can still see them —
+they are just not drawn on the graph canvas.
 
 ---
 
