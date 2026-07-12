@@ -1,71 +1,58 @@
 # MCP Server Connection Check
 
 Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers
-to be connected before use. After a session disconnect and reconnect, these servers take
-10–30 seconds to initialize due to stacked module-level costs at startup:
+to be connected before use. After a session restart, these servers initialize in
+approximately 1–2 seconds:
 
-- `tiktoken.get_encoding("cl100k_base")` loaded at import time in both servers (~3–8 s cold)
-- PyGithub and gitpython transitive imports (~2–5 s)
-- Task/context backend initialization in the SAM server (~1–3 s)
-- Two servers starting sequentially, not in parallel
+- `backlog_core.server` full import: ~1.2 s (includes PyGithub, gitpython, ruamel.yaml, tiktoken)
+- `sam_schema.server` full import: ~0.8 s (includes pydantic models, tiktoken)
+- `tiktoken.get_encoding("cl100k_base")` alone: ~0.14 s (import 0.03 s + encoding load 0.11 s)
+- Both servers start in parallel at session startup (Claude Code spawns plugin MCP servers concurrently)
 
-Source: `backlog_core/server.py` line 65, `sam_schema/server.py` lines 68–78, 109.
+Source: `backlog_core/server.py` line 77, `sam_schema/server.py` line 164.
+
+Measured 2026-07-12 via MCP `initialize` handshake: SAM 0.9–1.0 s, backlog 1.2 s.
 
 ## When to Apply This Procedure
 
-Apply this procedure before any `mcp__plugin_dh_backlog__*` or `mcp__plugin_dh_sam__*`
-tool call when any of the following is true:
+In normal operation you do not need to apply any procedure. Claude Code handles
+MCP server connection waiting automatically:
 
-- A tool call returns no result or a connection error
-- `ToolSearch` response contains `"Some MCP servers are still connecting: plugin:dh:backlog"`
-  or `"plugin:dh:sam"`
-- Beginning a workflow immediately after a session restart or reconnect event
+- When **tool search** is enabled (the default), `ToolSearch` internally waits for
+  any server that is still connecting before returning results. You do not need
+  to poll or retry.
+- When tool search is disabled, Claude Code uses the `WaitForMcpServers` tool to
+  wait for connecting servers before proceeding.
 
-## Retry Procedure (up to 5 attempts)
+Apply the troubleshooting steps below only when a server has genuinely failed to
+connect — i.e. `/mcp` shows the server as **failed**, or a tool call returns a
+connection error (not a transient "still connecting" state).
 
-```mermaid
-flowchart TD
-    Start(["MCP tool unavailable or ToolSearch shows 'still connecting'"]) --> Attempt["attempt = 1"]
-    Attempt --> Check1["ToolSearch(query='backlog_list')<br>Check for mcp__plugin_dh_backlog__backlog_list in response"]
-    Check1 --> B1{"Available?"}
-    B1 -->|Yes| Check2["ToolSearch(query='sam_plan')<br>Check for mcp__plugin_dh_sam__sam_plan in response"]
-    B1 -->|"No — still connecting"| Count1{"attempt >= 5?"}
-    Count1 -->|Yes| Blocked(["BLOCKED — report and stop"])
-    Count1 -->|No| Wait1["Wait 30 seconds<br>attempt += 1"]
-    Wait1 --> Check1
-    Check2 --> B2{"Available?"}
-    B2 -->|Yes| Proceed(["Both servers ready — proceed with original tool call"])
-    B2 -->|"No — still connecting"| Count2{"attempt >= 5?"}
-    Count2 -->|Yes| Blocked
-    Count2 -->|No| Wait2["Wait 30 seconds<br>attempt += 1"]
-    Wait2 --> Check2
-```
+## Troubleshooting a Failed Server
 
-**Step-by-step:**
+If a server shows as failed in `/mcp` or tool calls return connection errors:
 
-1. Call `ToolSearch(query="backlog_list")` to check backlog server status.
-   - Response lists `mcp__plugin_dh_backlog__backlog_list` → proceed to step 2.
-   - Response says `"still connecting: plugin:dh:backlog"` → wait 30 s, increment attempt, repeat step 1.
-   - After 5 attempts still connecting → report BLOCKED (see below).
+1. Run `/mcp` in the Claude Code session and check the server status.
+   - `plugin:dh:backlog` or `plugin:dh:sam` showing as **connected** → the issue
+     is elsewhere; re-run the original tool call.
+   - Showing as **failed** → continue to step 2.
 
-2. Call `ToolSearch(query="sam_plan")` to check SAM server status.
-   - Response lists `mcp__plugin_dh_sam__sam_plan` → both servers ready, proceed.
-   - Response says `"still connecting: plugin:dh:sam"` → wait 30 s, increment attempt, repeat step 2.
-   - After 5 attempts still connecting → report BLOCKED (see below).
+2. Restart the Claude Code session. Plugin MCP servers restart automatically.
 
-3. Once both servers show as available, proceed with the original MCP tool call.
+3. If the problem persists after a session restart, verify the servers can start
+   manually:
 
-## BLOCKED Report Format
+   ```bash
+   uv run --script scripts/run_sam_server.py
+   uv run --script scripts/run_backlog_server.py --project-dir .
+   ```
 
-After 5 failed attempts (~2.5 minutes), output:
+   If either exits with `Error: missing dependencies`, ensure `uv` is installed
+   and run `uv sync` from the plugin root.
 
-```text
-BLOCKED — MCP server {plugin:dh:backlog | plugin:dh:sam} did not connect after 5 attempts
-(~2.5 minutes). Cannot proceed with {skill name or tool name}.
-
-To resolve: restart your Claude Code session. If the problem persists, check that uv is
-installed and the plugin cache is current (see CLAUDE.md — Testing MCP Servers).
-```
+4. Check `MCP_TIMEOUT` — if set too low, Claude Code may abort the connection
+   before the server finishes starting. The default is sufficient for these
+   servers (~1–2 s startup well within the default timeout).
 
 ## SAM CLI Fallback
 
@@ -91,4 +78,6 @@ cd plugins/development-harness
 uv run sam list
 uv run sam status P{N}
 uv run sam ready P{N}
-```
+
+Note: bare `P{N}` is ambiguous when multiple plans share the same number prefix.
+Always use the full `P{N}-{slug}` form (visible in `uv run sam list` output).

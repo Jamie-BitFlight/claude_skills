@@ -21,7 +21,7 @@ $ARGUMENTS
 
 ---
 
-**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server takes 10–30 seconds to initialize after a session restart. If unavailable or `ToolSearch` reports "still connecting", follow [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) before proceeding.
+**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server initializes in ~1 second after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
 ## Parse Arguments
 
