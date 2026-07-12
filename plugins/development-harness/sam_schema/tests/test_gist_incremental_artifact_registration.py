@@ -27,10 +27,11 @@ Test-to-AC mapping:
   byte-identical.
 
 Known coverage gap -- documented, not silently absent elsewhere: ``_make_fake_client``
-binds ``client.store = store.store`` directly onto the client instance, so
-neither this file nor ``tests_sam/test_gist_write_through.py`` exercises the
-REAL ``ArtifactRegistryClient.store()`` ``entry_exists`` idempotency guard
-(``artifact_registry_client.py`` lines 117-157) -- the fake bypasses that
+returns a ``_FakeArtifactRegistryClient`` subclass that overrides ``store``/``read``/
+``store_index``/``read_index`` to delegate to the in-memory store, so neither this
+file nor ``tests_sam/test_gist_write_through.py`` exercises the REAL
+``ArtifactRegistryClient.store()`` ``entry_exists`` idempotency guard
+(``artifact_registry_client.py`` lines 117-157) -- the override replaces that
 method's body entirely. That guard is independently covered by
 ``tests_backlog/test_artifact_registry.py::test_register_same_type_and_path_updates_in_place``.
 A future reader should not mistake "not exercised by AC6" for "not tested
@@ -98,18 +99,35 @@ class _InMemoryArtifactStore:
         return self._index_store.get(sentinel_issue)
 
 
-def _make_fake_client(store: _InMemoryArtifactStore) -> ArtifactRegistryClient:
-    """Return an ArtifactRegistryClient backed by the given in-memory store.
+class _FakeArtifactRegistryClient(ArtifactRegistryClient):
+    """ArtifactRegistryClient subclass that delegates I/O to an in-memory store.
 
-    Monkey-patches the four public methods so the client exercises its own
-    interface contract while delegating to the deterministic store.
+    Overrides the four public methods directly instead of monkey-patching
+    bound methods onto an instance -- avoids ``# type: ignore[method-assign]``
+    suppressions, which require documented user approval per
+    ``.claude/rules/linting-exceptions.md`` and were not approved here.
     """
-    client = ArtifactRegistryClient.__new__(ArtifactRegistryClient)
-    client.store = store.store  # type: ignore[method-assign]
-    client.read = store.read  # type: ignore[method-assign]
-    client.store_index = store.store_index  # type: ignore[method-assign]
-    client.read_index = store.read_index  # type: ignore[method-assign]
-    return client
+
+    def __init__(self, store: _InMemoryArtifactStore) -> None:
+        super().__init__(provider=None)
+        self._fake_store = store
+
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+        self._fake_store.store(issue, content, artifact_type=artifact_type)
+
+    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+        return self._fake_store.read(issue, artifact_type)
+
+    def store_index(self, sentinel_issue: int, content: str) -> None:
+        self._fake_store.store_index(sentinel_issue, content)
+
+    def read_index(self, sentinel_issue: int) -> str | None:
+        return self._fake_store.read_index(sentinel_issue)
+
+
+def _make_fake_client(store: _InMemoryArtifactStore) -> ArtifactRegistryClient:
+    """Return an ArtifactRegistryClient backed by the given in-memory store."""
+    return _FakeArtifactRegistryClient(store)
 
 
 def _make_fake_plan_index(client: ArtifactRegistryClient, sentinel_issue: int = _SENTINEL_ISSUE) -> PlanIdIndex:
@@ -189,7 +207,7 @@ def test_incremental_plan_registers_finalized_task_plan_artifact(
 
     # Force a Gist-only read: delete the local YAML so read_plan cannot serve
     # from a surviving local file -- content must come from the artifact store.
-    local_dir: Path = gist_layer._local._plan_dir
+    local_dir: Path = gist_layer.local.plan_dir
     for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
         yaml_file.unlink()
 
@@ -271,6 +289,20 @@ def test_finalize_plan_is_idempotent_on_second_call(gist_layer: GistTaskLayer, s
 
     count_after_first = store.store_call_count
     content_after_first = store.read(_PLAN_ISSUE, "task-plan")
+
+    # Sanity check: the first finalize must have actually produced stored
+    # content before asserting the second finalize is a no-op -- otherwise a
+    # broken first finalize (writing nothing) would make the "no growth"
+    # assertion below vacuously true (0 == 0, None == None) and silently mask
+    # the real regression it's meant to catch.
+    assert count_after_first > 0, (
+        "First finalize_plan call must have invoked store() at least once; "
+        "count_after_first=0 would make the idempotency assertion below meaningless"
+    )
+    assert content_after_first is not None, (
+        "First finalize_plan call must have produced stored task-plan content; "
+        "content_after_first=None would make the idempotency assertion below meaningless"
+    )
 
     # Act: second finalize_plan call on the now-ready plan. Must not raise --
     # deliberately NOT wrapped in pytest.raises so an uncaught exception here
