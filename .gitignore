@@ -81,3 +81,7 @@ plan/
 **/graphify-out/.vocab.txt
 **/graphify-out/.graphify_*.json
 **/graphify-out/.graphify_*.txt
+
+
+# Hermes
+.hermes/plans/
