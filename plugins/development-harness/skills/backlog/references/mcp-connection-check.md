@@ -69,11 +69,25 @@ installed and the plugin cache is current (see CLAUDE.md — Testing MCP Servers
 
 ## SAM CLI Fallback
 
-If the SAM server is unavailable and the task cannot wait, use the `uv run sam` CLI for
-SAM-only operations. For backlog operations there is no CLI equivalent — the MCP server
-must be available.
+If the SAM server is unavailable and the task cannot wait, use the `sam` CLI for SAM-only
+operations. It is registered as a console script in the `plugins/development-harness`
+sub-project (`pyproject.toml` — `sam = "sam_schema.cli:app"`), which is a separate uv
+project from the repo root. Running `uv run sam ...` from the repo root fails with
+`error: Failed to spawn: 'sam'` because the root project has no such script. For backlog
+operations there is no CLI equivalent — the MCP server must be available.
+
+From the repo root, use `--project`:
 
 ```bash
+uv run --project plugins/development-harness sam list
+uv run --project plugins/development-harness sam status P{N}
+uv run --project plugins/development-harness sam ready P{N}
+```
+
+Or `cd plugins/development-harness` first and drop `--project`:
+
+```bash
+cd plugins/development-harness
 uv run sam list
 uv run sam status P{N}
 uv run sam ready P{N}
