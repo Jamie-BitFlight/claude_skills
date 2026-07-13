@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.dependencies import DependencyGraph
@@ -817,10 +816,11 @@ def update_active_task(
     plan address and task ID, then delegates field/section updates to
     *task_backend* via :func:`update_task_fields`.
 
-    The active task context stores ``task_file_path`` and ``task_id``.
-    The plan ID is derived from the YAML filename stem (the segment
-    before the first ``-``) and the plan directory is the parent of
-    the task file — matching the derivation in the MCP server.
+    The active task context stores structured ``plan`` and ``task``
+    fields (the plan address and task ID). These are used directly —
+    no filesystem path derivation is performed in the operations layer.
+    The caller resolves the *task_backend* from the active task's
+    ``plan_dir`` field before calling this function.
 
     Args:
         ctx_backend: The resolved ContextBackend instance used to read
@@ -831,8 +831,8 @@ def update_active_task(
             calling (matching the MCP server convention).
         task_backend: The resolved TaskBackend instance used to apply
             field/section updates. The caller is responsible for
-            resolving it from the active task's ``plan_dir`` (matching
-            the MCP server's ``_get_backend`` lookup).
+            resolving it from the active task's ``plan_dir`` field
+            (matching the MCP server's ``_get_backend`` lookup).
         set_fields_json: Optional dict of raw field-value pairs to
             patch onto the task. Keys use kebab-case (wire convention).
             Values are normalized through the Task model before being
@@ -849,7 +849,9 @@ def update_active_task(
         (``"{plan}/{task}"``) keys.
 
     Raises:
-        ValueError: When no active task has been set for *session_id*.
+        ValueError: When no active task has been set for *session_id*,
+            or when the context lacks structured ``plan``/``task``
+            fields (pre-additive-schema contexts).
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskNotFoundError: When the task ID cannot be resolved in the
             plan.
@@ -860,12 +862,16 @@ def update_active_task(
     if active is None:
         msg = "update_active_task: no active task set for this session. Call set_active_task(...) first."
         raise ValueError(msg)
-    active_plan_id = Path(active.task_file_path).stem.split("-")[0]
-    active_task_id = active.task_id
+    if active.plan is None or active.task is None:
+        msg = (
+            "update_active_task: active task context lacks structured plan/task fields. "
+            "Call set_active_task(...) again to populate them."
+        )
+        raise ValueError(msg)
     return update_task_fields(
         task_backend,
-        active_plan_id,
-        active_task_id,
+        active.plan,
+        active.task,
         set_fields_json=set_fields_json,
         append_section=append_section,
         section_content=section_content,

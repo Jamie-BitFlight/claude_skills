@@ -1286,6 +1286,9 @@ class BeadsContextBackend:
         context = ActiveTaskContext(
             task_file_path=task_file_path,
             task_id=task,
+            plan=plan,
+            task=task,
+            plan_dir=plan_dir,
             parent_issue_number=parent_issue_number,
             session_id=session_id,
             started_at=datetime.now(tz=UTC).isoformat(),

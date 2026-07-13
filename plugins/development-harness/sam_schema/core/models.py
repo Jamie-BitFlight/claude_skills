@@ -555,6 +555,17 @@ class ActiveTaskContext(BaseModel):
 
     task_file_path: str = Field(description="Absolute path to the plan YAML file containing this task.")
     task_id: str = Field(description="Task identifier within the plan (e.g., 'T3').")
+    plan: str | None = Field(
+        default=None,
+        description="Plan address (e.g., 'P1' or slug). Additive field — existing files without this field are valid.",
+    )
+    task: str | None = Field(
+        default=None, description="Task ID within the plan (structured address, mirrors task_id). Additive field."
+    )
+    plan_dir: str | None = Field(
+        default=None,
+        description="Plan directory sentinel or absolute path. Additive field — existing files without this field are valid.",
+    )
     parent_issue_number: str | int | None = Field(
         default=None,
         description="GitHub issue number (int) or beads nanoid (str, e.g. 'bd-a3f8') for the parent story/feature.",
