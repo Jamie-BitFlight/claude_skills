@@ -13,20 +13,23 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import tiktoken
 from dh_core.operations import (
     append_task as _append_task,
+    claim_task as _claim_task,
     create_plan as _create_plan,
     finalize_plan as _finalize_plan,
     get_plan_status as _get_plan_status,
     get_ready_tasks as _get_ready_tasks,
     list_plans as _list_plans_op,
     read_plan as _read_plan,
+    read_task as _read_task,
     update_plan_fields as _update_plan_fields,
+    update_task_fields as _update_task_fields,
+    update_task_status as _update_task_status,
 )
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -51,10 +54,8 @@ from sam_schema.core.action_models import (
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import PlanState, Task, TaskAssignment, TaskStatus
+from sam_schema.core.models import PlanState
 from sam_schema.core.plan_id_index import create_plan_id_index
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
@@ -90,38 +91,6 @@ try:
     get_context_config()
 except RuntimeError:
     set_context_config(ContextConfig(backend=create_context_backend()))
-
-
-def _claim_task_via_backend(backend: TaskBackend, plan_id: str, task_id: str) -> tuple[bool, str | None]:
-    """Claim a task, falling back to the local backend for local-only plans.
-
-    Returns a ``(claimed, warning)`` tuple where *warning* is non-``None`` when
-    the claim fell back to the local backend because the plan has no GitHub issue.
-    ADR-2509-3: exactly-once is provided by serialized dispatch at the caller level.
-
-    Args:
-        backend: Backend to attempt claim through.
-        plan_id: Plan identifier.
-        task_id: Task identifier.
-
-    Returns:
-        ``(True, None)`` on successful Gist-backed claim.
-        ``(True, warning_str)`` when claim fell back to local backend.
-        ``(False, None)`` when task is not claimable.
-    """
-    try:
-        return backend.claim_task(plan_id, task_id), None
-    except ConcurrentClaimUnsupportedError:
-        # Local-only plan (issue=None): fall back to local backend claim.
-        local_backend = backend.local if isinstance(backend, GistTaskLayer) else backend
-        claimed = local_backend.claim_task(plan_id, task_id)
-        warning = (
-            f"Plan '{plan_id}' has no associated GitHub issue — claimed locally only. "
-            "Parallel dispatch is not supported for local-only plans. "
-            "Associate a GitHub issue with this plan for multi-agent dispatch support."
-        )
-        _log.warning("_claim_task_via_backend: %s", warning)
-        return claimed, warning
 
 
 def _get_backend(plan_dir_str: str) -> TaskBackend:
@@ -243,33 +212,6 @@ def _paginate_results(
         next_offset = offset + len(page)
         result["next_call"] = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
     return result
-
-
-def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_fields: dict[str, Any]) -> Task:
-    """Validate raw JSON patch fields through the Pydantic Task model.
-
-    Reads the current task, merges *raw_fields* into its data, then passes the
-    merged dict through ``Task.model_validate`` so field validators run (e.g.
-    ``validate_task_id_list`` normalises ``dependencies``).  Returns the
-    fully-validated Task model for the caller to write via ``backend.update_task``.
-
-    Args:
-        backend: Active TaskBackend instance.
-        plan_id: Backend-assigned plan identifier.
-        task_id: Task identifier within the plan.
-        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
-
-    Returns:
-        Fully-validated Task model with the patched fields applied.
-
-    Raises:
-        PlanNotFoundError: When plan_id cannot be resolved by the backend.
-        TaskNotFoundError: When task_id does not exist within the plan.
-        pydantic.ValidationError: When a field value fails Task model validation.
-    """
-    task_data = backend.read_task(plan_id, task_id)
-    current = Task.model_validate(task_data)
-    return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
 
 
 # Actions that require the ``plan`` parameter to be supplied.
@@ -585,74 +527,27 @@ def sam_task(
 
     match config.action:
         case "read":
-            plan_data = backend.read_plan(plan)
-            task_data = backend.read_task(plan, task)
-            task_model = Task.model_validate(task_data)
-            assignment = TaskAssignment(
-                plan_number=plan_data.get("plan_id", plan),
-                plan_slug=plan_data.get("feature") or None,
-                plan_goal=plan_data.get("goal") or None,
-                plan_context=plan_data.get("context") or None,
-                plan_acceptance_criteria=plan_data.get("acceptance_criteria")
-                or plan_data.get("acceptance-criteria")
-                or None,
-                task=task_model,
-            )
-            return assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
+            return _read_task(backend, plan, task)
 
         case "claim":
-            # ADR-2509-3: GistTaskLayer raises ConcurrentClaimUnsupportedError for
-            # local-only plans.  _claim_task_via_backend falls back to the local
-            # backend for single-agent workflows and returns a warning string.
-            claimed, claim_warning = _claim_task_via_backend(backend, plan, task)
-            if not claimed:
-                try:
-                    task_data = backend.read_task(plan, task)
-                    current_status = task_data["status"]
-                except (PlanNotFoundError, TaskNotFoundError, SamError):
-                    return {
-                        "claimed": False,
-                        "error": f"Cannot claim task '{task}': task is not available for claiming.",
-                    }
-                else:
-                    return {
-                        "claimed": False,
-                        "error": (
-                            f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."
-                        ),
-                    }
-            result: dict[str, object] = {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
-            if claim_warning is not None:
-                result["warnings"] = [claim_warning]
-            return result
+            return _claim_task(backend, plan, task)
 
         case "state":
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
-            backend.update_task_status(plan, task, config.status)
-            if config.status == TaskStatus.FAILED:
-                plan_data = backend.read_plan(plan)
-                tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
-                graph = DependencyGraph(tasks)
-                skipped: list[str] = graph.mark_downstream_skipped(task)
-                for skipped_task_id in skipped:
-                    backend.update_task_status(plan, skipped_task_id, TaskStatus.SKIPPED)
-                    backend.update_task_fields(plan, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
-                return {"id": task, "status": config.status, "skipped_downstream": skipped}
-            return {"id": task, "status": config.status}
+            return _update_task_status(backend, plan, task, config.status)
 
         case "update":
             if not isinstance(config, UpdateTaskConfig):
                 raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
-            update_config = config
-            if update_config.set_fields_json is not None:
-                validated_task = _validated_task_patch(backend, plan, task, update_config.set_fields_json)
-                backend.update_task(plan, validated_task)
-            if update_config.append_section is not None:
-                backend.append_task_section(
-                    plan, task, update_config.append_section, update_config.section_content or ""
-                )
-            return {"updated": True, "address": f"{plan}/{task}"}
+            return _update_task_fields(
+                backend,
+                plan,
+                task,
+                set_fields_json=config.set_fields_json,
+                append_section=config.append_section,
+                section_content=config.section_content,
+            )
 
         case _:  # pragma: no cover
             msg = f"sam_task: unhandled action '{config.action}'"
@@ -742,16 +637,14 @@ def sam_active_task(
             active_plan_id = Path(active.task_file_path).stem.split("-")[0]
             active_task_id = active.task_id
             task_backend = _get_backend(active_plan_dir)
-            if update_config.set_fields_json is not None:
-                validated_task = _validated_task_patch(
-                    task_backend, active_plan_id, active_task_id, update_config.set_fields_json
-                )
-                task_backend.update_task(active_plan_id, validated_task)
-            if update_config.append_section is not None:
-                task_backend.append_task_section(
-                    active_plan_id, active_task_id, update_config.append_section, update_config.section_content or ""
-                )
-            return {"updated": True, "address": f"{active_plan_id}/{active_task_id}"}
+            return _update_task_fields(
+                task_backend,
+                active_plan_id,
+                active_task_id,
+                set_fields_json=update_config.set_fields_json,
+                append_section=update_config.append_section,
+                section_content=update_config.section_content,
+            )
 
         case "clear":
             removed = ctx_backend.clear_active_task(resolved_session)
