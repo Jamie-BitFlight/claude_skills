@@ -31,7 +31,16 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan", "get_plan_status", "get_ready_tasks", "list_plans", "read_plan", "update_plan_fields"]
+__all__ = [
+    "append_task",
+    "create_plan",
+    "finalize_plan",
+    "get_plan_status",
+    "get_ready_tasks",
+    "list_plans",
+    "read_plan",
+    "update_plan_fields",
+]
 
 
 def create_plan(
@@ -391,3 +400,78 @@ def update_plan_fields(
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
     backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
     return {"updated": True, "address": plan}
+
+
+def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) -> dict[str, Any]:
+    """Append a single task to an existing plan.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: task
+    normalization (accepting either a Task model or a dict) and
+    delegation to ``backend.append_task``.
+
+    Pydantic handles alias normalisation (kebab-case → snake_case) at the
+    MCP boundary when the frontend passes a ``TaskDefinition`` (subclass of
+    ``Task``); no YAML parsing or re-normalisation is required downstream.
+
+    See the single-writer contract in ADR-1770-1: callers MUST serialize
+    writes to the same plan.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        task: Task model or dict to append. When a dict is provided, it
+            is normalized through ``Task.model_validate`` before being
+            passed to the backend. When a ``Task`` (or ``TaskDefinition``)
+            is provided, it is passed through unchanged.
+
+    Returns:
+        Dict with ``appended`` (``True``) and ``task_id`` keys, matching
+        the shape returned by ``backend.append_task``.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskValidationError: When the task ID duplicates an existing
+            task in the plan.
+        pydantic.ValidationError: When a dict task fails model validation.
+    """
+    if not isinstance(task, Task):
+        task = Task.model_validate(task)
+    return backend.append_task(plan, task)
+
+
+def finalize_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
+    """Transition a plan from drafting state to ready state.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation delegates to
+    ``backend.finalize_plan``.
+
+    The backend resolves the issue association internally from the plan
+    index; no caller-provided issue is needed at finalize time. After
+    finalize, the plan transitions from ``state="drafting"`` to
+    ``state="ready"`` and becomes available for execution via
+    ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
+
+    See ADR-1770-1 for the single-writer contract (callers must serialize
+    writes to the same plan).
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+
+    Returns:
+        Dict with ``finalized`` (``True``) and ``state`` (``"ready"``)
+        keys, matching the shape returned by
+        ``backend.finalize_plan``.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+    """
+    return backend.finalize_plan(plan)
