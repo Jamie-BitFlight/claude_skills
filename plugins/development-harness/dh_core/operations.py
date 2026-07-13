@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan", "read_plan"]
+__all__ = ["create_plan", "list_plans", "read_plan"]
 
 
 def create_plan(
@@ -172,3 +172,50 @@ def read_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
         ]
 
     return result
+
+
+def list_plans(
+    backend: TaskBackend, *, search: str | None = None, offset: int = 0, limit: int | None = None
+) -> dict[str, Any]:
+    """List all plans with optional search filtering and pagination.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: plan
+    listing, search filtering (delegated to the backend), summary-to-dict
+    mapping, and offset/limit pagination.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        search: Optional case-insensitive substring filter applied across
+            ``feature``, ``description``, and ``goal`` fields. Delegated
+            to the backend's ``list_plans`` method.
+        offset: Zero-based index of the first item to return.
+        limit: Maximum number of items to return. ``None`` means no limit.
+
+    Returns:
+        Dict with ``items`` (list of per-plan summary dicts), ``count``
+        (number of items in the current page), and ``total`` (total
+        number of plans after filtering). Each item dict contains
+        ``feature``, ``goal``, ``description``, ``task_count``, ``issue``,
+        and ``plan_ref``.
+    """
+    summaries = backend.list_plans(search=search)
+    all_items: list[dict[str, Any]] = [
+        {
+            "feature": s["feature"],
+            "goal": s["goal"],
+            "description": s["description"],
+            "task_count": s["task_count"],
+            "issue": s.get("issue"),
+            "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
+        }
+        for s in summaries
+    ]
+
+    total = len(all_items)
+    page = all_items[offset:] if limit is None else all_items[offset : offset + limit]
+
+    return {"items": page, "count": len(page), "total": total}

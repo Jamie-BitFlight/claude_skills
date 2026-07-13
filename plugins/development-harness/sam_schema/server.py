@@ -339,26 +339,29 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
 def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
     """List all plans with optional search and auto-pagination.
 
+    Thin adapter: delegates business logic to ``dh_core.operations.list_plans``
+    via a resolved backend, then applies MCP-specific token-budget
+    pagination via ``_paginate_results``.
+
     Returns:
         Paginated dict with ``items``, ``count``, ``pagination``, ``messages``,
         ``warnings``, and ``errors`` keys. Each item contains ``feature``,
         ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
+    from dh_core.operations import list_plans as _list_plans_op  # noqa: PLC0415
+
     backend = _get_backend(plan_dir)
-    summaries = backend.list_plans(search=config.search)
-    all_items: list[dict[str, Any]] = [
-        {
-            "feature": s["feature"],
-            "goal": s["goal"],
-            "description": s["description"],
-            "task_count": s["task_count"],
-            "issue": s.get("issue"),
-            "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
-        }
-        for s in summaries
-    ]
+    # Operations layer does search + summary mapping; pagination is deferred
+    # to _paginate_results which applies offset/limit + token-budget paging.
+    result = _list_plans_op(backend, search=config.search, offset=0, limit=None)
     return _paginate_results(
-        all_items, offset=config.offset, limit=config.limit, messages=[], warnings=[], errors=[], tool_name="sam_plan"
+        result["items"],
+        offset=config.offset,
+        limit=config.limit,
+        messages=[],
+        warnings=[],
+        errors=[],
+        tool_name="sam_plan",
     )
 
 

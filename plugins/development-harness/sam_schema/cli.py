@@ -344,13 +344,17 @@ def list_plans(
 ) -> None:
     """List all plans in plan_dir with optional search filtering.
 
-    Reads every plan file found in ``plan_dir``, applies optional search
-    filtering across ``feature``, ``description``, and ``goal`` fields
-    (case-insensitive), then returns a page of results.
+    Delegates to ``dh_core.operations.list_plans`` via a
+    ``LocalYamlTaskProvider`` backend so the CLI shares the same code
+    path as the MCP server.
 
     Output (JSON)::
 
-        {"items": [{"feature": "auth-system", "goal": "...", "task_count": 3, "path": "..."}], "count": 1, "total": 1}
+        {
+            "items": [{"feature": "auth-system", "goal": "...", "task_count": 3, "plan_ref": "..."}],
+            "count": 1,
+            "total": 1,
+        }
 
     Args:
         plan_dir: Directory to scan for plan files.
@@ -360,6 +364,10 @@ def list_plans(
         limit: Maximum number of items to return. Defaults to all results.
         output_format: Output serialization format (json or yaml).
     """
+    from dh_core.operations import list_plans as _list_plans_op  # noqa: PLC0415
+
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+
     plan_dir = _coerce_plan_dir(plan_dir)
     if output_format not in _OUTPUT_FORMATS:
         _err(f"Invalid format '{output_format}'. Must be one of: {', '.join(_OUTPUT_FORMATS)}")
@@ -367,53 +375,13 @@ def list_plans(
     if not plan_dir.exists():
         _err(f"Plan directory does not exist: {plan_dir}")
 
-    candidates: list[Path] = sorted(c for c in plan_dir.iterdir() if c.suffix in {".yaml", ".md"} or c.is_dir())
-
-    all_items: list[dict[str, object]] = []
-    for candidate in candidates:
-        try:
-            read_result = load_plan(candidate)
-            plan = read_result.plan
-            summary: dict[str, object] = {
-                "feature": plan.feature,
-                "goal": plan.goal,
-                "description": plan.description,
-                "task_count": len(plan.tasks),
-                "path": str(plan.source_path or candidate),
-            }
-            if search is None or _plan_summary_matches(summary, search):
-                all_items.append(summary)
-        except _PLAN_LOAD_ERRORS as exc:
-            typer.echo(f"Warning: skipping {candidate.name}: {exc}", err=True)
-
-    total = len(all_items)
-    page = all_items[offset:] if limit is None else all_items[offset : offset + limit]
-    result: dict[str, object] = {"items": page, "count": len(page), "total": total}
+    backend = LocalYamlTaskProvider(plan_dir)
+    result = _list_plans_op(backend, search=search, offset=offset, limit=limit)
 
     if output_format == "yaml":
         _output_yaml(result)
     else:
         _output_json(result)
-
-
-def _plan_summary_matches(summary: dict[str, object], search: str) -> bool:
-    """Return ``True`` if any searchable field in ``summary`` contains ``search``.
-
-    Matches case-insensitively against ``feature``, ``description``, and ``goal``.
-
-    Args:
-        summary: Plan summary dict with ``feature``, ``description``, ``goal`` keys.
-        search: Substring to search for.
-
-    Returns:
-        ``True`` if any field matches.
-    """
-    needle = search.lower()
-    for field in ("feature", "description", "goal"):
-        val = summary.get(field)
-        if val is not None and needle in str(val).lower():
-            return True
-    return False
 
 
 @app.command()

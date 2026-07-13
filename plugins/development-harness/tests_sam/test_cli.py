@@ -80,7 +80,7 @@ def test_list_returns_json_with_items_count_total(plan_dir: Path) -> None:
 
 
 def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
-    """Each item in list output has feature, goal, task_count, and path fields."""
+    """Each item in list output has feature, goal, task_count, and plan_ref fields."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -88,7 +88,7 @@ def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
     item = data["items"][0]
     assert "feature" in item
     assert "task_count" in item
-    assert "path" in item
+    assert "plan_ref" in item
 
 
 def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
