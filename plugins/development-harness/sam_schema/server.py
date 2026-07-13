@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 import tiktoken
 from dh_core.operations import (
+    append_task as _append_task,
     create_plan as _create_plan,
+    finalize_plan as _finalize_plan,
     get_plan_status as _get_plan_status,
     get_ready_tasks as _get_ready_tasks,
     list_plans as _list_plans_op,
@@ -384,10 +386,9 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
     """Append a single task to an existing plan.
 
-    Converts ``config.task`` (a validated :class:`TaskDefinition` model) to a
-    snake_case dict via ``model_dump`` and delegates to ``backend.append_task``.
-    Pydantic handles alias normalisation (kebab-case → snake_case) at the MCP
-    boundary; no YAML parsing or re-normalisation is required downstream.
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.append_task``. The operation handles
+    ``config.task`` conversion and ``backend.append_task`` delegation.
 
     See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
 
@@ -397,18 +398,23 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         plan_dir: Plan directory path passed through to ``_get_backend``.
 
     Returns:
-        Result dict from ``backend.append_task`` — shape: ``{"appended": True, "task_id": ...}``.
+        Result dict from ``dh_core.operations.append_task`` — shape:
+        ``{"appended": True, "task_id": ...}``.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
     """
     backend = _get_backend(plan_dir)
-    return backend.append_task(plan, config.task)
+    return _append_task(backend, plan, config.task)
 
 
 def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     """Transition a plan from drafting state to ready state.
+
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.finalize_plan``. The operation handles the
+    drafting → ready state transition via ``backend.finalize_plan``.
 
     See FinalizePlanConfig and #1770 for the ADR.
 
@@ -416,10 +422,11 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     no caller-provided issue is needed at finalize time.
 
     Returns:
-        Result dict from ``backend.finalize_plan`` — shape: ``{"finalized": True, "state": "ready"}``.
+        Result dict from ``dh_core.operations.finalize_plan`` — shape:
+        ``{"finalized": True, "state": "ready"}``.
     """
     backend = _get_backend(plan_dir)
-    return backend.finalize_plan(plan)
+    return _finalize_plan(backend, plan)
 
 
 def _require_plan(plan: str | None, action: str) -> str:
