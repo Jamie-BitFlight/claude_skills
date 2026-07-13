@@ -20,13 +20,17 @@ import tiktoken
 from dh_core.operations import (
     append_task as _append_task,
     claim_task as _claim_task,
+    clear_active_task as _clear_active_task,
     create_plan as _create_plan,
     finalize_plan as _finalize_plan,
+    get_active_task as _get_active_task,
     get_plan_status as _get_plan_status,
     get_ready_tasks as _get_ready_tasks,
     list_plans as _list_plans_op,
     read_plan as _read_plan,
     read_task as _read_task,
+    set_active_task as _set_active_task,
+    update_active_task as _update_active_task,
     update_plan_fields as _update_plan_fields,
     update_task_fields as _update_task_fields,
     update_task_status as _update_task_status,
@@ -607,20 +611,18 @@ def sam_active_task(
 
     match config.action:
         case "get":
-            active = ctx_backend.get_active_task(resolved_session)
-            if active is None:
-                return {"active_task": None}
-            return {"active_task": active.model_dump(mode="json")}
+            return _get_active_task(ctx_backend, resolved_session)
 
         case "set":
             if not isinstance(config, SetActiveTaskConfig):
                 raise TypeError(f"Expected SetActiveTaskConfig, got {type(config).__name__}")
-            active = ctx_backend.set_active_task(
-                resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
+            return _set_active_task(
+                ctx_backend, resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
             )
-            return {"active_task": active.model_dump(mode="json")}
 
         case "update":
+            if not isinstance(config, UpdateActiveTaskConfig):
+                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
             active = ctx_backend.get_active_task(resolved_session)
             if active is None:
                 msg = (
@@ -628,27 +630,18 @@ def sam_active_task(
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
                 raise ToolError(msg)
-            if not isinstance(config, UpdateActiveTaskConfig):
-                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
-            update_config = config
-            # ActiveTaskContext stores task_file_path and task_id.
-            # Derive plan_id and plan_dir from the path rather than storing them separately.
-            active_plan_dir = str(Path(active.task_file_path).parent)
-            active_plan_id = Path(active.task_file_path).stem.split("-")[0]
-            active_task_id = active.task_id
-            task_backend = _get_backend(active_plan_dir)
-            return _update_task_fields(
+            task_backend = _get_backend(str(Path(active.task_file_path).parent))
+            return _update_active_task(
+                ctx_backend,
+                resolved_session,
                 task_backend,
-                active_plan_id,
-                active_task_id,
-                set_fields_json=update_config.set_fields_json,
-                append_section=update_config.append_section,
-                section_content=update_config.section_content,
+                set_fields_json=config.set_fields_json,
+                append_section=config.append_section,
+                section_content=config.section_content,
             )
 
         case "clear":
-            removed = ctx_backend.clear_active_task(resolved_session)
-            return {"cleared": removed}
+            return _clear_active_task(ctx_backend, resolved_session)
 
         case _:  # pragma: no cover
             msg = f"sam_active_task: unhandled action '{config.action}'"
