@@ -22,13 +22,14 @@ from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
 import tiktoken
+from dh_core import operations
 from fastmcp import Context, FastMCP
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
-from . import models as _models, operations, sync_engine as _sync_engine
+from . import models as _models, sync_engine as _sync_engine
 from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
