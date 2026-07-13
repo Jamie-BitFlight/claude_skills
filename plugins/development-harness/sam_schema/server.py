@@ -24,6 +24,7 @@ from dh_core.operations import (
     get_ready_tasks as _get_ready_tasks,
     list_plans as _list_plans_op,
     read_plan as _read_plan,
+    update_plan_fields as _update_plan_fields,
 )
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -51,7 +52,7 @@ from sam_schema.core.context_config import ContextConfig, create_context_backend
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
+from sam_schema.core.models import PlanState, Task, TaskAssignment, TaskStatus
 from sam_schema.core.plan_id_index import create_plan_id_index
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
@@ -269,32 +270,6 @@ def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_
     return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
 
 
-def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
-    """Validate raw JSON patch fields through the Pydantic Plan model.
-
-    Reads the current plan, merges *raw_fields* into its data, then passes the
-    merged dict through ``Plan.model_validate`` so field validators run (e.g.
-    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
-    fully-validated Plan model so callers use normalized field values, not the
-    raw input.
-
-    Args:
-        backend: Active TaskBackend instance.
-        plan_id: Backend-assigned plan identifier.
-        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
-
-    Returns:
-        Fully-validated Plan model with the patched fields applied.
-
-    Raises:
-        PlanNotFoundError: When plan_id cannot be resolved by the backend.
-        pydantic.ValidationError: When a field value fails Plan model validation.
-    """
-    plan_data = backend.read_plan(plan_id)
-    current = Plan.model_validate(plan_data)
-    return Plan.model_validate({**current.model_dump(), **raw_fields})
-
-
 # Actions that require the ``plan`` parameter to be supplied.
 _SAM_PLAN_REQUIRED_ACTIONS: frozenset[str] = frozenset({"read", "status", "ready", "update", "append_task", "finalize"})
 
@@ -395,18 +370,15 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
     """Update plan-level context and/or fields.
 
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates to
+    ``dh_core.operations.update_plan_fields``. The operation handles raw field
+    validation through the Plan model, backend delegation, and response assembly.
+
     Returns:
         Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
     """
     backend = _get_backend(plan_dir)
-    plan_fields: dict[str, Any] | None = None
-    if config.set_fields_json is not None:
-        raw_fields: dict[str, Any] = config.set_fields_json
-        validated = _validated_plan_patch(backend, plan, raw_fields)
-        # by_alias=True: raw_fields uses kebab-case keys (MCP wire convention); alias keys must match
-        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in raw_fields}
-    backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
-    return {"updated": True, "address": plan}
+    return _update_plan_fields(backend, plan, context=config.context, set_fields=config.set_fields_json)
 
 
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan", "get_plan_status", "get_ready_tasks", "list_plans", "read_plan"]
+__all__ = ["create_plan", "get_plan_status", "get_ready_tasks", "list_plans", "read_plan", "update_plan_fields"]
 
 
 def create_plan(
@@ -317,3 +317,77 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> d
         msg = f"get_plan_status must return str for 'feature', got {type(feature).__name__}"
         raise TypeError(msg)
     return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}
+
+
+def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
+    """Validate raw JSON patch fields through the Pydantic Plan model.
+
+    Reads the current plan, merges *raw_fields* into its data, then passes the
+    merged dict through ``Plan.model_validate`` so field validators run (e.g.
+    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
+    fully-validated Plan model so callers use normalized field values, not the
+    raw input.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan_id: Backend-assigned plan identifier.
+        raw_fields: JSON-decoded patch dict from ``set_fields``.
+
+    Returns:
+        Fully-validated Plan model with the patched fields applied.
+
+    Raises:
+        PlanNotFoundError: When plan_id cannot be resolved by the backend.
+        pydantic.ValidationError: When a field value fails Plan model validation.
+    """
+    plan_data = backend.read_plan(plan_id)
+    current = Plan.model_validate(plan_data)
+    return Plan.model_validate({**current.model_dump(), **raw_fields})
+
+
+def update_plan_fields(
+    backend: TaskBackend, plan: str, *, context: str | None = None, set_fields: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Update plan-level context and/or fields on the backend.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: raw field
+    validation through the Plan model (when ``set_fields`` is provided),
+    delegation to ``backend.update_plan_fields``, and response assembly.
+
+    When ``set_fields`` is provided, the raw fields are validated by reading
+    the current plan, merging the raw fields into its data, passing the
+    merged dict through ``Plan.model_validate`` (so field validators run),
+    and extracting only the requested keys from the validated model. This
+    ensures the backend receives normalized field values, not raw input.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        context: Optional plan-level context narrative (markdown). When
+            ``None``, the plan's existing context is not modified.
+        set_fields: Optional dict of raw field-value pairs to patch onto
+            the plan. Keys use kebab-case (wire convention). Values are
+            normalized through the Plan model before being passed to the
+            backend. When ``None``, no plan-level fields are modified.
+
+    Returns:
+        Dict with ``updated`` (``True``) and ``address`` (the plan address
+        string) keys.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        pydantic.ValidationError: When a field value fails Plan model
+            validation.
+    """
+    plan_fields: dict[str, Any] | None = None
+    if set_fields is not None:
+        validated = _validated_plan_patch(backend, plan, set_fields)
+        # by_alias=True: set_fields uses kebab-case keys (wire convention);
+        # alias keys must match so we extract only the requested keys.
+        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
+    backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+    return {"updated": True, "address": plan}
