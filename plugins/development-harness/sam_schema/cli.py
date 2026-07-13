@@ -270,21 +270,29 @@ def _output_rich_status(status_data: dict[str, object]) -> None:
         console.print(f"Ready tasks: {', '.join(ready_list)}")
 
 
-def _read_plan_only(plan_path: Path, output_format: str) -> None:
+def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
     """Read a plan-only address and emit its fields.
 
+    Delegates to dh_core.operations.read_plan via a LocalYamlTaskProvider
+    backend so the CLI shares the same code path as the MCP server.
+
     Args:
-        plan_path: Resolved path to the plan file or directory.
+        plan_ref: Plan address component (e.g. ``"1"``, ``"auth-system"``).
+        plan_dir: Directory to search for plan files.
         output_format: One of ``json``, ``yaml``, ``rich``.
     """
-    try:
-        result = load_plan(plan_path)
-    except FileNotFoundError as exc:
-        _err(str(exc))
-    except FormatDetectionError as exc:
-        _err(str(exc), exit_code=2)
+    from dh_core.operations import read_plan as _read_plan  # noqa: PLC0415
 
-    data = result.plan.model_dump(mode="json", by_alias=True, exclude_none=True)
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.exceptions import PlanNotFoundError  # noqa: PLC0415
+
+    backend = LocalYamlTaskProvider(plan_dir)
+    try:
+        data = _read_plan(backend, plan_ref)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
+        return
+
     match output_format:
         case "json":
             _output_json(data)
@@ -437,12 +445,11 @@ def read(
     except ValueError as exc:
         _err(str(exc))
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
-
     if task_ref is None:
-        _read_plan_only(plan_path, output_format)
+        _read_plan_only(plan_ref, plan_dir, output_format)
         return
 
+    plan_path = _resolve_plan(plan_ref, plan_dir)
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
     _read_task_assignment(plan_path, task_id, output_format)
 

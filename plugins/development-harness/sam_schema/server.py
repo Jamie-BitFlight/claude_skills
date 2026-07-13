@@ -310,24 +310,14 @@ def _require_plan(plan: str | None, action: str) -> str:
 def _sam_plan_read(plan: str, plan_dir: str) -> dict:
     """Return Plan fields for the given plan address.
 
-    When ``GistTaskLayer`` serves the plan from local cache (``last_read_source == "local"``),
-    a ``warnings`` key is added to the response with the annotated-source warning string
-    (ADR-2509-5).  This surfaces the degraded-source status to the MCP caller without
-    changing the response shape — the ``warnings`` key is additive.
+    Thin adapter: resolves the backend and delegates to dh_core.operations.
+    The operation handles plan retrieval, Plan model conversion, dict
+    serialization, and source-degradation warning surfacing.
     """
+    from dh_core.operations import read_plan as _read_plan  # noqa: PLC0415
+
     backend = _get_backend(plan_dir)
-    plan_data = backend.read_plan(plan)
-    plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
-    plan_model = Plan.model_validate(plan_dict)
-    result = plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
-
-    # Surface source annotation when plan was served from local cache.
-    if isinstance(backend, GistTaskLayer) and backend.last_read_source == "local":
-        result["warnings"] = [
-            f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
-        ]
-
-    return result
+    return _read_plan(backend, plan)
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:

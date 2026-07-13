@@ -24,14 +24,14 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.exceptions import ArtifactWriteError
-from sam_schema.core.models import Task
+from sam_schema.core.models import Plan, Task
 
 if TYPE_CHECKING:
     from dh_core.protocols import TaskBackend
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan"]
+__all__ = ["create_plan", "read_plan"]
 
 
 def create_plan(
@@ -129,5 +129,46 @@ def create_plan(
 
     if warnings:
         result["warnings"] = warnings
+
+    return result
+
+
+def read_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
+    """Read a plan by its address and return a serialized dict.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: plan
+    retrieval, Plan model conversion, dict serialization, and
+    source-degradation warning surfacing.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+
+    Returns:
+        Dict with the plan fields (serialized via the Plan model with
+        ``by_alias=True, exclude_none=True``). When the backend served
+        the plan from local cache, a ``warnings`` key is added with a
+        degraded-source message.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+    """
+    plan_data = backend.read_plan(plan)
+    plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
+    plan_model = Plan.model_validate(plan_dict)
+    result = plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    # Surface source annotation when plan was served from local cache.
+    # Use getattr to stay backend-agnostic — not all backends have
+    # last_read_source (only GistTaskLayer does).
+    last_read_source = getattr(backend, "last_read_source", None)
+    if last_read_source == "local":
+        result["warnings"] = [
+            f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
+        ]
 
     return result
