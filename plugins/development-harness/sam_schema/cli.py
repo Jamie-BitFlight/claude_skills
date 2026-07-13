@@ -31,7 +31,7 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -47,7 +47,7 @@ from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
-from sam_schema.core.models import PlanStatus, TaskStatus
+from sam_schema.core.models import TaskStatus
 from sam_schema.core.query import (
     claim_task,
     get_plan_status,
@@ -60,6 +60,9 @@ from sam_schema.core.query import (
 )
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (FileNotFoundError, FormatDetectionError, ValueError, TypeError)
 
@@ -151,37 +154,47 @@ def _resolve_plan(address_part: str, plan_dir: Path) -> Path:
         _err(str(exc))
 
 
-def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> PlanStatus:
-    """Resolve ``plan_address`` to a path and return its plan status.
+def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str, object]:
+    """Resolve ``plan_address`` to a plan and return its status via the operations layer.
 
     Accepts either a direct filesystem path (e.g. ``plan/tasks-696-slug.md``)
     or a structured plan address (e.g. ``P696``, ``auth-system``).  Direct paths
     are detected by checking whether the argument exists on disk before falling
     back to address parsing.
 
+    Delegates to ``dh_core.operations.get_plan_status`` via a
+    ``LocalYamlTaskProvider`` backend so the CLI shares the same code path
+    as the MCP server, including the drafting-state check.
+
     Args:
         plan_address: Plan address string or filesystem path.
         plan_dir: Directory to search when resolving structured addresses.
 
     Returns:
-        ``PlanStatus`` for the resolved plan.
+        Status dict from the operations layer. When the plan is in drafting
+        state, returns ``{"drafting": True, "state": "drafting"}``.
 
     Raises:
         SystemExit(1): If the path or address cannot be resolved.
         SystemExit(2): If the format cannot be detected.
     """
-    direct = Path(plan_address)
-    if direct.exists() and (direct.is_file() or direct.is_dir()):
-        plan_path: Path = direct
-    else:
-        try:
-            plan_ref, _ = parse_address(plan_address)
-        except ValueError as exc:
-            _err(str(exc))
-        plan_path = _resolve_plan(plan_ref, plan_dir)
+    from dh_core.operations import get_plan_status as _get_plan_status_op  # noqa: PLC0415
 
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.exceptions import PlanNotFoundError  # noqa: PLC0415
+
+    # Accept structured addresses only (P{N}, slug). The backend resolves
+    # the address to whatever storage it uses — never pass filesystem paths.
     try:
-        return get_plan_status(plan_path)
+        plan_ref, _ = parse_address(plan_address)
+    except ValueError as exc:
+        _err(str(exc))
+
+    backend = LocalYamlTaskProvider(plan_dir)
+    try:
+        return _get_plan_status_op(backend, plan_ref)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
     except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
@@ -232,7 +245,7 @@ def _output_rich_status(status_data: dict[str, object]) -> None:
     """Print plan status as Rich tables.
 
     Args:
-        status_data: PlanStatus dict from ``model_dump(mode="json")``.
+        status_data: Status dict from the operations layer.
     """
     console = Console()
 
@@ -557,9 +570,15 @@ def status(
     if plan_address is None:
         _err("Provide a plan address or use --all to list every plan")
 
-    plan_status = _get_plan_status_for_address(plan_address, plan_dir)
+    data = _get_plan_status_for_address(plan_address, plan_dir)
 
-    data = plan_status.model_dump(mode="json")
+    if data.get("drafting"):
+        if output_format == "rich":
+            console = Console()
+            console.print("Plan is in drafting state.")
+        else:
+            _output_json(data)
+        return
 
     if output_format == "rich":
         _output_rich_status(data)

@@ -368,19 +368,13 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
 def _sam_plan_status(plan: str, plan_dir: str) -> dict:
     """Return plan-level progress summary including autonomy mode.
 
-    Calls ``get_plan_status`` for computed metrics and ``read_plan`` to
-    surface the ``autonomy`` field, which lives on the Plan model and is
-    not part of ``PlanStatus``.  Follows the same pattern as
-    ``_sam_plan_ready``.
+    Thin adapter that resolves the backend via ``_get_backend`` and
+    delegates to ``dh_core.operations.get_plan_status``.
     """
+    from dh_core.operations import get_plan_status as _get_plan_status  # noqa: PLC0415
+
     backend = _get_backend(plan_dir)
-    status = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        return dict(_DRAFTING_MARKER_RESPONSE)
-    plan_data = backend.read_plan(plan)
-    result = dict(status)
-    result["autonomy"] = plan_data.get("autonomy", "full_auto")
-    return result
+    return _get_plan_status(backend, plan)
 
 
 def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:

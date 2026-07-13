@@ -24,14 +24,14 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.exceptions import ArtifactWriteError
-from sam_schema.core.models import Plan, Task
+from sam_schema.core.models import Plan, PlanState, Task
 
 if TYPE_CHECKING:
     from dh_core.protocols import TaskBackend
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan", "list_plans", "read_plan"]
+__all__ = ["create_plan", "get_plan_status", "list_plans", "read_plan"]
 
 
 def create_plan(
@@ -219,3 +219,40 @@ def list_plans(
     page = all_items[offset:] if limit is None else all_items[offset : offset + limit]
 
     return {"items": page, "count": len(page), "total": total}
+
+
+def get_plan_status(backend: TaskBackend, plan: str) -> dict[str, Any]:
+    """Return plan-level progress summary including autonomy mode.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: status
+    retrieval, drafting-state check, and autonomy field enrichment.
+
+    When the plan is in the ``DRAFTING`` state, a drafting marker dict
+    is returned immediately (matching the MCP server's
+    ``_DRAFTING_MARKER_RESPONSE`` shape). This prevents dispatching a
+    partial plan.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+
+    Returns:
+        When the plan is drafting: ``{"drafting": True, "state": "drafting"}``.
+        Otherwise: a dict with the status fields from
+        ``backend.get_plan_status`` plus an ``autonomy`` key sourced from
+        ``backend.read_plan`` (defaulting to ``"full_auto"`` when absent).
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+    """
+    status = backend.get_plan_status(plan)
+    if status.get("state") == PlanState.DRAFTING:
+        return {"drafting": True, "state": PlanState.DRAFTING}
+    plan_data = backend.read_plan(plan)
+    result = dict(status)
+    result["autonomy"] = plan_data.get("autonomy", "full_auto")
+    return result
