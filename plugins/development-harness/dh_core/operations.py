@@ -20,4 +20,114 @@ such calls.
 
 from __future__ import annotations
 
-__all__: list[str] = []
+import logging
+from typing import TYPE_CHECKING, Any
+
+from sam_schema.core.exceptions import ArtifactWriteError
+from sam_schema.core.models import Task
+
+if TYPE_CHECKING:
+    from dh_core.protocols import TaskBackend
+
+_log = logging.getLogger(__name__)
+
+__all__ = ["create_plan"]
+
+
+def create_plan(
+    backend: TaskBackend,
+    *,
+    slug: str,
+    goal: str,
+    tasks: list[dict[str, Any]] | list[Any],
+    context: str | None = None,
+    issue: int | None = None,
+) -> dict[str, Any]:
+    """Create a new plan with the given slug, goal, and task definitions.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: plan
+    creation, artifact write error handling, and response assembly.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        slug: Human-readable identifier slug for the plan.
+        goal: One-sentence goal statement for the plan.
+        tasks: List of task definitions (dicts or Task models).
+        context: Optional plan-level context narrative (markdown).
+        issue: Optional GitHub issue number to associate with the plan.
+
+    Returns:
+        Dict with ``plan_id``, ``task_count``, and optional ``warnings``
+        keys. On Gist write failure, returns a dict with ``error``,
+        ``reason``, ``plan_id``, ``issue``, ``local_path``, and ``hint``
+        keys (structured error so the caller knows the plan is not
+        portable).
+
+    Raises:
+        ValueError: When any task definition fails schema validation.
+        OSError: When the local filesystem write fails.
+    """
+    # Normalize tasks to Task models if they aren't already.
+    # The CLI passes raw dicts (from YAML), the MCP server passes
+    # TaskDefinition Pydantic models. The backend expects Task models.
+    normalized_tasks: list[Task] = []
+    for t in tasks:
+        if isinstance(t, Task):
+            normalized_tasks.append(t)
+        elif isinstance(t, dict):
+            # Accept "task" key as the task id (YAML frontmatter convention)
+            normalized = {**t, "id": t["task"]} if "task" in t and "id" not in t else t
+            normalized_tasks.append(Task.model_validate(normalized))
+        elif hasattr(t, "model_dump"):
+            # Pydantic models with model_dump (e.g. TaskDefinition)
+            normalized_tasks.append(Task.model_validate(t.model_dump()))
+        else:
+            normalized_tasks.append(Task.model_validate(dict(t)))
+
+    try:
+        plan_data = backend.create_plan(slug=slug, goal=goal, tasks=normalized_tasks, context=context, issue=issue)
+    except ArtifactWriteError as exc:
+        # Gist write failed — return structured error (ADR-2509-5).
+        # The plan may exist locally (local_backend wrote it), but it
+        # is NOT durable.
+        _log.error("create_plan: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
+        return {
+            "error": "create_plan failed: artifact write to Gist unsuccessful",
+            "reason": exc.reason,
+            "plan_id": exc.plan_id,
+            "issue": exc.issue,
+            "local_path": None,
+            "hint": "The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist.",
+        }
+
+    plan_id_str = plan_data["plan_id"]
+    result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"])}
+
+    # Compute plan_ref: #{issue},{plan_id} when issue is set, else plan_id.
+    if issue is not None:
+        result["plan_ref"] = f"#{issue},{plan_id_str}"
+    else:
+        result["plan_ref"] = plan_id_str
+
+    # Collect warnings: local-only non-portability + backend-specific warnings.
+    warnings: list[str] = []
+    if issue is None:
+        warnings.append(
+            f"Plan {plan_id_str} has no associated issue — stored locally only. "
+            "This plan is not portable across environments and cannot be retrieved from CI "
+            "or fresh checkouts. Associate a GitHub issue to enable portability."
+        )
+
+    # GistTaskLayer-specific: surface index warnings if present.
+    last_warnings = getattr(backend, "last_warnings", None)
+    if last_warnings:
+        warnings.extend(last_warnings)
+
+    if warnings:
+        result["warnings"] = warnings
+
+    return result

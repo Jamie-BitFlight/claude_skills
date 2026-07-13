@@ -50,7 +50,6 @@ from sam_schema.core.addressing import AddressingError, parse_address, resolve_p
 from sam_schema.core.models import PlanStatus, TaskStatus
 from sam_schema.core.query import (
     claim_task,
-    create_plan,
     get_plan_status,
     get_ready_tasks,
     get_task,
@@ -640,23 +639,26 @@ def create(
             else:
                 _err("stdin must be YAML with a top-level 'tasks:' list or a bare list")
 
+    # Delegate to dh_core.operations via a LocalYamlTaskProvider backend.
+    from dh_core.operations import create_plan as _create_plan_op  # noqa: PLC0415
+
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        plan = create_plan(slug=slug, goal=goal, tasks=tasks, plan_dir=plan_dir, context=context, issue=issue)
+        result = _create_plan_op(backend, slug=slug, goal=goal, tasks=tasks, context=context, issue=issue)
     except ValueError as exc:
         _err(str(exc))
     except OSError as exc:
         _err(str(exc), exit_code=2)
 
-    source_path = plan.source_path
-    path_str = str(source_path) if source_path is not None else str(plan_dir)
-    # Extract UUID-based plan_id from written path stem (e.g. Pa1b2c3d4-slug.yaml -> Pa1b2c3d4)
-    plan_id: str | None = None
-    if source_path is not None:
-        m = re.match(r"^(P[0-9a-f]+)-", source_path.name, re.IGNORECASE)
-        if m:
-            plan_id = m.group(1)
+    if "error" in result:
+        _err(result["error"], exit_code=2)
 
-    result: dict[str, object] = {"path": path_str, "plan_id": plan_id, "task_count": len(plan.tasks)}
+    # Add path for CLI output (operations layer doesn't return it).
+    plan_id = result.get("plan_id")
+    path_str = str(plan_dir / f"{plan_id}-{slug}.yaml") if plan_id else str(plan_dir)
+    result["path"] = path_str
     _output_json(result)
 
 

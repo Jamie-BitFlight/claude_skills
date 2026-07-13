@@ -42,13 +42,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import (
-    ArtifactWriteError,
-    ConcurrentClaimUnsupportedError,
-    PlanNotFoundError,
-    SamError,
-    TaskNotFoundError,
-)
+from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 from sam_schema.core.plan_id_index import create_plan_id_index
@@ -339,55 +333,17 @@ def _sam_plan_read(plan: str, plan_dir: str) -> dict:
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     """Create a new plan from a typed list of task definitions.
 
+    Thin adapter: resolves the backend and delegates to dh_core.operations.
+
     Returns:
-        On success: dict with ``plan_id``, ``plan_ref``, ``task_count``, and optional
-        ``warnings`` keys.  ``plan_ref`` is ``#{issue},{plan_id}`` when an issue is
-        set, or just ``plan_id`` otherwise.
-
-        On Gist write failure: dict with ``error``, ``reason``, ``plan_id``, ``issue``,
-        ``local_path``, and ``hint`` keys (structured error — MCP caller sees ``error``
-        key and knows the plan is not portable).
+        Dict from dh_core.operations.create_plan().
     """
+    from dh_core.operations import create_plan as _create_plan  # noqa: PLC0415
+
     backend = _get_backend(plan_dir)
-    try:
-        plan_data = backend.create_plan(
-            slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
-        )
-    except ArtifactWriteError as exc:
-        # Gist write failed — return structured error (ADR-2509-5).
-        # The plan may exist locally (local_backend wrote it), but it is NOT durable.
-        _log.error("sam_plan create: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
-        return {
-            "error": "sam_plan create failed: artifact write to Gist unsuccessful",
-            "reason": exc.reason,
-            "plan_id": exc.plan_id,
-            "issue": exc.issue,
-            "local_path": None,
-            "hint": ("The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist."),
-        }
-
-    plan_id_str = plan_data["plan_id"]
-    plan_ref: str | None = (
-        (f"#{config.issue},{plan_id_str}" if config.issue is not None else plan_id_str) if plan_id_str else None
+    return _create_plan(
+        backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
     )
-    result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"]), "plan_ref": plan_ref}
-
-    # Collect warnings: local-only non-portability + any GistTaskLayer index warnings.
-    warnings: list[str] = []
-    if config.issue is None:
-        warnings.append(
-            f"Plan {plan_id_str} has no associated issue — stored locally only. "
-            "This plan is not portable across environments and cannot be retrieved from CI "
-            "or fresh checkouts. Associate a GitHub issue to enable portability."
-        )
-
-    if isinstance(backend, GistTaskLayer) and backend.last_warnings:
-        warnings.extend(backend.last_warnings)
-
-    if warnings:
-        result["warnings"] = warnings
-
-    return result
 
 
 def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
