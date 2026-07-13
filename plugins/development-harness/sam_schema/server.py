@@ -17,24 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import tiktoken
-from dh_core.operations import (
-    append_task as _append_task,
-    claim_task as _claim_task,
-    clear_active_task as _clear_active_task,
-    create_plan as _create_plan,
-    finalize_plan as _finalize_plan,
-    get_active_task as _get_active_task,
-    get_plan_status as _get_plan_status,
-    get_ready_tasks as _get_ready_tasks,
-    list_plans as _list_plans_op,
-    read_plan as _read_plan,
-    read_task as _read_task,
-    set_active_task as _set_active_task,
-    update_active_task as _update_active_task,
-    update_plan_fields as _update_plan_fields,
-    update_task_fields as _update_task_fields,
-    update_task_status as _update_task_status,
-)
+from dh_core import operations
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -245,7 +228,7 @@ def _sam_plan_read(plan: str, plan_dir: str) -> dict:
     serialization, and source-degradation warning surfacing.
     """
     backend = _get_backend(plan_dir)
-    return _read_plan(backend, plan)
+    return operations.read_plan(backend, plan)
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
@@ -257,7 +240,7 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
         Dict from dh_core.operations.create_plan().
     """
     backend = _get_backend(plan_dir)
-    return _create_plan(
+    return operations.create_plan(
         backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
     )
 
@@ -277,7 +260,7 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
     backend = _get_backend(plan_dir)
     # Operations layer does search + summary mapping; pagination is deferred
     # to _paginate_results which applies offset/limit + token-budget paging.
-    result = _list_plans_op(backend, search=config.search, offset=0, limit=None)
+    result = operations.list_plans(backend, search=config.search, offset=0, limit=None)
     return _paginate_results(
         result["items"],
         offset=config.offset,
@@ -296,7 +279,7 @@ def _sam_plan_status(plan: str, plan_dir: str) -> dict:
     delegates to ``dh_core.operations.get_plan_status``.
     """
     backend = _get_backend(plan_dir)
-    return _get_plan_status(backend, plan)
+    return operations.get_plan_status(backend, plan)
 
 
 def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
@@ -312,7 +295,7 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
         keys. When the plan is drafting, returns a drafting marker.
     """
     backend = _get_backend(plan_dir)
-    return _get_ready_tasks(backend, plan, full=config.full)
+    return operations.get_ready_tasks(backend, plan, full=config.full)
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
@@ -326,7 +309,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
         Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
     """
     backend = _get_backend(plan_dir)
-    return _update_plan_fields(backend, plan, context=config.context, set_fields=config.set_fields_json)
+    return operations.update_plan_fields(backend, plan, context=config.context, set_fields=config.set_fields_json)
 
 
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
@@ -352,7 +335,7 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         TaskValidationError: When the task definition fails model validation.
     """
     backend = _get_backend(plan_dir)
-    return _append_task(backend, plan, config.task)
+    return operations.append_task(backend, plan, config.task)
 
 
 def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
@@ -372,7 +355,7 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
         ``{"finalized": True, "state": "ready"}``.
     """
     backend = _get_backend(plan_dir)
-    return _finalize_plan(backend, plan)
+    return operations.finalize_plan(backend, plan)
 
 
 def _require_plan(plan: str | None, action: str) -> str:
@@ -531,20 +514,20 @@ def sam_task(
 
     match config.action:
         case "read":
-            return _read_task(backend, plan, task)
+            return operations.read_task(backend, plan, task)
 
         case "claim":
-            return _claim_task(backend, plan, task)
+            return operations.claim_task(backend, plan, task)
 
         case "state":
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
-            return _update_task_status(backend, plan, task, config.status)
+            return operations.update_task_status(backend, plan, task, config.status)
 
         case "update":
             if not isinstance(config, UpdateTaskConfig):
                 raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
-            return _update_task_fields(
+            return operations.update_task_fields(
                 backend,
                 plan,
                 task,
@@ -611,12 +594,12 @@ def sam_active_task(
 
     match config.action:
         case "get":
-            return _get_active_task(ctx_backend, resolved_session)
+            return operations.get_active_task(ctx_backend, resolved_session)
 
         case "set":
             if not isinstance(config, SetActiveTaskConfig):
                 raise TypeError(f"Expected SetActiveTaskConfig, got {type(config).__name__}")
-            return _set_active_task(
+            return operations.set_active_task(
                 ctx_backend, resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
             )
 
@@ -631,7 +614,7 @@ def sam_active_task(
                 )
                 raise ToolError(msg)
             task_backend = _get_backend(str(Path(active.task_file_path).parent))
-            return _update_active_task(
+            return operations.update_active_task(
                 ctx_backend,
                 resolved_session,
                 task_backend,
@@ -641,7 +624,7 @@ def sam_active_task(
             )
 
         case "clear":
-            return _clear_active_task(ctx_backend, resolved_session)
+            return operations.clear_active_task(ctx_backend, resolved_session)
 
         case _:  # pragma: no cover
             msg = f"sam_active_task: unhandled action '{config.action}'"

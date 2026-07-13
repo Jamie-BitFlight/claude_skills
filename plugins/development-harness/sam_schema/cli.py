@@ -45,18 +45,7 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 import dh_paths
 import typer
-from dh_core.operations import (
-    append_task as _append_task_op,
-    claim_task as _claim_task_op,
-    create_plan as _create_plan_op,
-    finalize_plan as _finalize_plan_op,
-    get_plan_status as _get_plan_status_op,
-    get_ready_tasks as _get_ready_tasks_op,
-    list_plans as _list_plans_op,
-    read_plan as _read_plan_op,
-    read_task as _read_task_op,
-    update_task_status as _update_task_status_op,
-)
+from dh_core import operations
 from rich.console import Console
 from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
@@ -192,7 +181,7 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        return _get_plan_status_op(backend, plan_ref)
+        return operations.get_plan_status(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -296,7 +285,7 @@ def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
     """
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        data = _read_plan_op(backend, plan_ref)
+        data = operations.read_plan(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
         return
@@ -325,7 +314,7 @@ def _read_task_assignment(plan_ref: str, plan_dir: Path, task_id: str, output_fo
     """
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        data = _read_task_op(backend, plan_ref, task_id)
+        data = operations.read_task(backend, plan_ref, task_id)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except TaskNotFoundError as exc:
@@ -387,7 +376,7 @@ def list_plans(
         _err(f"Plan directory does not exist: {plan_dir}")
 
     backend = LocalYamlTaskProvider(plan_dir)
-    result = _list_plans_op(backend, search=search, offset=offset, limit=limit)
+    result = operations.list_plans(backend, search=search, offset=offset, limit=limit)
 
     if output_format == "yaml":
         _output_yaml(result)
@@ -466,7 +455,7 @@ def state(
 
     # Read current task to capture old status for the confirmation message.
     try:
-        assignment = _read_task_op(backend, plan_ref, task_id)
+        assignment = operations.read_task(backend, plan_ref, task_id)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except TaskNotFoundError as exc:
@@ -480,7 +469,7 @@ def state(
     old_status = task_data.get("status", "unknown")
 
     try:
-        result = _update_task_status_op(backend, plan_ref, task_id, parsed_status)
+        result = operations.update_task_status(backend, plan_ref, task_id, parsed_status)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except TaskNotFoundError as exc:
@@ -519,7 +508,7 @@ def ready(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = _get_ready_tasks_op(backend, plan_ref)
+        result = operations.get_ready_tasks(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -653,7 +642,7 @@ def create(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = _create_plan_op(backend, slug=slug, goal=goal, tasks=tasks, context=context, issue=issue)
+        result = operations.create_plan(backend, slug=slug, goal=goal, tasks=tasks, context=context, issue=issue)
     except ValueError as exc:
         _err(str(exc))
     except OSError as exc:
@@ -780,7 +769,7 @@ def claim(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = _claim_task_op(backend, plan_ref, task_id)
+        result = operations.claim_task(backend, plan_ref, task_id)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except TaskNotFoundError as exc:
@@ -926,7 +915,7 @@ def append_task(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = _append_task_op(backend, plan_ref, task_dict)
+        result = operations.append_task(backend, plan_ref, task_dict)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -972,7 +961,7 @@ def finalize(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = _finalize_plan_op(backend, plan_ref)
+        result = operations.finalize_plan(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
