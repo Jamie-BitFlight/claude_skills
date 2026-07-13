@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sam_schema.core.dependencies import DependencyGraph
@@ -35,6 +36,8 @@ from sam_schema.core.exceptions import (
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 
 if TYPE_CHECKING:
+    from sam_schema.core.context_backend import ContextBackend
+
     from dh_core.protocols import TaskBackend
 
 _log = logging.getLogger(__name__)
@@ -42,13 +45,17 @@ _log = logging.getLogger(__name__)
 __all__ = [
     "append_task",
     "claim_task",
+    "clear_active_task",
     "create_plan",
     "finalize_plan",
+    "get_active_task",
     "get_plan_status",
     "get_ready_tasks",
     "list_plans",
     "read_plan",
     "read_task",
+    "set_active_task",
+    "update_active_task",
     "update_plan_fields",
     "update_task_fields",
     "update_task_status",
@@ -726,3 +733,164 @@ def update_task_fields(
     if append_section is not None:
         backend.append_task_section(plan, task, append_section, section_content or "")
     return {"updated": True, "address": f"{plan}/{task}"}
+
+
+def get_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str, Any]:
+    """Retrieve the active task context for a session.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the context backend (LocalContextBackend,
+    GitHubContextBackend, etc.) and pass it here. The operation delegates
+    to ``ctx_backend.get_active_task`` and serializes the result.
+
+    Args:
+        ctx_backend: The resolved ContextBackend instance. The caller is
+            responsible for backend selection — this function is
+            backend-agnostic.
+        session_id: Session identifier to scope the lookup. Callers
+            should resolve the ``None`` sentinel to ``"_default"`` before
+            calling (matching the MCP server convention).
+
+    Returns:
+        Dict with an ``active_task`` key. When a context exists, the
+        value is the serialized :class:`~sam_schema.core.models.ActiveTaskContext`
+        (via ``model_dump(mode="json")``). When no context exists, the
+        value is ``None``.
+    """
+    active = ctx_backend.get_active_task(session_id)
+    if active is None:
+        return {"active_task": None}
+    return {"active_task": active.model_dump(mode="json")}
+
+
+def set_active_task(
+    ctx_backend: ContextBackend,
+    session_id: str,
+    plan: str,
+    task: str,
+    plan_dir: str,
+    parent_issue_number: str | int | None = None,
+) -> dict[str, Any]:
+    """Store a task address as the active task for a session.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the context backend (LocalContextBackend,
+    GitHubContextBackend, etc.) and pass it here. The operation delegates
+    to ``ctx_backend.set_active_task`` and serializes the stored context.
+
+    Args:
+        ctx_backend: The resolved ContextBackend instance. The caller is
+            responsible for backend selection — this function is
+            backend-agnostic.
+        session_id: Session identifier to scope the storage. Callers
+            should resolve the ``None`` sentinel to ``"_default"`` before
+            calling (matching the MCP server convention).
+        plan: Plan address to register (e.g., ``"P1"`` or slug).
+        task: Task ID within the plan (e.g., ``"T3"``).
+        plan_dir: Plan directory path sentinel or absolute path. Stored
+            alongside plan/task so retrieval uses the same backend.
+        parent_issue_number: Optional GitHub issue number (int) or beads
+            nanoid (str, e.g. ``"bd-a3f8"``) for the parent story.
+
+    Returns:
+        Dict with an ``active_task`` key containing the serialized
+        :class:`~sam_schema.core.models.ActiveTaskContext` (via
+        ``model_dump(mode="json")``).
+    """
+    active = ctx_backend.set_active_task(session_id, plan, task, plan_dir, parent_issue_number)
+    return {"active_task": active.model_dump(mode="json")}
+
+
+def update_active_task(
+    ctx_backend: ContextBackend,
+    session_id: str,
+    task_backend: TaskBackend,
+    *,
+    set_fields_json: dict[str, Any] | None = None,
+    append_section: str | None = None,
+    section_content: str | None = None,
+) -> dict[str, Any]:
+    """Update fields and/or append a section on the active task.
+
+    This is the unified operation called by both the CLI and MCP server.
+    It reads the active task context from *ctx_backend* to recover the
+    plan address and task ID, then delegates field/section updates to
+    *task_backend* via :func:`update_task_fields`.
+
+    The active task context stores ``task_file_path`` and ``task_id``.
+    The plan ID is derived from the YAML filename stem (the segment
+    before the first ``-``) and the plan directory is the parent of
+    the task file — matching the derivation in the MCP server.
+
+    Args:
+        ctx_backend: The resolved ContextBackend instance used to read
+            the active task context. The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        session_id: Session identifier to scope the lookup. Callers
+            should resolve the ``None`` sentinel to ``"_default"`` before
+            calling (matching the MCP server convention).
+        task_backend: The resolved TaskBackend instance used to apply
+            field/section updates. The caller is responsible for
+            resolving it from the active task's ``plan_dir`` (matching
+            the MCP server's ``_get_backend`` lookup).
+        set_fields_json: Optional dict of raw field-value pairs to
+            patch onto the task. Keys use kebab-case (wire convention).
+            Values are normalized through the Task model before being
+            passed to the backend. When ``None``, no task-level fields
+            are modified.
+        append_section: Optional section name to append to the task's
+            content. When ``None``, no section is appended.
+        section_content: Content for the appended section. Ignored when
+            ``append_section`` is ``None``. Defaults to an empty string
+            when ``append_section`` is set but this is ``None``.
+
+    Returns:
+        Dict with ``updated`` (``True``) and ``address``
+        (``"{plan}/{task}"``) keys.
+
+    Raises:
+        ValueError: When no active task has been set for *session_id*.
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskNotFoundError: When the task ID cannot be resolved in the
+            plan.
+        pydantic.ValidationError: When a field value fails Task model
+            validation.
+    """
+    active = ctx_backend.get_active_task(session_id)
+    if active is None:
+        msg = "update_active_task: no active task set for this session. Call set_active_task(...) first."
+        raise ValueError(msg)
+    active_plan_id = Path(active.task_file_path).stem.split("-")[0]
+    active_task_id = active.task_id
+    return update_task_fields(
+        task_backend,
+        active_plan_id,
+        active_task_id,
+        set_fields_json=set_fields_json,
+        append_section=append_section,
+        section_content=section_content,
+    )
+
+
+def clear_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str, Any]:
+    """Remove the active task context for a session.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the context backend (LocalContextBackend,
+    GitHubContextBackend, etc.) and pass it here. The operation delegates
+    to ``ctx_backend.clear_active_task``.
+
+    Args:
+        ctx_backend: The resolved ContextBackend instance. The caller is
+            responsible for backend selection — this function is
+            backend-agnostic.
+        session_id: Session identifier to scope the removal. Callers
+            should resolve the ``None`` sentinel to ``"_default"`` before
+            calling (matching the MCP server convention).
+
+    Returns:
+        Dict with a ``cleared`` key (``True`` when a context existed and
+        was removed, ``False`` when no context was found).
+    """
+    removed = ctx_backend.clear_active_task(session_id)
+    return {"cleared": removed}
