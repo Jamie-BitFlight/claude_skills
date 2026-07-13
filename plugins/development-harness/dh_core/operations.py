@@ -21,10 +21,18 @@ such calls.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sam_schema.core.exceptions import ArtifactWriteError
-from sam_schema.core.models import Plan, PlanState, Task
+from sam_schema.core.dependencies import DependencyGraph
+from sam_schema.core.exceptions import (
+    ArtifactWriteError,
+    ConcurrentClaimUnsupportedError,
+    PlanNotFoundError,
+    SamError,
+    TaskNotFoundError,
+)
+from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 
 if TYPE_CHECKING:
     from dh_core.protocols import TaskBackend
@@ -33,13 +41,17 @@ _log = logging.getLogger(__name__)
 
 __all__ = [
     "append_task",
+    "claim_task",
     "create_plan",
     "finalize_plan",
     "get_plan_status",
     "get_ready_tasks",
     "list_plans",
     "read_plan",
+    "read_task",
     "update_plan_fields",
+    "update_task_fields",
+    "update_task_status",
 ]
 
 
@@ -475,3 +487,242 @@ def finalize_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
         PlanNotFoundError: When the plan address cannot be resolved.
     """
     return backend.finalize_plan(plan)
+
+
+def read_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
+    """Read a single task with its full plan context and return a serialized assignment.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: plan
+    retrieval, task retrieval, Task model conversion, TaskAssignment
+    construction, and dict serialization.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        task: Task ID within the plan (e.g. ``"T3"``).
+
+    Returns:
+        Dict serialized from a :class:`~sam_schema.core.models.TaskAssignment`
+        model via ``model_dump(mode="json", by_alias=True, exclude_none=True)``.
+        Contains the plan number, slug, goal, context, acceptance
+        criteria, and the full task model.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskNotFoundError: When the task ID cannot be resolved in the plan.
+    """
+    plan_data = backend.read_plan(plan)
+    task_data = backend.read_task(plan, task)
+    task_model = Task.model_validate(task_data)
+    assignment = TaskAssignment(
+        plan_number=plan_data.get("plan_id", plan),
+        plan_slug=plan_data.get("feature") or None,
+        plan_goal=plan_data.get("goal") or None,
+        plan_context=plan_data.get("context") or None,
+        plan_acceptance_criteria=plan_data.get("acceptance_criteria") or plan_data.get("acceptance-criteria") or None,
+        task=task_model,
+    )
+    return assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+
+def claim_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
+    """Claim a task for dispatch, with local-backend fallback for local-only plans.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: claim
+    attempt, ``ConcurrentClaimUnsupportedError`` fallback to the local
+    backend for local-only plans (ADR-2509-3), and the "not claimed"
+    status-check error path.
+
+    When the backend raises :class:`ConcurrentClaimUnsupportedError`
+    (indicating a local-only plan with no GitHub issue), the operation
+    falls back to ``backend.local`` when available (GistTaskLayer), or
+    to ``backend`` itself otherwise. This uses
+    ``getattr(backend, "local", backend)`` to stay backend-agnostic.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        task: Task ID within the plan (e.g. ``"T3"``).
+
+    Returns:
+        On success: dict with ``claimed`` (``True``), ``task_id``, and
+        ``started`` (ISO 8601 UTC timestamp). When the claim fell back
+        to the local backend, a ``warnings`` key is added with a
+        non-portability notice. On failure: dict with ``claimed``
+        (``False``) and an ``error`` message describing why the task
+        could not be claimed.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskNotFoundError: When the task ID cannot be resolved in the plan.
+    """
+    try:
+        claimed, claim_warning = backend.claim_task(plan, task), None
+    except ConcurrentClaimUnsupportedError:
+        # Local-only plan (issue=None): fall back to local backend claim.
+        local_backend = getattr(backend, "local", backend)
+        claimed = local_backend.claim_task(plan, task)
+        claim_warning = (
+            f"Plan '{plan}' has no associated GitHub issue — claimed locally only. "
+            "Parallel dispatch is not supported for local-only plans. "
+            "Associate a GitHub issue with this plan for multi-agent dispatch support."
+        )
+        _log.warning("claim_task: %s", claim_warning)
+
+    if not claimed:
+        try:
+            task_data = backend.read_task(plan, task)
+            current_status = task_data["status"]
+        except (PlanNotFoundError, TaskNotFoundError, SamError):
+            return {"claimed": False, "error": f"Cannot claim task '{task}': task is not available for claiming."}
+        return {
+            "claimed": False,
+            "error": (f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."),
+        }
+
+    result: dict[str, Any] = {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
+    if claim_warning is not None:
+        result["warnings"] = [claim_warning]
+    return result
+
+
+def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) -> dict[str, Any]:
+    """Update the status of a task, cascading SKIPPED to downstream tasks on failure.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation delegates to
+    ``backend.update_task_status`` and assembles the response dict.
+
+    When *status* is ``FAILED``, a :class:`DependencyGraph` is built from
+    the plan's tasks and all downstream tasks are marked ``SKIPPED`` via
+    ``backend.update_task_status`` and ``backend.update_task_fields`` (to
+    record a reason). The list of skipped task IDs is returned in the
+    ``skipped_downstream`` key.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        task: Task ID within the plan (e.g. ``"T3"``).
+        status: New status string. When equal to
+            :attr:`TaskStatus.FAILED`, downstream tasks are skipped.
+
+    Returns:
+        Dict with ``id`` (the task ID) and ``status`` keys. When
+        *status* is ``FAILED``, also includes ``skipped_downstream`` (a
+        list of task IDs that were marked ``SKIPPED``).
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskNotFoundError: When the task ID cannot be resolved in the plan.
+    """
+    backend.update_task_status(plan, task, status)
+    if status == TaskStatus.FAILED:
+        plan_data = backend.read_plan(plan)
+        tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
+        graph = DependencyGraph(tasks)
+        skipped: list[str] = graph.mark_downstream_skipped(task)
+        for skipped_task_id in skipped:
+            backend.update_task_status(plan, skipped_task_id, TaskStatus.SKIPPED)
+            backend.update_task_fields(plan, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
+        return {"id": task, "status": status, "skipped_downstream": skipped}
+    return {"id": task, "status": status}
+
+
+def _validated_task_patch(backend: TaskBackend, plan: str, task: str, raw_fields: dict[str, Any]) -> Task:
+    """Validate raw JSON patch fields through the Pydantic Task model.
+
+    Reads the current task, merges *raw_fields* into its data, then passes
+    the merged dict through ``Task.model_validate`` so field validators run
+    (e.g. ``validate_task_id_list`` normalises ``dependencies``).  Returns
+    the fully-validated Task model for the caller to write via
+    ``backend.update_task``.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan: Plan address string.
+        task: Task identifier within the plan.
+        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
+
+    Returns:
+        Fully-validated Task model with the patched fields applied.
+
+    Raises:
+        PlanNotFoundError: When *plan* cannot be resolved by the backend.
+        TaskNotFoundError: When *task* does not exist within the plan.
+        pydantic.ValidationError: When a field value fails Task model
+            validation.
+    """
+    task_data = backend.read_task(plan, task)
+    current = Task.model_validate(task_data)
+    return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
+
+
+def update_task_fields(
+    backend: TaskBackend,
+    plan: str,
+    task: str,
+    *,
+    set_fields_json: dict[str, Any] | None = None,
+    append_section: str | None = None,
+    section_content: str | None = None,
+) -> dict[str, Any]:
+    """Update fields and/or append a section to a task.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: raw field
+    validation through the Task model (when ``set_fields_json`` is
+    provided), delegation to ``backend.update_task`` and
+    ``backend.append_task_section``, and response assembly.
+
+    When ``set_fields_json`` is provided, the raw fields are validated by
+    reading the current task, merging the raw fields into its data,
+    passing the merged dict through ``Task.model_validate`` (so field
+    validators run), and passing the validated Task model to
+    ``backend.update_task``. This ensures the backend receives normalized
+    field values, not raw input.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        task: Task ID within the plan (e.g. ``"T3"``).
+        set_fields_json: Optional dict of raw field-value pairs to patch
+            onto the task. Keys use kebab-case (wire convention). Values
+            are normalized through the Task model before being passed to
+            the backend. When ``None``, no task-level fields are modified.
+        append_section: Optional section name to append to the task's
+            content. When ``None``, no section is appended.
+        section_content: Content for the appended section. Ignored when
+            ``append_section`` is ``None``. Defaults to an empty string
+            when ``append_section`` is set but this is ``None``.
+
+    Returns:
+        Dict with ``updated`` (``True``) and ``address``
+        (``"{plan}/{task}"``) keys.
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+        TaskNotFoundError: When the task ID cannot be resolved in the
+            plan.
+        pydantic.ValidationError: When a field value fails Task model
+            validation.
+    """
+    if set_fields_json is not None:
+        validated_task = _validated_task_patch(backend, plan, task, set_fields_json)
+        backend.update_task(plan, validated_task)
+    if append_section is not None:
+        backend.append_task_section(plan, task, append_section, section_content or "")
+    return {"updated": True, "address": f"{plan}/{task}"}
