@@ -6,11 +6,10 @@ SQL, Gist, noSQL, Jira, or any other storage. The operations layer
 (``dh_core.operations``) calls methods on this protocol; it never assumes
 a specific storage implementation.
 
-The protocol will be built incrementally during the extraction. Initially it
-re-exports the existing protocols (TaskBackend, BacklogBackend, ArtifactBackend,
-ContextBackend) for reference. The end state is a single unified DHBackend
-protocol (or a small composite of sub-protocols — see open question #3 in the
-plan).
+During the incremental extraction, this module re-exports the existing
+backend protocols so Phase 1 has concrete types to work against. The end
+state is a single unified ``DHBackend`` protocol (or a composite of
+sub-protocols — see open question #3 in the plan).
 
 Dependency direction (must remain acyclic):
     models <- protocols <- operations <- frontends
@@ -19,4 +18,6 @@ Dependency direction (must remain acyclic):
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from sam_schema.core.task_backend import TaskBackend
+
+__all__ = ["TaskBackend"]

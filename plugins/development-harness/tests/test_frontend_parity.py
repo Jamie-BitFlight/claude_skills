@@ -6,7 +6,7 @@ the unified backend extraction.
 
 Strategy:
   - CLI path: subprocess `uv run sam <cmd> --format json`
-  - MCP path: call the MCP tool function directly (imported from server module)
+  - MCP path: call the internal server function directly with a test backend
   - Both paths should delegate to the same dh_core.operations function.
   - Once delegation is in place, parity is structural — both call the same
     function with the same arguments. These tests verify that delegation
@@ -18,20 +18,26 @@ Tests are added incrementally as operations are extracted to dh_core.operations.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 # Ensure plugin root is on sys.path so dh_core resolves.
 _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
+
+
+def _get_project_slug() -> str:
+    """Derive the project slug the CLI will compute from the git root."""
+    import dh_paths
+
+    project_root = dh_paths.infer_project_root()
+    return dh_paths.compute_slug(project_root)
 
 
 def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None) -> dict[str, Any]:
@@ -50,8 +56,6 @@ def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = 
         json.JSONDecodeError: If stdout is not valid JSON.
         RuntimeError: If the CLI exits with a non-zero code.
     """
-    import os
-
     run_env = os.environ.copy()
     if env:
         run_env.update(env)
@@ -70,35 +74,30 @@ def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = 
 
 
 @pytest.fixture
-def dh_state_home(tmp_path: Path) -> Iterator[Path]:
-    """Provide an isolated DH_STATE_HOME so the CLI finds a valid plan dir.
+def dh_state_home(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    """Provide an isolated DH_STATE_HOME for the CLI subprocess.
 
-    The CLI derives the project slug from the git root, not cwd. We run
-    the subprocess from _plugin_root (which is inside the git repo), so
-    the slug will be based on the git root path. We create the plan dir
-    under the git-root-derived slug so the CLI finds it.
+    Returns a tuple of (state_home_path, env_overrides) so tests can pass
+    the env dict to run_cli() explicitly instead of mutating os.environ.
+
+    The CLI derives the project slug from the git root, not cwd. We create
+    the plan dir under the git-root-derived slug so the CLI finds it.
     """
-    import os
-
-    import dh_paths
-
     state_home = tmp_path / "dh_state"
-    # Use dh_paths to derive the actual slug the CLI will compute
-    project_root = dh_paths.infer_project_root()
-    slug = dh_paths.compute_slug(project_root)
+    slug = _get_project_slug()
     plan_dir = state_home / "projects" / slug / "plan"
     plan_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["DH_STATE_HOME"] = str(state_home)
-    yield state_home
-    os.environ.pop("DH_STATE_HOME", None)
+    env = {"DH_STATE_HOME": str(state_home)}
+    return state_home, env
 
 
 class TestParityInfrastructure:
     """Verify the test harness itself works before adding operation tests."""
 
-    def test_cli_list_returns_json(self, dh_state_home: Path) -> None:
+    def test_cli_list_returns_json(self, dh_state_home: tuple[Path, dict[str, str]]) -> None:
         """The CLI `list` command must return valid JSON with an 'items' key."""
-        result = run_cli(["list", "--limit", "1"])
+        _, env = dh_state_home
+        result = run_cli(["list", "--limit", "1"], env=env)
         assert "items" in result
         assert isinstance(result["items"], list)
 
@@ -113,3 +112,9 @@ class TestParityInfrastructure:
         import dh_core.protocols
 
         assert dh_core.protocols is not None
+
+    def test_dh_core_protocols_re_exports_task_backend(self) -> None:
+        """dh_core.protocols must re-export TaskBackend for Phase 1 typing."""
+        from dh_core.protocols import TaskBackend
+
+        assert TaskBackend is not None
