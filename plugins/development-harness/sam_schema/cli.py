@@ -31,7 +31,7 @@ import subprocess
 import sys
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, NoReturn
+from typing import Annotated, NoReturn
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -42,16 +42,24 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 import dh_paths
 import typer
+from dh_core.operations import (
+    create_plan as _create_plan_op,
+    get_plan_status as _get_plan_status_op,
+    get_ready_tasks as _get_ready_tasks_op,
+    list_plans as _list_plans_op,
+    read_plan as _read_plan_op,
+)
 from rich.console import Console
 from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+from sam_schema.core.exceptions import PlanNotFoundError
 from sam_schema.core.models import TaskStatus
 from sam_schema.core.query import (
     claim_task,
     get_plan_status,
-    get_ready_tasks,
     get_task,
     get_task_assignment,
     load_plan,
@@ -60,9 +68,6 @@ from sam_schema.core.query import (
 )
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 _PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (FileNotFoundError, FormatDetectionError, ValueError, TypeError)
 
@@ -178,11 +183,6 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
         SystemExit(1): If the path or address cannot be resolved.
         SystemExit(2): If the format cannot be detected.
     """
-    from dh_core.operations import get_plan_status as _get_plan_status_op  # noqa: PLC0415
-
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-    from sam_schema.core.exceptions import PlanNotFoundError  # noqa: PLC0415
-
     # Accept structured addresses only (P{N}, slug). The backend resolves
     # the address to whatever storage it uses — never pass filesystem paths.
     try:
@@ -294,14 +294,9 @@ def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
         plan_dir: Directory to search for plan files.
         output_format: One of ``json``, ``yaml``, ``rich``.
     """
-    from dh_core.operations import read_plan as _read_plan  # noqa: PLC0415
-
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-    from sam_schema.core.exceptions import PlanNotFoundError  # noqa: PLC0415
-
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        data = _read_plan(backend, plan_ref)
+        data = _read_plan_op(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
         return
@@ -377,10 +372,6 @@ def list_plans(
         limit: Maximum number of items to return. Defaults to all results.
         output_format: Output serialization format (json or yaml).
     """
-    from dh_core.operations import list_plans as _list_plans_op  # noqa: PLC0415
-
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-
     plan_dir = _coerce_plan_dir(plan_dir)
     if output_format not in _OUTPUT_FORMATS:
         _err(f"Invalid format '{output_format}'. Must be one of: {', '.join(_OUTPUT_FORMATS)}")
@@ -506,21 +497,33 @@ def ready(
     if output_format not in _OUTPUT_FORMATS:
         _err(f"Invalid format '{output_format}'. Must be one of: {', '.join(_OUTPUT_FORMATS)}")
 
+    # Accept structured addresses only (P{N}, slug). The backend resolves
+    # the address to whatever storage it uses — never pass filesystem paths.
     try:
         plan_ref, _ = parse_address(plan_address)
     except ValueError as exc:
         _err(str(exc))
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
-
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        tasks = get_ready_tasks(plan_path)
+        result = _get_ready_tasks_op(backend, plan_ref)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
     except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    data = [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in tasks]
+    # Drafting marker — return the marker dict as-is.
+    if result.get("drafting"):
+        if output_format == "yaml":
+            _output_yaml(result)
+        else:
+            _output_json(result)
+        return
+
+    # CLI output: just the ready_tasks list (backward-compatible shape).
+    data = result["ready_tasks"]
     if output_format == "yaml":
         _output_yaml(data)
     else:
@@ -634,9 +637,6 @@ def create(
                 _err("stdin must be YAML with a top-level 'tasks:' list or a bare list")
 
     # Delegate to dh_core.operations via a LocalYamlTaskProvider backend.
-    from dh_core.operations import create_plan as _create_plan_op  # noqa: PLC0415
-
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:

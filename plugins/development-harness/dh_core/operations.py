@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-__all__ = ["create_plan", "get_plan_status", "list_plans", "read_plan"]
+__all__ = ["create_plan", "get_plan_status", "get_ready_tasks", "list_plans", "read_plan"]
 
 
 def create_plan(
@@ -256,3 +256,64 @@ def get_plan_status(backend: TaskBackend, plan: str) -> dict[str, Any]:
     result = dict(status)
     result["autonomy"] = plan_data.get("autonomy", "full_auto")
     return result
+
+
+def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> dict[str, Any]:
+    """Return tasks ready for dispatch along with plan-level metadata.
+
+    This is the unified operation called by both the CLI and MCP server.
+    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
+    and pass it here. The operation handles all business logic: drafting
+    check, ready-task retrieval, compact/full serialization, and
+    ``feature``/``issue`` enrichment from the plan record.
+
+    When the plan is in the ``DRAFTING`` state, a drafting marker dict
+    is returned immediately (matching the MCP server's
+    ``_DRAFTING_MARKER_RESPONSE`` shape). This prevents dispatching a
+    partial plan.
+
+    Args:
+        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
+            LocalYamlTaskProvider). The caller is responsible for
+            backend selection — this function is backend-agnostic.
+        plan: Plan address string (e.g. ``"P1"`` or slug).
+        full: When ``False`` (default), return a compact 7-field routing
+            manifest per task: ``id``, ``task``, ``agent``, ``skills``,
+            ``dependencies``, ``status``, ``priority``. When ``True``,
+            return the full :class:`~sam_schema.core.models.Task` model
+            dump (all fields).
+
+    Returns:
+        When the plan is drafting: ``{"drafting": True, "state": "drafting"}``.
+        Otherwise: a dict with ``ready_tasks`` (list of task dicts),
+        ``count`` (number of ready tasks), ``feature`` (plan feature
+        string), and ``issue`` (plan issue number).
+
+    Raises:
+        PlanNotFoundError: When the plan address cannot be resolved.
+    """
+    status = backend.get_plan_status(plan)
+    if status.get("state") == PlanState.DRAFTING:
+        return {"drafting": True, "state": PlanState.DRAFTING}
+    tasks_data = backend.get_ready_tasks(plan)
+    plan_data = backend.read_plan(plan)
+    if full:
+        ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
+    else:
+        ready_tasks = [
+            {
+                "id": t["id"],
+                "task": t["title"],
+                "agent": t["agent"],
+                "skills": t["skills"] or [],
+                "dependencies": t["dependencies"] or [],
+                "status": t["status"],
+                "priority": int(t["priority"]),
+            }
+            for t in tasks_data
+        ]
+    feature = status["feature"]
+    if not isinstance(feature, str):
+        msg = f"get_plan_status must return str for 'feature', got {type(feature).__name__}"
+        raise TypeError(msg)
+    return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}

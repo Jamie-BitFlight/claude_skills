@@ -18,6 +18,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import tiktoken
+from dh_core.operations import (
+    create_plan as _create_plan,
+    get_plan_status as _get_plan_status,
+    get_ready_tasks as _get_ready_tasks,
+    list_plans as _list_plans_op,
+    read_plan as _read_plan,
+)
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -314,8 +321,6 @@ def _sam_plan_read(plan: str, plan_dir: str) -> dict:
     The operation handles plan retrieval, Plan model conversion, dict
     serialization, and source-degradation warning surfacing.
     """
-    from dh_core.operations import read_plan as _read_plan  # noqa: PLC0415
-
     backend = _get_backend(plan_dir)
     return _read_plan(backend, plan)
 
@@ -328,8 +333,6 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     Returns:
         Dict from dh_core.operations.create_plan().
     """
-    from dh_core.operations import create_plan as _create_plan  # noqa: PLC0415
-
     backend = _get_backend(plan_dir)
     return _create_plan(
         backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
@@ -348,8 +351,6 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
         ``warnings``, and ``errors`` keys. Each item contains ``feature``,
         ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
-    from dh_core.operations import list_plans as _list_plans_op  # noqa: PLC0415
-
     backend = _get_backend(plan_dir)
     # Operations layer does search + summary mapping; pagination is deferred
     # to _paginate_results which applies offset/limit + token-budget paging.
@@ -371,8 +372,6 @@ def _sam_plan_status(plan: str, plan_dir: str) -> dict:
     Thin adapter that resolves the backend via ``_get_backend`` and
     delegates to ``dh_core.operations.get_plan_status``.
     """
-    from dh_core.operations import get_plan_status as _get_plan_status  # noqa: PLC0415
-
     backend = _get_backend(plan_dir)
     return _get_plan_status(backend, plan)
 
@@ -380,37 +379,17 @@ def _sam_plan_status(plan: str, plan_dir: str) -> dict:
 def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
     """List tasks ready for dispatch.
 
-    Calls ``get_plan_status`` first for the drafting check (single backend call),
-    then ``get_ready_tasks`` only when the plan is not in drafting state.
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.get_ready_tasks``. The operation handles the
+    drafting check, ready-task retrieval, compact/full serialization, and
+    ``feature``/``issue`` enrichment.
 
     Returns:
-        Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue`` keys.
+        Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue``
+        keys. When the plan is drafting, returns a drafting marker.
     """
     backend = _get_backend(plan_dir)
-    status = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        return dict(_DRAFTING_MARKER_RESPONSE)
-    tasks_data = backend.get_ready_tasks(plan)
-    plan_data = backend.read_plan(plan)  # needed for plan_data["issue"]
-    if config.full:
-        ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
-    else:
-        ready_tasks = [
-            {
-                "id": t["id"],
-                "task": t["title"],
-                "agent": t["agent"],
-                "skills": t["skills"] or [],
-                "dependencies": t["dependencies"] or [],
-                "status": t["status"],
-                "priority": int(t["priority"]),
-            }
-            for t in tasks_data
-        ]
-    feature = status["feature"]
-    if not isinstance(feature, str):
-        raise TypeError(f"get_plan_status must return str for 'feature', got {type(feature).__name__}")
-    return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}
+    return _get_ready_tasks(backend, plan, full=config.full)
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
