@@ -122,7 +122,7 @@ Every SKILL.md consists of:
 - **Frontmatter** (YAML): Metadata fields like `name`, `description`, `argument-hint`, `allowed-tools`, `model`, `context`, `user-invocable`, `disable-model-invocation`, and `hooks`. The `description` field (or first paragraph if omitted) is what Claude reads to determine when the skill gets used, thus it is very important to be clear and comprehensive in describing what the skill is and when it should be used.
 - **Body** (Markdown): Instructions and guidance for using the skill. Only loaded AFTER the skill triggers (if at all).
 
-#### Bundled Resources (optional)
+#### Bundled Resources and Content Patterns (optional)
 
 ##### Scripts (`scripts/`)
 
@@ -528,6 +528,8 @@ For advanced body features (string substitutions, dynamic context injection, ext
 
 ### After Step 5: Quality Review
 
+Before delegating the draft, run it against [references/authoring-checklist.md](./references/authoring-checklist.md) — the pre-publish checklist covering Structure, Core Quality, Code and Scripts, and Testing.
+
 After completing the SKILL.md and all bundled resources, delegate the draft to the `ai-doc-optimizer` agent before packaging or evaluation. This agent pre-loads `prompt-optimization`, `audit-skill-completeness`, and the official Claude Code skill guidelines — it verifies the draft against best practices and produces an optimized version with evidence-backed changes.
 
 Task is SKILL.md quality review with subagent_type="plugin-creator:ai-doc-optimizer"
@@ -583,7 +585,7 @@ Load [schemas.md](./references/schemas.md) for evals.json and grading.json forma
 | `@plugin-creator:grader` | Assertion grading — evaluates eval outputs against expectations |
 | `@plugin-creator:comparator` | Blind A/B comparison — evaluates two skill versions without knowing which is which |
 | `@plugin-creator:analyzer` | Post-hoc analysis — explains why the winning version won and generates improvement suggestions |
-| `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns) |
+| `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns), [`references/authoring-checklist.md`](./references/authoring-checklist.md) (pre-publish checklist) |
 | `eval-viewer/` | `viewer.html` (interactive eval viewer), `generate_review.py` (HTML generator) |
 | `assets/` | `eval_review.html` (trigger eval review template) |
 | `scripts/` | `init_skill.py`, `package_skill.py`, `quick_validate.py`, `run_eval.py`, `run_loop.py`, `improve_description.py`, `generate_report.py`, `aggregate_benchmark.py` |

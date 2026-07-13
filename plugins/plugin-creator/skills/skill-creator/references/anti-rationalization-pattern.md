@@ -15,11 +15,13 @@ Include this component when the skill enforces a multi-step discipline containin
 
 Header row is exactly:
 
+```markdown
 | Rationalization | Response |
 |---|---|
 | "I'll add tests later" | Add the test in this same turn — a task marked complete without tests is not complete |
 | "This should be fine, I'm confident" | Confidence is not verification; run the check and cite its output |
 | "The step doesn't apply this time" | Confirm the exemption against the skill's stated conditions before skipping; do not assume |
+```
 
 Each row pairs a first-person quoted excuse with a direct imperative counter-response. Source rows from rationalizations actually observed in agent output where possible, rather than inventing hypothetical ones. A table needs a minimum of one row; there is no fixed maximum — see the verify-done precedent below for a larger worked example.
 
@@ -27,9 +29,11 @@ Each row pairs a first-person quoted excuse with a direct imperative counter-res
 
 Red Flags are an optional bullet list (not a table) of self-checkable warning signs an author includes alongside the table. Optional means the skill author decides, per skill, whether to add it — the authoring-checklist item covers the decision, not a mandate to always include it.
 
+```markdown
 - Language in your own output like "should work", "probably fine", or "seems correct" appearing before the verification step ran
 - A completion claim ("Done!") followed immediately by a commit or push with no fresh command output in the same turn
 - A verification step that exists in the skill's process but is treated as optional in practice
+```
 
 ## Distinguishing This From Similar Tables
 
