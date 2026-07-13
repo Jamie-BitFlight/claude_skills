@@ -43,11 +43,14 @@ if isinstance(sys.stderr, TextIOWrapper):
 import dh_paths
 import typer
 from dh_core.operations import (
+    claim_task as _claim_task_op,
     create_plan as _create_plan_op,
     get_plan_status as _get_plan_status_op,
     get_ready_tasks as _get_ready_tasks_op,
     list_plans as _list_plans_op,
     read_plan as _read_plan_op,
+    read_task as _read_task_op,
+    update_task_status as _update_task_status_op,
 )
 from rich.console import Console
 from rich.table import Table
@@ -55,17 +58,9 @@ from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-from sam_schema.core.exceptions import PlanNotFoundError
+from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import TaskStatus
-from sam_schema.core.query import (
-    claim_task,
-    get_plan_status,
-    get_task,
-    get_task_assignment,
-    load_plan,
-    update_plan_fields,
-    update_status,
-)
+from sam_schema.core.query import get_plan_status, load_plan, update_plan_fields
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -310,24 +305,31 @@ def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
             _output_rich_task(data)
 
 
-def _read_task_assignment(plan_path: Path, task_id: str, output_format: str) -> None:
+def _read_task_assignment(plan_ref: str, plan_dir: Path, task_id: str, output_format: str) -> None:
     """Read a task address and emit a ``TaskAssignment`` response.
 
+    Delegates to ``dh_core.operations.read_task`` via a
+    ``LocalYamlTaskProvider`` backend so the CLI shares the same code path
+    as the MCP server.
+
     Args:
-        plan_path: Resolved path to the plan file or directory.
+        plan_ref: Plan address component (e.g. ``"1"``, ``"auth-system"``).
+        plan_dir: Directory to search for plan files.
         task_id: Normalised task ID (e.g. ``"T3"``).
         output_format: One of ``json``, ``yaml``, ``rich``.
     """
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        assignment = get_task_assignment(plan_path, task_id)
-    except FileNotFoundError as exc:
+        data = _read_task_op(backend, plan_ref, task_id)
+    except PlanNotFoundError as exc:
         _err(str(exc))
-    except KeyError as exc:
+    except TaskNotFoundError as exc:
+        _err(str(exc))
+    except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    data = assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
     match output_format:
         case "json":
             _output_json(data)
@@ -335,10 +337,10 @@ def _read_task_assignment(plan_path: Path, task_id: str, output_format: str) -> 
             _output_yaml(data)
         case _:
             console = Console()
-            if assignment.plan_goal:
-                console.print(f"[bold cyan]Plan goal:[/bold cyan] {assignment.plan_goal}")
-            if assignment.plan_context:
-                console.print(f"[bold cyan]Plan context:[/bold cyan] {assignment.plan_context}")
+            if data.get("plan_goal"):
+                console.print(f"[bold cyan]Plan goal:[/bold cyan] {data['plan_goal']}")
+            if data.get("plan_context"):
+                console.print(f"[bold cyan]Plan context:[/bold cyan] {data['plan_context']}")
             _output_rich_task(data.get("task", data))
 
 
@@ -421,9 +423,8 @@ def read(
         _read_plan_only(plan_ref, plan_dir, output_format)
         return
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
-    _read_task_assignment(plan_path, task_id, output_format)
+    _read_task_assignment(plan_ref, plan_dir, task_id, output_format)
 
 
 @app.command()
@@ -454,30 +455,37 @@ def state(
         valid = ", ".join(str(s) for s in TaskStatus)
         _err(f"Invalid status '{new_status}'. Must be one of: {valid}")
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
 
+    backend = LocalYamlTaskProvider(plan_dir)
+
+    # Read current task to capture old status for the confirmation message.
     try:
-        old_task = get_task(plan_path, task_id)
-    except FileNotFoundError as exc:
+        assignment = _read_task_op(backend, plan_ref, task_id)
+    except PlanNotFoundError as exc:
         _err(str(exc))
-    except KeyError as exc:
+    except TaskNotFoundError as exc:
+        _err(str(exc))
+    except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    old_status = old_task.status
+    task_data = assignment.get("task", assignment)
+    old_status = task_data.get("status", "unknown")
 
     try:
-        updated_task = update_status(plan_path, task_id, parsed_status)
-    except FileNotFoundError as exc:
+        result = _update_task_status_op(backend, plan_ref, task_id, parsed_status)
+    except PlanNotFoundError as exc:
         _err(str(exc))
-    except (KeyError, ValueError) as exc:
+    except TaskNotFoundError as exc:
+        _err(str(exc))
+    except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    typer.echo(f"Task {task_id}: {old_status} -> {updated_task.status}")
+    typer.echo(f"Task {task_id}: {old_status} -> {result['status']}")
 
 
 @app.command()
@@ -763,24 +771,25 @@ def claim(
     if task_ref is None:
         _err(f"Address '{address}' does not include a task component (expected P{{N}}/T{{M}})")
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
 
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        updated_task = claim_task(plan_path, task_id)
+        result = _claim_task_op(backend, plan_ref, task_id)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
+    except TaskNotFoundError as exc:
+        _err(str(exc))
     except FileNotFoundError as exc:
-        _err(str(exc))
-    except KeyError as exc:
-        _err(str(exc))
-    except ValueError as exc:
-        # Already claimed or in non-claimable state — exit non-zero
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    started_val = updated_task.started
-    started_str = started_val.isoformat() if started_val is not None else None
-    _output_json({"claimed": True, "task_id": task_id, "started": started_str})
+    if not result.get("claimed"):
+        # Task is not claimable — already claimed or in a terminal state.
+        _err(result.get("error", f"Cannot claim task '{task_id}'."))
+
+    _output_json(result)
 
 
 @app.command()
