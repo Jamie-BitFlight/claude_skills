@@ -19,6 +19,9 @@ Usage::
     sam migrate --all
     sam migrate --all --dry-run
     sam migrate --all --skip-sync
+    sam append-task P1 --task-json '{"task":"T3","title":"New","status":"not-started","agent":"worker","dependencies":[],"priority":3,"complexity":"medium"}'
+    sam append-task P1 --stdin
+    sam finalize P1
 """
 
 from __future__ import annotations
@@ -43,8 +46,10 @@ if isinstance(sys.stderr, TextIOWrapper):
 import dh_paths
 import typer
 from dh_core.operations import (
+    append_task as _append_task_op,
     claim_task as _claim_task_op,
     create_plan as _create_plan_op,
+    finalize_plan as _finalize_plan_op,
     get_plan_status as _get_plan_status_op,
     get_ready_tasks as _get_ready_tasks_op,
     list_plans as _list_plans_op,
@@ -843,10 +848,139 @@ def validate(
             warnings.append(msg)
 
     valid = len(errors) == 0
-    _output_json({"valid": valid, "errors": errors, "warnings": warnings})
-
     if not valid:
         raise typer.Exit(1)
+
+
+def _resolve_task_definition(task_json: str | None, from_stdin: bool) -> dict[str, object]:
+    """Resolve a task definition from ``--task-json`` or ``--stdin``.
+
+    Args:
+        task_json: Task definition as a JSON string, or ``None``.
+        from_stdin: If ``True``, read task YAML from stdin.
+
+    Returns:
+        Parsed task definition dict.
+
+    Raises:
+        SystemExit(1): If neither source is provided, JSON is invalid, or
+            stdin does not contain a YAML mapping.
+    """
+    if task_json is not None:
+        try:
+            parsed = json.loads(task_json)
+        except json.JSONDecodeError as exc:
+            _err(f"Invalid JSON in --task-json: {exc}")
+        if not isinstance(parsed, dict):
+            _err("--task-json must be a JSON object (task definition)")
+        return parsed
+    if not from_stdin:
+        _err("Provide a task definition via --task-json or --stdin")
+
+    raw = sys.stdin.read()
+    if not raw.strip():
+        _err("stdin is empty — provide a task definition via --stdin or --task-json")
+    y = YAML()
+    parsed = y.load(raw)
+    if not isinstance(parsed, dict):
+        _err("stdin must be a YAML task definition (single mapping)")
+    return parsed
+
+
+@app.command(name="append-task")
+def append_task(
+    plan_address: Annotated[str, typer.Argument(help="Plan address: P{plan} or slug")],
+    plan_dir: Annotated[Path | None, typer.Option("--plan-dir", help="Plan directory")] = None,
+    task_json: Annotated[str | None, typer.Option("--task-json", help="Task definition as JSON string")] = None,
+    from_stdin: Annotated[bool, typer.Option("--stdin", help="Read task YAML from stdin")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Append a single task to an existing plan.
+
+    Reads a task definition from ``--task-json`` (JSON string) or ``--stdin``
+    (YAML). The task is appended to the plan identified by ``plan_address``.
+    Plans in ``drafting`` state stay in drafting until ``sam finalize`` is called.
+
+    Output (JSON)::
+
+        {"appended": true, "task_id": "T3"}
+
+    Args:
+        plan_address: Plan address in ``P{N}`` or slug format.
+        plan_dir: Directory to search for plan files.
+        task_json: Task definition as a JSON string.
+        from_stdin: If ``True``, read task YAML from stdin.
+        output_format: Output format (only ``json`` is supported).
+    """
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
+    plan_dir = _coerce_plan_dir(plan_dir)
+
+    # Accept structured addresses only (P{N}, slug).
+    try:
+        plan_ref, _ = parse_address(plan_address)
+    except ValueError as exc:
+        _err(str(exc))
+
+    task_dict = _resolve_task_definition(task_json, from_stdin)
+
+    backend = LocalYamlTaskProvider(plan_dir)
+    try:
+        result = _append_task_op(backend, plan_ref, task_dict)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
+    except FileNotFoundError as exc:
+        _err(str(exc))
+    except FormatDetectionError as exc:
+        _err(str(exc), exit_code=2)
+    except ValueError as exc:
+        _err(str(exc))
+
+    _output_json(result)
+
+
+@app.command()
+def finalize(
+    plan_address: Annotated[str, typer.Argument(help="Plan address: P{plan} or slug")],
+    plan_dir: Annotated[Path | None, typer.Option("--plan-dir", help="Plan directory")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Transition a plan from drafting state to ready state.
+
+    After appending tasks to a drafting plan, ``finalize`` transitions the
+    plan to ``ready`` state, making it available for execution via
+    ``sam ready`` and ``sam status``.
+
+    Output (JSON)::
+
+        {"finalized": true, "state": "ready"}
+
+    Args:
+        plan_address: Plan address in ``P{N}`` or slug format.
+        plan_dir: Directory to search for plan files.
+        output_format: Output format (only ``json`` is supported).
+    """
+    if output_format != "json":
+        _err(f"Unsupported output format: {output_format!r}. Only 'json' is supported.")
+    plan_dir = _coerce_plan_dir(plan_dir)
+
+    # Accept structured addresses only (P{N}, slug).
+    try:
+        plan_ref, _ = parse_address(plan_address)
+    except ValueError as exc:
+        _err(str(exc))
+
+    backend = LocalYamlTaskProvider(plan_dir)
+    try:
+        result = _finalize_plan_op(backend, plan_ref)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
+    except FileNotFoundError as exc:
+        _err(str(exc))
+    except FormatDetectionError as exc:
+        _err(str(exc), exit_code=2)
+
+    _output_json(result)
 
 
 def _canonical_output_path(plan_path: Path) -> Path:
