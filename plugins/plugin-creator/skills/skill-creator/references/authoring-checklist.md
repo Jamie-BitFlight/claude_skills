@@ -19,6 +19,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 - [ ] File references are one level deep — ``references/file.md`` not ``references/subdir/file.md``
 - [ ] Progressive disclosure used appropriately — overview in SKILL.md, detail in references
 - [ ] Workflows have clear, numbered steps
+- [ ] For skills enforcing a multi-step discipline with skippable quality gates, a `Rationalization | Response` table (plus optional Red Flags) is present or explicitly deemed not applicable — see [anti-rationalization-pattern.md](./anti-rationalization-pattern.md)
 
 ---
 
