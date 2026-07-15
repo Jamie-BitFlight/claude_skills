@@ -695,21 +695,6 @@ def _process_trace(
                 source_heading=heading,
             )
 
-    elif terminal_type == "completes_workflow":
-        # terminal_target is null/empty — emit a terminal completion edge
-        # so the branch outcome is visible rather than silently dropped.
-        target_id = f"terminal.completion.{slugify(from_fork_raw)}"
-        eid = f"{edge_id_base}.branch"
-        edges[eid] = _edge(
-            eid,
-            "branch",
-            source_id,
-            target_id,
-            label=f"completes_workflow: {condition or '(no condition)'}"[:80],
-            source_file=source_file,
-            source_heading=heading,
-        )
-
     elif terminal_type == "hands_off_to_skill" and terminal_target:
         _emit_skill_handoff(
             trace_ctx={

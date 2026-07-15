@@ -108,7 +108,10 @@ repos:
         # hence the optional leading path group) but only the ROOT
         # .claude-plugin/marketplace.json (hence the ^ anchor with no
         # optional path group) — a nested marketplace.json is not excluded.
-        exclude: (graphify-out/|^(.*/)?\.claude-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$)
+        # dh-workflow-graph.json is machine-generated (assemble_graph.py
+        # writes minified JSON via json.dumps() with no indent) -- excluded
+        # for the same reason, not hand-authored config.
+        exclude: (graphify-out/|^(.*/)?\.claude-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$|dh-workflow-graph\.json$)
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.22.0

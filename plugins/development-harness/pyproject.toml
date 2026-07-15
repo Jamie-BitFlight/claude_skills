@@ -46,7 +46,7 @@ addopts = [
     "-m",
     "not e2e",
 ]
-testpaths = ["tests", "tests_sam", "tests_backlog"]
+testpaths = ["tests", "tests_sam", "tests_backlog", "sam_schema/tests"]
 pythonpath = [
     ".",
     "./skills/implementation-manager/scripts",

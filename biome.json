@@ -19,7 +19,8 @@
       "!.claude-plugin/marketplace.json",
       "!**/*.lock",
       "!**/dist",
-      "!**/graphify-out"
+      "!**/graphify-out",
+      "!**/dh-workflow-graph.json"
     ]
   },
   "formatter": {
