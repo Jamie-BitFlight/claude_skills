@@ -61,13 +61,21 @@ _SAM_PACKAGES_DIR = str(_REPO_ROOT / "packages")
 if _SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _SAM_PACKAGES_DIR)
 
+# dh_core is in plugins/development-harness/ — same directory as dh_paths.
+# Fallback: add plugin dir to sys.path for direct-script execution outside the venv.
+_PLUGIN_DIR = str(_REPO_ROOT / "plugins" / "development-harness")
+if _PLUGIN_DIR not in sys.path:
+    sys.path.insert(0, _PLUGIN_DIR)
+
 # Import directly from submodules so static type checkers resolve concrete types
 # instead of the lazy ``object`` returned by sam_schema.__getattr__.
 # dh_paths is in plugins/development-harness/ — resolvable via the uv workspace
 # (root pyproject.toml pythonpath includes the plugin directory).
 import dh_paths
+from dh_core import operations
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path
+from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import STATUS_MAP
-from sam_schema.core.query import claim_task as sam_claim_task, load_plan as sam_load_plan
 from sam_schema.readers.detect import FormatDetectionError
 
 if TYPE_CHECKING:
@@ -1077,7 +1085,7 @@ def _sam_task_to_dict(task: SamTask) -> TaskDict:
 def _load_tasks_via_sam(task_file: Path) -> list[Task]:
     """Load tasks from a plan file via sam_schema and convert to internal Task objects.
 
-    Uses sam_load_plan for parsing, then converts each sam_schema.Task
+    Uses operations.read_plan for parsing, then converts each sam_schema.Task
     to the internal Task dataclass for use by existing CLI commands.
 
     Args:
@@ -1086,7 +1094,9 @@ def _load_tasks_via_sam(task_file: Path) -> list[Task]:
     Returns:
         List of internal Task dataclass objects.
     """
-    result = sam_load_plan(task_file)
+    plan_ref = plan_id_from_path(task_file)
+    backend = LocalYamlTaskProvider(task_file.parent if task_file.is_file() else task_file)
+    result = operations.read_plan(backend, plan_ref)
     tasks: list[Task] = []
     for st in result.plan.tasks:
         try:
@@ -1341,7 +1351,7 @@ def claim_task(
 ) -> None:
     """Claim a task by atomically transitioning it from not-started to in-progress.
 
-    Delegates to sam_schema.core.query.claim_task for the atomic read-check-write.
+    Delegates to dh_core.operations.claim_task for the atomic read-check-write.
     Exits 0 with JSON output on success. Exits 1 with ``claimed: false`` JSON
     when the task is not found, already claimed, or the file cannot be written.
 
@@ -1350,14 +1360,19 @@ def claim_task(
         task_id: Task identifier to claim (e.g., ``T1``, ``1.1``).
     """
     task_file_str = str(task_file_path)
+    plan_ref = plan_id_from_path(task_file_path)
+    backend = LocalYamlTaskProvider(task_file_path.parent if task_file_path.is_file() else task_file_path)
 
     try:
-        claimed_task = sam_claim_task(task_file_path, task_id)
-    except KeyError:
+        claimed_task = operations.claim_task(backend, plan_ref, task_id)
+    except PlanNotFoundError:
+        _claim_fail({"claimed": False, "task_id": task_id, "reason": "plan-not-found", "task_file": task_file_str})
+        return  # unreachable; satisfies type checker
+    except TaskNotFoundError:
         _claim_fail({"claimed": False, "task_id": task_id, "reason": "task-not-found", "task_file": task_file_str})
         return  # unreachable; satisfies type checker
     except ValueError as exc:
-        # sam_claim_task raises ValueError when task is not in not-started status.
+        # operations.claim_task raises ValueError when task is not in not-started status.
         # Extract the current status from the error message if possible.
         current_status_str = _normalize_status(str(exc).split("'")[-2]) if "'" in str(exc) else "in-progress"
         _claim_fail(

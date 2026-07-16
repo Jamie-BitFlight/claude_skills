@@ -249,9 +249,10 @@ class ReadyPlanConfig(_ActionConfigBase):
 
 
 class UpdatePlanConfig(_ActionConfigBase):
-    """Update plan-level fields.
+    """Update plan-level fields or append a section to a task body.
 
-    Applies field patches and/or sets the plan context field.
+    Applies field patches, sets the plan context field, and/or appends a
+    markdown section to a task's body when ``task_id`` is provided.
     """
 
     action: Literal["update"] = "update"
@@ -266,6 +267,22 @@ class UpdatePlanConfig(_ActionConfigBase):
             "Applied via backend.update_plan_fields. "
             'Example: {"goal": "New goal statement", "issue": 42}'
         ),
+    )
+    task_id: str | None = Field(
+        default=None,
+        description=(
+            "Task ID to target for task-level operations (append_section_name, "
+            "section_content, or task-level set_fields). None means plan-level operations only."
+        ),
+    )
+    append_section_name: str | None = Field(
+        default=None,
+        description=(
+            "Heading of the markdown section to append to the task body. Requires task_id and section_content."
+        ),
+    )
+    section_content: str | None = Field(
+        default=None, description="Body text for the appended section. Used with append_section_name and task_id."
     )
 
 

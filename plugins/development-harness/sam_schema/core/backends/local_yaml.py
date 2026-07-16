@@ -43,7 +43,7 @@ _TASKS_STEM_RE = re.compile(r"^tasks-(\d+)-")
 _TASK_VALIDATION_RE = re.compile(r"Task at index (\d+) failed validation: (.+)", re.DOTALL)
 
 
-def _plan_id_from_path(path: Path) -> str:
+def plan_id_from_path(path: Path) -> str:
     """Extract the plan_id string (e.g. 'P912') from a plan file path.
 
     Args:
@@ -300,7 +300,7 @@ class LocalYamlTaskProvider:
             if plan.source_path is not None:
                 write_plan(plan, plan.source_path, force_single=True)
 
-        plan_id = _plan_id_from_path(plan.source_path) if plan.source_path else slug
+        plan_id = plan_id_from_path(plan.source_path) if plan.source_path else slug
         return _plan_to_plan_data(plan, plan_id)
 
     def read_plan(self, plan_id: str) -> PlanData:
@@ -322,7 +322,7 @@ class LocalYamlTaskProvider:
             raise PlanNotFoundError(plan_id) from exc
         # Prefer the plan_id stored in the record; fall back to filename-derived
         # value for backwards compatibility with pre-existing files.
-        effective_plan_id = result.plan.plan_id or _plan_id_from_path(path)
+        effective_plan_id = result.plan.plan_id or plan_id_from_path(path)
         return _plan_to_plan_data(result.plan, effective_plan_id)
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
@@ -351,7 +351,7 @@ class LocalYamlTaskProvider:
                         continue
                 # Prefer the plan_id stored in the record; fall back to filename-derived
                 # value for backwards compatibility with pre-existing files.
-                plan_id = plan.plan_id or _plan_id_from_path(candidate)
+                plan_id = plan.plan_id or plan_id_from_path(candidate)
                 summary: PlanSummary = {
                     "plan_id": plan_id,
                     "feature": plan.feature,

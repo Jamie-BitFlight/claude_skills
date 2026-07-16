@@ -67,11 +67,12 @@ from sam_schema.core.exceptions import (
     SamError,
     TaskNotFoundError,
 )
-from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
+from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskAssignment, TaskStatus
 
 if TYPE_CHECKING:
     from backlog_core.operations import ImpactRadiusItem
     from sam_schema.core.context_backend import ContextBackend
+    from sam_schema.core.task_backend_types import PlanSummary
 
     from dh_core.protocols import TaskBackend
 
@@ -271,14 +272,14 @@ def create_plan(
     return result
 
 
-def read_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
-    """Read a plan by its address and return a serialized dict.
+def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
+    """Read a plan by its address and return a :class:`ReadResult`.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: plan
-    retrieval, Plan model conversion, dict serialization, and
-    source-degradation warning surfacing.
+    retrieval, Plan model conversion, and source-degradation warning
+    surfacing.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -287,10 +288,11 @@ def read_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
         plan: Plan address string (e.g. ``"P1"`` or slug).
 
     Returns:
-        Dict with the plan fields (serialized via the Plan model with
-        ``by_alias=True, exclude_none=True``). When the backend served
-        the plan from local cache, a ``warnings`` key is added with a
-        degraded-source message.
+        A :class:`~sam_schema.core.models.ReadResult` containing the
+        parsed :class:`~sam_schema.core.models.Plan` and any
+        :class:`~sam_schema.core.models.SchemaGap` records. When the
+        backend served the plan from local cache, a ``warnings`` key is
+        added to the result's source metadata.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -298,30 +300,29 @@ def read_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
     plan_data = backend.read_plan(plan)
     plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
     plan_model = Plan.model_validate(plan_dict)
-    result = plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
 
     # Surface source annotation when plan was served from local cache.
     # Use getattr to stay backend-agnostic — not all backends have
     # last_read_source (only GistTaskLayer does).
     last_read_source = getattr(backend, "last_read_source", None)
     if last_read_source == "local":
-        result["warnings"] = [
-            f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
-        ]
+        _log.warning("Plan %s served from local cache — Gist copy may be unavailable or predates this fix.", plan)
 
-    return result
+    source_path_str = plan_data.get("source_path") or ""
+    source_path = Path(source_path_str) if source_path_str else Path()
+    return ReadResult(plan=plan_model, gaps=[], source_format="backend", source_path=source_path)
 
 
 def list_plans(
     backend: TaskBackend, *, search: str | None = None, offset: int = 0, limit: int | None = None
-) -> dict[str, Any]:
+) -> list[PlanSummary]:
     """List all plans with optional search filtering and pagination.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: plan
-    listing, search filtering (delegated to the backend), summary-to-dict
-    mapping, and offset/limit pagination.
+    listing, search filtering (delegated to the backend), summary
+    enrichment, and offset/limit pagination.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -334,19 +335,19 @@ def list_plans(
         limit: Maximum number of items to return. ``None`` means no limit.
 
     Returns:
-        Dict with ``items`` (list of per-plan summary dicts), ``count``
-        (number of items in the current page), and ``total`` (total
-        number of plans after filtering). Each item dict contains
-        ``feature``, ``goal``, ``description``, ``task_count``, ``issue``,
-        and ``plan_ref``.
+        List of :class:`~sam_schema.core.task_backend_types.PlanSummary`
+        dicts, each containing ``feature``, ``goal``, ``description``,
+        ``task_count``, ``issue``, and ``plan_ref``.
     """
     summaries = backend.list_plans(search=search)
-    all_items: list[dict[str, Any]] = [
+    all_items: list[PlanSummary] = [
         {
+            "plan_id": s["plan_id"],
             "feature": s["feature"],
             "goal": s["goal"],
             "description": s["description"],
             "task_count": s["task_count"],
+            "source_path": s.get("source_path"),
             "issue": s.get("issue"),
             "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
         }
@@ -355,11 +356,11 @@ def list_plans(
 
     total = len(all_items)
     page = all_items[offset:] if limit is None else all_items[offset : offset + limit]
+    _log.debug("list_plans: %d of %d plans returned", len(page), total)
+    return page
 
-    return {"items": page, "count": len(page), "total": total}
 
-
-def get_plan_status(backend: TaskBackend, plan: str) -> dict[str, Any]:
+def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
     """Return plan-level progress summary including autonomy mode.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -367,10 +368,8 @@ def get_plan_status(backend: TaskBackend, plan: str) -> dict[str, Any]:
     and pass it here. The operation handles all business logic: status
     retrieval, drafting-state check, and autonomy field enrichment.
 
-    When the plan is in the ``DRAFTING`` state, a drafting marker dict
-    is returned immediately (matching the MCP server's
-    ``_DRAFTING_MARKER_RESPONSE`` shape). This prevents dispatching a
-    partial plan.
+    When the plan is in the ``DRAFTING`` state, a ``ValueError`` is raised
+    to prevent dispatching a partial plan.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -379,36 +378,49 @@ def get_plan_status(backend: TaskBackend, plan: str) -> dict[str, Any]:
         plan: Plan address string (e.g. ``"P1"`` or slug).
 
     Returns:
-        When the plan is drafting: ``{"drafting": True, "state": "drafting"}``.
-        Otherwise: a dict with the status fields from
-        ``backend.get_plan_status`` plus an ``autonomy`` key sourced from
+        A :class:`~sam_schema.core.models.PlanStatus` model with task
+        counts, ready/blocked task lists, completion percentage, and
+        cycle detection result. The ``autonomy`` field is sourced from
         ``backend.read_plan`` (defaulting to ``"full_auto"`` when absent).
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
+        ValueError: When the plan is in the ``DRAFTING`` state.
     """
-    status = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        return {"drafting": True, "state": PlanState.DRAFTING}
-    plan_data = backend.read_plan(plan)
-    result = dict(status)
-    result["autonomy"] = plan_data.get("autonomy", "full_auto")
-    return result
+    result = read_plan(backend, plan)
+    plan_model = result.plan
+    if plan_model.state == PlanState.DRAFTING:
+        msg = f"Plan '{plan}' is in drafting state — not ready for dispatch."
+        raise ValueError(msg)
+    graph = DependencyGraph(plan_model.tasks)
+    by_status: dict[str, int] = {}
+    for task in plan_model.tasks:
+        by_status[task.status] = by_status.get(task.status, 0) + 1
+    total = len(plan_model.tasks)
+    complete_count = by_status.get(TaskStatus.COMPLETE, 0)
+    completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+    return PlanStatus(
+        feature=plan_model.feature,
+        total_tasks=total,
+        by_status=by_status,
+        ready_tasks=[t.id for t in graph.get_ready_tasks()],
+        blocked_tasks=[{t.id: missing} for t, missing in graph.get_blocked_tasks()],
+        completion_pct=completion_pct,
+        has_cycles=graph.has_cycles(),
+    )
 
 
-def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> dict[str, Any]:
+def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> list[Task]:
     """Return tasks ready for dispatch along with plan-level metadata.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: drafting
-    check, ready-task retrieval, compact/full serialization, and
-    ``feature``/``issue`` enrichment from the plan record.
+    check, ready-task retrieval, and ``feature``/``issue`` enrichment
+    from the plan record.
 
-    When the plan is in the ``DRAFTING`` state, a drafting marker dict
-    is returned immediately (matching the MCP server's
-    ``_DRAFTING_MARKER_RESPONSE`` shape). This prevents dispatching a
-    partial plan.
+    When the plan is in the ``DRAFTING`` state, a ``ValueError`` is raised
+    to prevent dispatching a partial plan.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -418,43 +430,22 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> d
         full: When ``False`` (default), return a compact 7-field routing
             manifest per task: ``id``, ``task``, ``agent``, ``skills``,
             ``dependencies``, ``status``, ``priority``. When ``True``,
-            return the full :class:`~sam_schema.core.models.Task` model
-            dump (all fields).
+            return the full :class:`~sam_schema.core.models.Task` model.
 
     Returns:
-        When the plan is drafting: ``{"drafting": True, "state": "drafting"}``.
-        Otherwise: a dict with ``ready_tasks`` (list of task dicts),
-        ``count`` (number of ready tasks), ``feature`` (plan feature
-        string), and ``issue`` (plan issue number).
+        List of :class:`~sam_schema.core.models.Task` models ready for
+        dispatch, sorted by priority then numeric ID.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
+        ValueError: When the plan is in the ``DRAFTING`` state.
     """
-    status = backend.get_plan_status(plan)
+    status: dict[str, Any] = backend.get_plan_status(plan)
     if status.get("state") == PlanState.DRAFTING:
-        return {"drafting": True, "state": PlanState.DRAFTING}
+        msg = f"Plan '{plan}' is in drafting state — not ready for dispatch."
+        raise ValueError(msg)
     tasks_data = backend.get_ready_tasks(plan)
-    plan_data = backend.read_plan(plan)
-    if full:
-        ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
-    else:
-        ready_tasks = [
-            {
-                "id": t["id"],
-                "task": t["title"],
-                "agent": t["agent"],
-                "skills": t["skills"] or [],
-                "dependencies": t["dependencies"] or [],
-                "status": t["status"],
-                "priority": int(t["priority"]),
-            }
-            for t in tasks_data
-        ]
-    feature = status["feature"]
-    if not isinstance(feature, str):
-        msg = f"get_plan_status must return str for 'feature', got {type(feature).__name__}"
-        raise TypeError(msg)
-    return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}
+    return [Task.model_validate(t) for t in tasks_data]
 
 
 def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
@@ -484,21 +475,33 @@ def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[s
 
 
 def update_plan_fields(
-    backend: TaskBackend, plan: str, *, context: str | None = None, set_fields: dict[str, Any] | None = None
+    backend: TaskBackend,
+    plan: str,
+    *,
+    context: str | None = None,
+    set_fields: dict[str, Any] | None = None,
+    task_id: str | None = None,
+    append_section_name: str | None = None,
+    section_content: str | None = None,
 ) -> dict[str, Any]:
-    """Update plan-level context and/or fields on the backend.
+    """Update plan-level context/fields and/or task-level fields on the backend.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: raw field
     validation through the Plan model (when ``set_fields`` is provided),
-    delegation to ``backend.update_plan_fields``, and response assembly.
+    task-level field updates, section appends, and response assembly.
 
-    When ``set_fields`` is provided, the raw fields are validated by reading
-    the current plan, merging the raw fields into its data, passing the
-    merged dict through ``Plan.model_validate`` (so field validators run),
-    and extracting only the requested keys from the validated model. This
-    ensures the backend receives normalized field values, not raw input.
+    When ``set_fields`` is provided without ``task_id``, the raw fields are
+    validated by reading the current plan, merging the raw fields into its
+    data, passing the merged dict through ``Plan.model_validate`` (so field
+    validators run), and extracting only the requested keys from the
+    validated model. This ensures the backend receives normalized field
+    values, not raw input.
+
+    When ``task_id`` is provided, task-level operations are delegated to
+    ``backend.update_task_fields`` (for ``set_fields``) and
+    ``backend.append_task_section`` (for ``append_section_name``).
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -508,9 +511,14 @@ def update_plan_fields(
         context: Optional plan-level context narrative (markdown). When
             ``None``, the plan's existing context is not modified.
         set_fields: Optional dict of raw field-value pairs to patch onto
-            the plan. Keys use kebab-case (wire convention). Values are
-            normalized through the Plan model before being passed to the
-            backend. When ``None``, no plan-level fields are modified.
+            the plan or task. Keys use kebab-case (wire convention). Values
+            are normalized through the Plan model before being passed to
+            the backend. When ``None``, no fields are modified.
+        task_id: Task ID to target for task-level operations. ``None`` means
+            plan-level operations only.
+        append_section_name: Section heading to append. Requires
+            ``section_content`` and ``task_id``.
+        section_content: Body text for the appended section.
 
     Returns:
         Dict with ``updated`` (``True``) and ``address`` (the plan address
@@ -520,14 +528,31 @@ def update_plan_fields(
         PlanNotFoundError: When the plan address cannot be resolved.
         pydantic.ValidationError: When a field value fails Plan model
             validation.
+        ValueError: When ``append_section_name`` is given without ``task_id``
+            or ``section_content``.
     """
+    if append_section_name is not None:
+        if task_id is None:
+            msg = "append_section_name requires task_id"
+            raise ValueError(msg)
+        if not section_content:
+            msg = "append_section_name requires section_content"
+            raise ValueError(msg)
+
     plan_fields: dict[str, Any] | None = None
-    if set_fields is not None:
+    if set_fields is not None and task_id is None:
         validated = _validated_plan_patch(backend, plan, set_fields)
         # by_alias=True: set_fields uses kebab-case keys (wire convention);
         # alias keys must match so we extract only the requested keys.
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
     backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+
+    if set_fields is not None and task_id is not None:
+        backend.update_task_fields(plan, task_id, set_fields)
+
+    if append_section_name is not None and task_id is not None and section_content:
+        backend.append_task_section(plan, task_id, append_section_name, section_content)
+
     return {"updated": True, "address": plan}
 
 
@@ -609,14 +634,14 @@ def finalize_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
     return backend.finalize_plan(plan)
 
 
-def read_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
-    """Read a single task with its full plan context and return a serialized assignment.
+def read_task(backend: TaskBackend, plan: str, task: str) -> TaskAssignment:
+    """Read a single task with its full plan context and return a TaskAssignment.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: plan
-    retrieval, task retrieval, Task model conversion, TaskAssignment
-    construction, and dict serialization.
+    retrieval, task retrieval, Task model conversion, and
+    TaskAssignment construction.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -626,10 +651,9 @@ def read_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
         task: Task ID within the plan (e.g. ``"T3"``).
 
     Returns:
-        Dict serialized from a :class:`~sam_schema.core.models.TaskAssignment`
-        model via ``model_dump(mode="json", by_alias=True, exclude_none=True)``.
-        Contains the plan number, slug, goal, context, acceptance
-        criteria, and the full task model.
+        A :class:`~sam_schema.core.models.TaskAssignment` model containing
+        the plan number, slug, goal, context, acceptance criteria, and
+        the full task model.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -638,7 +662,7 @@ def read_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
     plan_data = backend.read_plan(plan)
     task_data = backend.read_task(plan, task)
     task_model = Task.model_validate(task_data)
-    assignment = TaskAssignment(
+    return TaskAssignment(
         plan_number=plan_data.get("plan_id", plan),
         plan_slug=plan_data.get("feature") or None,
         plan_goal=plan_data.get("goal") or None,
@@ -646,10 +670,9 @@ def read_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
         plan_acceptance_criteria=plan_data.get("acceptance_criteria") or plan_data.get("acceptance-criteria") or None,
         task=task_model,
     )
-    return assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
 
 
-def claim_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
+def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
     """Claim a task for dispatch, with local-backend fallback for local-only plans.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -673,16 +696,14 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
         task: Task ID within the plan (e.g. ``"T3"``).
 
     Returns:
-        On success: dict with ``claimed`` (``True``), ``task_id``, and
-        ``started`` (ISO 8601 UTC timestamp). When the claim fell back
-        to the local backend, a ``warnings`` key is added with a
-        non-portability notice. On failure: dict with ``claimed``
-        (``False``) and an ``error`` message describing why the task
-        could not be claimed.
+        The :class:`~sam_schema.core.models.Task` model with status
+        ``in-progress`` and ``started`` timestamp set.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskNotFoundError: When the task ID cannot be resolved in the plan.
+        ValueError: When the task is not in ``not-started`` status (already
+            claimed or in a terminal state).
     """
     try:
         claimed, claim_warning = backend.claim_task(plan, task), None
@@ -702,16 +723,14 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> dict[str, Any]:
             task_data = backend.read_task(plan, task)
             current_status = task_data["status"]
         except (PlanNotFoundError, TaskNotFoundError, SamError):
-            return {"claimed": False, "error": f"Cannot claim task '{task}': task is not available for claiming."}
-        return {
-            "claimed": False,
-            "error": (f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."),
-        }
+            msg = f"Cannot claim task '{task}': task is not available for claiming."
+            raise ValueError(msg) from None
+        msg = f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."
+        raise ValueError(msg)
 
-    result: dict[str, Any] = {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
-    if claim_warning is not None:
-        result["warnings"] = [claim_warning]
-    return result
+    # Re-read the task to get the updated model with started timestamp.
+    task_data = backend.read_task(plan, task)
+    return Task.model_validate(task_data)
 
 
 def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) -> dict[str, Any]:

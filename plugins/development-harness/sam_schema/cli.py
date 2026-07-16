@@ -46,15 +46,15 @@ if isinstance(sys.stderr, TextIOWrapper):
 import dh_paths
 import typer
 from dh_core import operations
+from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
-from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import TaskStatus
-from sam_schema.core.query import get_plan_status, load_plan, update_plan_fields
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -174,9 +174,15 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
     """
     # If the argument is an existing file path, load the plan directly.
     if Path(plan_address).exists():
+        file_path = Path(plan_address)
+        file_plan_dir = file_path.parent
+        plan_ref = plan_id_from_path(file_path)
+        backend = LocalYamlTaskProvider(file_plan_dir)
         try:
-            status = get_plan_status(Path(plan_address))
+            status = operations.get_plan_status(backend, plan_ref)
             return status.model_dump(mode="json")
+        except ValueError:
+            return {"drafting": True, "state": "drafting"}
         except PlanNotFoundError as exc:
             _err(str(exc))
         except FileNotFoundError as exc:
@@ -193,7 +199,10 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        return operations.get_plan_status(backend, plan_ref)
+        status = operations.get_plan_status(backend, plan_ref)
+        return status.model_dump(mode="json")
+    except ValueError:
+        return {"drafting": True, "state": "drafting"}
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -203,12 +212,22 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
 
 
 def _output_json(data: object) -> None:
-    """Print ``data`` as formatted JSON to stdout.
+    """Print ``data`` as compact JSON to stdout.
+
+    Pydantic models use ``model_dump_json()`` directly. Other objects fall
+    back to ``json.dumps`` with a string default.
 
     Args:
-        data: Any JSON-serializable object.
+        data: A Pydantic model, list of models, or JSON-serializable object.
     """
-    typer.echo(json.dumps(data, indent=2, default=str))
+    if isinstance(data, BaseModel):
+        typer.echo(data.model_dump_json())
+    elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
+        typer.echo(
+            json.dumps([item.model_dump(mode="json") for item in data if isinstance(item, BaseModel)], default=str)
+        )
+    else:
+        typer.echo(json.dumps(data, default=str))
 
 
 def _output_yaml(data: object) -> None:
@@ -308,7 +327,7 @@ def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
         case "yaml":
             _output_yaml(data)
         case _:
-            _output_rich_task(data)
+            _output_json(data.plan.model_dump(mode="json", by_alias=True, exclude_none=True))
 
 
 def _read_task_assignment(plan_ref: str, plan_dir: Path, task_id: str, output_format: str) -> None:
@@ -342,12 +361,13 @@ def _read_task_assignment(plan_ref: str, plan_dir: Path, task_id: str, output_fo
         case "yaml":
             _output_yaml(data)
         case _:
+            task_dict = data.model_dump(mode="json", by_alias=True, exclude_none=True)
             console = Console()
-            if data.get("plan_goal"):
-                console.print(f"[bold cyan]Plan goal:[/bold cyan] {data['plan_goal']}")
-            if data.get("plan_context"):
-                console.print(f"[bold cyan]Plan context:[/bold cyan] {data['plan_context']}")
-            _output_rich_task(data.get("task", data))
+            if task_dict.get("plan_goal"):
+                console.print(f"[bold cyan]Plan goal:[/bold cyan] {task_dict['plan_goal']}")
+            if task_dict.get("plan_context"):
+                console.print(f"[bold cyan]Plan context:[/bold cyan] {task_dict['plan_context']}")
+            _output_rich_task(task_dict.get("task", task_dict))
 
 
 @app.command(name="list")
@@ -477,8 +497,8 @@ def state(
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    task_data = assignment.get("task", assignment)
-    old_status = task_data.get("status", "unknown")
+    task_data = assignment.task
+    old_status = task_data.status
 
     try:
         result = operations.update_task_status(backend, plan_ref, task_id, parsed_status)
@@ -520,24 +540,24 @@ def ready(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = operations.get_ready_tasks(backend, plan_ref, full=True)
+        result = operations.get_ready_tasks(backend, plan_ref)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
-
-    # Drafting marker — return the marker dict as-is.
-    if result.get("drafting"):
+    except ValueError:
+        # Drafting marker — plan is in DRAFTING state.
+        drafting_marker = {"drafting": True, "ready_tasks": []}
         if output_format == "yaml":
-            _output_yaml(result)
+            _output_yaml(drafting_marker)
         else:
-            _output_json(result)
+            _output_json(drafting_marker)
         return
 
-    # CLI output: just the ready_tasks list (backward-compatible shape).
-    data = result["ready_tasks"]
+    # CLI output: serialize list[Task] models.
+    data = [t.model_dump(mode="json") for t in result]
     if output_format == "yaml":
         _output_yaml(data)
     else:
@@ -569,11 +589,13 @@ def status(
         if not plan_dir.exists():
             _err(f"Plan directory does not exist: {plan_dir}")
         results: list[dict[str, object]] = []
+        backend = LocalYamlTaskProvider(plan_dir)
         for candidate in sorted(plan_dir.iterdir()):
             if not (candidate.suffix in {".yaml", ".md"} or candidate.is_dir()):
                 continue
             try:
-                ps = get_plan_status(candidate)
+                plan_ref = plan_id_from_path(candidate)
+                ps = operations.get_plan_status(backend, plan_ref)
                 entry = ps.model_dump(mode="json")
                 entry["path"] = str(candidate)
                 results.append(entry)
@@ -712,7 +734,6 @@ def update(
     except ValueError as exc:
         _err(str(exc))
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
     task_id = f"T{task_ref}" if task_ref is not None and task_ref.isdigit() else task_ref
 
     # Parse --set field=value pairs
@@ -726,9 +747,11 @@ def update(
     if not context and not parsed_fields and not append_section_name:
         _err("Provide at least one of --context, --set, or --append-section")
 
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        update_plan_fields(
-            plan_path,
+        operations.update_plan_fields(
+            backend,
+            plan_ref,
             task_id=task_id,
             set_fields=parsed_fields or None,
             context=context,
@@ -790,12 +813,13 @@ def claim(
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
-
-    if not result.get("claimed"):
+    except ValueError as exc:
         # Task is not claimable — already claimed or in a terminal state.
-        _err(result.get("error", f"Cannot claim task '{task_id}'."))
+        _err(str(exc))
 
-    _output_json(result)
+    task_data = result.model_dump(mode="json")
+    started_str = task_data.get("started")
+    _output_json({"claimed": True, "task_id": task_id, "started": started_str})
 
 
 @app.command()
@@ -826,10 +850,11 @@ def validate(
     except ValueError as exc:
         _err(str(exc))
 
-    plan_path = _resolve_plan(plan_ref, plan_dir)
-
+    backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = load_plan(plan_path)
+        result = operations.read_plan(backend, plan_ref)
+    except PlanNotFoundError as exc:
+        _err(str(exc))
     except FileNotFoundError as exc:
         _err(str(exc))
     except FormatDetectionError as exc:
@@ -1123,7 +1148,7 @@ def _migrate_one_fallback(plan_path: Path, dry_run: bool) -> tuple[Path | None, 
 def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
     """Migrate a single plan file to canonical pure-YAML format.
 
-    Attempts canonical load via ``load_plan``.  If the loader raises any
+    Attempts canonical load via ``operations.read_plan``.  If the loader raises any
     exception (non-standard task lists, checklist tasks, or prose-only markdown),
     falls back to ``_migrate_one_fallback`` which performs best-effort
     preservation: the original content is stored verbatim in ``context.body``.
@@ -1141,8 +1166,10 @@ def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
         FileExistsError: If the canonical target already exists (collision guard).
         OSError: If the output file cannot be written.
     """
+    plan_ref = plan_id_from_path(plan_path)
+    backend = LocalYamlTaskProvider(plan_path.parent if plan_path.is_file() else plan_path)
     try:
-        result = load_plan(plan_path)
+        result = operations.read_plan(backend, plan_ref)
     except _PLAN_LOAD_ERRORS:
         return _migrate_one_fallback(plan_path, dry_run)
 

@@ -42,7 +42,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import PlanState
+from sam_schema.core.models import PlanState, PlanStatus, ReadResult, Task, TaskAssignment
 from sam_schema.core.plan_id_index import create_plan_id_index
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
 
@@ -220,12 +220,12 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> dict:
+def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     """Return Plan fields for the given plan address.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
-    The operation handles plan retrieval, Plan model conversion, dict
-    serialization, and source-degradation warning surfacing.
+    The operation handles plan retrieval, Plan model conversion, and
+    source-degradation warning surfacing.
     """
     backend = _get_backend(plan_dir)
     return operations.read_plan(backend, plan)
@@ -245,7 +245,7 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
     )
 
 
-def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
+def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict[str, Any]:
     """List all plans with optional search and auto-pagination.
 
     Thin adapter: delegates business logic to ``dh_core.operations.list_plans``
@@ -258,44 +258,46 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
         ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
     backend = _get_backend(plan_dir)
-    # Operations layer does search + summary mapping; pagination is deferred
-    # to _paginate_results which applies offset/limit + token-budget paging.
-    result = operations.list_plans(backend, search=config.search, offset=0, limit=None)
+    # Operations layer returns a list of PlanSummary dicts; pagination is
+    # deferred to _paginate_results which applies offset/limit + token-budget
+    # paging.
+    summaries = operations.list_plans(backend, search=config.search, offset=0, limit=None)
+    all_items: list[dict[str, Any]] = [{**s} for s in summaries]  # Spread TypedDict into plain dict at this boundary
     return _paginate_results(
-        result["items"],
-        offset=config.offset,
-        limit=config.limit,
-        messages=[],
-        warnings=[],
-        errors=[],
-        tool_name="sam_plan",
+        all_items, offset=config.offset, limit=config.limit, messages=[], warnings=[], errors=[], tool_name="sam_plan"
     )
 
 
-def _sam_plan_status(plan: str, plan_dir: str) -> dict:
+def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus | dict[str, object]:
     """Return plan-level progress summary including autonomy mode.
 
     Thin adapter that resolves the backend via ``_get_backend`` and
-    delegates to ``dh_core.operations.get_plan_status``.
+    delegates to ``dh_core.operations.get_plan_status``. When the plan
+    is in drafting state, returns a drafting marker dict.
     """
     backend = _get_backend(plan_dir)
-    return operations.get_plan_status(backend, plan)
+    try:
+        return operations.get_plan_status(backend, plan)
+    except ValueError:
+        return _DRAFTING_MARKER_RESPONSE
 
 
-def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
+def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[str, object] | list[Task]:
     """List tasks ready for dispatch.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates
     to ``dh_core.operations.get_ready_tasks``. The operation handles the
-    drafting check, ready-task retrieval, compact/full serialization, and
-    ``feature``/``issue`` enrichment.
+    drafting check and ready-task retrieval.
 
     Returns:
-        Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue``
-        keys. When the plan is drafting, returns a drafting marker.
+        List of :class:`~sam_schema.core.models.Task` models ready for
+        dispatch. When the plan is drafting, returns a drafting marker dict.
     """
     backend = _get_backend(plan_dir)
-    return operations.get_ready_tasks(backend, plan, full=config.full)
+    try:
+        return operations.get_ready_tasks(backend, plan)
+    except ValueError:
+        return _DRAFTING_MARKER_RESPONSE
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
@@ -309,7 +311,15 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
         Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
     """
     backend = _get_backend(plan_dir)
-    return operations.update_plan_fields(backend, plan, context=config.context, set_fields=config.set_fields_json)
+    return operations.update_plan_fields(
+        backend,
+        plan,
+        context=config.context,
+        set_fields=config.set_fields_json,
+        task_id=config.task_id,
+        append_section_name=config.append_section_name,
+        section_content=config.section_content,
+    )
 
 
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
@@ -405,7 +415,7 @@ def sam_plan(
             )
         ),
     ] = None,
-) -> dict:
+) -> dict[str, object] | list[Task] | PlanStatus | ReadResult | TaskAssignment:
     """Consolidated plan-level operations for SAM.
 
     Delegates to the appropriate plan operation based on ``config.action``.
@@ -488,7 +498,7 @@ def sam_task(
         TaskActionConfig, Field(description="Action config. Set 'action' to: read | claim | state | update")
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
-) -> dict:
+) -> TaskAssignment | Task | dict[str, Any]:
     """Read, claim, update state, or update fields for a specific task.
 
     # TRADE-OFF: readonly annotation loss

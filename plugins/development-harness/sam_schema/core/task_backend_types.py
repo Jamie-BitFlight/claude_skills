@@ -219,6 +219,8 @@ class PlanSummary(TypedDict):
     # Optional fields
     issue: NotRequired[str | None]
     backend_ref: NotRequired[str | None]
+    # Computed by the operations layer for display purposes
+    plan_ref: NotRequired[str | None]
 
 
 class DocumentHandle(TypedDict):
