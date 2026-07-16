@@ -172,6 +172,18 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
         SystemExit(1): If the path or address cannot be resolved.
         SystemExit(2): If the format cannot be detected.
     """
+    # If the argument is an existing file path, load the plan directly.
+    if Path(plan_address).exists():
+        try:
+            status = get_plan_status(Path(plan_address))
+            return status.model_dump(mode="json")
+        except PlanNotFoundError as exc:
+            _err(str(exc))
+        except FileNotFoundError as exc:
+            _err(str(exc))
+        except FormatDetectionError as exc:
+            _err(str(exc), exit_code=2)
+
     # Accept structured addresses only (P{N}, slug). The backend resolves
     # the address to whatever storage it uses — never pass filesystem paths.
     try:
@@ -508,7 +520,7 @@ def ready(
 
     backend = LocalYamlTaskProvider(plan_dir)
     try:
-        result = operations.get_ready_tasks(backend, plan_ref)
+        result = operations.get_ready_tasks(backend, plan_ref, full=True)
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -837,6 +849,8 @@ def validate(
             warnings.append(msg)
 
     valid = len(errors) == 0
+    result = {"valid": valid, "errors": errors, "warnings": warnings}
+    _output_json(result)
     if not valid:
         raise typer.Exit(1)
 
@@ -1382,10 +1396,15 @@ def _attempt_backlog_sync() -> None:
         typer.echo(f"Warning: backlog sync unavailable: {exc}", err=True)
 
 
-def _print_output_messages(out: Output) -> None:
-    """Print any messages, warnings, and errors collected in an ``Output``."""
+def _print_output_messages(out: Output, *, stderr: bool = True) -> None:
+    """Print any messages, warnings, and errors collected in an ``Output``.
+
+    By default informational messages are sent to stderr (via ``err=True``)
+    so that stdout remains parseable for JSON consumers. When ``stderr`` is
+    ``False``, messages go to stdout.
+    """
     for msg in out.messages:
-        typer.echo(msg)
+        typer.echo(msg, err=stderr)
     for msg in out.warnings:
         typer.echo(f"Warning: {msg}", err=True)
     for msg in out.errors:
@@ -1633,7 +1652,6 @@ def sam_task_create(
         str, typer.Option("--acceptance-criteria-json", help="JSON list of acceptance criteria")
     ] = "[]",
     labels_json: Annotated[str, typer.Option("--labels-json", help="JSON list of labels")] = "[]",
-    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
 ) -> None:
     """Create a SAM task issue under a parent issue."""
@@ -1682,12 +1700,13 @@ def sam_tasks(
 def sam_task_status(
     issue_number: Annotated[int, typer.Argument(help="SAM task issue number")],
     status: Annotated[str, typer.Option("--status", help="New status")] = "",
-    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
 ) -> None:
     """Update a SAM task's status."""
     if output_format != "json":
         _err(f"Invalid format '{output_format}'. Must be one of: json")
+    if not status:
+        _err("--status is required")
     out = Output()
     result = operations.update_sam_task_status(issue_number=issue_number, new_status=status, output=out)
     _output_json(result)

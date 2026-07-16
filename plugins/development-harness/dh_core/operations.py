@@ -561,6 +561,9 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
         pydantic.ValidationError: When a dict task fails model validation.
     """
     if not isinstance(task, Task):
+        if isinstance(task, dict) and "task" in task and "id" not in task:
+            # Accept "task" key as the task id (YAML frontmatter convention)
+            task = {**task, "id": task.pop("task")}
         task = Task.model_validate(task)
     return backend.append_task(plan, task)
 
@@ -1198,6 +1201,25 @@ def dispatch_create_plan(
         val_errors = list(val_result.errors)
         val_warnings = list(val_result.warnings)
 
+    # Register the dispatch-plan artifact (best-effort) when an issue is provided.
+    if issue is not None:
+        try:
+            provider = _get_artifact_provider()
+            registry = _get_artifact_registry()
+            entry = ArtifactEntry(
+                artifact_type=ArtifactType.DISPATCH_PLAN,
+                artifact_id=str(plan_path),
+                status=ArtifactStatus.CURRENT,
+                agent="dispatch_create_plan",
+            )
+            manifest = provider.get_manifest(issue)
+            updated_manifest = registry.register(manifest, entry)
+            provider.set_manifest(issue, updated_manifest)
+        except (BacklogError, GithubException) as exc:
+            _log.warning(
+                "dispatch_create_plan: artifact registration failed for item %s (path=%s): %s", issue, plan_path, exc
+            )
+
     wave_count = len(plan_model.waves)
     item_count = sum(len(wave.items) for wave in plan_model.waves)
 
@@ -1573,6 +1595,13 @@ def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | Non
         entries = registry.get_by_type(manifest, type_enum)
         if not entries:
             return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
+        if artifact_id is not None:
+            entries = [e for e in entries if e.artifact_id == artifact_id]
+            if not entries:
+                return {
+                    "error": f"No artifact with id '{artifact_id}' of type '{artifact_type}' found for item #{item_id}",
+                    **out.to_dict(),
+                }
         entries_sorted = sorted(entries, key=lambda e: e.created_at or "", reverse=True)
         entry = entries_sorted[0]
         if len(entries_sorted) > 1:

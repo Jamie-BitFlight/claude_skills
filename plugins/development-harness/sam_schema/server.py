@@ -614,12 +614,9 @@ def sam_active_task(
                 )
                 raise ToolError(msg)
             if active.plan_dir is None:
-                msg = (
-                    "sam_active_task: active task context lacks structured plan_dir field. "
-                    "Call sam_active_task(action='set', plan=..., task=...) again to populate it."
-                )
-                raise ToolError(msg)
-            task_backend = _get_backend(active.plan_dir)
+                task_backend = _get_backend(str(Path(active.task_file_path).parent))
+            else:
+                task_backend = _get_backend(active.plan_dir)
             return operations.update_active_task(
                 ctx_backend,
                 resolved_session,
