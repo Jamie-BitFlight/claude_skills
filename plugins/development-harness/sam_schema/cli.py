@@ -1885,5 +1885,85 @@ def create_project(
     _print_output_messages(out)
 
 
+@app.command(name="backlog-pull")
+def backlog_pull(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    diff: Annotated[bool, typer.Option("--diff", help="Return a diff instead of writing the item")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Pull a single backlog item from GitHub by selector."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.pull_by_selector(selector=selector, repo=repo, diff=diff, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-pull-all")
+def backlog_pull_all(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes without writing")] = False,
+    force: Annotated[bool, typer.Option("--force", help="Force pull even if local items are newer")] = False,
+    diff: Annotated[bool, typer.Option("--diff", help="Return a diff instead of writing items")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Pull all backlog items from GitHub for a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.pull_items(repo=repo, dry_run=dry_run, force=force, diff=diff, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-normalize")
+def backlog_normalize(
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes without writing")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Normalize backlog item files (canonical frontmatter and structure)."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.normalize_items(dry_run=dry_run, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-strike")
+def backlog_strike(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    entry_id: Annotated[str, typer.Option("--entry-id", help="Log entry ID to strike (required)")],
+    reason: Annotated[str, typer.Option("--reason", help="Reason for striking the entry (required)")],
+    section: Annotated[str | None, typer.Option("--section", help="Section containing the entry")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Strike a log entry from a backlog item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.strike_entry(selector=selector, entry_id=entry_id, reason=reason, section=section, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-refresh")
+def backlog_refresh(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    label: Annotated[str | None, typer.Option("--label", help="Filter issues by label")] = None,
+    full_refresh: Annotated[bool, typer.Option("--full-refresh", help="Re-fetch all items, not just deltas")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Refresh the local backlog cache from GitHub Issues."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.refresh_local_cache_from_github(repo=repo, label=label, full_refresh=full_refresh, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
