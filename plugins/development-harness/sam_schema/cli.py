@@ -52,9 +52,10 @@ from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
 
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
-from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path
+from sam_schema.core.backends.local_yaml import plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import TaskStatus
+from sam_schema.core.task_config import get_backend
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -177,7 +178,7 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
         file_path = Path(plan_address)
         file_plan_dir = file_path.parent
         plan_ref = plan_id_from_path(file_path)
-        backend = LocalYamlTaskProvider(file_plan_dir)
+        backend = get_backend(str(file_plan_dir))
         try:
             status = operations.get_plan_status(backend, plan_ref)
             return status.model_dump(mode="json")
@@ -197,7 +198,7 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
     except ValueError as exc:
         _err(str(exc))
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         status = operations.get_plan_status(backend, plan_ref)
         return status.model_dump(mode="json")
@@ -321,7 +322,7 @@ def _read_plan_only(plan_ref: str, plan_dir: Path, output_format: str) -> None:
         plan_dir: Directory to search for plan files.
         output_format: One of ``json``, ``yaml``, ``rich``.
     """
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         data = operations.read_plan(backend, plan_ref)
     except PlanNotFoundError as exc:
@@ -350,7 +351,7 @@ def _read_task_assignment(plan_ref: str, plan_dir: Path, task_id: str, output_fo
         task_id: Normalised task ID (e.g. ``"T3"``).
         output_format: One of ``json``, ``yaml``, ``rich``.
     """
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         data = operations.read_task(backend, plan_ref, task_id)
     except PlanNotFoundError as exc:
@@ -414,7 +415,7 @@ def list_plans(
     if not plan_dir.exists():
         _err(f"Plan directory does not exist: {plan_dir}")
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     result = operations.list_plans(backend, search=search, offset=offset, limit=limit)
 
     if output_format == "yaml":
@@ -490,7 +491,7 @@ def state(
 
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
 
     # Read current task to capture old status for the confirmation message.
     try:
@@ -545,7 +546,7 @@ def ready(
     except ValueError as exc:
         _err(str(exc))
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.get_ready_tasks(backend, plan_ref)
     except PlanNotFoundError as exc:
@@ -596,7 +597,7 @@ def status(
         if not plan_dir.exists():
             _err(f"Plan directory does not exist: {plan_dir}")
         results: list[dict[str, object]] = []
-        backend = LocalYamlTaskProvider(plan_dir)
+        backend = get_backend(str(plan_dir))
         for candidate in sorted(plan_dir.iterdir()):
             if not (candidate.suffix in {".yaml", ".md"} or candidate.is_dir()):
                 continue
@@ -681,7 +682,7 @@ def create(
 
     # Delegate to dh_core.operations via a LocalYamlTaskProvider backend.
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.create_plan(backend, slug=slug, goal=goal, tasks=tasks, context=context, issue=issue)
     except ValueError as exc:
@@ -754,7 +755,7 @@ def update(
     if not context and not parsed_fields and not append_section_name:
         _err("Provide at least one of --context, --set, or --append-section")
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         operations.update_plan_fields(
             backend,
@@ -809,7 +810,7 @@ def claim(
 
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.claim_task(backend, plan_ref, task_id)
     except PlanNotFoundError as exc:
@@ -857,7 +858,7 @@ def validate(
     except ValueError as exc:
         _err(str(exc))
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.read_plan(backend, plan_ref)
     except PlanNotFoundError as exc:
@@ -959,7 +960,7 @@ def append_task(
 
     task_dict = _resolve_task_definition(task_json, from_stdin)
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.append_task(backend, plan_ref, task_dict)
     except PlanNotFoundError as exc:
@@ -1005,7 +1006,7 @@ def finalize(
     except ValueError as exc:
         _err(str(exc))
 
-    backend = LocalYamlTaskProvider(plan_dir)
+    backend = get_backend(str(plan_dir))
     try:
         result = operations.finalize_plan(backend, plan_ref)
     except PlanNotFoundError as exc:
@@ -1174,7 +1175,7 @@ def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
         OSError: If the output file cannot be written.
     """
     plan_ref = plan_id_from_path(plan_path)
-    backend = LocalYamlTaskProvider(plan_path.parent if plan_path.is_file() else plan_path)
+    backend = get_backend(str(plan_path.parent if plan_path.is_file() else plan_path))
     try:
         result = operations.read_plan(backend, plan_ref)
     except _PLAN_LOAD_ERRORS:

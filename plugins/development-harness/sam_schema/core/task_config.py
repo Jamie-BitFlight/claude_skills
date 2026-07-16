@@ -15,12 +15,22 @@ from __future__ import annotations
 import importlib
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
 
-__all__ = ["TaskConfig", "create_task_backend", "get_task_config", "reset_task_config", "set_task_config"]
+__all__ = [
+    "TaskConfig",
+    "create_task_backend",
+    "get_backend",
+    "get_task_config",
+    "reset_task_config",
+    "set_task_config",
+]
+
+_PLAN_DIR_SENTINEL = "plan"
 
 _VALID_BACKENDS: tuple[str, ...] = ("beads", "local", "github", "memory")
 
@@ -160,3 +170,54 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
     raise ValueError(msg)
+
+
+# ---------------------------------------------------------------------------
+# Shared backend resolution (used by both CLI and MCP server)
+# ---------------------------------------------------------------------------
+
+
+def get_backend(plan_dir: str | None = None) -> TaskBackend:
+    """Return the appropriate TaskBackend for the given plan_dir.
+
+    When *plan_dir* is ``None`` or ``"plan"``, returns the module-level
+    configured backend from :func:`get_task_config`, wrapped in
+    :class:`~sam_schema.core.gist_task_layer.GistTaskLayer` when the
+    underlying backend is a ``LocalYamlTaskProvider`` (matching MCP server
+    behaviour — write-through to GitHub Gist).
+
+    When *plan_dir* is a concrete filesystem path, creates a
+    :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider`
+    for that path and returns it directly (no Gist wrapping — an explicit
+    path means local-only).
+
+    Args:
+        plan_dir: The ``plan_dir`` parameter from the caller.  ``None`` or
+            ``"plan"`` selects the configured backend; any other value is
+            treated as a filesystem path.
+
+    Returns:
+        A :class:`~sam_schema.core.task_backend.TaskBackend` instance.
+    """
+    if plan_dir is None or plan_dir == _PLAN_DIR_SENTINEL:
+        return _get_configured_backend()
+
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+
+    return LocalYamlTaskProvider(Path(plan_dir))
+
+
+def _get_configured_backend() -> TaskBackend:
+    """Return the configured backend, wrapped in GistTaskLayer when applicable."""
+    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
+    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
+
+    configured = get_task_config().backend
+    if not isinstance(configured, LocalYamlTaskProvider):
+        return configured
+
+    artifact_client = ArtifactRegistryClient()
+    plan_index = create_plan_id_index(artifact_client)
+    return GistTaskLayer(local_backend=configured, artifact_client=artifact_client, plan_index=plan_index)

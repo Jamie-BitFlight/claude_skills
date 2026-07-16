@@ -38,20 +38,14 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
-from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
-from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import PlanState, PlanStatus, ReadResult, Task, TaskAssignment
-from sam_schema.core.plan_id_index import create_plan_id_index
-from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
+from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
 
 _log = logging.getLogger(__name__)
-
-_PLAN_DIR_SENTINEL = "plan"
 
 # Sentinel session key used when session_id is omitted from sam_active_task calls.
 # Single-agent scenarios do not require explicit session isolation.
@@ -81,42 +75,19 @@ except RuntimeError:
 
 
 def _get_backend(plan_dir_str: str) -> TaskBackend:
-    """Return a GistTaskLayer wrapping the configured local backend.
+    """Return the appropriate TaskBackend for the given plan_dir.
 
-    When *plan_dir_str* is the default sentinel (``"plan"``), wraps the
-    module-level configured backend in a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`
-    so MCP callers always route through write-through Gist storage.
-
-    When *plan_dir_str* is a concrete filesystem path, creates a
-    :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider` for
-    that path and wraps it in ``GistTaskLayer`` to preserve backward compatibility
-    while still enabling write-through for callers that supply an explicit directory.
-
-    CLI and non-MCP callers that bypass this function continue to use
-    ``LocalYamlTaskProvider`` directly — this wrapper is MCP-server-only.
+    Delegates to the shared :func:`sam_schema.core.task_config.get_backend` so that
+    both the MCP server and the CLI use the same backend-resolution logic.
 
     Args:
         plan_dir_str: The ``plan_dir`` parameter from the MCP tool call.
 
     Returns:
         :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
-        this tool call (always a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`).
+        this tool call.
     """
-    artifact_client = ArtifactRegistryClient()
-    plan_index = create_plan_id_index(artifact_client)
-
-    if plan_dir_str == _PLAN_DIR_SENTINEL:
-        configured = get_task_config().backend
-        # When the configured backend is already a LocalYamlTaskProvider, use it
-        # directly.  When it is another type (e.g. InMemoryTaskProvider for tests),
-        # skip wrapping — GistTaskLayer requires a LocalYamlTaskProvider.
-        if isinstance(configured, LocalYamlTaskProvider):
-            return GistTaskLayer(local_backend=configured, artifact_client=artifact_client, plan_index=plan_index)
-        return configured
-
-    # Non-default plan_dir: create a LocalYamlTaskProvider for that explicit path.
-    local = LocalYamlTaskProvider(Path(plan_dir_str))
-    return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
+    return get_backend(plan_dir_str)
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
