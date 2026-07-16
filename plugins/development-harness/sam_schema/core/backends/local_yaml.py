@@ -17,6 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import dh_paths
+
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.backends._utils import validate_appended_task
 from sam_schema.core.dependencies import DependencyGraph
@@ -231,16 +233,8 @@ class LocalYamlTaskProvider:
         Args:
             plan_dir: Root directory for plan YAML files. When None,
                 resolves via ``dh_paths.plan_dir()``.
-
-        Raises:
-            RuntimeError: If plan_dir is None and dh_paths is not importable.
         """
         if plan_dir is None:
-            try:
-                import dh_paths
-            except ImportError as exc:
-                msg = "plan_dir is None and dh_paths is not importable — install dh_paths or pass plan_dir explicitly"
-                raise RuntimeError(msg) from exc
             plan_dir = dh_paths.plan_dir()
         self._plan_dir: Path = plan_dir
         # Per-plan task-ID cache — avoids repeated YAML parse+deserialize when
@@ -406,7 +400,12 @@ class LocalYamlTaskProvider:
         # Prefer the plan_id stored in the record; fall back to filename-derived
         # value for backwards compatibility with pre-existing files.
         effective_plan_id = result.plan.plan_id or plan_id_from_path(path)
-        return _plan_to_plan_data(result.plan, effective_plan_id)
+        plan_data = _plan_to_plan_data(result.plan, effective_plan_id)
+        # Preserve schema gaps from the reader/normalizer pipeline so that
+        # operations.read_plan can surface them in ReadResult for `sam validate`.
+        if result.gaps:
+            plan_data["gaps"] = [g.model_dump() for g in result.gaps]
+        return plan_data
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return lightweight summaries for all plans, optionally filtered.

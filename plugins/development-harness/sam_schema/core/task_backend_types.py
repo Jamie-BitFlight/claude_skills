@@ -12,7 +12,7 @@ All types follow the pattern established in backlog_core/backend_protocol.py:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NotRequired
+from typing import TYPE_CHECKING, Any, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -132,6 +132,10 @@ class PlanData(TypedDict):
 
     # Autonomy mode for the implement-feature dispatch loop
     autonomy: NotRequired[str]
+
+    # Schema gaps from normalization (populated by LocalYamlTaskProvider.read_plan;
+    # absent for backends that don't detect gaps, e.g. GitHub backend).
+    gaps: NotRequired[list[dict[str, Any]]]
 
 
 class PlanFieldsUpdate(TypedDict, total=False):

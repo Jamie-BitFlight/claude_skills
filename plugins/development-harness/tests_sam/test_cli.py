@@ -391,3 +391,33 @@ def test_migrate_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
     """Migrate P99 exits 1 when no matching plan exists."""
     result = runner.invoke(app, ["migrate", "P99", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# sam validate
+# ---------------------------------------------------------------------------
+
+
+def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
+    """Validate P1 on a canonical YAML plan reports no errors or warnings."""
+    result = runner.invoke(app, ["validate", "P1", "--plan-dir", str(plan_dir)])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["valid"] is True
+    assert data["errors"] == []
+    assert data["warnings"] == []
+
+
+def test_validate_legacy_plan_reports_gaps(legacy_plan_dir: Path) -> None:
+    """Validate P2 on a legacy markdown plan surfaces schema gaps as errors.
+
+    This verifies that operations.read_plan preserves gaps from the
+    reader/normalizer pipeline through the backend and back to ReadResult.
+    Without the fix, gaps was hardcoded to [] and validate reported
+    {"valid": true} for non-canonical plans.
+    """
+    result = runner.invoke(app, ["validate", "P2", "--plan-dir", str(legacy_plan_dir)])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["valid"] is False
+    assert len(data["errors"]) > 0

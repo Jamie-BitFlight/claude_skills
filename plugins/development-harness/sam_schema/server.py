@@ -80,6 +80,10 @@ def _get_backend(plan_dir_str: str) -> TaskBackend:
     Delegates to the shared :func:`sam_schema.core.task_config.get_backend` so that
     both the MCP server and the CLI use the same backend-resolution logic.
 
+    The MCP server always passes ``wrap_gist=True`` so that explicit plan
+    directories are also wrapped in ``GistTaskLayer`` for write-through to
+    GitHub Gist (matching pre-refactor MCP behaviour).
+
     Args:
         plan_dir_str: The ``plan_dir`` parameter from the MCP tool call.
 
@@ -87,7 +91,7 @@ def _get_backend(plan_dir_str: str) -> TaskBackend:
         :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
         this tool call.
     """
-    return get_backend(plan_dir_str)
+    return get_backend(plan_dir_str, wrap_gist=True)
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).

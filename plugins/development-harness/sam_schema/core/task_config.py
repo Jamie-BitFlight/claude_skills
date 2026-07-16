@@ -177,7 +177,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
 # ---------------------------------------------------------------------------
 
 
-def get_backend(plan_dir: str | None = None) -> TaskBackend:
+def get_backend(plan_dir: str | None = None, *, wrap_gist: bool = False) -> TaskBackend:
     """Return the appropriate TaskBackend for the given plan_dir.
 
     When *plan_dir* is ``None`` or ``"plan"``, returns the module-level
@@ -188,13 +188,19 @@ def get_backend(plan_dir: str | None = None) -> TaskBackend:
 
     When *plan_dir* is a concrete filesystem path, creates a
     :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider`
-    for that path and returns it directly (no Gist wrapping — an explicit
-    path means local-only).
+    for that path.  When *wrap_gist* is ``True`` (MCP server), wraps it in
+    ``GistTaskLayer`` to preserve write-through behaviour for explicit
+    plan directories.  When ``False`` (CLI default), returns it directly
+    (local-only — an explicit path means no Gist sync).
 
     Args:
         plan_dir: The ``plan_dir`` parameter from the caller.  ``None`` or
             ``"plan"`` selects the configured backend; any other value is
             treated as a filesystem path.
+        wrap_gist: When ``True``, wrap explicit-path backends in
+            ``GistTaskLayer`` (MCP server behaviour).  When ``False``
+            (default, CLI behaviour), return bare
+            ``LocalYamlTaskProvider`` for explicit paths.
 
     Returns:
         A :class:`~sam_schema.core.task_backend.TaskBackend` instance.
@@ -204,7 +210,20 @@ def get_backend(plan_dir: str | None = None) -> TaskBackend:
 
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
 
-    return LocalYamlTaskProvider(Path(plan_dir))
+    local = LocalYamlTaskProvider(Path(plan_dir))
+
+    if not wrap_gist:
+        return local
+
+    # MCP server path: wrap explicit-path backends in GistTaskLayer to
+    # preserve write-through to GitHub Gist (matching pre-refactor behaviour).
+    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
+    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
+    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
+
+    artifact_client = ArtifactRegistryClient()
+    plan_index = create_plan_id_index(artifact_client)
+    return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
 
 
 def _get_configured_backend() -> TaskBackend:

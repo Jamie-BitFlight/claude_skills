@@ -74,6 +74,7 @@ from sam_schema.core.models import (
     PlanStatus,
     ReadResult,
     ReadyTasksResult,
+    SchemaGap,
     Task,
     TaskAssignment,
     TaskStatus,
@@ -319,7 +320,14 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
 
     source_path_str = plan_data.get("source_path") or ""
     source_path = Path(source_path_str) if source_path_str else Path()
-    return ReadResult(plan=plan_model, gaps=[], source_format="backend", source_path=source_path)
+
+    # Preserve schema gaps from the backend (populated by LocalYamlTaskProvider
+    # from the reader/normalizer pipeline). Other backends (e.g. GitHub) don't
+    # detect gaps, so the key is absent and we default to an empty list.
+    raw_gaps = plan_data.get("gaps") or []
+    gaps = [SchemaGap.model_validate(g) for g in raw_gaps]
+
+    return ReadResult(plan=plan_model, gaps=gaps, source_format="backend", source_path=source_path)
 
 
 def list_plans(
