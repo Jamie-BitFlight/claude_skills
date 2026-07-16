@@ -20,10 +20,38 @@ such calls.
 
 from __future__ import annotations
 
+import collections
+import contextlib
+import dataclasses
+import importlib
 import logging
+import re
+import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import dh_paths
+import dispatch_schema as _ds
+from backlog_core.artifact_provider import ArtifactBackend, create_artifact_provider
+from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
+from backlog_core.artifact_registry import ArtifactRegistry
+from backlog_core.backend_protocol import get_config
+from backlog_core.dispatch_state import DispatchStateManager
+from backlog_core.models import (
+    ArtifactContent,
+    ArtifactEntry,
+    ArtifactStatus,
+    ArtifactType,
+    BacklogError,
+    DispatchItemRecord,
+    DispatchWaveSummary,
+    GitHubUnavailableError,
+    Output,
+    get_default_repo,
+    get_repo_root,
+)
+from github import GithubException
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import (
     ArtifactWriteError,
@@ -35,6 +63,7 @@ from sam_schema.core.exceptions import (
 from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
 
 if TYPE_CHECKING:
+    from backlog_core.operations import ImpactRadiusItem
     from sam_schema.core.context_backend import ContextBackend
 
     from dh_core.protocols import TaskBackend
@@ -49,6 +78,12 @@ __all__ = [
     "apply_status_groomed",
     "apply_status_in_progress",
     "apply_status_verified",
+    "artifact_get",
+    "artifact_list",
+    "artifact_migrate",
+    "artifact_read",
+    # --- Artifact operations ---
+    "artifact_register",
     "batch_fetch_statuses",
     "check_open_prs_for_issue",
     "claim_task",
@@ -62,6 +97,15 @@ __all__ = [
     "create_project",
     "create_sam_task",
     "create_task_issue",
+    "dispatch_conflicts",
+    "dispatch_create_plan",
+    "dispatch_item_status",
+    # --- Dispatch operations ---
+    "dispatch_read_plan",
+    "dispatch_stale_check",
+    "dispatch_validate_plan",
+    "dispatch_wave_start",
+    "dispatch_wave_status",
     "fetch_github_issue_body",
     "fetch_open_issues_by_title",
     "finalize_plan",
@@ -1026,3 +1070,593 @@ from backlog_core.operations import (
     view_enrich_from_github,
     view_item,
 )
+
+# ---------------------------------------------------------------------------
+# Dispatch operations (Task 2.31)
+# ---------------------------------------------------------------------------
+# Thin wrappers around dispatch_schema functions.  Each resolves the project
+# root via backlog_core.models.get_repo_root() and delegates to the
+# dispatch_schema function, returning a dict matching the MCP server response.
+
+
+def _dispatch_plan_path(milestone_number: int) -> Path:
+    """Return the canonical dispatch plan path for a milestone.
+
+    Resolves the project root from ``backlog_core.models.get_repo_root()``
+    and delegates to ``dispatch_schema.dispatch_plan_path``.
+    """
+    return _ds.dispatch_plan_path(milestone_number, get_repo_root())
+
+
+def dispatch_read_plan(milestone_number: int) -> dict[str, Any]:
+    """Read a dispatch plan for the given milestone.
+
+    Returns:
+        Dict with ``milestone_number`` and ``plan``, or ``error`` on failure.
+    """
+    plan_path = _dispatch_plan_path(milestone_number)
+    try:
+        plan = _ds.read_dispatch_plan(plan_path)
+    except FileNotFoundError:
+        return {"error": f"Dispatch plan not found: {plan_path}", "milestone_number": milestone_number}
+    except ValueError as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
+    return {"milestone_number": milestone_number, "plan": plan.model_dump()}
+
+
+def dispatch_validate_plan(milestone_number: int) -> dict[str, Any]:
+    """Validate an existing dispatch plan's structural integrity.
+
+    Returns:
+        Dict with ``is_valid``, ``errors``, ``warnings``, or ``error``.
+    """
+    plan_path = _dispatch_plan_path(milestone_number)
+    try:
+        plan = _ds.read_dispatch_plan(plan_path)
+    except (FileNotFoundError, ValueError) as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
+    result = _ds.validate_plan_integrity(plan)
+    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+
+
+def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any]:
+    """Check whether a dispatch plan is stale relative to the current milestone.
+
+    Returns:
+        Dict with ``is_stale``, ``added_issues``, ``removed_issues``,
+        ``message``, or ``error`` on failure.
+    """
+    plan_path = _dispatch_plan_path(milestone_number)
+    try:
+        plan = _ds.read_dispatch_plan(plan_path)
+    except (FileNotFoundError, ValueError) as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
+
+    try:
+        gh_repo = get_config().backend.get_github(repo)
+        owner, repo_name = gh_repo.full_name.split("/", 1)
+        open_issues = get_config().backend.sync_issues_graphql(
+            gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
+        )
+        closed_issues = get_config().backend.sync_issues_graphql(
+            gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
+        )
+        current_numbers = [issue["number"] for issue in open_issues + closed_issues]
+    except GitHubUnavailableError as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
+    except (BacklogError, GithubException) as exc:
+        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+
+    result = _ds.detect_stale_plan(plan, current_numbers)
+    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+
+
+def dispatch_create_plan(
+    milestone_number: int,
+    plan: dict[str, Any],
+    overwrite: bool = False,
+    validate: bool = True,
+    issue: int | None = None,
+) -> dict[str, Any]:
+    """Create or overwrite a dispatch plan YAML file for a milestone.
+
+    Returns:
+        Dict with ``wave_count``, ``item_count``, ``is_valid``, ``errors``,
+        ``warnings``, or ``error`` on failure.
+    """
+    plan_path = _dispatch_plan_path(milestone_number)
+    plan_model = _ds.DispatchPlan.model_validate(plan)
+
+    if plan_model.milestone.number != milestone_number:
+        return {
+            "error": (
+                f"Milestone number mismatch: parameter is {milestone_number} "
+                f"but plan.milestone.number is {plan_model.milestone.number}"
+            ),
+            "milestone_number": milestone_number,
+        }
+
+    if not overwrite and plan_path.exists():
+        return {
+            "error": f"Plan file already exists: {plan_path}. Pass overwrite=True to replace it.",
+            "milestone_number": milestone_number,
+        }
+
+    try:
+        _ds.write_dispatch_plan(plan_model, plan_path)
+    except ValueError as exc:
+        return {"error": f"Cannot write plan (symlink target rejected): {exc}", "milestone_number": milestone_number}
+    except OSError as exc:
+        return {"error": f"Failed to write plan file: {exc}", "milestone_number": milestone_number}
+
+    is_valid: bool | None = None
+    val_errors: list[str] = []
+    val_warnings: list[str] = []
+    if validate:
+        val_result = _ds.validate_plan_integrity(plan_model)
+        is_valid = val_result.is_valid
+        val_errors = list(val_result.errors)
+        val_warnings = list(val_result.warnings)
+
+    wave_count = len(plan_model.waves)
+    item_count = sum(len(wave.items) for wave in plan_model.waves)
+
+    return {
+        "milestone_number": milestone_number,
+        "wave_count": wave_count,
+        "item_count": item_count,
+        "is_valid": is_valid,
+        "errors": val_errors,
+        "warnings": val_warnings,
+    }
+
+
+def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
+    """Analyze Impact Radius conflicts for items in a milestone.
+
+    Returns:
+        Dict with ``conflict_groups``, ``count``, ``milestone_number``,
+        or ``error`` on failure.
+    """
+    try:
+        gh_repo = get_config().backend.get_github(repo)
+        owner, repo_name = gh_repo.full_name.split("/", 1)
+        issue_nodes = get_config().backend.sync_issues_graphql(
+            gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
+        )
+    except GitHubUnavailableError as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
+    except (BacklogError, GithubException) as exc:
+        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+
+    ir_re = re.compile(r"##\s+Impact\s+Radius\b(.*?)(?=\n##|\Z)", re.IGNORECASE | re.DOTALL)
+    items: list[ImpactRadiusItem] = []
+    for issue in issue_nodes:
+        body = issue["body"] or ""
+        match = ir_re.search(body)
+        impact_radius = match.group(1).strip() if match else ""
+        items.append({"title": issue["title"], "issue": issue["number"], "impact_radius": impact_radius})
+
+    conflict_groups = analyze_impact_radius_conflicts(items)
+    return {
+        "milestone_number": milestone_number,
+        "conflict_groups": [dataclasses.asdict(cg) for cg in conflict_groups],
+        "count": len(conflict_groups),
+    }
+
+
+def _dispatch_db_path() -> Path:
+    """Return the dispatch state database path for the current project."""
+    project_root = _get_project_root()
+    project_stub = str(project_root).lstrip("/").replace("/", "-")
+    db_path = Path.home() / ".dh" / "projects" / project_stub / "dispatch-state.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return db_path
+
+
+def dispatch_wave_start(milestone: int, wave_num: int, items: list[dict[str, object]]) -> dict[str, Any]:
+    """Record the start of a dispatch wave.
+
+    Returns:
+        Dict with ``milestone``, ``wave_num``, ``items_count``, ``status``,
+        or ``error`` if the wave already exists.
+    """
+    mgr = DispatchStateManager(_dispatch_db_path())
+    item_records = [
+        DispatchItemRecord(
+            milestone=milestone, wave_num=wave_num, issue=int(str(item["issue"])), title=str(item.get("title", ""))
+        )
+        for item in items
+    ]
+    try:
+        wave = mgr.create_wave(milestone, wave_num, item_records)
+    except sqlite3.IntegrityError:
+        return {
+            "error": f"Wave {wave_num} already exists for milestone {milestone}",
+            "milestone": milestone,
+            "wave_num": wave_num,
+        }
+    return {
+        "milestone": wave.milestone,
+        "wave_num": wave.wave_num,
+        "items_count": len(wave.items),
+        "status": wave.status,
+        "messages": [f"Wave {wave_num} created with {len(wave.items)} items"],
+        "warnings": [],
+        "errors": [],
+    }
+
+
+def dispatch_item_status(
+    milestone: int, issue: int, status: str, result: str = "", error: str = "", cost: float | None = None
+) -> dict[str, Any]:
+    """Record completion or failure of a dispatch item.
+
+    Returns:
+        Dict with ``milestone``, ``issue``, ``wave_num``, ``status``,
+        or ``error`` if the item is not found.
+    """
+    mgr = DispatchStateManager(_dispatch_db_path())
+    waves = mgr.get_all_waves(milestone)
+    for wave in waves:
+        for item in wave.items:
+            if item.issue == issue:
+                match status:
+                    case "complete":
+                        mgr.set_item_complete(
+                            milestone=milestone, wave_num=wave.wave_num, issue=issue, result=result, cost=cost
+                        )
+                    case "failed":
+                        mgr.set_item_failed(milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error)
+                    case "skipped":
+                        mgr.set_item_failed(
+                            milestone=milestone, wave_num=wave.wave_num, issue=issue, error=error or "skipped"
+                        )
+                    case _:
+                        return {
+                            "error": f"Invalid status '{status}': must be 'complete', 'failed', or 'skipped'",
+                            "milestone": milestone,
+                            "issue": issue,
+                        }
+                return {
+                    "milestone": milestone,
+                    "issue": issue,
+                    "wave_num": wave.wave_num,
+                    "status": status,
+                    "messages": [f"Item #{issue} marked {status} in wave {wave.wave_num}"],
+                    "warnings": [],
+                    "errors": [],
+                }
+    return {
+        "error": f"Item #{issue} not found in any wave for milestone {milestone}",
+        "milestone": milestone,
+        "issue": issue,
+    }
+
+
+def dispatch_wave_status(milestone: int, wave_num: int) -> dict[str, Any]:
+    """Query the current status of a dispatch wave.
+
+    Returns:
+        Dict with wave summary fields, or ``error`` if wave not found.
+    """
+    mgr = DispatchStateManager(_dispatch_db_path())
+    stale = mgr.check_stale_pids()
+    warnings = [
+        f"PID {stale_item.pid} for issue #{stale_item.issue} is dead — marked failed"
+        for stale_item in stale
+        if stale_item.milestone == milestone and stale_item.wave_num == wave_num
+    ]
+    wave = mgr.get_wave(milestone, wave_num)
+
+    if wave is None:
+        return {
+            "error": f"Wave {wave_num} not found for milestone {milestone}",
+            "milestone": milestone,
+            "wave_num": wave_num,
+        }
+
+    items = wave.items
+    status_counts = collections.Counter(i.status for i in items)
+    elapsed: float | None = None
+    if wave.started_at:
+        with contextlib.suppress(ValueError):
+            start = datetime.fromisoformat(wave.started_at)
+            end = datetime.fromisoformat(wave.completed_at) if wave.completed_at else datetime.now(UTC)
+            elapsed = (end - start).total_seconds()
+
+    accumulated_usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+        "estimated_cost_usd": 0.0,
+        "events_with_usage": 0,
+    }
+
+    summary = DispatchWaveSummary(
+        milestone=milestone,
+        wave_num=wave_num,
+        status=wave.status,
+        total_items=len(items),
+        pending=status_counts.get("pending", 0),
+        in_progress=status_counts.get("in-progress", 0),
+        complete=status_counts.get("complete", 0),
+        failed=status_counts.get("failed", 0),
+        skipped=status_counts.get("skipped", 0),
+        started_at=wave.started_at,
+        completed_at=wave.completed_at,
+        elapsed_seconds=elapsed,
+        items=items,
+    )
+    return {
+        **summary.model_dump(),
+        "messages": [],
+        "warnings": warnings,
+        "errors": [],
+        "accumulated_usage": accumulated_usage,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Artifact operations (Task 2.30)
+# ---------------------------------------------------------------------------
+
+_artifact_state: dict[str, Any] = {"provider": None, "registry": None, "warning": None}
+
+
+def _get_project_root() -> Path:
+    """Return the git project root via backlog_core.models.get_repo_root()."""
+    return get_repo_root()
+
+
+def _get_artifact_provider() -> ArtifactBackend:
+    """Return (or lazily create) the ArtifactBackend singleton.
+
+    Falls back to LocalFilesystemArtifactProvider when the remote backend
+    is unavailable or unconfigured.
+    """
+    if _artifact_state["provider"] is not None:
+        return _artifact_state["provider"]
+
+    repo = get_default_repo()
+    if not repo:
+        provider = LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
+    else:
+        try:
+            provider = create_artifact_provider(repo=repo, root_worktree=_get_project_root())
+        except (BacklogError, GithubException, OSError):
+            provider = LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
+    _artifact_state["provider"] = provider
+    if isinstance(provider, LocalFilesystemArtifactProvider):
+        _artifact_state["warning"] = "Artifacts stored in local filesystem provider. Remote sync unavailable."
+    return _artifact_state["provider"]
+
+
+def _get_artifact_registry() -> ArtifactRegistry:
+    """Return the lazily created ArtifactRegistry singleton."""
+    if _artifact_state["registry"] is None:
+        _artifact_state["registry"] = ArtifactRegistry()
+    return _artifact_state["registry"]
+
+
+def artifact_register(
+    item_id: int | str,
+    artifact_type: str,
+    artifact_id: str,
+    status: str = "current",
+    agent: str = "",
+    content: str | None = None,
+) -> dict[str, Any]:
+    """Upsert an artifact entry in the manifest for a backlog item.
+
+    Returns:
+        Dict with ``registered``, ``artifact_count``, ``action``,
+        ``content_stored``, or ``error`` on failure.
+    """
+    out = Output()
+    try:
+        provider = _get_artifact_provider()
+        if _artifact_state["warning"] is not None:
+            out.warnings.append(_artifact_state["warning"])
+        artifact_type_enum = ArtifactType(artifact_type)
+        status_enum = ArtifactStatus(status)
+        entry = ArtifactEntry(
+            artifact_type=artifact_type_enum,
+            artifact_id=artifact_id,
+            status=status_enum,
+            created_at=datetime.now(UTC).isoformat(),
+            agent=agent,
+        )
+
+        registry = _get_artifact_registry()
+        manifest = provider.get_manifest(item_id)
+        existed = any(
+            e.artifact_type == artifact_type_enum and e.artifact_id == artifact_id for e in manifest.artifacts
+        )
+        updated_manifest = registry.register(manifest, entry)
+        provider.set_manifest(item_id, updated_manifest)
+        action = "updated" if existed else "added"
+
+        upload_content = content
+        if upload_content is None:
+            upload_content = provider.read_local_artifact_content(artifact_id)
+            if upload_content is None:
+                out.warn(
+                    f"No content provided and no local file found at {artifact_id!r}. "
+                    "Manifest entry registered without content storage."
+                )
+
+        content_stored = False
+        if upload_content is not None:
+            provider.store_artifact_content(item_id, artifact_type, artifact_id, upload_content)
+            content_stored = True
+
+        return {
+            "registered": True,
+            "artifact_count": len(updated_manifest.artifacts),
+            "action": action,
+            "content_stored": content_stored,
+            **out.to_dict(),
+        }
+    except (ValueError, KeyError) as exc:
+        return {"error": f"Invalid parameter: {exc}", **out.to_dict()}
+    except BacklogError as exc:
+        return {"error": str(exc), **out.to_dict()}
+
+
+def artifact_list(item_id: int | str, artifact_type: str | None = None) -> dict[str, Any]:
+    """Return all artifacts registered for a backlog item.
+
+    Returns:
+        Dict with ``artifacts`` (list of dicts), ``count``, or ``error``.
+    """
+    out = Output()
+    try:
+        provider = _get_artifact_provider()
+        if _artifact_state["warning"] is not None:
+            out.warnings.append(_artifact_state["warning"])
+        type_filter: ArtifactType | None = ArtifactType(artifact_type) if artifact_type else None
+        registry = _get_artifact_registry()
+
+        manifest = provider.get_manifest(item_id)
+        entries = registry.get_by_type(manifest, type_filter) if type_filter is not None else manifest.artifacts
+        artifacts = [e.model_dump(mode="json") for e in entries]
+        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+    except (ValueError, KeyError) as exc:
+        return {"error": f"Invalid parameter: {exc}", **out.to_dict()}
+    except BacklogError as exc:
+        return {"error": str(exc), **out.to_dict()}
+
+
+def artifact_get(item_id: int | str, artifact_type: str, artifact_id: str | None = None) -> dict[str, Any]:
+    """Return metadata for artifacts of a specific type on a backlog item.
+
+    Returns:
+        Dict with ``artifacts`` (list of dicts), ``count``, or ``error``.
+    """
+    out = Output()
+    try:
+        provider = _get_artifact_provider()
+        if _artifact_state["warning"] is not None:
+            out.warnings.append(_artifact_state["warning"])
+        type_enum = ArtifactType(artifact_type)
+        registry = _get_artifact_registry()
+
+        manifest = provider.get_manifest(item_id)
+        entries = registry.get_by_type(manifest, type_enum)
+        artifacts = [e.model_dump(mode="json") for e in entries]
+        if not artifacts:
+            return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
+        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+    except (ValueError, KeyError) as exc:
+        return {"error": f"Invalid parameter: {exc}", **out.to_dict()}
+    except BacklogError as exc:
+        return {"error": str(exc), **out.to_dict()}
+
+
+def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | None = None) -> dict[str, Any]:
+    """Read the file content for an artifact registered on a backlog item.
+
+    Returns:
+        Dict with ``type``, ``path``, ``content``, ``status``, or ``error``.
+    """
+    out = Output()
+    try:
+        provider = _get_artifact_provider()
+        if _artifact_state["warning"] is not None:
+            out.warnings.append(_artifact_state["warning"])
+        type_enum = ArtifactType(artifact_type)
+        registry = _get_artifact_registry()
+
+        manifest = provider.get_manifest(item_id)
+        entries = registry.get_by_type(manifest, type_enum)
+        if not entries:
+            return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
+        entries_sorted = sorted(entries, key=lambda e: e.created_at or "", reverse=True)
+        entry = entries_sorted[0]
+        if len(entries_sorted) > 1:
+            skipped = [e.artifact_id for e in entries_sorted[1:]]
+            out.warnings.append(
+                f"Multiple {artifact_type!r} artifacts found ({len(entries_sorted)}); "
+                f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
+            )
+
+        github_content = provider.read_artifact_content_from_remote(item_id, artifact_type, entry.artifact_id)
+        if github_content is not None:
+            result = ArtifactContent(
+                artifact_type=entry.artifact_type, path=entry.artifact_id, content=github_content, status=entry.status
+            )
+        else:
+            content = provider.read_artifact_content(entry.artifact_id)
+            result = ArtifactContent(
+                artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
+            )
+        return {**result.model_dump(mode="json"), **out.to_dict()}
+    except (ValueError, KeyError) as exc:
+        return {"error": f"Invalid parameter: {exc}", **out.to_dict()}
+    except BacklogError as exc:
+        return {"error": str(exc), **out.to_dict()}
+
+
+def _artifact_migrate_rename(item_id: int, old_artifact_id: str, new_artifact_id: str, out: Output) -> dict[str, Any]:
+    """Rename a single artifact_id within the manifest for one item.
+
+    Returns:
+        Dict with ``migrated``, ``old_id``, ``new_id``, or ``error``.
+    """
+    try:
+        provider = _get_artifact_provider()
+        if _artifact_state["warning"] is not None:
+            out.warnings.append(_artifact_state["warning"])
+        manifest = provider.get_manifest(item_id)
+        updated = False
+        for entry in manifest.artifacts:
+            if entry.artifact_id == old_artifact_id:
+                entry.artifact_id = new_artifact_id
+                updated = True
+                break
+        if not updated:
+            return {"error": f"Artifact '{old_artifact_id}' not found for item #{item_id}", **out.to_dict()}
+        provider.set_manifest(item_id, manifest)
+        return {"migrated": 1, "old_id": old_artifact_id, "new_id": new_artifact_id, **out.to_dict()}
+    except BacklogError as exc:
+        return {"error": str(exc), **out.to_dict()}
+
+
+def artifact_migrate(
+    item_id: int | None = None,
+    dry_run: bool = False,
+    old_artifact_id: str | None = None,
+    new_artifact_id: str | None = None,
+) -> dict[str, Any]:
+    """Migrate existing plan/research artifacts into the artifact manifest system.
+
+    When ``old_artifact_id`` and ``new_artifact_id`` are provided, performs a
+    single-item migration (rename).  Otherwise, scans ``plan/`` and ``research/``
+    directories for artifact files and registers them.
+
+    Returns:
+        Dict with migration results, or ``error`` on failure.
+    """
+    out = Output()
+
+    if old_artifact_id is not None and new_artifact_id is not None and item_id is not None:
+        return _artifact_migrate_rename(item_id, old_artifact_id, new_artifact_id, out)
+
+    # Lazy import via importlib to avoid a circular dependency:
+    # backlog_core.server imports dh_core.operations at module load time.
+    server_mod = importlib.import_module("backlog_core.server")
+
+    if dry_run:
+        try:
+            result = server_mod.migrate_dry_run(item_id)
+        except OSError as exc:
+            return {"error": f"Discovery failed: {exc}", **out.to_dict()}
+        return {**result, **out.to_dict()}
+
+    try:
+        result = server_mod.migrate_live_run(item_id, out)
+    except (BacklogError, GithubException, OSError) as exc:
+        return {"error": f"Migration failed: {exc}", **out.to_dict()}
+    return {**result, **out.to_dict()}

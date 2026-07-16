@@ -1965,5 +1965,225 @@ def backlog_refresh(
     _print_output_messages(out)
 
 
+# ---------------------------------------------------------------------------
+# Dispatch CLI commands
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="dispatch-read")
+def dispatch_read(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Read a dispatch plan for a milestone."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_read_plan(milestone_number=milestone)
+    _output_json(result)
+
+
+@app.command(name="dispatch-validate")
+def dispatch_validate(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Validate a dispatch plan's structural integrity."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_validate_plan(milestone_number=milestone)
+    _output_json(result)
+
+
+@app.command(name="dispatch-stale-check")
+def dispatch_stale(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Check whether a dispatch plan is stale relative to the current milestone."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_stale_check(milestone_number=milestone, repo=repo)
+    _output_json(result)
+
+
+@app.command(name="dispatch-create-plan")
+def dispatch_create(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    plan_json: Annotated[str, typer.Option("--plan-json", help="Dispatch plan as JSON string")],
+    overwrite: Annotated[bool, typer.Option("--overwrite", help="Overwrite existing plan file")] = False,
+    validate: Annotated[bool, typer.Option("--validate", help="Run validation after writing")] = True,
+    issue: Annotated[int | None, typer.Option("--issue", help="Optional issue to register artifact for")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Create or overwrite a dispatch plan YAML file."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    try:
+        plan_dict = json.loads(plan_json)
+    except json.JSONDecodeError as exc:
+        _err(f"Invalid JSON for plan: {exc}")
+    result = operations.dispatch_create_plan(
+        milestone_number=milestone, plan=plan_dict, overwrite=overwrite, validate=validate, issue=issue
+    )
+    _output_json(result)
+
+
+@app.command(name="dispatch-conflicts")
+def dispatch_conflicts_cmd(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Analyze Impact Radius conflicts for items in a milestone."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_conflicts(milestone_number=milestone, repo=repo)
+    _output_json(result)
+
+
+@app.command(name="dispatch-wave-start")
+def dispatch_wave_start_cmd(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    wave: Annotated[int, typer.Option("--wave", help="Wave number (1-based)")],
+    items_json: Annotated[str, typer.Option("--items-json", help="JSON list of items with 'issue' and 'title' keys")],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Record the start of a dispatch wave."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    try:
+        items = json.loads(items_json)
+    except json.JSONDecodeError as exc:
+        _err(f"Invalid JSON for items: {exc}")
+    if not isinstance(items, list):
+        _err("Invalid JSON for items: expected a list")
+    result = operations.dispatch_wave_start(milestone=milestone, wave_num=wave, items=items)
+    _output_json(result)
+
+
+@app.command(name="dispatch-item-status")
+def dispatch_item_status_cmd(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    issue: Annotated[int, typer.Argument(help="Issue number of the item")],
+    status: Annotated[str, typer.Option("--status", help="New status: complete, failed, or skipped")],
+    result_summary: Annotated[str, typer.Option("--result", help="Result summary or JSON")] = "",
+    error: Annotated[str, typer.Option("--error", help="Error details on failure")] = "",
+    cost: Annotated[float | None, typer.Option("--cost", help="USD cost if available")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Record completion or failure of a dispatch item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_item_status(
+        milestone=milestone, issue=issue, status=status, result=result_summary, error=error, cost=cost
+    )
+    _output_json(result)
+
+
+@app.command(name="dispatch-wave-status")
+def dispatch_wave_status_cmd(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    wave: Annotated[int, typer.Argument(help="Wave number to query (1-based)")],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Query the current status of a dispatch wave."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_wave_status(milestone=milestone, wave_num=wave)
+    _output_json(result)
+
+
+# ---------------------------------------------------------------------------
+# Artifact CLI commands
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="artifact-register")
+def artifact_register_cmd(
+    item_id: Annotated[int, typer.Argument(help="Backlog item identifier (GitHub issue number)")],
+    artifact_type: Annotated[str, typer.Option("--type", help="Artifact type")],
+    artifact_id: Annotated[str, typer.Option("--artifact-id", help="Artifact logical identifier or path")],
+    status: Annotated[str, typer.Option("--status", help="Lifecycle status")] = "current",
+    agent: Annotated[str, typer.Option("--agent", help="Producing agent name")] = "",
+    content: Annotated[str | None, typer.Option("--content", help="Optional artifact content")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Register or update an artifact for a backlog item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.artifact_register(
+        item_id=item_id,
+        artifact_type=artifact_type,
+        artifact_id=artifact_id,
+        status=status,
+        agent=agent,
+        content=content,
+    )
+    _output_json(result)
+
+
+@app.command(name="artifact-list")
+def artifact_list_cmd(
+    item_id: Annotated[int, typer.Argument(help="Backlog item identifier (GitHub issue number)")],
+    artifact_type: Annotated[str | None, typer.Option("--type", help="Filter by artifact type")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List artifacts registered for a backlog item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.artifact_list(item_id=item_id, artifact_type=artifact_type)
+    _output_json(result)
+
+
+@app.command(name="artifact-get")
+def artifact_get_cmd(
+    item_id: Annotated[int, typer.Argument(help="Backlog item identifier (GitHub issue number)")],
+    artifact_type: Annotated[str, typer.Option("--type", help="Artifact type to retrieve")],
+    artifact_id: Annotated[str | None, typer.Option("--artifact-id", help="Specific artifact ID")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Get metadata for artifacts of a specific type on a backlog item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.artifact_get(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id)
+    _output_json(result)
+
+
+@app.command(name="artifact-read")
+def artifact_read_cmd(
+    item_id: Annotated[int, typer.Argument(help="Backlog item identifier (GitHub issue number)")],
+    artifact_type: Annotated[str, typer.Option("--type", help="Artifact type to read")],
+    artifact_id: Annotated[str | None, typer.Option("--artifact-id", help="Specific artifact ID")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Read the file content for an artifact on a backlog item."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.artifact_read(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id)
+    _output_json(result)
+
+
+@app.command(name="artifact-migrate")
+def artifact_migrate_cmd(
+    item_id: Annotated[int | None, typer.Option("--item-id", help="Migrate for a specific item only")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without making API calls")] = False,
+    old_artifact_id: Annotated[
+        str | None, typer.Option("--old-id", help="Old artifact ID for single-item rename")
+    ] = None,
+    new_artifact_id: Annotated[
+        str | None, typer.Option("--new-id", help="New artifact ID for single-item rename")
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Migrate plan/research artifacts into the artifact manifest system."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.artifact_migrate(
+        item_id=item_id, dry_run=dry_run, old_artifact_id=old_artifact_id, new_artifact_id=new_artifact_id
+    )
+    _output_json(result)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

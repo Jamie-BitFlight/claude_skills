@@ -4576,7 +4576,7 @@ def _migrate_register_one(
 # ---------------------------------------------------------------------------
 
 
-def _migrate_dry_run(issue_number: int | None) -> dict:
+def migrate_dry_run(issue_number: int | None) -> dict:
     """Discover candidates and return a preview without making any API calls.
 
     Args:
@@ -4658,7 +4658,7 @@ def _migrate_queue_manifest_only(
     return result
 
 
-def _migrate_live_run(issue_number: int | None, out: Output) -> dict:
+def migrate_live_run(issue_number: int | None, out: Output) -> dict:
     """Execute the live migration against GitHub.
 
     Args:
@@ -4765,13 +4765,13 @@ async def artifact_migrate(
 
     if dry_run:
         try:
-            result = await asyncio.to_thread(_migrate_dry_run, item_id)
+            result = await asyncio.to_thread(migrate_dry_run, item_id)
         except OSError as exc:
             return {"error": f"Discovery failed: {exc}", **out.to_dict()}
         return {**result, **out.to_dict()}
 
     try:
-        result = await asyncio.to_thread(_migrate_live_run, item_id, out)
+        result = await asyncio.to_thread(migrate_live_run, item_id, out)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), **out.to_dict()}
     except (BacklogError, _GithubException, OSError) as exc:
