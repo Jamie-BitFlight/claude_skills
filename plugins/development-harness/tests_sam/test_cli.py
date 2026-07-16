@@ -69,13 +69,16 @@ def test_help_shows_all_commands() -> None:
 
 
 def test_list_returns_json_with_items_count_total(plan_dir: Path) -> None:
-    """List returns JSON array of plan summaries (not a dict wrapper)."""
+    """List returns a JSON envelope with items, count, and total."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    # list_plans now returns a bare JSON array of PlanSummary dicts.
-    assert isinstance(data, list)
-    assert len(data) >= 1
+    # list_plans returns an envelope {"items": [...], "count": N, "total": N}.
+    assert isinstance(data, dict)
+    assert "items" in data
+    assert "count" in data
+    assert "total" in data
+    assert len(data["items"]) >= 1
 
 
 def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
@@ -83,9 +86,10 @@ def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert len(data) >= 1
-    item = data[0]
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) >= 1
+    item = items[0]
     assert "feature" in item
     assert "task_count" in item
     assert "plan_ref" in item
@@ -96,9 +100,10 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "auth-system"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert len(data) >= 1
-    for item in data:
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) >= 1
+    for item in items:
         feature_val = str(item.get("feature", "")).lower()
         goal_val = str(item.get("goal", "")).lower()
         desc_val = str(item.get("description", "")).lower()
@@ -106,12 +111,12 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
 
 
 def test_list_search_no_match_returns_empty_items(plan_dir: Path) -> None:
-    """List --search with no matching plans returns an empty array."""
+    """List --search with no matching plans returns an empty items array."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "zzz-no-match-zzz"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert data == []
+    assert isinstance(data, dict)
+    assert data["items"] == []
 
 
 def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
@@ -119,8 +124,9 @@ def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--offset", "0", "--limit", "1"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert len(data) <= 1
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) <= 1
 
 
 def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
@@ -276,11 +282,12 @@ def test_status_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
 
 
 def test_ready_returns_json_list(plan_dir: Path) -> None:
-    """Ready P1 returns a JSON array (may be empty or contain tasks)."""
+    """Ready P1 returns a JSON envelope with ready_tasks (may be empty or contain tasks)."""
     result = runner.invoke(app, ["ready", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert "ready_tasks" in data
 
 
 def test_ready_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
@@ -290,11 +297,12 @@ def test_ready_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
 
 
 def test_ready_explicit_json_format_option_succeeds(plan_dir: Path) -> None:
-    """Ready P1 --format json exits 0 and returns a JSON list."""
+    """Ready P1 --format json exits 0 and returns a JSON envelope with ready_tasks."""
     result = runner.invoke(app, ["ready", "P1", "--format", "json", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert "ready_tasks" in data
 
 
 def test_ready_yaml_format_option_produces_yaml(plan_dir: Path) -> None:

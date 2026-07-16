@@ -431,8 +431,8 @@ class TestSamCreateRoundTrip:
         # Assert
         assert read_result.exit_code == 0, read_result.output
         data = json.loads(read_result.output)
-        # TaskAssignment serializes with snake_case field names by default.
-        assert data.get("plan_goal") == "My specific goal"
+        # TaskAssignment now serializes with alias field names (by_alias=True).
+        assert data.get("plan-goal") == "My specific goal"
 
     def test_create_with_stdin_preserves_task_body_content(self, plan_dir: Path) -> None:
         """Task ``body`` field round-trips through create -> read without data loss.
