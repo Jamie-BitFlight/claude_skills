@@ -1603,5 +1603,287 @@ def backlog_sync(
     _print_output_messages(out)
 
 
+def _parse_json_list(raw: str, param_name: str) -> list[str]:
+    """Parse a JSON string into a list[str], or exit with error.
+
+    Returns:
+        Parsed list of strings.
+    """
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        _err(f"Invalid JSON for {param_name}: {exc}")
+    if not isinstance(parsed, list):
+        _err(f"Invalid JSON for {param_name}: expected a list")
+    return [str(item) for item in parsed]
+
+
+@app.command(name="sam-task-create")
+def sam_task_create(
+    parent_issue: Annotated[int, typer.Argument(help="Parent issue number")],
+    task_id: Annotated[str, typer.Option("--task-id", help="Task identifier")] = "",
+    feature: Annotated[str, typer.Option("--feature", help="Feature name")] = "",
+    task_type: Annotated[str, typer.Option("--task-type", help="Task type")] = "",
+    agent: Annotated[str, typer.Option("--agent", help="Agent name")] = "",
+    priority: Annotated[int, typer.Option("--priority", help="Task priority")] = 0,
+    skills_json: Annotated[str, typer.Option("--skills-json", help="JSON list of skills")] = "[]",
+    dependencies_json: Annotated[str, typer.Option("--dependencies-json", help="JSON list of dependencies")] = "[]",
+    description: Annotated[str, typer.Option("--description", help="Task description")] = "",
+    acceptance_criteria_json: Annotated[
+        str, typer.Option("--acceptance-criteria-json", help="JSON list of acceptance criteria")
+    ] = "[]",
+    labels_json: Annotated[str, typer.Option("--labels-json", help="JSON list of labels")] = "[]",
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Create a SAM task issue under a parent issue."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    skills = _parse_json_list(skills_json, "skills")
+    dependencies = _parse_json_list(dependencies_json, "dependencies")
+    acceptance_criteria = _parse_json_list(acceptance_criteria_json, "acceptance_criteria")
+    labels = _parse_json_list(labels_json, "labels")
+    out = Output()
+    result = operations.create_sam_task(
+        parent_issue_number=parent_issue,
+        task_id=task_id,
+        feature=feature,
+        task_type=task_type,
+        agent=agent,
+        priority=priority,
+        skills=skills,
+        dependencies=dependencies,
+        description=description,
+        acceptance_criteria=acceptance_criteria,
+        labels=labels,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="sam-tasks")
+def sam_tasks(
+    parent_issue: Annotated[int, typer.Argument(help="Parent issue number")],
+    refresh_cache: Annotated[bool, typer.Option("--refresh-cache", help="Refresh cache from GitHub")] = True,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List SAM tasks under a parent issue."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.get_sam_tasks(parent_issue_number=parent_issue, refresh_cache=refresh_cache, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="sam-task-status")
+def sam_task_status(
+    issue_number: Annotated[int, typer.Argument(help="SAM task issue number")],
+    status: Annotated[str, typer.Option("--status", help="New status")] = "",
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Update a SAM task's status."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.update_sam_task_status(issue_number=issue_number, new_status=status, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="sam-ready-tasks")
+def sam_ready_tasks(
+    parent_issue: Annotated[int, typer.Argument(help="Parent issue number")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List SAM tasks that are ready to start (dependencies met)."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.get_ready_sam_tasks(parent_issue_number=parent_issue, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="labels")
+def labels(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    limit: Annotated[int, typer.Option("--limit", help="Maximum labels to return")] = 100,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List GitHub labels for a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_labels(repo=repo, limit=limit, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="merged-prs")
+def merged_prs(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    search: Annotated[str | None, typer.Option("--search", help="Search query")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum PRs to return")] = 20,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List merged pull requests for a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_merged_prs(repo=repo, search=search, limit=limit, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="milestones")
+def milestones(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    state: Annotated[str, typer.Option("--state", help="Milestone state (open/closed/all)")] = "open",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List milestones for a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_milestones(repo=repo, state=state, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="soonest-milestone")
+def soonest_milestone(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Get the soonest open milestone for a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.get_soonest_milestone(repo=repo, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="create-milestone")
+def create_milestone(
+    title: Annotated[str, typer.Option("--title", help="Milestone title (required)")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    description: Annotated[str, typer.Option("--description", help="Milestone description")] = "",
+    due_on: Annotated[str | None, typer.Option("--due-on", help="Due date (ISO 8601)")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Create a new milestone in a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.create_milestone(repo=repo, title=title, description=description, due_on=due_on, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="issues")
+def issues(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    milestone: Annotated[str | None, typer.Option("--milestone", help="Filter by milestone")] = None,
+    labels: Annotated[str | None, typer.Option("--labels", help="Comma-separated labels")] = None,
+    state: Annotated[str, typer.Option("--state", help="Issue state (open/closed/all)")] = "open",
+    limit: Annotated[int, typer.Option("--limit", help="Maximum issues to return")] = 30,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List issues in a repository."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_issues(repo=repo, milestone=milestone, labels=labels, state=state, limit=limit, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="comment-issue")
+def comment_issue(
+    issue_number: Annotated[int, typer.Option("--issue-number", help="Issue number (required)")],
+    body: Annotated[str, typer.Option("--body", help="Comment body (required)")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Add a comment to a GitHub issue."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.comment_issue(repo=repo, issue_number=issue_number, body=body, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="comments")
+def comments(
+    issue_number: Annotated[int, typer.Option("--issue-number", help="Issue number (required)")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    limit: Annotated[int, typer.Option("--limit", help="Maximum comments to return")] = 20,
+    offset: Annotated[int, typer.Option("--offset", help="Pagination offset")] = 0,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List comments on a GitHub issue."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_comments(repo=repo, issue_number=issue_number, limit=limit, offset=offset, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="read-comment")
+def read_comment(
+    issue_number: Annotated[int, typer.Option("--issue-number", help="Issue number (required)")],
+    comment_id: Annotated[int, typer.Option("--comment-id", help="Comment ID (required)")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Read a single comment on a GitHub issue."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.read_comment(repo=repo, issue_number=issue_number, comment_id=comment_id, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="projects")
+def projects(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    owner: Annotated[str | None, typer.Option("--owner", help="Repository owner")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum projects to return")] = 20,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List GitHub Projects for a repository or owner."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_projects(repo=repo, owner=owner, limit=limit, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="create-project")
+def create_project(
+    title: Annotated[str, typer.Option("--title", help="Project title (required)")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    owner: Annotated[str | None, typer.Option("--owner", help="Repository owner")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Create a new GitHub Project."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.create_project(repo=repo, title=title, owner=owner, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
