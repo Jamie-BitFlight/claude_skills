@@ -39,7 +39,7 @@ from sam_schema.core.action_models import (
     UpdateTaskConfig,
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.models import PlanState, PlanStatus, ReadResult, Task, TaskAssignment
+from sam_schema.core.models import ClaimResult, Plan, PlanState, PlanStatus, ReadyTasksResult, Task, TaskAssignment
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
@@ -191,15 +191,18 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
+def _sam_plan_read(plan: str, plan_dir: str) -> Plan:
     """Return Plan fields for the given plan address.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
     The operation handles plan retrieval, Plan model conversion, and
-    source-degradation warning surfacing.
+    source-degradation warning surfacing. Returns ``result.plan`` (the
+    :class:`~sam_schema.core.models.Plan` model) so MCP clients receive
+    flat plan fields (feature, goal, context, …) rather than a nested
+    ``ReadResult`` envelope.
     """
     backend = _get_backend(plan_dir)
-    return operations.read_plan(backend, plan)
+    return operations.read_plan(backend, plan).plan
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
@@ -253,16 +256,18 @@ def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus | dict[str, object]
         return _DRAFTING_MARKER_RESPONSE
 
 
-def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[str, object] | list[Task]:
+def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[str, object] | ReadyTasksResult:
     """List tasks ready for dispatch.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates
     to ``dh_core.operations.get_ready_tasks``. The operation handles the
-    drafting check and ready-task retrieval.
+    drafting check and ready-task retrieval, and returns a
+    :class:`~sam_schema.core.models.ReadyTasksResult` envelope.
 
     Returns:
-        List of :class:`~sam_schema.core.models.Task` models ready for
-        dispatch. When the plan is drafting, returns a drafting marker dict.
+        A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``,
+        ``count``, and ``issue`` fields. When the plan is drafting,
+        returns a drafting marker dict.
     """
     backend = _get_backend(plan_dir)
     try:
@@ -386,7 +391,7 @@ def sam_plan(
             )
         ),
     ] = None,
-) -> dict[str, object] | list[Task] | PlanStatus | ReadResult | TaskAssignment:
+) -> dict[str, object] | list[Task] | PlanStatus | Plan | TaskAssignment | ReadyTasksResult:
     """Consolidated plan-level operations for SAM.
 
     Delegates to the appropriate plan operation based on ``config.action``.
@@ -469,7 +474,7 @@ def sam_task(
         TaskActionConfig, Field(description="Action config. Set 'action' to: read | claim | state | update")
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
-) -> TaskAssignment | Task | dict[str, Any]:
+) -> TaskAssignment | Task | dict[str, Any] | ClaimResult:
     """Read, claim, update state, or update fields for a specific task.
 
     # TRADE-OFF: readonly annotation loss

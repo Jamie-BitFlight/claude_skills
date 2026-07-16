@@ -215,17 +215,26 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
 def _output_json(data: object) -> None:
     """Print ``data`` as compact JSON to stdout.
 
-    Pydantic models use ``model_dump_json()`` directly. Other objects fall
-    back to ``json.dumps`` with a string default.
+    Pydantic models use ``model_dump_json(by_alias=True, exclude_none=True)``
+    directly so wire-alias keys (kebab-case) and absent-optional elision
+    are preserved. Other objects fall back to ``json.dumps`` with a string
+    default.
 
     Args:
         data: A Pydantic model, list of models, or JSON-serializable object.
     """
     if isinstance(data, BaseModel):
-        typer.echo(data.model_dump_json())
+        typer.echo(data.model_dump_json(by_alias=True, exclude_none=True))
     elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
         typer.echo(
-            json.dumps([item.model_dump(mode="json") for item in data if isinstance(item, BaseModel)], default=str)
+            json.dumps(
+                [
+                    item.model_dump(mode="json", by_alias=True, exclude_none=True)
+                    for item in data
+                    if isinstance(item, BaseModel)
+                ],
+                default=str,
+            )
         )
     else:
         typer.echo(json.dumps(data, default=str))
@@ -418,10 +427,14 @@ def list_plans(
     backend = get_backend(str(plan_dir))
     result = operations.list_plans(backend, search=search, offset=offset, limit=limit)
 
+    # Wrap the list in the documented envelope so CLI consumers receive a
+    # stable shape: {"items": [...], "count": N, "total": N}.
+    envelope = {"items": [dict(s) for s in result], "count": len(result), "total": len(result)}
+
     if output_format == "yaml":
-        _output_yaml(result)
+        _output_yaml(envelope)
     else:
-        _output_json(result)
+        _output_json(envelope)
 
 
 @app.command()
@@ -564,12 +577,11 @@ def ready(
             _output_json(drafting_marker)
         return
 
-    # CLI output: serialize list[Task] models.
-    data = [t.model_dump(mode="json") for t in result]
+    # CLI output: serialize the ReadyTasksResult model.
     if output_format == "yaml":
-        _output_yaml(data)
+        _output_yaml(result)
     else:
-        _output_json(data)
+        _output_json(result)
 
 
 @app.command()
@@ -607,6 +619,11 @@ def status(
                 entry = ps.model_dump(mode="json")
                 entry["path"] = str(candidate)
                 results.append(entry)
+            except ValueError:
+                # Drafting plans raise ValueError — include a drafting marker
+                # entry instead of silently skipping them.
+                results.append({"drafting": True, "state": "drafting", "path": str(candidate)})
+                continue
             except _PLAN_LOAD_ERRORS as exc:
                 # Skip unreadable plan files when listing all; emit to stderr
                 typer.echo(f"Warning: skipping {candidate}: {exc}", err=True)
@@ -825,9 +842,8 @@ def claim(
         # Task is not claimable — already claimed or in a terminal state.
         _err(str(exc))
 
-    task_data = result.model_dump(mode="json")
-    started_str = task_data.get("started")
-    _output_json({"claimed": True, "task_id": task_id, "started": started_str})
+    # claim_task returns a ClaimResult envelope with claimed/task_id/started/warnings.
+    _output_json(result)
 
 
 @app.command()
@@ -1175,7 +1191,11 @@ def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
         OSError: If the output file cannot be written.
     """
     plan_ref = plan_id_from_path(plan_path)
-    backend = get_backend(str(plan_path.parent if plan_path.is_file() else plan_path))
+    # Root the backend at the parent directory for both files and directories.
+    # For files (e.g. P1-auth.yaml), plan_path.parent is the plan dir. For
+    # directory-based plans (e.g. P1-auth/), the backend must also look at the
+    # parent — rooting at the directory itself breaks plan resolution.
+    backend = get_backend(str(plan_path.parent))
     try:
         result = operations.read_plan(backend, plan_ref)
     except _PLAN_LOAD_ERRORS:
@@ -1726,7 +1746,9 @@ def sam_tasks(
     if output_format != "json":
         _err(f"Invalid format '{output_format}'. Must be one of: json")
     out = Output()
-    result = operations.get_sam_tasks(parent_issue_number=parent_issue, refresh_cache=refresh_cache, output=out)
+    result = operations.get_sam_tasks(
+        parent_issue_number=parent_issue, refresh_cache=refresh_cache, repo=repo, output=out
+    )
     _output_json(result)
     _print_output_messages(out)
 
@@ -1758,7 +1780,7 @@ def sam_ready_tasks(
     if output_format != "json":
         _err(f"Invalid format '{output_format}'. Must be one of: json")
     out = Output()
-    result = operations.get_ready_sam_tasks(parent_issue_number=parent_issue, output=out)
+    result = operations.get_ready_sam_tasks(parent_issue_number=parent_issue, repo=repo, output=out)
     _output_json(result)
     _print_output_messages(out)
 

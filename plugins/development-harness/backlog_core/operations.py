@@ -4831,7 +4831,9 @@ def create_sam_task(
     return {"issue_number": issue["number"], "title": issue["title"], "url": "", **out.to_dict()}
 
 
-def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None) -> SamTasksResult:
+def get_sam_tasks(
+    parent_issue_number: int, refresh_cache: bool = True, repo: str = "", output: Output | None = None
+) -> SamTasksResult:
     """Fetch all SAM task sub-issues for a parent story issue.
 
     When GitHub is unavailable, falls back to the local cache file
@@ -4840,6 +4842,7 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
     Args:
         parent_issue_number: Issue number of the parent story (without ``#``).
         refresh_cache: Write cache file after a successful GitHub fetch when ``True``.
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         output: Optional Output collector.
 
     Returns:
@@ -4848,8 +4851,8 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
     """
     out = output or Output()
 
-    repo = try_get_github()
-    if repo is None:
+    gh_repo = try_get_github(repo)
+    if gh_repo is None:
         # Offline fallback: scan cache directory for any matching cache file
         cache_dir = _dh_paths.context_dir()
         cache_files = list(cache_dir.glob("sam-tasks-*.json")) if cache_dir.exists() else []
@@ -4884,7 +4887,7 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
             "errors": out.errors,
         }
 
-    sub_issues = get_task_issues(repo, parent_issue_number, output=out)
+    sub_issues = get_task_issues(gh_repo, parent_issue_number, output=out)
     tasks = _sub_issues_to_task_dicts(sub_issues)
     if refresh_cache and tasks and not _write_sam_task_cache(tasks, parent_issue_number):
         out.warn("  WARNING: Could not write SAM task cache — no feature slug found in tasks")
@@ -4956,7 +4959,7 @@ def _is_sam_task_ready(task: dict[str, object], status_by_id: dict[str, str]) ->
 
 
 def get_ready_sam_tasks(
-    parent_issue_number: int, output: Output | None = None
+    parent_issue_number: int, repo: str = "", output: Output | None = None
 ) -> dict[str, str | list[dict[str, object]] | int | list[str]]:
     """Return SAM tasks that are ready to execute (not-started with all deps satisfied).
 
@@ -4966,6 +4969,7 @@ def get_ready_sam_tasks(
 
     Args:
         parent_issue_number: Issue number of the parent story (without ``#``).
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         output: Optional Output collector.
 
     Returns:
@@ -4973,7 +4977,7 @@ def get_ready_sam_tasks(
         Each ready task dict contains: ``id``, ``name``, ``agent``, ``skills``, ``issue_number``.
     """
     out = output or Output()
-    tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, output=out)
+    tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, repo=repo, output=out)
     tasks_raw = tasks_result.get("tasks", [])
     tasks: list[dict[str, object]] = tasks_raw if isinstance(tasks_raw, list) else []
     feature_slug = _extract_feature_slug(tasks)

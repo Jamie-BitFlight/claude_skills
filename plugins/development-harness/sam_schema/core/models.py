@@ -530,6 +530,8 @@ class PlanStatus(BaseModel):
     """Summary of plan execution progress.
 
     Used by the CLI ``sam status`` command and the ``sam_status`` MCP tool.
+    Includes the plan's ``autonomy`` mode so clients can gate dispatch
+    without a separate plan read.
     """
 
     feature: str
@@ -539,6 +541,40 @@ class PlanStatus(BaseModel):
     blocked_tasks: list[dict[str, list[str]]]  # [{task_id: [missing_dep_ids]}]
     completion_pct: float
     has_cycles: bool
+    autonomy: Literal["full_auto", "checkpoint", "per_task"] = "full_auto"
+
+
+class ClaimResult(BaseModel):
+    """Result of claiming a task for dispatch.
+
+    Returned by ``operations.claim_task`` so MCP clients receive the
+    ``{"claimed": true, "task_id": ..., "started": ..., "warnings": ...}``
+    envelope directly, without the server having to reconstruct it from a
+    raw ``Task`` model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    claimed: bool = True
+    task_id: str
+    started: str | None = None
+    warnings: list[str] | None = None
+
+
+class ReadyTasksResult(BaseModel):
+    """Result of listing tasks ready for dispatch.
+
+    Returned by ``operations.get_ready_tasks`` so MCP clients receive the
+    ``{"feature": ..., "ready_tasks": [...], "count": N, "issue": ...}``
+    envelope directly.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    feature: str
+    ready_tasks: list[Task]
+    count: int
+    issue: str | None = None
 
 
 class ActiveTaskContext(BaseModel):
@@ -623,3 +659,4 @@ Task.model_rebuild(_types_namespace={"datetime": _dt.datetime, "Path": _Path})
 Plan.model_rebuild(_types_namespace={"Path": _Path, "Task": Task, "AcceptanceCriterion": AcceptanceCriterion})
 ReadResult.model_rebuild(_types_namespace={"Path": _Path, "Plan": Plan, "SchemaGap": SchemaGap})
 TaskAssignment.model_rebuild(_types_namespace={"Task": Task})
+ReadyTasksResult.model_rebuild(_types_namespace={"Task": Task})

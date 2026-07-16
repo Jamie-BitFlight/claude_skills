@@ -67,7 +67,17 @@ from sam_schema.core.exceptions import (
     SamError,
     TaskNotFoundError,
 )
-from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskAssignment, TaskStatus
+from sam_schema.core.models import (
+    ClaimResult,
+    Plan,
+    PlanState,
+    PlanStatus,
+    ReadResult,
+    ReadyTasksResult,
+    Task,
+    TaskAssignment,
+    TaskStatus,
+)
 
 if TYPE_CHECKING:
     from backlog_core.operations import ImpactRadiusItem
@@ -298,8 +308,7 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
         PlanNotFoundError: When the plan address cannot be resolved.
     """
     plan_data = backend.read_plan(plan)
-    plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
-    plan_model = Plan.model_validate(plan_dict)
+    plan_model = Plan.model_validate(plan_data)
 
     # Surface source annotation when plan was served from local cache.
     # Use getattr to stay backend-agnostic — not all backends have
@@ -407,10 +416,11 @@ def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
         blocked_tasks=[{t.id: missing} for t, missing in graph.get_blocked_tasks()],
         completion_pct=completion_pct,
         has_cycles=graph.has_cycles(),
+        autonomy=plan_model.autonomy,
     )
 
 
-def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> list[Task]:
+def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> ReadyTasksResult:
     """Return tasks ready for dispatch along with plan-level metadata.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -433,8 +443,9 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> l
             return the full :class:`~sam_schema.core.models.Task` model.
 
     Returns:
-        List of :class:`~sam_schema.core.models.Task` models ready for
-        dispatch, sorted by priority then numeric ID.
+        A :class:`~sam_schema.core.models.ReadyTasksResult` model with
+        ``feature``, ``ready_tasks`` (list of Task models), ``count``,
+        and ``issue`` fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -445,7 +456,14 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> l
         msg = f"Plan '{plan}' is in drafting state — not ready for dispatch."
         raise ValueError(msg)
     tasks_data = backend.get_ready_tasks(plan)
-    return [Task.model_validate(t) for t in tasks_data]
+    tasks = [Task.model_validate(t) for t in tasks_data]
+    feature_val = status.get("feature")
+    return ReadyTasksResult(
+        feature=str(feature_val) if feature_val else plan,
+        ready_tasks=tasks,
+        count=len(tasks),
+        issue=str(status["issue"]) if status.get("issue") is not None else None,
+    )
 
 
 def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
@@ -545,7 +563,12 @@ def update_plan_fields(
         # by_alias=True: set_fields uses kebab-case keys (wire convention);
         # alias keys must match so we extract only the requested keys.
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
-    backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+
+    # Only call the plan-level update when there is something to write at the
+    # plan level (context narrative or validated plan-level fields). Task-only
+    # writes should not trigger a no-op plan update.
+    if context is not None or plan_fields is not None:
+        backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
 
     if set_fields is not None and task_id is not None:
         backend.update_task_fields(plan, task_id, set_fields)
@@ -672,7 +695,7 @@ def read_task(backend: TaskBackend, plan: str, task: str) -> TaskAssignment:
     )
 
 
-def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
+def claim_task(backend: TaskBackend, plan: str, task: str) -> ClaimResult:
     """Claim a task for dispatch, with local-backend fallback for local-only plans.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -696,8 +719,9 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
         task: Task ID within the plan (e.g. ``"T3"``).
 
     Returns:
-        The :class:`~sam_schema.core.models.Task` model with status
-        ``in-progress`` and ``started`` timestamp set.
+        A :class:`~sam_schema.core.models.ClaimResult` model with
+        ``claimed`` (``True``), ``task_id``, ``started`` timestamp, and
+        optional ``warnings`` (e.g. local-only plan notice).
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -705,6 +729,7 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
         ValueError: When the task is not in ``not-started`` status (already
             claimed or in a terminal state).
     """
+    warnings: list[str] = []
     try:
         claimed, claim_warning = backend.claim_task(plan, task), None
     except ConcurrentClaimUnsupportedError:
@@ -718,6 +743,9 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
         )
         _log.warning("claim_task: %s", claim_warning)
 
+    if claim_warning is not None:
+        warnings.append(claim_warning)
+
     if not claimed:
         try:
             task_data = backend.read_task(plan, task)
@@ -730,7 +758,11 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> Task:
 
     # Re-read the task to get the updated model with started timestamp.
     task_data = backend.read_task(plan, task)
-    return Task.model_validate(task_data)
+    task_model = Task.model_validate(task_data)
+    started_str: str | None = None
+    if task_model.started is not None:
+        started_str = task_model.started.isoformat()
+    return ClaimResult(claimed=True, task_id=task_model.id, started=started_str, warnings=warnings or None)
 
 
 def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) -> dict[str, Any]:

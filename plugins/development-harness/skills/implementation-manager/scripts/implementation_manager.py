@@ -1095,7 +1095,11 @@ def _load_tasks_via_sam(task_file: Path) -> list[Task]:
         List of internal Task dataclass objects.
     """
     plan_ref = plan_id_from_path(task_file)
-    backend = LocalYamlTaskProvider(task_file.parent if task_file.is_file() else task_file)
+    # Root the backend at the parent directory for both files and directories.
+    # For files (e.g. P1-auth.yaml), task_file.parent is the plan dir. For
+    # directory-based plans (e.g. P1-auth/), the backend must also look at
+    # the parent — rooting at the directory itself breaks plan resolution.
+    backend = LocalYamlTaskProvider(task_file.parent)
     result = operations.read_plan(backend, plan_ref)
     tasks: list[Task] = []
     for st in result.plan.tasks:
