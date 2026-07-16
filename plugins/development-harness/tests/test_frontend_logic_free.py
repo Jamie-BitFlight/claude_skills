@@ -48,6 +48,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "typer",
         "rich",
         "ruamel",
+        "pydantic",
         "dh_core",
         "sam_schema",
         "dh_paths",

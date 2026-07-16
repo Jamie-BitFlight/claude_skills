@@ -69,14 +69,13 @@ def test_help_shows_all_commands() -> None:
 
 
 def test_list_returns_json_with_items_count_total(plan_dir: Path) -> None:
-    """List returns JSON with items, count, and total keys."""
+    """List returns JSON array of plan summaries (not a dict wrapper)."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert "items" in data
-    assert "count" in data
-    assert "total" in data
-    assert data["total"] >= 1
+    # list_plans now returns a bare JSON array of PlanSummary dicts.
+    assert isinstance(data, list)
+    assert len(data) >= 1
 
 
 def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
@@ -84,8 +83,9 @@ def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] >= 1
-    item = data["items"][0]
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    item = data[0]
     assert "feature" in item
     assert "task_count" in item
     assert "plan_ref" in item
@@ -96,8 +96,9 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "auth-system"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] >= 1
-    for item in data["items"]:
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    for item in data:
         feature_val = str(item.get("feature", "")).lower()
         goal_val = str(item.get("goal", "")).lower()
         desc_val = str(item.get("description", "")).lower()
@@ -105,12 +106,12 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
 
 
 def test_list_search_no_match_returns_empty_items(plan_dir: Path) -> None:
-    """List --search with no matching plans returns items=[] and count=0."""
+    """List --search with no matching plans returns an empty array."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "zzz-no-match-zzz"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] == 0
-    assert data["items"] == []
+    assert isinstance(data, list)
+    assert data == []
 
 
 def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
@@ -118,7 +119,8 @@ def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--offset", "0", "--limit", "1"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] <= 1
+    assert isinstance(data, list)
+    assert len(data) <= 1
 
 
 def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
@@ -174,7 +176,7 @@ def test_read_uses_slug_address(plan_dir: Path) -> None:
 def test_read_with_yaml_format_option(plan_dir: Path) -> None:
     """Read --format yaml emits YAML output containing nested task id."""
     result = runner.invoke(app, ["read", "P1/T1", "--plan-dir", str(plan_dir), "--format", "yaml"])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     # Task is nested under the 'task' key in the TaskAssignment YAML.
     assert "T1" in result.output
 
@@ -194,13 +196,15 @@ def test_read_invalid_address_exits_with_code_1(plan_dir: Path) -> None:
 
 
 def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
-    """Read P1 (no task part) returns Plan JSON — plan-level fields, no TaskAssignment wrapper."""
+    """Read P1 (no task part) returns ReadResult JSON — plan is nested under 'plan' key."""
     result = runner.invoke(app, ["read", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    # Plan JSON has 'feature' at top level, no 'task' key.
-    assert "feature" in data
+    # read_plan returns a ReadResult with .plan, .gaps, .source_format, .source_path.
+    # The plan fields are nested under the "plan" key.
+    assert "plan" in data
     assert "task" not in data
+    assert "feature" in data["plan"]
 
 
 def test_read_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:

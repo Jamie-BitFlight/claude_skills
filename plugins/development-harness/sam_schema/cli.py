@@ -233,9 +233,16 @@ def _output_json(data: object) -> None:
 def _output_yaml(data: object) -> None:
     """Print ``data`` as YAML to stdout.
 
+    Pydantic models are converted to plain dicts before serialization so the
+    YAML dumper can handle them.
+
     Args:
-        data: Any YAML-serializable object.
+        data: Any YAML-serializable object, Pydantic model, or list of models.
     """
+    if isinstance(data, BaseModel):
+        data = data.model_dump(mode="json")
+    elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
+        data = [item.model_dump(mode="json") for item in data if isinstance(item, BaseModel)]
     y = YAML()
     y.default_flow_style = False
     buf = io.StringIO()

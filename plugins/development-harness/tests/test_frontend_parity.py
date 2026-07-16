@@ -95,11 +95,11 @@ class TestParityInfrastructure:
     """Verify the test harness itself works before adding operation tests."""
 
     def test_cli_list_returns_json(self, dh_state_home: tuple[Path, dict[str, str]]) -> None:
-        """The CLI `list` command must return valid JSON with an 'items' key."""
+        """The CLI `list` command must return valid JSON — a list of plan summaries."""
         _, env = dh_state_home
         result = run_cli(["list", "--limit", "1"], env=env)
-        assert "items" in result
-        assert isinstance(result["items"], list)
+        # list_plans now returns a bare JSON array of PlanSummary dicts.
+        assert isinstance(result, list)
 
     def test_dh_core_operations_importable(self) -> None:
         """The unified operations layer must be importable."""
