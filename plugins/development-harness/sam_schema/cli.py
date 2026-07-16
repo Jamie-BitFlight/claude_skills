@@ -2113,6 +2113,27 @@ def dispatch_wave_status_cmd(
     _output_json(result)
 
 
+@app.command(name="dispatch-spawn")
+def dispatch_spawn_cmd(
+    milestone: Annotated[int, typer.Argument(help="GitHub milestone number")],
+    wave: Annotated[int, typer.Option("--wave", help="Starting wave number (1-based)")],
+    max_concurrent: Annotated[int, typer.Option("--max-concurrent", help="Maximum concurrent spawned sessions")] = 3,
+    model: Annotated[str, typer.Option("--model", help="Model identifier for spawned sessions")] = "sonnet",
+    phase: Annotated[str, typer.Option("--phase", help="Dispatch phase: 'groom' or 'work'")] = "work",
+    effort: Annotated[
+        str | None, typer.Option("--effort", help="Effort level: low, medium, high, max (omit for model default)")
+    ] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Spawn and monitor kage-bunshin sessions for a dispatch wave."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    result = operations.dispatch_spawn(
+        milestone=milestone, wave_num=wave, max_concurrent=max_concurrent, model=model, phase=phase, effort=effort
+    )
+    _output_json(result)
+
+
 # ---------------------------------------------------------------------------
 # Artifact CLI commands
 # ---------------------------------------------------------------------------

@@ -20,13 +20,18 @@ such calls.
 
 from __future__ import annotations
 
+import asyncio
 import collections
 import contextlib
 import dataclasses
 import importlib
+import json
 import logging
+import os
 import re
 import sqlite3
+import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -45,12 +50,14 @@ from backlog_core.models import (
     ArtifactType,
     BacklogError,
     DispatchItemRecord,
+    DispatchSpawnSummary,
     DispatchWaveSummary,
     GitHubUnavailableError,
     Output,
     get_default_repo,
     get_repo_root,
 )
+from dispatch_schema import Wave
 from github import GithubException
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import (
@@ -100,8 +107,8 @@ __all__ = [
     "dispatch_conflicts",
     "dispatch_create_plan",
     "dispatch_item_status",
-    # --- Dispatch operations ---
     "dispatch_read_plan",
+    "dispatch_spawn",
     "dispatch_stale_check",
     "dispatch_validate_plan",
     "dispatch_wave_start",
@@ -1418,6 +1425,345 @@ def dispatch_wave_status(milestone: int, wave_num: int) -> dict[str, Any]:
         "errors": [],
         "accumulated_usage": accumulated_usage,
     }
+
+
+# ---------------------------------------------------------------------------
+# Dispatch spawn (Task 2.32) — CLI-compatible async spawn orchestration
+# ---------------------------------------------------------------------------
+
+#: Path to spawn.py, resolved once at module level (same as server.py).
+_SPAWN_SCRIPT: Path = Path(__file__).parent.parent / "skills" / "kage-bunshin" / "scripts" / "spawn.py"
+
+
+@dataclasses.dataclass
+class _WaveCounters:
+    """Mutable counters shared across concurrent item coroutines in one wave."""
+
+    completed: int = 0
+    failed: int = 0
+    skipped: int = 0
+    total_done: int = 0
+
+
+def _build_spawn_cmd(
+    milestone: int,
+    issue_num: int,
+    item_title: str,
+    model: str,
+    phase: str,
+    integration_branch: str,
+    effort: str | None = None,
+) -> list[str]:
+    """Construct the spawn.py subprocess command for one dispatch item.
+
+    Returns:
+        List of strings suitable for ``asyncio.create_subprocess_exec``.
+    """
+    cmd: list[str] = ["uv", "run", str(_SPAWN_SCRIPT), "--model", model, "--name", f"dispatch-{milestone}-{issue_num}"]
+    if effort is not None:
+        cmd += ["--effort", effort]
+    if phase == "work":
+        cmd.append("--worktree")
+    if integration_branch:
+        cmd += ["--branch", integration_branch]
+    cmd.append(f"Work on issue #{issue_num}: {item_title}")
+    return cmd
+
+
+async def _poll_until_done(
+    mgr: DispatchStateManager, milestone: int, wave_num: int, issue_num: int, pid: int, result_file: str
+) -> tuple[bool, float | None]:
+    """Poll until a spawned item completes or its PID dies.
+
+    Returns:
+        ``(succeeded, cost)`` — ``succeeded`` is ``True`` when the result
+        file was found; ``cost`` is the USD amount or ``None``.
+    """
+    rf_path = Path(result_file) if result_file else None
+    while True:
+        await asyncio.sleep(2)
+        if rf_path is not None:
+            result_ready = await asyncio.to_thread(lambda: rf_path.exists() and rf_path.stat().st_size > 0)
+            if result_ready:
+                item_cost = await _read_result_cost(rf_path, mgr, milestone, wave_num, issue_num)
+                return True, item_cost
+        pid_alive = _check_pid_alive(pid)
+        if not pid_alive:
+            await asyncio.to_thread(
+                mgr.set_item_failed, milestone, wave_num, issue_num, f"Process died unexpectedly (PID {pid})"
+            )
+            return False, None
+
+
+async def _read_result_cost(
+    rf_path: Path, mgr: DispatchStateManager, milestone: int, wave_num: int, issue_num: int
+) -> float | None:
+    """Read the result file, record completion, and return cost.
+
+    Returns:
+        USD cost extracted from result JSON, or ``None``.
+    """
+    try:
+        content = await asyncio.to_thread(lambda: rf_path.read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        content = ""
+    item_cost: float | None = None
+    try:
+        rj = json.loads(content)
+        item_cost = float(rj.get("cost", 0)) or None
+    except (ValueError, KeyError, TypeError):
+        pass
+    await asyncio.to_thread(mgr.set_item_complete, milestone, wave_num, issue_num, content, item_cost)
+    return item_cost
+
+
+def _check_pid_alive(pid: int) -> bool:
+    """Return True if *pid* is still running (or unknown)."""
+    if pid <= 0:
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    return True
+
+
+def _report_progress(total_done: int, total_items: int, counters: _WaveCounters, wave_num: int) -> None:
+    """Print progress to stderr (CLI replacement for ctx.report_progress)."""
+    print(
+        f"Wave {wave_num}: {total_done}/{total_items} items — {counters.completed} done, {counters.failed} failed",
+        file=sys.stderr,
+    )
+
+
+async def _run_spawn_item(
+    mgr: DispatchStateManager,
+    semaphore: asyncio.Semaphore,
+    counters: _WaveCounters,
+    warnings: list[str],
+    milestone: int,
+    wave_num: int,
+    issue_num: int,
+    item_title: str,
+    total_items: int,
+    model: str,
+    phase: str,
+    integration_branch: str,
+    effort: str | None = None,
+) -> None:
+    """Spawn one dispatch item, monitor it, and update shared counters."""
+    async with semaphore:
+        cmd = _build_spawn_cmd(milestone, issue_num, item_title, model, phase, integration_branch, effort=effort)
+        try:
+            await _execute_spawn_item(mgr, cmd, counters, warnings, milestone, wave_num, issue_num)
+        except (OSError, sqlite3.Error) as exc:
+            await asyncio.to_thread(mgr.set_item_failed, milestone, wave_num, issue_num, f"Spawn error: {exc}")
+            counters.failed += 1
+            warnings.append(f"Item #{issue_num} failed: Spawn error: {exc}")
+        counters.total_done += 1
+        _report_progress(counters.total_done, total_items, counters, wave_num)
+
+
+async def _execute_spawn_item(
+    mgr: DispatchStateManager,
+    cmd: list[str],
+    counters: _WaveCounters,
+    warnings: list[str],
+    milestone: int,
+    wave_num: int,
+    issue_num: int,
+) -> None:
+    """Run the spawn subprocess and poll for completion.
+
+    Raises:
+        OSError: If the subprocess cannot be created.
+        sqlite3.Error: If a state database operation fails.
+    """
+    proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout_bytes, _ = await proc.communicate()
+    stdout_text = stdout_bytes.decode(errors="replace").strip()
+    spawn_data = _parse_spawn_data(stdout_text)
+    if spawn_data is None:
+        await asyncio.to_thread(
+            mgr.set_item_failed, milestone, wave_num, issue_num, f"spawn.py non-JSON output: {stdout_text}"
+        )
+        counters.failed += 1
+        warnings.append(f"Item #{issue_num} failed: spawn.py non-JSON output")
+        return
+    pid, result_file, session_id = spawn_data
+    if pid > 0:
+        await asyncio.to_thread(mgr.set_item_in_progress, milestone, wave_num, issue_num, pid)
+    if session_id:
+        await asyncio.to_thread(mgr.set_item_session_id, milestone, wave_num, issue_num, session_id)
+    succeeded, _ = await _poll_until_done(mgr, milestone, wave_num, issue_num, pid, result_file)
+    if succeeded:
+        counters.completed += 1
+    else:
+        counters.failed += 1
+        warnings.append(f"Item #{issue_num} failed: process exited with no result")
+
+
+def _parse_spawn_data(stdout_text: str) -> tuple[int, str, str] | None:
+    """Parse spawn.py JSON output, returning (pid, result_file, session_id).
+
+    Returns:
+        Tuple of (pid, result_file, session_id) if valid JSON, else None.
+    """
+    try:
+        spawn_data = json.loads(stdout_text)
+        return (
+            int(spawn_data.get("pid", -1)),
+            str(spawn_data.get("result_file", "")),
+            str(spawn_data.get("session_id", "")),
+        )
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+async def _run_dispatch_spawn(
+    milestone: int, wave_num: int, max_concurrent: int, model: str, phase: str, effort: str | None
+) -> dict[str, Any]:
+    """Async core of dispatch_spawn — reads plan, spawns waves, returns summary.
+
+    Returns:
+        Dict with DispatchSpawnSummary fields, or error dict on failure.
+    """
+    try:
+        plan = await asyncio.to_thread(_ds.read_dispatch_plan, _dispatch_plan_path(milestone))
+    except FileNotFoundError:
+        return {"error": f"Dispatch plan not found for milestone {milestone}", "milestone": milestone}
+    except ValueError as exc:
+        return {"error": f"Invalid dispatch plan: {exc}", "milestone": milestone}
+
+    mgr = DispatchStateManager(_dispatch_db_path())
+    await asyncio.to_thread(mgr.check_stale_pids)
+
+    start_time = time.monotonic()
+    integration_branch = plan.milestone.integration_branch
+    all_waves = [w for w in plan.waves if w.wave >= wave_num]
+    total_items = sum(len(w.items) for w in all_waves)
+    per_wave_summaries: list[DispatchWaveSummary] = []
+    warnings: list[str] = []
+    semaphore = asyncio.Semaphore(max_concurrent)
+    overall = _WaveCounters()
+
+    for wave in all_waves:
+        with contextlib.suppress(sqlite3.IntegrityError):
+            await asyncio.to_thread(
+                mgr.create_wave,
+                milestone,
+                wave.wave,
+                [
+                    DispatchItemRecord(milestone=milestone, wave_num=wave.wave, issue=i.issue, title=i.title)
+                    for i in wave.items
+                ],
+            )
+        wave_counters = _WaveCounters(total_done=overall.total_done)
+        await asyncio.gather(*[
+            _run_spawn_item(
+                mgr=mgr,
+                semaphore=semaphore,
+                counters=wave_counters,
+                warnings=warnings,
+                milestone=milestone,
+                wave_num=wave.wave,
+                issue_num=item.issue,
+                item_title=item.title,
+                total_items=total_items,
+                model=model,
+                phase=phase,
+                integration_branch=integration_branch,
+                effort=effort,
+            )
+            for item in wave.items
+        ])
+        overall.completed += wave_counters.completed
+        overall.failed += wave_counters.failed
+        overall.total_done = wave_counters.total_done
+        per_wave_summaries.append(_build_wave_summary(mgr, milestone, wave, wave_counters))
+
+    elapsed_seconds = time.monotonic() - start_time
+    total_cost = await asyncio.to_thread(_sum_costs, mgr, milestone, wave_num)
+    summary = DispatchSpawnSummary(
+        milestone=milestone,
+        waves_executed=len(all_waves),
+        total_items=total_items,
+        completed=overall.completed,
+        failed=overall.failed,
+        skipped=overall.skipped,
+        elapsed_seconds=elapsed_seconds,
+        per_wave=per_wave_summaries,
+        total_cost=total_cost,
+    )
+    return {
+        **summary.model_dump(),
+        "messages": [f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
+        "warnings": warnings,
+        "errors": [],
+    }
+
+
+def _build_wave_summary(
+    mgr: DispatchStateManager, milestone: int, wave: Wave, wave_counters: _WaveCounters
+) -> DispatchWaveSummary:
+    """Build a DispatchWaveSummary for one completed wave.
+
+    Returns:
+        DispatchWaveSummary with wave execution results.
+    """
+    fetched = mgr.get_wave(milestone, wave.wave)
+    return DispatchWaveSummary(
+        milestone=milestone,
+        wave_num=wave.wave,
+        status=fetched.status if fetched else "complete",
+        total_items=len(wave.items),
+        pending=0,
+        in_progress=0,
+        complete=wave_counters.completed,
+        failed=wave_counters.failed,
+        skipped=wave_counters.skipped,
+    )
+
+
+def _sum_costs(mgr: DispatchStateManager, milestone: int, wave_num: int) -> float | None:
+    """Sum all item costs for waves >= wave_num.
+
+    Returns:
+        Total cost as float, or None if no items have cost data.
+    """
+    all_w = mgr.get_all_waves(milestone)
+    costs = [i.cost for w in all_w if w.wave_num >= wave_num for i in w.items if i.cost is not None]
+    return sum(costs) if costs else None
+
+
+def dispatch_spawn(
+    milestone: int,
+    wave_num: int,
+    max_concurrent: int = 3,
+    model: str = "sonnet",
+    phase: str = "work",
+    effort: str | None = None,
+) -> dict[str, Any]:
+    """Spawn and monitor kage-bunshin sessions for a dispatch wave.
+
+    Synchronous wrapper that runs the async dispatch logic via
+    :func:`asyncio.run`.  Progress is printed to stderr instead of
+    MCP Context.  Returns the same dict structure as the MCP version.
+
+    Args:
+        milestone: GitHub milestone number.
+        wave_num: Starting wave number (1-based); all subsequent waves run too.
+        max_concurrent: Maximum number of sessions running in parallel.
+        model: Model identifier forwarded to each spawned session.
+        phase: ``'work'`` adds ``--worktree``; ``'groom'`` omits it.
+        effort: Effort level (``low``, ``medium``, ``high``, ``max``) or ``None``.
+
+    Returns:
+        Dict with :class:`DispatchSpawnSummary` fields, or ``error`` on failure.
+    """
+    return asyncio.run(_run_dispatch_spawn(milestone, wave_num, max_concurrent, model, phase, effort))
 
 
 # ---------------------------------------------------------------------------
