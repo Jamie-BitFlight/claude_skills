@@ -62,7 +62,7 @@ _PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (FileNotFoundError, FormatDetec
 
 _SYNC_ERRORS: tuple[type[Exception], ...]
 try:
-    from backlog_core.models import BacklogError
+    from backlog_core.models import BacklogError, Output
     from backlog_core.operations import sync_items as _sync_backlog
 
     _BACKLOG_CORE_AVAILABLE = True
@@ -1380,6 +1380,227 @@ def _attempt_backlog_sync() -> None:
             typer.echo(f"Warning: backlog sync failed (exit {proc.returncode}): {proc.stderr.strip()}", err=True)
     except (subprocess.SubprocessError, OSError) as exc:
         typer.echo(f"Warning: backlog sync unavailable: {exc}", err=True)
+
+
+def _print_output_messages(out: Output) -> None:
+    """Print any messages, warnings, and errors collected in an ``Output``."""
+    for msg in out.messages:
+        typer.echo(msg)
+    for msg in out.warnings:
+        typer.echo(f"Warning: {msg}", err=True)
+    for msg in out.errors:
+        typer.echo(f"Error: {msg}", err=True)
+
+
+@app.command(name="backlog-add")
+def backlog_add(
+    title: Annotated[str, typer.Argument(help="Backlog item title")],
+    description: Annotated[str, typer.Option("--description", help="Item description")] = "",
+    priority: Annotated[str, typer.Option("--priority", help="Priority level (P1/P2/P3)")] = "P1",
+    source: Annotated[str, typer.Option("--source", help="Source of the item")] = "Not specified",
+    type_: Annotated[str, typer.Option("--type", help="Item type (Feature/Bug/etc.)")] = "Feature",
+    force: Annotated[bool, typer.Option("--force", help="Force creation even if duplicate suspected")] = False,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Add a new item to the backlog."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.add_item(
+        title=title,
+        description=description,
+        priority=priority,
+        source=source,
+        type_=type_,
+        force=force,
+        repo=repo,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-list")
+def backlog_list(
+    from_github: Annotated[bool, typer.Option("--from-github", help="Refresh from GitHub before listing")] = False,
+    label: Annotated[str | None, typer.Option("--label", help="Filter by label")] = None,
+    section: Annotated[str | None, typer.Option("--section", help="Filter by section")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by status")] = None,
+    title: Annotated[str | None, typer.Option("--title", help="Filter by title substring")] = None,
+    type_: Annotated[str | None, typer.Option("--type", help="Filter by item type")] = None,
+    topic: Annotated[str | None, typer.Option("--topic", help="Filter by topic")] = None,
+    include_closed: Annotated[bool, typer.Option("--include-closed", help="Include closed items")] = False,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List backlog items, optionally filtered."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_items(
+        from_github=from_github,
+        label=label,
+        section=section,
+        status=status,
+        title=title,
+        type_=type_,
+        topic=topic,
+        include_closed=include_closed,
+        repo=repo,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-view")
+def backlog_view(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    offset: Annotated[int, typer.Option("--offset", help="Pagination offset")] = 0,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum items to return (0 = all)")] = 0,
+    show: Annotated[str | None, typer.Option("--show", help="Show specific section or field")] = None,
+    since: Annotated[str | None, typer.Option("--since", help="Filter entries since date/commit")] = None,
+    section: Annotated[str | None, typer.Option("--section", help="Show only a named section")] = None,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """View a single backlog item by selector."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.view_item(
+        selector=selector, repo=repo, offset=offset, limit=limit, show=show, since=since, output=out, section=section
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-update")
+def backlog_update(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    plan: Annotated[str | None, typer.Option("--plan", help="Set plan reference")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Set status (e.g. in-progress)")] = None,
+    section: Annotated[str | None, typer.Option("--section", help="Section name for content update")] = None,
+    content: Annotated[str | None, typer.Option("--content", help="Content to write into section")] = None,
+    title: Annotated[str | None, typer.Option("--title", help="New title")] = None,
+    description: Annotated[str | None, typer.Option("--description", help="New description")] = None,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Update a backlog item's fields."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.update_item(
+        selector=selector,
+        plan=plan,
+        status=status,
+        section=section,
+        content=content,
+        title=title,
+        description=description,
+        repo=repo,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-close")
+def backlog_close(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    reason: Annotated[str, typer.Option("--reason", help="Categorized reason for closing (required)")],
+    reference: Annotated[str, typer.Option("--reference", help="Reference URL or issue number")] = "",
+    comment: Annotated[str, typer.Option("--comment", help="Closing comment")] = "",
+    cleanup: Annotated[bool, typer.Option("--cleanup", help="Clean up local files after closing")] = False,
+    force: Annotated[bool, typer.Option("--force", help="Force close even if checks fail")] = False,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Dismiss a backlog item without completion (duplicate, out-of-scope, etc.)."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.close_item(
+        selector=selector,
+        reason=reason,
+        reference=reference,
+        comment=comment,
+        cleanup=cleanup,
+        force=force,
+        repo=repo,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-resolve")
+def backlog_resolve(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    summary: Annotated[str, typer.Option("--summary", help="Completion summary (required)")],
+    plan: Annotated[str, typer.Option("--plan", help="Plan reference applied")] = "",
+    method: Annotated[str, typer.Option("--method", help="Method used to resolve")] = "",
+    notes: Annotated[str, typer.Option("--notes", help="Additional notes")] = "",
+    follow_ups: Annotated[str, typer.Option("--follow-ups", help="Follow-up items")] = "",
+    findings: Annotated[str, typer.Option("--findings", help="Findings or evidence")] = "",
+    cleanup: Annotated[bool, typer.Option("--cleanup", help="Clean up local files after resolving")] = False,
+    force: Annotated[bool, typer.Option("--force", help="Force resolve even if checks fail")] = False,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Mark a backlog item as done (completed) and close the issue with evidence."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.resolve_item(
+        selector=selector,
+        summary=summary,
+        plan=plan,
+        method=method,
+        notes=notes,
+        follow_ups=follow_ups,
+        findings=findings,
+        cleanup=cleanup,
+        force=force,
+        repo=repo,
+        output=out,
+    )
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-groom")
+def backlog_groom(
+    selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],
+    section: Annotated[str | None, typer.Option("--section", help="Section name for content")] = None,
+    content: Annotated[str | None, typer.Option("--content", help="Content to write into section")] = None,
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Write groomed content into a backlog item file."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.groom_item(selector=selector, section=section, content=content, repo=repo, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-sync")
+def backlog_sync(
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes without writing")] = False,
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Sync local backlog items to GitHub (create missing issues, push groomed content)."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.sync_items(repo=repo, dry_run=dry_run, output=out)
+    _output_json(result)
+    _print_output_messages(out)
 
 
 if __name__ == "__main__":  # pragma: no cover
