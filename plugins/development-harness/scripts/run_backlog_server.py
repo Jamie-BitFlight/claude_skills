@@ -27,38 +27,26 @@ _plugin_root = _scripts_dir.parent
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
 
-try:
-    import os
+import os
 
-    from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-    load_dotenv()
+load_dotenv()
 
-    # The Anthropic-managed proxy intercepts GitHub REST calls and returns 403.
-    # The GITHUB_TOKEN PAT is valid but blocked by proxy enforcement for
-    # repo-specific endpoints. Bypass the proxy for GitHub domains so PyGitHub
-    # can reach api.github.com directly using the user's own token.
-    _gh_domains = "api.github.com,*.github.com,*.githubusercontent.com,uploads.github.com"
-    for _var in ("no_proxy", "NO_PROXY"):
-        existing = os.environ.get(_var, "")
-        if _gh_domains not in existing:
-            os.environ[_var] = f"{existing},{_gh_domains}".lstrip(",")
+# The Anthropic-managed proxy intercepts GitHub REST calls and returns 403.
+# The GITHUB_TOKEN PAT is valid but blocked by proxy enforcement for
+# repo-specific endpoints. Bypass the proxy for GitHub domains so PyGithub
+# can reach api.github.com directly using the user's own token.
+_gh_domains = "api.github.com,*.github.com,*.githubusercontent.com,uploads.github.com"
+for _var in ("no_proxy", "NO_PROXY"):
+    existing = os.environ.get(_var, "")
+    if _gh_domains not in existing:
+        os.environ[_var] = f"{existing},{_gh_domains}".lstrip(",")
 
-    from dh_mcp_preinit import apply_project_dir_from_argv
+from dh_mcp_preinit import apply_project_dir_from_argv
 
-    apply_project_dir_from_argv()
+apply_project_dir_from_argv()
 
-    from backlog_core.server import mcp
-except ImportError:
-    import sys
-
-    _script = Path(__file__).resolve()
-    print(
-        f"Error: missing dependencies. Run this script with uv:\n\n"
-        f"    uv run --script {_script}\n\n"
-        f"Do not invoke it directly with python3.",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+from backlog_core.server import mcp
 
 mcp.run()

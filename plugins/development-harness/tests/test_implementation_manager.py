@@ -10,7 +10,16 @@ operated on lowercased strings.  These tests guard against recurrence.
 
 from __future__ import annotations
 
-from implementation_manager import Task, TaskPriority, TaskStatus, get_ready_tasks
+import json
+from pathlib import Path
+
+from sam_schema.core.models import Plan, Task as SamTask, TaskStatus as SamTaskStatus
+from sam_schema.writers.yaml_writer import _write_directory, write_plan
+from typer.testing import CliRunner
+
+from implementation_manager import Task, TaskPriority, TaskStatus, app, get_ready_tasks
+
+runner = CliRunner()
 
 
 def _task(task_id: str, status: TaskStatus, dependencies: list[str] | None = None, name: str | None = None) -> Task:
@@ -22,6 +31,11 @@ def _task(task_id: str, status: TaskStatus, dependencies: list[str] | None = Non
         dependencies=dependencies or [],
         priority=TaskPriority.MEDIUM,
     )
+
+
+def _sam_task(task_id: str) -> SamTask:
+    """Create a minimal claimable SAM task."""
+    return SamTask(id=task_id, title=f"Task {task_id}", status=SamTaskStatus.NOT_STARTED)
 
 
 # ---------------------------------------------------------------------------
@@ -159,3 +173,31 @@ class TestGetReadyTasksDependencySatisfaction:
         result = get_ready_tasks([dep, ready, blocked])
 
         assert result == [ready]
+
+
+def test_claim_task_returns_started_string_and_persists(tmp_path: Path) -> None:
+    """claim-task returns ClaimResult.started and persists the state transition."""
+    task_file = tmp_path / "tasks-001-claimable.yaml"
+    write_plan(Plan(feature="claimable", tasks=[_sam_task("T1")]), task_file, force_single=True)
+
+    result = runner.invoke(app, ["claim-task", str(task_file), "T1"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["claimed"] is True
+    assert payload["task_id"] == "T1"
+    assert isinstance(payload["started"], str)
+    assert payload["started"]
+    assert "in-progress" in task_file.read_text(encoding="utf-8")
+
+
+def test_claim_task_directory_plan_uses_parent_backend_root(tmp_path: Path) -> None:
+    """claim-task resolves a directory-layout plan from its parent directory."""
+    plan_dir = tmp_path / "tasks-directory-claim"
+    _write_directory(Plan(feature="directory-claim", tasks=[_sam_task("T1")]), plan_dir)
+
+    result = runner.invoke(app, ["claim-task", str(plan_dir), "T1"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["claimed"] is True
+    assert "in-progress" in (plan_dir / "task-T1.yaml").read_text(encoding="utf-8")

@@ -21,6 +21,7 @@ from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException, GithubObject  # GithubObject used only by create_milestone (ADR-004)
 from ruamel.yaml import YAMLError
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
 from typing_extensions import TypedDict
 
 from . import models as _models
@@ -84,14 +85,7 @@ from .parsing import (
 from .rendering import SECTION_HEADING
 from .yaml_io import load_item, save_item
 
-# sam_schema may not be installed in all environments (e.g. direct-script execution).
-# Guard the import; fall back to the full alias set when unavailable.
-try:
-    from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
-
-    _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
-except ImportError:
-    _SAM_SUCCESSFUL_STATUSES = frozenset({"complete", "deferred", "closed", "done", "skipped"})
+_SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping

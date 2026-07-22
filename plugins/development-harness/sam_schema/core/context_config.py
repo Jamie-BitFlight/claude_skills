@@ -12,10 +12,13 @@ Resolution order for backend selection:
 
 from __future__ import annotations
 
-import importlib
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from sam_schema.core.backends.beads import BeadsContextBackend
+from sam_schema.core.backends.local_context_backend import LocalContextBackend
+from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
 
 if TYPE_CHECKING:
     from sam_schema.core.context_backend import ContextBackend
@@ -143,18 +146,13 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
     resolved = name or os.environ.get("CONTEXTBACKEND") or _load_backend_toml_name() or "local"
 
     if resolved == "local":
-        mod = importlib.import_module("sam_schema.core.backends.local_context_backend")
-        return mod.LocalContextBackend()  # type: ignore[return-value]
+        return LocalContextBackend()
 
     if resolved == "memory":
-        mod = importlib.import_module("sam_schema.core.backends.memory_context_backend")
-        return mod.InMemoryContextBackend()  # type: ignore[return-value]
+        return InMemoryContextBackend()
 
     if resolved == "beads":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the beads backend module is created in T08.
-        mod = importlib.import_module("sam_schema.core.backends.beads")
-        return mod.BeadsContextBackend()  # type: ignore[return-value]
+        return BeadsContextBackend()
 
     if resolved == "github":
         msg = "GitHub context backend is implemented in T02. Use 'local' or 'memory' instead."

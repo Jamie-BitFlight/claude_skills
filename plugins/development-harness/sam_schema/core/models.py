@@ -473,6 +473,7 @@ class ReadResult(BaseModel):
 
     plan: Plan
     gaps: list[SchemaGap] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     source_format: str  # FormatType value
     source_path: Path
 

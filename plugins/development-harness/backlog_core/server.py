@@ -1499,25 +1499,13 @@ def _read_startup_sync_enabled_from_yaml() -> bool | None:
     Returns:
         The configured bool, or ``None`` when the key is absent.
     """
-    try:
-        import contextlib  # noqa: PLC0415
+    search_paths = []
+    with contextlib.suppress(FileNotFoundError, RuntimeError):
+        project_root = _dh_paths.git_project_root()
+        search_paths.append(_dh_paths.project_dh_dir(project_root) / "config.yaml")
+    search_paths.append(_dh_paths._dh_user_root() / "config.yaml")
 
-        import dh_paths as _dp  # noqa: PLC0415
-
-        search_paths = []
-        with contextlib.suppress(FileNotFoundError, RuntimeError):
-            project_root = _dp.git_project_root()
-            search_paths.append(_dp.project_dh_dir(project_root) / "config.yaml")
-        search_paths.append(_dp._dh_user_root() / "config.yaml")
-    except ImportError:
-        return None
-
-    try:
-        from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
-
-        yaml = _YAML(typ="safe")
-    except ImportError:
-        return None
+    yaml = _YAML(typ="safe")
 
     for config_path in search_paths:
         result = _read_enabled_from_config_file(yaml, config_path)

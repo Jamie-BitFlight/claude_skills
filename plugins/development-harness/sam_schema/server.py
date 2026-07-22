@@ -195,18 +195,22 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> Plan:
+def _sam_plan_read(plan: str, plan_dir: str) -> Plan | dict[str, object]:
     """Return Plan fields for the given plan address.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
     The operation handles plan retrieval, Plan model conversion, and
-    source-degradation warning surfacing. Returns ``result.plan`` (the
-    :class:`~sam_schema.core.models.Plan` model) so MCP clients receive
-    flat plan fields (feature, goal, context, …) rather than a nested
-    ``ReadResult`` envelope.
+    source-degradation warning surfacing. Returns flat plan fields (feature,
+    goal, context, …) rather than a nested ``ReadResult`` envelope. Warnings
+    are added at the top level when present.
     """
     backend = _get_backend(plan_dir)
-    return operations.read_plan(backend, plan).plan
+    result = operations.read_plan(backend, plan)
+    if not result.warnings:
+        return result.plan
+    response = result.plan.model_dump(by_alias=True, exclude_none=True)
+    response["warnings"] = result.warnings
+    return response
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:

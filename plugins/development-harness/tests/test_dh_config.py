@@ -18,7 +18,7 @@ Resolution order per subsystem (precedence highest → lowest):
 
 Config search paths (priority order):
     1. {project_root}/.dh/config.yaml   via dh_paths.project_dh_dir()
-    2. ~/.dh/config.yaml                via dh_paths._dh_user_root() or Path.home() / ".dh"
+    2. ~/.dh/config.yaml                via dh_paths._dh_user_root()
 
 YAML schema:
     backend:
@@ -590,84 +590,7 @@ def test_when_project_config_invalid_yaml_then_user_config_is_tried(
 
 
 # ---------------------------------------------------------------------------
-# Test group 10 — dh_paths absent: user path fallback, project path skipped
-# ---------------------------------------------------------------------------
-
-
-def test_when_dh_paths_absent_then_user_config_is_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """When dh_paths is None, ~/.dh/config.yaml is read via Path.home() fallback.
-
-    Why: dh_paths is an optional import — tests and environments without the
-    plugin must still read user-level config. The fallback to Path.home() / ".dh"
-    is the contract for this case.
-    """
-    from dh_config import DHConfig  # ImportError until module exists
-
-    # Arrange
-    _clear_all_backend_env_vars(monkeypatch)
-    fake_home = tmp_path / "fakehome"
-    monkeypatch.setenv("HOME", str(fake_home))
-    monkeypatch.setattr("dh_config._dh_paths", None)
-
-    user_config = fake_home / ".dh" / "config.yaml"
-    _write_config(user_config, "backend:\n  name: memory\n")
-
-    # Act
-    result = DHConfig().get_backend("backlog")
-
-    # Assert
-    assert result == "memory"
-
-
-def test_when_dh_paths_absent_then_project_path_is_gracefully_skipped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When dh_paths is None, project-root config lookup is skipped without error.
-
-    Why: Project path discovery requires dh_paths.project_dh_dir(). With
-    dh_paths absent, the lookup cannot happen and must be silently skipped,
-    not raise AttributeError.
-    """
-    from dh_config import DHConfig  # ImportError until module exists
-
-    # Arrange
-    _clear_all_backend_env_vars(monkeypatch)
-    monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
-    monkeypatch.setattr("dh_config._dh_paths", None)
-    # No user config either — should return default
-
-    # Act — must not raise
-    result = DHConfig().get_backend("backlog")
-
-    # Assert — falls through to default
-    assert result == "github"
-
-
-def test_when_dh_paths_absent_then_all_subsystems_return_defaults(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """With dh_paths None and no user config, all subsystems return their defaults.
-
-    Why: Tests the complete fallback chain for the common test/CI environment
-    where dh_paths is not installed.
-    """
-    from dh_config import DHConfig  # ImportError until module exists
-
-    # Arrange
-    _clear_all_backend_env_vars(monkeypatch)
-    monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
-    monkeypatch.setattr("dh_config._dh_paths", None)
-
-    config = DHConfig()
-
-    # Act + Assert — each subsystem falls to its own default
-    assert config.get_backend("backlog") == "github"
-    assert config.get_backend("task") == "local"
-    assert config.get_backend("context") == "local"
-
-
-# ---------------------------------------------------------------------------
-# Test group 11 — edge cases and combined scenarios
+# Test group 10 — edge cases and combined scenarios
 # ---------------------------------------------------------------------------
 
 

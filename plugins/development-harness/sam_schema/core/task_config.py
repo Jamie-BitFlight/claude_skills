@@ -12,11 +12,17 @@ Resolution order for backend selection:
 
 from __future__ import annotations
 
-import importlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.backends.beads import BeadsTaskProvider
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+from sam_schema.core.backends.memory import InMemoryTaskProvider
+from sam_schema.core.gist_task_layer import GistTaskLayer
+from sam_schema.core.plan_id_index import create_plan_id_index
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
@@ -147,22 +153,13 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
     resolved = name or os.environ.get("TASKBACKEND") or _load_backend_toml_name() or "local"
 
     if resolved == "local":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the backends package is created in T03.
-        mod = importlib.import_module("sam_schema.core.backends.local_yaml")
-        return mod.LocalYamlTaskProvider()  # type: ignore[return-value]
+        return LocalYamlTaskProvider()
 
     if resolved == "memory":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the backends package is created in T03.
-        mod = importlib.import_module("sam_schema.core.backends.memory")
-        return mod.InMemoryTaskProvider()  # type: ignore[return-value]
+        return InMemoryTaskProvider()
 
     if resolved == "beads":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the beads backend module is created in T08.
-        mod = importlib.import_module("sam_schema.core.backends.beads")
-        return mod.BeadsTaskProvider()  # type: ignore[return-value]
+        return BeadsTaskProvider()
 
     if resolved == "github":
         msg = "GitHub backend requires IssueBackend + DocumentBackend (see #984). Use 'local' or 'memory' instead."
@@ -208,8 +205,6 @@ def get_backend(plan_dir: str | None = None, *, wrap_gist: bool = False) -> Task
     if plan_dir is None or plan_dir == _PLAN_DIR_SENTINEL:
         return _get_configured_backend()
 
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-
     local = LocalYamlTaskProvider(Path(plan_dir))
 
     if not wrap_gist:
@@ -217,10 +212,6 @@ def get_backend(plan_dir: str | None = None, *, wrap_gist: bool = False) -> Task
 
     # MCP server path: wrap explicit-path backends in GistTaskLayer to
     # preserve write-through to GitHub Gist (matching pre-refactor behaviour).
-    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
-
     artifact_client = ArtifactRegistryClient()
     plan_index = create_plan_id_index(artifact_client)
     return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
@@ -228,11 +219,6 @@ def get_backend(plan_dir: str | None = None, *, wrap_gist: bool = False) -> Task
 
 def _get_configured_backend() -> TaskBackend:
     """Return the configured backend, wrapped in GistTaskLayer when applicable."""
-    from sam_schema.core.artifact_registry_client import ArtifactRegistryClient  # noqa: PLC0415
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider  # noqa: PLC0415
-    from sam_schema.core.gist_task_layer import GistTaskLayer  # noqa: PLC0415
-    from sam_schema.core.plan_id_index import create_plan_id_index  # noqa: PLC0415
-
     configured = get_task_config().backend
     if not isinstance(configured, LocalYamlTaskProvider):
         return configured

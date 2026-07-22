@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from dh_core import operations
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError
@@ -132,6 +133,21 @@ def test_local_plan_readable_via_fallback(tmp_path: Path) -> None:
     assert len(retrieved["tasks"]) == 1
     assert retrieved["tasks"][0]["id"] == "T1"
     assert retrieved["tasks"][0]["title"] == "Pre-fix task"
+
+
+def test_operations_read_plan_surfaces_local_fallback_warning(tmp_path: Path) -> None:
+    """Local Gist fallback is surfaced to callers as a ReadResult warning."""
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    plan_id = _create_local_only_plan(
+        plan_dir, "warning-plan", [Task(id="T1", title="Task", status=TaskStatus.NOT_STARTED)]
+    )
+
+    result = operations.read_plan(_make_layer_with_empty_gist(plan_dir), plan_id)
+
+    assert result.warnings == [
+        f"Plan {plan_id} served from local cache — Gist copy may be unavailable or predates this fix."
+    ]
 
 
 def test_local_plan_full_content_equality(tmp_path: Path) -> None:

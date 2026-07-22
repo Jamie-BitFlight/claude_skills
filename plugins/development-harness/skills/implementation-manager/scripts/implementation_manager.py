@@ -1365,7 +1365,7 @@ def claim_task(
     """
     task_file_str = str(task_file_path)
     plan_ref = plan_id_from_path(task_file_path)
-    backend = LocalYamlTaskProvider(task_file_path.parent if task_file_path.is_file() else task_file_path)
+    backend = LocalYamlTaskProvider(task_file_path.parent)
 
     try:
         claimed_task = operations.claim_task(backend, plan_ref, task_id)
@@ -1394,11 +1394,7 @@ def claim_task(
         _claim_fail({"claimed": False, "reason": "write-error", "error": str(exc), "task_file": task_file_str}, exc)
         return  # unreachable; satisfies type checker
 
-    started_str = (
-        claimed_task.started.isoformat()
-        if claimed_task.started
-        else datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    )
+    started_str = claimed_task.started or datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(json.dumps({"claimed": True, "task_id": task_id, "started": started_str, "task_file": task_file_str}))
     raise typer.Exit(0)
 

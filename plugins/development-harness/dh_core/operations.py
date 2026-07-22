@@ -315,8 +315,11 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
     # Use getattr to stay backend-agnostic — not all backends have
     # last_read_source (only GistTaskLayer does).
     last_read_source = getattr(backend, "last_read_source", None)
+    warnings: list[str] = []
     if last_read_source == "local":
-        _log.warning("Plan %s served from local cache — Gist copy may be unavailable or predates this fix.", plan)
+        warning = f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
+        _log.warning(warning)
+        warnings.append(warning)
 
     source_path_str = plan_data.get("source_path") or ""
     source_path = Path(source_path_str) if source_path_str else Path()
@@ -327,7 +330,7 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
     raw_gaps = plan_data.get("gaps") or []
     gaps = [SchemaGap.model_validate(g) for g in raw_gaps]
 
-    return ReadResult(plan=plan_model, gaps=gaps, source_format="backend", source_path=source_path)
+    return ReadResult(plan=plan_model, gaps=gaps, warnings=warnings, source_format="backend", source_path=source_path)
 
 
 def list_plans(

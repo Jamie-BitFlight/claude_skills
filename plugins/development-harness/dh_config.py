@@ -29,26 +29,16 @@ from __future__ import annotations
 import contextlib
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeGuard
+from typing import TypeGuard
 
-if TYPE_CHECKING:
-    import types
-
-_dh_paths: types.ModuleType | None = None
-with contextlib.suppress(ImportError):
-    import dh_paths as _dh_paths  # optional — only present inside the plugin
+import dh_paths as _dh_paths
+from ruamel.yaml import YAML as _RuamelYAML
+from ruamel.yaml.error import YAMLError as _YAMLError
 
 __all__ = ["DHConfig"]
 
-try:
-    from ruamel.yaml import YAML as _RuamelYAML
-    from ruamel.yaml.error import YAMLError as _YAMLError
-
-    _YAML: _RuamelYAML | None = _RuamelYAML(typ="safe")
-    _YAML_PARSE_ERRORS: tuple[type[Exception], ...] = (OSError, _YAMLError)
-except ImportError:
-    _YAML = None
-    _YAML_PARSE_ERRORS = (OSError,)
+_YAML: _RuamelYAML = _RuamelYAML(typ="safe")
+_YAML_PARSE_ERRORS: tuple[type[Exception], ...] = (OSError, _YAMLError)
 
 # ---------------------------------------------------------------------------
 # Subsystem configuration constants
@@ -82,8 +72,6 @@ def _load_yaml_config(path: Path) -> dict[str, object] | None:
     """
     if not path.is_file():
         return None
-    if _YAML is None:
-        return None
     try:
         data = _YAML.load(path.read_text(encoding="utf-8"))
     except _YAML_PARSE_ERRORS:
@@ -95,18 +83,16 @@ def _load_yaml_config(path: Path) -> dict[str, object] | None:
 def _dh_user_root_path() -> Path:
     """Return the user-level .dh directory path.
 
-    Uses _dh_paths._dh_user_root() when available, falls back to
-    Path.home() / ".dh" otherwise.
+    Uses _dh_paths._dh_user_root(), falls back to Path.home() / ".dh" if it
+    raises FileNotFoundError or RuntimeError (e.g. not in a git repo).
 
     Returns:
         Path to the user-level .dh directory.
     """
-    if _dh_paths is not None:
-        try:
-            return _dh_paths._dh_user_root()  # noqa: SLF001
-        except (FileNotFoundError, RuntimeError):
-            pass
-    return Path.home() / ".dh"
+    try:
+        return _dh_paths._dh_user_root()  # noqa: SLF001
+    except (FileNotFoundError, RuntimeError):
+        return Path.home() / ".dh"
 
 
 def _get_config_search_paths() -> list[Path]:
@@ -119,11 +105,10 @@ def _get_config_search_paths() -> list[Path]:
     """
     paths: list[Path] = []
 
-    if _dh_paths is not None:
-        with contextlib.suppress(FileNotFoundError, RuntimeError):
-            project_root = _dh_paths.git_project_root()
-            dh_dir = _dh_paths.project_dh_dir(project_root)
-            paths.append(dh_dir / _CONFIG_FILENAME)
+    with contextlib.suppress(FileNotFoundError, RuntimeError):
+        project_root = _dh_paths.git_project_root()
+        dh_dir = _dh_paths.project_dh_dir(project_root)
+        paths.append(dh_dir / _CONFIG_FILENAME)
 
     paths.append(_dh_user_root_path() / _CONFIG_FILENAME)
     return paths
@@ -165,14 +150,12 @@ def _resolve_from_config(subsystem: str) -> str | None:
 def _auto_detect_beads() -> str | None:
     """Return 'beads' when .beads/dh-backend marker file exists at the project root.
 
-    Uses _dh_paths to resolve project root. Returns None if _dh_paths absent,
-    project root cannot be determined, or .beads/dh-backend does not exist as a file.
+    Uses _dh_paths to resolve project root. Returns None if project root
+    cannot be determined or .beads/dh-backend does not exist as a file.
 
     Returns:
         "beads" when the opt-in marker file is present, otherwise None.
     """
-    if _dh_paths is None:
-        return None
     try:
         project_root = _dh_paths.git_project_root()
     except (FileNotFoundError, RuntimeError):
