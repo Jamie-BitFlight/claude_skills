@@ -241,13 +241,12 @@ def _migrate_make_candidate(
 
 
 def _migrate_scan_codebase_dir(
-    codebase_dir: Path, repo_root: Path, issue_filter: int | None, backlog_items: list[dict]
+    codebase_dir: Path, issue_filter: int | None, backlog_items: list[dict]
 ) -> _MigrateDiscoveryResult:
     """Scan ``plan/codebase/`` for markdown codebase-analysis files.
 
     Args:
         codebase_dir: Absolute path to the ``plan/codebase/`` directory.
-        repo_root: Absolute path to the repository root.
         issue_filter: When set, non-matching files are counted but not
             included in the returned candidate list.
         backlog_items: Pre-fetched backlog items for slug-based fallback.
@@ -260,7 +259,7 @@ def _migrate_scan_codebase_dir(
     for child in codebase_dir.iterdir():
         if not (child.is_file() and _MIGRATE_CODEBASE_PATTERN.match(child.name)):
             continue
-        rel = child.relative_to(repo_root).as_posix()
+        rel = f"plan/codebase/{child.relative_to(codebase_dir).as_posix()}"
         issue = _migrate_resolve_issue(child, backlog_items)
         candidate = _migrate_make_candidate(rel, ArtifactType.CODEBASE_ANALYSIS, issue, issue_filter)
         if candidate is None:
@@ -271,13 +270,12 @@ def _migrate_scan_codebase_dir(
 
 
 def _migrate_scan_plan_dir(
-    plan_dir: Path, repo_root: Path, issue_filter: int | None, backlog_items: list[dict]
+    plan_dir: Path, issue_filter: int | None, backlog_items: list[dict]
 ) -> _MigrateDiscoveryResult:
     """Scan ``plan/`` (excluding subdirectories other than ``codebase/``).
 
     Args:
         plan_dir: Absolute path to the ``plan/`` directory.
-        repo_root: Absolute path to the repository root.
         issue_filter: When set, non-matching files are counted but not
             included in the returned candidate list.
         backlog_items: Pre-fetched backlog items for slug-based fallback.
@@ -290,9 +288,7 @@ def _migrate_scan_plan_dir(
     for file_path in plan_dir.iterdir():
         if file_path.is_dir():
             if file_path.name == "codebase":
-                sub_results, sub_filtered = _migrate_scan_codebase_dir(
-                    file_path, repo_root, issue_filter, backlog_items
-                )
+                sub_results, sub_filtered = _migrate_scan_codebase_dir(file_path, issue_filter, backlog_items)
                 results.extend(sub_results)
                 filtered += sub_filtered
             continue
@@ -301,7 +297,7 @@ def _migrate_scan_plan_dir(
         atype = _migrate_classify_plan_file(file_path)
         if atype is None:
             continue
-        rel = file_path.relative_to(repo_root).as_posix()
+        rel = f"plan/{file_path.relative_to(plan_dir).as_posix()}"
         issue = _migrate_resolve_issue(file_path, backlog_items)
         candidate = _migrate_make_candidate(rel, atype, issue, issue_filter)
         if candidate is None:
@@ -338,7 +334,7 @@ def _migrate_discover_candidates(
 
     plan_dir = dh_paths.plan_dir(repo_root)
     if plan_dir.is_dir():
-        plan_candidates, plan_filtered = _migrate_scan_plan_dir(plan_dir, repo_root, issue_filter, backlog_items)
+        plan_candidates, plan_filtered = _migrate_scan_plan_dir(plan_dir, issue_filter, backlog_items)
         candidates.extend(plan_candidates)
         filtered += plan_filtered
 
