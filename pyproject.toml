@@ -260,7 +260,7 @@ unfixable = ["F401"]
 "**/assets/version.py" = ["PLC0415"]
 # BacklogBackend Protocol must expose all 41 operations from gh_client/github_sync/github_branches
 # PLR0904 limit (20) is not applicable to Protocol classes that define a full backend surface
-"**/backlog_core/backend_protocol.py" = ["PLR0904"]
+"**/backlog_core/backend_types.py" = ["PLR0904"]
 # FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
 # parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
 # present in the module's global namespace even with `from __future__ import annotations`.

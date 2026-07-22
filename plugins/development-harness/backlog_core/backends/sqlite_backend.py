@@ -17,7 +17,8 @@ Branch operations are not supported; all five branch methods raise
 Usage::
 
     from backlog_core.backends.sqlite_backend import SQLiteBackend
-    from backlog_core.backend_protocol import BacklogBackend, BacklogConfig, set_config
+    from backlog_core.backend_protocol import set_config
+    from backlog_core.backend_types import BacklogBackend, BacklogConfig
 
     backend = SQLiteBackend(":memory:")
     set_config(BacklogConfig(backend=backend))
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_protocol import BacklogBackend, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
+from backlog_core.backend_types import BacklogBackend, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,

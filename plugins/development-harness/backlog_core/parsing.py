@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .backend_protocol import IssueNode
+    from .backend_types import IssueNode
 
 log = logging.getLogger(__name__)
 

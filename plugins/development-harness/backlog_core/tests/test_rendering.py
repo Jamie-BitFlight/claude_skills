@@ -24,7 +24,7 @@ from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import GroomedData
 
 if TYPE_CHECKING:
-    from backlog_core.backend_protocol import BacklogBackend
+    from backlog_core.backend_types import BacklogBackend
 
 # ---------------------------------------------------------------------------
 # Shared fixture

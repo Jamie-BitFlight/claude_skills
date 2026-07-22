@@ -52,8 +52,7 @@ from ruamel.yaml import YAML, YAMLError
 from sam_schema.task_format import resolve_task_id
 
 if TYPE_CHECKING:
-    # IssueNode is a TypedDict from backlog_core.gh_client; only imported for type checking
-    from backlog_core.gh_client import IssueNode
+    from backlog_core.backend_types import IssueNode
     from github.Repository import Repository
 
 # ---------------------------------------------------------------------------

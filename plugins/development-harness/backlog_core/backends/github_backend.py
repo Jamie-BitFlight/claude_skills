@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
-from backlog_core.backend_protocol import BacklogBackend
+from backlog_core.backend_types import BacklogBackend
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.gh_client import IssueCommentNode, IssueNode, MilestoneFullNode
+    from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
     from backlog_core.models import (
         BackendStatus,
         BacklogItem,

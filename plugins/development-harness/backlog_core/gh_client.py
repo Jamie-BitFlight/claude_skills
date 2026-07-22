@@ -22,7 +22,7 @@ from github import Auth, Github, GithubException
 from typing_extensions import TypedDict
 
 from . import models as _models
-from .backend_protocol import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .entry_blocks import wrap_entry
 from .models import (
     TYPE_TO_LABEL,

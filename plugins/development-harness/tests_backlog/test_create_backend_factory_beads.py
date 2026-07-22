@@ -56,7 +56,7 @@ def test_create_backend_beads_instance_satisfies_protocol() -> None:
     Why: Protocol conformance is checked at runtime by operations.py; a backend
          that doesn't satisfy the Protocol would silently drop operations.
     """
-    from backlog_core.backend_protocol import BacklogBackend
+    from backlog_core.backend_types import BacklogBackend
 
     backend = create_backend("beads")
 

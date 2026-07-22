@@ -33,18 +33,14 @@ Test layout:
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backend_types import BacklogBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMetadata, ViewItemResult
 from github.Repository import Repository as GithubRepository
-
-if TYPE_CHECKING:
-    from backlog_core.backend_protocol import BacklogBackend
-
 
 pytestmark = pytest.mark.cross_backend
 
@@ -912,7 +908,7 @@ class TestBeadsBackendConformance:
         Why: isinstance is the conformance gate in operations.py — failing this
              means BeadsBackend is silently rejected by the factory.
         """
-        from backlog_core.backend_protocol import BacklogBackend as _BacklogBackend
+        from backlog_core.backend_types import BacklogBackend as _BacklogBackend
 
         assert isinstance(beads_backend, _BacklogBackend)
 

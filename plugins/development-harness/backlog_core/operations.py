@@ -27,7 +27,8 @@ from typing_extensions import TypedDict
 from . import models as _models
 from .artifact_provider import create_artifact_provider
 from .artifact_registry import ArtifactRegistry
-from .backend_protocol import IssueCommentNode, IssueNode, MilestoneFullNode, get_config
+from .backend_protocol import get_config
+from .backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
 from .entry_blocks import ENTRY_RE, _render_entry_raw, generate_diff, parse_entries, strike_entry as strike_entry_block
 from .models import (
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,

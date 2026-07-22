@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import ValidationError
 
 from backlog_core import github_sync, rendering as _rendering
-from backlog_core.backend_protocol import BacklogBackend
+from backlog_core.backend_types import BacklogBackend
 from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
 from backlog_core.backends.beads_models import (
     BeadsIssueType,
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_protocol import IssueCommentNode, IssueNode, MilestoneFullNode, MilestoneNode
+    from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode, MilestoneNode
     from backlog_core.models import Output, SamTask
 
 __all__ = ["BeadsBackend"]

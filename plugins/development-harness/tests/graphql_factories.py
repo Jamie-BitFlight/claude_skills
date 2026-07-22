@@ -1,7 +1,7 @@
 """GraphQL response fixture factories for backlog_core tests.
 
 These factories produce dict shapes that match the TypedDict response models
-defined in backlog_core/gh_client.py (IssueNode, MilestoneFullNode, etc.).
+defined in backlog_core/backend_types.py (IssueNode, MilestoneFullNode, etc.).
 
 All factories accept **overrides so individual tests can customise specific
 fields without spelling out the full structure every time.
@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from backlog_core.gh_client import IssueNode
+    from backlog_core.backend_types import IssueNode
 
 # ---------------------------------------------------------------------------
 # Node factories

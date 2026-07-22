@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core.backend_protocol import BacklogBackend
+from backlog_core.backend_types import BacklogBackend
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMetadata, ViewItemResult
@@ -752,7 +752,7 @@ def test_issue_to_local_fields_maps_node_to_local_fields() -> None:
     Why: This is a translation utility — wrong field mapping corrupts local
          metadata for items synced from GitHub-shaped data.
     """
-    from backlog_core.backend_protocol import IssueNode
+    from backlog_core.backend_types import IssueNode
 
     runner = _make_runner()
     backend = BeadsBackend(runner=runner)

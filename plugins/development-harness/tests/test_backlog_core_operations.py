@@ -304,7 +304,8 @@ class TestAddItemBeadsBackend:
         """
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -331,7 +332,8 @@ class TestAddItemBeadsBackend:
         """
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.yaml_io import load_item
@@ -362,7 +364,8 @@ class TestAddItemBeadsBackend:
         """
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -557,7 +560,7 @@ class TestListItemsBeadsBackend:
         """Patch get_config() to return a BacklogConfig backed by BeadsBackend."""
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig as _BPConfig
+        from backlog_core.backend_types import BacklogConfig as _BPConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -656,7 +659,7 @@ class TestApplyIssueStatusLabelsBeads:
         """Patch get_config() to return a BacklogConfig backed by BeadsBackend."""
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig as _BPConfig
+        from backlog_core.backend_types import BacklogConfig as _BPConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -3258,7 +3261,8 @@ class TestRenameItemTitleBeadsNanoid:
         from unittest.mock import MagicMock
 
         import backlog_core.models as models
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.operations import update_item
@@ -3310,7 +3314,8 @@ class TestApplyPlanToItemBeadsNanoid:
         from unittest.mock import MagicMock
 
         import backlog_core.models as models
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.operations import update_item
@@ -3361,7 +3366,8 @@ class TestAutoRegisterPlanArtifactBeadsNanoid:
         from unittest.mock import MagicMock
 
         import backlog_core.models as models
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
         from backlog_core.operations import update_item
@@ -3409,7 +3415,8 @@ class TestViewItemBeadsNanoidUncached:
         """
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -3440,7 +3447,8 @@ class TestViewItemBeadsNanoidUncached:
         """
         from unittest.mock import MagicMock
 
-        from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 

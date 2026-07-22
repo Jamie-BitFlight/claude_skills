@@ -34,7 +34,8 @@ from .artifact_migration import migrate_dry_run, migrate_live_run
 from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
-from .backend_protocol import IssueNode as _IssueNode, get_config as _get_config
+from .backend_protocol import get_config as _get_config
+from .backend_types import IssueNode as _IssueNode
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
