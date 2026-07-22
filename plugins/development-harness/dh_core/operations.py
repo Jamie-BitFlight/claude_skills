@@ -24,7 +24,6 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
-import importlib
 import json
 import logging
 import os
@@ -38,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 import dh_paths
 import dispatch_schema as _ds
+from backlog_core.artifact_migration import migrate_dry_run, migrate_live_run
 from backlog_core.artifact_provider import ArtifactBackend, create_artifact_provider
 from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry
@@ -2081,19 +2081,15 @@ def artifact_migrate(
     if old_artifact_id is not None and new_artifact_id is not None and item_id is not None:
         return _artifact_migrate_rename(item_id, old_artifact_id, new_artifact_id, out)
 
-    # Lazy import via importlib to avoid a circular dependency:
-    # backlog_core.server imports dh_core.operations at module load time.
-    server_mod = importlib.import_module("backlog_core.server")
-
     if dry_run:
         try:
-            result = server_mod.migrate_dry_run(item_id)
+            result = migrate_dry_run(item_id)
         except OSError as exc:
             return {"error": f"Discovery failed: {exc}", **out.to_dict()}
         return {**result, **out.to_dict()}
 
     try:
-        result = server_mod.migrate_live_run(item_id, out)
+        result = migrate_live_run(item_id, out)
     except (BacklogError, GithubException, OSError) as exc:
         return {"error": f"Migration failed: {exc}", **out.to_dict()}
     return {**result, **out.to_dict()}
