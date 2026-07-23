@@ -2,6 +2,8 @@
 
 Language-agnostic development process harness that orchestrates feature development through a structured 7-stage pipeline. Any language plugin can compose with this harness by providing a language manifest declaring specialist agents and quality gates.
 
+**Target contract:** See [docs/PURPOSE.md](./docs/PURPOSE.md) for the authoritative system purpose, target architecture, and current-state boundaries.
+
 ---
 
 ## Plugin Identity
