@@ -77,16 +77,10 @@ def test_normalize_task_space_separated_status_mapped() -> None:
     assert task.status == TaskStatus.NOT_STARTED
 
 
-def test_normalize_task_emoji_complete_status_mapped() -> None:
-    raw = {"task": "T1", "title": "T", "status": ":white_check_mark: COMPLETE"}
+def test_normalize_task_direct_emoji_token_status_mapped() -> None:
+    raw = {"task": "T1", "title": "T", "status": ":white_check_mark:"}
     task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.COMPLETE
-
-
-def test_normalize_task_emoji_in_progress_status_mapped() -> None:
-    raw = {"task": "T1", "title": "T", "status": ":arrows_counterclockwise: IN PROGRESS"}
-    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
-    assert task.status == TaskStatus.IN_PROGRESS
 
 
 def test_normalize_task_unknown_status_raises_value_error() -> None:

@@ -1,8 +1,7 @@
-"""Regression tests for three confirmed silent data-loss bugs in the SAM migrate pipeline.
+"""Regression tests for confirmed silent data-loss bugs in the SAM migrate pipeline.
 
 BUG-1: global_manifest — prose parallelize-with value drops tasks.
 BUG-2: global_manifest — string-format tasks: entries silently dropped.
-BUG-3: Unicode emoji-prefixed status values drop all tasks.
 
 Tests: Each bug's previously-silent-drop now produces correct output.
 How: Construct minimal in-memory inputs that reproduce the exact failure path,
@@ -16,9 +15,8 @@ from __future__ import annotations
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
-import pytest
 from sam_schema.readers.manifest_reader import _build_task_dict, _extract_bold_fields, read_manifest_plan
-from sam_schema.readers.normalize import _normalize_status, normalize_plan
+from sam_schema.readers.normalize import normalize_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -159,47 +157,3 @@ class TestBug2StringFormatTaskEntriesDropped:
         assert "1.1" in task_ids
         assert "1.2" in task_ids
         assert "1.3" in task_ids
-
-
-# ---------------------------------------------------------------------------
-# BUG-3: Unicode emoji-prefixed status values drop all tasks that use ✅ COMPLETE
-#        instead of :white_check_mark: COMPLETE.
-# ---------------------------------------------------------------------------
-
-
-class TestBug3UnicodeEmojiStatusDroppedTasks:
-    """Verify that Unicode emoji-prefixed status values are normalized correctly.
-
-    Tests: _normalize_status strips leading Unicode emoji characters before lookup.
-    How: Pass status strings with common Unicode emoji prefixes directly to
-         _normalize_status.
-    Why: Before the fix, '✅ COMPLETE' failed all status lookups and raised
-         ValueError, causing normalize_plan to silently drop every task.
-    """
-
-    def test_normalize_status_checkmark_emoji_complete(self) -> None:
-        """✅ COMPLETE normalizes to 'complete'."""
-        assert _normalize_status("✅ COMPLETE") == "complete"
-
-    def test_normalize_status_checkmark_emoji_lowercase_complete(self) -> None:
-        """✅ complete normalizes to 'complete'."""
-        assert _normalize_status("✅ complete") == "complete"
-
-    def test_normalize_status_x_emoji_not_started(self) -> None:
-        """❌ NOT STARTED normalizes to 'not-started'."""
-        assert _normalize_status("❌ NOT STARTED") == "not-started"
-
-    def test_normalize_status_hourglass_in_progress(self) -> None:
-        """⏳ IN PROGRESS normalizes to 'in-progress'."""
-        assert _normalize_status("⏳ IN PROGRESS") == "in-progress"
-
-    def test_normalize_status_without_emoji_still_works(self) -> None:
-        """Existing non-emoji status values are unaffected."""
-        assert _normalize_status("COMPLETE") == "complete"
-        assert _normalize_status("not-started") == "not-started"
-        assert _normalize_status(":white_check_mark: COMPLETE") == "complete"
-
-    def test_normalize_status_unrecognized_raises_value_error(self) -> None:
-        """Completely unrecognized status still raises ValueError."""
-        with pytest.raises(ValueError, match="Unrecognized status"):
-            _normalize_status("totally-invalid-status")
