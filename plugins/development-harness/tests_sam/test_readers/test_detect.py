@@ -50,23 +50,6 @@ def test_detect_format_directory_with_task_files_returns_directory() -> None:
 
 
 # ---------------------------------------------------------------------------
-# detect_format — LEGACY_MARKDOWN
-# ---------------------------------------------------------------------------
-
-
-def test_detect_format_legacy_markdown_returns_legacy_markdown() -> None:
-    """Verify .md file with ## Task N: headings is detected as LEGACY_MARKDOWN.
-
-    Tests: LEGACY_MARKDOWN format detection.
-    How: Point detect_format at a legacy markdown fixture.
-    Why: Legacy format must be detected to route to the legacy reader.
-    """
-    path = _FIXTURES / "legacy_markdown.md"
-    result = detect_format(path)
-    assert result == FormatType.LEGACY_MARKDOWN
-
-
-# ---------------------------------------------------------------------------
 # detect_format — YAML_FRONTMATTER
 # ---------------------------------------------------------------------------
 
@@ -286,19 +269,6 @@ def test_read_plan_routes_pure_yaml_returns_tuple_with_format_type() -> None:
     assert fmt == FormatType.PURE_YAML
     assert isinstance(plan_meta, dict)
     assert isinstance(task_dicts, list)
-
-
-def test_read_plan_routes_legacy_markdown_returns_tuple_with_format_type() -> None:
-    """Verify read_plan routes LEGACY_MARKDOWN to legacy_reader.
-
-    Tests: read_plan routing for LEGACY_MARKDOWN format.
-    How: Call read_plan on legacy markdown fixture.
-    Why: Correct routing ensures tasks are parsed by the right reader.
-    """
-    path = _FIXTURES / "legacy_markdown.md"
-    _plan_meta, task_dicts, fmt = read_plan(path)
-    assert fmt == FormatType.LEGACY_MARKDOWN
-    assert len(task_dicts) == 3
 
 
 def test_read_plan_routes_global_manifest_returns_tuple_with_format_type() -> None:

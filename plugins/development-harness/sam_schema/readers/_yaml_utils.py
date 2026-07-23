@@ -79,7 +79,6 @@ _HEADING_RE = re.compile(r"^(?:#{2,4})\s+(.+)$", re.MULTILINE)
 
 # Map recognised heading names (lowercased) to canonical task field names.
 # frontmatter_reader and manifest_reader both use this identical mapping.
-# legacy_reader uses a separate _PROSE_HEADING_TO_FIELD with different keys.
 HEADING_TO_FIELD: dict[str, str] = {
     "description": "description",
     "context": "description",

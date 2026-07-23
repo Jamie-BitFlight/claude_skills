@@ -115,18 +115,6 @@ def test_load_plan_yaml_frontmatter_single_has_task_id_in_result() -> None:
     assert result.source_format == "yaml_frontmatter"
 
 
-def test_load_plan_legacy_markdown_returns_read_result() -> None:
-    # Arrange
-    path = FIXTURES_DIR / "legacy_markdown.md"
-
-    # Act
-    result = load_plan(path)
-
-    # Assert
-    assert len(result.plan.tasks) > 0
-    assert result.source_format == "legacy_markdown"
-
-
 def test_load_plan_global_manifest_returns_read_result() -> None:
     # Arrange
     path = FIXTURES_DIR / "global_manifest.md"

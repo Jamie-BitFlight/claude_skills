@@ -36,20 +36,6 @@ def plan_dir(tmp_path: Path) -> Path:
     return d
 
 
-@pytest.fixture
-def legacy_plan_dir(tmp_path: Path) -> Path:
-    """Create a temporary plan directory containing a legacy markdown plan file.
-
-    Returns:
-        Path to a ``plan/`` directory with a legacy-format plan file.
-    """
-    d = tmp_path / "plan"
-    d.mkdir()
-    content = (FIXTURES_DIR / "legacy_markdown.md").read_text(encoding="utf-8")
-    (d / "tasks-2-legacy.md").write_text(content, encoding="utf-8")
-    return d
-
-
 # ---------------------------------------------------------------------------
 # sam --help
 # ---------------------------------------------------------------------------
@@ -366,27 +352,6 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_migrate_dry_run_prints_plan_info_without_writing(legacy_plan_dir: Path) -> None:
-    """Migrate P2 --dry-run prints what would change without modifying files."""
-    original_files = set(legacy_plan_dir.iterdir())
-    result = runner.invoke(app, ["migrate", "P2", "--dry-run", "--plan-dir", str(legacy_plan_dir)])
-    assert result.exit_code == 0
-    assert "Would migrate" in result.output
-    assert "Source format" in result.output
-    # No new files should be written
-    assert set(legacy_plan_dir.iterdir()) == original_files
-
-
-def test_migrate_converts_legacy_to_yaml(legacy_plan_dir: Path) -> None:
-    """Migrate P2 converts a legacy markdown plan to .yaml format."""
-    result = runner.invoke(app, ["migrate", "P2", "--plan-dir", str(legacy_plan_dir)])
-    assert result.exit_code == 0
-    assert "Migrated" in result.output
-    # A .yaml file should now exist in the plan dir
-    yaml_files = list(legacy_plan_dir.glob("*.yaml"))
-    assert len(yaml_files) >= 1
-
-
 def test_migrate_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
     """Migrate P99 exits 1 when no matching plan exists."""
     result = runner.invoke(app, ["migrate", "P99", "--plan-dir", str(plan_dir)])
@@ -406,18 +371,3 @@ def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
     assert data["valid"] is True
     assert data["errors"] == []
     assert data["warnings"] == []
-
-
-def test_validate_legacy_plan_reports_gaps(legacy_plan_dir: Path) -> None:
-    """Validate P2 on a legacy markdown plan surfaces schema gaps as errors.
-
-    This verifies that operations.read_plan preserves gaps from the
-    reader/normalizer pipeline through the backend and back to ReadResult.
-    Without the fix, gaps was hardcoded to [] and validate reported
-    {"valid": true} for non-canonical plans.
-    """
-    result = runner.invoke(app, ["validate", "P2", "--plan-dir", str(legacy_plan_dir)])
-    assert result.exit_code == 1
-    data = json.loads(result.output)
-    assert data["valid"] is False
-    assert len(data["errors"]) > 0

@@ -673,7 +673,7 @@ class TestReadResultModel:
         """Verify ReadResult includes schema gaps."""
         plan = Plan(feature="test")
         gap = SchemaGap(task_id="T1", field_name="agent", gap_type="missing", expected="Agent")
-        result = ReadResult(plan=plan, gaps=[gap], source_format="legacy_markdown", source_path=Path("/fake"))
+        result = ReadResult(plan=plan, gaps=[gap], source_format="yaml_frontmatter", source_path=Path("/fake"))
         assert len(result.gaps) == 1
 
 

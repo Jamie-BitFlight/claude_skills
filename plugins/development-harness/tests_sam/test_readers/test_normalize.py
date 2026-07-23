@@ -56,7 +56,7 @@ def test_normalize_task_accepts_id_key_as_alias_for_task() -> None:
 
 def test_normalize_task_accepts_task_id_key_as_alias() -> None:
     raw = {"task_id": "3", "title": "Using task_id", "status": "not-started"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.id == "3"
 
 
@@ -73,19 +73,19 @@ def test_normalize_task_canonical_status_preserved() -> None:
 
 def test_normalize_task_space_separated_status_mapped() -> None:
     raw = {"task": "T1", "title": "T", "status": "NOT STARTED"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.NOT_STARTED
 
 
 def test_normalize_task_emoji_complete_status_mapped() -> None:
     raw = {"task": "T1", "title": "T", "status": ":white_check_mark: COMPLETE"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.COMPLETE
 
 
 def test_normalize_task_emoji_in_progress_status_mapped() -> None:
     raw = {"task": "T1", "title": "T", "status": ":arrows_counterclockwise: IN PROGRESS"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.IN_PROGRESS
 
 
@@ -97,7 +97,7 @@ def test_normalize_task_unknown_status_raises_value_error() -> None:
     """
     raw = {"task": "T1", "title": "T", "status": "INVENTED_STATUS"}
     with pytest.raises(ValueError, match="Unrecognized status"):
-        normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+        normalize_task(raw, FormatType.YAML_FRONTMATTER)
 
 
 def test_normalize_task_none_status_defaults_to_not_started() -> None:
@@ -158,20 +158,8 @@ def test_normalize_status_valid_canonical_value_returned() -> None:
 
 
 # ---------------------------------------------------------------------------
-# normalize_task — dependency cleaning (legacy prefix stripping)
+# normalize_task — dependency handling
 # ---------------------------------------------------------------------------
-
-
-def test_normalize_task_strips_task_prefix_from_dependencies() -> None:
-    raw = {"task": "2", "title": "T", "status": "not-started", "dependencies": ["Task 1"]}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
-    assert task.dependencies == ["1"]
-
-
-def test_normalize_task_strips_task_prefix_case_insensitive() -> None:
-    raw = {"task": "3", "title": "T", "status": "not-started", "dependencies": ["task 1", "TASK 2"]}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
-    assert task.dependencies == ["1", "2"]
 
 
 def test_normalize_task_bare_id_dependencies_unchanged() -> None:
@@ -187,7 +175,7 @@ def test_normalize_task_bare_id_dependencies_unchanged() -> None:
 
 def test_normalize_task_non_canonical_format_reports_gaps() -> None:
     raw = {"task": "T1", "title": "T", "status": "not-started"}
-    _, gaps = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    _, gaps = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert len(gaps) > 0
 
 
@@ -199,7 +187,7 @@ def test_normalize_task_canonical_format_reports_no_gaps() -> None:
 
 def test_normalize_task_gap_field_names_are_canonical() -> None:
     raw = {"task": "T1", "title": "T", "status": "not-started"}
-    _, gaps = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    _, gaps = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     field_names = {g.field_name for g in gaps}
     # "agent" is one of the tracked optional fields
     assert "agent" in field_names
@@ -207,7 +195,7 @@ def test_normalize_task_gap_field_names_are_canonical() -> None:
 
 def test_normalize_task_present_optional_field_not_reported_as_gap() -> None:
     raw = {"task": "T1", "title": "T", "status": "not-started", "agent": "some-agent", "priority": 1}
-    _, gaps = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    _, gaps = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     gap_fields = {g.field_name for g in gaps}
     assert "agent" not in gap_fields
     assert "priority" not in gap_fields
@@ -255,24 +243,6 @@ def test_normalize_plan_pure_yaml_single_has_no_gaps() -> None:
     plan_meta, task_dicts, fmt = read_yaml_plan(path)
     result = normalize_plan(plan_meta, task_dicts, fmt, path)
     assert result.gaps == []
-
-
-def test_normalize_plan_legacy_markdown_produces_three_tasks() -> None:
-    from sam_schema.readers.legacy_reader import read_legacy_plan
-
-    path = _FIXTURES / "legacy_markdown.md"
-    plan_meta, task_dicts, fmt = read_legacy_plan(path)
-    result = normalize_plan(plan_meta, task_dicts, fmt, path)
-    assert len(result.plan.tasks) == 3
-
-
-def test_normalize_plan_legacy_markdown_produces_schema_gaps() -> None:
-    from sam_schema.readers.legacy_reader import read_legacy_plan
-
-    path = _FIXTURES / "legacy_markdown.md"
-    plan_meta, task_dicts, fmt = read_legacy_plan(path)
-    result = normalize_plan(plan_meta, task_dicts, fmt, path)
-    assert len(result.gaps) > 0
 
 
 def test_normalize_plan_global_manifest_produces_four_tasks() -> None:
@@ -488,10 +458,10 @@ def test_normalize_task_accepts_name_as_title_alias() -> None:
 
     Tests: Backward compatibility alias for title field.
     How: Pass raw dict with 'name' instead of 'title'.
-    Why: Some legacy formats use 'name' instead of 'title'.
+    Why: Some historical inputs use 'name' instead of 'title'.
     """
     raw: dict = {"task": "T1", "name": "Named task", "status": "not-started"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.title == "Named task"
 
 
@@ -505,10 +475,10 @@ def test_normalize_task_deferred_title_prefix_overrides_status() -> None:
 
     Tests: Title-marker-based status override.
     How: Pass raw dict with title starting with '[DEFERRED]'.
-    Why: Legacy tasks may mark status only in the title prefix.
+    Why: Historical tasks may mark status only in the title prefix.
     """
     raw: dict = {"task": "T1", "title": "[DEFERRED] Some task", "status": "not-started"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.DEFERRED
 
 
@@ -517,10 +487,10 @@ def test_normalize_task_skipped_title_prefix_overrides_status() -> None:
 
     Tests: Title-marker-based status override.
     How: Pass raw dict with title starting with '[SKIPPED]'.
-    Why: Legacy tasks may mark status only in the title prefix.
+    Why: Historical tasks may mark status only in the title prefix.
     """
     raw: dict = {"task": "T1", "title": "[SKIPPED] Obsolete task", "status": "in-progress"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.SKIPPED
 
 
@@ -537,7 +507,7 @@ def test_normalize_task_status_direct_emoji_token_mapped() -> None:
     Why: Emoji tokens like ':x:' are direct STATUS_MAP keys.
     """
     raw: dict = {"task": "T1", "title": "T", "status": ":x:"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.NOT_STARTED
 
 
@@ -558,10 +528,10 @@ def test_normalize_task_deferred_space_separated_mapped() -> None:
 
     Tests: STATUS_MAP uppercase lookup.
     How: Pass 'DEFERRED' as status.
-    Why: Legacy markdown uses uppercase status labels.
+    Why: Historical inputs use uppercase status labels.
     """
     raw: dict = {"task": "T1", "title": "T", "status": "DEFERRED"}
-    task, _ = normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+    task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.DEFERRED
 
 
@@ -575,7 +545,7 @@ def test_normalize_task_wont_fix_status_raises_value_error() -> None:
     """
     raw: dict = {"task": "T1", "title": "T", "status": "WONT FIX"}
     with pytest.raises(ValueError, match="Unrecognized status"):
-        normalize_task(raw, FormatType.LEGACY_MARKDOWN)
+        normalize_task(raw, FormatType.YAML_FRONTMATTER)
 
 
 # ---------------------------------------------------------------------------

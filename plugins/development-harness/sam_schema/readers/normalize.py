@@ -240,7 +240,7 @@ def normalize_task(raw: dict, source_format: FormatType) -> tuple[Task, list[Sch
             normalized["status"] = overridden_status
             break
 
-    # Clean legacy "Task N" prefix from dependency lists (legacy_reader emits raw values)
+    # Clean legacy "Task N" prefix from dependency lists.
     for dep_field in ("dependencies", "blocked-by", "blocked_by"):
         if dep_field in normalized and isinstance(normalized[dep_field], list):
             normalized[dep_field] = _clean_dependency_list(normalized[dep_field])
