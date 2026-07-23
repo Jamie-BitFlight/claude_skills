@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import sam_schema
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.models import Plan, Task, TaskStatus
 from sam_schema.core.query import (
@@ -17,6 +18,7 @@ from sam_schema.core.query import (
     load_plan,
     update_status,
 )
+from sam_schema.readers.detect import FormatType, detect_format
 from sam_schema.writers.yaml_writer import write_plan
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -27,6 +29,24 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 from tests_sam.conftest import make_task
+
+
+def test_package_reexports_query_reader_and_writer_symbols() -> None:
+    expected = {
+        "claim_task": claim_task,
+        "get_plan_status": get_plan_status,
+        "get_ready_tasks": get_ready_tasks,
+        "get_task": get_task,
+        "list_tasks": list_tasks,
+        "load_plan": load_plan,
+        "update_status": update_status,
+        "FormatType": FormatType,
+        "detect_format": detect_format,
+        "write_plan": write_plan,
+    }
+    for name, symbol in expected.items():
+        assert getattr(sam_schema, name) is symbol
+        assert name in sam_schema.__all__
 
 
 @pytest.fixture
