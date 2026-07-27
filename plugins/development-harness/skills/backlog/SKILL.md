@@ -253,9 +253,7 @@ GitHub Actions and environments without an MCP client use `fastmcp call` against
 uv run fastmcp call plugins/development-harness/.mcp.json <tool_name> [key=value ...]
 ```
 
-Available tools mirror the MCP tools: `backlog_add`, `backlog_list`, `backlog_view`,
-`backlog_sync`, `backlog_close`, `backlog_resolve`, `backlog_update`, `backlog_groom`,
-`backlog_normalize`, `backlog_pull`, `backlog_list_comments`, `backlog_read_comment`.
+The CLI (`sam_schema/cli.py`, surfaced as the `dh` entry point) mirrors most MCP backlog tools, using kebab-case and sometimes dropping the `backlog_` prefix. Mirrored backlog tools: `backlog_add` (`backlog-add`), `backlog_list` (`backlog-list`), `backlog_view` (`backlog-view`), `backlog_update` (`backlog-update`), `backlog_close` (`backlog-close`), `backlog_resolve` (`backlog-resolve`), `backlog_groom` (`backlog-groom`), `backlog_sync` (`backlog-sync`), `backlog_normalize` (`backlog-normalize`), `backlog_pull` (`backlog-pull`), `backlog_strike_entry` (`backlog-strike`), `backlog_comment_issue` (`comment-issue`), `backlog_list_comments` (`comments`), `backlog_read_comment` (`read-comment`), `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`), `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`). MCP-only (no CLI equivalent): `sync_now` and `sync_status` (server-bound background-sync operations). The full, authoritative CLI-vs-MCP capability list is in [backend-providers.md](../../docs/backend-providers.md) "CLI vs MCP Capability Surface".
 
 ## Environment
 

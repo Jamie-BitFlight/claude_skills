@@ -101,6 +101,49 @@ The development harness uses three subsystems. The backlog MCP now uses a plugga
 - **Fallback**: When the configured remote backend raises `GitHubUnavailableError` or `BacklogError` during initialisation, `_get_artifact_provider()` in `server.py` silently activates `LocalFilesystemArtifactProvider`; callers receive the same response shape with a `warnings` entry: `"Artifacts stored in local filesystem provider. Remote sync unavailable."`
 - **Factory**: `create_artifact_provider(backend_name=None, repo=None, root_worktree=None)` in `backlog_core/artifact_provider.py`
 
+## CLI vs MCP Capability Surface
+
+MCP is the primary interface for the development harness; the CLI (`sam_schema/cli.py`, a Typer app surfaced as the `dh` entry point) mirrors most MCP operations. This section is the authoritative list of the current capability gap so consumers do not infer CLI parity where it does not exist. The gap is a documented current-state boundary, not a target; see [PURPOSE.md](./PURPOSE.md) "Target Frontend Contract" for the interchangeable-transports target.
+
+Both surfaces delegate the operations they share to the same `backlog_core.operations` / `sam_schema.core` paths — there is no parallel CLI implementation. The gap is missing CLI commands, not divergent behaviour.
+
+### Operations exposed on both surfaces
+
+The CLI mirrors these MCP tools. The CLI uses kebab-case and sometimes drops the `backlog_`/`sam_` prefix; the mapping below is semantic.
+
+- **Backlog CRUD**: `backlog_add` (`backlog-add`), `backlog_list` (`backlog-list`), `backlog_view` (`backlog-view`), `backlog_update` (`backlog-update`), `backlog_close` (`backlog-close`), `backlog_resolve` (`backlog-resolve`), `backlog_groom` (`backlog-groom`), `backlog_sync` (`backlog-sync`), `backlog_normalize` (`backlog-normalize`), `backlog_pull` (`backlog-pull`), `backlog_strike_entry` (`backlog-strike`).
+- **Comments**: `backlog_comment_issue` (`comment-issue`), `backlog_list_comments` (`comments`), `backlog_read_comment` (`read-comment`).
+- **GitHub metadata**: `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`).
+- **SAM task bridges**: `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`).
+- **Artifacts**: `artifact_register` (`artifact-register`), `artifact_list` (`artifact-list`), `artifact_get` (`artifact-get`), `artifact_read` (`artifact-read`), `artifact_migrate` (`artifact-migrate`).
+- **SAM plan/task sub-operations**: the MCP composites `sam_plan` (actions: read, create, list, status, ready, update, append_task, finalize) and `sam_task` (actions: read, claim, state, update) are exposed on the CLI as individual sub-commands (`create`, `read`, `list`, `state`, `ready`, `status`, `update`, `claim`, `append-task`, `finalize`). The CLI does not expose the composite `sam_plan`/`sam_task` verbs themselves, but every composite sub-operation is reachable. The CLI also has a standalone `validate` command (plan-schema validation) that is not a sub-action of either composite.
+- **Dispatch**: `dispatch_read` (`dispatch-read`), `dispatch_validate` (`dispatch-validate`), `dispatch_stale_check` (`dispatch-stale-check`), `dispatch_create_plan` (`dispatch-create-plan`), `dispatch_conflicts` (`dispatch-conflicts`), `dispatch_spawn` (`dispatch-spawn`), `dispatch_wave_start` (`dispatch-wave-start`), `dispatch_wave_status` (`dispatch-wave-status`), `dispatch_item_status` (`dispatch-item-status`).
+
+### MCP-only operations (no CLI equivalent)
+
+Three MCP tools have no CLI command today. The audit's B1 verdict named four (`sam_active_task` plus three bridge tools); on full inventory the bridge tools and the GitHub-metadata tools do have CLI equivalents (listed above), so the real gap is three tools.
+
+| MCP tool | Surface | Notes |
+|----------|---------|-------|
+| `sam_active_task` (get/set/update/clear) | SAM | Session-scoped active-task context. Tracked separately by T-P5-ACTIVE-TASK. |
+| `sync_now` | backlog | Trigger an immediate background backlog sync. The CLI `backlog-sync` command does a synchronous sync; `sync_now` triggers the MCP server's background sync singleton. |
+| `sync_status` | backlog | Report the MCP server's background sync state. The CLI has no equivalent because it does not run a long-lived server with background sync state. |
+
+`sync_now`/`sync_status` are inherently MCP-server-bound: they manage a background sync loop that only exists inside the long-running MCP server process. A CLI invocation cannot observe or trigger that loop in-process; a CLI equivalent would have to call the MCP server over transport, which adds no value over `backlog-sync`. The audit's interchangeable-transports claim (P5) is therefore interpreted as covering logical CRUD/workflow operations; server-process state operations are out of scope by design.
+
+### "Delete" CRUD verb
+
+Per decision DEC-1 in the remediation plan, `close` (`backlog_close`) and `resolve` (`backlog_resolve`) satisfy the PURPOSE.md "deleting logical objects" CRUD surface. There is no destructive delete-by-ID operation and none is planned — backlog items, plans, and tasks are evidence-bearing work records, and the closed-loop model closes work with evidence rather than erasing it. Both `close` and `resolve` are exposed on both surfaces via shared `backlog_core.operations`.
+
+## Backlog Persistence Boundary
+
+This section is the single authoritative statement of the current backlog persistence boundary (audit clause B4, verdict `aligns`). It documents current state only; it does not claim the boundary is removed.
+
+- **GitHub Issues are the source of truth for the default backend.** The `github` backend is the default; `~/.dh/projects/{slug}/backlog/` per-item markdown files are a derived local cache updated by `backlog_sync` and `backlog_pull`. When the local cache and the backend disagree, the backend wins.
+- **Only `GitHubBackend` is remote-backed.** Among the four `BacklogBackend` implementations (`github`, `sqlite`, `memory`, `beads`), only `github` writes to a remote platform. `sqlite` and `memory` are local-only; `beads` routes to the local `bd` CLI (the beads issue tracker; storage is the `bd` process's concern, not named here). A deployment that needs cross-environment backlog durability must use the `github` backend.
+- **Branch operations are not capability-gated.** `create_integration_branch`, `get_integration_branch_status`, `merge_integration_branch`, `delete_integration_branch`, and `list_integration_branches` are `BacklogBackend` Protocol methods, but only `GitHubBackend` implements them. `SQLiteBackend` and `InMemoryBackend` raise `RuntimeError` ("branch operations not supported; use the GitHub backend") rather than reporting unsupported via a capability flag — so callers cannot branch on a capability property to detect support; they must catch the `RuntimeError`. Capability-gating branch ops is the target of task T-P6-PROTOCOL.
+- **This is consistent with PURPOSE.md "Current Boundary"** ("Backlog persistence remains partly GitHub- and filesystem-shaped") and with the audit's high-confidence `aligns` verdict for B4.
+
 ## BacklogBackend Protocol
 
 The `BacklogBackend` Protocol (defined in `backlog_core/backend_protocol.py`) decouples all backlog MCP operations from any specific storage platform. `BacklogConfig` wraps the active backend instance; `operations.py` and `server.py` receive it via dependency injection. Rendering utilities (`section_heading`, `render_groomed_section`, `section_display_title`) are accessed through the protocol rather than imported directly from `github_sync`.

@@ -80,9 +80,15 @@ The preceding sections describe the target contract, not fully implemented
 behavior today.
 
 - MCP is currently the primary interface; the CLI does not expose every MCP
-  capability surface.
+  capability surface. The authoritative list of MCP-only operations is in
+  [backend-providers.md](./backend-providers.md) "CLI vs MCP Capability
+  Surface". Close/resolve satisfies the "delete" CRUD verb per DEC-1; no
+  destructive delete is planned.
 - CLI and MCP durability differs: MCP plan paths use Gist write-through, while
-  CLI and direct paths can remain local-only.
+  CLI and direct paths can remain local-only. The backlog persistence boundary
+  (GitHub Issues source of truth for the default backend; only `GitHubBackend`
+  remote-backed; branch operations not capability-gated) is documented in
+  [backend-providers.md](./backend-providers.md) "Backlog Persistence Boundary".
 - Present interfaces expose GitHub issue numbers and file or path addressing;
   agents do not yet see only logical objects.
 - Plans and tasks are mostly provider-neutral, but select CLI and manager paths
