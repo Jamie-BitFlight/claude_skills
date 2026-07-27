@@ -1,6 +1,6 @@
 """Tests — .dh/config.yaml backend resolution for shim modules.
 
-Verifies that _load_backend_toml_name() in both backlog_core.backend_protocol
+Verifies that _load_backend_name_from_config() in both backlog_core.backend_protocol
 and sam_schema.core.task_config resolves backend names from .dh/config.yaml
 (and via DHConfig's full resolution chain) as expected after the TOML→YAML
 migration.
@@ -28,7 +28,7 @@ _yaml = YAML(typ="safe")
 class _BackendSearchModule(Protocol):
     """Protocol matching both backlog_core.backend_protocol and sam_schema.core.task_config."""
 
-    def _load_backend_toml_name(self) -> str | None: ...
+    def _load_backend_name_from_config(self) -> str | None: ...
 
 
 def _write_yaml_config(path: Path, backend_name: str) -> None:
@@ -83,7 +83,7 @@ def test_dh_subdir_config_yaml_discovered(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_toml_name() == configured_name
+    assert module._load_backend_name_from_config() == configured_name
 
 
 @_BOTH_SIDES
@@ -98,7 +98,7 @@ def test_only_dh_config_present_is_picked_up(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_toml_name() == configured_name
+    assert module._load_backend_name_from_config() == configured_name
 
 
 @_BOTH_SIDES_ONLY_MODULE
@@ -114,7 +114,7 @@ def test_returns_none_when_no_config_files(
     # Ensure no .beads/ dir so auto-detect returns None too; patch both module
     # and dh_config._dh_paths so DHConfig sees the isolated tmp project root
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_toml_name() is None
+    assert module._load_backend_name_from_config() is None
 
 
 @_BOTH_SIDES
@@ -133,7 +133,7 @@ def test_subsystem_section_overrides_global_backend(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_toml_name() == configured_name
+    assert module._load_backend_name_from_config() == configured_name
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ def test_subsystem_section_overrides_global_backend(
 
 
 def test_backend_config_yaml_beads_name_honored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_load_backend_toml_name() returns 'beads' when config.yaml specifies it.
+    """_load_backend_name_from_config() returns 'beads' when config.yaml specifies it.
 
     Why: If 'beads' is not treated as a valid string name by the YAML parser,
          create_backend() never receives it and silently falls through to the
@@ -155,11 +155,11 @@ def test_backend_config_yaml_beads_name_honored(tmp_path: Path, monkeypatch: pyt
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
 
-    assert _bp._load_backend_toml_name() == "beads"
+    assert _bp._load_backend_name_from_config() == "beads"
 
 
 def test_backend_config_yaml_dh_subdir_beads_honored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_load_backend_toml_name() returns 'beads' from {project_root}/.dh/config.yaml.
+    """_load_backend_name_from_config() returns 'beads' from {project_root}/.dh/config.yaml.
 
     Why: The .dh/ subdir search path is how project-level config is detected;
          if that path is broken for 'beads', users with .dh/config.yaml config
@@ -172,7 +172,7 @@ def test_backend_config_yaml_dh_subdir_beads_honored(tmp_path: Path, monkeypatch
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
 
-    assert _bp._load_backend_toml_name() == "beads"
+    assert _bp._load_backend_name_from_config() == "beads"
 
 
 # ---------------------------------------------------------------------------

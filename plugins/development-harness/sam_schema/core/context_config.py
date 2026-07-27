@@ -6,7 +6,7 @@ pattern established in task_config.py.
 
 Resolution order for backend selection:
     1. ``CONTEXTBACKEND`` environment variable
-    2. ``[backend] name`` in ``.dh/config.yaml`` (via DHConfig)
+    2. ``context.backend`` key in ``.dh/config.yaml`` (via DHConfig)
     3. Default: ``"local"``
 """
 
@@ -105,8 +105,8 @@ def reset_context_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_toml_name() -> str | None:
-    """Read backend name from .dh/config.yaml if present.
+def _load_backend_name_from_config() -> str | None:
+    """Read the context backend name from ``.dh/config.yaml`` if present.
 
     Delegates to DHConfig for YAML-based backend resolution. Returns None
     when the resolved value matches the subsystem default ("local"), so
@@ -127,7 +127,7 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
     Resolution order when *name* is ``None``:
 
     1. ``CONTEXTBACKEND`` environment variable.
-    2. ``[backend] name`` in ``contextbackend.toml`` (project root or ``~/.dh/``).
+    2. ``context.backend`` key in ``.dh/config.yaml`` (project ``.dh/`` then ``~/.dh/``).
     3. Default: ``"local"``.
 
     Args:
@@ -143,7 +143,7 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending T02
             GitHubContextBackend implementation).
     """
-    resolved = name or os.environ.get("CONTEXTBACKEND") or _load_backend_toml_name() or "local"
+    resolved = name or os.environ.get("CONTEXTBACKEND") or _load_backend_name_from_config() or "local"
 
     if resolved == "local":
         return LocalContextBackend()

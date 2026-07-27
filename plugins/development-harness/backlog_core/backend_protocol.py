@@ -140,7 +140,7 @@ def reset_config() -> None:
 _VALID_BACKENDS: tuple[str, ...] = ("github", "memory", "sqlite", "beads")
 
 
-def _load_backend_toml_name() -> str | None:
+def _load_backend_name_from_config() -> str | None:
     """Read backend name from .dh/config.yaml if present.
 
     Delegates to DHConfig for YAML-based backend resolution. Returns None
@@ -203,7 +203,11 @@ def create_backend(name: str | None = None) -> BacklogBackend:
             backend identifier.  The message lists all valid options.
     """
     resolved = (
-        name or os.environ.get("BACKLOG_BACKEND") or _load_backend_toml_name() or _auto_detect_beads() or "github"
+        name
+        or os.environ.get("BACKLOG_BACKEND")
+        or _load_backend_name_from_config()
+        or _auto_detect_beads()
+        or "github"
     )
 
     if resolved == "github":

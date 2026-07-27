@@ -45,7 +45,7 @@ def _context_backend() -> ContextBackend:
     the CLI is a fresh process on every invocation and has no such hook.
     Mirror the server's lazy-init pattern so both transports resolve the
     backend through the same chain: ``CONTEXTBACKEND`` env var →
-    ``contextbackend.toml`` → default ``local``.
+    ``context.backend`` in ``.dh/config.yaml`` → default ``local``.
 
     The CLI is therefore backend-agnostic, not local-only. Note that
     ``memory`` is per-process and so is not meaningful across separate CLI

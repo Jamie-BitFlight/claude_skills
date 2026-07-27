@@ -2,7 +2,7 @@
 
 Tests verify the resolution order for ``create_task_backend()``:
 
-    TASKBACKEND env var > taskbackend.toml > default "local"
+    TASKBACKEND env var > .dh/config.yaml > default "local"
 
 And verify that ``create_task_backend(name=...)`` routes correctly to the
 appropriate backend, simulating what backend_ref detection in a plan YAML
@@ -60,7 +60,7 @@ class TestLazyMigration:
     def test_plan_without_backend_ref_uses_local(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A plan YAML without backend_ref routes through LocalYamlTaskProvider.
 
-        When no TASKBACKEND env var is set and no taskbackend.toml is found,
+        When no TASKBACKEND env var is set and no .dh/config.yaml is found,
         create_task_backend() returns the default LocalYamlTaskProvider. This is
         the "plan without backend_ref" path — the plan has not been migrated to a
         remote backend.
@@ -71,7 +71,7 @@ class TestLazyMigration:
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_toml_name", lambda: None)
+        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
 
         # Act
         backend = create_task_backend()
@@ -94,7 +94,7 @@ class TestLazyMigration:
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_toml_name", lambda: None)
+        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
 
         # Act — simulates backend_ref detection resolving to "memory"
         backend = create_task_backend(name="memory")
@@ -196,7 +196,7 @@ class TestLazyMigration:
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_toml_name", lambda: None)
+        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
 
         # Act — two plans in the same directory routed to different backends
         local_backend = create_task_backend()  # plan without backend_ref → default local

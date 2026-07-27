@@ -94,7 +94,7 @@ def test_backend_is_selectable_not_hardcoded_local(monkeypatch) -> None:
     """CONTEXTBACKEND selects the backend; the CLI is not pinned to 'local'.
 
     Regression guard: _context_backend() must call create_context_backend()
-    with no argument so the env var / contextbackend.toml chain applies, the
+    with no argument so the env var / .dh/config.yaml chain applies, the
     same way the MCP server resolves it.
     """
     from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend

@@ -112,7 +112,7 @@ def reset_task_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_toml_name() -> str | None:
+def _load_backend_name_from_config() -> str | None:
     """Read backend name from .dh/config.yaml if present.
 
     Delegates to DHConfig for YAML-based backend resolution. Returns None
@@ -150,7 +150,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
-    resolved = name or os.environ.get("TASKBACKEND") or _load_backend_toml_name() or "local"
+    resolved = name or os.environ.get("TASKBACKEND") or _load_backend_name_from_config() or "local"
 
     if resolved == "local":
         return LocalYamlTaskProvider()

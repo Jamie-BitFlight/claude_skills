@@ -533,7 +533,7 @@ def test_server_module_source_calls_create_task_backend() -> None:
 
     After T04, the backend instance must be obtained via the factory function
     create_task_backend(), which honours the TASKBACKEND env var and
-    taskbackend.toml, rather than directly constructing LocalYamlTaskProvider.
+    .dh/config.yaml, rather than directly constructing LocalYamlTaskProvider.
 
     Why: Direct construction bypasses backend selection, breaking env-based
     backend switching used in tests and CI.
