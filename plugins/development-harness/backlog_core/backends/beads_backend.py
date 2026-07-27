@@ -1,21 +1,33 @@
-"""BeadsBackend — full implementation of the BacklogBackend Protocol.
+"""BeadsBackend — structural implementation of the WorkItemBackend Protocol.
 
 Routes all supported backlog operations to the ``bd`` (beads) CLI via
 :class:`~backlog_core.backends.bd_runner.BdRunner`.
 
+BeadsBackend implements :class:`~backlog_core.backend_types.WorkItemBackend`
+only — it does not implement :class:`~backlog_core.backend_types.GitHubExtras`
+or :class:`~backlog_core.backend_types.BranchBackend`.  Callers gate
+GitHub-specific operations on ``isinstance(backend, GitHubExtras)`` and branch
+operations on the ``supports_branches`` capability flag.
+
 ADR-001: GitHub-specific operations (GraphQL, integration branches, task
-issues, milestone/project management) raise :exc:`NotImplementedError` with a
-reference to ADR-001.  These methods require a PyGithub ``Repository`` transport
-that has no beads equivalent.
+issues, milestone/project management) are not implemented for beads and have
+no stubs here.  These methods require a PyGithub ``Repository`` transport that
+has no beads equivalent.
 
 ADR-002: Methods whose Protocol signature uses GitHub issue *numbers* (``int``)
 as keys cannot be implemented for beads because beads IDs are strings with no
 meaningful integer representation.  Affected methods raise
 :exc:`NotImplementedError` with a reference to ADR-002:
 
+- :meth:`BeadsBackend.create_issue_for_item` — takes ``Repository``, returns
+  ``int | None``; use the beads-native shadow method
+  :meth:`BeadsBackend.create_beads_issue_for_item` (returns a string nanoid)
+  instead.
 - :meth:`BeadsBackend.fetch_open_issues_by_title` — returns ``dict[str, int]``
   (title → issue number); use the beads-native shadow method
   :meth:`BeadsBackend.fetch_open_issues_by_title_str` instead.
+- :meth:`BeadsBackend.fetch_github_issue_body` — takes ``Repository`` + ``int``.
+  No beads equivalent.
 - :meth:`BeadsBackend.batch_fetch_statuses` — returns ``dict[int, IssueStatus]``
   (issue number → status); use :meth:`BeadsBackend.fetch_item_status` for
   individual beads issue status lookups instead.
@@ -24,12 +36,11 @@ meaningful integer representation.  Affected methods raise
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import ValidationError
 
 from backlog_core import github_sync, rendering as _rendering
-from backlog_core.backend_types import BacklogBackend
 from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
 from backlog_core.backends.beads_models import (
     BeadsIssueType,
@@ -42,24 +53,19 @@ from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
     BacklogItem,
-    BranchInfo,
     GroomedData,
     IssueLocalFields,
     IssueStatus,
-    MergeResult,
     MilestoneInfo,
     PullRequestRef,
     ViewItemResult,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from datetime import datetime
-
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode, MilestoneNode
-    from backlog_core.models import Output, SamTask
+    from backlog_core.backend_types import IssueNode, MilestoneNode
+    from backlog_core.models import Output
 
 __all__ = ["BeadsBackend"]
 
@@ -131,20 +137,24 @@ _ADR_002_BATCH_NOTE = (
 )
 
 
-class BeadsBackend(BacklogBackend):
+class BeadsBackend:
     """Routes backlog operations to the ``bd`` CLI subprocess.
+
+    Implements the :class:`~backlog_core.backend_types.WorkItemBackend` Protocol
+    structurally.  Does not implement ``GitHubExtras`` or ``BranchBackend``.
 
     Capability flags:
 
     - ``supports_batch_status_fetch = False`` — beads issue IDs are strings;
       :meth:`batch_fetch_statuses` raises :exc:`NotImplementedError` (ADR-002).
       Callers must check this flag before invoking the method.
-    - ``supports_batch_issue_update = False`` — beads does not expose GraphQL;
-      :meth:`_update_issues_graphql_batch` raises :exc:`NotImplementedError`.
+    - ``supports_batch_issue_update = False`` — beads does not expose GraphQL.
     - ``issue_id_type = "string"`` — beads issues are identified by string
       nanoids (e.g. ``"bd-a3f8"``).  When ``item.issue`` is absent, the item
       title is used as the selector.  The list command skips live batch-status
       fetch and relies on the local YAML cache instead.
+    - ``supports_branches = False`` — beads does not manage git branches;
+      callers must check this flag before invoking ``BranchBackend`` methods.
 
     Parameters
     ----------
@@ -167,10 +177,6 @@ class BeadsBackend(BacklogBackend):
     # ------------------------------------------------------------------
     # Repository access
     # ------------------------------------------------------------------
-
-    def get_github(self, repo: str = "", timeout: int = 15) -> Repository:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)  # type: ignore[return]
 
     def try_get_github(self, repo: str = "") -> Repository | None:
         """Return None — beads does not use PyGithub Repository."""
@@ -199,82 +205,20 @@ class BeadsBackend(BacklogBackend):
         )
 
     # ------------------------------------------------------------------
-    # GraphQL utilities — ADR-001
-    # ------------------------------------------------------------------
-
-    def _graphql_request(
-        self, repo: Repository, query: str, variables: dict[str, object] | None = None
-    ) -> dict[str, Any]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _resolve_labels_graphql(
-        self, repo: Repository, repo_owner: str, repo_name: str, label_names: list[str]
-    ) -> list[str]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    # ------------------------------------------------------------------
     # Issue CRUD
     # ------------------------------------------------------------------
-
-    def _fetch_issue_graphql(self, repo: Repository, owner: str, repo_name: str, issue_number: int) -> IssueNode:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _fetch_issues_graphql(
-        self,
-        repo: Repository,
-        owner: str,
-        repo_name: str,
-        state: str = "OPEN",
-        labels: list[str] | None = None,
-        milestone_number: int | None = None,
-        first: int = 100,
-        since: str | None = None,
-    ) -> list[IssueNode]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _update_issue_graphql(
-        self,
-        repo: Repository,
-        issue_node_id: str,
-        *,
-        state: str | None = None,
-        body: str | None = None,
-        title: str | None = None,
-        label_ids: list[str] | None = None,
-        milestone_id: str | None = None,
-    ) -> None:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def sync_issues_graphql(
-        self,
-        repo: Repository,
-        owner: str,
-        repo_name: str,
-        *,
-        state: str = "OPEN",
-        labels: list[str] | None = None,
-        milestone_number: int | None = None,
-        since: datetime | None = None,
-        callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
-    ) -> list[IssueNode]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
 
     def create_issue_for_item(
         self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)
+        """Raise NotImplementedError — beads does not use PyGithub Repository.
+
+        The ``WorkItemBackend`` signature returns ``int | None`` (a GitHub issue
+        number).  Beads IDs are string nanoids, so this method cannot satisfy
+        the contract; use :meth:`create_beads_issue_for_item` instead.  See
+        ADR-001 and ADR-002.
+        """
+        raise NotImplementedError(_ADR_001_NOTE)  # type: ignore[return]
 
     def create_beads_issue_for_item(self, item: BacklogItem, output: Output | None = None) -> str | None:
         """Create a beads issue via ``bd create`` and return the nanoid.
@@ -405,7 +349,12 @@ class BeadsBackend(BacklogBackend):
         return {issue.title: issue.id for issue in issues}
 
     def fetch_github_issue_body(self, repo_obj: Repository, issue_num: int, output: Output | None = None) -> str | None:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
+        """Raise NotImplementedError — beads does not use PyGithub Repository.
+
+        No beads equivalent exists; the ``WorkItemBackend`` signature takes
+        ``Repository`` + ``int`` issue number, which beads cannot satisfy.
+        See ADR-001.
+        """
         raise NotImplementedError(_ADR_001_NOTE)
 
     def check_open_prs_for_issue(self, issue_num: int, repo: str = "") -> list[PullRequestRef]:
@@ -536,28 +485,6 @@ class BeadsBackend(BacklogBackend):
         )
 
     # ------------------------------------------------------------------
-    # Issue comments — ADR-001
-    # ------------------------------------------------------------------
-
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _fetch_issue_comments_graphql(
-        self, repo: Repository, owner: str, repo_name: str, issue_number: int
-    ) -> list[IssueCommentNode]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _update_issue_comment_graphql(self, repo: Repository, comment_node_id: str, body: str) -> None:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    # ------------------------------------------------------------------
     # Status mutations
     # ------------------------------------------------------------------
 
@@ -589,64 +516,6 @@ class BeadsBackend(BacklogBackend):
             repo: Ignored.
             output: Ignored.
         """
-
-    def sync_groomed_to_github_issue(
-        self,
-        repo_obj: Repository,
-        issue_num: int,
-        groomed_content: str,
-        section_name: str | None = None,
-        output: Output | None = None,
-    ) -> bool:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    # ------------------------------------------------------------------
-    # Milestones and projects — ADR-001
-    # ------------------------------------------------------------------
-
-    def _fetch_milestones_graphql(
-        self, repo: Repository, owner: str, repo_name: str, states: list[str] | None = None
-    ) -> list[MilestoneFullNode]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _projects_v2_list_query(self, owner: str, limit: int = 20) -> tuple[str, dict[str, object]]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def _projects_v2_create_mutation(self, owner_id: str, title: str) -> tuple[str, dict[str, object]]:
-        """Raise NotImplementedError — beads does not expose GraphQL."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    # ------------------------------------------------------------------
-    # Task issues — ADR-001
-    # ------------------------------------------------------------------
-
-    def create_task_issue(
-        self,
-        repo: Repository,
-        parent_issue_number: int | str,
-        task: SamTask,
-        description: str = "",
-        acceptance_criteria: list[str] | None = None,
-        labels: list[str] | None = None,
-        output: Output | None = None,
-    ) -> IssueNode | None:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def get_task_issues(
-        self, repo: Repository, parent_issue_number: int, output: Output | None = None
-    ) -> list[IssueNode]:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def update_task_status(
-        self, repo: Repository, issue_number: int, new_status: str, output: Output | None = None
-    ) -> bool:
-        """Raise NotImplementedError — beads does not use PyGithub Repository."""
-        raise NotImplementedError(_ADR_001_NOTE)
 
     # ------------------------------------------------------------------
     # Sync / serialisation
@@ -730,39 +599,3 @@ class BeadsBackend(BacklogBackend):
             Display title string (e.g. ``"Fact-Check"``).
         """
         return _rendering.section_display_title(key, groomed_date)
-
-    # ------------------------------------------------------------------
-    # Integration branches — ADR-001
-    # ------------------------------------------------------------------
-
-    def create_integration_branch(
-        self,
-        milestone_number: int,
-        slug: str,
-        *,
-        base_branch: str = "main",
-        repo: str = "",
-        output: Output | None = None,
-    ) -> BranchInfo:
-        """Raise NotImplementedError — beads does not manage git branches."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def get_integration_branch_status(
-        self, branch_name: str, *, repo: str = "", output: Output | None = None
-    ) -> BranchInfo | None:
-        """Raise NotImplementedError — beads does not manage git branches."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def merge_integration_branch(
-        self, head_branch: str, base_branch: str, commit_message: str, *, repo: str = "", output: Output | None = None
-    ) -> MergeResult:
-        """Raise NotImplementedError — beads does not manage git branches."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def delete_integration_branch(self, branch_name: str, *, repo: str = "", output: Output | None = None) -> bool:
-        """Raise NotImplementedError — beads does not manage git branches."""
-        raise NotImplementedError(_ADR_001_NOTE)
-
-    def list_integration_branches(self, *, repo: str = "", output: Output | None = None) -> list[BranchInfo]:
-        """Raise NotImplementedError — beads does not manage git branches."""
-        raise NotImplementedError(_ADR_001_NOTE)
