@@ -103,6 +103,7 @@ class InMemoryBackend(BacklogBackend):
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
+    supports_branches: bool = False
 
     def __init__(self) -> None:
         """Initialise empty in-memory storage for all backend state."""

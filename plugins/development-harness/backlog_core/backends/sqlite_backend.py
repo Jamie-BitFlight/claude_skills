@@ -140,6 +140,7 @@ class SQLiteBackend(BacklogBackend):
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
+    supports_branches: bool = False
 
     def __init__(self, db_path: str = ":memory:") -> None:
         """Initialise the SQLite database and create tables if absent.

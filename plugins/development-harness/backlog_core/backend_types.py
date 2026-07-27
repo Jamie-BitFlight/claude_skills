@@ -148,6 +148,15 @@ class BacklogBackend(Protocol):
     #: Concrete backends assign the appropriate string literal directly.
     issue_id_type: Literal["integer", "string"]
 
+    #: ``True`` when this backend implements the ``BranchBackend`` protocol
+    #: (``create_integration_branch``, ``get_integration_branch_status``,
+    #: ``merge_integration_branch``, ``delete_integration_branch``,
+    #: ``list_integration_branches``).  ``False`` for backends that do not
+    #: support Git branch operations (sqlite, memory, beads).  Callers branch
+    #: on this flag instead of catching :exc:`RuntimeError` from a stub.
+    #: Added by T-P6-PROTOCOL; see ``BranchBackend`` below.
+    supports_branches: bool
+
     # ------------------------------------------------------------------
     # Repository access
     # ------------------------------------------------------------------
@@ -883,6 +892,213 @@ class BacklogBackend(Protocol):
             List of BranchInfo TypedDicts for all integration branches.
         """
         ...
+
+
+# ---------------------------------------------------------------------------
+# Layered protocol subsets (T-P6-PROTOCOL)
+#
+# The single ``BacklogBackend`` Protocol above bundles 46 methods, most
+# carrying GitHub/GraphQL/PyGithub vocabulary.  A new provider that is not
+# GitHub-backed is forced to implement ~40 GitHub-named methods today, which
+# violates PURPOSE.md:74-75 ("Adding a provider must change only provider
+# implementation, registration, and configuration").
+#
+# The subsets below partition that surface so a non-GitHub backend
+# implements only ``WorkItemBackend`` plus any optional protocol it opts
+# into.  ``BacklogBackend`` remains as the union (compatibility alias) until
+# the migration completes; nothing here changes existing call sites.
+#
+# Membership is derived from what the four current backends *already
+# really implement*: BeadsBackend has real implementations of the generic-ish
+# methods (close/resolve, apply_status_*, render/parse_issue_body, merge_item,
+# view_enrich_from_github, issue_to_local_fields, try_get_github,
+# check_open_prs_for_issue, fetch_item_status, probe_backend_status) plus 28
+# NotImplementedError stubs for the GitHub-only surface.  The split puts
+# those 28 on ``GitHubExtras`` so a future BeadsBackend (or any new backend)
+# is not required to stub them.
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class WorkItemBackend(Protocol):
+    """Generic work-item surface every backend must implement.
+
+    Methods take and return logical objects (or existing types tolerated as
+    generic during migration).  No ``PyGithub.Repository`` parameter, no
+    GraphQL-only primitives, no GitHub issue-number return type on the generic
+    create path.  ``IssueNode`` remains the return type of
+    ``_fetch_issue_graphql`` on ``GitHubExtras``; the generic surface uses
+    ``BacklogItem`` / ``IssueLocalFields`` which are already backend-neutral.
+
+    Capability flags (read by ``operations.py`` to avoid ``isinstance``):
+
+    - ``supports_batch_status_fetch`` — batch status fetch implemented.
+    - ``supports_batch_issue_update`` — batch GraphQL update implemented.
+    - ``issue_id_type`` — integer vs string issue IDs.
+    - ``supports_branches`` — whether ``BranchBackend`` is implemented.
+    """
+
+    supports_batch_status_fetch: bool
+    supports_batch_issue_update: bool
+    issue_id_type: Literal["integer", "string"]
+    supports_branches: bool
+
+    # Repository access (generic subset)
+    def try_get_github(self, repo: str = "") -> Repository | None: ...
+    def probe_backend_status(self, repo: str = "") -> BackendStatus: ...
+
+    # Issue CRUD (generic subset)
+    def create_issue_for_item(
+        self, repo: Repository, item: BacklogItem, *, output: Output | None = None
+    ) -> int | None: ...
+    def close_github_issue(self, item: BacklogItem, *, repo: str = "", output: Output | None = None) -> bool: ...
+    def resolve_github_issue(self, item: BacklogItem, *, repo: str = "", output: Output | None = None) -> bool: ...
+    def fetch_open_issues_by_title(self, repo: Repository) -> dict[str, int]: ...
+    def fetch_github_issue_body(
+        self, repo_obj: Repository, issue_num: int, output: Output | None = None
+    ) -> str | None: ...
+    def check_open_prs_for_issue(self, issue_num: int, repo: str = "") -> list[PullRequestRef]: ...
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]: ...
+    def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str: ...
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool: ...
+    def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields: ...
+
+    # Status mutations (generic — BeadsBackend really implements these)
+    def apply_status_in_progress(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None: ...
+    def apply_status_verified(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None: ...
+    def apply_status_groomed(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None: ...
+
+    # Sync / serialisation (generic)
+    def render_issue_body(self, item: BacklogItem, original_body: str | None = None) -> str: ...
+    def parse_issue_body(self, body: str, existing: BacklogItem | None = None) -> BacklogItem: ...
+    def merge_item(self, local: BacklogItem, remote: BacklogItem) -> BacklogItem: ...
+    def unknown_key_to_heading(self, key: str) -> str: ...
+    @property
+    def section_heading(self) -> dict[str, str]: ...
+    def render_groomed_section(self, groomed: GroomedData) -> str: ...
+    def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
+
+
+@runtime_checkable
+class GitHubExtras(Protocol):
+    """GitHub-specific surface only ``GitHubBackend`` implements.
+
+    Backends that are not GitHub-backed are NOT required to implement this
+    protocol; they set the capability flags to ``False`` / raise
+    ``NotImplementedError`` only if a caller bypasses the capability check.
+    Callers gate on ``isinstance(backend, GitHubExtras)`` (or the relevant
+    capability flag) before invoking these.
+    """
+
+    # Repository access (GitHub-only)
+    def get_github(self, repo: str = "", timeout: int = 15) -> Repository: ...
+
+    # GraphQL utilities
+    def _graphql_request(
+        self, repo: Repository, query: str, variables: dict[str, object] | None = None
+    ) -> dict[str, Any]: ...
+    def _resolve_labels_graphql(
+        self, repo: Repository, repo_owner: str, repo_name: str, label_names: list[str]
+    ) -> list[str]: ...
+
+    # Issue CRUD (GraphQL fetch/update)
+    def _fetch_issue_graphql(self, repo: Repository, owner: str, repo_name: str, issue_number: int) -> IssueNode: ...
+    def _fetch_issues_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        state: str = "OPEN",
+        labels: list[str] | None = None,
+        milestone_number: int | None = None,
+        first: int = 100,
+        since: str | None = None,
+    ) -> list[IssueNode]: ...
+    def _update_issue_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        issue_number: int,
+        title: str | None = None,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        milestone_number: int | None = None,
+        state: str | None = None,
+    ) -> IssueNode: ...
+    def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None: ...
+    def sync_issues_graphql(
+        self,
+        *,
+        repo: Repository,
+        output: Output | None = None,
+        state: str = "OPEN",
+        labels: list[str] | None = None,
+        milestone_number: int | None = None,
+        first: int = 100,
+        since: str | None = None,
+    ) -> list[IssueNode]: ...
+
+    # Issue comments (GraphQL)
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str: ...
+    def _fetch_issue_comments_graphql(
+        self, repo: Repository, owner: str, repo_name: str, issue_number: int
+    ) -> list[IssueCommentNode]: ...
+    def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode: ...
+    def _update_issue_comment_graphql(self, repo: Repository, comment_node_id: str, body: str) -> None: ...
+
+    # Status sync to GitHub (GitHub-only — the local YAML path is generic)
+    def sync_groomed_to_github_issue(
+        self, item: BacklogItem, *, repo: str = "", output: Output | None = None
+    ) -> bool: ...
+
+    # Milestones / projects (GitHub-only)
+    def _fetch_milestones_graphql(
+        self, repo: Repository, owner: str, repo_name: str, state: str = "OPEN"
+    ) -> list[MilestoneFullNode]: ...
+    def _projects_v2_list_query(self, owner: str, limit: int = 20) -> tuple[str, dict[str, object]]: ...
+    def _projects_v2_create_mutation(self, owner_id: str, title: str) -> tuple[str, dict[str, object]]: ...
+
+    # Task issues (GitHub sub-issue bridge)
+    def create_task_issue(
+        self, repo: Repository, parent_item: BacklogItem, task: SamTask, *, output: Output | None = None
+    ) -> int | None: ...
+    def get_task_issues(
+        self, repo: Repository, parent_issue_number: int, *, output: Output | None = None
+    ) -> list[IssueNode]: ...
+    def update_task_status(
+        self, repo: Repository, task_issue_number: int, status: str, *, output: Output | None = None
+    ) -> None: ...
+
+
+@runtime_checkable
+class BranchBackend(Protocol):
+    """Optional Git branch-operation surface.
+
+    Backends that do not support Git branch operations set
+    ``supports_branches = False`` and are NOT required to implement this
+    protocol.  Callers branch on ``supports_branches`` (or
+    ``isinstance(backend, BranchBackend)``) before invoking these methods;
+    they must not rely on catching :exc:`RuntimeError` from a stub.
+    """
+
+    def create_integration_branch(
+        self,
+        milestone_number: int,
+        slug: str,
+        *,
+        base_branch: str = "main",
+        repo: str = "",
+        output: Output | None = None,
+    ) -> BranchInfo: ...
+    def get_integration_branch_status(
+        self, branch_name: str, *, repo: str = "", output: Output | None = None
+    ) -> BranchInfo | None: ...
+    def merge_integration_branch(
+        self, head_branch: str, base_branch: str, commit_message: str, *, repo: str = "", output: Output | None = None
+    ) -> MergeResult: ...
+    def delete_integration_branch(self, branch_name: str, *, repo: str = "", output: Output | None = None) -> bool: ...
+    def list_integration_branches(self, *, repo: str = "", output: Output | None = None) -> list[BranchInfo]: ...
 
 
 @dataclass

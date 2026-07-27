@@ -158,6 +158,7 @@ class BeadsBackend(BacklogBackend):
     supports_batch_status_fetch: bool = False
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "string"
+    supports_branches: bool = False
 
     def __init__(self, runner: BdRunner | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""

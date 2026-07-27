@@ -55,6 +55,7 @@ class GitHubBackend(BacklogBackend):
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = True
     issue_id_type: Literal["integer", "string"] = "integer"
+    supports_branches: bool = True
 
     def __init__(self, repo: str = "") -> None:
         """Initialise with an optional default repo string.
