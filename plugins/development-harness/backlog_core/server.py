@@ -35,7 +35,7 @@ from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
-from .backend_types import IssueNode as _IssueNode
+from .backend_types import GitHubExtras, IssueNode as _IssueNode
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
@@ -4003,12 +4003,15 @@ async def dispatch_stale_check(
         return {"error": str(exc), "milestone_number": milestone_number}
 
     def _fetch_milestone_issue_numbers() -> list[int]:
-        gh_repo = _get_config().backend.get_github(repo)
+        backend = _get_config().backend
+        if not isinstance(backend, GitHubExtras):
+            raise BacklogError("dispatch_stale_check requires a GitHub-backed backend")
+        gh_repo = backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        open_issues = _get_config().backend.sync_issues_graphql(
+        open_issues = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
-        closed_issues = _get_config().backend.sync_issues_graphql(
+        closed_issues = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
         )
         return [issue["number"] for issue in open_issues + closed_issues]
@@ -4172,9 +4175,12 @@ async def dispatch_conflicts(
     """
 
     def _fetch_items_with_impact_radius() -> list[_ImpactRadiusItem]:
-        gh_repo = _get_config().backend.get_github(repo)
+        backend = _get_config().backend
+        if not isinstance(backend, GitHubExtras):
+            raise BacklogError("dispatch_conflicts requires a GitHub-backed backend")
+        gh_repo = backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        issue_nodes: list[_IssueNode] = _get_config().backend.sync_issues_graphql(
+        issue_nodes: list[_IssueNode] = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
         items: list[_ImpactRadiusItem] = []

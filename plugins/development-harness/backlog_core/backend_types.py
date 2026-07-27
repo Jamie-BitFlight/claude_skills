@@ -949,10 +949,30 @@ class WorkItemBackend(Protocol):
 
     # Issue CRUD (generic subset)
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, *, output: Output | None = None
+        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None: ...
-    def close_github_issue(self, item: BacklogItem, *, repo: str = "", output: Output | None = None) -> bool: ...
-    def resolve_github_issue(self, item: BacklogItem, *, repo: str = "", output: Output | None = None) -> bool: ...
+    def close_github_issue(
+        self,
+        issue_ref: str,
+        reason: str,
+        *,
+        reference: str = "",
+        comment: str = "",
+        repo: str = "",
+        output: Output | None = None,
+    ) -> None: ...
+    def resolve_github_issue(
+        self,
+        issue_ref: str,
+        *,
+        summary: str,
+        method: str = "",
+        notes: str = "",
+        follow_ups: str = "",
+        findings: str = "",
+        repo: str = "",
+        output: Output | None = None,
+    ) -> None: ...
     def fetch_open_issues_by_title(self, repo: Repository) -> dict[str, int]: ...
     def fetch_github_issue_body(
         self, repo_obj: Repository, issue_num: int, output: Output | None = None
@@ -1017,26 +1037,27 @@ class GitHubExtras(Protocol):
     def _update_issue_graphql(
         self,
         repo: Repository,
-        owner: str,
-        repo_name: str,
-        issue_number: int,
-        title: str | None = None,
-        body: str | None = None,
-        labels: list[str] | None = None,
-        milestone_number: int | None = None,
+        issue_node_id: str,
+        *,
         state: str | None = None,
-    ) -> IssueNode: ...
+        body: str | None = None,
+        title: str | None = None,
+        label_ids: list[str] | None = None,
+        milestone_id: str | None = None,
+    ) -> None: ...
     def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None: ...
     def sync_issues_graphql(
         self,
-        *,
         repo: Repository,
-        output: Output | None = None,
+        owner: str,
+        repo_name: str,
+        *,
         state: str = "OPEN",
         labels: list[str] | None = None,
         milestone_number: int | None = None,
-        first: int = 100,
-        since: str | None = None,
+        since: datetime | None = None,
+        callback: Callable[[IssueNode], None] | None = None,
+        track_timestamp: bool = False,
     ) -> list[IssueNode]: ...
 
     # Issue comments (GraphQL)
@@ -1049,26 +1070,38 @@ class GitHubExtras(Protocol):
 
     # Status sync to GitHub (GitHub-only — the local YAML path is generic)
     def sync_groomed_to_github_issue(
-        self, item: BacklogItem, *, repo: str = "", output: Output | None = None
+        self,
+        repo_obj: Repository,
+        issue_num: int,
+        groomed_content: str,
+        section_name: str | None = None,
+        output: Output | None = None,
     ) -> bool: ...
 
     # Milestones / projects (GitHub-only)
     def _fetch_milestones_graphql(
-        self, repo: Repository, owner: str, repo_name: str, state: str = "OPEN"
+        self, repo: Repository, owner: str, repo_name: str, states: list[str] | None = None
     ) -> list[MilestoneFullNode]: ...
     def _projects_v2_list_query(self, owner: str, limit: int = 20) -> tuple[str, dict[str, object]]: ...
     def _projects_v2_create_mutation(self, owner_id: str, title: str) -> tuple[str, dict[str, object]]: ...
 
     # Task issues (GitHub sub-issue bridge)
     def create_task_issue(
-        self, repo: Repository, parent_item: BacklogItem, task: SamTask, *, output: Output | None = None
-    ) -> int | None: ...
+        self,
+        repo: Repository,
+        parent_issue_number: int,
+        task: SamTask,
+        description: str = "",
+        acceptance_criteria: list[str] | None = None,
+        labels: list[str] | None = None,
+        output: Output | None = None,
+    ) -> IssueNode | None: ...
     def get_task_issues(
-        self, repo: Repository, parent_issue_number: int, *, output: Output | None = None
+        self, repo: Repository, parent_issue_number: int, output: Output | None = None
     ) -> list[IssueNode]: ...
     def update_task_status(
-        self, repo: Repository, task_issue_number: int, status: str, *, output: Output | None = None
-    ) -> None: ...
+        self, repo: Repository, issue_number: int, new_status: str, output: Output | None = None
+    ) -> bool: ...
 
 
 @runtime_checkable
@@ -1113,4 +1146,4 @@ class BacklogConfig:
         backend: The active BacklogBackend implementation.
     """
 
-    backend: BacklogBackend
+    backend: WorkItemBackend

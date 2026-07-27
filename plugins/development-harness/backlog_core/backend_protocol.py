@@ -165,7 +165,7 @@ def _auto_detect_beads() -> str | None:
     return "beads" if (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).is_file() else None
 
 
-def create_backend(name: str | None = None) -> BacklogBackend:
+def create_backend(name: str | None = None) -> WorkItemBackend:
     """Instantiate and return a BacklogBackend by name.
 
     When *name* is ``None``, resolution is delegated in full to
