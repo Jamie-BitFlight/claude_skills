@@ -13,6 +13,11 @@ Strategy:
     produces matching output.
 
 Tests are added incrementally as operations are extracted to dh_core.operations.
+
+See also ``tests/test_cli_active_task.py`` for the ``active-task`` command
+group (T-P5-ACTIVE-TASK): it covers CLI/MCP shared-context-store parity plus
+CLI-only concerns (backend selection via CONTEXTBACKEND, clean error on a bad
+backend name). T-P5-PARITY will fold per-operation parity into this file.
 """
 
 from __future__ import annotations
