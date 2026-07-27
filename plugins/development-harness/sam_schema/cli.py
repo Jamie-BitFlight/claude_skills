@@ -79,6 +79,35 @@ _OUTPUT_FORMATS = ("json", "yaml", "rich")
 _YAML_FRONTMATTER_PARTS = 3
 
 
+def _parse_filter_pairs(filters: list[str] | None) -> dict[str, str] | None:
+    """Parse repeated ``--filter key=value`` options into a dict.
+
+    Each entry must be ``key=value``; the first ``=`` splits the pair. An empty
+    or all-None list returns ``None`` so callers can pass it straight through to
+    operations that treat ``None`` as "no filter".
+
+    Args:
+        filters: List of ``key=value`` strings from a repeatable Typer option.
+
+    Returns:
+        Dict of key→value pairs, or ``None`` when no filters were supplied.
+
+    Raises:
+        typer.BadParameter: When an entry lacks ``=`` or has an empty key.
+    """
+    if not filters:
+        return None
+    result: dict[str, str] = {}
+    for entry in filters:
+        if "=" not in entry:
+            raise typer.BadParameter(f"--filter expects 'key=value', got: {entry!r}")
+        key, _, value = entry.partition("=")
+        if not key:
+            raise typer.BadParameter(f"--filter key must be non-empty: {entry!r}")
+        result[key] = value
+    return result or None
+
+
 def _coerce_plan_dir(plan_dir: Path | None) -> Path:
     """Return the resolved plan directory.
 
@@ -383,6 +412,10 @@ def list_plans(
     search: Annotated[str | None, typer.Option("--search", help="Case-insensitive substring filter")] = None,
     offset: Annotated[int, typer.Option("--offset", help="Zero-based index of first item to return")] = 0,
     limit: Annotated[int | None, typer.Option("--limit", help="Maximum number of items to return")] = None,
+    filters: Annotated[
+        list[str] | None,
+        typer.Option("--filter", help="Filter by key=value pairs (repeatable). Example: --filter feature=auth"),
+    ] = None,
     output_format: Annotated[str, typer.Option("--format", help="Output format: json|yaml")] = "json",
 ) -> None:
     """List all plans in plan_dir with optional search filtering.
@@ -405,6 +438,8 @@ def list_plans(
                 against ``feature``, ``description``, and ``goal`` fields.
         offset: Zero-based start index into the filtered result list.
         limit: Maximum number of items to return. Defaults to all results.
+        filters: Optional ``key=value`` pairs (repeatable) for generic key filtering.
+                Compose with AND logic; a key absent from a plan excludes it.
         output_format: Output serialization format (json or yaml).
     """
     plan_dir = _coerce_plan_dir(plan_dir)
@@ -415,7 +450,9 @@ def list_plans(
         _err(f"Plan directory does not exist: {plan_dir}")
 
     backend = get_backend(str(plan_dir))
-    result = operations.list_plans(backend, search=search, offset=offset, limit=limit)
+    result = operations.list_plans(
+        backend, search=search, offset=offset, limit=limit, filter_by_key=_parse_filter_pairs(filters)
+    )
 
     # Wrap the list in the documented envelope so CLI consumers receive a
     # stable shape: {"items": [...], "count": N, "total": N}.
@@ -1495,6 +1532,12 @@ def backlog_list(
     type_: Annotated[str | None, typer.Option("--type", help="Filter by item type")] = None,
     topic: Annotated[str | None, typer.Option("--topic", help="Filter by topic")] = None,
     include_closed: Annotated[bool, typer.Option("--include-closed", help="Include closed items")] = False,
+    filters: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--filter", help="Filter by key=value pairs on result items (repeatable). Example: --filter type=Bug"
+        ),
+    ] = None,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
 ) -> None:
@@ -1511,6 +1554,7 @@ def backlog_list(
         type_=type_,
         topic=topic,
         include_closed=include_closed,
+        filter_by_key=_parse_filter_pairs(filters),
         repo=repo,
         output=out,
     )

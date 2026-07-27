@@ -1960,6 +1960,18 @@ async def backlog_list(
             )
         ),
     ] = None,
+    filter_by_key: Annotated[
+        dict[str, str] | None,
+        Field(
+            description=(
+                "Generic key=value filter applied after type/topic/status filtering, "
+                "on the result item dicts. Each key=value pair matches items where the "
+                "item's value for that key equals the requested value (string comparison). "
+                "All pairs compose with AND logic. A key the item does not carry returns "
+                'no match (a no-op, not an error). Example: {"type": "Bug", "section": "P1"}.'
+            )
+        ),
+    ] = None,
     include_closed: Annotated[
         bool, Field(description="Include items with closed/done/resolved status (excluded by default)")
     ] = False,
@@ -2132,6 +2144,7 @@ async def backlog_list(
                 type_=type_,
                 topic=topic,
                 include_closed=include_closed,
+                filter_by_key=filter_by_key,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),

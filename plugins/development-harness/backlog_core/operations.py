@@ -2441,6 +2441,7 @@ def list_items(
     include_closed: bool = False,
     repo: str = "",
     output: Output | None = None,
+    filter_by_key: dict[str, str] | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
     """List backlog items. Default reads local cache only. Use from_github=True to refresh first.
 
@@ -2457,6 +2458,12 @@ def list_items(
         include_closed: When True, include items with terminal status (done, resolved, closed).
         repo: GitHub repo in owner/repo format.
         output: Optional Output collector.
+        filter_by_key: Generic key=value filter applied AFTER type/topic/status
+            filtering, on the result item dicts. Each ``key=value`` pair matches
+            items where the item's value for ``key`` equals ``value`` (string
+            comparison). All pairs compose with AND logic. A key the item does
+            not carry returns no match (a no-op, not an error). Existing
+            type/topic/status filters are unaffected.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -2486,6 +2493,8 @@ def list_items(
         status_map: dict[int, IssueStatus] = {}
     open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
     result_items = [_build_list_entry(it, status_map) for it in open_items]
+    if filter_by_key:
+        result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     return {"items": result_items, "count": len(result_items), **out.to_dict()}
 
 
