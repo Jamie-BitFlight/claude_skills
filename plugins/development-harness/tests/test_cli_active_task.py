@@ -88,3 +88,33 @@ def test_cli_and_mcp_share_the_same_context_store() -> None:
     assert mcp_view["active_task"] is not None
     assert mcp_view["active_task"]["plan"] == "7"
     assert mcp_view["active_task"]["task"] == "2"
+
+
+def test_backend_is_selectable_not_hardcoded_local(monkeypatch) -> None:
+    """CONTEXTBACKEND selects the backend; the CLI is not pinned to 'local'.
+
+    Regression guard: _context_backend() must call create_context_backend()
+    with no argument so the env var / contextbackend.toml chain applies, the
+    same way the MCP server resolves it.
+    """
+    from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
+
+    monkeypatch.setenv("CONTEXTBACKEND", "memory")
+    reset_context_config()
+
+    from sam_schema.cli_active_task import _context_backend
+
+    assert isinstance(_context_backend(), InMemoryContextBackend)
+
+
+@pytest.mark.parametrize(("backend_name", "expected"), [("nope", "Unknown backend"), ("github", "implemented in T02")])
+def test_bad_backend_reports_clean_error(monkeypatch, backend_name: str, expected: str) -> None:
+    """A misconfigured CONTEXTBACKEND exits cleanly, not with a raw traceback."""
+    monkeypatch.setenv("CONTEXTBACKEND", backend_name)
+    reset_context_config()
+
+    result = runner.invoke(app, ["active-task", "get"])
+
+    assert result.exit_code != 0
+    assert expected in result.output
+    assert "Traceback" not in result.output

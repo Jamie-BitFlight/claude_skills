@@ -43,10 +43,13 @@ def _context_backend() -> ContextBackend:
     ``get_context_config()`` deliberately raises when no config has been
     registered — the MCP server sets one at import time (``server.py``), but
     the CLI is a fresh process on every invocation and has no such hook.
-    Mirror the server's lazy-init pattern so both transports resolve the same
-    session-scoped context store (``LocalContextBackend`` by default, which
-    persists to ``active-task-{session_id}.json`` under
-    ``dh_paths.context_dir()``).
+    Mirror the server's lazy-init pattern so both transports resolve the
+    backend through the same chain: ``CONTEXTBACKEND`` env var →
+    ``contextbackend.toml`` → default ``local``.
+
+    The CLI is therefore backend-agnostic, not local-only. Note that
+    ``memory`` is per-process and so is not meaningful across separate CLI
+    invocations; ``local`` and ``beads`` are durable.
 
     Returns:
         The active ContextBackend implementation.
@@ -54,7 +57,13 @@ def _context_backend() -> ContextBackend:
     try:
         return get_context_config().backend
     except RuntimeError:
-        set_context_config(ContextConfig(backend=create_context_backend()))
+        try:
+            backend = create_context_backend()
+        except (ValueError, NotImplementedError) as exc:
+            # Surface misconfiguration as a clean CLI error rather than a
+            # raw traceback from the factory.
+            err(str(exc))
+        set_context_config(ContextConfig(backend=backend))
         return get_context_config().backend
 
 
