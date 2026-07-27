@@ -18,8 +18,9 @@ Dependency direction (must remain acyclic):
 from __future__ import annotations
 
 import contextlib
-import os
 from typing import TYPE_CHECKING
+
+from dh_config import DHConfig
 
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.github_backend import GitHubBackend
@@ -140,22 +141,6 @@ def reset_config() -> None:
 _VALID_BACKENDS: tuple[str, ...] = ("github", "memory", "sqlite", "beads")
 
 
-def _load_backend_name_from_config() -> str | None:
-    """Read backend name from .dh/config.yaml if present.
-
-    Delegates to DHConfig for YAML-based backend resolution. Returns None
-    when the resolved value matches the subsystem default ("github"), so
-    the caller's resolution chain can continue to the next step.
-
-    Returns:
-        Backend name string when explicitly configured, otherwise ``None``.
-    """
-    from dh_config import DHConfig  # noqa: PLC0415
-
-    result = DHConfig().get_backend(subsystem="backlog")
-    return result if result != "github" else None
-
-
 def _auto_detect_beads() -> str | None:
     """Return ``"beads"`` when the explicit opt-in marker ``.beads/dh-backend`` exists.
 
@@ -183,13 +168,11 @@ def _auto_detect_beads() -> str | None:
 def create_backend(name: str | None = None) -> BacklogBackend:
     """Instantiate and return a BacklogBackend by name.
 
-    Resolution order when *name* is ``None``:
-
-    1. ``BACKLOG_BACKEND`` environment variable.
-    2. ``backlog.backend`` key in ``.dh/config.yaml`` (project config directory).
-    3. Auto-detect: ``"beads"`` when ``.beads/dh-backend`` marker file exists at
-       the project root (directory alone is not sufficient — explicit opt-in required).
-    4. Default: ``"github"``.
+    When *name* is ``None``, resolution is delegated in full to
+    :meth:`dh_config.DHConfig.get_backend`, which implements the complete
+    chain: ``BACKLOG_BACKEND`` env var → ``backlog.backend`` (then global
+    ``backend.name``) in ``.dh/config.yaml`` → ``.beads/dh-backend`` marker
+    auto-detect → default ``"github"``.
 
     Args:
         name: Backend identifier to instantiate.  Pass ``None`` to trigger
@@ -202,13 +185,7 @@ def create_backend(name: str | None = None) -> BacklogBackend:
         ValueError: When *name* (or the resolved name) is not a recognised
             backend identifier.  The message lists all valid options.
     """
-    resolved = (
-        name
-        or os.environ.get("BACKLOG_BACKEND")
-        or _load_backend_name_from_config()
-        or _auto_detect_beads()
-        or "github"
-    )
+    resolved = name or DHConfig().get_backend(subsystem="backlog")
 
     if resolved == "github":
         return GitHubBackend()

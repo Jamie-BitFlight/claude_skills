@@ -12,9 +12,10 @@ Resolution order for backend selection:
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from dh_config import DHConfig
 
 from sam_schema.core.backends.beads import BeadsContextBackend
 from sam_schema.core.backends.local_context_backend import LocalContextBackend
@@ -105,30 +106,14 @@ def reset_context_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_name_from_config() -> str | None:
-    """Read the context backend name from ``.dh/config.yaml`` if present.
-
-    Delegates to DHConfig for YAML-based backend resolution. Returns None
-    when the resolved value matches the subsystem default ("local"), so
-    the caller's resolution chain can continue to the next step.
-
-    Returns:
-        Backend name string when explicitly configured, otherwise ``None``.
-    """
-    from dh_config import DHConfig  # noqa: PLC0415
-
-    result = DHConfig().get_backend(subsystem="context")
-    return result if result != "local" else None
-
-
 def create_context_backend(name: str | None = None) -> ContextBackend:
     """Instantiate and return a ContextBackend by name.
 
-    Resolution order when *name* is ``None``:
-
-    1. ``CONTEXTBACKEND`` environment variable.
-    2. ``context.backend`` key in ``.dh/config.yaml`` (project ``.dh/`` then ``~/.dh/``).
-    3. Default: ``"local"``.
+    When *name* is ``None``, resolution is delegated in full to
+    :meth:`dh_config.DHConfig.get_backend`, which implements the complete
+    chain: ``CONTEXTBACKEND`` env var → ``context.backend`` (then global
+    ``backend.name``) in ``.dh/config.yaml`` → ``.beads/dh-backend`` marker
+    auto-detect → default ``"local"``.
 
     Args:
         name: Backend identifier to instantiate. Pass ``None`` to trigger
@@ -143,7 +128,7 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending T02
             GitHubContextBackend implementation).
     """
-    resolved = name or os.environ.get("CONTEXTBACKEND") or _load_backend_name_from_config() or "local"
+    resolved = name or DHConfig().get_backend(subsystem="context")
 
     if resolved == "local":
         return LocalContextBackend()

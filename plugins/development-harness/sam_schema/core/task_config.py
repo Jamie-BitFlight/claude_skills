@@ -12,10 +12,11 @@ Resolution order for backend selection:
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from dh_config import DHConfig
 
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.beads import BeadsTaskProvider
@@ -112,30 +113,14 @@ def reset_task_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_name_from_config() -> str | None:
-    """Read backend name from .dh/config.yaml if present.
-
-    Delegates to DHConfig for YAML-based backend resolution. Returns None
-    when the resolved value matches the subsystem default ("local"), so
-    the caller's resolution chain can continue to the next step.
-
-    Returns:
-        Backend name string when explicitly configured, otherwise ``None``.
-    """
-    from dh_config import DHConfig  # noqa: PLC0415
-
-    result = DHConfig().get_backend(subsystem="task")
-    return result if result != "local" else None
-
-
 def create_task_backend(name: str | None = None) -> TaskBackend:
     """Instantiate and return a TaskBackend by name.
 
-    Resolution order when *name* is ``None``:
-
-    1. ``TASKBACKEND`` environment variable.
-    2. ``task.backend`` in ``.dh/config.yaml`` (project or user home dir, via DHConfig).
-    3. Default: ``"local"``.
+    When *name* is ``None``, resolution is delegated in full to
+    :meth:`dh_config.DHConfig.get_backend`, which implements the complete
+    chain: ``TASKBACKEND`` env var → ``task.backend`` (then global
+    ``backend.name``) in ``.dh/config.yaml`` → ``.beads/dh-backend`` marker
+    auto-detect → default ``"local"``.
 
     Args:
         name: Backend identifier to instantiate. Pass ``None`` to trigger
@@ -150,7 +135,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
-    resolved = name or os.environ.get("TASKBACKEND") or _load_backend_name_from_config() or "local"
+    resolved = name or DHConfig().get_backend(subsystem="task")
 
     if resolved == "local":
         return LocalYamlTaskProvider()

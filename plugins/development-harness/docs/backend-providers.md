@@ -89,7 +89,7 @@ The development harness uses three subsystems. The backlog MCP now uses a plugga
 - **Implementation**: `sam_schema/` package with pluggable `TaskBackend` Protocol, exposed as FastMCP 3.x server (`mcp__plugin_dh_sam__*`)
 - **Operations**: List plans, read/claim/update tasks, check readiness, create plans
 - **Format**: YAML frontmatter per task file (legacy: monolithic markdown with `## Task {ID}` headers)
-- **Backend selection**: `TASKBACKEND` env var → `taskbackend.toml` (git project root, then `~/.dh/`) → default `local`
+- **Backend selection**: `TASKBACKEND` env var → `task.backend` in `.dh/config.yaml` (git project root, then `~/.dh/`) → default `local`
 
 ### Artifact Manifest (backlog MCP artifact tools)
 
@@ -297,7 +297,7 @@ behavior rather than assuming tasks become visible only after finalization. Both
 Backend selection uses this resolution order:
 
 1. `TASKBACKEND` environment variable
-2. `[backend] name` in `taskbackend.toml` (project root searched first, then `~/.dh/`)
+2. `task.backend` in `.dh/config.yaml` (project root searched first, then `~/.dh/`)
 3. Default: `local`
 
 **Environment variable:**
@@ -306,18 +306,18 @@ Backend selection uses this resolution order:
 TASKBACKEND=memory uv run python plugins/development-harness/scripts/run_sam_server.py
 ```
 
-**`taskbackend.toml` file:**
+**`.dh/config.yaml` file:**
 
-```toml
-[backend]
-name = "memory"
+```yaml
+task:
+  backend: memory
 ```
 
-Place `taskbackend.toml` in the project root or `~/.dh/` for a persistent override. Project root takes precedence over `~/.dh/`. Call `reset_task_config()` between tests to force re-resolution.
+Place `config.yaml` in the project's `.dh/` directory or in `~/.dh/` for a persistent override. Project root takes precedence over `~/.dh/`. Call `reset_task_config()` between tests to force re-resolution.
 
 ### Lazy Migration
 
-Plans without a `backend_ref` field continue using `LocalYamlTaskProvider` unchanged — existing deployments require no configuration changes. Plans migrated to a remote backend carry a `backend_ref` field with a backend-native resource identifier (e.g. a GitHub Issue number). When no `TASKBACKEND` variable and no `taskbackend.toml` file exist, the server selects `local` — identical behavior to before the Protocol was introduced.
+Plans without a `backend_ref` field continue using `LocalYamlTaskProvider` unchanged — existing deployments require no configuration changes. Plans migrated to a remote backend carry a `backend_ref` field with a backend-native resource identifier (e.g. a GitHub Issue number). When no `TASKBACKEND` variable and no `.dh/config.yaml` task override exist, the server selects `local` — identical behavior to before the Protocol was introduced.
 
 ---
 
@@ -560,7 +560,7 @@ Source: `backlog_core/artifact_provider.py` — `GitLabArtifactProvider`
 | `GITLAB_PROJECT_ID` | `gitlab` backend | — |
 | `GITLAB_URL` | `gitlab` backend | `https://gitlab.com` |
 
-**`backend.toml` extensions** for Linear and GitLab — set `BACKLOG_BACKEND` in environment or use the `backend_name` argument. There is no `backend.toml` key specific to artifact providers; artifact backend selection uses the same `BACKLOG_BACKEND` mechanism as the `BacklogBackend`.
+**`.dh/config.yaml` extensions** for Linear and GitLab — set `BACKLOG_BACKEND` in environment or use the `backend_name` argument. There is no `.dh/config.yaml` key specific to artifact providers; artifact backend selection uses the same `BACKLOG_BACKEND` mechanism as the `BacklogBackend`.
 
 ### IssueBackend Protocol (#389 — to be created)
 
@@ -762,7 +762,7 @@ class TaskBackend(Protocol):
 Backend selection uses this resolution order (mirrors BacklogBackend pattern):
 
 1. `TASKBACKEND` environment variable
-2. `[backend] name` key in `taskbackend.toml` (project root searched first, then `~/.dh/`)
+2. `task.backend` key in `.dh/config.yaml` (project root searched first, then `~/.dh/`)
 3. Default: `local`
 
 **Environment variable:**
@@ -771,20 +771,20 @@ Backend selection uses this resolution order (mirrors BacklogBackend pattern):
 TASKBACKEND=memory uv run python plugins/development-harness/scripts/run_sam_server.py
 ```
 
-**`taskbackend.toml` file:**
+**`.dh/config.yaml` file:**
 
-```toml
-[backend]
-name = "local"
+```yaml
+task:
+  backend: local
 ```
 
-Place `taskbackend.toml` in the project root or `~/.dh/` for a persistent override. Project root takes precedence over `~/.dh/`. Call `reset_task_config()` between tests to force re-resolution.
+Place `config.yaml` in the project's `.dh/` directory or in `~/.dh/` for a persistent override. Project root takes precedence over `~/.dh/`. Call `reset_task_config()` between tests to force re-resolution.
 
 The factory function `create_task_backend(name)` in `sam_schema.core.task_config` resolves the backend name and returns a configured `TaskBackend` instance. The `TaskConfig` dataclass wraps the active backend for dependency injection into the MCP server.
 
 #### Migration Guide
 
-Existing users are unaffected. When no `TASKBACKEND` variable and no `taskbackend.toml` file exist, the server selects `local` — identical behavior to before the pluggable architecture was introduced. The `local` backend wraps the existing YAML I/O stack without modifying underlying modules. No configuration changes are required unless switching backends.
+Existing users are unaffected. When no `TASKBACKEND` variable and no `.dh/config.yaml` task override exist, the server selects `local` — identical behavior to before the pluggable architecture was introduced. The `local` backend wraps the existing YAML I/O stack without modifying underlying modules. No configuration changes are required unless switching backends.
 
 #### GistTaskLayer — Gist-Backed Plan Storage (#2509)
 

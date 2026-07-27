@@ -1,9 +1,9 @@
-"""Tests — .dh/config.yaml backend resolution for shim modules.
+"""Tests — .dh/config.yaml backend resolution through the backend factories.
 
-Verifies that _load_backend_name_from_config() in both backlog_core.backend_protocol
-and sam_schema.core.task_config resolves backend names from .dh/config.yaml
-(and via DHConfig's full resolution chain) as expected after the TOML→YAML
-migration.
+The factories (``create_backend`` / ``create_task_backend``) delegate resolution
+in full to ``DHConfig.get_backend``. These tests assert against the factories
+rather than any private helper, so they exercise the contract callers actually
+depend on: which backend object you get for a given .dh/config.yaml.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _yaml = YAML(typ="safe")
 class _BackendSearchModule(Protocol):
     """Protocol matching both backlog_core.backend_protocol and sam_schema.core.task_config."""
 
-    def _load_backend_name_from_config(self) -> str | None: ...
+    def create_backend(self) -> object: ...
 
 
 def _write_yaml_config(path: Path, backend_name: str) -> None:
@@ -60,22 +60,40 @@ def _patch_dh_paths(
     monkeypatch.setattr(_dh_config, "_dh_paths", dh_mock)
 
 
+def _resolve(module: object, subsystem: str) -> str:
+    """Return the concrete backend class name the module's factory produces."""
+    if subsystem == "backlog":
+        return type(_bp.create_backend()).__name__
+    return type(_tc.create_task_backend()).__name__
+
+
 _BOTH_SIDES = pytest.mark.parametrize(
-    ("module", "subsystem", "configured_name"),
-    [pytest.param(_bp, "backlog", "local", id="backlog_core"), pytest.param(_tc, "task", "memory", id="sam_schema")],
+    ("module", "subsystem", "configured_name", "expected_cls"),
+    [
+        pytest.param(_bp, "backlog", "memory", "InMemoryBackend", id="backlog_core"),
+        pytest.param(_tc, "task", "memory", "InMemoryTaskProvider", id="sam_schema"),
+    ],
 )
 
 _BOTH_SIDES_ONLY_MODULE = pytest.mark.parametrize(
-    ("module", "subsystem"),
-    [pytest.param(_bp, "backlog", id="backlog_core"), pytest.param(_tc, "task", id="sam_schema")],
+    ("module", "subsystem", "default_cls"),
+    [
+        pytest.param(_bp, "backlog", "GitHubBackend", id="backlog_core"),
+        pytest.param(_tc, "task", "LocalYamlTaskProvider", id="sam_schema"),
+    ],
 )
 
 
 @_BOTH_SIDES
 def test_dh_subdir_config_yaml_discovered(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, subsystem: str, configured_name: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module: _BackendSearchModule,
+    subsystem: str,
+    configured_name: str,
+    expected_cls: str,
 ) -> None:
-    """Backend name from {project_root}/.dh/config.yaml is returned."""
+    """Backend from {project_root}/.dh/config.yaml is the one the factory builds."""
     project_root = tmp_path / "project"
     project_root.mkdir()
     _write_yaml_config(project_root / ".dh" / "config.yaml", configured_name)
@@ -83,12 +101,17 @@ def test_dh_subdir_config_yaml_discovered(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_name_from_config() == configured_name
+    assert _resolve(module, subsystem) == expected_cls
 
 
 @_BOTH_SIDES
 def test_only_dh_config_present_is_picked_up(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, subsystem: str, configured_name: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module: _BackendSearchModule,
+    subsystem: str,
+    configured_name: str,
+    expected_cls: str,
 ) -> None:
     """Only .dh/config.yaml exists — config.yaml is the sole source."""
     project_root = tmp_path / "project"
@@ -98,14 +121,14 @@ def test_only_dh_config_present_is_picked_up(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_name_from_config() == configured_name
+    assert _resolve(module, subsystem) == expected_cls
 
 
 @_BOTH_SIDES_ONLY_MODULE
 def test_returns_none_when_no_config_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, subsystem: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, subsystem: str, default_cls: str
 ) -> None:
-    """Returns None when no config.yaml files exist in any search path."""
+    """Falls back to the subsystem default when no config.yaml exists."""
     project_root = tmp_path / "project"
     project_root.mkdir()
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
@@ -114,12 +137,17 @@ def test_returns_none_when_no_config_files(
     # Ensure no .beads/ dir so auto-detect returns None too; patch both module
     # and dh_config._dh_paths so DHConfig sees the isolated tmp project root
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_name_from_config() is None
+    assert _resolve(module, subsystem) == default_cls
 
 
 @_BOTH_SIDES
 def test_subsystem_section_overrides_global_backend(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, subsystem: str, configured_name: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module: _BackendSearchModule,
+    subsystem: str,
+    configured_name: str,
+    expected_cls: str,
 ) -> None:
     """Subsystem-specific backend in config.yaml overrides global backend.name."""
     project_root = tmp_path / "project"
@@ -133,7 +161,7 @@ def test_subsystem_section_overrides_global_backend(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
-    assert module._load_backend_name_from_config() == configured_name
+    assert _resolve(module, subsystem) == expected_cls
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +170,7 @@ def test_subsystem_section_overrides_global_backend(
 
 
 def test_backend_config_yaml_beads_name_honored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_load_backend_name_from_config() returns 'beads' when config.yaml specifies it.
+    """create_backend() builds BeadsBackend when config.yaml specifies it.
 
     Why: If 'beads' is not treated as a valid string name by the YAML parser,
          create_backend() never receives it and silently falls through to the
@@ -155,11 +183,11 @@ def test_backend_config_yaml_beads_name_honored(tmp_path: Path, monkeypatch: pyt
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
 
-    assert _bp._load_backend_name_from_config() == "beads"
+    assert type(_bp.create_backend()).__name__ == "BeadsBackend"
 
 
 def test_backend_config_yaml_dh_subdir_beads_honored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_load_backend_name_from_config() returns 'beads' from {project_root}/.dh/config.yaml.
+    """create_backend() builds BeadsBackend from {project_root}/.dh/config.yaml.
 
     Why: The .dh/ subdir search path is how project-level config is detected;
          if that path is broken for 'beads', users with .dh/config.yaml config
@@ -172,7 +200,7 @@ def test_backend_config_yaml_dh_subdir_beads_honored(tmp_path: Path, monkeypatch
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
 
-    assert _bp._load_backend_name_from_config() == "beads"
+    assert type(_bp.create_backend()).__name__ == "BeadsBackend"
 
 
 # ---------------------------------------------------------------------------
@@ -275,3 +303,49 @@ def test_config_yaml_takes_precedence_over_auto_detect(tmp_path: Path, monkeypat
     backend = create_backend()
 
     assert isinstance(backend, InMemoryBackend)
+
+
+def test_explicit_default_pin_wins_over_auto_detect(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """config.yaml pinning backlog to its DEFAULT ('github') beats the beads marker.
+
+    Why: regression guard for the sentinel-collision bug. The old
+    ``_load_backend_name_from_config()`` returned ``None`` whenever the resolved
+    value equalled the subsystem default, making an explicit pin indistinguishable
+    from "unset" — so the outer ``or`` chain fell through to ``_auto_detect_beads()``
+    and handed back BeadsBackend. A user on a beads project could not pin backlog
+    back to github. The sibling test above uses 'memory' (a non-default), which is
+    why it never caught this.
+    """
+    from backlog_core.backend_protocol import create_backend
+    from backlog_core.backends.github_backend import GitHubBackend
+
+    project_root = tmp_path / "project"
+    (project_root / BEADS_DIR).mkdir(parents=True)
+    (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).write_text("", encoding="utf-8")
+    _write_yaml_config_subsystem(project_root / ".dh" / "config.yaml", "backlog", "github")
+
+    monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
+    _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
+
+    assert isinstance(create_backend(), GitHubBackend)
+
+
+def test_marker_only_still_auto_detects_beads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With no config.yaml, the .beads/dh-backend marker still selects BeadsBackend.
+
+    Why: pairs with the test above — fixing the explicit-pin case must not disable
+    auto-detect for users who rely on the marker alone.
+    """
+    from backlog_core.backend_protocol import create_backend
+    from backlog_core.backends.beads_backend import BeadsBackend
+
+    project_root = tmp_path / "project"
+    (project_root / BEADS_DIR).mkdir(parents=True)
+    (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).write_text("", encoding="utf-8")
+
+    monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
+    _patch_dh_paths(monkeypatch, cast("_BackendSearchModule", _bp), project_root, tmp_path)
+
+    assert isinstance(create_backend(), BeadsBackend)

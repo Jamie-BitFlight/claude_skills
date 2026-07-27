@@ -294,7 +294,7 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
 - `BacklogBackend` — `@runtime_checkable` Protocol defining the full backend contract. Method groups: repository access, GraphQL utilities, issue CRUD, issue comments, status mutations, milestones/projects, task issues, sync/serialisation (including rendering methods), and integration branches.
 - `BacklogConfig` — dataclass wrapping the active `BacklogBackend` instance; passed by dependency injection to `operations.py` and `server.py`.
-- `create_backend(name)` — factory that instantiates the backend by name (`"github"`, `"sqlite"`, `"memory"`). Resolution order: explicit name → `BACKLOG_BACKEND` env var → `[backend] name` in `backend.toml` → default `"github"`.
+- `create_backend(name)` — factory that instantiates the backend by name (`"github"`, `"sqlite"`, `"memory"`, `"beads"`). Resolution order: explicit name → `BACKLOG_BACKEND` env var → `backlog.backend` in `.dh/config.yaml` → `.beads/dh-backend` marker auto-detect → default `"github"`.
 - `get_config()` — returns the module-level `BacklogConfig` singleton, auto-initialising on first call.
 
 **Rendering utilities via protocol dispatch**: Rendering methods (`section_heading`, `render_groomed_section`, `section_display_title`) are part of the `BacklogBackend` Protocol surface. Callers access rendering through the active backend rather than importing directly from `github_sync`. Shared rendering logic lives in `rendering.py` and is used by all backend implementations.

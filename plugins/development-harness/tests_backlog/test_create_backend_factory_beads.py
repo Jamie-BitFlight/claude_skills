@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import backlog_core.backend_protocol as _bp
+import dh_config as _dh_config
 import pytest
 from backlog_core.backend_protocol import BEADS_DIR, BEADS_OPT_IN_MARKER, create_backend, reset_config
 from backlog_core.backends.beads_backend import BeadsBackend
@@ -73,7 +74,7 @@ def test_env_var_backlog_backend_beads_creates_beads_backend(monkeypatch: pytest
     """BACKLOG_BACKEND=beads causes create_backend(None) to return BeadsBackend.
 
     Why: The env var is the primary user-facing configuration mechanism — if it
-         is ignored, users cannot select beads without a backend.toml.
+         is ignored, users cannot select beads without a `.dh/config.yaml`.
     """
     monkeypatch.setenv("BACKLOG_BACKEND", "beads")
 
@@ -83,21 +84,21 @@ def test_env_var_backlog_backend_beads_creates_beads_backend(monkeypatch: pytest
 
 
 @pytest.mark.unit
-def test_env_var_overrides_toml_to_select_beads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """BACKLOG_BACKEND=beads takes precedence over backend.toml set to 'memory'.
+def test_env_var_overrides_config_file_to_select_beads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """BACKLOG_BACKEND=beads takes precedence over .dh/config.yaml set to 'memory'.
 
-    Why: Resolution order mandates env var first — a TOML file that sets
+    Why: Resolution order mandates env var first — a config file that sets
          'memory' must be ignored when the env var is explicitly set to 'beads'.
     """
-    import tomlkit
-
     project_root = tmp_path / "project"
-    project_root.mkdir()
-    toml_path = project_root / "backend.toml"
-    toml_path.write_text(tomlkit.dumps({"backend": {"name": "memory"}}), encoding="utf-8")
+    config_path = project_root / ".dh" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("backlog:\n  backend: memory\n", encoding="utf-8")
 
+    dh_paths_mock = _make_dh_paths_mock(project_root, user_dh_root=tmp_path / "fakehome" / ".dh")
     monkeypatch.setenv("BACKLOG_BACKEND", "beads")
-    monkeypatch.setattr(_bp, "_dh_paths", _make_dh_paths_mock(project_root))
+    monkeypatch.setattr(_bp, "_dh_paths", dh_paths_mock)
+    monkeypatch.setattr(_dh_config, "_dh_paths", dh_paths_mock)
 
     backend = create_backend()
 
@@ -200,7 +201,11 @@ def test_create_backend_none_auto_detects_beads_when_marker_file_present(
 
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
-    monkeypatch.setattr(_bp, "_dh_paths", _make_dh_paths_mock(project_root))
+    # Auto-detect now runs inside DHConfig (create_backend delegates the whole
+    # chain to it), so dh_config's _dh_paths must see the temp project root too.
+    dh_mock = _make_dh_paths_mock(project_root)
+    monkeypatch.setattr(_bp, "_dh_paths", dh_mock)
+    monkeypatch.setattr(_dh_config, "_dh_paths", dh_mock)
 
     backend = create_backend()
 
@@ -276,7 +281,7 @@ def test_create_backend_unknown_name_raises_value_error() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Ordering — env var > TOML > auto-detect > default
+# Ordering — env var > .dh/config.yaml > auto-detect > default
 # ---------------------------------------------------------------------------
 
 

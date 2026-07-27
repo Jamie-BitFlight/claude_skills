@@ -65,13 +65,15 @@ class TestLazyMigration:
         the "plan without backend_ref" path — the plan has not been migrated to a
         remote backend.
 
-        Arrange: clear TASKBACKEND env var; mock toml loader to return None.
+        Arrange: clear TASKBACKEND env var; stub DHConfig to the subsystem default.
         Act: call create_task_backend() with no arguments.
         Assert: returned backend is a LocalYamlTaskProvider instance.
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
+        # create_task_backend delegates the whole chain to DHConfig; stub it to the
+        # subsystem default so this test exercises the no-config fall-through.
+        monkeypatch.setattr(task_config_module.DHConfig, "get_backend", lambda self, subsystem: "local")
 
         # Act
         backend = create_task_backend()
@@ -88,13 +90,15 @@ class TestLazyMigration:
         ``name="memory"`` — as backend_ref detection would do — returns an
         InMemoryTaskProvider instead of the default local backend.
 
-        Arrange: clear TASKBACKEND env var; mock toml loader to return None.
+        Arrange: clear TASKBACKEND env var; stub DHConfig to the subsystem default.
         Act: call create_task_backend(name="memory").
         Assert: returned backend is an InMemoryTaskProvider instance.
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
+        # create_task_backend delegates the whole chain to DHConfig; stub it to the
+        # subsystem default so this test exercises the no-config fall-through.
+        monkeypatch.setattr(task_config_module.DHConfig, "get_backend", lambda self, subsystem: "local")
 
         # Act — simulates backend_ref detection resolving to "memory"
         backend = create_task_backend(name="memory")
@@ -187,7 +191,7 @@ class TestLazyMigration:
         backend_ref use the local default; plans with a backend_ref (e.g.
         ``"memory://..."``) route to the named backend.
 
-        Arrange: clear TASKBACKEND env var; mock toml loader to return None.
+        Arrange: clear TASKBACKEND env var; stub DHConfig to the subsystem default.
         Act: call create_task_backend() without a name (plan without backend_ref)
              and create_task_backend("memory") (plan with backend_ref).
         Assert: first call returns LocalYamlTaskProvider;
@@ -196,7 +200,9 @@ class TestLazyMigration:
         """
         # Arrange
         monkeypatch.delenv("TASKBACKEND", raising=False)
-        monkeypatch.setattr(task_config_module, "_load_backend_name_from_config", lambda: None)
+        # create_task_backend delegates the whole chain to DHConfig; stub it to the
+        # subsystem default so this test exercises the no-config fall-through.
+        monkeypatch.setattr(task_config_module.DHConfig, "get_backend", lambda self, subsystem: "local")
 
         # Act — two plans in the same directory routed to different backends
         local_backend = create_task_backend()  # plan without backend_ref → default local
