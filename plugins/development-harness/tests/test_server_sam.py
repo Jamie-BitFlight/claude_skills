@@ -2,7 +2,7 @@
 
 Four MCP tools are tested through the in-memory FastMCP transport using
 Client(mcp). Operations are mocked at the boundary via
-``unittest.mock.patch("backlog_core.operations.<function_name>")``.
+``unittest.mock.patch("dh_core.operations.<function_name>")``.
 
 Each tool is tested to verify:
 - Successful operation returns a dict with expected keys (not raises).
@@ -70,7 +70,7 @@ async def test_backlog_create_sam_task_returns_dict() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.create_sam_task", return_value=op_result) as mock_op:
+    with patch("dh_core.operations.create_sam_task", return_value=op_result) as mock_op:
         response = await _call("backlog_create_sam_task", _MINIMAL_CREATE_PARAMS)
 
     # Assert
@@ -95,7 +95,7 @@ async def test_backlog_create_sam_task_error_key() -> None:
          convert it to a structured error response so the caller can inspect it.
     """
     # Arrange / Act
-    with patch("backlog_core.operations.create_sam_task", side_effect=BacklogError("test error")):
+    with patch("dh_core.operations.create_sam_task", side_effect=BacklogError("test error")):
         response = await _call("backlog_create_sam_task", _MINIMAL_CREATE_PARAMS)
 
     # Assert
@@ -137,7 +137,7 @@ async def test_backlog_get_sam_tasks_shape() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.get_sam_tasks", return_value=op_result):
+    with patch("dh_core.operations.get_sam_tasks", return_value=op_result):
         response = await _call("backlog_get_sam_tasks", {"parent_issue_number": 480})
 
     # Assert
@@ -174,7 +174,7 @@ async def test_backlog_update_sam_task_status_no_op() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.update_sam_task_status", return_value=op_result):
+    with patch("dh_core.operations.update_sam_task_status", return_value=op_result):
         response = await _call("backlog_update_sam_task_status", {"issue_number": 1, "new_status": "complete"})
 
     # Assert
@@ -211,7 +211,7 @@ async def test_backlog_get_ready_sam_tasks_shape() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.get_ready_sam_tasks", return_value=op_result):
+    with patch("dh_core.operations.get_ready_sam_tasks", return_value=op_result):
         response = await _call("backlog_get_ready_sam_tasks", {"parent_issue_number": 480})
 
     # Assert

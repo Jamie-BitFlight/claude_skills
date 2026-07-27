@@ -7,7 +7,7 @@ Covers:
 - Signature contract: sections parameter is present on the tool
 
 All tests use the in-memory FastMCP transport via Client(mcp).
-Operations are mocked at ``backlog_core.operations.groom_item``.
+Operations are mocked at ``dh_core.operations.groom_item``.
 
 No @pytest.mark.asyncio decorators — asyncio_mode = "auto" is set globally.
 All imports are at module level.
@@ -92,7 +92,7 @@ async def test_backlog_groom_sections_calls_groom_item() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         response = await _call(
             "backlog_groom", {"selector": "#42", "sections": {"Background": "Some context", "Research": "Key findings"}}
         )
@@ -126,7 +126,7 @@ async def test_backlog_groom_sections_forwarded_to_groom_item() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call("backlog_groom", {"selector": "Feature", "sections": sections_input})
 
     # Assert
@@ -147,7 +147,7 @@ async def test_backlog_groom_sections_none_forwarded_when_absent() -> None:
     op_result = {"title": "Item", "synced": False, "messages": [], "warnings": [], "errors": []}
 
     # Act
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call("backlog_groom", {"selector": "Item", "section": "Background", "content": "text"})
 
     # Assert
@@ -175,7 +175,7 @@ async def test_backlog_groom_empty_sections_dict_calls_groom_item() -> None:
     }
 
     # Act
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call("backlog_groom", {"selector": "Item", "sections": {}})
 
     # Assert
@@ -194,7 +194,7 @@ async def test_backlog_groom_sections_backlog_error_returns_error_key() -> None:
          path triggered it. Error propagation must not leak raw exceptions.
     """
     # Arrange / Act
-    with patch("backlog_core.operations.groom_item", side_effect=BacklogError("item not found")):
+    with patch("dh_core.operations.groom_item", side_effect=BacklogError("item not found")):
         response = await _call("backlog_groom", {"selector": "#999", "sections": {"Background": "text"}})
 
     # Assert
@@ -228,7 +228,7 @@ async def test_backlog_groom_sections_mutual_exclusion_returns_error(case_id: st
          The server must reject these combinations before delegating to operations.
     """
     # Act — groom_item must NOT be called for any of these combinations
-    with patch("backlog_core.operations.groom_item") as mock_groom:
+    with patch("dh_core.operations.groom_item") as mock_groom:
         response = await _call("backlog_groom", params)
 
     # Assert
@@ -253,7 +253,7 @@ async def test_backlog_groom_sections_mutual_exclusion_error_message() -> None:
          distinguish this validation failure from other error types.
     """
     # Act
-    with patch("backlog_core.operations.groom_item"):
+    with patch("dh_core.operations.groom_item"):
         response = await _call(
             "backlog_groom", {"selector": "Item", "sections": {"Background": "text"}, "section": "Background"}
         )
@@ -276,7 +276,7 @@ async def test_backlog_groom_sections_mutual_exclusion_no_output_keys() -> None:
          on the absence of spurious keys.
     """
     # Act
-    with patch("backlog_core.operations.groom_item"):
+    with patch("dh_core.operations.groom_item"):
         response = await _call(
             "backlog_groom", {"selector": "Item", "sections": {"Background": "text"}, "content": "text"}
         )

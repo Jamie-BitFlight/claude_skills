@@ -406,7 +406,7 @@ async def test_backlog_list_projects_success_returns_projects_list() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.list_projects", return_value=fake_result):
+    with patch("dh_core.operations.list_projects", return_value=fake_result):
         # Act
         result = await _call("backlog_list_projects", {})
 
@@ -433,7 +433,7 @@ async def test_backlog_list_projects_passes_owner_and_limit() -> None:
         captured["limit"] = limit
         return {"projects": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_projects", side_effect=fake_list):
+    with patch("dh_core.operations.list_projects", side_effect=fake_list):
         # Act
         await _call("backlog_list_projects", {"owner": "myorg", "limit": 5})
 
@@ -450,7 +450,7 @@ async def test_backlog_list_projects_backlog_error_returns_error_key() -> None:
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.list_projects", side_effect=BacklogError("Token missing")):
+    with patch("dh_core.operations.list_projects", side_effect=BacklogError("Token missing")):
         # Act
         result = await _call("backlog_list_projects", {})
 
@@ -469,7 +469,7 @@ async def test_backlog_list_projects_empty_result() -> None:
     # Arrange
     fake_result = {"projects": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_projects", return_value=fake_result):
+    with patch("dh_core.operations.list_projects", return_value=fake_result):
         # Act
         result = await _call("backlog_list_projects", {})
 
@@ -500,7 +500,7 @@ async def test_backlog_create_project_success_returns_project_fields() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.create_project", return_value=fake_result):
+    with patch("dh_core.operations.create_project", return_value=fake_result):
         # Act
         result = await _call("backlog_create_project", {"title": "Sprint Board"})
 
@@ -526,7 +526,7 @@ async def test_backlog_create_project_forwards_title_and_owner() -> None:
         captured["owner"] = owner
         return {"project_id": "PVT_x", "title": title, "url": "", "number": 1, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.create_project", side_effect=fake_create):
+    with patch("dh_core.operations.create_project", side_effect=fake_create):
         # Act
         await _call("backlog_create_project", {"title": "My Board", "owner": "myorg"})
 
@@ -543,7 +543,7 @@ async def test_backlog_create_project_backlog_error_returns_error_key() -> None:
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.create_project", side_effect=BacklogError("GraphQL mutation failed")):
+    with patch("dh_core.operations.create_project", side_effect=BacklogError("GraphQL mutation failed")):
         # Act
         result = await _call("backlog_create_project", {"title": "New Board"})
 

@@ -750,7 +750,7 @@ class TestBacklogListBackendIntegration:
         )
 
         with (
-            patch("backlog_core.operations.list_items", return_value={"items": []}),
+            patch("dh_core.operations.list_items", return_value={"items": []}),
             patch("backlog_core.server._probe_backend_status", return_value=backend_status),
         ):
             response = await _call("backlog_list", {})
@@ -777,7 +777,7 @@ class TestBacklogListBackendIntegration:
         )
 
         with (
-            patch("backlog_core.operations.list_items", return_value={"items": []}),
+            patch("dh_core.operations.list_items", return_value={"items": []}),
             patch("backlog_core.server._probe_backend_status", return_value=backend_status),
         ):
             response = await _call("backlog_list", {})
@@ -807,7 +807,7 @@ class TestBacklogListBackendIntegration:
 
         with (
             patch(
-                "backlog_core.operations.list_items",
+                "dh_core.operations.list_items",
                 return_value={"items": [{"title": "Feature X", "priority": "P1", "issue": "", "plan": ""}]},
             ),
             patch("backlog_core.server._probe_backend_status", return_value=backend_status),
@@ -848,7 +848,7 @@ class TestBacklogListBackendIntegration:
         expected_backend = backend_status.model_dump(mode="json")
 
         with (
-            patch("backlog_core.operations.list_items", return_value={"items": []}),
+            patch("dh_core.operations.list_items", return_value={"items": []}),
             patch("backlog_core.server._probe_backend_status", return_value=backend_status),
         ):
             response = await _call("backlog_list", {})

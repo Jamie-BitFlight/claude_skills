@@ -2,7 +2,7 @@
 
 All 10 MCP tools are tested through the in-memory FastMCP transport using
 Client(mcp). Operations are mocked at the boundary via
-``unittest.mock.patch("backlog_core.operations.<function_name>")``.
+``unittest.mock.patch("dh_core.operations.<function_name>")``.
 
 Each tool is tested for:
 - Successful operation (verifies parameter forwarding and dict merge)
@@ -86,7 +86,7 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
 async def test_backlog_add_success_returns_merged_result(gate_token: str):
     """backlog_add passes params to operations.add_item and merges output."""
     op_result = {"file_path": "/tmp/p1-my-item.md", "title": "My Item", "priority": "P1"}
-    with patch("backlog_core.operations.add_item", return_value=op_result) as mock_add:
+    with patch("dh_core.operations.add_item", return_value=op_result) as mock_add:
         response = await _call(
             "backlog_add",
             {"title": "My Item", "priority": "P1", "description": "A test item", "gate_token": gate_token},
@@ -107,7 +107,7 @@ async def test_backlog_add_success_returns_merged_result(gate_token: str):
 async def test_backlog_add_passes_optional_params(gate_token: str):
     """backlog_add forwards source, type_, and force to operations."""
     op_result = {"file_path": "/tmp/p0-bug.md", "title": "Bug", "priority": "P0"}
-    with patch("backlog_core.operations.add_item", return_value=op_result) as mock_add:
+    with patch("dh_core.operations.add_item", return_value=op_result) as mock_add:
         await _call(
             "backlog_add",
             {
@@ -129,7 +129,7 @@ async def test_backlog_add_passes_optional_params(gate_token: str):
 
 async def test_backlog_add_backlog_error_returns_error_key(gate_token: str):
     """backlog_add catches BacklogError and includes error key in response."""
-    with patch("backlog_core.operations.add_item", side_effect=BacklogError("duplicate found")):
+    with patch("dh_core.operations.add_item", side_effect=BacklogError("duplicate found")):
         response = await _call(
             "backlog_add",
             {"title": "Dupe", "priority": "P1", "description": "Already exists", "gate_token": gate_token},
@@ -150,7 +150,7 @@ async def test_backlog_add_output_messages_included(gate_token: str):
         kwargs["output"].warn("no github token")
         return {"file_path": "/tmp/p1-item.md"}
 
-    with patch("backlog_core.operations.add_item", side_effect=_add_with_messages):
+    with patch("dh_core.operations.add_item", side_effect=_add_with_messages):
         response = await _call(
             "backlog_add", {"title": "Item", "priority": "P1", "description": "Test", "gate_token": gate_token}
         )
@@ -161,7 +161,7 @@ async def test_backlog_add_output_messages_included(gate_token: str):
 
 async def test_backlog_add_gate_rejects_missing_token():
     """backlog_add returns error when gate_token is absent or wrong."""
-    with patch("backlog_core.operations.add_item") as mock_add:
+    with patch("dh_core.operations.add_item") as mock_add:
         response_missing = await _call("backlog_add", {"title": "X", "priority": "P1", "description": "Y"})
         response_wrong = await _call(
             "backlog_add", {"title": "X", "priority": "P1", "description": "Y", "gate_token": "wrong-value"}
@@ -214,7 +214,7 @@ def test_gate_token_file_readable_at_runtime() -> None:
 async def test_backlog_list_success_returns_items():
     """backlog_list passes params to operations.list_items and merges output."""
     op_result = {"items": [{"title": "Item A", "priority": "P1", "issue": "", "plan": ""}]}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         response = await _call("backlog_list", {})
 
     mock_list.assert_called_once()
@@ -227,7 +227,7 @@ async def test_backlog_list_success_returns_items():
 async def test_backlog_list_passes_filter_params():
     """backlog_list forwards from_github and label flags."""
     op_result = {"items": []}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         await _call("backlog_list", {"from_github": True, "label": "priority:p0"})
 
     call_kwargs = mock_list.call_args.kwargs
@@ -238,7 +238,7 @@ async def test_backlog_list_passes_filter_params():
 async def test_backlog_list_passes_new_filter_params():
     """backlog_list forwards section, status, and title to list_items."""
     op_result = {"items": []}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         await _call("backlog_list", {"section": "P1", "status": "needs-grooming", "title": "auth"})
     call_kwargs = mock_list.call_args.kwargs
     assert call_kwargs["section"] == "P1"
@@ -249,7 +249,7 @@ async def test_backlog_list_passes_new_filter_params():
 async def test_backlog_list_passes_type_and_topic_params():
     """backlog_list forwards type_ and topic filter params to list_items."""
     op_result = {"items": []}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         await _call("backlog_list", {"type": "Bug", "topic": "auth"})
 
     call_kwargs = mock_list.call_args.kwargs
@@ -260,7 +260,7 @@ async def test_backlog_list_passes_type_and_topic_params():
 async def test_backlog_list_type_and_topic_default_to_none():
     """backlog_list passes type_ and topic as None when not provided."""
     op_result = {"items": []}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         await _call("backlog_list", {})
 
     call_kwargs = mock_list.call_args.kwargs
@@ -270,7 +270,7 @@ async def test_backlog_list_type_and_topic_default_to_none():
 
 async def test_backlog_list_backlog_error_returns_error_key():
     """backlog_list catches BacklogError and includes error key in response."""
-    with patch("backlog_core.operations.list_items", side_effect=BacklogError("backlog dir missing")):
+    with patch("dh_core.operations.list_items", side_effect=BacklogError("backlog dir missing")):
         response = await _call("backlog_list", {})
 
     assert response["error"] == "backlog dir missing"
@@ -285,7 +285,7 @@ async def test_backlog_list_search_filters_across_title_description_topic_type()
         {"title": "Refactor", "description": "clean up", "topic": "quality", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "sam"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -304,7 +304,7 @@ async def test_backlog_list_search_is_case_insensitive():
         {"title": "unrelated", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response_lower = await _call("backlog_list", {"search": "sam"})
         response_upper = await _call("backlog_list", {"search": "SAM"})
 
@@ -320,7 +320,7 @@ async def test_backlog_list_search_none_returns_all_items():
         {"title": "Item B", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert response["pagination"]["total"] == 2
@@ -331,7 +331,7 @@ async def test_backlog_list_pagination_returns_correct_page():
     """backlog_list offset=10, limit=5 returns items 10-14 from the filtered set."""
     items = [{"title": f"Item {i}", "description": "", "topic": "", "type": "Feature"} for i in range(20)]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"offset": 10, "limit": 5})
 
     assert response["pagination"]["offset"] == 10
@@ -348,7 +348,7 @@ async def test_backlog_list_pagination_last_page_has_more_false():
     """backlog_list returns has_more=False when the page exhausts the item list."""
     items = [{"title": f"Item {i}", "description": "", "topic": "", "type": "Feature"} for i in range(8)]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"offset": 5, "limit": 5})
 
     assert response["pagination"]["has_more"] is False
@@ -373,7 +373,7 @@ async def test_backlog_list_autopagination_stays_within_token_budget():
         for i in range(500)
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     # The items sub-list alone must fit in the budget.
@@ -391,7 +391,7 @@ async def test_backlog_list_search_combined_with_section_filter():
     ]
     # Operations layer already applied the section filter before returning items.
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+    with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
         response = await _call("backlog_list", {"section": "P1", "search": "sam"})
 
     # section is forwarded to operations
@@ -408,7 +408,7 @@ async def test_backlog_list_search_or_operator_matches_either_term():
         {"title": "Refactor models", "description": "", "topic": "", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth OR deploy"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -425,7 +425,7 @@ async def test_backlog_list_search_and_operator_requires_both_terms():
         {"title": "Deploy bug", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth AND bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -442,7 +442,7 @@ async def test_backlog_list_search_regex_slash_form_matches_pattern():
         {"title": "Unrelated", "description": "", "topic": "", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "/auth.*bug/"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -458,7 +458,7 @@ async def test_backlog_list_search_regex_prefix_form_matches_pattern():
         {"title": "Auth feature", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "regex:auth.*bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -474,7 +474,7 @@ async def test_backlog_list_search_field_specific_title_prefix():
         {"title": "Deploy", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "title:auth"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -492,7 +492,7 @@ async def test_backlog_list_search_field_specific_type_prefix():
         {"title": "Deploy", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "type:bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -508,7 +508,7 @@ async def test_backlog_list_search_invalid_regex_falls_back_to_plain_text():
         {"title": "Unrelated", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "/[invalid/"})
 
     # Falls back to substring match on the literal string "/[invalid/"
@@ -541,7 +541,7 @@ async def test_backlog_list_search_matches_body_content():
         },
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "sdlc-layers"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -569,7 +569,7 @@ async def test_backlog_list_search_body_field_specific_prefix():
         {"title": "Unrelated task", "section": "P2", "topic": "", "type": "Bug", "body": "Fixes a crash"},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "body:sdlc-layers"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -642,7 +642,7 @@ def test_apply_search_filter_or_operator_pre_computed_haystack():
 async def test_backlog_list_response_includes_pagination_key_always():
     """backlog_list always includes a pagination key in a successful response."""
     op_result = {"items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}]}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert "pagination" in response
@@ -668,7 +668,7 @@ async def test_backlog_list_response_includes_backend_key():
         cache_total_count=0,
     )
     with (
-        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("dh_core.operations.list_items", return_value=op_result),
         patch("backlog_core.server._probe_backend_status", return_value=reachable_status),
     ):
         response = await _call("backlog_list", {})
@@ -696,7 +696,7 @@ async def test_backlog_list_backend_reachable_message_format():
         cache_total_count=0,
     )
     with (
-        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("dh_core.operations.list_items", return_value=op_result),
         patch("backlog_core.server._probe_backend_status", return_value=reachable_status),
     ):
         response = await _call("backlog_list", {})
@@ -725,7 +725,7 @@ async def test_backlog_list_backend_unavailable_message_format():
         error="GITHUB_TOKEN not set",
     )
     with (
-        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("dh_core.operations.list_items", return_value=op_result),
         patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
     ):
         response = await _call("backlog_list", {})
@@ -755,7 +755,7 @@ async def test_backlog_list_backend_unavailable_cache_open_count_reflects_filter
         error="GITHUB_TOKEN not set",
     )
     with (
-        patch("backlog_core.operations.list_items", return_value=op_result),
+        patch("dh_core.operations.list_items", return_value=op_result),
         patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
     ):
         response = await _call("backlog_list", {})
@@ -780,7 +780,7 @@ async def test_backlog_list_backend_error_path_includes_backend_key():
         error="connection refused",
     )
     with (
-        patch("backlog_core.operations.list_items", side_effect=BacklogError("backlog dir missing")),
+        patch("dh_core.operations.list_items", side_effect=BacklogError("backlog dir missing")),
         patch("backlog_core.server._probe_backend_status", return_value=unavailable_status),
     ):
         response = await _call("backlog_list", {})
@@ -814,7 +814,7 @@ async def test_backlog_view_success_returns_item_detail():
         "labels": ["priority:p1"],
         "milestone": "",
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     mock_view.assert_called_once()
@@ -829,7 +829,7 @@ async def test_backlog_view_success_returns_item_detail():
 async def test_backlog_view_passes_pagination_params():
     """backlog_view forwards offset and limit to operations."""
     op_result = _make_view_result({"title": "Item", "body": "line1\nline2\nline3"})
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         await _call("backlog_view", {"selector": "Item", "offset": 5, "limit": 20})
 
     call_kwargs = mock_view.call_args.kwargs
@@ -839,7 +839,7 @@ async def test_backlog_view_passes_pagination_params():
 
 async def test_backlog_view_backlog_error_returns_error_key():
     """backlog_view catches BacklogError when item is not found."""
-    with patch("backlog_core.operations.view_item", side_effect=BacklogError("No item found for: #999")):
+    with patch("dh_core.operations.view_item", side_effect=BacklogError("No item found for: #999")):
         response = await _call("backlog_view", {"selector": "#999"})
 
     assert "No item found for: #999" in response["error"]
@@ -872,7 +872,7 @@ async def test_backlog_view_default_includes_content():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     # Assert
@@ -908,7 +908,7 @@ async def test_backlog_view_compact_mode_omits_body():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         response = await _call("backlog_view", {"selector": "#42", "include_content": False, "summary": False})
 
     # Assert
@@ -944,7 +944,7 @@ async def test_backlog_view_compact_mode_includes_sections_metadata():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#42", "include_content": False, "summary": False})
 
     # Assert
@@ -995,7 +995,7 @@ async def test_backlog_view_summary_true_returns_compact_manifest():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#36"})
 
     # Assert — compact fields present
@@ -1031,7 +1031,7 @@ async def test_backlog_view_summary_true_hint_contains_selector():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "My Feature Title"})
 
     # Assert
@@ -1059,7 +1059,7 @@ async def test_backlog_view_summary_true_plan_address_none_when_absent():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#10"})
 
     # Assert
@@ -1090,7 +1090,7 @@ async def test_backlog_view_summary_true_plan_address_round_trip():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#23"})
 
     # Assert — plan_address present with correct value, plan_path absent
@@ -1118,7 +1118,7 @@ async def test_backlog_view_summary_true_closed_issue_status_is_closed():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#5"})
 
     # Assert
@@ -1154,7 +1154,7 @@ async def test_backlog_view_summary_false_returns_full_response():
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     # Assert — full response keys present
@@ -1192,7 +1192,7 @@ async def test_backlog_view_summary_true_full_chars_reflects_full_response_size(
     expected_full_chars = len(_json_test.dumps(op_result.model_dump()))
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#7"})
 
     # Assert
@@ -1222,7 +1222,7 @@ def test_backlog_view_summary_param_in_signature():
 async def test_backlog_sync_success_returns_counts():
     """backlog_sync calls operations.sync_items and returns created/pushed counts."""
     op_result = {"created": 3, "pushed": 2}
-    with patch("backlog_core.operations.sync_items", return_value=op_result) as mock_sync:
+    with patch("dh_core.operations.sync_items", return_value=op_result) as mock_sync:
         response = await _call("backlog_sync", {})
 
     mock_sync.assert_called_once()
@@ -1235,7 +1235,7 @@ async def test_backlog_sync_success_returns_counts():
 async def test_backlog_sync_dry_run_forwarded():
     """backlog_sync passes dry_run=True to operations.sync_items."""
     op_result = {"created": 0, "pushed": 0}
-    with patch("backlog_core.operations.sync_items", return_value=op_result) as mock_sync:
+    with patch("dh_core.operations.sync_items", return_value=op_result) as mock_sync:
         await _call("backlog_sync", {"dry_run": True})
 
     assert mock_sync.call_args.kwargs["dry_run"] is True
@@ -1243,7 +1243,7 @@ async def test_backlog_sync_dry_run_forwarded():
 
 async def test_backlog_sync_backlog_error_returns_error_key():
     """backlog_sync catches BacklogError and includes error key."""
-    with patch("backlog_core.operations.sync_items", side_effect=BacklogError("GitHub unavailable")):
+    with patch("dh_core.operations.sync_items", side_effect=BacklogError("GitHub unavailable")):
         response = await _call("backlog_sync", {})
 
     assert response["error"] == "GitHub unavailable"
@@ -1257,7 +1257,7 @@ async def test_backlog_sync_backlog_error_returns_error_key():
 async def test_backlog_close_success_returns_closed_item():
     """backlog_close calls operations.close_item and merges result."""
     op_result = {"title": "Done Feature", "issue": "#7"}
-    with patch("backlog_core.operations.close_item", return_value=op_result) as mock_close:
+    with patch("dh_core.operations.close_item", return_value=op_result) as mock_close:
         response = await _call("backlog_close", {"selector": "Done Feature", "reason": "wontfix"})
 
     mock_close.assert_called_once()
@@ -1274,7 +1274,7 @@ async def test_backlog_close_success_returns_closed_item():
 async def test_backlog_close_passes_cleanup_and_force():
     """backlog_close forwards cleanup and force flags."""
     op_result = {"title": "Item", "issue": "#5"}
-    with patch("backlog_core.operations.close_item", return_value=op_result) as mock_close:
+    with patch("dh_core.operations.close_item", return_value=op_result) as mock_close:
         await _call("backlog_close", {"selector": "Item", "reason": "duplicate", "cleanup": True, "force": True})
 
     call_kwargs = mock_close.call_args.kwargs
@@ -1284,7 +1284,7 @@ async def test_backlog_close_passes_cleanup_and_force():
 
 async def test_backlog_close_backlog_error_returns_error_key():
     """backlog_close catches BacklogError (e.g. item not found)."""
-    with patch("backlog_core.operations.close_item", side_effect=BacklogError("item not found")):
+    with patch("dh_core.operations.close_item", side_effect=BacklogError("item not found")):
         response = await _call("backlog_close", {"selector": "Item", "reason": "wontfix"})
 
     assert response["error"] == "item not found"
@@ -1298,7 +1298,7 @@ async def test_backlog_close_backlog_error_returns_error_key():
 async def test_backlog_resolve_success_returns_resolved_item():
     """backlog_resolve calls operations.resolve_item and merges result."""
     op_result = {"title": "Old Feature", "summary": "duplicate of #10", "issue": "#3"}
-    with patch("backlog_core.operations.resolve_item", return_value=op_result) as mock_resolve:
+    with patch("dh_core.operations.resolve_item", return_value=op_result) as mock_resolve:
         response = await _call("backlog_resolve", {"selector": "Old Feature", "summary": "duplicate of #10"})
 
     mock_resolve.assert_called_once()
@@ -1314,7 +1314,7 @@ async def test_backlog_resolve_success_returns_resolved_item():
 async def test_backlog_resolve_passes_cleanup_and_force():
     """backlog_resolve forwards cleanup and force to operations."""
     op_result = {"title": "Item", "summary": "out of scope", "issue": ""}
-    with patch("backlog_core.operations.resolve_item", return_value=op_result) as mock_resolve:
+    with patch("dh_core.operations.resolve_item", return_value=op_result) as mock_resolve:
         await _call("backlog_resolve", {"selector": "Item", "summary": "out of scope", "cleanup": True, "force": True})
 
     call_kwargs = mock_resolve.call_args.kwargs
@@ -1324,7 +1324,7 @@ async def test_backlog_resolve_passes_cleanup_and_force():
 
 async def test_backlog_resolve_backlog_error_returns_error_key():
     """backlog_resolve catches BacklogError when resolution fails."""
-    with patch("backlog_core.operations.resolve_item", side_effect=BacklogError("open PRs exist")):
+    with patch("dh_core.operations.resolve_item", side_effect=BacklogError("open PRs exist")):
         response = await _call("backlog_resolve", {"selector": "Item", "summary": "no longer needed"})
 
     assert response["error"] == "open PRs exist"
@@ -1338,7 +1338,7 @@ async def test_backlog_resolve_backlog_error_returns_error_key():
 async def test_backlog_update_success_with_plan():
     """backlog_update calls operations.update_item and merges result."""
     op_result = {"title": "Feature", "changes": ["plan attached"]}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         response = await _call("backlog_update", {"selector": "Feature", "plan": "plan/tasks-feature.md"})
 
     mock_update.assert_called_once()
@@ -1354,7 +1354,7 @@ async def test_backlog_update_success_with_plan():
 async def test_backlog_update_passes_status():
     """backlog_update forwards status to operations."""
     op_result = {"title": "Item", "changes": ["status updated"]}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "status": "in-progress"})
 
     call_kwargs = mock_update.call_args.kwargs
@@ -1364,7 +1364,7 @@ async def test_backlog_update_passes_status():
 async def test_backlog_update_passes_section_content():
     """backlog_update forwards section and content for groomed update."""
     op_result = {"title": "Item", "changes": ["groomed"]}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "some content"})
 
     call_kwargs = mock_update.call_args.kwargs
@@ -1375,7 +1375,7 @@ async def test_backlog_update_passes_section_content():
 async def test_backlog_update_passes_section_and_content():
     """backlog_update forwards section and content for incremental update."""
     op_result = {"title": "Item", "changes": ["section updated"]}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "- [ ] Done"})
 
     call_kwargs = mock_update.call_args.kwargs
@@ -1386,7 +1386,7 @@ async def test_backlog_update_passes_section_and_content():
 async def test_backlog_update_passes_title():
     """backlog_update forwards title to operations.update_item."""
     op_result = {"title": "Old", "renamed_to": "New Title"}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Old", "title": "New Title"})
 
     call_kwargs = mock_update.call_args.kwargs
@@ -1396,7 +1396,7 @@ async def test_backlog_update_passes_title():
 async def test_backlog_update_passes_description():
     """backlog_update forwards description to operations.update_item."""
     op_result = {"title": "Item", "description_updated": True}
-    with patch("backlog_core.operations.update_item", return_value=op_result) as mock_update:
+    with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "description": "Updated description."})
 
     call_kwargs = mock_update.call_args.kwargs
@@ -1405,7 +1405,7 @@ async def test_backlog_update_passes_description():
 
 async def test_backlog_update_backlog_error_returns_error_key():
     """backlog_update catches BacklogError."""
-    with patch("backlog_core.operations.update_item", side_effect=BacklogError("item not found")):
+    with patch("dh_core.operations.update_item", side_effect=BacklogError("item not found")):
         response = await _call("backlog_update", {"selector": "Missing"})
 
     assert response["error"] == "item not found"
@@ -1419,7 +1419,7 @@ async def test_backlog_update_backlog_error_returns_error_key():
 async def test_backlog_groom_success_with_section_content():
     """backlog_groom calls operations.groom_item with section and content."""
     op_result = {"title": "Feature", "synced": True}
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         response = await _call(
             "backlog_groom", {"selector": "Feature", "section": "Acceptance Criteria", "content": "- [ ] Pass tests"}
         )
@@ -1436,7 +1436,7 @@ async def test_backlog_groom_success_with_section_content():
 async def test_backlog_groom_passes_section_and_content():
     """backlog_groom forwards section and content for incremental update."""
     op_result = {"title": "Item", "synced": False}
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call("backlog_groom", {"selector": "Item", "section": "Background", "content": "Some background info"})
 
     call_kwargs = mock_groom.call_args.kwargs
@@ -1446,7 +1446,7 @@ async def test_backlog_groom_passes_section_and_content():
 
 async def test_backlog_groom_backlog_error_returns_error_key():
     """backlog_groom catches BacklogError."""
-    with patch("backlog_core.operations.groom_item", side_effect=BacklogError("item not found")):
+    with patch("dh_core.operations.groom_item", side_effect=BacklogError("item not found")):
         response = await _call("backlog_groom", {"selector": "#999"})
 
     assert response["error"] == "item not found"
@@ -1455,7 +1455,7 @@ async def test_backlog_groom_backlog_error_returns_error_key():
 async def test_backlog_groom_accepts_mark_groomed_parameter():
     """backlog_groom forwards mark_groomed=True to operations.groom_item."""
     op_result = {"title": "Feature", "synced": True}
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call(
             "backlog_groom", {"selector": "Feature", "section": "Background", "content": "Done", "mark_groomed": True}
         )
@@ -1468,7 +1468,7 @@ async def test_backlog_groom_accepts_mark_groomed_parameter():
 async def test_backlog_groom_mark_groomed_defaults_false():
     """backlog_groom passes mark_groomed=False to groom_item when not specified."""
     op_result = {"title": "Feature", "synced": True}
-    with patch("backlog_core.operations.groom_item", return_value=op_result) as mock_groom:
+    with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         await _call("backlog_groom", {"selector": "Feature", "section": "Background", "content": "Done"})
 
     mock_groom.assert_called_once()
@@ -1484,7 +1484,7 @@ async def test_backlog_groom_mark_groomed_defaults_false():
 async def test_backlog_normalize_success_returns_count():
     """backlog_normalize calls operations.normalize_items and returns count."""
     op_result = {"normalized": 5}
-    with patch("backlog_core.operations.normalize_items", return_value=op_result) as mock_normalize:
+    with patch("dh_core.operations.normalize_items", return_value=op_result) as mock_normalize:
         response = await _call("backlog_normalize", {})
 
     mock_normalize.assert_called_once()
@@ -1496,7 +1496,7 @@ async def test_backlog_normalize_success_returns_count():
 async def test_backlog_normalize_dry_run_forwarded():
     """backlog_normalize passes dry_run to operations."""
     op_result = {"normalized": 0}
-    with patch("backlog_core.operations.normalize_items", return_value=op_result) as mock_normalize:
+    with patch("dh_core.operations.normalize_items", return_value=op_result) as mock_normalize:
         await _call("backlog_normalize", {"dry_run": True})
 
     assert mock_normalize.call_args.kwargs["dry_run"] is True
@@ -1504,7 +1504,7 @@ async def test_backlog_normalize_dry_run_forwarded():
 
 async def test_backlog_normalize_backlog_error_returns_error_key():
     """backlog_normalize catches BacklogError."""
-    with patch("backlog_core.operations.normalize_items", side_effect=BacklogError("malformed files")):
+    with patch("dh_core.operations.normalize_items", side_effect=BacklogError("malformed files")):
         response = await _call("backlog_normalize", {})
 
     assert response["error"] == "malformed files"
@@ -1518,7 +1518,7 @@ async def test_backlog_normalize_backlog_error_returns_error_key():
 async def test_backlog_pull_success_returns_count():
     """backlog_pull calls operations.pull_items and returns pulled count."""
     op_result = {"pulled": 4}
-    with patch("backlog_core.operations.pull_items", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_items", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {})
 
     mock_pull.assert_called_once()
@@ -1531,7 +1531,7 @@ async def test_backlog_pull_success_returns_count():
 async def test_backlog_pull_passes_dry_run_and_force():
     """backlog_pull forwards dry_run and force to operations."""
     op_result = {"pulled": 0}
-    with patch("backlog_core.operations.pull_items", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_items", return_value=op_result) as mock_pull:
         await _call("backlog_pull", {"dry_run": True, "force": True})
 
     call_kwargs = mock_pull.call_args.kwargs
@@ -1541,7 +1541,7 @@ async def test_backlog_pull_passes_dry_run_and_force():
 
 async def test_backlog_pull_backlog_error_returns_error_key():
     """backlog_pull catches BacklogError."""
-    with patch("backlog_core.operations.pull_items", side_effect=BacklogError("no GitHub token")):
+    with patch("dh_core.operations.pull_items", side_effect=BacklogError("no GitHub token")):
         response = await _call("backlog_pull", {})
 
     assert response["error"] == "no GitHub token"
@@ -1550,7 +1550,7 @@ async def test_backlog_pull_backlog_error_returns_error_key():
 async def test_backlog_pull_with_issue_number_selector_calls_pull_by_selector():
     """backlog_pull(selector='#321') routes to operations.pull_by_selector."""
     op_result = {"file_path": "/tmp/test.md"}
-    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {"selector": "#321"})
 
     mock_pull.assert_called_once()
@@ -1560,7 +1560,7 @@ async def test_backlog_pull_with_issue_number_selector_calls_pull_by_selector():
 async def test_backlog_pull_with_url_selector_calls_pull_by_selector():
     """backlog_pull(selector='https://github.com/owner/repo/issues/42') routes to pull_by_selector."""
     op_result = {"file_path": "/tmp/test.md"}
-    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {"selector": "https://github.com/owner/repo/issues/42"})
 
     mock_pull.assert_called_once()
@@ -1570,7 +1570,7 @@ async def test_backlog_pull_with_url_selector_calls_pull_by_selector():
 async def test_backlog_pull_with_title_selector_calls_pull_by_selector():
     """backlog_pull(selector='some title') routes to pull_by_selector."""
     op_result = {"file_path": "/tmp/test.md"}
-    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {"selector": "some title substring"})
 
     mock_pull.assert_called_once()
@@ -1579,7 +1579,7 @@ async def test_backlog_pull_with_title_selector_calls_pull_by_selector():
 
 async def test_backlog_pull_selector_error_returns_error_key():
     """backlog_pull with selector propagates BacklogError."""
-    with patch("backlog_core.operations.pull_by_selector", side_effect=BacklogError("item not found")):
+    with patch("dh_core.operations.pull_by_selector", side_effect=BacklogError("item not found")):
         response = await _call("backlog_pull", {"selector": "#999"})
 
     assert response["error"] == "item not found"
@@ -1588,7 +1588,7 @@ async def test_backlog_pull_selector_error_returns_error_key():
 async def test_backlog_pull_single_diff_true_returns_diff_field():
     """backlog_pull with diff=True on a single item returns non-empty 'diff' field."""
     op_result = {"file_path": "/tmp/p1-item.md", "diff": "- old line\n+ new line\n"}
-    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {"selector": "#42", "diff": True})
 
     # Arrange: pull_by_selector called with diff=True
@@ -1602,7 +1602,7 @@ async def test_backlog_pull_single_diff_true_returns_diff_field():
 async def test_backlog_pull_single_diff_false_omits_diff_field():
     """backlog_pull with diff=False (default) returns no 'diff' field."""
     op_result = {"file_path": "/tmp/p1-item.md"}
-    with patch("backlog_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
+    with patch("dh_core.operations.pull_by_selector", return_value=op_result) as mock_pull:
         response = await _call("backlog_pull", {"selector": "#42"})
 
     # Arrange: pull_by_selector called with diff=False (default)
@@ -1616,8 +1616,8 @@ async def test_backlog_pull_no_selector_uses_bulk_pull():
     """backlog_pull without selector calls pull_items (bulk), not pull_by_selector."""
     op_result = {"pulled": 3}
     with (
-        patch("backlog_core.operations.pull_items", return_value=op_result) as mock_bulk,
-        patch("backlog_core.operations.pull_by_selector") as mock_single,
+        patch("dh_core.operations.pull_items", return_value=op_result) as mock_bulk,
+        patch("dh_core.operations.pull_by_selector") as mock_single,
     ):
         response = await _call("backlog_pull", {})
 
@@ -1716,7 +1716,7 @@ def test_backlog_list_topic_param_schema():
 async def test_backlog_view_show_numeric_string_converts_to_int():
     """backlog_view converts show='2' (string) to int 2 before passing to view_item."""
     op_result = _make_view_result({"title": "My Item", "body": "content"})
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         await _call("backlog_view", {"selector": "#1", "show": "2"})
 
     call_kwargs = mock_view.call_args.kwargs
@@ -1726,7 +1726,7 @@ async def test_backlog_view_show_numeric_string_converts_to_int():
 async def test_backlog_view_show_non_numeric_string_passed_as_str():
     """backlog_view passes show='last' as a string (not converted to int)."""
     op_result = _make_view_result({"title": "My Item", "body": "content"})
-    with patch("backlog_core.operations.view_item", return_value=op_result) as mock_view:
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
         await _call("backlog_view", {"selector": "#1", "show": "last"})
 
     call_kwargs = mock_view.call_args.kwargs
@@ -1739,19 +1739,19 @@ async def test_backlog_view_show_non_numeric_string_passed_as_str():
         (
             "backlog_add",
             {"title": "T", "priority": "P1", "description": "D", "gate_token": TEST_GATE_TOKEN},
-            "backlog_core.operations.add_item",
+            "dh_core.operations.add_item",
             {"file_path": "f"},
         ),
-        ("backlog_list", {}, "backlog_core.operations.list_items", {"items": []}),
+        ("backlog_list", {}, "dh_core.operations.list_items", {"items": []}),
         (
             "backlog_view",
             {"selector": "#1", "summary": False},
-            "backlog_core.operations.view_item",
+            "dh_core.operations.view_item",
             _make_view_result({"title": "T"}),
         ),
-        ("backlog_sync", {}, "backlog_core.operations.sync_items", {"created": 0}),
-        ("backlog_normalize", {}, "backlog_core.operations.normalize_items", {"normalized": 0}),
-        ("backlog_pull", {}, "backlog_core.operations.pull_items", {"pulled": 0}),
+        ("backlog_sync", {}, "dh_core.operations.sync_items", {"created": 0}),
+        ("backlog_normalize", {}, "dh_core.operations.normalize_items", {"normalized": 0}),
+        ("backlog_pull", {}, "dh_core.operations.pull_items", {"pulled": 0}),
     ],
 )
 async def test_output_fields_always_present_on_success(tool_name, params, mock_target, mock_return):
@@ -1773,21 +1773,21 @@ async def test_output_fields_always_present_on_success(tool_name, params, mock_t
         (
             "backlog_add",
             {"title": "T", "priority": "P1", "description": "D", "gate_token": TEST_GATE_TOKEN},
-            "backlog_core.operations.add_item",
+            "dh_core.operations.add_item",
         ),
-        ("backlog_list", {}, "backlog_core.operations.list_items"),
-        ("backlog_view", {"selector": "#1"}, "backlog_core.operations.view_item"),
-        ("backlog_sync", {}, "backlog_core.operations.sync_items"),
-        ("backlog_close", {"selector": "X", "reason": "wontfix"}, "backlog_core.operations.close_item"),
-        ("backlog_resolve", {"selector": "X", "summary": "done"}, "backlog_core.operations.resolve_item"),
-        ("backlog_update", {"selector": "X"}, "backlog_core.operations.update_item"),
-        ("backlog_groom", {"selector": "X"}, "backlog_core.operations.groom_item"),
-        ("backlog_normalize", {}, "backlog_core.operations.normalize_items"),
-        ("backlog_pull", {}, "backlog_core.operations.pull_items"),
+        ("backlog_list", {}, "dh_core.operations.list_items"),
+        ("backlog_view", {"selector": "#1"}, "dh_core.operations.view_item"),
+        ("backlog_sync", {}, "dh_core.operations.sync_items"),
+        ("backlog_close", {"selector": "X", "reason": "wontfix"}, "dh_core.operations.close_item"),
+        ("backlog_resolve", {"selector": "X", "summary": "done"}, "dh_core.operations.resolve_item"),
+        ("backlog_update", {"selector": "X"}, "dh_core.operations.update_item"),
+        ("backlog_groom", {"selector": "X"}, "dh_core.operations.groom_item"),
+        ("backlog_normalize", {}, "dh_core.operations.normalize_items"),
+        ("backlog_pull", {}, "dh_core.operations.pull_items"),
         (
             "backlog_strike_entry",
             {"selector": "X", "entry_id": "2026-01-01T00:00:00Z", "reason": "test"},
-            "backlog_core.operations.strike_entry",
+            "dh_core.operations.strike_entry",
         ),
     ],
 )
@@ -1848,7 +1848,7 @@ async def test_backlog_add_passes_output_instance_to_operations(gate_token: str)
         captured.append(kwargs["output"])
         return {"file_path": "/tmp/p1-x.md"}
 
-    with patch("backlog_core.operations.add_item", side_effect=_capture):
+    with patch("dh_core.operations.add_item", side_effect=_capture):
         await _call("backlog_add", {"title": "X", "priority": "P1", "description": "D", "gate_token": gate_token})
 
     assert len(captured) == 1
@@ -1863,7 +1863,7 @@ async def test_backlog_list_passes_output_instance_to_operations():
         captured.append(kwargs["output"])
         return {"items": []}
 
-    with patch("backlog_core.operations.list_items", side_effect=_capture):
+    with patch("dh_core.operations.list_items", side_effect=_capture):
         await _call("backlog_list", {})
 
     assert len(captured) == 1
@@ -1877,7 +1877,7 @@ async def test_backlog_list_passes_output_instance_to_operations():
 
 async def test_backlog_add_no_error_key_on_success(gate_token: str):
     """Successful backlog_add response must not contain an 'error' key."""
-    with patch("backlog_core.operations.add_item", return_value={"file_path": "/tmp/p1-ok.md"}):
+    with patch("dh_core.operations.add_item", return_value={"file_path": "/tmp/p1-ok.md"}):
         response = await _call(
             "backlog_add", {"title": "OK", "priority": "P1", "description": "Fine", "gate_token": gate_token}
         )
@@ -1887,7 +1887,7 @@ async def test_backlog_add_no_error_key_on_success(gate_token: str):
 
 async def test_backlog_sync_no_error_key_on_success():
     """Successful backlog_sync response must not contain an 'error' key."""
-    with patch("backlog_core.operations.sync_items", return_value={"created": 1, "pushed": 0}):
+    with patch("dh_core.operations.sync_items", return_value={"created": 1, "pushed": 0}):
         response = await _call("backlog_sync", {})
 
     assert "error" not in response
@@ -1902,7 +1902,7 @@ async def test_backlog_sync_ctx_info_start_message():
     """backlog_sync emits ctx.info with start message before the operation."""
     op_result = {"created": 2, "pushed": 1}
     with (
-        patch("backlog_core.operations.sync_items", return_value=op_result),
+        patch("dh_core.operations.sync_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_sync", {})
@@ -1915,7 +1915,7 @@ async def test_backlog_sync_ctx_info_start_message_dry_run():
     """backlog_sync emits ctx.info with '(dry-run)' suffix when dry_run=True."""
     op_result = {"created": 0, "pushed": 0}
     with (
-        patch("backlog_core.operations.sync_items", return_value=op_result),
+        patch("dh_core.operations.sync_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_sync", {"dry_run": True})
@@ -1928,7 +1928,7 @@ async def test_backlog_sync_ctx_info_completion_message():
     """backlog_sync emits ctx.info with completion summary including counts."""
     op_result = {"created": 3, "pushed": 5}
     with (
-        patch("backlog_core.operations.sync_items", return_value=op_result),
+        patch("dh_core.operations.sync_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_sync", {})
@@ -1946,7 +1946,7 @@ async def test_backlog_sync_ctx_warning_surfaces_output_warnings():
         return {"created": 0, "pushed": 0}
 
     with (
-        patch("backlog_core.operations.sync_items", side_effect=_sync_with_warnings),
+        patch("dh_core.operations.sync_items", side_effect=_sync_with_warnings),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_sync", {})
@@ -1965,7 +1965,7 @@ async def test_backlog_groom_ctx_info_start_message():
     """backlog_groom emits ctx.info with 'Grooming item: {selector}' before operation."""
     op_result = {"title": "Auth Feature", "synced": True}
     with (
-        patch("backlog_core.operations.groom_item", return_value=op_result),
+        patch("dh_core.operations.groom_item", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_groom", {"selector": "#42"})
@@ -1978,7 +1978,7 @@ async def test_backlog_groom_ctx_info_completion_message():
     """backlog_groom emits ctx.info with 'Groomed: {title}' after operation."""
     op_result = {"title": "Auth Feature", "synced": True}
     with (
-        patch("backlog_core.operations.groom_item", return_value=op_result),
+        patch("dh_core.operations.groom_item", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_groom", {"selector": "#42"})
@@ -1995,7 +1995,7 @@ async def test_backlog_groom_ctx_warning_surfaces_output_warnings():
         return {"title": "Item", "synced": False}
 
     with (
-        patch("backlog_core.operations.groom_item", side_effect=_groom_with_warnings),
+        patch("dh_core.operations.groom_item", side_effect=_groom_with_warnings),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_groom", {"selector": "Item"})
@@ -2013,7 +2013,7 @@ async def test_backlog_normalize_ctx_info_start_message():
     """backlog_normalize emits ctx.info with start message before operation."""
     op_result = {"updated": 3}
     with (
-        patch("backlog_core.operations.normalize_items", return_value=op_result),
+        patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_normalize", {})
@@ -2026,7 +2026,7 @@ async def test_backlog_normalize_ctx_info_start_message_dry_run():
     """backlog_normalize emits ctx.info with '(dry-run)' suffix when dry_run=True."""
     op_result = {"updated": 0}
     with (
-        patch("backlog_core.operations.normalize_items", return_value=op_result),
+        patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_normalize", {"dry_run": True})
@@ -2039,7 +2039,7 @@ async def test_backlog_normalize_ctx_info_completion_message():
     """backlog_normalize emits ctx.info with 'Normalized N file(s)' after operation."""
     op_result = {"updated": 7}
     with (
-        patch("backlog_core.operations.normalize_items", return_value=op_result),
+        patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_normalize", {})
@@ -2052,7 +2052,7 @@ async def test_backlog_normalize_ctx_info_completion_message_dry_run():
     """backlog_normalize completion message includes '(dry-run)' suffix."""
     op_result = {"updated": 2}
     with (
-        patch("backlog_core.operations.normalize_items", return_value=op_result),
+        patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_normalize", {"dry_run": True})
@@ -2069,7 +2069,7 @@ async def test_backlog_normalize_ctx_warning_surfaces_output_warnings():
         return {"updated": 1}
 
     with (
-        patch("backlog_core.operations.normalize_items", side_effect=_normalize_with_warnings),
+        patch("dh_core.operations.normalize_items", side_effect=_normalize_with_warnings),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_normalize", {})
@@ -2087,7 +2087,7 @@ async def test_backlog_pull_bulk_ctx_info_start_message():
     """backlog_pull (bulk) emits ctx.info with start message before operation."""
     op_result = {"pulled": 5}
     with (
-        patch("backlog_core.operations.pull_items", return_value=op_result),
+        patch("dh_core.operations.pull_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {})
@@ -2100,7 +2100,7 @@ async def test_backlog_pull_bulk_ctx_info_start_message_dry_run():
     """backlog_pull (bulk) emits ctx.info with '(dry-run)' suffix."""
     op_result = {"pulled": 0}
     with (
-        patch("backlog_core.operations.pull_items", return_value=op_result),
+        patch("dh_core.operations.pull_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {"dry_run": True})
@@ -2113,7 +2113,7 @@ async def test_backlog_pull_bulk_ctx_info_completion_message():
     """backlog_pull (bulk) emits ctx.info with 'Pull complete: N item(s) pulled'."""
     op_result = {"pulled": 8}
     with (
-        patch("backlog_core.operations.pull_items", return_value=op_result),
+        patch("dh_core.operations.pull_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {})
@@ -2130,7 +2130,7 @@ async def test_backlog_pull_bulk_ctx_warning_surfaces_output_warnings():
         return {"pulled": 1}
 
     with (
-        patch("backlog_core.operations.pull_items", side_effect=_pull_with_warnings),
+        patch("dh_core.operations.pull_items", side_effect=_pull_with_warnings),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {})
@@ -2148,7 +2148,7 @@ async def test_backlog_pull_single_ctx_info_start_message():
     """backlog_pull (single) emits ctx.info with 'Pulling issue: {selector}'."""
     op_result = {"file_path": "/tmp/p1-item.md"}
     with (
-        patch("backlog_core.operations.pull_by_selector", return_value=op_result),
+        patch("dh_core.operations.pull_by_selector", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {"selector": "#321"})
@@ -2161,7 +2161,7 @@ async def test_backlog_pull_single_ctx_info_completion_message():
     """backlog_pull (single) emits ctx.info with 'Pulled: {file_path}' after operation."""
     op_result = {"file_path": "/tmp/p1-my-item.md"}
     with (
-        patch("backlog_core.operations.pull_by_selector", return_value=op_result),
+        patch("dh_core.operations.pull_by_selector", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {"selector": "#42"})
@@ -2174,7 +2174,7 @@ async def test_backlog_pull_single_ctx_info_nothing_pulled():
     """backlog_pull (single) emits 'Nothing pulled' when file_path is absent."""
     op_result = {"message": "already up to date"}
     with (
-        patch("backlog_core.operations.pull_by_selector", return_value=op_result),
+        patch("dh_core.operations.pull_by_selector", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {"selector": "#42"})
@@ -2191,7 +2191,7 @@ async def test_backlog_pull_single_ctx_warning_surfaces_output_warnings():
         return {"file_path": "/tmp/p1-item.md"}
 
     with (
-        patch("backlog_core.operations.pull_by_selector", side_effect=_pull_with_warnings),
+        patch("dh_core.operations.pull_by_selector", side_effect=_pull_with_warnings),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_pull", {"selector": "#10"})
@@ -2209,7 +2209,7 @@ async def test_backlog_sync_ctx_uses_info_level_for_start_and_completion():
     """backlog_sync uses 'info' level for start and completion messages."""
     op_result = {"created": 0, "pushed": 0}
     with (
-        patch("backlog_core.operations.sync_items", return_value=op_result),
+        patch("dh_core.operations.sync_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
     ):
         await _call("backlog_sync", {})
@@ -2286,7 +2286,7 @@ async def test_backlog_list_search_not_operator_excludes_term():
             {"title": "Backlog quality review", "section": "P1", "topic": "quality", "type": "Chore", "body": ""},
         ]
     }
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "backlog NOT quality"})
 
     titles = [i["title"] for i in response["items"]]
@@ -2367,7 +2367,7 @@ async def test_backlog_list_search_grouped_or_and():
             {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
         ]
     }
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "(auth OR deploy) AND quality"})
 
     titles = [i["title"] for i in response["items"]]
@@ -2396,7 +2396,7 @@ async def test_backlog_list_count_only_returns_count_key():
             {"title": "Item B", "section": "P2", "topic": "b", "type": "Bug", "body": ""},
         ]
     }
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"count_only": True})
 
     assert "count" in response, "count_only response must include 'count' key"
@@ -2419,7 +2419,7 @@ async def test_backlog_list_count_only_respects_search_filter():
             {"title": "Auth token refresh", "section": "P1", "topic": "security", "type": "Bug", "body": ""},
         ]
     }
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"count_only": True, "search": "auth"})
 
     assert response["count"] == 2, f"Expected 2 auth items, got {response['count']}"
@@ -2433,7 +2433,7 @@ async def test_backlog_list_count_only_false_returns_full_response():
     Why: Confirms the default behaviour is unchanged by the new parameter.
     """
     op_result = {"items": [{"title": "Item X", "section": "P1", "topic": "x", "type": "Feature", "body": ""}]}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert "items" in response
@@ -2458,7 +2458,7 @@ async def test_backlog_list_match_context_false_default_unchanged():
         {"title": "Deploy pipeline", "section": "P2", "topic": "infra", "type": "Feature", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth"})
 
     for item in response["items"]:
@@ -2476,7 +2476,7 @@ async def test_backlog_list_match_context_true_returns_matches_key_per_item():
     """
     items = [{"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth", "match_context": True})
 
     assert len(response["items"]) == 1
@@ -2497,7 +2497,7 @@ async def test_backlog_list_match_context_title_match_attributed_to_title_field(
     """
     items = [{"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth", "match_context": True})
 
     assert len(response["items"]) == 1
@@ -2535,7 +2535,7 @@ async def test_backlog_list_match_context_body_match_attributed_to_named_section
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "quality", "match_context": True})
 
     assert len(response["items"]) == 1
@@ -2560,7 +2560,7 @@ async def test_backlog_list_match_context_multiple_terms_produce_multiple_matche
     """
     items = [{"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth AND bug", "match_context": True})
 
     assert len(response["items"]) == 1
@@ -2581,7 +2581,7 @@ async def test_backlog_list_match_context_match_entry_has_required_keys():
     """
     items = [{"title": "Auth service", "section": "P1", "topic": "", "type": "Feature", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth", "match_context": True})
 
     assert len(response["items"]) == 1
@@ -2756,7 +2756,7 @@ async def test_backlog_list_snippet_context_parameter_accepted():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "backlog", "match_context": True, "snippet_context": 200})
 
     assert "error" not in response
@@ -2777,7 +2777,7 @@ async def test_backlog_list_match_header_format():
     """
     items = [{"number": "42", "title": "My feature", "section": "P1", "topic": "", "type": "Feature", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "feature", "match_context": True})
 
     item = response["items"][0]
@@ -2803,7 +2803,7 @@ async def test_backlog_list_match_text_format():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "quality", "match_context": True})
 
     item = response["items"][0]
@@ -2829,7 +2829,7 @@ async def test_backlog_list_item_depth_zero_default_response_unchanged():
     """
     items = [{"title": "Auth service", "section": "P1", "topic": "", "type": "Feature", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 0})
 
     assert len(response["items"]) == 1
@@ -2859,7 +2859,7 @@ async def test_backlog_list_item_depth_one_adds_description_snippet():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 1})
 
     assert len(response["items"]) == 1
@@ -2890,7 +2890,7 @@ async def test_backlog_list_item_depth_one_adds_section_names():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 1})
 
     assert len(response["items"]) == 1
@@ -2921,7 +2921,7 @@ async def test_backlog_list_item_depth_two_adds_full_description():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 2})
 
     assert len(response["items"]) == 1
@@ -2950,7 +2950,7 @@ async def test_backlog_list_item_depth_two_adds_section_first_lines():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 2})
 
     assert len(response["items"]) == 1
@@ -2984,7 +2984,7 @@ async def test_backlog_list_item_depth_three_returns_full_item_content():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"item_depth": 3})
 
     assert len(response["items"]) == 1
@@ -3005,7 +3005,7 @@ async def test_backlog_list_item_depth_zero_omitted_is_same_as_explicit_zero():
     items = [{"title": "Item A", "section": "P1", "topic": "", "type": "Feature", "body": ""}]
     op_result = {"items": items}
     depth_keys = {"description_snippet", "section_names", "full_description", "section_first_lines"}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response_default = await _call("backlog_list", {})
         response_zero = await _call("backlog_list", {"item_depth": 0})
 
@@ -3042,7 +3042,7 @@ async def test_backlog_list_match_context_and_item_depth_one_no_body_leak():
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "quality", "match_context": True, "item_depth": 1})
 
     assert len(response["items"]) == 1
@@ -3074,7 +3074,7 @@ async def test_backlog_view_sections_none_default_returns_unchanged_response():
             "Acceptance Criteria": {"num_entries": 1, "num_struck": 0, "entries": []},
         },
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#42", "summary": False})
 
     assert response["title"] == "Auth service"
@@ -3110,7 +3110,7 @@ async def test_backlog_view_sections_single_section_returns_only_that_section():
             },
         },
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#42", "summary": False, "sections": ["description"]})
 
     # Identity fields always included
@@ -3147,7 +3147,7 @@ async def test_backlog_view_sections_multiple_sections_returns_all_requested():
             "impact-radius": {"num_entries": 1, "num_struck": 0, "entries": []},
         },
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call(
             "backlog_view", {"selector": "#99", "summary": False, "sections": ["description", "acceptance-criteria"]}
         )
@@ -3177,7 +3177,7 @@ async def test_backlog_view_sections_invalid_section_name_returns_error():
         "body": "## Description\nContent here.",
         "sections": {"description": {"num_entries": 1, "num_struck": 0, "entries": []}},
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call(
             "backlog_view", {"selector": "#42", "summary": False, "sections": ["nonexistent-section-xyz"]}
         )
@@ -3206,7 +3206,7 @@ async def test_backlog_view_sections_always_includes_identity_fields():
         "body": "## Description\nContent.",
         "sections": {"description": {"num_entries": 1, "num_struck": 0, "entries": []}},
     })
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#42", "summary": False, "sections": ["description"]})
 
     assert "title" in response, "title must always be present in sections-filtered response"
@@ -3234,7 +3234,7 @@ async def test_backlog_list_dedup_same_issue_number_appears_once():
         {"issue": "261", "title": "Deploy pipeline", "section": "P2", "type": "Feature", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     numbers = [str(it.get("issue", it.get("number", ""))) for it in response["items"]]
@@ -3256,7 +3256,7 @@ async def test_backlog_list_dedup_preserves_first_occurrence():
         {"issue": "99", "title": "Second occurrence — must be dropped", "section": "P0", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert len(response["items"]) == 1
@@ -3277,7 +3277,7 @@ async def test_backlog_list_dedup_hash_prefix_stripped():
         {"issue": "42", "title": "Auth service refactor duplicate", "section": "P1", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert len(response["items"]) == 1
@@ -3298,7 +3298,7 @@ async def test_backlog_list_dedup_match_context_merged_matches():
         {"issue": "500", "title": "Auth token expiry", "section": "P1", "type": "Bug", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth", "match_context": True})
 
     assert len(response["items"]) == 1, (
@@ -3323,7 +3323,7 @@ async def test_backlog_list_match_pages_present_when_match_context_true():
     """
     items = [{"issue": "1", "title": "Auth bug", "section": "P1", "type": "Bug", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth", "match_context": True})
 
     assert "match_pages" in response, "match_pages must be present when match_context=True"
@@ -3345,7 +3345,7 @@ async def test_backlog_list_match_pages_absent_when_match_context_false():
     """
     items = [{"issue": "1", "title": "Auth bug", "section": "P1", "body": ""}]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"search": "auth"})
 
     assert "match_pages" not in response
@@ -3365,7 +3365,7 @@ async def test_backlog_list_match_pages_not_paginated_when_tokens_below_limit():
         {"issue": "2", "title": "Beta", "section": "P2", "type": "Feature", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call(
             "backlog_list", {"search": "a", "match_context": True, "page_token_limit": 10000, "tokens_per_page": 5000}
         )
@@ -3395,7 +3395,7 @@ async def test_backlog_list_match_pagination_activates_above_token_limit(mocker)
     fake_tokens = list(range(200))
     mocker.patch("backlog_core.server._enc.encode", return_value=fake_tokens)
 
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call(
             "backlog_list",
             {"search": "item", "match_context": True, "page": 1, "tokens_per_page": 200, "page_token_limit": 300},
@@ -3424,7 +3424,7 @@ async def test_backlog_list_match_pagination_page2_returns_next_items(mocker):
     fake_tokens = list(range(200))
     mocker.patch("backlog_core.server._enc.encode", return_value=fake_tokens)
 
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response_p1 = await _call(
             "backlog_list",
             {"search": "item", "match_context": True, "page": 1, "tokens_per_page": 200, "page_token_limit": 300},
@@ -3456,7 +3456,7 @@ async def test_backlog_list_match_pagination_message_on_page1(mocker):
     fake_tokens = list(range(200))
     mocker.patch("backlog_core.server._enc.encode", return_value=fake_tokens)
 
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call(
             "backlog_list",
             {"search": "item", "match_context": True, "page": 1, "tokens_per_page": 200, "page_token_limit": 300},
@@ -3483,7 +3483,7 @@ async def test_backlog_list_match_pagination_no_message_on_page2(mocker):
     fake_tokens = list(range(200))
     mocker.patch("backlog_core.server._enc.encode", return_value=fake_tokens)
 
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call(
             "backlog_list",
             {"search": "item", "match_context": True, "page": 2, "tokens_per_page": 200, "page_token_limit": 300},
@@ -3511,7 +3511,7 @@ async def test_backlog_list_match_context_false_page_param_uses_offset_limit():
         {"issue": "3", "title": "Gamma", "section": "P2", "body": ""},
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"match_context": False, "page": 2, "offset": 1, "limit": 1})
 
     assert "match_pages" not in response
@@ -3556,7 +3556,7 @@ async def test_backlog_list_default_response_excludes_body() -> None:
         },
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert "items" in response
@@ -3587,7 +3587,7 @@ async def test_backlog_list_response_includes_available_fields() -> None:
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
     assert "available_fields" in response, "Expected 'available_fields' key in backlog_list response"
@@ -3627,7 +3627,7 @@ async def test_backlog_list_fields_returns_only_requested_fields() -> None:
         },
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"fields": ["title", "issue"]})
 
     assert "items" in response
@@ -3659,7 +3659,7 @@ async def test_backlog_list_fields_body_returns_body_content() -> None:
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"fields": ["body"]})
 
     assert "items" in response
@@ -3693,7 +3693,7 @@ async def test_backlog_list_fields_nonexistent_field_returns_warning_or_error() 
         }
     ]
     op_result = {"items": items}
-    with patch("backlog_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {"fields": ["nonexistent"]})
 
     has_warning = bool(response.get("warnings"))
@@ -3924,7 +3924,7 @@ async def test_backlog_view_auto_compact_triggers_when_over_token_budget(mocker)
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#99", "summary": False})
 
     # Assert
@@ -3958,7 +3958,7 @@ async def test_backlog_view_auto_compact_not_triggered_when_under_token_budget(m
     })
 
     # Act
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#10", "summary": False})
 
     # Assert — full response, no compact form
@@ -3994,7 +3994,7 @@ async def test_backlog_view_auto_compact_enforced_when_sections_filter_provided(
     })
 
     # Act — sections= filter must not bypass budget enforcement
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#15", "summary": False, "sections": ["Plan"]})
 
     # Assert — compact form must activate because response is over budget
@@ -4032,7 +4032,7 @@ async def test_backlog_view_auto_compact_enforced_when_section_filter_provided(m
     })
 
     # Act — section= filter must not bypass budget enforcement
-    with patch("backlog_core.operations.view_item", return_value=op_result):
+    with patch("dh_core.operations.view_item", return_value=op_result):
         response = await _call("backlog_view", {"selector": "#20", "summary": False, "section": "0"})
 
     # Assert — compact form must activate because response is over budget

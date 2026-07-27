@@ -309,7 +309,7 @@ async def test_backlog_list_merged_prs_success_returns_merged_result() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.list_merged_prs", return_value=fake_result):
+    with patch("dh_core.operations.list_merged_prs", return_value=fake_result):
         # Act
         result = await _call("backlog_list_merged_prs", {})
 
@@ -331,7 +331,7 @@ async def test_backlog_list_merged_prs_passes_search_and_limit() -> None:
         captured["limit"] = limit
         return {"pull_requests": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_merged_prs", side_effect=fake_list):
+    with patch("dh_core.operations.list_merged_prs", side_effect=fake_list):
         # Act
         await _call("backlog_list_merged_prs", {"search": "#42", "limit": 5})
 
@@ -349,7 +349,7 @@ async def test_backlog_list_merged_prs_uses_default_limit() -> None:
         captured["limit"] = limit
         return {"pull_requests": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_merged_prs", side_effect=fake_list):
+    with patch("dh_core.operations.list_merged_prs", side_effect=fake_list):
         # Act
         await _call("backlog_list_merged_prs", {})
 
@@ -360,7 +360,7 @@ async def test_backlog_list_merged_prs_uses_default_limit() -> None:
 async def test_backlog_list_merged_prs_backlog_error_returns_error_key() -> None:
     """backlog_list_merged_prs returns error key dict on BacklogError."""
     # Arrange
-    with patch("backlog_core.operations.list_merged_prs", side_effect=BacklogError("API rate limit exceeded")):
+    with patch("dh_core.operations.list_merged_prs", side_effect=BacklogError("API rate limit exceeded")):
         # Act
         result = await _call("backlog_list_merged_prs", {})
 
@@ -374,7 +374,7 @@ async def test_backlog_list_merged_prs_empty_result() -> None:
     # Arrange
     fake_result = {"pull_requests": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_merged_prs", return_value=fake_result):
+    with patch("dh_core.operations.list_merged_prs", return_value=fake_result):
         # Act
         result = await _call("backlog_list_merged_prs", {})
 
