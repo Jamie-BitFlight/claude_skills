@@ -117,15 +117,15 @@ The CLI mirrors these MCP tools. The CLI uses kebab-case and sometimes drops the
 - **SAM task bridges**: `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`).
 - **Artifacts**: `artifact_register` (`artifact-register`), `artifact_list` (`artifact-list`), `artifact_get` (`artifact-get`), `artifact_read` (`artifact-read`), `artifact_migrate` (`artifact-migrate`).
 - **SAM plan/task sub-operations**: the MCP composites `sam_plan` (actions: read, create, list, status, ready, update, append_task, finalize) and `sam_task` (actions: read, claim, state, update) are exposed on the CLI as individual sub-commands (`create`, `read`, `list`, `state`, `ready`, `status`, `update`, `claim`, `append-task`, `finalize`). The CLI does not expose the composite `sam_plan`/`sam_task` verbs themselves, but every composite sub-operation is reachable. The CLI also has a standalone `validate` command (plan-schema validation) that is not a sub-action of either composite.
+- **Active task**: `sam_active_task` (actions: get, set, update, clear) is mirrored by the CLI `active-task` command group (`active-task get`, `active-task set`, `active-task update`, `active-task clear`). Both transports resolve a `ContextBackend` and delegate to the same `dh_core.operations` functions, so a task parked by one surface is visible to the other — the default `LocalContextBackend` persists to `active-task-{session_id}.json` under `dh_paths.context_dir()`. Added by T-P5-ACTIVE-TASK; parity covered by `tests/test_cli_active_task.py`.
 - **Dispatch**: `dispatch_read` (`dispatch-read`), `dispatch_validate` (`dispatch-validate`), `dispatch_stale_check` (`dispatch-stale-check`), `dispatch_create_plan` (`dispatch-create-plan`), `dispatch_conflicts` (`dispatch-conflicts`), `dispatch_spawn` (`dispatch-spawn`), `dispatch_wave_start` (`dispatch-wave-start`), `dispatch_wave_status` (`dispatch-wave-status`), `dispatch_item_status` (`dispatch-item-status`).
 
 ### MCP-only operations (no CLI equivalent)
 
-Three MCP tools have no CLI command today. The audit's B1 verdict named four (`sam_active_task` plus three bridge tools); on full inventory the bridge tools and the GitHub-metadata tools do have CLI equivalents (listed above), so the real gap is three tools.
+Two MCP tools have no CLI command today. The audit's B1 verdict named four (`sam_active_task` plus three bridge tools); on full inventory the bridge tools and the GitHub-metadata tools do have CLI equivalents (listed above), and `sam_active_task` gained one in T-P5-ACTIVE-TASK, so the real gap is two tools.
 
 | MCP tool | Surface | Notes |
 |----------|---------|-------|
-| `sam_active_task` (get/set/update/clear) | SAM | Session-scoped active-task context. Tracked separately by T-P5-ACTIVE-TASK. |
 | `sync_now` | backlog | Trigger an immediate background backlog sync. The CLI `backlog-sync` command does a synchronous sync; `sync_now` triggers the MCP server's background sync singleton. |
 | `sync_status` | backlog | Report the MCP server's background sync state. The CLI has no equivalent because it does not run a long-lived server with background sync state. |
 

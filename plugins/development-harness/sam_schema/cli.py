@@ -51,6 +51,7 @@ from rich.console import Console
 from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
 
+from sam_schema import cli_active_task, cli_output
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.backends.local_yaml import plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
@@ -120,12 +121,17 @@ def _coerce_backlog_dir(backlog_dir: Path | None) -> Path:
 def _err(msg: str, exit_code: int = 1) -> NoReturn:
     """Print an error message to stderr and exit.
 
+    Thin alias for :func:`sam_schema.cli_output.err`, kept so the many
+    existing call sites in this module stay unchanged.
+
     Args:
         msg: Human-readable error message.
         exit_code: Process exit code (1 for user errors, 2 for internal errors).
+
+    Raises:
+        typer.Exit: Always — terminates the command with *exit_code*.
     """
-    typer.echo(f"Error: {msg}", err=True)
-    raise typer.Exit(exit_code)
+    cli_output.err(msg, exit_code)
 
 
 def _resolve_plan(address_part: str, plan_dir: Path) -> Path:
@@ -215,29 +221,13 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
 def _output_json(data: object) -> None:
     """Print ``data`` as compact JSON to stdout.
 
-    Pydantic models use ``model_dump_json(by_alias=True, exclude_none=True)``
-    directly so wire-alias keys (kebab-case) and absent-optional elision
-    are preserved. Other objects fall back to ``json.dumps`` with a string
-    default.
+    Thin alias for :func:`sam_schema.cli_output.output_json`, kept so the many
+    existing call sites in this module stay unchanged.
 
     Args:
         data: A Pydantic model, list of models, or JSON-serializable object.
     """
-    if isinstance(data, BaseModel):
-        typer.echo(data.model_dump_json(by_alias=True, exclude_none=True))
-    elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
-        typer.echo(
-            json.dumps(
-                [
-                    item.model_dump(mode="json", by_alias=True, exclude_none=True)
-                    for item in data
-                    if isinstance(item, BaseModel)
-                ],
-                default=str,
-            )
-        )
-    else:
-        typer.echo(json.dumps(data, default=str))
+    cli_output.output_json(data)
 
 
 def _output_yaml(data: object) -> None:
@@ -2280,6 +2270,10 @@ def artifact_migrate_cmd(
         item_id=item_id, dry_run=dry_run, old_artifact_id=old_artifact_id, new_artifact_id=new_artifact_id
     )
     _output_json(result)
+
+
+# Active-task commands live in cli_active_task.py (file-size budget).
+app.add_typer(cli_active_task.app, name="active-task")
 
 
 if __name__ == "__main__":  # pragma: no cover
