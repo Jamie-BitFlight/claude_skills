@@ -9,11 +9,9 @@ Covered operations:
 - Backlog list (CLI adds item, both list it)
 - Query filter (both filter by the same key and get the same results)
 
-Plan CRUD parity tests are deferred — the MCP ``sam_plan`` tool wraps the
-configured backend in GistTaskLayer, which requires additional test
-infrastructure to prevent network access.  The structural parity is already
-proven by the boundary test; per-operation plan parity will land with Phase 5
-E2E validation.
+Plan CRUD parity tests use explicit plan_dir to bypass the config singleton
+and issue=None to skip Gist write-through. The network guard in conftest.py
+forces GistTaskLayer to fall back to local cache for read/status/list.
 """
 
 from __future__ import annotations
@@ -35,6 +33,7 @@ from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogConfig as _ModelsBacklogConfig
 from backlog_core.server import mcp as _backlog_mcp
+from sam_schema.server import mcp as _sam_mcp
 
 from tests.helpers import call_mcp_tool
 
@@ -155,3 +154,70 @@ async def test_query_filter_absent_key_returns_empty(dh_env: dict[str, str]) -> 
 
     assert cli_filtered.get("count", 0) == 0
     assert len(mcp_filtered.get("items", [])) == 0
+
+
+# ---------------------------------------------------------------------------
+# Plan CRUD parity (Phase 5 E2E)
+# ---------------------------------------------------------------------------
+
+
+async def test_plan_create_read_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Plan created via CLI is readable via MCP and vice-versa."""
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    # CLI creates, MCP reads
+    cli_result = _run_cli(
+        ["create", "cli-plan", "--goal", "CLI goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_result["plan_id"]
+    mcp_result = await call_mcp_tool(
+        _sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+    assert mcp_result["feature"] == "cli-plan"
+    assert mcp_result["goal"] == "CLI goal"
+
+    # MCP creates, CLI reads
+    mcp_create = await call_mcp_tool(
+        _sam_mcp,
+        "sam_plan",
+        {"config": {"action": "create", "slug": "mcp-plan", "goal": "MCP goal"}, "plan_dir": plan_dir},
+    )
+    mcp_plan_id = mcp_create["plan_id"]
+    cli_read = _run_cli(["read", mcp_plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert cli_read["plan"]["feature"] == "mcp-plan"
+    assert cli_read["plan"]["goal"] == "MCP goal"
+
+
+async def test_plan_status_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Plan status is the same dict through both transports."""
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_result = _run_cli(
+        ["create", "status-plan", "--goal", "Status goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_result["plan_id"]
+
+    cli_status = _run_cli(["status", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_status = await call_mcp_tool(
+        _sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+    assert cli_status["feature"] == mcp_status["feature"]
+    assert cli_status["total_tasks"] == mcp_status["total_tasks"]
+
+
+async def test_plan_list_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Plan list returns the same plans through both transports."""
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    for slug in ["list-a", "list-b"]:
+        _run_cli(["create", slug, "--goal", f"Goal {slug}", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    cli_list = _run_cli(["list", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_list = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "list"}, "plan_dir": plan_dir})
+    cli_ids = {item.get("plan_id", item.get("plan_ref")) for item in cli_list.get("items", [])}
+    mcp_ids = {item.get("plan_id", item.get("plan_ref")) for item in mcp_list.get("items", [])}
+    assert cli_ids == mcp_ids
+    assert len(cli_ids) == 2
