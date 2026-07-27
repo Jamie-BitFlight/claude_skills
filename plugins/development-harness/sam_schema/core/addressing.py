@@ -11,17 +11,11 @@ Address format:
     ``P{N}/T{M}``    — task within a plan
     ``QG{N}/T{M}``   — task within a quality-gate plan
     ``{slug}/T{M}``  — task within a plan by slug
-
-Backward compatibility:
-    If no ``P{NNN}-*`` pattern matches, falls back to ``tasks-{N}-{slug}``
-    naming for unmigrated files. This fallback is explicitly temporary and
-    will be removed after all plan files are renamed.
 """
 
 from __future__ import annotations
 
 import re
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -34,9 +28,6 @@ _P_NUMERIC_RE = re.compile(r"^P([0-9a-f]+)-", re.IGNORECASE)
 
 # Pattern: QG{NNN}-{slug}.yaml / QG{NNN}-{slug}.md / QG{NNN}-{slug}/
 _QG_NUMERIC_RE = re.compile(r"^QG(\d+)-", re.IGNORECASE)
-
-# Backward-compat pattern: tasks-{N}-{slug}.yaml / .md / directory
-_TASKS_NUMERIC_RE = re.compile(r"^tasks-(\d+)-")
 
 # Maps uppercase address prefix to the corresponding filename regex.
 # Used by resolve_plan_address for multi-character prefix resolution.
@@ -83,31 +74,6 @@ def _parse_prefix(address: str) -> tuple[str, str, re.Pattern[str]]:
     if address and address[0] in {"P", "p"} and len(address) > 1:
         return "P", address[1:], _P_NUMERIC_RE
     return "P", address, _P_NUMERIC_RE
-
-
-def _warn_legacy_shadow(ref: str, canonical_name: str, all_entries: list[Path]) -> None:
-    """Emit a stderr warning when a P-prefix plan shadows a legacy ``tasks-*`` file.
-
-    Only called for P-type plans; QG plans never have a legacy equivalent.
-
-    Args:
-        ref: Numeric reference string (e.g. ``"001"``).
-        canonical_name: Filename of the canonical P-file that was resolved.
-        all_entries: All entries in the plan directory (pre-sorted).
-    """
-    legacy_shadow = [
-        p
-        for p in all_entries
-        if p.name.startswith("tasks-") and (m := _TASKS_NUMERIC_RE.match(p.name)) and m.group(1) == ref
-    ]
-    if legacy_shadow:
-        shadow_names = ", ".join(p.name for p in legacy_shadow)
-        print(
-            f"WARNING: P{ref} resolved to '{canonical_name}' but a legacy file also exists "
-            f"with the same number: {shadow_names}. "
-            f"Run 'sam migrate P{ref}' to remove the legacy file.",
-            file=sys.stderr,
-        )
 
 
 class AddressingError(Exception):
@@ -159,10 +125,7 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
        ``AddressingError`` with the list of matches.
     5. If the ref is a slug (non-numeric, no recognised prefix), glob
        ``{PREFIX}*-{slug}*`` among prefix-pattern entries.
-    6. For ``P``-type addresses only: if no ``P{NNN}-*`` match found, fall back
-       to legacy ``tasks-{N}-{slug}`` pattern (backward compatibility).
-       ``QG`` plans have no legacy equivalent and raise immediately.
-    7. If still no match, raise ``AddressingError``.
+    6. If still no match, raise ``AddressingError``.
 
     Args:
         address: Plan address string. May be passed with or without prefix:
@@ -212,8 +175,6 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
             )
         ]
         if len(p_matches) == 1:
-            if active_prefix == "P":
-                _warn_legacy_shadow(ref, p_matches[0].name, all_entries)
             return p_matches[0]
         if len(p_matches) > 1:
             paths_listed = ", ".join(str(p) for p in p_matches)
@@ -232,23 +193,7 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
             # Slug matching is fuzzy — multiple matches return the first sorted entry
             # (deterministic tie-break). Collision detection only applies to numeric IDs.
             return first
-        # No prefix-pattern slug match — fall through to legacy fallback.
-        # QG plans have no legacy fallback and will raise AddressingError below.
-
-    # -------------------------------------------------------------------
-    # Phase 2: Backward-compatible fallback for tasks-{N}-{slug} naming
-    # (Temporary — removed after all plan files are renamed to P{NNN}-{slug})
-    # -------------------------------------------------------------------
-    legacy_candidates = [p for p in all_entries if p.name.startswith("tasks-")]
-
-    if ref.isdigit():
-        legacy_numeric = [p for p in legacy_candidates if (m := _TASKS_NUMERIC_RE.match(p.name)) and m.group(1) == ref]
-        if legacy_numeric:
-            return legacy_numeric[0]
-    else:
-        legacy_slug = [p for p in legacy_candidates if ref in p.name]
-        if legacy_slug:
-            return legacy_slug[0]
+        # No prefix-pattern slug match — fall through to AddressingError below.
 
     raise AddressingError(address, plan_dir)
 

@@ -86,16 +86,7 @@ _SKIP_NAME_PREFIXES = (
     "dh-doc-audit-",
     "T1-",
 )
-_SKIP_SUBDIRS = {
-    "research",
-    "tasks-1-plugin-linter",
-    "tasks-11-merge-same-file-tasks",
-    "tasks-15-fix-multi-yaml-fence",
-    "tasks-15-process-quality-discipline",
-    "tasks-16-audit-tests-limitation-patterns",
-    "tasks-4-validate-orchestrator-discipline",
-    "tasks-6-plan-artifact-lifecycle",
-}
+_SKIP_SUBDIRS = {"research"}
 
 # Agent names by artifact type
 _AGENT_BY_TYPE: dict[ArtifactType, str] = {
