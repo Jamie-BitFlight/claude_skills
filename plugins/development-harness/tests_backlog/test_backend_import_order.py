@@ -23,12 +23,12 @@ def test_backend_factory_import_order(imports: str) -> None:
     """Both import orders construct every backend and satisfy the contract."""
     script = f"""
 {imports}
-from backlog_core.backend_protocol import BacklogBackend, create_backend
+from backlog_core.backend_protocol import WorkItemBackend, create_backend
 
 for name, expected in {dict(zip(_BACKEND_NAMES, ("GitHubBackend", "InMemoryBackend", "SQLiteBackend", "BeadsBackend"), strict=False)).__repr__()}.items():
     backend = create_backend(name)
     assert type(backend).__name__ == expected
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 """
     env = os.environ | {"PYTHONPATH": str(_PLUGIN_DIR)}
     result = subprocess.run([sys.executable, "-c", script], capture_output=True, check=False, env=env, text=True)

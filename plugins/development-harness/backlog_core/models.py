@@ -734,6 +734,7 @@ class BacklogItemMetadata(BaseModel):
     layer: str = ""  # SDLC Layer 0 (framework), 1 (language), 2 (stack)
     language: str = ""  # Language plugin identifier (e.g., "python", "typescript")
     stack: str = ""  # Stack profile identifier (e.g., "fastapi", "nextjs")
+    followup_to: str = ""  # Logical ID of the originating plan/task (e.g. "P1", "P1/T3")
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
 

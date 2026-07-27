@@ -2666,6 +2666,78 @@ async def backlog_sync(
 
 @mcp.tool(
     annotations=ToolAnnotations(
+        title="Link Follow-up Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
+async def backlog_link_followup(
+    selector: Annotated[
+        str, Field(description="Item selector: title substring, #N, bare number, URL, or beads nanoid")
+    ],
+    followup_to: Annotated[
+        str,
+        Field(
+            description=(
+                "Logical ID of the originating plan or task (e.g. 'P1', 'P1/T3'). "
+                "Use P{N}/T{N} addresses or slugs — not GitHub issue numbers. "
+                "Empty string clears the link."
+            )
+        ),
+    ],
+) -> dict:
+    """Link a follow-up backlog item to its originating plan or task.
+
+    Records the origin's logical ID on the item's ``followup_to`` metadata
+    field so the relationship is queryable via ``backlog_list_followups``.
+
+    Returns:
+        Dict with title, followup_to, and output messages/warnings.
+        On error, dict contains an error key.
+    """
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.link_followup, selector=selector, followup_to=followup_to, output=out
+        )
+        return {**result, **out.to_dict()}
+    except BacklogError as e:
+        return {"error": str(e), **out.to_dict()}
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Follow-up Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
+async def backlog_list_followups(
+    followup_to: Annotated[
+        str,
+        Field(
+            description=(
+                "Logical ID of the originating plan or task (e.g. 'P1', 'P1/T3'). "
+                "Returns all backlog items whose followup_to matches this value."
+            )
+        ),
+    ],
+) -> dict:
+    """List backlog items linked as follow-ups to the given origin.
+
+    Returns all items whose ``metadata.followup_to`` exactly matches the
+    given logical ID.
+
+    Returns:
+        Dict with items list (each with title, section, issue, followup_to),
+        count, and output messages/warnings.
+    """
+    out = Output()
+    try:
+        result = await asyncio.to_thread(operations.list_followups, followup_to=followup_to, output=out)
+        return {**result, **out.to_dict()}
+    except BacklogError as e:
+        return {"error": str(e), **out.to_dict()}
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
         title="Close Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )

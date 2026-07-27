@@ -902,15 +902,18 @@ class TestBeadsBackendConformance:
         fixtures = Path(__file__).resolve().parent / "fixtures" / "beads"
         return json.loads((fixtures / "bd_list_epic_children.json").read_text())
 
-    def test_isinstance_satisfies_backlog_backend_protocol(self, beads_backend) -> None:
-        """BeadsBackend satisfies the runtime-checkable BacklogBackend Protocol.
+    def test_isinstance_satisfies_work_item_backend_protocol(self, beads_backend) -> None:
+        """BeadsBackend satisfies the runtime-checkable WorkItemBackend Protocol.
 
         Why: isinstance is the conformance gate in operations.py — failing this
-             means BeadsBackend is silently rejected by the factory.
+             means BeadsBackend is silently rejected by the factory.  BeadsBackend
+             implements WorkItemBackend only (not the full BacklogBackend union);
+             GitHub-specific methods live on GitHubExtras and are gated
+             separately via ``isinstance(backend, GitHubExtras)``.
         """
-        from backlog_core.backend_types import BacklogBackend as _BacklogBackend
+        from backlog_core.backend_types import WorkItemBackend as _WorkItemBackend
 
-        assert isinstance(beads_backend, _BacklogBackend)
+        assert isinstance(beads_backend, _WorkItemBackend)
 
     def test_probe_backend_status_reachable(self, beads_backend, bd_runner) -> None:
         """probe_backend_status returns REACHABLE when BdRunner.is_available() is True.

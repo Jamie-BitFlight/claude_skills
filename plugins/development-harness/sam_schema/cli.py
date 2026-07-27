@@ -1518,6 +1518,42 @@ def backlog_list(
     _print_output_messages(out)
 
 
+@app.command(name="backlog-link-followup")
+def backlog_link_followup(
+    selector: Annotated[
+        str, typer.Argument(help="Item selector: title substring, #N, bare number, URL, or beads nanoid")
+    ],
+    followup_to: Annotated[
+        str,
+        typer.Option(
+            "--to", help="Logical ID of the originating plan/task (e.g. P1, P1/T3). Empty string clears the link."
+        ),
+    ],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """Link a follow-up backlog item to its originating plan or task."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.link_followup(selector=selector, followup_to=followup_to, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
+@app.command(name="backlog-list-followups")
+def backlog_list_followups(
+    followup_to: Annotated[str, typer.Argument(help="Logical ID of the originating plan/task (e.g. P1, P1/T3)")],
+    output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
+) -> None:
+    """List backlog items linked as follow-ups to the given origin."""
+    if output_format != "json":
+        _err(f"Invalid format '{output_format}'. Must be one of: json")
+    out = Output()
+    result = operations.list_followups(followup_to=followup_to, output=out)
+    _output_json(result)
+    _print_output_messages(out)
+
+
 @app.command(name="backlog-view")
 def backlog_view(
     selector: Annotated[str, typer.Argument(help="Item selector: #N, bare number, title, or URL")],

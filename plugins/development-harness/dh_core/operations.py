@@ -31,9 +31,10 @@ import re
 import sqlite3
 import sys
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import dh_paths
 import dispatch_schema as _ds
@@ -42,6 +43,7 @@ from backlog_core.artifact_provider import ArtifactBackend, create_artifact_prov
 from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import get_config
+from backlog_core.backend_types import GitHubExtras
 from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import (
     ArtifactContent,
@@ -139,7 +141,9 @@ __all__ = [
     "get_task_issues",
     "groom_item",
     "issue_to_local_fields",
+    "link_followup",
     "list_comments",
+    "list_followups",
     "list_issues",
     "list_items",
     "list_labels",
@@ -334,7 +338,12 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
 
 
 def list_plans(
-    backend: TaskBackend, *, search: str | None = None, offset: int = 0, limit: int | None = None
+    backend: TaskBackend,
+    *,
+    search: str | None = None,
+    offset: int = 0,
+    limit: int | None = None,
+    filter_by_key: dict[str, str] | None = None,
 ) -> list[PlanSummary]:
     """List all plans with optional search filtering and pagination.
 
@@ -353,6 +362,15 @@ def list_plans(
             to the backend's ``list_plans`` method.
         offset: Zero-based index of the first item to return.
         limit: Maximum number of items to return. ``None`` means no limit.
+        filter_by_key: Generic Jira-style key filter. Each ``key=value``
+            pair matches items where the item's value for ``key`` equals
+            ``value`` (string comparison). All pairs compose with AND
+            logic. A key the item does not carry returns no match (a
+            no-op, not an error). Applied after backend listing and
+            summary enrichment, so any key in the returned summary dicts
+            (e.g. ``feature``, ``goal``, ``issue``, ``plan_id``) is
+            addressable. Existing ``search`` and offset/limit filters are
+            unaffected.
 
     Returns:
         List of :class:`~sam_schema.core.task_backend_types.PlanSummary`
@@ -374,10 +392,36 @@ def list_plans(
         for s in summaries
     ]
 
+    if filter_by_key:
+        all_items = _apply_key_filter(all_items, filter_by_key)
+
     total = len(all_items)
     page = all_items[offset:] if limit is None else all_items[offset : offset + limit]
     _log.debug("list_plans: %d of %d plans returned", len(page), total)
     return page
+
+
+_T = TypeVar("_T", bound=Mapping[str, Any])
+
+
+def _apply_key_filter(items: list[_T], filter_by_key: dict[str, str]) -> list[_T]:
+    """Filter ``items`` by generic key=value pairs (AND logic).
+
+    An item matches when every ``key`` in ``filter_by_key`` is present on
+    the item AND the item's value for that key equals the requested value
+    (string comparison). Items missing any requested key are excluded —
+    a no-op for absent keys, not an error.
+
+    Args:
+        items: List of Mapping items to filter.
+        filter_by_key: Mapping of key names to required string values.
+
+    Returns:
+        Filtered list of items matching all key=value pairs.
+    """
+    if not filter_by_key:
+        return items
+    return [it for it in items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
 
 
 def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
@@ -1107,7 +1151,9 @@ from backlog_core.operations import (
     get_task_issues,
     groom_item,
     issue_to_local_fields,
+    link_followup,
     list_comments,
+    list_followups,
     list_issues,
     list_items,
     list_labels,
@@ -1204,13 +1250,16 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
     except (FileNotFoundError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
 
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        return {"error": "dispatch_stale_check requires a GitHub-backed backend", "milestone_number": milestone_number}
     try:
-        gh_repo = get_config().backend.get_github(repo)
+        gh_repo = backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        open_issues = get_config().backend.sync_issues_graphql(
+        open_issues = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
-        closed_issues = get_config().backend.sync_issues_graphql(
+        closed_issues = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
         )
         current_numbers = [issue["number"] for issue in open_issues + closed_issues]
@@ -1309,10 +1358,13 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
         Dict with ``conflict_groups``, ``count``, ``milestone_number``,
         or ``error`` on failure.
     """
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        return {"error": "dispatch_conflicts requires a GitHub-backed backend", "milestone_number": milestone_number}
     try:
-        gh_repo = get_config().backend.get_github(repo)
+        gh_repo = backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        issue_nodes = get_config().backend.sync_issues_graphql(
+        issue_nodes = backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
     except GitHubUnavailableError as exc:
