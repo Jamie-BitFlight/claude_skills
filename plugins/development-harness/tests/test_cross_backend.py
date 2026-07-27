@@ -691,7 +691,7 @@ class TestBeadsBackendConformance:
 
         Why: isinstance is the conformance gate in operations.py — failing this
              means BeadsBackend is silently rejected by the factory.  BeadsBackend
-             implements WorkItemBackend only (not the full BacklogBackend union);
+             implements WorkItemBackend only (not GitHubExtras or BranchBackend);
              GitHub-specific methods live on GitHubExtras and are gated
              separately via ``isinstance(backend, GitHubExtras)``.
         """

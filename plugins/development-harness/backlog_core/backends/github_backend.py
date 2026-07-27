@@ -1,6 +1,7 @@
-"""GitHubBackend — concrete BacklogBackend delegating to gh_client, github_sync, github_branches.
+"""GitHubBackend — concrete backend delegating to gh_client, github_sync, github_branches.
 
-This module provides a thin wrapper class that implements BacklogBackend by
+This module provides a thin wrapper class that implements the backlog
+backend Protocols (WorkItemBackend, GitHubExtras, BranchBackend) by
 delegating every method to the corresponding module-level function in
 gh_client, github_sync, or github_branches.  No business logic lives here.
 """
@@ -10,7 +11,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
-from backlog_core.backend_types import BacklogBackend
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -36,8 +36,8 @@ if TYPE_CHECKING:
 __all__ = ["GitHubBackend"]
 
 
-class GitHubBackend(BacklogBackend):
-    """BacklogBackend implementation delegating to gh_client, github_sync, and github_branches.
+class GitHubBackend:
+    """Backend implementation delegating to gh_client, github_sync, and github_branches.
 
     Each method is a 1-3 line delegation.  The constructor accepts an optional
     default repo string that is used when callers pass an empty ``repo`` argument.

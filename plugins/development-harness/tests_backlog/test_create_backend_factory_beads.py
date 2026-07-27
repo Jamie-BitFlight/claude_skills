@@ -52,16 +52,16 @@ def test_create_backend_beads_explicit_returns_beads_backend() -> None:
 
 @pytest.mark.unit
 def test_create_backend_beads_instance_satisfies_protocol() -> None:
-    """create_backend('beads') result satisfies the BacklogBackend Protocol.
+    """create_backend('beads') result satisfies the WorkItemBackend Protocol.
 
     Why: Protocol conformance is checked at runtime by operations.py; a backend
          that doesn't satisfy the Protocol would silently drop operations.
     """
-    from backlog_core.backend_types import BacklogBackend
+    from backlog_core.backend_types import WorkItemBackend
 
     backend = create_backend("beads")
 
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 
 
 # ---------------------------------------------------------------------------

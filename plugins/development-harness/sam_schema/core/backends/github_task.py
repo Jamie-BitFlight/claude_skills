@@ -25,7 +25,7 @@ from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, Pla
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from backlog_core.backend_types import BacklogBackend, IssueNode, LabelNode
+    from backlog_core.backend_types import GitHubExtras, IssueNode, LabelNode
     from github.Repository import Repository
 
 __all__ = ["DocumentBackend", "GitHubTaskProvider"]
@@ -217,11 +217,11 @@ class GitHubTaskProvider:
     - The ``plan_id`` returned by this backend is the GitHub issue number (str).
 
     Args:
-        issue_backend: BacklogBackend providing GitHub Issue operations.
+        issue_backend: ``GitHubExtras`` providing GitHub Issue operations.
         doc_backend: DocumentBackend for document storage (stub pending #984).
     """
 
-    def __init__(self, issue_backend: BacklogBackend, doc_backend: DocumentBackend) -> None:
+    def __init__(self, issue_backend: GitHubExtras, doc_backend: DocumentBackend) -> None:
         """Store the IssueBackend and DocumentBackend dependency instances."""
         self._issue_backend = issue_backend
         self._doc_backend = doc_backend

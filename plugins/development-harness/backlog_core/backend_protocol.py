@@ -1,4 +1,4 @@
-"""BacklogBackend Protocol — implementation-agnostic abstraction for backlog storage.
+"""Backend Protocol — implementation-agnostic abstraction for backlog storage.
 
 This module owns backend selection and re-exports the contracts from
 ``backend_types``. Operations and server modules depend on this interface;
@@ -29,7 +29,6 @@ from backlog_core.backends.sqlite_backend import SQLiteBackend
 
 from .backend_types import (
     AssigneeNode,
-    BacklogBackend,
     BacklogConfig,
     BranchBackend,
     GitHubExtras,
@@ -52,7 +51,6 @@ __all__ = [
     "BEADS_DIR",
     "BEADS_OPT_IN_MARKER",
     "AssigneeNode",
-    "BacklogBackend",
     "BacklogConfig",
     "BranchBackend",
     "GitHubExtras",
@@ -166,7 +164,7 @@ def _auto_detect_beads() -> str | None:
 
 
 def create_backend(name: str | None = None) -> WorkItemBackend:
-    """Instantiate and return a BacklogBackend by name.
+    """Instantiate and return a backend by name.
 
     When *name* is ``None``, resolution is delegated in full to
     :meth:`dh_config.DHConfig.get_backend`, which implements the complete
@@ -179,7 +177,7 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
             automatic resolution.
 
     Returns:
-        Configured BacklogBackend instance.
+        Configured ``WorkItemBackend`` instance.
 
     Raises:
         ValueError: When *name* (or the resolved name) is not a recognised
