@@ -77,12 +77,10 @@ work-in-progress artifact — NOT a malformed or incomplete final plan.
 
 ### Decision Table: Drafting vs Ready Validation Modes
 
-| Condition | Plan state | Drafting marker in response | Validation mode | Full dispatchability checks |
-|---|---|---|---|---|
-| Plan under construction | `drafting` | Present | Structural only | Deferred |
-| Plan ready for dispatch | `ready` (or absent) | Absent | Full | Applied |
-| Malformed: finalized but marker still present | `ready` (or absent) | Present | Flag as malformed | N/A — flag error |
-| Malformed: drafting but no marker | `drafting` | Absent | Structural only | Deferred |
+| Condition | Plan state | Validation mode | Full dispatchability checks |
+|---|---|---|---|
+| Plan under construction | `drafting` | Structural only | Deferred |
+| Plan ready for dispatch | `ready` | Full | Applied |
 
 ### Flowchart: Validation Mode Selection
 
@@ -147,16 +145,16 @@ BLOCKERS:
 
 ### Malformed Plan Detection
 
-A plan is malformed when `plan.state` is `ready` (or absent) but the plan data still contains
-a drafting indicator inconsistent with that state. This indicates `finalize` was never called
-or the state field was corrupted. Report as:
+A plan is malformed when `plan.state` is missing or has an unexpected value.
+The `state` field is authoritative: `drafting` means the plan is under
+construction, and `ready` means it is available for dispatch. Report as:
 
 ```text
 STATUS: BLOCKED
-SUMMARY: Plan state is inconsistent — non-drafting plan contains drafting state indicators.
+SUMMARY: Plan state is inconsistent or missing.
 BLOCKERS:
-  1. [STRUCTURE] Plan: state field is absent or 'ready' but drafting indicators remain in data.
-     Fix: Call sam_plan(action='finalize') to clear the drafting state, then re-validate.
+  1. [STRUCTURE] Plan: `state` field is absent or invalid.
+     Fix: Call sam_plan(action='finalize') to set state="ready", then re-validate.
 ```
 
 SOURCE: Architectural Decision 2 — Drafting State (plan-context artifact #1770, 2026-04-13)

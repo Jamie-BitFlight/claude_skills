@@ -320,11 +320,12 @@ class FinalizePlanConfig(_ActionConfigBase):
     """Transition a plan out of ``drafting`` state into executable state.
 
     Plans created with an empty ``tasks`` list (the incremental build pattern)
-    start in ``drafting``. ``sam_plan(action='read')`` returns the tasks and a
-    ``drafting`` marker; ``status`` and ``ready`` return a ``drafting`` marker
-    instead of dispatchable task data. ``finalize`` clears ``drafting`` after
-    plan review completes (no-more-changes), making the plan available for
-    execution by ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
+    start in ``drafting``. While ``drafting``, ``sam_plan(action='read')``,
+    ``status``, and ``ready`` return their normal result models with
+    ``state="drafting"`` instead of dispatchable task data. ``finalize`` clears
+    ``drafting`` after plan review completes (no-more-changes), making the plan
+    available for execution by ``sam_plan(action='ready')`` and
+    ``/dh:implement-feature``.
 
     The backend resolves the issue association internally from the plan index —
     no caller-provided issue number is needed at finalize time. Establish the
