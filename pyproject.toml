@@ -416,6 +416,12 @@ docstring-quotes = "double"
 combine-as-imports = true
 force-single-line = false
 force-wrap-aliases = false
+known-local-folder = [
+    "models",
+    "registry_loader",
+    "state_manager",
+    "validators",
+]
 required-imports = ["from __future__ import annotations"]
 split-on-trailing-comma = false
 
