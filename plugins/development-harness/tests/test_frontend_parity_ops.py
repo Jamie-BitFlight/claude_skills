@@ -33,6 +33,8 @@ from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogConfig as _ModelsBacklogConfig
 from backlog_core.server import mcp as _backlog_mcp
+from sam_schema.core.backends.local_context_backend import LocalContextBackend
+from sam_schema.core.context_config import ContextConfig, get_context_config, reset_context_config, set_context_config
 from sam_schema.server import mcp as _sam_mcp
 
 from tests.helpers import call_mcp_tool
@@ -72,11 +74,10 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
 def dh_env(tmp_path: Path):
     """Provide an isolated DH_STATE_HOME with memory backends for both transports.
 
-    The CLI subprocess reads BACKLOG_BACKEND/TASKBACKEND env vars.  The
-    in-process MCP calls read the backlog_core singleton, so we patch it to
-    an InMemoryBackend explicitly.  Both transports share the same backlog
-    directory (derived from the real git root) so file-based operations
-    (add_item, list_items) see the same state.
+    The CLI subprocess reads BACKLOG_BACKEND/TASKBACKEND/CONTEXTBACKEND env vars.
+    The in-process MCP calls read the respective singletons, so we patch them to
+    appropriate backends explicitly.  Both transports share the same state
+    directory so file-based operations see the same state.
     """
     import dh_paths
 
@@ -93,16 +94,38 @@ def dh_env(tmp_path: Path):
         repo_root=real_root, backlog_dir=bd, default_repo=existing.default_repo if existing is not None else ""
     )
 
+    dh_state = str(tmp_path / "dh_state")
     env = os.environ.copy()
     env.update({
-        "DH_STATE_HOME": str(tmp_path / "dh_state"),
+        "DH_STATE_HOME": dh_state,
         "BACKLOG_BACKEND": "memory",
         "TASKBACKEND": "memory",
+        "CONTEXTBACKEND": "local",
         "GITHUB_TOKEN": "",
         "GH_TOKEN": "",
     })
+
+    # In-process: point dh_paths and context config at the test state home so
+    # MCP calls share the same file-based context store as the CLI subprocess.
+    saved_dh_home = os.environ.get("DH_STATE_HOME")
+    os.environ["DH_STATE_HOME"] = dh_state
+    saved_ctx_config = None
+    try:
+        saved_ctx_config = get_context_config()
+    except RuntimeError:
+        pass
+    set_context_config(ContextConfig(backend=LocalContextBackend()))
+
     yield env
-    # Teardown: reset the singleton so downstream tests get a fresh config
+
+    # Teardown: reset singletons so downstream tests get fresh config
+    reset_context_config()
+    if saved_ctx_config is not None:
+        set_context_config(saved_ctx_config)
+    if saved_dh_home is not None:
+        os.environ["DH_STATE_HOME"] = saved_dh_home
+    else:
+        os.environ.pop("DH_STATE_HOME", None)
     _reset_bp_config()
     _bc_models._config = saved_bc_config
 
@@ -534,3 +557,115 @@ async def test_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
     )
     assert cli_read["task"]["priority"] == 5
     assert mcp_read["task"]["priority"] == 5
+
+
+# ---------------------------------------------------------------------------
+# Active-task parity
+# ---------------------------------------------------------------------------
+
+
+async def test_active_task_get_parity(dh_env: dict[str, str]) -> None:
+    """CLI ``active-task get`` and MCP ``sam_active_task(action='get')`` return the same result."""
+    # Both report None when nothing is set
+    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
+    assert cli_get["active_task"] is None
+    assert mcp_get["active_task"] is None
+
+    # Set via CLI and both read it back
+    _run_cli(["active-task", "set", "P1/T3", "--format", "json"], env=dh_env)
+    cli_get2 = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    mcp_get2 = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
+    assert cli_get2["active_task"]["plan"] == mcp_get2["active_task"]["plan"]
+    assert cli_get2["active_task"]["task"] == mcp_get2["active_task"]["task"]
+
+
+async def test_active_task_set_parity(dh_env: dict[str, str]) -> None:
+    """CLI set → MCP get and MCP set → CLI get produce identical active task context."""
+    # CLI sets, MCP reads
+    cli_set = _run_cli(["active-task", "set", "P5/T7", "--format", "json"], env=dh_env)
+    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
+    assert mcp_get["active_task"]["plan"] == cli_set["active_task"]["plan"]
+    assert mcp_get["active_task"]["task"] == cli_set["active_task"]["task"]
+
+    # MCP sets, CLI reads
+    mcp_set = await call_mcp_tool(
+        _sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": "P9", "task": "T2"}}
+    )
+    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    assert cli_get["active_task"]["plan"] == mcp_set["active_task"]["plan"]
+    assert cli_get["active_task"]["task"] == mcp_set["active_task"]["task"]
+
+
+async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """CLI active-task update and MCP sam_active_task update produce equivalent results."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "at-update", "--goal", "AT update goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    # Set active task via MCP (preserves 'T01' prefix that plan file uses)
+    await call_mcp_tool(
+        _sam_mcp, "sam_active_task",
+        {"config": {"action": "set", "plan": plan_id, "task": "T01", "plan_dir": plan_dir}},
+    )
+
+    # CLI update
+    cli_update = _run_cli(
+        ["active-task", "update", "--set-fields-json", json.dumps({"priority": 8}), "--format", "json"], env=dh_env
+    )
+    assert cli_update["updated"] is True
+
+    # MCP read verifies the update
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert mcp_read["task"]["priority"] == 8
+
+    # Reset priority for reverse direction
+    _run_cli(
+        ["update", f"{plan_id}/T01", "--plan-dir", plan_dir, "--set", "priority=1", "--format", "json"], env=dh_env
+    )
+
+    # MCP update
+    mcp_update = await call_mcp_tool(
+        _sam_mcp, "sam_active_task",
+        {"config": {"action": "update", "set_fields_json": {"priority": 9}}},
+    )
+    assert mcp_update["updated"] is True
+
+    # CLI read verifies
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert cli_read["task"]["priority"] == 9
+
+
+async def test_active_task_clear_parity(dh_env: dict[str, str]) -> None:
+    """CLI clear → MCP get returns null, and MCP clear → CLI get returns null."""
+    # Set via CLI
+    _run_cli(["active-task", "set", "P3/T5", "--format", "json"], env=dh_env)
+
+    # CLI clear
+    cli_clear = _run_cli(["active-task", "clear", "--format", "json"], env=dh_env)
+    assert cli_clear["cleared"] is True
+
+    # MCP get returns null
+    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
+    assert mcp_get["active_task"] is None
+
+    # MCP set, MCP clear, CLI get returns null
+    await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": "P8", "task": "T4"}})
+    mcp_clear = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "clear"}})
+    assert mcp_clear["cleared"] is True
+
+    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    assert cli_get["active_task"] is None
