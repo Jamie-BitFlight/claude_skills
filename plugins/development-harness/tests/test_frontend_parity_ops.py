@@ -225,3 +225,150 @@ async def test_plan_list_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
     mcp_ids = {item.get("plan_id", item.get("plan_ref")) for item in mcp_list.get("items", [])}
     assert cli_ids == mcp_ids
     assert len(cli_ids) == 2
+
+
+# ---------------------------------------------------------------------------
+# Task CRUD parity
+# ---------------------------------------------------------------------------
+
+_TASK_DEF = {
+    "id": "T01",
+    "title": "Parity Task",
+    "status": "not-started",
+    "agent": "test-agent",
+    "dependencies": [],
+    "priority": 1,
+    "complexity": "low",
+}
+
+
+async def test_task_read_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Task read through CLI and MCP returns the same task data."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "read-task", "--goal", "Read goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert cli_read["task"]["id"] == mcp_read["task"]["id"] == "T01"
+    assert cli_read["task"]["title"] == mcp_read["task"]["title"] == "Parity Task"
+    assert cli_read["task"]["status"] == mcp_read["task"]["status"]
+
+
+async def test_task_claim_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Claim via CLI and MCP both produce claimed=true with a started timestamp."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "claim-task", "--goal", "Claim goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    cli_claim = _run_cli(["claim", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert cli_claim["claimed"] is True
+    assert cli_claim["task_id"] == "T01"
+    assert cli_claim.get("started") is not None
+
+    # Reset task to not-started for MCP claim (same backend, need fresh task).
+    TASK_DEF2 = dict(_TASK_DEF, id="T02")
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(TASK_DEF2), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    mcp_claim = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "claim"}, "plan_dir": plan_dir}
+    )
+    assert mcp_claim["claimed"] is True
+    assert mcp_claim["task_id"] == "T02"
+    assert mcp_claim.get("started") is not None
+
+
+async def test_task_state_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Task status changed via CLI and MCP is visible through both reads."""
+    import json
+    import subprocess
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "state-task", "--goal", "State goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    # CLI state command (no --format json — just prints status line).
+    result = subprocess.run(
+        ["uv", "run", "sam", "state", f"{plan_id}/T01", "complete", "--plan-dir", plan_dir],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=str(_plugin_root),
+        env=dh_env,
+        check=False,
+    )
+    assert result.returncode == 0, f"CLI state failed: {result.stderr[:500]}"
+
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert cli_read["task"]["status"] == "complete"
+    assert mcp_read["task"]["status"] == "complete"
+
+
+async def test_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Task field updated via CLI --set is visible through both read transports."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "update-task", "--goal", "Update goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    # CLI update --set
+    _run_cli(
+        ["update", f"{plan_id}/T01", "--plan-dir", plan_dir, "--set", "priority=5", "--format", "json"], env=dh_env
+    )
+
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert cli_read["task"]["priority"] == 5
+    assert mcp_read["task"]["priority"] == 5
