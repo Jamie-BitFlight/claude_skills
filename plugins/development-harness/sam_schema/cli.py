@@ -60,7 +60,13 @@ from sam_schema.core.task_config import get_backend
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
-_PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (FileNotFoundError, FormatDetectionError, ValueError, TypeError)
+_PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (
+    FileNotFoundError,
+    FormatDetectionError,
+    ValueError,
+    TypeError,
+    PlanNotFoundError,
+)
 
 _SYNC_ERRORS: tuple[type[Exception], ...]
 try:
