@@ -34,7 +34,7 @@ import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import dh_paths
 import dispatch_schema as _ds
@@ -61,6 +61,7 @@ from backlog_core.models import (
 )
 from dispatch_schema import Wave
 from github import GithubException
+from pydantic import BaseModel
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import (
     ArtifactWriteError,
@@ -70,6 +71,10 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
 )
 from sam_schema.core.models import (
+    ActiveTaskClearResult,
+    ActiveTaskGetResult,
+    ActiveTaskSetResult,
+    ActiveTaskUpdateResult,
     AppendTaskResult,
     ClaimResult,
     CreatePlanError,
@@ -78,19 +83,21 @@ from sam_schema.core.models import (
     Plan,
     PlanState,
     PlanStatus,
+    PlanSummaryModel,
     ReadResult,
     ReadyTasksResult,
     SchemaGap,
+    StateResult,
     Task,
     TaskAssignment,
     TaskStatus,
     UpdatePlanResult,
+    UpdateTaskResult,
 )
 
 if TYPE_CHECKING:
     from backlog_core.operations import ImpactRadiusItem
     from sam_schema.core.context_backend import ContextBackend
-    from sam_schema.core.task_backend_types import PlanSummary
 
     from dh_core.protocols import TaskBackend
 
@@ -344,7 +351,7 @@ def list_plans(
     offset: int = 0,
     limit: int | None = None,
     filter_by_key: dict[str, str] | None = None,
-) -> list[PlanSummary]:
+) -> list[PlanSummaryModel]:
     """List all plans with optional search filtering and pagination.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -367,28 +374,28 @@ def list_plans(
             ``value`` (string comparison). All pairs compose with AND
             logic. A key the item does not carry returns no match (a
             no-op, not an error). Applied after backend listing and
-            summary enrichment, so any key in the returned summary dicts
+            summary enrichment, so any key in the returned summary models
             (e.g. ``feature``, ``goal``, ``issue``, ``plan_id``) is
             addressable. Existing ``search`` and offset/limit filters are
             unaffected.
 
     Returns:
-        List of :class:`~sam_schema.core.task_backend_types.PlanSummary`
-        dicts, each containing ``feature``, ``goal``, ``description``,
+        List of :class:`~sam_schema.core.models.PlanSummaryModel`
+        instances, each containing ``feature``, ``goal``, ``description``,
         ``task_count``, ``issue``, and ``plan_ref``.
     """
     summaries = backend.list_plans(search=search)
-    all_items: list[PlanSummary] = [
-        {
-            "plan_id": s["plan_id"],
-            "feature": s["feature"],
-            "goal": s["goal"],
-            "description": s["description"],
-            "task_count": s["task_count"],
-            "source_path": s.get("source_path"),
-            "issue": s.get("issue"),
-            "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
-        }
+    all_items: list[PlanSummaryModel] = [
+        PlanSummaryModel(
+            plan_id=s["plan_id"],
+            feature=s["feature"],
+            goal=s["goal"],
+            description=s["description"],
+            task_count=s["task_count"],
+            source_path=s.get("source_path"),
+            issue=s.get("issue"),
+            plan_ref=(f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
+        )
         for s in summaries
     ]
 
@@ -401,7 +408,7 @@ def list_plans(
     return page
 
 
-_T = TypeVar("_T", bound=Mapping[str, Any])
+_T = TypeVar("_T")
 
 
 def _apply_key_filter(items: list[_T], filter_by_key: dict[str, str]) -> list[_T]:
@@ -413,7 +420,7 @@ def _apply_key_filter(items: list[_T], filter_by_key: dict[str, str]) -> list[_T
     a no-op for absent keys, not an error.
 
     Args:
-        items: List of Mapping items to filter.
+        items: List of mapping or Pydantic-model items to filter.
         filter_by_key: Mapping of key names to required string values.
 
     Returns:
@@ -421,7 +428,21 @@ def _apply_key_filter(items: list[_T], filter_by_key: dict[str, str]) -> list[_T
     """
     if not filter_by_key:
         return items
-    return [it for it in items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
+    return [it for it in items if all(str(_item_value(it, k)) == v for k, v in filter_by_key.items())]
+
+
+def _item_value(item: object, key: str) -> object:
+    """Return the value for *key* from a mapping or Pydantic model.
+
+    Supports both ``dict.get`` and model-attribute access so callers can
+    filter mixed or uniformly-typed item lists without branching.
+    """
+    if isinstance(item, BaseModel):
+        return getattr(item, key, None)
+    if isinstance(item, Mapping):
+        mapping = cast("Mapping[str, object]", item)
+        return mapping.get(key)
+    return getattr(item, key, None)
 
 
 def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
@@ -432,8 +453,8 @@ def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
     and pass it here. The operation handles all business logic: status
     retrieval, drafting-state check, and autonomy field enrichment.
 
-    When the plan is in the ``DRAFTING`` state, a ``ValueError`` is raised
-    to prevent dispatching a partial plan.
+    When the plan is in the ``DRAFTING`` state, the returned model carries
+    ``state=PlanState.DRAFTING`` instead of raising an exception.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -443,19 +464,16 @@ def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
 
     Returns:
         A :class:`~sam_schema.core.models.PlanStatus` model with task
-        counts, ready/blocked task lists, completion percentage, and
-        cycle detection result. The ``autonomy`` field is sourced from
-        ``backend.read_plan`` (defaulting to ``"full_auto"`` when absent).
+        counts, ready/blocked task lists, completion percentage, cycle
+        detection result, and plan ``state``. The ``autonomy`` field is
+        sourced from ``backend.read_plan`` (defaulting to ``"full_auto"``
+        when absent).
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
-        ValueError: When the plan is in the ``DRAFTING`` state.
     """
     result = read_plan(backend, plan)
     plan_model = result.plan
-    if plan_model.state == PlanState.DRAFTING:
-        msg = f"Plan '{plan}' is in drafting state — not ready for dispatch."
-        raise ValueError(msg)
     graph = DependencyGraph(plan_model.tasks)
     by_status: dict[str, int] = {}
     for task in plan_model.tasks:
@@ -471,7 +489,9 @@ def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
         blocked_tasks=[{t.id: missing} for t, missing in graph.get_blocked_tasks()],
         completion_pct=completion_pct,
         has_cycles=graph.has_cycles(),
+        issue=plan_model.issue,
         autonomy=plan_model.autonomy,
+        state=plan_model.state,
     )
 
 
@@ -484,8 +504,8 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> R
     check, ready-task retrieval, and ``feature``/``issue`` enrichment
     from the plan record.
 
-    When the plan is in the ``DRAFTING`` state, a ``ValueError`` is raised
-    to prevent dispatching a partial plan.
+    When the plan is in the ``DRAFTING`` state, the returned model carries
+    ``state=PlanState.DRAFTING`` and an empty ``ready_tasks`` list.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -500,24 +520,19 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> R
     Returns:
         A :class:`~sam_schema.core.models.ReadyTasksResult` model with
         ``feature``, ``ready_tasks`` (list of Task models), ``count``,
-        and ``issue`` fields.
+        ``issue``, and ``state`` fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
-        ValueError: When the plan is in the ``DRAFTING`` state.
     """
-    status: dict[str, Any] = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        msg = f"Plan '{plan}' is in drafting state — not ready for dispatch."
-        raise ValueError(msg)
-    tasks_data = backend.get_ready_tasks(plan)
+    status = get_plan_status(backend, plan)
+    if status.state == PlanState.DRAFTING:
+        tasks_data: list[dict[str, Any]] = []
+    else:
+        tasks_data = backend.get_ready_tasks(plan)
     tasks = [Task.model_validate(t) for t in tasks_data]
-    feature_val = status.get("feature")
     return ReadyTasksResult(
-        feature=str(feature_val) if feature_val else plan,
-        ready_tasks=tasks,
-        count=len(tasks),
-        issue=str(status["issue"]) if status.get("issue") is not None else None,
+        feature=status.feature, ready_tasks=tasks, count=len(tasks), issue=status.issue, state=status.state
     )
 
 
@@ -827,19 +842,19 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> ClaimResult:
     return ClaimResult(claimed=True, task_id=task_model.id, started=started_str, warnings=warnings or None)
 
 
-def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) -> dict[str, Any]:
+def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) -> StateResult:
     """Update the status of a task, cascading SKIPPED to downstream tasks on failure.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation delegates to
-    ``backend.update_task_status`` and assembles the response dict.
+    ``backend.update_task_status`` and returns a typed result model.
 
     When *status* is ``FAILED``, a :class:`DependencyGraph` is built from
     the plan's tasks and all downstream tasks are marked ``SKIPPED`` via
     ``backend.update_task_status`` and ``backend.update_task_fields`` (to
     record a reason). The list of skipped task IDs is returned in the
-    ``skipped_downstream`` key.
+    ``skipped_downstream`` field.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -851,9 +866,8 @@ def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) 
             :attr:`TaskStatus.FAILED`, downstream tasks are skipped.
 
     Returns:
-        Dict with ``id`` (the task ID) and ``status`` keys. When
-        *status* is ``FAILED``, also includes ``skipped_downstream`` (a
-        list of task IDs that were marked ``SKIPPED``).
+        :class:`~sam_schema.core.models.StateResult` with ``id``,
+        ``status``, and optional ``skipped_downstream`` fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -868,8 +882,8 @@ def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) 
         for skipped_task_id in skipped:
             backend.update_task_status(plan, skipped_task_id, TaskStatus.SKIPPED)
             backend.update_task_fields(plan, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
-        return {"id": task, "status": status, "skipped_downstream": skipped}
-    return {"id": task, "status": status}
+        return StateResult(id=task, status=status, skipped_downstream=skipped)
+    return StateResult(id=task, status=status)
 
 
 def _validated_task_patch(backend: TaskBackend, plan: str, task: str, raw_fields: dict[str, Any]) -> Task:
@@ -909,7 +923,7 @@ def update_task_fields(
     set_fields_json: dict[str, Any] | None = None,
     append_section: str | None = None,
     section_content: str | None = None,
-) -> dict[str, Any]:
+) -> UpdateTaskResult:
     """Update fields and/or append a section to a task.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -917,7 +931,7 @@ def update_task_fields(
     and pass it here. The operation handles all business logic: raw field
     validation through the Task model (when ``set_fields_json`` is
     provided), delegation to ``backend.update_task`` and
-    ``backend.append_task_section``, and response assembly.
+    ``backend.append_task_section``, and returns a typed result model.
 
     When ``set_fields_json`` is provided, the raw fields are validated by
     reading the current task, merging the raw fields into its data,
@@ -943,8 +957,9 @@ def update_task_fields(
             when ``append_section`` is set but this is ``None``.
 
     Returns:
-        Dict with ``updated`` (``True``) and ``address``
-        (``"{plan}/{task}"``) keys.
+        :class:`~sam_schema.core.models.UpdateTaskResult` with
+        ``updated`` (``True``) and ``address`` (``"{plan}/{task}"``)
+        fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -958,16 +973,16 @@ def update_task_fields(
         backend.update_task(plan, validated_task)
     if append_section is not None:
         backend.append_task_section(plan, task, append_section, section_content or "")
-    return {"updated": True, "address": f"{plan}/{task}"}
+    return UpdateTaskResult(updated=True, address=f"{plan}/{task}")
 
 
-def get_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str, Any]:
+def get_active_task(ctx_backend: ContextBackend, session_id: str) -> ActiveTaskGetResult:
     """Retrieve the active task context for a session.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the context backend (LocalContextBackend,
     GitHubContextBackend, etc.) and pass it here. The operation delegates
-    to ``ctx_backend.get_active_task`` and serializes the result.
+    to ``ctx_backend.get_active_task`` and returns a typed result model.
 
     Args:
         ctx_backend: The resolved ContextBackend instance. The caller is
@@ -978,15 +993,13 @@ def get_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str, A
             calling (matching the MCP server convention).
 
     Returns:
-        Dict with an ``active_task`` key. When a context exists, the
-        value is the serialized :class:`~sam_schema.core.models.ActiveTaskContext`
-        (via ``model_dump(mode="json")``). When no context exists, the
-        value is ``None``.
+        :class:`~sam_schema.core.models.ActiveTaskGetResult` with an
+        ``active_task`` field. When a context exists, the value is the
+        :class:`~sam_schema.core.models.ActiveTaskContext` model. When no
+        context exists, the value is ``None``.
     """
     active = ctx_backend.get_active_task(session_id)
-    if active is None:
-        return {"active_task": None}
-    return {"active_task": active.model_dump(mode="json")}
+    return ActiveTaskGetResult(active_task=active)
 
 
 def set_active_task(
@@ -996,13 +1009,13 @@ def set_active_task(
     task: str,
     plan_dir: str,
     parent_issue_number: str | int | None = None,
-) -> dict[str, Any]:
+) -> ActiveTaskSetResult:
     """Store a task address as the active task for a session.
 
     This is the unified operation called by both the CLI and MCP server.
     Both frontends resolve the context backend (LocalContextBackend,
     GitHubContextBackend, etc.) and pass it here. The operation delegates
-    to ``ctx_backend.set_active_task`` and serializes the stored context.
+    to ``ctx_backend.set_active_task`` and returns a typed result model.
 
     Args:
         ctx_backend: The resolved ContextBackend instance. The caller is
@@ -1019,12 +1032,12 @@ def set_active_task(
             nanoid (str, e.g. ``"bd-a3f8"``) for the parent story.
 
     Returns:
-        Dict with an ``active_task`` key containing the serialized
-        :class:`~sam_schema.core.models.ActiveTaskContext` (via
-        ``model_dump(mode="json")``).
+        :class:`~sam_schema.core.models.ActiveTaskSetResult` with an
+        ``active_task`` field containing the stored
+        :class:`~sam_schema.core.models.ActiveTaskContext` model.
     """
     active = ctx_backend.set_active_task(session_id, plan, task, plan_dir, parent_issue_number)
-    return {"active_task": active.model_dump(mode="json")}
+    return ActiveTaskSetResult(active_task=active)
 
 
 def update_active_task(
@@ -1035,7 +1048,7 @@ def update_active_task(
     set_fields_json: dict[str, Any] | None = None,
     append_section: str | None = None,
     section_content: str | None = None,
-) -> dict[str, Any]:
+) -> ActiveTaskUpdateResult:
     """Update fields and/or append a section on the active task.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -1072,8 +1085,9 @@ def update_active_task(
             when ``append_section`` is set but this is ``None``.
 
     Returns:
-        Dict with ``updated`` (``True``) and ``address``
-        (``"{plan}/{task}"``) keys.
+        :class:`~sam_schema.core.models.ActiveTaskUpdateResult` with
+        ``updated`` (``True``) and ``address`` (``"{plan}/{task}"``)
+        fields.
 
     Raises:
         ValueError: When no active task has been set for *session_id*,
@@ -1095,7 +1109,7 @@ def update_active_task(
             "Call set_active_task(...) again to populate them."
         )
         raise ValueError(msg)
-    return update_task_fields(
+    update_result = update_task_fields(
         task_backend,
         active.plan,
         active.task,
@@ -1103,9 +1117,10 @@ def update_active_task(
         append_section=append_section,
         section_content=section_content,
     )
+    return ActiveTaskUpdateResult(updated=update_result.updated, address=update_result.address)
 
 
-def clear_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str, Any]:
+def clear_active_task(ctx_backend: ContextBackend, session_id: str) -> ActiveTaskClearResult:
     """Remove the active task context for a session.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -1122,11 +1137,12 @@ def clear_active_task(ctx_backend: ContextBackend, session_id: str) -> dict[str,
             calling (matching the MCP server convention).
 
     Returns:
-        Dict with a ``cleared`` key (``True`` when a context existed and
-        was removed, ``False`` when no context was found).
+        :class:`~sam_schema.core.models.ActiveTaskClearResult` with a
+        ``cleared`` field (``True`` when a context existed and was
+        removed, ``False`` when no context was found).
     """
     removed = ctx_backend.clear_active_task(session_id)
-    return {"cleared": removed}
+    return ActiveTaskClearResult(cleared=removed)
 
 
 # --- Backlog operations re-export ---

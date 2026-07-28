@@ -532,7 +532,8 @@ class PlanStatus(BaseModel):
 
     Used by the CLI ``sam status`` command and the ``sam_status`` MCP tool.
     Includes the plan's ``autonomy`` mode so clients can gate dispatch
-    without a separate plan read.
+    without a separate plan read. The ``state`` field indicates whether the
+    plan is still being drafted or is ready for dispatch.
     """
 
     feature: str
@@ -542,7 +543,9 @@ class PlanStatus(BaseModel):
     blocked_tasks: list[dict[str, list[str]]]  # [{task_id: [missing_dep_ids]}]
     completion_pct: float
     has_cycles: bool
+    issue: str | None = None
     autonomy: Literal["full_auto", "checkpoint", "per_task"] = "full_auto"
+    state: PlanState = PlanState.READY
 
 
 class ClaimResult(BaseModel):
@@ -562,12 +565,40 @@ class ClaimResult(BaseModel):
     warnings: list[str] | None = None
 
 
+class StateResult(BaseModel):
+    """Result of updating a task's lifecycle status.
+
+    Returned by ``operations.update_task_status`` so both CLI and MCP
+    callers receive a typed envelope instead of a raw dict.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    status: str
+    skipped_downstream: list[str] | None = None
+
+
+class UpdateTaskResult(BaseModel):
+    """Result of updating fields or appending a section to a task.
+
+    Returned by ``operations.update_task_fields`` so both CLI and MCP
+    callers receive a typed envelope instead of a raw dict.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
 class ReadyTasksResult(BaseModel):
     """Result of listing tasks ready for dispatch.
 
     Returned by ``operations.get_ready_tasks`` so MCP clients receive the
     ``{"feature": ..., "ready_tasks": [...], "count": N, "issue": ...}``
-    envelope directly.
+    envelope directly. The ``state`` field indicates whether the plan is
+    still being drafted or is ready for dispatch.
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -576,6 +607,58 @@ class ReadyTasksResult(BaseModel):
     ready_tasks: list[Task]
     count: int
     issue: str | None = None
+    state: PlanState = PlanState.READY
+
+
+class PaginationMeta(BaseModel):
+    """Pagination metadata returned by paginated MCP list operations."""
+
+    offset: int
+    limit: int
+    total: int
+    has_more: bool
+
+
+class PlanSummaryModel(BaseModel):
+    """MCP envelope model for plan summary items.
+
+    Mirrors :class:`~sam_schema.core.task_backend_types.PlanSummary` but is a
+    Pydantic model so it can be used in :class:`PaginatedResult.items` without
+    resorting to ``dict[str, Any]``. The backend continues to return the
+    TypedDict; the operations layer converts to this model at the MCP boundary.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    plan_id: str
+    feature: str
+    goal: str
+    description: str
+    task_count: int
+    source_path: str | None = None
+    issue: str | None = None
+    backend_ref: str | None = Field(
+        default=None, validation_alias=AliasChoices("backend-ref", "backend_ref"), serialization_alias="backend-ref"
+    )
+    plan_ref: str | None = None
+
+
+class PaginatedResult(BaseModel):
+    """Paginated response envelope for MCP list operations.
+
+    Replaces the raw ``dict[str, Any]`` return from ``_paginate_results`` so
+    the consolidated ``sam_plan`` tool can expose a fully typed return schema.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[PlanSummaryModel]
+    count: int
+    pagination: PaginationMeta
+    messages: list[str]
+    warnings: list[str]
+    errors: list[str]
+    next_call: str | None = None
 
 
 class CreatePlanResult(BaseModel):
@@ -720,6 +803,57 @@ class ActiveTaskContext(BaseModel):
             return v
         msg = f"parent_issue_number must be int, str (beads ID), or None; got {type(v).__name__!r}"
         raise TypeError(msg)
+
+
+class ActiveTaskGetResult(BaseModel):
+    """Result of retrieving the active task context for a session.
+
+    Returned by ``operations.get_active_task`` and ``sam_active_task``
+    action="get". Preserves the ``active_task: null`` shape when no
+    context is set.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    active_task: ActiveTaskContext | None
+
+
+class ActiveTaskSetResult(BaseModel):
+    """Result of setting the active task context for a session.
+
+    Returned by ``operations.set_active_task`` and ``sam_active_task``
+    action="set". Mirrors the existing wire shape: a single
+    ``active_task`` field containing the stored context.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    active_task: ActiveTaskContext
+
+
+class ActiveTaskUpdateResult(BaseModel):
+    """Result of updating fields on the active task.
+
+    Returned by ``operations.update_active_task`` and ``sam_active_task``
+    action="update".
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
+class ActiveTaskClearResult(BaseModel):
+    """Result of clearing the active task context for a session.
+
+    Returned by ``operations.clear_active_task`` and ``sam_active_task``
+    action="clear".
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    cleared: bool
 
 
 # Rebuild models that reference TYPE_CHECKING-guarded types (datetime, Path).
