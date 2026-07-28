@@ -878,7 +878,8 @@ def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None
 
     # Assert
     assert second.get("claimed") is False
-    assert "error" in second
+    assert second.get("warnings") is not None
+    assert "already claimed" in second["warnings"][0]
 
 
 def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:

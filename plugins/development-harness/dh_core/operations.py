@@ -808,8 +808,12 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> ClaimResult:
         except (PlanNotFoundError, TaskNotFoundError, SamError):
             msg = f"Cannot claim task '{task}': task is not available for claiming."
             raise ValueError(msg) from None
-        msg = f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."
-        raise ValueError(msg)
+        return ClaimResult(
+            claimed=False,
+            task_id=task,
+            started=None,
+            warnings=[f"Task is '{current_status}', not 'not-started' — already claimed or in a terminal state."],
+        )
 
     # Re-read the task to get the updated model with started timestamp.
     task_data = backend.read_task(plan, task)
