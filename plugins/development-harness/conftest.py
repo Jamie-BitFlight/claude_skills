@@ -59,7 +59,13 @@ _mock_enc = _tk.Encoding(
     mergeable_ranks={b" ": 1, b"test": 2},
     special_tokens={},
 )
-_tk.get_encoding = lambda name, **kw: _mock_enc  # type: ignore[method-assign]
+
+
+def _mock_get_encoding(name: str, **kwargs: object) -> _tk.Encoding:
+    return _mock_enc
+
+
+_tk.get_encoding = _mock_get_encoding
 
 
 def _is_local(address: _Address) -> bool:

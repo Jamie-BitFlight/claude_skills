@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 # Helpers
 # ---------------------------------------------------------------------------
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
-from sam_schema.core.models import Complexity, CreatePlanResult, Plan, PlanStatus, Priority, ReadyTasksResult
+from sam_schema.core.models import Complexity, CreatePlanResult, PlanStatus, Priority, ReadResult, ReadyTasksResult
 from sam_schema.server import sam_plan
 
 if TYPE_CHECKING:
@@ -120,10 +120,10 @@ def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backen
 
     # Act
     read_result = sam_plan(config=ReadPlanConfig(), plan=plan_id)
-    assert isinstance(read_result, Plan)
+    assert isinstance(read_result, ReadResult)
 
     # Assert — tasks present
-    tasks = read_result.tasks
+    tasks = read_result.plan.tasks
     assert len(tasks) == 1, f"Expected 1 task after append, got: {len(tasks)}"
     assert tasks[0].id == "T1"
 
@@ -206,15 +206,13 @@ def _is_drafting(response: object) -> bool:
     Accepts either:
     - ``{"drafting": True, ...}`` (drafting marker dict)
     - ``{"state": "drafting", ...}`` (drafting marker dict)
-    - A Plan/PlanStatus model with ``state == "drafting"``
-
-    Uses ``getattr`` to read both dict-style (``.get``) and attribute-style
-    (``.state``) responses without narrowing the union at every call site.
+    - A ReadResult/Plan with ``state == "drafting"``
     """
-    if hasattr(response, "get"):
-        drafting = response.get("drafting")  # type: ignore[attr-defined]
-        if drafting is True:
+    if isinstance(response, dict):
+        if response.get("drafting") is True:
             return True
-        return response.get("state") == "drafting"  # type: ignore[attr-defined]
+        return response.get("state") == "drafting"
+    if isinstance(response, ReadResult):
+        return str(response.plan.state) == "drafting"
     state = getattr(response, "state", None)
     return str(state) == "drafting"
