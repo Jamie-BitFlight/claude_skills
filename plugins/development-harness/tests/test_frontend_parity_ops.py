@@ -184,6 +184,175 @@ async def test_query_filter_absent_key_returns_empty(dh_env: dict[str, str]) -> 
 
 
 # ---------------------------------------------------------------------------
+# Backlog CRUD parity (add, view, update, close, resolve, groom)
+# ---------------------------------------------------------------------------
+
+
+def _setup_gate_token(dh_state_home: str, session_id: str = "test-session", token: str = "abc123") -> str:
+    """Create a gate token file and return the full token string for MCP backlog_add."""
+    gate_dir = Path(dh_state_home) / "sessions" / session_id
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    full_token = f"{session_id}:{token}"
+    (gate_dir / ".gate-token").write_text(full_token)
+    return full_token
+
+
+async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
+    """Backlog add via CLI and MCP both create items with equivalent metadata."""
+    gate_token = _setup_gate_token(dh_env["DH_STATE_HOME"])
+
+    cli_result = _run_cli(
+        ["backlog-add", "Parity CLI Add", "--description", "cli test", "--priority", "P1"], env=dh_env
+    )
+    mcp_result = await call_mcp_tool(
+        _backlog_mcp, "backlog_add",
+        {"title": "Parity MCP Add", "priority": "P1", "description": "mcp test", "gate_token": gate_token, "force": True},
+    )
+
+    assert cli_result["title"] == "Parity CLI Add"
+    assert cli_result["priority"] == "P1"
+    assert mcp_result["title"] == "Parity MCP Add"
+    assert mcp_result["priority"] == "P1"
+
+    # Both items visible via list
+    cli_list = _run_cli(["backlog-list"], env=dh_env)
+    titles = {item["title"] for item in cli_list.get("items", [])}
+    assert "Parity CLI Add" in titles
+    assert "Parity MCP Add" in titles
+
+
+async def test_backlog_view_parity(dh_env: dict[str, str]) -> None:
+    """Backlog item viewed through CLI and MCP returns the same identity fields."""
+    _run_cli(
+        ["backlog-add", "Parity View Item", "--description", "view test", "--priority", "P1"], env=dh_env
+    )
+
+    cli_view = _run_cli(["backlog-view", "Parity View Item"], env=dh_env)
+    mcp_view = await call_mcp_tool(
+        _backlog_mcp, "backlog_view",
+        {"selector": "Parity View Item", "summary": False, "include_content": True},
+    )
+
+    assert cli_view.get("title") == "Parity View Item"
+    assert mcp_view.get("title") == "Parity View Item"
+    assert cli_view.get("priority") == mcp_view.get("priority")
+
+
+async def test_backlog_update_parity(dh_env: dict[str, str]) -> None:
+    """Backlog update through CLI and MCP both change the title correctly."""
+    _run_cli(
+        ["backlog-add", "Parity Update CLI", "--description", "update test", "--priority", "P1"], env=dh_env
+    )
+    _run_cli(
+        ["backlog-add", "Parity Update MCP", "--description", "update test", "--priority", "P1", "--force"], env=dh_env
+    )
+
+    # CLI update
+    cli_update = _run_cli(
+        ["backlog-update", "Parity Update CLI", "--title", "CLI Updated Title"], env=dh_env
+    )
+    assert "CLI Updated Title" in str(cli_update)
+
+    # MCP update
+    mcp_update = await call_mcp_tool(
+        _backlog_mcp, "backlog_update",
+        {"selector": "Parity Update MCP", "title": "MCP Updated Title"},
+    )
+    assert "MCP Updated Title" in str(mcp_update)
+
+    # Verify via list
+    cli_list = _run_cli(["backlog-list"], env=dh_env)
+    titles = {item["title"] for item in cli_list.get("items", [])}
+    assert "CLI Updated Title" in titles
+    assert "MCP Updated Title" in titles
+
+
+async def test_backlog_close_parity(dh_env: dict[str, str]) -> None:
+    """Backlog close through CLI and MCP both close items correctly."""
+    _run_cli(
+        ["backlog-add", "Parity Close CLI", "--description", "close test", "--priority", "P1"], env=dh_env
+    )
+    _run_cli(
+        ["backlog-add", "Parity Close MCP", "--description", "close test", "--priority", "P1", "--force"], env=dh_env
+    )
+
+    # CLI close
+    cli_close = _run_cli(
+        ["backlog-close", "Parity Close CLI", "--reason", "duplicate"], env=dh_env
+    )
+    assert cli_close.get("title") == "Parity Close CLI"
+    assert cli_close.get("closed") is True
+
+    # MCP close
+    mcp_close = await call_mcp_tool(
+        _backlog_mcp, "backlog_close",
+        {"selector": "Parity Close MCP", "reason": "duplicate"},
+    )
+    assert mcp_close.get("title") == "Parity Close MCP"
+    assert mcp_close.get("closed") is True
+
+
+async def test_backlog_resolve_parity(dh_env: dict[str, str]) -> None:
+    """CLI backlog resolve and MCP backlog_close both complete items."""
+    _run_cli(
+        ["backlog-add", "Parity Resolve CLI", "--description", "resolve test", "--priority", "P1"], env=dh_env
+    )
+    _run_cli(
+        ["backlog-add", "Parity Close MCP2", "--description", "close test", "--priority", "P1", "--force"], env=dh_env
+    )
+
+    # CLI resolve
+    cli_resolve = _run_cli(
+        ["backlog-resolve", "Parity Resolve CLI", "--summary", "Done"], env=dh_env
+    )
+    assert cli_resolve.get("title") == "Parity Resolve CLI"
+    assert cli_resolve.get("resolved") is True
+
+    # MCP close
+    mcp_close = await call_mcp_tool(
+        _backlog_mcp, "backlog_close",
+        {"selector": "Parity Close MCP2", "reason": "duplicate"},
+    )
+    assert mcp_close.get("title") == "Parity Close MCP2"
+    assert mcp_close.get("closed") is True
+
+
+async def test_backlog_groom_parity(dh_env: dict[str, str]) -> None:
+    """Both transports generate identical groomed content for the same section."""
+    _run_cli(
+        ["backlog-add", "Parity Groom CLI", "--description", "groom test", "--priority", "P1"], env=dh_env
+    )
+    _run_cli(
+        ["backlog-add", "Parity Groom MCP", "--description", "groom test", "--priority", "P1", "--force"], env=dh_env
+    )
+
+    GROOM_CONTENT = "## Analysis\n\nThis item needs investigation."
+
+    # CLI groom
+    cli_groom = _run_cli(
+        ["backlog-groom", "Parity Groom CLI", "--section", "Analysis", "--content", GROOM_CONTENT], env=dh_env
+    )
+    assert cli_groom.get("title") == "Parity Groom CLI"
+
+    # MCP groom
+    mcp_groom = await call_mcp_tool(
+        _backlog_mcp, "backlog_groom",
+        {"selector": "Parity Groom MCP", "section": "Analysis", "content": GROOM_CONTENT},
+    )
+    assert mcp_groom.get("title") == "Parity Groom MCP"
+
+    # Verify both items have groomed content via view
+    cli_view = _run_cli(["backlog-view", "Parity Groom CLI", "--section", "Analysis"], env=dh_env)
+    mcp_view = await call_mcp_tool(
+        _backlog_mcp, "backlog_view",
+        {"selector": "Parity Groom MCP", "summary": False, "section": "Analysis"},
+    )
+
+    assert "needs investigation" in str(cli_view)
+    assert "needs investigation" in str(mcp_view)
+
+
+# ---------------------------------------------------------------------------
 # Plan CRUD parity (Phase 5 E2E)
 # ---------------------------------------------------------------------------
 
