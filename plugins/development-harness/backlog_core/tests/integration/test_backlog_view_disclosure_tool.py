@@ -233,7 +233,7 @@ class TestMapMode:
     @_skip_without_real_enc
     async def test_map_response_has_map_text_key(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
         """map=True response dict contains 'map_text' key (MAP mode routing)."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "map": True})
@@ -247,7 +247,7 @@ class TestMapMode:
         """map_text from #2515 must be < 2000 tokens (AC-1 budget guarantee)."""
         from progressive_markdown.list_navigator import ENCODING
 
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "map": True})
@@ -268,7 +268,7 @@ class TestMapMode:
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """map_text contains ordinal lines (lines starting with a digit)."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "map": True})
@@ -289,7 +289,7 @@ class TestMapMode:
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """map=True response has total_sections > 0 for an item with sections."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "map": True})
@@ -334,7 +334,7 @@ class TestExtractMode:
         self, normalized_2515: list[NormalizedSection], view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """navigate + head=100 on RT-ICA returns truncated=True (100 < ~560t)."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
         rt_ica_ordinal = _find_rt_ica_ordinal(normalized_2515)
 
         async with Client(mcp) as client:
@@ -357,7 +357,7 @@ class TestExtractMode:
         self, normalized_2515: list[NormalizedSection], view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """returned_tokens <= 100 — window does not exceed the requested bound."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
         rt_ica_ordinal = _find_rt_ica_ordinal(normalized_2515)
 
         async with Client(mcp) as client:
@@ -386,7 +386,7 @@ class TestExtractMode:
         DN-2 correction: task spec stated total_tokens > 10000.
         Actual fixture: RT-ICA is ~560 tokens.  Corrected threshold: > 400.
         """
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
         rt_ica_ordinal = _find_rt_ica_ordinal(normalized_2515)
 
         async with Client(mcp) as client:
@@ -409,7 +409,7 @@ class TestExtractMode:
         self, normalized_2515: list[NormalizedSection], view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """next_call hint contains 'skip_tokens=100', NOT 'offset=' (AC-5)."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
         rt_ica_ordinal = _find_rt_ica_ordinal(normalized_2515)
 
         async with Client(mcp) as client:
@@ -453,7 +453,7 @@ class TestNavigateMiss:
     @_skip_without_real_enc
     async def test_navigate_miss_has_error_key(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
         """navigate='99.99' response contains 'error' key — no silent fallback."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "navigate": "99.99"})
@@ -469,7 +469,7 @@ class TestNavigateMiss:
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """navigate miss response includes non-empty 'valid_ordinals' list."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "navigate": "99.99"})
@@ -486,7 +486,7 @@ class TestNavigateMiss:
     @_skip_without_real_enc
     async def test_navigate_miss_has_no_body_key(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
         """navigate miss response has no 'body' key — error dict, not content."""
-        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
+        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515", "navigate": "99.99"})
@@ -526,6 +526,7 @@ class TestPassthrough:
         The exact key set is pinned in _PASSTHROUGH_LEGACY_KEYS.  Any deviation
         post-T24 means the PASSTHROUGH code path was inadvertently changed.
         """
+        # PASSTHROUGH path hits dh_core.operations.view_item (server.py line 25 imports from dh_core)
         mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
@@ -546,6 +547,7 @@ class TestPassthrough:
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """Zero-param response must not contain any disclosure-only keys."""
+        # PASSTHROUGH path hits dh_core.operations.view_item (server.py line 25 imports from dh_core)
         mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
