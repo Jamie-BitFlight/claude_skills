@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 # Helpers
 # ---------------------------------------------------------------------------
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
-from sam_schema.core.models import Complexity, Priority
+from sam_schema.core.models import Complexity, CreatePlanResult, Plan, PlanStatus, Priority, ReadyTasksResult
 from sam_schema.server import sam_plan
 
 if TYPE_CHECKING:
@@ -58,7 +58,8 @@ def test_status_returns_drafting_marker_on_mid_append_plan(memory_backend: InMem
 
     # Arrange — create plan in drafting state
     result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
-    plan_id = result["plan_id"]
+    assert isinstance(result, CreatePlanResult)
+    plan_id = result.plan_id
 
     # Act
     status = sam_plan(config=StatusPlanConfig(), plan=plan_id)
@@ -81,7 +82,8 @@ def test_ready_returns_drafting_marker_on_mid_append_plan(memory_backend: InMemo
 
     # Arrange
     create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
 
@@ -111,17 +113,19 @@ def test_read_returns_tasks_and_drafting_marker_on_mid_append_plan(memory_backen
 
     # Arrange
     create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
 
     # Act
     read_result = sam_plan(config=ReadPlanConfig(), plan=plan_id)
+    assert isinstance(read_result, Plan)
 
     # Assert — tasks present
-    tasks = read_result.get("tasks", [])
+    tasks = read_result.tasks
     assert len(tasks) == 1, f"Expected 1 task after append, got: {len(tasks)}"
-    assert tasks[0]["id"] == "T1"
+    assert tasks[0].id == "T1"
 
     # Assert — drafting marker present
     assert _is_drafting(read_result), (
@@ -147,17 +151,19 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
 
     # Arrange
     create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)
 
     # Act
     status = sam_plan(config=StatusPlanConfig(), plan=plan_id)
+    assert isinstance(status, PlanStatus)
 
     # Assert — no drafting marker
     assert not _is_drafting(status), f"Expected no drafting marker in status after finalize, got: {status!r}"
     # Assert — normal data present
-    assert status.get("total_tasks") == 1
+    assert status.total_tasks == 1
 
 
 def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
@@ -173,17 +179,19 @@ def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskPr
 
     # Arrange
     create_result = sam_plan(config=_DRAFTING_PLAN_CONFIG)
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
     sam_plan(config=AppendTaskConfig(task=_MINIMAL_TASK), plan=plan_id)
     sam_plan(config=FinalizePlanConfig(), plan=plan_id)
 
     # Act
     ready = sam_plan(config=ReadyPlanConfig(), plan=plan_id)
+    assert isinstance(ready, ReadyTasksResult)
 
     # Assert — no drafting marker
     assert not _is_drafting(ready), f"Expected no drafting marker in ready response after finalize, got: {ready!r}"
     # Assert — T1 is ready
-    ready_ids = [t["id"] for t in ready.get("ready_tasks", [])]
+    ready_ids = [t.id for t in ready.ready_tasks]
     assert "T1" in ready_ids, f"Expected T1 in ready tasks after finalize, got: {ready_ids}"
 
 
@@ -192,13 +200,21 @@ def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskPr
 # ---------------------------------------------------------------------------
 
 
-def _is_drafting(response: dict) -> bool:
+def _is_drafting(response: object) -> bool:
     """Return True when the response carries a drafting marker.
 
     Accepts either:
-    - ``{"drafting": True, ...}``
-    - ``{"state": "drafting", ...}``
+    - ``{"drafting": True, ...}`` (drafting marker dict)
+    - ``{"state": "drafting", ...}`` (drafting marker dict)
+    - A Plan/PlanStatus model with ``state == "drafting"``
+
+    Uses ``getattr`` to read both dict-style (``.get``) and attribute-style
+    (``.state``) responses without narrowing the union at every call site.
     """
-    if response.get("drafting") is True:
-        return True
-    return response.get("state") == "drafting"
+    if hasattr(response, "get"):
+        drafting = response.get("drafting")  # type: ignore[attr-defined]
+        if drafting is True:
+            return True
+        return response.get("state") == "drafting"  # type: ignore[attr-defined]
+    state = getattr(response, "state", None)
+    return str(state) == "drafting"

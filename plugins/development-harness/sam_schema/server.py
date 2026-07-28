@@ -39,7 +39,21 @@ from sam_schema.core.action_models import (
     UpdateTaskConfig,
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.models import ClaimResult, Plan, PlanState, PlanStatus, ReadyTasksResult, Task, TaskAssignment
+from sam_schema.core.models import (
+    AppendTaskResult,
+    ClaimResult,
+    CreatePlanError,
+    CreatePlanResult,
+    FinalizePlanResult,
+    Plan,
+    PlanState,
+    PlanStatus,
+    ReadResult,
+    ReadyTasksResult,
+    Task,
+    TaskAssignment,
+    UpdatePlanResult,
+)
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
@@ -195,7 +209,7 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> Plan | dict[str, object]:
+def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     """Return Plan fields for the given plan address.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
@@ -205,21 +219,17 @@ def _sam_plan_read(plan: str, plan_dir: str) -> Plan | dict[str, object]:
     are added at the top level when present.
     """
     backend = _get_backend(plan_dir)
-    result = operations.read_plan(backend, plan)
-    if not result.warnings:
-        return result.plan
-    response = result.plan.model_dump(by_alias=True, exclude_none=True)
-    response["warnings"] = result.warnings
-    return response
+    return operations.read_plan(backend, plan)
 
 
-def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
+def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResult | CreatePlanError:
     """Create a new plan from a typed list of task definitions.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
 
     Returns:
-        Dict from dh_core.operations.create_plan().
+        ``CreatePlanResult`` on success, ``CreatePlanError`` on artifact
+        write failure.
     """
     backend = _get_backend(plan_dir)
     return operations.create_plan(
@@ -284,7 +294,7 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[s
         return _DRAFTING_MARKER_RESPONSE
 
 
-def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
+def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult:
     """Update plan-level context and/or fields.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates to
@@ -292,7 +302,8 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
     validation through the Plan model, backend delegation, and response assembly.
 
     Returns:
-        Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
+        :class:`~sam_schema.core.models.UpdatePlanResult` with ``updated``
+        (bool) and ``address`` (plan identifier) fields.
     """
     backend = _get_backend(plan_dir)
     return operations.update_plan_fields(
@@ -306,7 +317,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict
     )
 
 
-def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
+def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult:
     """Append a single task to an existing plan.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates
@@ -321,8 +332,8 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         plan_dir: Plan directory path passed through to ``_get_backend``.
 
     Returns:
-        Result dict from ``dh_core.operations.append_task`` — shape:
-        ``{"appended": True, "task_id": ...}``.
+        :class:`~sam_schema.core.models.AppendTaskResult` — shape:
+        ``appended=True``, ``task_id=...``.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -332,7 +343,7 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
     return operations.append_task(backend, plan, config.task)
 
 
-def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
+def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
     """Transition a plan from drafting state to ready state.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates
@@ -345,8 +356,8 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     no caller-provided issue is needed at finalize time.
 
     Returns:
-        Result dict from ``dh_core.operations.finalize_plan`` — shape:
-        ``{"finalized": True, "state": "ready"}``.
+        :class:`~sam_schema.core.models.FinalizePlanResult` — shape:
+        ``finalized=True``, ``state="ready"``.
     """
     backend = _get_backend(plan_dir)
     return operations.finalize_plan(backend, plan)
@@ -399,7 +410,20 @@ def sam_plan(
             )
         ),
     ] = None,
-) -> dict[str, object] | list[Task] | PlanStatus | Plan | TaskAssignment | ReadyTasksResult:
+) -> (
+    CreatePlanResult
+    | CreatePlanError
+    | list[Task]
+    | PlanStatus
+    | Plan
+    | TaskAssignment
+    | ReadyTasksResult
+    | ReadResult
+    | UpdatePlanResult
+    | AppendTaskResult
+    | FinalizePlanResult
+    | dict[str, object]
+):
     """Consolidated plan-level operations for SAM.
 
     Delegates to the appropriate plan operation based on ``config.action``.

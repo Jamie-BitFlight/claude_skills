@@ -665,7 +665,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, Priority, Task as _Task
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task as _Task
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange: create plan via LocalYamlTaskProvider so the file is real YAML
@@ -678,8 +678,8 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     set_task_config(TaskConfig(backend=backend))
     try:
         result = _sam_plan_create(CreatePlanConfig(slug="roundtrip", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert "error" not in result, f"sam_create failed: {result}"
-        plan_id = result["plan_id"]
+        assert isinstance(result, CreatePlanResult), f"sam_create failed: {result}"
+        plan_id = result.plan_id
         plan_path = _Path(p_dir) / f"{plan_id}-roundtrip.yaml"
 
         # Act: update task with a Task model that has non-empty dependencies
@@ -756,7 +756,7 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
     """
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, Priority
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange: create a plan with a task that has no parallelize_with entries
@@ -769,8 +769,8 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
     set_task_config(TaskConfig(backend=backend))
     try:
         result = _sam_plan_create(CreatePlanConfig(slug="kebabmerge", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert "error" not in result, f"sam_plan create failed: {result}"
-        plan_id = result["plan_id"]
+        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
+        plan_id = result.plan_id
 
         # Act: patch parallelize-with using the MCP wire (kebab-case) key
         raw_fields: dict = {"parallelize-with": ["T01", "T02"]}
@@ -810,7 +810,7 @@ def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> 
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, Priority
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange
@@ -823,8 +823,8 @@ def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> 
     set_task_config(TaskConfig(backend=backend))
     try:
         result = _sam_plan_create(CreatePlanConfig(slug="kebabint", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert "error" not in result, f"sam_plan create failed: {result}"
-        plan_id = result["plan_id"]
+        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
+        plan_id = result.plan_id
 
         # Act: update via the MCP handler using the kebab-case wire key
         update_result = asyncio.run(
@@ -873,6 +873,7 @@ def test_sam_plan_update_serializes_list_model_fields_as_dicts(tmp_path: Path) -
 
     from sam_schema.core.action_models import CreatePlanConfig
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.models import CreatePlanResult
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange
@@ -882,8 +883,8 @@ def test_sam_plan_update_serializes_list_model_fields_as_dicts(tmp_path: Path) -
     set_task_config(TaskConfig(backend=backend))
     try:
         result = _sam_plan_create(CreatePlanConfig(slug="acstest", goal="Goal", tasks=[]), str(p_dir))
-        assert "error" not in result, f"sam_plan create failed: {result}"
-        plan_id = result["plan_id"]
+        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
+        plan_id = result.plan_id
 
         # Act: update the plan with a structured acceptance criterion via MCP call
         # Using _call (MCP handler) so the discriminated-union config deserialization runs
@@ -941,6 +942,7 @@ def test_sam_plan_update_list_field_no_repr_in_yaml(tmp_path: Path) -> None:
 
     from sam_schema.core.action_models import CreatePlanConfig
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.models import CreatePlanResult
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange
@@ -950,8 +952,8 @@ def test_sam_plan_update_list_field_no_repr_in_yaml(tmp_path: Path) -> None:
     set_task_config(TaskConfig(backend=backend))
     try:
         result = _sam_plan_create(CreatePlanConfig(slug="noreprtest", goal="Goal", tasks=[]), str(p_dir))
-        assert "error" not in result, f"sam_plan create failed: {result}"
-        plan_id = result["plan_id"]
+        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
+        plan_id = result.plan_id
 
         # Act: update the plan with a structured acceptance criterion via MCP call
         ac_value = [

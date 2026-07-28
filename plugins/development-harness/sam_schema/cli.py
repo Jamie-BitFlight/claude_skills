@@ -55,7 +55,7 @@ from sam_schema import cli_active_task, cli_output
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.backends.local_yaml import plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
-from sam_schema.core.models import TaskStatus
+from sam_schema.core.models import CreatePlanError, TaskStatus
 from sam_schema.core.task_config import get_backend
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
@@ -734,14 +734,14 @@ def create(
     except OSError as exc:
         _err(str(exc), exit_code=2)
 
-    if "error" in result:
-        _err(result["error"], exit_code=2)
+    if isinstance(result, CreatePlanError):
+        _err(result.error, exit_code=2)
 
-    # Add path for CLI output (operations layer doesn't return it).
-    plan_id = result.get("plan_id")
+    # Build the CLI output dict; operations layer returns a model, path is CLI-specific.
+    plan_id = result.plan_id
     path_str = str(plan_dir / f"{plan_id}-{slug}.yaml") if plan_id else str(plan_dir)
-    result["path"] = path_str
-    _output_json(result)
+    output = {**result.model_dump(by_alias=True, exclude_none=True), "path": path_str}
+    _output_json(output)
 
 
 @app.command()

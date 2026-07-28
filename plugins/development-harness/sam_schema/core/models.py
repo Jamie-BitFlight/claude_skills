@@ -578,6 +578,79 @@ class ReadyTasksResult(BaseModel):
     issue: str | None = None
 
 
+class CreatePlanResult(BaseModel):
+    """Result of successfully creating a plan.
+
+    Returned by ``operations.create_plan`` on the success path. Carries the
+    backend-assigned plan ID, task count, globally-addressable plan_ref, and
+    optional portability warnings.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    plan_id: str
+    task_count: int
+    plan_ref: str
+    warnings: list[str] | None = None
+
+
+class CreatePlanError(BaseModel):
+    """Structured error returned when plan creation's artifact write fails.
+
+    Returned by ``operations.create_plan`` on the ArtifactWriteError path
+    (ADR-2509-5). The plan may exist on local disk but is NOT durable; callers
+    inspect ``error``/``reason`` to decide retry behaviour.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    error: str
+    reason: str
+    plan_id: str | None = None
+    issue: int | None = None
+    local_path: None = None
+    hint: str
+
+
+class UpdatePlanResult(BaseModel):
+    """Result of updating plan-level context and/or fields.
+
+    Returned by ``operations.update_plan_fields``.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
+class AppendTaskResult(BaseModel):
+    """Result of appending a single task to a plan.
+
+    Returned by ``operations.append_task``, normalizing the backend dict
+    (``{"appended": True, "task_id": ...}``) into a typed model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    appended: bool = True
+    task_id: str
+    github_issue: int | None = None
+
+
+class FinalizePlanResult(BaseModel):
+    """Result of transitioning a plan from drafting to ready state.
+
+    Returned by ``operations.finalize_plan``, normalizing the backend dict
+    (``{"finalized": True, "state": "ready"}``) into a typed model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    finalized: bool = True
+    state: str
+
+
 class ActiveTaskContext(BaseModel):
     """Session-to-task binding stored in context_dir() as active-task-{session_id}.json.
 

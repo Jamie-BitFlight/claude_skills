@@ -70,7 +70,11 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
 )
 from sam_schema.core.models import (
+    AppendTaskResult,
     ClaimResult,
+    CreatePlanError,
+    CreatePlanResult,
+    FinalizePlanResult,
     Plan,
     PlanState,
     PlanStatus,
@@ -80,6 +84,7 @@ from sam_schema.core.models import (
     Task,
     TaskAssignment,
     TaskStatus,
+    UpdatePlanResult,
 )
 
 if TYPE_CHECKING:
@@ -196,7 +201,7 @@ def create_plan(
     tasks: list[dict[str, Any]] | list[Any],
     context: str | None = None,
     issue: int | None = None,
-) -> dict[str, Any]:
+) -> CreatePlanResult | CreatePlanError:
     """Create a new plan with the given slug, goal, and task definitions.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -215,11 +220,11 @@ def create_plan(
         issue: Optional GitHub issue number to associate with the plan.
 
     Returns:
-        Dict with ``plan_id``, ``task_count``, and optional ``warnings``
-        keys. On Gist write failure, returns a dict with ``error``,
-        ``reason``, ``plan_id``, ``issue``, ``local_path``, and ``hint``
-        keys (structured error so the caller knows the plan is not
-        portable).
+        :class:`~sam_schema.core.models.CreatePlanResult` on success with
+        ``plan_id``, ``task_count``, ``plan_ref``, and optional
+        ``warnings``. On Gist write failure, returns
+        :class:`~sam_schema.core.models.CreatePlanError` (structured error so
+        the caller knows the plan is not portable).
 
     Raises:
         ValueError: When any task definition fails schema validation.
@@ -249,23 +254,19 @@ def create_plan(
         # The plan may exist locally (local_backend wrote it), but it
         # is NOT durable.
         _log.error("create_plan: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
-        return {
-            "error": "create_plan failed: artifact write to Gist unsuccessful",
-            "reason": exc.reason,
-            "plan_id": exc.plan_id,
-            "issue": exc.issue,
-            "local_path": None,
-            "hint": "The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist.",
-        }
+        return CreatePlanError(
+            error="create_plan failed: artifact write to Gist unsuccessful",
+            reason=exc.reason,
+            plan_id=exc.plan_id,
+            issue=exc.issue,
+            local_path=None,
+            hint="The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist.",
+        )
 
     plan_id_str = plan_data["plan_id"]
-    result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"])}
 
     # Compute plan_ref: #{issue},{plan_id} when issue is set, else plan_id.
-    if issue is not None:
-        result["plan_ref"] = f"#{issue},{plan_id_str}"
-    else:
-        result["plan_ref"] = plan_id_str
+    plan_ref = f"#{issue},{plan_id_str}" if issue is not None else plan_id_str
 
     # Collect warnings: local-only non-portability + backend-specific warnings.
     warnings: list[str] = []
@@ -281,10 +282,9 @@ def create_plan(
     if last_warnings:
         warnings.extend(last_warnings)
 
-    if warnings:
-        result["warnings"] = warnings
-
-    return result
+    return CreatePlanResult(
+        plan_id=plan_id_str, task_count=len(plan_data["tasks"]), plan_ref=plan_ref, warnings=warnings or None
+    )
 
 
 def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
@@ -556,7 +556,7 @@ def update_plan_fields(
     task_id: str | None = None,
     append_section_name: str | None = None,
     section_content: str | None = None,
-) -> dict[str, Any]:
+) -> UpdatePlanResult:
     """Update plan-level context/fields and/or task-level fields on the backend.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -594,8 +594,8 @@ def update_plan_fields(
         section_content: Body text for the appended section.
 
     Returns:
-        Dict with ``updated`` (``True``) and ``address`` (the plan address
-        string) keys.
+        :class:`~sam_schema.core.models.UpdatePlanResult` with ``updated``
+        (``True``) and ``address`` (the plan address string) fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -631,10 +631,10 @@ def update_plan_fields(
     if append_section_name is not None and task_id is not None and section_content:
         backend.append_task_section(plan, task_id, append_section_name, section_content)
 
-    return {"updated": True, "address": plan}
+    return UpdatePlanResult(updated=True, address=plan)
 
 
-def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) -> dict[str, Any]:
+def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) -> AppendTaskResult:
     """Append a single task to an existing plan.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -661,8 +661,8 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
             is provided, it is passed through unchanged.
 
     Returns:
-        Dict with ``appended`` (``True``) and ``task_id`` keys, matching
-        the shape returned by ``backend.append_task``.
+        :class:`~sam_schema.core.models.AppendTaskResult` with ``appended``
+        (``True``), ``task_id``, and optional ``github_issue`` fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
@@ -675,10 +675,13 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
             # Accept "task" key as the task id (YAML frontmatter convention)
             task = {**task, "id": task.pop("task")}
         task = Task.model_validate(task)
-    return backend.append_task(plan, task)
+    result = backend.append_task(plan, task)
+    return AppendTaskResult(
+        appended=result["appended"], task_id=result["task_id"], github_issue=result.get("github_issue")
+    )
 
 
-def finalize_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
+def finalize_plan(backend: TaskBackend, plan: str) -> FinalizePlanResult:
     """Transition a plan from drafting state to ready state.
 
     This is the unified operation called by both the CLI and MCP server.
@@ -702,14 +705,14 @@ def finalize_plan(backend: TaskBackend, plan: str) -> dict[str, Any]:
         plan: Plan address string (e.g. ``"P1"`` or slug).
 
     Returns:
-        Dict with ``finalized`` (``True``) and ``state`` (``"ready"``)
-        keys, matching the shape returned by
-        ``backend.finalize_plan``.
+        :class:`~sam_schema.core.models.FinalizePlanResult` with
+        ``finalized`` (``True``) and ``state`` (``"ready"``) fields.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
     """
-    return backend.finalize_plan(plan)
+    result = backend.finalize_plan(plan)
+    return FinalizePlanResult(finalized=result["finalized"], state=result["state"])
 
 
 def read_task(backend: TaskBackend, plan: str, task: str) -> TaskAssignment:
