@@ -85,9 +85,9 @@ def test_cli_and_mcp_share_the_same_context_store() -> None:
     set_context_config(ContextConfig(backend=create_context_backend()))
     mcp_view = operations.get_active_task(create_context_backend(), "_default")
 
-    assert mcp_view["active_task"] is not None
-    assert mcp_view["active_task"]["plan"] == "7"
-    assert mcp_view["active_task"]["task"] == "2"
+    assert mcp_view.active_task is not None
+    assert mcp_view.active_task.plan == "7"
+    assert mcp_view.active_task.task == "2"
 
 
 def test_backend_is_selectable_not_hardcoded_local(monkeypatch) -> None:

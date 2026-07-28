@@ -30,24 +30,27 @@ def err(msg: str, exit_code: int = 1) -> NoReturn:
     raise typer.Exit(exit_code)
 
 
-def output_json(data: object) -> None:
+def output_json(data: object, *, exclude_none: bool = True) -> None:
     """Print ``data`` as compact JSON to stdout.
 
-    Pydantic models use ``model_dump_json(by_alias=True, exclude_none=True)``
+    Pydantic models use ``model_dump_json(by_alias=True, exclude_none=...)``
     directly so wire-alias keys (kebab-case) and absent-optional elision
     are preserved. Other objects fall back to ``json.dumps`` with a string
     default.
 
     Args:
         data: A Pydantic model, list of models, or JSON-serializable object.
+        exclude_none: When ``True`` (default), omit fields whose value is
+            ``None``. Set to ``False`` when the caller needs explicit
+            ``null`` values (e.g., ``active_task: null``).
     """
     if isinstance(data, BaseModel):
-        typer.echo(data.model_dump_json(by_alias=True, exclude_none=True))
+        typer.echo(data.model_dump_json(by_alias=True, exclude_none=exclude_none))
     elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
         typer.echo(
             json.dumps(
                 [
-                    item.model_dump(mode="json", by_alias=True, exclude_none=True)
+                    item.model_dump(mode="json", by_alias=True, exclude_none=exclude_none)
                     for item in data
                     if isinstance(item, BaseModel)
                 ],

@@ -84,7 +84,8 @@ def active_task_get(
     """Show the active task context for a session."""
     _check_format(output_format)
     result = operations.get_active_task(_context_backend(), session_id or DEFAULT_SESSION_ID)
-    output_json(result)
+    # Preserve explicit `active_task: null` when no context is set.
+    output_json(result, exclude_none=False)
 
 
 @app.command(name="set")

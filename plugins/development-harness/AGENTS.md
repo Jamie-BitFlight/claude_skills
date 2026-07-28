@@ -111,9 +111,9 @@ For plans with 16+ tasks, use the three-call incremental workflow instead of a s
 2. `sam_plan(plan='Pa1b2c3d4', action='append_task', task=<TaskDefinition dict>)` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
 3. `sam_plan(plan='Pa1b2c3d4', action='finalize')` — clears drafting state, plan becomes ready and artifact content is updated
 
-While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` return a drafting
-marker instead of task counts — this prevents dispatching a partial plan. Only `finalize` makes
-the plan visible to the dispatch loop.
+While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` return their normal
+result models with `state="drafting"` instead of dispatchable task data — this prevents dispatching
+a partial plan. Only `finalize` makes the plan visible to the dispatch loop.
 
 **Gotcha — `append_task` is single-writer only:**
 

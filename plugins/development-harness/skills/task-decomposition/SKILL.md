@@ -149,8 +149,9 @@ Use three calls to avoid large single-call payloads:
    ```
 
    The response includes the assigned plan number `P{N}`. While `state="drafting"`,
-   `sam_plan status` and `sam_plan ready` return a drafting marker instead of task
-   counts — the plan is not visible to the dispatch loop.
+   `sam_plan status` and `sam_plan ready` return their normal result models with
+   `state="drafting"` instead of dispatchable data — the plan is not visible to the
+   dispatch loop.
 
 2. Append each task one at a time (repeat for every task):
 

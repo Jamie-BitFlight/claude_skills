@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 import tiktoken
 from dh_core import operations
@@ -40,19 +40,25 @@ from sam_schema.core.action_models import (
 )
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.models import (
+    ActiveTaskClearResult,
+    ActiveTaskGetResult,
+    ActiveTaskSetResult,
+    ActiveTaskUpdateResult,
     AppendTaskResult,
     ClaimResult,
     CreatePlanError,
     CreatePlanResult,
     FinalizePlanResult,
-    Plan,
-    PlanState,
+    PaginatedResult,
+    PaginationMeta,
     PlanStatus,
+    PlanSummaryModel,
     ReadResult,
     ReadyTasksResult,
-    Task,
+    StateResult,
     TaskAssignment,
     UpdatePlanResult,
+    UpdateTaskResult,
 )
 from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
 
@@ -64,10 +70,6 @@ _log = logging.getLogger(__name__)
 # Sentinel session key used when session_id is omitted from sam_active_task calls.
 # Single-agent scenarios do not require explicit session isolation.
 _DEFAULT_SESSION_ID = "_default"
-
-# Returned by _sam_plan_status and _sam_plan_ready when the plan is in drafting state.
-# Defined once here to ensure both handlers return an identical shape.
-_DRAFTING_MARKER_RESPONSE: dict[str, object] = {"drafting": True, "state": PlanState.DRAFTING}
 
 # Stem parsing thresholds used in _build_task_assignment.
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
@@ -134,7 +136,7 @@ def run_server() -> None:
 
 
 def _paginate_results(
-    all_items: list[dict[str, Any]],
+    all_items: list[PlanSummaryModel],
     *,
     offset: int,
     limit: int | None,
@@ -142,12 +144,13 @@ def _paginate_results(
     warnings: list[str],
     errors: list[str],
     tool_name: str,
-) -> dict[str, Any]:
-    """Paginate ``all_items`` within the token budget and return the response dict.
+) -> PaginatedResult:
+    """Paginate ``all_items`` within the token budget and return the response envelope.
 
     Returns:
-        Dict with ``items``, ``count``, ``pagination``, ``messages``, ``warnings``, ``errors``,
-        and optionally ``next_call``.
+        :class:`~sam_schema.core.models.PaginatedResult` with ``items``, ``count``,
+        ``pagination``, ``messages``, ``warnings``, ``errors``, and optionally
+        ``next_call``.
     """
     total = len(all_items)
     page_items = all_items[offset:]
@@ -157,8 +160,13 @@ def _paginate_results(
     else:
         effective_limit = len(page_items)
         if page_items:
+            # Pre-serialize to plain dicts once; token counting only needs the
+            # wire representation, and model_dump(mode="json") is idempotent
+            # across binary-search probes.  This preserves the O(N) total
+            # serialization work of the original refactor.
+            serialized_items = [item.model_dump(mode="json") for item in page_items]
             # Binary search for the largest k such that f(k) = len(_enc.encode(
-            # json.dumps(page_items[:k]))) <= _TOKEN_BUDGET.  f is monotonically
+            # json.dumps(serialized_items[:k]))) <= _TOKEN_BUDGET.  f is monotonically
             # non-decreasing, so binary search is valid and evaluates the *same*
             # function as the original loop, preserving exact pagination boundaries.
             # Total serialisation work: O(N) across all probes (N/2 + N/4 + … ≈ N)
@@ -168,7 +176,7 @@ def _paginate_results(
             lo, hi = 1, len(page_items)
             while lo < hi:
                 mid = (lo + hi + 1) // 2
-                if len(_enc.encode(json.dumps(page_items[:mid]))) <= _TOKEN_BUDGET:
+                if len(_enc.encode(json.dumps(serialized_items[:mid]))) <= _TOKEN_BUDGET:
                     lo = mid
                 else:
                     hi = mid - 1
@@ -176,17 +184,17 @@ def _paginate_results(
 
     page = page_items[:effective_limit]
     has_more = (offset + len(page)) < total
-    result: dict[str, Any] = {
-        "items": page,
-        "count": len(page),
-        "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
-        "messages": messages,
-        "warnings": warnings,
-        "errors": errors,
-    }
+    result = PaginatedResult(
+        items=page,
+        count=len(page),
+        pagination=PaginationMeta(offset=offset, limit=effective_limit, total=total, has_more=has_more),
+        messages=messages,
+        warnings=warnings,
+        errors=errors,
+    )
     if has_more:
         next_offset = offset + len(page)
-        result["next_call"] = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
+        result.next_call = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
     return result
 
 
@@ -222,22 +230,33 @@ def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     return operations.read_plan(backend, plan)
 
 
-def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResult | CreatePlanError:
+def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResult:
     """Create a new plan from a typed list of task definitions.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
+    On artifact write failure, the operations layer returns a
+    :class:`~sam_schema.core.models.CreatePlanError`; this boundary function
+    converts it to :class:`fastmcp.exceptions.ToolError` so the consolidated
+    ``sam_plan`` tool exposes only the success model in its return schema.
 
     Returns:
-        ``CreatePlanResult`` on success, ``CreatePlanError`` on artifact
-        write failure.
+        :class:`~sam_schema.core.models.CreatePlanResult` on success.
+
+    Raises:
+        ToolError: When plan creation's artifact write fails. The error
+            message includes ``error``, ``reason``, and ``hint`` from the
+            structured failure model.
     """
     backend = _get_backend(plan_dir)
-    return operations.create_plan(
+    result = operations.create_plan(
         backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
     )
+    if isinstance(result, CreatePlanError):
+        raise ToolError(f"{result.error}: {result.reason} (hint: {result.hint})")
+    return result
 
 
-def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict[str, Any]:
+def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> PaginatedResult:
     """List all plans with optional search and auto-pagination.
 
     Thin adapter: delegates business logic to ``dh_core.operations.list_plans``
@@ -250,31 +269,27 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict[str, Any]:
         ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
     backend = _get_backend(plan_dir)
-    # Operations layer returns a list of PlanSummary dicts; pagination is
+    # Operations layer returns typed PlanSummaryModel instances; pagination is
     # deferred to _paginate_results which applies offset/limit + token-budget
     # paging.
-    summaries = operations.list_plans(backend, search=config.search, offset=0, limit=None)
-    all_items: list[dict[str, Any]] = [{**s} for s in summaries]  # Spread TypedDict into plain dict at this boundary
+    all_items = operations.list_plans(backend, search=config.search, offset=0, limit=None)
     return _paginate_results(
         all_items, offset=config.offset, limit=config.limit, messages=[], warnings=[], errors=[], tool_name="sam_plan"
     )
 
 
-def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus | dict[str, object]:
+def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus:
     """Return plan-level progress summary including autonomy mode.
 
     Thin adapter that resolves the backend via ``_get_backend`` and
-    delegates to ``dh_core.operations.get_plan_status``. When the plan
-    is in drafting state, returns a drafting marker dict.
+    delegates to ``dh_core.operations.get_plan_status``. The returned
+    model carries ``state`` so callers can detect drafting plans.
     """
     backend = _get_backend(plan_dir)
-    try:
-        return operations.get_plan_status(backend, plan)
-    except ValueError:
-        return _DRAFTING_MARKER_RESPONSE
+    return operations.get_plan_status(backend, plan)
 
 
-def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[str, object] | ReadyTasksResult:
+def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyTasksResult:
     """List tasks ready for dispatch.
 
     Thin adapter: resolves the backend via ``_get_backend`` and delegates
@@ -284,14 +299,12 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict[s
 
     Returns:
         A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``,
-        ``count``, and ``issue`` fields. When the plan is drafting,
-        returns a drafting marker dict.
+        ``count``, ``issue``, and ``state`` fields. When the plan is
+        drafting, ``state`` is ``"drafting"`` and
+        ``ready_tasks`` is empty.
     """
     backend = _get_backend(plan_dir)
-    try:
-        return operations.get_ready_tasks(backend, plan)
-    except ValueError:
-        return _DRAFTING_MARKER_RESPONSE
+    return operations.get_ready_tasks(backend, plan)
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult:
@@ -363,30 +376,6 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
     return operations.finalize_plan(backend, plan)
 
 
-def _require_plan(plan: str | None, action: str) -> str:
-    """Narrow ``plan: str | None`` to ``str`` for actions that require it.
-
-    The ``_SAM_PLAN_REQUIRED_ACTIONS`` guard in ``sam_plan`` raises ``ToolError``
-    before the match statement when ``plan`` is ``None`` for a required action,
-    so this branch is unreachable in normal execution.  It is retained to satisfy
-    the type checker without using ``cast`` or ``assert``.
-
-    Args:
-        plan: The optional plan address from the tool call.
-        action: Action name, used only in the error message.
-
-    Returns:
-        The validated non-None plan address string.
-
-    Raises:
-        ToolError: If ``plan`` is ``None`` (unreachable after the outer guard).
-    """
-    if plan is None:  # pragma: no cover
-        msg = f"sam_plan: action='{action}' requires the 'plan' parameter (e.g., plan='P1')."
-        raise ToolError(msg)
-    return plan
-
-
 @mcp.tool(
     annotations=ToolAnnotations(
         title="SAM Plan Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -412,17 +401,13 @@ def sam_plan(
     ] = None,
 ) -> (
     CreatePlanResult
-    | CreatePlanError
-    | list[Task]
     | PlanStatus
-    | Plan
-    | TaskAssignment
     | ReadyTasksResult
     | ReadResult
     | UpdatePlanResult
     | AppendTaskResult
     | FinalizePlanResult
-    | dict[str, object]
+    | PaginatedResult
 ):
     """Consolidated plan-level operations for SAM.
 
@@ -448,7 +433,7 @@ def sam_plan(
         plan: Plan address component. Required for read, status, ready, update, append_task, finalize actions.
 
     Returns:
-        Response dict whose shape depends on the action (see individual action docs).
+        Response model whose shape depends on the action (see individual action docs).
 
     Raises:
         ToolError: When ``plan`` is None for an action that requires it.
@@ -506,7 +491,7 @@ def sam_task(
         TaskActionConfig, Field(description="Action config. Set 'action' to: read | claim | state | update")
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
-) -> TaskAssignment | Task | dict[str, Any] | ClaimResult:
+) -> TaskAssignment | ClaimResult | StateResult | UpdateTaskResult:
     """Read, claim, update state, or update fields for a specific task.
 
     # TRADE-OFF: readonly annotation loss
@@ -526,7 +511,7 @@ def sam_task(
         plan_dir: Path to the directory containing plan files.
 
     Returns:
-        Action-specific dict. See individual action descriptions.
+        Action-specific Pydantic model. See individual action descriptions.
     """
     backend = _get_backend(plan_dir)
 
@@ -581,7 +566,7 @@ def sam_active_task(
             )
         ),
     ] = None,
-) -> dict:
+) -> ActiveTaskGetResult | ActiveTaskSetResult | ActiveTaskUpdateResult | ActiveTaskClearResult:
     """Session-scoped active task context management.
 
     Parks a task address in session-scoped storage so subsequent operations
@@ -602,7 +587,7 @@ def sam_active_task(
             do not need explicit session isolation).
 
     Returns:
-        Action-specific dict. See individual action descriptions.
+        Action-specific Pydantic model. See individual action descriptions.
 
     Raises:
         ToolError: When ``action="update"`` and no active task has been set.

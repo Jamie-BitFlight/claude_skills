@@ -293,7 +293,7 @@ Execute the three-step sequence in order:
 mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "{goal}", "tasks": []})
 ```
 
-Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return a drafting marker instead of task counts until Step 3. This prevents the dispatch loop from seeing a partial plan.
+Record the returned plan ID (e.g., `Pa1b2c3d4`). The plan enters `state="drafting"` — `sam_plan status` and `sam_plan ready` return their normal result models with `state="drafting"` (and empty ready_tasks) instead of dispatchable data until Step 3. This prevents the dispatch loop from seeing a partial plan.
 
 **Step 2** — Append each task individually (repeat N times, one call per task):
 

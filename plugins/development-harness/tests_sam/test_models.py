@@ -25,6 +25,7 @@ from sam_schema.core.models import (
     CriterionStatus,
     IssueClassification,
     Plan,
+    PlanState,
     PlanStatus,
     Priority,
     ReadResult,
@@ -700,11 +701,13 @@ class TestPlanStatusModel:
             blocked_tasks=[],
             completion_pct=66.7,
             has_cycles=False,
+            state=PlanState.READY,
         )
         assert status.feature == "test"
         assert status.total_tasks == 3
         assert abs(status.completion_pct - 66.7) < 0.1
         assert not status.has_cycles
+        assert status.state == PlanState.READY
 
 
 # ---------------------------------------------------------------------------

@@ -207,8 +207,8 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
         plan_dir: Directory to search when resolving structured addresses.
 
     Returns:
-        Status dict from the operations layer. When the plan is in drafting
-        state, returns ``{"drafting": True, "state": "drafting"}``.
+        Status dict from the operations layer. The ``state`` key is
+        ``"drafting"`` when the plan is in drafting state.
 
     Raises:
         SystemExit(1): If the path or address cannot be resolved.
@@ -223,8 +223,6 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
         try:
             status = operations.get_plan_status(backend, plan_ref)
             return status.model_dump(mode="json")
-        except ValueError:
-            return {"drafting": True, "state": "drafting"}
         except PlanNotFoundError as exc:
             _err(str(exc))
         except FileNotFoundError as exc:
@@ -243,8 +241,6 @@ def _get_plan_status_for_address(plan_address: str, plan_dir: Path) -> dict[str,
     try:
         status = operations.get_plan_status(backend, plan_ref)
         return status.model_dump(mode="json")
-    except ValueError:
-        return {"drafting": True, "state": "drafting"}
     except PlanNotFoundError as exc:
         _err(str(exc))
     except FileNotFoundError as exc:
@@ -462,7 +458,11 @@ def list_plans(
 
     # Wrap the list in the documented envelope so CLI consumers receive a
     # stable shape: {"items": [...], "count": N, "total": N}.
-    envelope = {"items": [dict(s) for s in result], "count": len(result), "total": len(result)}
+    envelope = {
+        "items": [s.model_dump(mode="json", by_alias=True, exclude_none=True) for s in result],
+        "count": len(result),
+        "total": len(result),
+    }
 
     if output_format == "yaml":
         _output_yaml(envelope)
@@ -565,7 +565,7 @@ def state(
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
 
-    typer.echo(f"Task {task_id}: {old_status} -> {result['status']}")
+    typer.echo(f"Task {task_id}: {old_status} -> {result.status}")
 
 
 @app.command()
@@ -601,14 +601,6 @@ def ready(
         _err(str(exc))
     except FormatDetectionError as exc:
         _err(str(exc), exit_code=2)
-    except ValueError:
-        # Drafting marker — plan is in DRAFTING state.
-        drafting_marker = {"drafting": True, "ready_tasks": []}
-        if output_format == "yaml":
-            _output_yaml(drafting_marker)
-        else:
-            _output_json(drafting_marker)
-        return
 
     # CLI output: serialize the ReadyTasksResult model.
     if output_format == "yaml":
@@ -652,11 +644,6 @@ def status(
                 entry = ps.model_dump(mode="json")
                 entry["path"] = str(candidate)
                 results.append(entry)
-            except ValueError:
-                # Drafting plans raise ValueError — include a drafting marker
-                # entry instead of silently skipping them.
-                results.append({"drafting": True, "state": "drafting", "path": str(candidate)})
-                continue
             except _PLAN_LOAD_ERRORS as exc:
                 # Skip unreadable plan files when listing all; emit to stderr
                 typer.echo(f"Warning: skipping {candidate}: {exc}", err=True)
@@ -669,7 +656,7 @@ def status(
 
     data = _get_plan_status_for_address(plan_address, plan_dir)
 
-    if data.get("drafting"):
+    if data.get("state") == "drafting":
         if output_format == "rich":
             console = Console()
             console.print("Plan is in drafting state.")

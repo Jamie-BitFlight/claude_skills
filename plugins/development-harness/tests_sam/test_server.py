@@ -39,10 +39,12 @@ from sam_schema.core.models import (
     Priority,
     ReadResult,
     ReadyTasksResult,
+    StateResult,
     Task,
     TaskAssignment,
     TaskStatus,
     UpdatePlanResult,
+    UpdateTaskResult,
 )
 from sam_schema.server import sam_plan, sam_task
 from sam_schema.writers.yaml_writer import write_plan
@@ -185,10 +187,10 @@ def test_sam_state_updates_task_status(plan_dir: Path, plan_dir_str: str) -> Non
     # Act
     result = sam_task(plan="P1", task="T2", config=StateTaskConfig(status="in-progress"), plan_dir=plan_dir_str)
 
-    # Assert — update_task_status returns a dict; narrow via isinstance.
-    assert isinstance(result, dict)
-    assert result["id"] == "T2"
-    assert result["status"] == "in-progress"
+    # Assert — update_task_status returns a StateResult model.
+    assert isinstance(result, StateResult)
+    assert result.id == "T2"
+    assert result.status == "in-progress"
 
 
 def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str: str) -> None:
@@ -200,8 +202,8 @@ def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str:
     """
     for status_str in ("in-progress", "blocked", "complete", "deferred", "skipped", "failed", "not-started"):
         result = sam_task(plan="P1", task="T2", config=StateTaskConfig(status=status_str), plan_dir=plan_dir_str)
-        assert isinstance(result, dict), f"Unexpected non-dict for status '{status_str}': {result}"
-        assert result["status"] == status_str
+        assert isinstance(result, StateResult), f"Unexpected non-StateResult for status '{status_str}': {result}"
+        assert result.status == status_str
 
 
 def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> None:
@@ -222,7 +224,7 @@ def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> No
 
     # Act
     result = sam_task(plan="P1", task="T1", config=StateTaskConfig(status="failed"), plan_dir=str(plan_dir))
-    assert isinstance(result, dict)
+    assert isinstance(result, StateResult)
     t2 = sam_task(plan="P1", task="T2", config=ReadTaskConfig(), plan_dir=str(plan_dir))
     assert isinstance(t2, TaskAssignment)
     t3 = sam_task(plan="P1", task="T3", config=ReadTaskConfig(), plan_dir=str(plan_dir))
@@ -231,8 +233,8 @@ def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> No
     assert isinstance(ready, ReadyTasksResult)
 
     # Assert
-    assert result["status"] == "failed"
-    assert result["skipped_downstream"] == ["T2", "T3"]
+    assert result.status == "failed"
+    assert result.skipped_downstream == ["T2", "T3"]
     assert t2.task.status == "skipped"
     assert t3.task.status == "skipped"
     assert "skipped: upstream T1 failed" in (t2.task.reason or "")
@@ -744,10 +746,10 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
         config=UpdateTaskConfig(append_section="Divergence Notes", section_content="No divergence observed."),
         plan_dir=str(p_dir),
     )
-    assert isinstance(update_result, dict)
+    assert isinstance(update_result, UpdateTaskResult)
 
     # Assert
-    assert update_result.get("updated") is True
+    assert update_result.updated is True
 
     # Verify by reading the raw file — the section should be appended to task body
     raw = plan_path.read_text(encoding="utf-8")

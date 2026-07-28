@@ -413,6 +413,7 @@ def get_plan_status(plan_path: Path) -> PlanStatus:
         blocked_tasks=blocked_tasks,
         completion_pct=completion_pct,
         has_cycles=graph.has_cycles(),
+        state=plan.state,
     )
 
 
