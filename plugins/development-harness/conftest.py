@@ -56,7 +56,7 @@ from tests.network_blocked import NetworkBlocked
 _mock_enc = _tk.Encoding(
     name="cl100k_base",
     pat_str=r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""",
-    mergeable_ranks={b" ": 1, b"test": 2},
+    mergeable_ranks={bytes([i]): i for i in range(256)},
     special_tokens={},
 )
 
