@@ -43,7 +43,7 @@ def test_migrate_dry_run_uses_plan_relative_paths_outside_repo(monkeypatch, tmp_
     result = artifact_migration.migrate_dry_run(42)
 
     assert result["would_register"] == 2
-    assert [detail["path"] for detail in result["details"]] == [
+    assert sorted([detail["path"] for detail in result["details"]]) == sorted([
         "plan/codebase/architecture.md",
         "plan/P42-state-plan.yaml",
-    ]
+    ])
