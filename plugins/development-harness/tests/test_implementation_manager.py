@@ -177,7 +177,7 @@ class TestGetReadyTasksDependencySatisfaction:
 
 def test_claim_task_returns_started_string_and_persists(tmp_path: Path) -> None:
     """claim-task returns ClaimResult.started and persists the state transition."""
-    task_file = tmp_path / "tasks-001-claimable.yaml"
+    task_file = tmp_path / "P001-claimable.yaml"
     write_plan(Plan(feature="claimable", tasks=[_sam_task("T1")]), task_file, force_single=True)
 
     result = runner.invoke(app, ["claim-task", str(task_file), "T1"])
@@ -193,7 +193,7 @@ def test_claim_task_returns_started_string_and_persists(tmp_path: Path) -> None:
 
 def test_claim_task_directory_plan_uses_parent_backend_root(tmp_path: Path) -> None:
     """claim-task resolves a directory-layout plan from its parent directory."""
-    plan_dir = tmp_path / "tasks-directory-claim"
+    plan_dir = tmp_path / "P001-directory-claim"
     _write_directory(Plan(feature="directory-claim", tasks=[_sam_task("T1")]), plan_dir)
 
     result = runner.invoke(app, ["claim-task", str(plan_dir), "T1"])

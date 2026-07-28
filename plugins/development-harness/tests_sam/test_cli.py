@@ -23,7 +23,7 @@ _PURE_YAML_SINGLE: Path = FIXTURES_DIR / "pure_yaml_single.yaml"
 def plan_dir(tmp_path: Path) -> Path:
     """Create a temporary plan directory containing a copy of pure_yaml_single.yaml.
 
-    The file is named ``tasks-1-auth-system.yaml`` so address ``P1`` resolves
+    The file is named ``P001-auth-system.yaml`` so address ``P1`` resolves
     to it via numeric match, and ``auth-system`` resolves via slug match.
 
     Returns:
@@ -32,7 +32,7 @@ def plan_dir(tmp_path: Path) -> Path:
     d = tmp_path / "plan"
     d.mkdir()
     content = _PURE_YAML_SINGLE.read_text(encoding="utf-8")
-    (d / "tasks-1-auth-system.yaml").write_text(content, encoding="utf-8")
+    (d / "P001-auth-system.yaml").write_text(content, encoding="utf-8")
     return d
 
 

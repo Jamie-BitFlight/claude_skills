@@ -178,12 +178,11 @@ def test_sam_plan_read_keeps_flat_plan_shape_with_fallback_warning(monkeypatch: 
 
     response = _sam_plan_read("P1", "plan")
 
-    assert isinstance(response, dict)
-    assert response["feature"] == "test-feature"
-    assert response["warnings"] == [
-        "Plan P1 served from local cache — Gist copy may be unavailable or predates this fix."
-    ]
-    assert "plan" not in response
+    from sam_schema.core.models import ReadResult
+
+    assert isinstance(response, ReadResult)
+    assert response.plan.feature == "test-feature"
+    assert response.warnings == ["Plan P1 served from local cache — Gist copy may be unavailable or predates this fix."]
 
 
 async def test_sam_read_with_task_routes_through_backend_read_task(backend_mock: MagicMock) -> None:

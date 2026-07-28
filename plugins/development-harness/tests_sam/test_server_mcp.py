@@ -45,7 +45,7 @@ def plan_dir(tmp_path: Path) -> Path:
 
         tmp_path/
         └── plan/
-            └── tasks-1-mcp-test.yaml   (T1 complete, T2 depends on T1)
+            └── P001-mcp-test.yaml   (T1 complete, T2 depends on T1)
 
     Returns:
         Path to the plan directory (``tmp_path/plan``).
@@ -54,7 +54,7 @@ def plan_dir(tmp_path: Path) -> Path:
     p_dir.mkdir()
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="mcp-test", version="1.0", goal="MCP test goal", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-mcp-test.yaml", force_single=True)
+    write_plan(plan, p_dir / "P001-mcp-test.yaml", force_single=True)
     return p_dir
 
 
@@ -113,11 +113,8 @@ async def test_mcp_sam_read_existing_task_returns_task_assignment(plan_dir: Path
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "task" in data
-    assert data["task"]["id"] == "T1"
-    assert data["task"]["status"] == "complete"
+    assert data.task.id == "T1"
+    assert data.task.status == "complete"
 
 
 async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> None:
@@ -135,10 +132,9 @@ async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> Non
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "feature" in data
-    assert "task" not in data
+    assert data.plan.feature == "mcp-test"
+    # plan-only read returns a ReadResult, not a TaskAssignment — no task field
+    assert not hasattr(data, "task")
 
 
 async def test_mcp_sam_read_missing_task_returns_error_dict(plan_dir: Path) -> None:
@@ -230,10 +226,8 @@ async def test_mcp_sam_ready_returns_ready_tasks(plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["count"] == 1
-    assert data["ready_tasks"][0]["id"] == "T2"
+    assert data.count == 1
+    assert data.ready_tasks[0].id == "T2"
 
 
 # ---------------------------------------------------------------------------
@@ -256,13 +250,11 @@ async def test_mcp_sam_status_returns_plan_summary(plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["total_tasks"] == 2
-    assert "by_status" in data
-    assert "completion_pct" in data
-    assert "has_cycles" in data
-    assert data["has_cycles"] is False
+    assert data.total_tasks == 2
+    assert hasattr(data, "by_status")
+    assert hasattr(data, "completion_pct")
+    assert hasattr(data, "has_cycles")
+    assert data.has_cycles is False
 
 
 # ---------------------------------------------------------------------------
@@ -306,10 +298,8 @@ async def test_mcp_sam_create_creates_plan_file(tmp_path: Path) -> None:
     data = result.data
     import re
 
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["task_count"] == 1
-    assert re.match(r"^P[0-9a-f]{8}$", data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
+    assert data.task_count == 1
+    assert re.match(r"^P[0-9a-f]{8}$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -475,9 +465,9 @@ def multi_plan_dir(tmp_path: Path) -> Path:
 
         tmp_path/
         └── plan/
-            ├── tasks-1-alpha-feature.yaml   (goal: "Implement alpha")
-            ├── tasks-2-beta-feature.yaml    (goal: "Implement beta")
-            └── tasks-3-gamma-search.yaml    (goal: "Search integration")
+            ├── P001-alpha-feature.yaml   (goal: "Implement alpha")
+            ├── P002-beta-feature.yaml    (goal: "Implement beta")
+            └── P003-gamma-search.yaml     (goal: "Search integration")
 
     Returns:
         Path to the plan directory (``tmp_path/plan``).
@@ -492,7 +482,7 @@ def multi_plan_dir(tmp_path: Path) -> Path:
     ]:
         tasks = [make_task("T1")]
         plan = Plan(feature=feature, version="1.0", goal=goal, tasks=tasks)
-        write_plan(plan, p_dir / f"tasks-{plan_num}-{feature}.yaml", force_single=True)
+        write_plan(plan, p_dir / f"P{plan_num:03d}-{feature}.yaml", force_single=True)
 
     return p_dir
 
@@ -739,7 +729,7 @@ async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
     plan = Plan(
         feature="autonomy-test", version="1.0", goal="Test autonomy surfacing", tasks=tasks, autonomy="checkpoint"
     )
-    write_plan(plan, p_dir / "tasks-1-autonomy-test.yaml", force_single=True)
+    write_plan(plan, p_dir / "P001-autonomy-test.yaml", force_single=True)
 
     # Act
     async with Client(mcp) as client:

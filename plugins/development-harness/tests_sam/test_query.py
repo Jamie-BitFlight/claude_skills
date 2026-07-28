@@ -515,13 +515,13 @@ def plan_dir_with_files(tmp_path: Path) -> Path:
     """Create a directory with two task plan files for addressing tests.
 
     Files created:
-      - tasks-1-auth-system.yaml
-      - tasks-2-cache-layer.yaml
+      - P001-auth-system.yaml
+      - P002-cache-layer.yaml
     """
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
-    (plan_dir / "tasks-1-auth-system.yaml").write_text("feature: auth-system\n")
-    (plan_dir / "tasks-2-cache-layer.yaml").write_text("feature: cache-layer\n")
+    (plan_dir / "P001-auth-system.yaml").write_text("feature: auth-system\n")
+    (plan_dir / "P002-cache-layer.yaml").write_text("feature: cache-layer\n")
     return plan_dir
 
 
@@ -530,7 +530,7 @@ def test_resolve_plan_address_numeric_finds_correct_file(plan_dir_with_files: Pa
     result = resolve_plan_address("P1", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-1-auth-system.yaml"
+    assert result.name == "P001-auth-system.yaml"
 
 
 def test_resolve_plan_address_numeric_two_finds_second_file(plan_dir_with_files: Path) -> None:
@@ -538,7 +538,7 @@ def test_resolve_plan_address_numeric_two_finds_second_file(plan_dir_with_files:
     result = resolve_plan_address("P2", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-2-cache-layer.yaml"
+    assert result.name == "P002-cache-layer.yaml"
 
 
 def test_resolve_plan_address_slug_finds_matching_file(plan_dir_with_files: Path) -> None:
@@ -546,20 +546,20 @@ def test_resolve_plan_address_slug_finds_matching_file(plan_dir_with_files: Path
     result = resolve_plan_address("cache-layer", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-2-cache-layer.yaml"
+    assert result.name == "P002-cache-layer.yaml"
 
 
 def test_resolve_plan_address_numeric_takes_precedence_over_slug(tmp_path: Path) -> None:
     # Arrange — create a file where the slug contains a number
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
-    (plan_dir / "tasks-1-step-1-api.yaml").write_text("feature: step-1-api\n")
+    (plan_dir / "P001-step-1-api.yaml").write_text("feature: step-1-api\n")
 
-    # Act — numeric "1" matches tasks-1-* prefix, not slug "1"
+    # Act — numeric "1" matches P001-* prefix, not slug "1"
     result = resolve_plan_address("P1", plan_dir)
 
     # Assert
-    assert result.name == "tasks-1-step-1-api.yaml"
+    assert result.name == "P001-step-1-api.yaml"
 
 
 def test_resolve_plan_address_missing_plan_raises_addressing_error(plan_dir_with_files: Path) -> None:
