@@ -24,7 +24,7 @@ from sam_schema.core.backends._utils import validate_appended_task
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
-from sam_schema.readers.detect import FormatDetectionError, FormatType, read_plan as _detect_read_plan
+from sam_schema.readers import detect
 from sam_schema.readers.normalize import normalize_plan
 from sam_schema.writers.yaml_writer import (
     _atomic_write,
@@ -293,7 +293,7 @@ class LocalYamlTaskProvider:
             A ``ReadResult`` containing the parsed ``Plan`` and any
             ``SchemaGap`` records for non-canonical fields.
         """
-        plan_meta, task_dicts, fmt = _detect_read_plan(path)
+        plan_meta, task_dicts, fmt = detect.read_plan(path)
         return normalize_plan(plan_meta, task_dicts, fmt, path)
 
     # ------------------------------------------------------------------
@@ -447,7 +447,7 @@ class LocalYamlTaskProvider:
                 if plan.backend_ref is not None:
                     summary["backend_ref"] = plan.backend_ref
                 summaries.append(summary)
-            except (FileNotFoundError, FormatDetectionError, ValueError, TypeError):
+            except (FileNotFoundError, detect.FormatDetectionError, ValueError, TypeError):
                 continue
 
         paginated = summaries[offset:]
@@ -631,7 +631,7 @@ class LocalYamlTaskProvider:
 
         updated_tasks = [task if t.id == task.id else t for t in plan.tasks]
         updated_plan = plan.model_copy(update={"tasks": updated_tasks})
-        write_plan(updated_plan, path, force_single=(result.source_format != FormatType.DIRECTORY))
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append markdown content to a named section of a task's context_notes.
