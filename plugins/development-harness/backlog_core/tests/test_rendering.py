@@ -1,7 +1,7 @@
 """Tests for the rendering abstraction introduced in backlog_core.rendering.
 
 Verifies:
-- All three BacklogBackend implementations return identical output for
+- All three backend implementations return identical output for
   ``render_groomed_section`` — confirming the shared rendering module is used.
 - ``operations.py`` no longer imports rendering symbols from ``github_sync``.
 - The ``section_heading`` property is accessible on all backends and contains
@@ -24,7 +24,7 @@ from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import GroomedData
 
 if TYPE_CHECKING:
-    from backlog_core.backend_protocol import BacklogBackend
+    from backlog_core.backend_types import WorkItemBackend
 
 # ---------------------------------------------------------------------------
 # Shared fixture
@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=["github", "sqlite", "memory", "beads"])
-def backend_instance(request: pytest.FixtureRequest) -> BacklogBackend:
-    """Parametrised fixture yielding each BacklogBackend implementation.
+def backend_instance(request: pytest.FixtureRequest) -> WorkItemBackend:
+    """Parametrised fixture yielding each backend implementation.
 
     Covers GitHubBackend, SQLiteBackend (in-memory), InMemoryBackend, and
     BeadsBackend so that rendering tests exercise all four without repeating
@@ -62,7 +62,7 @@ class TestRenderGroomedSectionConsistency:
     """render_groomed_section on all three backends produces the same markdown."""
 
     def test_render_groomed_section_returns_same_output_for_all_backends(
-        self, backend_instance: BacklogBackend
+        self, backend_instance: WorkItemBackend
     ) -> None:
         """Each backend's render_groomed_section matches the canonical rendering module output.
 
@@ -155,11 +155,11 @@ class TestOperationsDoesNotImportFromGithubSync:
 class TestBackendProtocolSectionHeadingProperty:
     """section_heading property is accessible on all backends and contains required keys."""
 
-    def test_backend_protocol_section_heading_property(self, backend_instance: BacklogBackend) -> None:
+    def test_backend_protocol_section_heading_property(self, backend_instance: WorkItemBackend) -> None:
         """section_heading returns a dict[str, str] with the minimum required section keys.
 
         Verifies that all three backends correctly expose the section_heading property
-        defined on the BacklogBackend Protocol, that the returned value is a plain dict
+        defined on the WorkItemBackend Protocol, that the returned value is a plain dict
         mapping str to str, and that the keys used by the grooming workflow are present.
         """
         # Act
@@ -219,7 +219,7 @@ class TestUnknownKeyToHeading:
 class TestSectionDisplayTitleConsistency:
     """section_display_title on all four backends produces identical output.
 
-    Regression guard: verifies that every BacklogBackend delegates
+    Regression guard: verifies that every backend delegates
     ``section_display_title`` to ``backlog_core.rendering.section_display_title``
     rather than re-implementing the logic locally.  A backend that diverges
     (e.g. returns a different heading for the same key) would produce
@@ -237,7 +237,7 @@ class TestSectionDisplayTitleConsistency:
         ids=["known_key", "groomed_key_with_date", "unknown_key"],
     )
     def test_section_display_title_returns_same_output_for_all_backends(
-        self, backend_instance: BacklogBackend, key: str, groomed_date: str
+        self, backend_instance: WorkItemBackend, key: str, groomed_date: str
     ) -> None:
         """Each backend's section_display_title matches the canonical rendering module output.
 

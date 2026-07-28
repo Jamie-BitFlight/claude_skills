@@ -451,7 +451,7 @@ Check for an existing implementation team before dispatching QG agents:
 
 ### Dispatch Loop
 
-Repeat until `sam_plan(action='ready')` returns an empty list:
+Repeat until `sam_plan(action='ready')` returns a `ReadyTasksResult` with an empty `ready_tasks` list:
 
 **1. Get next ready task:**
 

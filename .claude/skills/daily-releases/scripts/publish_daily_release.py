@@ -27,7 +27,7 @@ from __future__ import annotations
 import os
 import sys
 from io import TextIOWrapper
-from pathlib import Path  # noqa: TC003
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).

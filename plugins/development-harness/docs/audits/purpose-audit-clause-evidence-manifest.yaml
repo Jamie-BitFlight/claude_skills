@@ -1,0 +1,540 @@
+# Purpose Audit — Clause/Evidence Manifest
+# Atomic mapping of every PURPOSE.md clause to selected sources, evidence
+# methods, and audit partitions. Consumed by fresh fidelity auditors.
+# Generated from the frozen reference manifest; no findings or remediation.
+
+manifest_version: 1
+manifest_type: purpose-audit-clause-evidence-manifest
+
+baseline:
+  commit: 2c76f47da69117724d619e364fa4b968e83e944d
+  purpose_doc: plugins/development-harness/docs/PURPOSE.md
+  purpose_doc_read: complete
+  reference_manifest: plugins/development-harness/docs/audits/purpose-audit-reference-manifest.yaml
+  reference_manifest_read: complete
+  frozen: true
+  worktree_state_at_freeze: clean
+
+# Source precedence inherited from the reference manifest.
+source_precedence:
+  - PURPOSE.md target contract clauses
+  - PURPOSE.md current-boundary clauses
+  - executable protocols, configuration, transport, and provider implementations
+  - published plugin, lifecycle, and skill contracts
+  - focused parity, conformance, and transport tests
+  - supporting ADRs and agent procedures
+
+# Evidence schema: every auditor finding must classify each assertion.
+evidence_schema:
+  documented-claim: >-
+    A statement of intent or contract found in docs, skills, ADRs, or agent
+    prompts. Proves what the system declares, not what it does.
+  implementation-fact: >-
+    A structural property observable in committed source: a class, function,
+    field, import, registration, or configuration value. Proves existence/shape,
+    not runtime behavior.
+  test-evidence: >-
+    A focused, executable test that asserts specific behavior against an
+    isolated backend. Proves expected behavior under test conditions, not all
+    real runtime configurations.
+  confidence: >-
+    Auditor's confidence level for a resolved assertion: high / medium / low.
+    High = multiple independent evidence types agree; low = single weak signal.
+  unknown: >-
+    An assertion the auditor could not resolve to source, test, or runtime
+    proof. Must state the missing observable or unavailable environment — not
+    mere lack of effort. Never inferred.
+
+# Audit safety: read-only, no external writes, no --help as proof.
+audit_safety:
+  mode: read-only
+  backlog_backend_default: memory
+  task_backend_default: memory
+  sqlite_allowed: true
+  external_writes: prohibited
+  network_writes: prohibited
+  gist_writes: prohibited
+  github_writes: prohibited
+  state_root_isolation: required
+  help_output_as_proof: prohibited
+  import_as_proof: prohibited
+  mock_as_proof: prohibited
+  runtime_proof_requirements: >-
+    Any runtime claim must record exact command, environment variables, backend
+    selection, fixture/state root, exit status, response body, and timestamp.
+    Run in isolated local/memory configurations unless a deliberately approved
+    live-provider test is necessary.
+
+# Audit partitions: independent auditors own one partition; may cite another
+# but cannot claim its behavior without marking it dependent/unknown.
+audit_partitions:
+  A:
+    name: public-docs-skills-readme-cli
+    scope: >-
+      Public docs, skills, README, plugin manifest, CLI transport surface,
+      and published contract claims. Owns the public-surface inventory and
+      documented-intent evidence.
+    clauses: [P1, P4, P5, B1]
+  B:
+    name: backlog-logical-objects-providers
+    scope: >-
+      Backlog logical objects, backend protocols, provider selection, and
+      cross-provider conformance. Owns the canonical model and provider-
+      neutrality evidence for backlog storage.
+    clauses: [P2, P6, B3]
+  C:
+    name: sam-plans-tasks-coordination
+    scope: >-
+      SAM plan/task lifecycle, coordination/dispatch, task backend contract,
+      and the closed-loop workflow stages. Owns lifecycle and coordination
+      evidence.
+    clauses: [P3]
+  D:
+    name: artifacts-durability-cross-surface-integration
+    scope: >-
+      Artifact manifests/content storage, durability guarantees (Gist vs
+      local), fallback behavior, backlog persistence boundary, and cross-
+      surface integration (CLI+MCP+backend end-to-end). Owns durability and
+      integration evidence.
+    clauses: [B2, B4]
+
+# Clause definitions: stable IDs, verbatim text from PURPOSE.md, line refs,
+# mapped sources, evidence methods, audit partition, and status.
+clauses:
+  P1:
+    label: Purpose and generic logical work-management system (PURPOSE.md lines 5-7, 41-43).
+    purpose_line_refs: [[5, 7], [41, 43]]
+    clause_text:
+      excerpt_1: |-
+        Development Harness targets a generic agent work-management system that
+        preserves logical work and the evidence needed to move it from intake to
+        validated closure.
+      excerpt_2: |-
+        This model is domain-generic. It applies to software, Markdown agent and plugin
+        work, design, TUI, web, and font work, job search, research, ranking, and other
+        work that benefits from durable scope, relationships, coordination, and evidence.
+    audit_partition:
+      primary: A
+      secondary: ['C']
+    evidence_methods: ['doc-claim', 'static-source']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/skills/development-harness/SKILL.md
+      - plugins/development-harness/skills/development-harness/references/default-development-flow.md
+    status: pending
+  P2:
+    label: Logical objects and relationships; agents do not use provider IDs/paths/API objects (lines 11-24).
+    purpose_line_refs: [[11, 24]]
+    clause_text:
+      text: |-
+        Under the target contract, agents work only with logical objects and
+        relationships:
+
+        - backlog item;
+        - research, reference, guide, or note;
+        - architecture;
+        - plan;
+        - atomic task;
+        - coordination or dispatch state;
+        - review, validation, or result evidence; and
+        - follow-up item.
+
+        An agent uses logical identifiers and relationships, not provider IDs, file
+        paths, issue bodies, database rows, Gists, or API-specific objects.
+    audit_partition:
+      primary: B
+      secondary: ['A', 'C']
+    evidence_methods: ['static-source', 'focused-test']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/docs/backlog-lifecycle.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/backlog_core/backend_types.py
+      - plugins/development-harness/sam_schema/core/task_backend.py
+      - plugins/development-harness/sam_schema/core/models.py
+      - plugins/development-harness/sam_schema/core/gist_task_layer.py
+      - plugins/development-harness/sam_schema/core/artifact_registry_client.py
+      - plugins/development-harness/backlog_core/artifact_provider_local.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/backlog_core/artifact_provider.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/docs/plan-artifact-lifecycle.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/work-backlog-item/SKILL.md
+      - plugins/development-harness/skills/add-new-feature/SKILL.md
+      - plugins/development-harness/skills/development-harness/references/artifact-conventions.md
+      - plugins/development-harness/tests/test_artifact_content_storage.py
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  P3:
+    label: Closed-loop intake through evidence-backed closure and follow-up (lines 28-39).
+    purpose_line_refs: [[28, 39]]
+    clause_text:
+      text: |-
+        The system is intended to support a full closed loop:
+
+        1. Intake a backlog item and groom its scope and evidence.
+        2. Research and assess the existing system factually, then produce architecture.
+        3. Produce a plan.
+        4. Decompose work into atomic tasks; sequence, distribute, and coordinate them.
+        5. Execute tasks.
+        6. Append findings, workarounds, concerns, and validation evidence upstream.
+        7. Revise the plan, add tasks, or create a follow-up backlog item when evidence requires it.
+        8. Review the plan and architecture.
+        9. Validate the product-level outcome, including documentation, tests, end-to-end checks, and CI when applicable.
+        10. Close work with evidence.
+    audit_partition:
+      primary: C
+      secondary: ['A', 'D']
+    evidence_methods: ['static-source', 'focused-test', 'doc-claim']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/skills/development-harness/SKILL.md
+      - plugins/development-harness/docs/backlog-item-lifecycle.md
+      - plugins/development-harness/docs/backlog-lifecycle.md
+      - plugins/development-harness/sam_schema/core/models.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/docs/adr-9-close-resolve-semantics.md
+      - plugins/development-harness/docs/adrs/ADR-1770-1-single-writer-task-backend.md
+      - plugins/development-harness/docs/plan-artifact-lifecycle.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/work-backlog-item/SKILL.md
+      - plugins/development-harness/skills/add-new-feature/SKILL.md
+      - plugins/development-harness/skills/implement-feature/SKILL.md
+      - plugins/development-harness/skills/complete-implementation/SKILL.md
+      - plugins/development-harness/skills/dispatch/SKILL.md
+      - plugins/development-harness/skills/development-harness/references/default-development-flow.md
+      - plugins/development-harness/skills/development-harness/references/artifact-conventions.md
+      - plugins/development-harness/agents/task-worker.md
+      - plugins/development-harness/agents/doc-drift-auditor.md
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  P4:
+    label: CLI/MCP logical CRUD, lifecycle, evidence, coordination, and queries (lines 47-55).
+    purpose_line_refs: [[47, 55]]
+    clause_text:
+      text: |-
+        CLI and MCP should expose stable logical CRUD and workflow operations for:
+
+        - creating, reading, updating, and deleting logical objects;
+        - updating fields and sections, including append and delete operations;
+        - recording and retrieving references and evidence;
+        - managing architecture, plan, and task lifecycles;
+        - returning task feedback upstream;
+        - assigning sequence and ownership; and
+        - querying by logical ID, relationship, status, capability, and provenance.
+    audit_partition:
+      primary: A
+      secondary: ['B', 'C']
+    evidence_methods: ['static-source', 'runtime-proof']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/.claude-plugin/plugin.json
+      - plugins/development-harness/skills/development-harness/SKILL.md
+      - plugins/development-harness/docs/backlog-lifecycle.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/backlog_core/backend_types.py
+      - plugins/development-harness/sam_schema/core/task_backend.py
+      - plugins/development-harness/sam_schema/core/models.py
+      - plugins/development-harness/sam_schema/core/gist_task_layer.py
+      - plugins/development-harness/dh_core/operations.py
+      - plugins/development-harness/sam_schema/server.py
+      - plugins/development-harness/sam_schema/cli.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/docs/mcp-progressive-disclosure-contract.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/work-backlog-item/SKILL.md
+      - plugins/development-harness/skills/add-new-feature/SKILL.md
+      - plugins/development-harness/skills/implement-feature/SKILL.md
+      - plugins/development-harness/skills/complete-implementation/SKILL.md
+      - plugins/development-harness/skills/dispatch/SKILL.md
+      - plugins/development-harness/skills/development-harness/references/artifact-conventions.md
+      - plugins/development-harness/agents/task-worker.md
+      - plugins/development-harness/tests/test_task_backend_conformance.py
+      - plugins/development-harness/tests/test_cross_backend.py
+      - plugins/development-harness/tests/test_server_sam.py
+      - plugins/development-harness/tests/test_backlog_core_server.py
+      - plugins/development-harness/tests/test_backend_status.py
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  P5:
+    label: CLI/MCP interchangeable transports; both supported; provider-independent frontend contract (lines 57-63).
+    purpose_line_refs: [[57, 63]]
+    clause_text:
+      text: |-
+        The target frontend contract treats CLI and MCP as interchangeable transports:
+        both expose logical operations rather than a provider's files, issue objects, or
+        API-specific addresses. Both surfaces remain supported; this document makes no
+        retirement or deprecation claim about either one.
+
+        The frontend contract must not depend on a selected provider's object model or
+        addressing scheme.
+    audit_partition:
+      primary: A
+      secondary: ['B', 'C']
+    evidence_methods: ['focused-test', 'runtime-proof']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/.claude-plugin/plugin.json
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/sam_schema/core/task_config.py
+      - plugins/development-harness/dh_core/operations.py
+      - plugins/development-harness/dh_core/protocols.py
+      - plugins/development-harness/sam_schema/server.py
+      - plugins/development-harness/sam_schema/cli.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/tests/test_frontend_parity.py
+      - plugins/development-harness/tests/test_frontend_logic_free.py
+      - plugins/development-harness/tests/test_server_sam.py
+      - plugins/development-harness/tests/test_backlog_core_server.py
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  P6:
+    label: Canonical provider-neutral backend semantics; new providers do not change frontend/workflow behavior (lines 67-75).
+    purpose_line_refs: [[67, 75]]
+    clause_text:
+      text: |-
+        Storage is an implementation detail. Logical objects may be stored together or
+        across providers such as GitHub, GitLab, Linear, SQLite, Beads, local storage,
+        or Gist-backed storage.
+
+        The target backend contract is canonical and provider-neutral. It defines object
+        and relationship semantics, content and revisions, links, append behavior,
+        statuses, query capabilities, ownership, and provenance. Adding a provider must
+        change only provider implementation, registration, and configuration—not CLI or
+        MCP commands or workflow behavior.
+    audit_partition:
+      primary: B
+      secondary: ['D']
+    evidence_methods: ['static-source', 'focused-test']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/backlog_core/backend_protocol.py
+      - plugins/development-harness/backlog_core/backend_types.py
+      - plugins/development-harness/sam_schema/core/task_backend.py
+      - plugins/development-harness/sam_schema/core/task_config.py
+      - plugins/development-harness/sam_schema/core/gist_task_layer.py
+      - plugins/development-harness/sam_schema/core/artifact_registry_client.py
+      - plugins/development-harness/backlog_core/artifact_provider_local.py
+      - plugins/development-harness/dh_config.py
+      - plugins/development-harness/dh_core/operations.py
+      - plugins/development-harness/dh_core/protocols.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/backlog_core/artifact_provider.py
+      - plugins/development-harness/docs/adrs/ADR-1770-1-single-writer-task-backend.md
+      - plugins/development-harness/tests/test_frontend_logic_free.py
+      - plugins/development-harness/tests/test_task_backend_conformance.py
+      - plugins/development-harness/tests/test_cross_backend.py
+      - plugins/development-harness/tests/test_artifact_content_storage.py
+      - plugins/development-harness/tests/test_backend_status.py
+    status: pending
+  B1:
+    label: Current MCP-primary / incomplete CLI surface (lines 82-83).
+    purpose_line_refs: [[82, 83]]
+    clause_text:
+      text: |-
+        - MCP is currently the primary interface; the CLI does not expose every MCP
+          capability surface.
+    audit_partition:
+      primary: A
+      secondary: ['C']
+    evidence_methods: ['static-source', 'runtime-proof']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/.claude-plugin/plugin.json
+      - plugins/development-harness/skills/development-harness/SKILL.md
+      - plugins/development-harness/docs/backlog-item-lifecycle.md
+      - plugins/development-harness/sam_schema/server.py
+      - plugins/development-harness/sam_schema/cli.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/implement-feature/SKILL.md
+    status: pending
+  B2:
+    label: Current MCP Gist durability versus local CLI/direct paths (lines 84-85).
+    purpose_line_refs: [[84, 85]]
+    clause_text:
+      text: |-
+        - CLI and MCP durability differs: MCP plan paths use Gist write-through, while
+          CLI and direct paths can remain local-only.
+    audit_partition:
+      primary: D
+      secondary: ['C']
+    evidence_methods: ['focused-test', 'runtime-proof']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/docs/backlog-item-lifecycle.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/sam_schema/core/task_config.py
+      - plugins/development-harness/sam_schema/core/gist_task_layer.py
+      - plugins/development-harness/sam_schema/core/artifact_registry_client.py
+      - plugins/development-harness/sam_schema/cli.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/skills/implement-feature/SKILL.md
+      - plugins/development-harness/tests_sam/test_gist_write_through.py
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  B3:
+    label: Current provider/native identifier and addressing exposure (lines 86-89).
+    purpose_line_refs: [[86, 89]]
+    clause_text:
+      text: |-
+        - Present interfaces expose GitHub issue numbers and file or path addressing;
+          agents do not yet see only logical objects.
+        - Plans and tasks are mostly provider-neutral, but select CLI and manager paths
+          remain backend-coupled.
+    audit_partition:
+      primary: B
+      secondary: ['A', 'C']
+    evidence_methods: ['static-source', 'focused-test']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/docs/backlog-item-lifecycle.md
+      - plugins/development-harness/docs/backlog-lifecycle.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/sam_schema/core/task_backend.py
+      - plugins/development-harness/sam_schema/core/models.py
+      - plugins/development-harness/sam_schema/core/task_config.py
+      - plugins/development-harness/sam_schema/core/gist_task_layer.py
+      - plugins/development-harness/sam_schema/cli.py
+      - plugins/development-harness/docs/TASK_FILE_FORMAT.md
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/work-backlog-item/SKILL.md
+      - plugins/development-harness/skills/implement-feature/SKILL.md
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+  B4:
+    label: Current artifact remote-manifest/local-content behavior and backlog persistence boundary (lines 90-92).
+    purpose_line_refs: [[90, 92]]
+    clause_text:
+      text: |-
+        - Artifact manifests may use remote providers, while established content-serving
+          paths currently use or fall back to the local filesystem.
+        - Backlog persistence remains partly GitHub- and filesystem-shaped.
+    audit_partition:
+      primary: D
+      secondary: ['B']
+    evidence_methods: ['focused-test', 'static-source']
+    mapped_sources:
+      - plugins/development-harness/docs/PURPOSE.md
+      - plugins/development-harness/CLAUDE.md
+      - plugins/development-harness/README.md
+      - plugins/development-harness/docs/backlog-item-lifecycle.md
+      - plugins/development-harness/docs/backlog-lifecycle.md
+      - plugins/development-harness/docs/backend-providers.md
+      - plugins/development-harness/backlog_core/backend_protocol.py
+      - plugins/development-harness/sam_schema/core/artifact_registry_client.py
+      - plugins/development-harness/backlog_core/artifact_provider_local.py
+      - plugins/development-harness/dh_config.py
+      - plugins/development-harness/backlog_core/server.py
+      - plugins/development-harness/backlog_core/artifact_provider.py
+      - plugins/development-harness/skills/backlog/SKILL.md
+      - plugins/development-harness/skills/development-harness/references/artifact-conventions.md
+      - plugins/development-harness/tests/test_artifact_content_storage.py
+      - plugins/development-harness/tests/test_artifact_provider_fallback.py
+      - plugins/development-harness/docs/workflow-architecture-diagram.md
+    status: pending
+
+# Cross-partition dependencies: clauses whose evidence spans partitions.
+# Auditors cite the dependent partition but mark unresolved behavior as
+# 'unknown' rather than inferring it.
+cross_partition_dependencies:
+  P1:
+    primary: A
+    depends_on: ['C']
+    note: >-
+      Primary evidence in partition A; secondary evidence
+      required from partition(s) C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  P2:
+    primary: B
+    depends_on: ['A', 'C']
+    note: >-
+      Primary evidence in partition B; secondary evidence
+      required from partition(s) A, C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  P3:
+    primary: C
+    depends_on: ['A', 'D']
+    note: >-
+      Primary evidence in partition C; secondary evidence
+      required from partition(s) A, D for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  P4:
+    primary: A
+    depends_on: ['B', 'C']
+    note: >-
+      Primary evidence in partition A; secondary evidence
+      required from partition(s) B, C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  P5:
+    primary: A
+    depends_on: ['B', 'C']
+    note: >-
+      Primary evidence in partition A; secondary evidence
+      required from partition(s) B, C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  P6:
+    primary: B
+    depends_on: ['D']
+    note: >-
+      Primary evidence in partition B; secondary evidence
+      required from partition(s) D for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  B1:
+    primary: A
+    depends_on: ['C']
+    note: >-
+      Primary evidence in partition A; secondary evidence
+      required from partition(s) C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  B2:
+    primary: D
+    depends_on: ['C']
+    note: >-
+      Primary evidence in partition D; secondary evidence
+      required from partition(s) C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  B3:
+    primary: B
+    depends_on: ['A', 'C']
+    note: >-
+      Primary evidence in partition B; secondary evidence
+      required from partition(s) A, C for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+  B4:
+    primary: D
+    depends_on: ['B']
+    note: >-
+      Primary evidence in partition D; secondary evidence
+      required from partition(s) B for full
+      resolution. Mark unverified cross-surface behavior as 'unknown'.
+
+# Status legend: every clause starts 'pending' and is updated only by the
+# assigned partition auditor upon evidence collection.
+status_legend:
+  pending: no evidence collected yet
+  in_progress: auditor actively collecting evidence
+  evidenced: at least one evidence method resolved; findings recorded separately
+  blocked: missing observable or unavailable environment; reason recorded

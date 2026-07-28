@@ -162,7 +162,7 @@ class TestReadDispatchPlanInvalidYAML:
         bad_yaml.write_text(": invalid: yaml: {", encoding="utf-8")
 
         # Act / Assert
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
             read_dispatch_plan(bad_yaml)
 
     def test_read_dispatch_plan_non_mapping_yaml_raises_value_error(self, tmp_path: Path) -> None:
@@ -171,7 +171,7 @@ class TestReadDispatchPlanInvalidYAML:
         bad_yaml.write_text("- item1\n- item2\n", encoding="utf-8")
 
         # Act / Assert
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
             read_dispatch_plan(bad_yaml)
 
     def test_read_dispatch_plan_missing_required_field_raises_value_error(self, tmp_path: Path) -> None:
@@ -182,7 +182,7 @@ class TestReadDispatchPlanInvalidYAML:
         )
 
         # Act / Assert
-        with pytest.raises(ValueError):  # noqa: PT011
+        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
             read_dispatch_plan(incomplete_yaml)
 
     def test_read_dispatch_plan_validation_error_message_contains_path(self, tmp_path: Path) -> None:

@@ -20,7 +20,7 @@ _YAML_RT: YAML = YAML(typ="rt")
 _YAML_RT.preserve_quotes = True
 
 
-def _load_yaml(content: str) -> Any:  # noqa: ANN401
+def _load_yaml(content: str) -> Any:  # ruff: ignore[any-type]
     """Parse YAML text using ruamel.yaml round-trip mode.
 
     Args:
@@ -39,7 +39,7 @@ def _load_yaml(content: str) -> Any:  # noqa: ANN401
         raise ValueError(msg) from exc
 
 
-def _coerce_to_plain(obj: Any) -> Any:  # noqa: ANN401
+def _coerce_to_plain(obj: Any) -> Any:  # ruff: ignore[any-type]
     """Recursively coerce ruamel.yaml CommentedMap/CommentedSeq to plain Python types.
 
     ruamel.yaml round-trip mode returns ``CommentedMap`` and ``CommentedSeq``
@@ -81,7 +81,7 @@ def read_dispatch_plan(path: Path) -> DispatchPlan:
 
     if not isinstance(parsed, dict):
         msg = f"Expected a YAML mapping at the top level of {path}, got {type(parsed).__name__}"
-        raise ValueError(msg)  # noqa: TRY004 -- structural parse error, not a caller type error
+        raise ValueError(msg)  # ruff: ignore[type-check-without-type-error] -- structural parse error, not a caller type error
 
     plain = _coerce_to_plain(parsed)
 

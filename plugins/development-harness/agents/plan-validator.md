@@ -77,12 +77,10 @@ work-in-progress artifact — NOT a malformed or incomplete final plan.
 
 ### Decision Table: Drafting vs Ready Validation Modes
 
-| Condition | Plan state | Drafting marker in response | Validation mode | Full dispatchability checks |
-|---|---|---|---|---|
-| Plan under construction | `drafting` | Present | Structural only | Deferred |
-| Plan ready for dispatch | `ready` (or absent) | Absent | Full | Applied |
-| Malformed: finalized but marker still present | `ready` (or absent) | Present | Flag as malformed | N/A — flag error |
-| Malformed: drafting but no marker | `drafting` | Absent | Structural only | Deferred |
+| Condition | Plan state | Validation mode | Full dispatchability checks |
+|---|---|---|---|
+| Plan under construction | `drafting` | Structural only | Deferred |
+| Plan ready for dispatch | `ready` | Full | Applied |
 
 ### Flowchart: Validation Mode Selection
 
@@ -90,14 +88,11 @@ work-in-progress artifact — NOT a malformed or incomplete final plan.
 Read plan via sam_plan(action='read')
         |
         v
-Is state == "drafting"?
+Is plan.state == "drafting"?
   YES --> Apply Structural-Only checks (see below)
           Return: STATUS=DRAFTING (not READY/BLOCKED)
-  NO  --> Is drafting marker present in response?
-            YES --> Flag: MALFORMED (non-drafting plan contains drafting marker)
-                    Return: STATUS=BLOCKED with STRUCTURE gap
-            NO  --> Apply Full Dispatchability checks (all dimensions)
-                    Return: STATUS=READY or STATUS=BLOCKED
+  NO  --> Apply Full Dispatchability checks (all dimensions)
+          Return: STATUS=READY or STATUS=BLOCKED
 ```
 
 ### Structural-Only Checks (Drafting Plans)
@@ -150,18 +145,16 @@ BLOCKERS:
 
 ### Malformed Plan Detection
 
-A plan is malformed when `state` is `ready` (or absent) BUT the `sam_plan(action='read')` response
-contains a drafting marker (`{drafting: True}` or `{state: "drafting"}` embedded in the
-plan data).
-
-This indicates `finalize` was never called or the state field was corrupted. Report as:
+A plan is malformed when `plan.state` is missing or has an unexpected value.
+The `state` field is authoritative: `drafting` means the plan is under
+construction, and `ready` means it is available for dispatch. Report as:
 
 ```text
 STATUS: BLOCKED
-SUMMARY: Plan state is inconsistent — non-drafting plan still contains drafting marker.
+SUMMARY: Plan state is inconsistent or missing.
 BLOCKERS:
-  1. [STRUCTURE] Plan: state field is absent or 'ready' but drafting marker is present in data.
-     Fix: Call sam_plan(action='finalize') to clear the drafting marker, then re-validate.
+  1. [STRUCTURE] Plan: `state` field is absent or invalid.
+     Fix: Call sam_plan(action='finalize') to set state="ready", then re-validate.
 ```
 
 SOURCE: Architectural Decision 2 — Drafting State (plan-context artifact #1770, 2026-04-13)

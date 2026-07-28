@@ -6,16 +6,20 @@ pattern established in task_config.py.
 
 Resolution order for backend selection:
     1. ``CONTEXTBACKEND`` environment variable
-    2. ``[backend] name`` in ``.dh/config.yaml`` (via DHConfig)
+    2. ``context.backend`` key in ``.dh/config.yaml`` (via DHConfig)
     3. Default: ``"local"``
 """
 
 from __future__ import annotations
 
-import importlib
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from dh_config import DHConfig
+
+from sam_schema.core.backends.beads import BeadsContextBackend
+from sam_schema.core.backends.local_context_backend import LocalContextBackend
+from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
 
 if TYPE_CHECKING:
     from sam_schema.core.context_backend import ContextBackend
@@ -83,7 +87,7 @@ def set_context_config(config: ContextConfig) -> None:
     Args:
         config: ContextConfig instance wrapping the chosen backend implementation.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = config
 
 
@@ -93,7 +97,7 @@ def reset_context_config() -> None:
     Intended for test teardown — call this between tests to force the next
     ``get_context_config()`` call to raise rather than returning a stale config.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = None
 
 
@@ -102,30 +106,14 @@ def reset_context_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_toml_name() -> str | None:
-    """Read backend name from .dh/config.yaml if present.
-
-    Delegates to DHConfig for YAML-based backend resolution. Returns None
-    when the resolved value matches the subsystem default ("local"), so
-    the caller's resolution chain can continue to the next step.
-
-    Returns:
-        Backend name string when explicitly configured, otherwise ``None``.
-    """
-    from dh_config import DHConfig  # noqa: PLC0415
-
-    result = DHConfig().get_backend(subsystem="context")
-    return result if result != "local" else None
-
-
 def create_context_backend(name: str | None = None) -> ContextBackend:
     """Instantiate and return a ContextBackend by name.
 
-    Resolution order when *name* is ``None``:
-
-    1. ``CONTEXTBACKEND`` environment variable.
-    2. ``[backend] name`` in ``contextbackend.toml`` (project root or ``~/.dh/``).
-    3. Default: ``"local"``.
+    When *name* is ``None``, resolution is delegated in full to
+    :meth:`dh_config.DHConfig.get_backend`, which implements the complete
+    chain: ``CONTEXTBACKEND`` env var → ``context.backend`` (then global
+    ``backend.name``) in ``.dh/config.yaml`` → ``.beads/dh-backend`` marker
+    auto-detect → default ``"local"``.
 
     Args:
         name: Backend identifier to instantiate. Pass ``None`` to trigger
@@ -140,21 +128,16 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending T02
             GitHubContextBackend implementation).
     """
-    resolved = name or os.environ.get("CONTEXTBACKEND") or _load_backend_toml_name() or "local"
+    resolved = name or DHConfig().get_backend(subsystem="context")
 
     if resolved == "local":
-        mod = importlib.import_module("sam_schema.core.backends.local_context_backend")
-        return mod.LocalContextBackend()  # type: ignore[return-value]
+        return LocalContextBackend()
 
     if resolved == "memory":
-        mod = importlib.import_module("sam_schema.core.backends.memory_context_backend")
-        return mod.InMemoryContextBackend()  # type: ignore[return-value]
+        return InMemoryContextBackend()
 
     if resolved == "beads":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the beads backend module is created in T08.
-        mod = importlib.import_module("sam_schema.core.backends.beads")
-        return mod.BeadsContextBackend()  # type: ignore[return-value]
+        return BeadsContextBackend()
 
     if resolved == "github":
         msg = "GitHub context backend is implemented in T02. Use 'local' or 'memory' instead."

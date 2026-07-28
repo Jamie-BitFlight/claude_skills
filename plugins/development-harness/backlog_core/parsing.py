@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .backend_protocol import IssueNode
+    from .backend_types import IssueNode
 
 log = logging.getLogger(__name__)
 
@@ -1003,14 +1003,17 @@ def _parse_section_entries(content: str, added_date: str) -> Section:
         ``Section`` with one or more ``Entry`` objects.
     """
     # Import here to avoid circular dependency: entry_blocks → parsing (now_iso).
-    from .entry_blocks import ENTRY_RE  # noqa: PLC0415
+    from .entry_blocks import ENTRY_RE  # ruff: ignore[import-outside-top-level]
 
     if not content:
         return Section(entries=[])
 
     matches = list(ENTRY_RE.finditer(content))
     if matches:
-        from .entry_blocks import _deduplicate_timestamps, _parse_match_to_entry  # noqa: PLC0415
+        from .entry_blocks import (  # ruff: ignore[import-outside-top-level]
+            _deduplicate_timestamps,
+            _parse_match_to_entry,
+        )
 
         entries = [_parse_match_to_entry(m) for m in matches]
         _deduplicate_timestamps(entries)

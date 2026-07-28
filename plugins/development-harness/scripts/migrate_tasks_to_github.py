@@ -52,8 +52,7 @@ from ruamel.yaml import YAML, YAMLError
 from sam_schema.task_format import resolve_task_id
 
 if TYPE_CHECKING:
-    # IssueNode is a TypedDict from backlog_core.gh_client; only imported for type checking
-    from backlog_core.gh_client import IssueNode
+    from backlog_core.backend_types import IssueNode
     from github.Repository import Repository
 
 # ---------------------------------------------------------------------------
@@ -152,7 +151,7 @@ def _parse_frontmatter(content: str) -> dict[str, Any]:
         Parsed frontmatter dict, or empty dict on failure.
     """
     parts = content.split("---\n", 2)
-    if len(parts) < 3:  # noqa: PLR2004
+    if len(parts) < 3:  # ruff: ignore[magic-value-comparison]
         return {}
     try:
         parsed = _YAML_SAFE.load(parts[1])
@@ -272,7 +271,7 @@ def parse_task_file(path: Path) -> list[TaskRecord]:
     # Multi-task: global manifest has 'feature' but no task identifier.
     if "feature" in first_fm and "task" not in first_fm and "task_id" not in first_fm:
         parts = content.split("---\n", 2)
-        body = parts[2] if len(parts) >= 3 else ""  # noqa: PLR2004
+        body = parts[2] if len(parts) >= 3 else ""  # ruff: ignore[magic-value-comparison]
         tasks: list[TaskRecord] = []
         for segment in re.split(r"\n---\n", body):
             has_task_field = "task:" in segment or "task_id:" in segment
@@ -452,7 +451,7 @@ def _patch_segment_in_multi_task(content: str, task_id: str, issue_number: int) 
         Updated full content string.
     """
     header_split = content.split("---\n", 2)
-    if len(header_split) < 3:  # noqa: PLR2004
+    if len(header_split) < 3:  # ruff: ignore[magic-value-comparison]
         return content
 
     prefix = header_split[0]
@@ -465,7 +464,7 @@ def _patch_segment_in_multi_task(content: str, task_id: str, issue_number: int) 
         if id_pattern.search(seg):
             seg_content = f"---\n{seg}\n---\n"
             seg_content = _patch_frontmatter_field(seg_content, "github_issue", issue_number)
-            seg = seg_content.removeprefix("---\n").removesuffix("\n---\n")  # noqa: PLW2901
+            seg = seg_content.removeprefix("---\n").removesuffix("\n---\n")  # ruff: ignore[redefined-loop-name]
         patched_segments.append(seg)
 
     body_patched = "\n---\n".join(patched_segments)
@@ -587,10 +586,10 @@ def _migrate_task(
     Returns:
         Created Issue object, or None on failure.
     """
-    from backlog_core.models import BacklogError  # noqa: PLC0415
+    from backlog_core.models import BacklogError  # ruff: ignore[import-outside-top-level]
 
-    assert SamTask is not None  # noqa: S101 — guarded by _connect_github caller
-    assert create_task_issue is not None  # noqa: S101 — guarded by _connect_github caller
+    assert SamTask is not None  # ruff: ignore[assert] — guarded by _connect_github caller
+    assert create_task_issue is not None  # ruff: ignore[assert] — guarded by _connect_github caller
 
     task_type = infer_task_type(task.title)
     sam = SamTask(

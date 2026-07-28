@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from tests.helpers import make_dh_paths_mock
 
 from sam_schema.core.backends.beads import BeadsContextBackend, BeadsTaskProvider
 from sam_schema.core.context_config import create_context_backend, reset_context_config
@@ -79,12 +80,9 @@ class TestCreateTaskBackendConfig:
         # Clear TASKBACKEND env var so config file path is used.
         monkeypatch.delenv("TASKBACKEND", raising=False)
 
-        # Null out _dh_paths so project-root config (which sets task.backend: local)
-        # is not found — only the user-home config (tmp_path/.dh/config.yaml) is searched.
-        monkeypatch.setattr(_dh_config_mod, "_dh_paths", None)
-
-        # Patch Path.home() so DHConfig finds the config at tmp_path/.dh/config.yaml.
-        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        monkeypatch.setattr(
+            _dh_config_mod, "_dh_paths", make_dh_paths_mock(tmp_path / "empty-project", user_dh_root=dh_dir)
+        )
 
         backend = create_task_backend()
         assert isinstance(backend, BeadsTaskProvider)

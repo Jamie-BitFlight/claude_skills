@@ -38,7 +38,7 @@ def _load_md_frontmatter(text: str) -> tuple[dict[str, Any], str]:
         valid frontmatter block is found.
     """
     parts = text.split("---", 2)
-    if len(parts) < 3:  # noqa: PLR2004
+    if len(parts) < 3:  # ruff: ignore[magic-value-comparison]
         return {}, text
     y = YAML(typ="rt")
     y.width = 2147483647

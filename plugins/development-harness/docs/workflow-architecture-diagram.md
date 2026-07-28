@@ -338,7 +338,7 @@ flowchart TD
     Finalize --> Ready["Plan state = ready<br>Tasks visible to sam_plan ready/status"]
     Ready --> Dispatch([Dispatch loop begins])
 
-    DraftingGuard["Drafting guard<br>sam_plan read → drafting marker<br>sam_plan status → drafting marker<br>sam_plan ready → drafting marker"]
+    DraftingGuard["Drafting guard<br>sam_plan read → plan.state = drafting<br>sam_plan status → PlanStatus.state = drafting<br>sam_plan ready → ReadyTasksResult.state = drafting"]
     Drafting -.->|"consumer calls status/ready"| DraftingGuard
     AppendLoop -.->|"consumer calls status/ready"| DraftingGuard
 ```

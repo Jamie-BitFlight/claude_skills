@@ -1,4 +1,4 @@
-"""In-memory test double implementing the BacklogBackend Protocol.
+"""In-memory test double implementing the backend Protocols.
 
 This module provides InMemoryBackend, a pure-Python implementation that
 stores all state in plain dicts and lists.  Designed for use in tests as a
@@ -8,11 +8,12 @@ network access or individual gh_client mocking.
 Usage::
 
     from backlog_core.backends.memory_backend import InMemoryBackend
-    from backlog_core.backend_protocol import BacklogBackend, BacklogConfig, set_config
+    from backlog_core.backend_protocol import set_config
+    from backlog_core.backend_types import BacklogConfig, WorkItemBackend
 
     backend = InMemoryBackend()
     set_config(BacklogConfig(backend=backend))
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 """
 
 from __future__ import annotations
@@ -29,14 +30,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_protocol import (
-    BacklogBackend,
-    IssueCommentNode,
-    IssueNode,
-    LabelNode,
-    MilestoneFullNode,
-    MilestoneNode,
-)
+from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -83,8 +77,8 @@ def _make_issue_node(
     )
 
 
-class InMemoryBackend(BacklogBackend):
-    """In-memory BacklogBackend for use in tests.
+class InMemoryBackend:
+    """In-memory backend for use in tests.
 
     All state lives in plain Python dicts and lists.  Every method is
     synchronous and has no side effects outside this instance.  No imports
@@ -97,11 +91,15 @@ class InMemoryBackend(BacklogBackend):
     - ``supports_batch_issue_update = False`` — no real GraphQL layer; batch
       mutations are not available.
     - ``issue_id_type = "integer"`` — issues are keyed by integer number.
+    - ``supports_branches = True`` — in-memory branch CRUD is fully
+      implemented (create/get/list/delete/merge) for test-double coverage
+      of the ``BranchBackend`` protocol.
     """
 
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
+    supports_branches: bool = True
 
     def __init__(self) -> None:
         """Initialise empty in-memory storage for all backend state."""

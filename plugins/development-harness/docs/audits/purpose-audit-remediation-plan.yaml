@@ -1,0 +1,401 @@
+# Purpose Audit - Remediation Plan
+# Dependency-ordered remediation tasks derived from the partition A-D audit
+# findings against PURPOSE.md at baseline 2a58fda0. Pure planning artifact;
+# no implementation code. Sequenced for implementation.
+
+plan_version: 1
+plan_type: purpose-audit-remediation-plan
+baseline:
+  commit: 2a58fda01c5385d3ad92e872b31834f38884ca0a
+  purpose_doc: plugins/development-harness/docs/PURPOSE.md
+  clause_evidence_manifest: plugins/development-harness/docs/audits/purpose-audit-clause-evidence-manifest.yaml
+  audit_partitions:
+    A: complete  # public-docs-skills-readme-cli  (clauses P1, P4, P5, B1)
+    B: complete  # backlog-logical-objects-providers (clauses P2, P6, B3)
+    C: complete  # sam-plans-tasks-coordination (clause P3)
+    D: complete  # artifacts-durability-cross-surface-integration (clauses B2, B4)
+  frozen: true
+
+# Resolved user decisions that scope the remediation. Each decision closes a
+# 'needs user decision' flag raised by a partition auditor.
+decision_log:
+  - id: DEC-1
+    date: 2026-07-26
+    clause_ids: [P4]
+    origin: >-
+      partition-A-findings P4-G1 (delete-by-ID); partition-C findings
+      (no delete_plan/delete_task in TaskBackend Protocol, no `sam delete`
+      CLI, PURPOSE.md:49 names 'append and delete').
+    question: >-
+      Does close/resolve satisfy the PURPOSE.md:49 'deleting logical
+      objects' CRUD surface, or is a destructive delete-by-ID operation
+      required?
+    decision: >-
+      Close/resolve is sufficient for the 'delete' intent. No destructive
+      delete-by-ID operation is required in the CLI/MCP CRUD surface.
+    rationale: >-
+      Backlog items, plans, and tasks are evidence-bearing work records;
+      the closed-loop model in PURPOSE.md:28-39 closes work 'with
+      evidence' rather than erasing it. A destructive delete would break
+      the evidence-preservation guarantee the system is built to provide.
+      The audit confirmed close/resolve is already implemented across both
+      surfaces via shared dh_core.operations, so the CRUD 'delete' verb is
+      already satisfied under this interpretation.
+    impact: >-
+      Closes P4-G1. No new destructive delete primitive is added. The CRUD
+      surface continues to model 'delete' as close/resolve. The decision
+      and the resulting capability gap are documented by T-DOC-B1 so
+      consumers see the current state rather than inferring it.
+  - id: DEC-2
+    date: 2026-07-26
+    clause_ids: [P4]
+    origin: >-
+      partition-A-findings P4-G2 (capability/provenance query dimensions
+      not surfaced as named filters); partition-C findings (data present
+      in Task.skills and Plan.backend_ref but not exposed as list_plans
+      filters).
+    question: >-
+      Do the current type/topic/status query filters satisfy the
+      PURPOSE.md:55 'querying by logical ID, relationship, status,
+      capability, and provenance' surface, or are new named filters
+      required?
+    decision: >-
+      Query filters should allow filtering by any key present in the
+      work-item data, like Jira's generic key-based query. Capability and
+      provenance filters are surfaced only when those keys are already
+      tracked on the item; no new tracking is added speculatively.
+    rationale: >-
+      A generic key-based filter subsumes the named capability/provenance
+      facets without forcing a schema change or speculative tracking. It
+      matches the audit's observation that capability data (Task.skills)
+      and provenance (Plan.backend_ref) are already present but not
+      exposed as filters. Generic filtering exposes them for free once
+      present and is a no-op for items that lack the key, so it does not
+      invent a capability dimension the data does not already carry.
+    impact: >-
+      Rescopes P4-G2 from 'add named capability/provenance filters' to
+      'add generic key-based query filter'. Implemented by T-P4-QUERY.
+
+# Remediation tasks, dependency-ordered (sequence field gives implementation
+# order; depends_on lists task IDs that must complete first). Each task names
+# the clause IDs it addresses, acceptance criteria, validation method,
+# complexity, and dependencies. No implementation code lives in this plan.
+#
+# Ordering rationale:
+#   - Documentation of current state (T-DOC-B1, T-DOC-B4) has no code
+#     dependencies and sets context; do first.
+#   - Protocol reshaping (T-P6-PROTOCOL) is foundational: new backends, new
+#     operations, and parity tests all depend on the generic work-item
+#     surface existing.
+#   - Beads stubs (T-P6-BEADS), follow-up linking (T-P3-FOLLOWUP), and the
+#     generic query filter (T-P4-QUERY) all build on the reshaped protocol.
+#   - Per-operation parity tests (T-P5-PARITY) run after the shared operations
+#     they cover are stable.
+#   - sam_active_task CLI parity (T-P5-ACTIVE-TASK) is verified by the parity
+#     suite, so it follows T-P5-PARITY.
+remediation_tasks:
+  - task_id: T-DOC-B1
+    sequence: 1
+    title: Document current CLI/MCP capability gap in existing docs
+    clause_ids: [B1, P4, P5]
+    description: >-
+      Update the existing public docs (PURPOSE.md Current Boundary section,
+      backend-providers.md, and the backlog/SKILL.md) to state explicitly
+      which MCP operations have no CLI equivalent today. The audit already
+      lists the MCP-only bridge tools (backlog_get_ready_sam_tasks,
+      backlog_create_sam_task, backlog_update_sam_task_status) and the
+      sam_active_task get/set/update/clear family (handled separately by
+      T-P5-ACTIVE-TASK). This task records the current gap, including the
+      DEC-1 resolution that close/resolve satisfies the 'delete' CRUD verb
+      so consumers do not expect a destructive delete that will not come.
+    acceptance_criteria:
+      - >-
+        PURPOSE.md Current Boundary (or a referenced doc it points to)
+        names the MCP-only operations and states that close/resolve is the
+        'delete' verb per DEC-1.
+      - >-
+        backend-providers.md lists the CLI-vs-MCP capability gap for
+        backlog and SAM task operations in one place (not scattered across
+        skill files).
+      - >-
+        backlog/SKILL.md no longer implies CLI parity where the audit
+        showed MCP-only operations.
+    validation_method: static-source
+    estimated_complexity: S
+    depends_on: []
+  - task_id: T-DOC-B4
+    sequence: 1
+    title: Document current backlog persistence boundary
+    clause_ids: [B4, P6]
+    description: >-
+      Document in one place (backend-providers.md or backlog-lifecycle.md)
+      the current backlog persistence boundary: GitHub Issues are the
+      source of truth for the default backend, per-item files are the
+      local cache, and only GitHubBackend is remote-backed among the four
+      backends. The audit confirmed this matches PURPOSE.md:90-92, but it
+      is stated across multiple files rather than in a single authoritative
+      boundary statement. Also record that branch operations are not
+      capability-gated (SQLiteBackend skips them via test exceptions), so
+      consumers know the boundary applies to capability flags too.
+    acceptance_criteria:
+      - >-
+        A single section in backend-providers.md (or backlog-lifecycle.md)
+        states: GitHub Issues = source of truth for default backend;
+        per-item files = local cache; only GitHubBackend is remote-backed;
+        branch operations are not capability-gated.
+      - >-
+        The statement is consistent with PURPOSE.md:90-92 and with the
+        audit's high-confidence 'aligns' verdict for B4.
+      - >-
+        No claim is made that the boundary is removed; this documents the
+        current state only.
+    validation_method: static-source
+    estimated_complexity: S
+    depends_on: []
+  - task_id: T-P6-PROTOCOL
+    sequence: 2
+    title: Reshape BacklogBackend protocol - separate generic work-item methods from GitHub-specific methods
+    clause_ids: [P6, P2]
+    description: >-
+      The audit (partition B, high confidence) found the BacklogBackend
+      Protocol is GitHub-shaped at the contract surface: ~40 methods carry
+      GraphQL/issue/branch vocabulary, PyGithub Repository is a structural
+      type dependency, IssueNode (a GitHub GraphQL projection) is the
+      canonical return type, and create_issue_for_item returns a GitHub
+      issue number. This forces a new provider to implement ~40
+      GitHub-named methods, which violates PURPOSE.md:74-75 ('Adding a
+      provider must change only provider implementation, registration, and
+      configuration'). Reshape the protocol so generic work-item methods
+      (create/read/update/close/list/link/query a work item by logical ID)
+      are separate from GitHub-specific methods (GraphQL fetch, branch
+      ops, projects-v2 mutations). Generic methods take and return logical
+      objects only; GitHub-specific methods move behind a capability flag
+      or a narrower protocol a backend opts into. Branch operations must
+      become capability-gated (currently SQLiteBackend skips them via test
+      exceptions). This is the foundational task: T-P6-BEADS,
+      T-P3-FOLLOWUP, T-P4-QUERY, and T-P5-PARITY all depend on the generic
+      surface existing.
+    acceptance_criteria:
+      - >-
+        BacklogBackend Protocol exposes a generic work-item method surface
+        (create, read, update, close, list, link, query by logical ID)
+        that takes and returns logical objects only - no GitHub issue
+        numbers, GraphQL projections, or PyGithub types in the generic
+        method signatures.
+      - >-
+        GitHub-specific methods (_graphql_request, _fetch_issue_graphql,
+        _update_issue_graphql, _projects_v2_create_mutation,
+        create_issue_for_item) are isolated behind a narrower protocol or
+        capability flag that a backend opts into; the generic surface does
+        not require them.
+      - >-
+        Branch operations are capability-gated: a backend that does not
+        support branches reports it via a capability flag rather than
+        raising test-only exceptions.
+      - >-
+        Adding a new backend requires implementing only generic work-item
+        methods plus the provider-specific protocol it opts into - not
+        ~40 GitHub-named methods.
+      - >-
+        Existing GitHubBackend behavior is preserved; the reshaping is a
+        structural refactor of the Protocol, not a behavior change.
+    validation_method: integration
+    estimated_complexity: L
+    depends_on: []
+  - task_id: T-P6-BEADS
+    sequence: 3
+    title: Replace Beads backend NotImplementedError stubs with real implementations
+    clause_ids: [P6]
+    description: >-
+      The audit (partition B) found the Beads backend has known
+      NotImplementedError stubs that break cross-backend conformance tests.
+      After T-P6-PROTOCOL reshapes the protocol, implement the Beads
+      backend against the generic work-item surface so it passes the
+      cross-backend conformance suite alongside memory and sqlite. The
+      Beads backend should implement only generic work-item methods (no
+      GitHub-specific methods unless it opts into the narrower
+      GitHub-capability protocol, which it should not).
+    acceptance_criteria:
+      - >-
+        Beads backend implements the generic work-item protocol from
+        T-P6-PROTOCOL with no NotImplementedError stubs on generic methods.
+      - >-
+        Beads backend passes test_cross_backend.py and
+        test_task_backend_conformance.py (the conformance suite already
+        enforced for memory/sqlite).
+      - >-
+        Beads backend does not opt into GitHub-specific methods; branch
+        ops and GraphQL paths report unsupported via the capability flag
+        introduced in T-P6-PROTOCOL.
+    validation_method: integration
+    estimated_complexity: M
+    depends_on: [T-P6-PROTOCOL]
+  - task_id: T-P3-FOLLOWUP
+    sequence: 3
+    title: Add SAM primitive to link a follow-up item to its originating plan/task
+    clause_ids: [P3]
+    description: >-
+      The audit (partition C, medium confidence) found closed-loop stage
+      7 ('create a follow-up backlog item when evidence requires it') is
+      partial: append_task and update_plan_fields exist, but no SAM
+      primitive links a follow-up backlog item back to its originating
+      plan or task. Follow-up creation is procedural via skill prompts
+      calling backlog_* add_item, so the relationship is not recorded as
+      data. Add a SAM primitive (MCP + CLI, per the interchangeable-
+      transports contract) that records the link from a follow-up item to
+      its origin plan/task as a relationship, so the closed loop is
+      traceable end-to-end. The primitive lives on the generic work-item
+      surface from T-P6-PROTOCOL (linking is a generic relationship, not a
+      GitHub-specific operation).
+    acceptance_criteria:
+      - >-
+        A SAM primitive (e.g. sam_link_followup or equivalent) exists in
+        both MCP and CLI and records a relationship from a follow-up
+        backlog item to its originating plan or task by logical ID.
+      - >-
+        The relationship is queryable: given an originating plan/task, its
+        follow-up items can be listed; given a follow-up item, its origin
+        can be retrieved.
+      - >-
+        The primitive uses logical IDs only - no GitHub issue numbers or
+        file paths in its interface (per P2, enforced by T-P6-PROTOCOL).
+      - >-
+        Closed-loop stage 7 is verifiable end-to-end: a task that produces
+        evidence requiring a follow-up can create one and the link is
+        durable.
+    validation_method: integration
+    estimated_complexity: M
+    depends_on: [T-P6-PROTOCOL]
+  - task_id: T-P4-QUERY
+    sequence: 3
+    title: Add generic key-based query filter (Jira-style) to list operations
+    clause_ids: [P4]
+    description: >-
+      Per DEC-2, the query surface should allow filtering by any key
+      present in the work-item data, not just the current type/topic/
+      status filters. Implement a generic key-based filter on list_plans
+      and list operations (and the equivalent backlog listing) so a caller
+      can filter by any key the item carries (e.g. skills, backend_ref,
+      agent, status, type, or any future key). Capability and provenance
+      are exposed for free when the key is present and are a no-op when
+      absent; no speculative tracking is added. This subsumes the named
+      capability/provenance facets the audit flagged as missing
+      (P4-G2). The filter operates on the generic work-item surface from
+      T-P6-PROTOCOL.
+    acceptance_criteria:
+      - >-
+        list_plans and the equivalent backlog listing accept a generic
+        key-based filter that matches items by any key present in the
+        item data, not just a fixed set of named dimensions.
+      - >-
+        Filtering by a key the item does not carry returns no matches (or
+        an explicit empty result) rather than erroring - the filter is a
+        no-op for absent keys.
+      - >-
+        The existing type/topic/status filters continue to work (the
+        generic filter subsumes them; no regression).
+      - >-
+        Capability (Task.skills) and provenance (Plan.backend_ref) keys
+        are filterable when present on the item, satisfying
+        PURPOSE.md:55 without adding new tracking.
+      - >-
+        The filter is exposed on both CLI and MCP (per the
+        interchangeable-transports contract, P5).
+    validation_method: integration
+    estimated_complexity: M
+    depends_on: [T-P6-PROTOCOL]
+  - task_id: T-P5-PARITY
+    sequence: 4
+    title: Add per-operation CLI/MCP parity tests (not just infrastructure)
+    clause_ids: [P5]
+    description: >-
+      The audit (partitions A and C) found tests/test_frontend_parity.py
+      has infrastructure tests only (list + importability); per-operation
+      parity tests were stubbed ('added incrementally') and are not yet
+      operation-verified. After the shared operations are stable
+      (T-P6-PROTOCOL, T-P3-FOLLOWUP, T-P4-QUERY), add per-operation parity
+      tests that assert CLI and MCP produce equivalent results for each
+      logical CRUD and workflow operation: create/read/update/close for
+      backlog items, plans, and tasks; lifecycle transitions; evidence
+      recording; upstream feedback; sequence/ownership assignment; and
+      the new follow-up linking and generic query filter. Each test runs
+      the same logical operation through both transports and asserts
+      equivalence. This is the validation gate for the
+      interchangeable-transports claim in PURPOSE.md:57-60.
+    acceptance_criteria:
+      - >-
+        test_frontend_parity.py (or a companion file) contains a parity
+        test for each shared logical operation: create, read, update,
+        close, list, lifecycle transition, evidence record, upstream
+        feedback, sequence/ownership assignment, follow-up link
+        (T-P3-FOLLOWUP), and generic query filter (T-P4-QUERY).
+      - >-
+        Each parity test runs the operation through both CLI and MCP
+        (against the same memory backend) and asserts equivalent results,
+        not just equivalent imports or a single list call.
+      - >-
+        The parity suite passes for memory and sqlite backends.
+      - >-
+        The suite fails if a new operation is added to one transport but
+        not the other (regression guard).
+    validation_method: system
+    estimated_complexity: M
+    depends_on: [T-P6-PROTOCOL, T-P3-FOLLOWUP, T-P4-QUERY]
+  - task_id: T-P5-ACTIVE-TASK
+    sequence: 5
+    title: Add sam_active_task CLI equivalent or record an explicit MCP-only decision
+    clause_ids: [P5, B1]
+    description: >-
+      The audit (partition C) found sam_active_task (get/set/update/clear)
+      is MCP-only - grep found 0 CLI matches. This breaks the
+      interchangeable-transports claim for that operation family. Either
+      add a CLI equivalent (the default, per P5) so the parity suite
+      (T-P5-PARITY) can cover it, or record an explicit MCP-only decision
+      in the docs (T-DOC-B1) with rationale. If MCP-only is chosen, the
+      decision must be explicit and documented, not silent. The chosen
+      path must be reflected in the parity suite: a CLI equivalent gets a
+      parity test; an MCP-only decision gets a documented carve-out that
+      the parity suite acknowledges.
+    acceptance_criteria:
+      - >-
+        Either: a `sam_active_task` CLI equivalent exists for get/set/
+        update/clear and is covered by a parity test in T-P5-PARITY; OR
+        an explicit MCP-only decision is recorded in the docs updated by
+        T-DOC-B1 with rationale.
+      - >-
+        If CLI equivalent is added, it delegates to the same
+        dh_core.operations path as the MCP tool (no parallel
+        implementation), per the thin-frontend contract.
+      - >-
+        If MCP-only is chosen, the carve-out is stated in PURPOSE.md
+        Current Boundary or backend-providers.md, not left implicit.
+    validation_method: integration
+    estimated_complexity: S
+    depends_on: [T-P5-PARITY, T-DOC-B1]
+
+# Coverage check: every audit gap maps to at least one task.
+#   P3 follow-up linking       -> T-P3-FOLLOWUP
+#   P4 delete-by-ID            -> DEC-1 (no task; close/resolve suffices)
+#   P4 query filters           -> DEC-2 + T-P4-QUERY
+#   P5 per-operation parity    -> T-P5-PARITY
+#   P5 sam_active_task CLI     -> T-P5-ACTIVE-TASK
+#   P6 protocol reshaping      -> T-P6-PROTOCOL
+#   P6 beads stubs             -> T-P6-BEADS
+#   B1 capability-gap docs      -> T-DOC-B1
+#   B4 persistence-boundary docs -> T-DOC-B4
+coverage_matrix:
+  P3: [T-P3-FOLLOWUP]
+  P4: [DEC-1, DEC-2, T-P4-QUERY, T-DOC-B1]
+  P5: [T-P5-PARITY, T-P5-ACTIVE-TASK, T-DOC-B1]
+  P6: [T-P6-PROTOCOL, T-P6-BEADS, T-DOC-B4]
+  B1: [T-DOC-B1]
+  B4: [T-DOC-B4]
+
+# Clauses with no remediation task (audit verdict was 'aligns', high
+# confidence, and no user decision was required):
+#   P1 - aligns (partition A)
+#   B2 - aligns (partition D); MCP Gist write-through vs CLI local-only is
+#        the documented current boundary, not a gap to close.
+#   B3 - aligns (partitions A and B); provider ID exposure is the
+#        documented current boundary, removed by T-P6-PROTOCOL over time.
+no_remediation_clauses: [P1, B2, B3]

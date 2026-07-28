@@ -21,12 +21,14 @@ from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException, GithubObject  # GithubObject used only by create_milestone (ADR-004)
 from ruamel.yaml import YAMLError
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
 from typing_extensions import TypedDict
 
 from . import models as _models
 from .artifact_provider import create_artifact_provider
 from .artifact_registry import ArtifactRegistry
-from .backend_protocol import IssueCommentNode, IssueNode, MilestoneFullNode, get_config
+from .backend_protocol import get_config
+from .backend_types import GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode
 from .entry_blocks import ENTRY_RE, _render_entry_raw, generate_diff, parse_entries, strike_entry as strike_entry_block
 from .models import (
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
@@ -84,14 +86,7 @@ from .parsing import (
 from .rendering import SECTION_HEADING
 from .yaml_io import load_item, save_item
 
-# sam_schema may not be installed in all environments (e.g. direct-script execution).
-# Guard the import; fall back to the full alias set when unavailable.
-try:
-    from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
-
-    _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
-except ImportError:
-    _SAM_SUCCESSFUL_STATUSES = frozenset({"complete", "deferred", "closed", "done", "skipped"})
+_SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -112,7 +107,10 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
     Returns:
         Authenticated Repository object.
     """
-    return get_config().backend.get_github(repo, timeout)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("get_github requires a GitHub-backed backend")
+    return backend.get_github(repo, timeout)
 
 
 def try_get_github(repo: str = "") -> Repository | None:
@@ -147,7 +145,10 @@ def sync_groomed_to_github_issue(
     Returns:
         True if the issue body was updated, False otherwise.
     """
-    return get_config().backend.sync_groomed_to_github_issue(repo_obj, issue_num, groomed_content, section_name, output)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("sync_groomed_to_github_issue requires a GitHub-backed backend")
+    return backend.sync_groomed_to_github_issue(repo_obj, issue_num, groomed_content, section_name, output)
 
 
 def fetch_github_issue_body(repo_obj: Repository, issue_num: int, output: Output | None = None) -> str | None:
@@ -176,7 +177,10 @@ def sync_issues_graphql(
     Returns:
         List of IssueNode objects matching the query.
     """
-    return get_config().backend.sync_issues_graphql(
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("sync_issues_graphql requires a GitHub-backed backend")
+    return backend.sync_issues_graphql(
         repo,
         owner,
         repo_name,
@@ -296,9 +300,10 @@ def create_task_issue(
     Returns:
         IssueNode for the created child issue, or None on failure.
     """
-    return get_config().backend.create_task_issue(
-        repo, parent_issue_number, task, description, acceptance_criteria, labels, output
-    )
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("create_task_issue requires a GitHub-backed backend")
+    return backend.create_task_issue(repo, parent_issue_number, task, description, acceptance_criteria, labels, output)
 
 
 def get_task_issues(repo: Repository, parent_issue_number: int, output: Output | None = None) -> list[IssueNode]:
@@ -307,7 +312,10 @@ def get_task_issues(repo: Repository, parent_issue_number: int, output: Output |
     Returns:
         List of IssueNode objects for child task issues.
     """
-    return get_config().backend.get_task_issues(repo, parent_issue_number, output)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("get_task_issues requires a GitHub-backed backend")
+    return backend.get_task_issues(repo, parent_issue_number, output)
 
 
 def update_task_status(repo: Repository, issue_number: int, new_status: str, output: Output | None = None) -> bool:
@@ -316,7 +324,10 @@ def update_task_status(repo: Repository, issue_number: int, new_status: str, out
     Returns:
         True if the status was updated, False otherwise.
     """
-    return get_config().backend.update_task_status(repo, issue_number, new_status, output)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("update_task_status requires a GitHub-backed backend")
+    return backend.update_task_status(repo, issue_number, new_status, output)
 
 
 def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_number: int) -> IssueNode:
@@ -325,7 +336,10 @@ def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_num
     Returns:
         IssueNode for the requested issue.
     """
-    return get_config().backend._fetch_issue_graphql(repo, owner, repo_name, issue_number)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_fetch_issue_graphql requires a GitHub-backed backend")
+    return backend._fetch_issue_graphql(repo, owner, repo_name, issue_number)
 
 
 def _update_issue_graphql(
@@ -339,7 +353,10 @@ def _update_issue_graphql(
     milestone_id: str | None = None,
 ) -> None:
     """Update an issue's mutable fields via the active backend."""
-    get_config().backend._update_issue_graphql(
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_update_issue_graphql requires a GitHub-backed backend")
+    backend._update_issue_graphql(
         repo, issue_node_id, state=state, body=body, title=title, label_ids=label_ids, milestone_id=milestone_id
     )
 
@@ -351,7 +368,10 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     before calling this function.  Backends with ``supports_batch_issue_update
     = False`` raise :exc:`NotImplementedError`.
     """
-    get_config().backend._update_issues_graphql_batch(repo, updates)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_update_issues_graphql_batch requires a GitHub-backed backend")
+    backend._update_issues_graphql_batch(repo, updates)
 
 
 def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
@@ -360,7 +380,10 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
     Returns:
         GraphQL node ID of the newly created comment.
     """
-    return get_config().backend._add_comment_graphql(repo, issue_node_id, body)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_add_comment_graphql requires a GitHub-backed backend")
+    return backend._add_comment_graphql(repo, issue_node_id, body)
 
 
 def _fetch_issue_comments_graphql(
@@ -371,7 +394,10 @@ def _fetch_issue_comments_graphql(
     Returns:
         List of IssueCommentNode objects for the issue.
     """
-    return get_config().backend._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_fetch_issue_comments_graphql requires a GitHub-backed backend")
+    return backend._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
 
 
 def _fetch_comment_by_id_graphql(repo: Repository, comment_node_id: str) -> IssueCommentNode:
@@ -380,7 +406,10 @@ def _fetch_comment_by_id_graphql(repo: Repository, comment_node_id: str) -> Issu
     Returns:
         IssueCommentNode for the requested comment.
     """
-    return get_config().backend._fetch_comment_by_id_graphql(repo, comment_node_id)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_fetch_comment_by_id_graphql requires a GitHub-backed backend")
+    return backend._fetch_comment_by_id_graphql(repo, comment_node_id)
 
 
 def _fetch_milestones_graphql(
@@ -391,7 +420,10 @@ def _fetch_milestones_graphql(
     Returns:
         List of MilestoneFullNode objects.
     """
-    return get_config().backend._fetch_milestones_graphql(repo, owner, repo_name, states)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_fetch_milestones_graphql requires a GitHub-backed backend")
+    return backend._fetch_milestones_graphql(repo, owner, repo_name, states)
 
 
 def _graphql_request(repo: Repository, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
@@ -400,7 +432,10 @@ def _graphql_request(repo: Repository, query: str, variables: dict[str, object] 
     Returns:
         Parsed JSON response dict from the GraphQL endpoint.
     """
-    return get_config().backend._graphql_request(repo, query, variables)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_graphql_request requires a GitHub-backed backend")
+    return backend._graphql_request(repo, query, variables)
 
 
 def _projects_v2_list_query(owner: str, limit: int = 20) -> tuple[str, dict[str, object]]:
@@ -409,7 +444,10 @@ def _projects_v2_list_query(owner: str, limit: int = 20) -> tuple[str, dict[str,
     Returns:
         Tuple of (query_string, variables_dict).
     """
-    return get_config().backend._projects_v2_list_query(owner, limit)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_projects_v2_list_query requires a GitHub-backed backend")
+    return backend._projects_v2_list_query(owner, limit)
 
 
 def _projects_v2_create_mutation(owner_id: str, title: str) -> tuple[str, dict[str, object]]:
@@ -418,7 +456,10 @@ def _projects_v2_create_mutation(owner_id: str, title: str) -> tuple[str, dict[s
     Returns:
         Tuple of (mutation_string, variables_dict).
     """
-    return get_config().backend._projects_v2_create_mutation(owner_id, title)
+    backend = get_config().backend
+    if not isinstance(backend, GitHubExtras):
+        raise BacklogError("_projects_v2_create_mutation requires a GitHub-backed backend")
+    return backend._projects_v2_create_mutation(owner_id, title)
 
 
 # github_sync delegates — original alias names preserved for test patchability
@@ -1790,7 +1831,7 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
     """
     backend = get_config().backend
     if backend.issue_id_type == "string":
-        from backlog_core.backends.beads_backend import BeadsBackend  # noqa: PLC0415
+        from backlog_core.backends.beads_backend import BeadsBackend  # ruff: ignore[import-outside-top-level]
 
         if isinstance(backend, BeadsBackend):
             nanoid = backend.create_beads_issue_for_item(item_data, output=out)
@@ -2400,6 +2441,7 @@ def list_items(
     include_closed: bool = False,
     repo: str = "",
     output: Output | None = None,
+    filter_by_key: dict[str, str] | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
     """List backlog items. Default reads local cache only. Use from_github=True to refresh first.
 
@@ -2416,6 +2458,12 @@ def list_items(
         include_closed: When True, include items with terminal status (done, resolved, closed).
         repo: GitHub repo in owner/repo format.
         output: Optional Output collector.
+        filter_by_key: Generic key=value filter applied AFTER type/topic/status
+            filtering, on the result item dicts. Each ``key=value`` pair matches
+            items where the item's value for ``key`` equals ``value`` (string
+            comparison). All pairs compose with AND logic. A key the item does
+            not carry returns no match (a no-op, not an error). Existing
+            type/topic/status filters are unaffected.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -2445,6 +2493,71 @@ def list_items(
         status_map: dict[int, IssueStatus] = {}
     open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
     result_items = [_build_list_entry(it, status_map) for it in open_items]
+    if filter_by_key:
+        result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
+    return {"items": result_items, "count": len(result_items), **out.to_dict()}
+
+
+# ---------------------------------------------------------------------------
+# Public API: FOLLOWUP — link a follow-up backlog item to its origin
+# ---------------------------------------------------------------------------
+
+
+def link_followup(selector: str, followup_to: str, output: Output | None = None) -> dict[str, str | bool | list[str]]:
+    """Link a backlog item to its originating plan or task via ``followup_to``.
+
+    Records the logical ID of the origin (e.g. ``"P1"``, ``"P1/T3"``) on the
+    item's ``metadata.followup_to`` field and persists it to YAML frontmatter.
+
+    Args:
+        selector: Item selector — title substring, issue ref, or file path
+            (forwarded to :func:`find_item`).
+        followup_to: Logical ID of the originating plan or task.  Use the
+            ``P{N}`` / ``P{N}/T{N}`` address form (or a slug).  Empty string
+            clears the link.
+        output: Optional :class:`Output` collector.
+
+    Returns:
+        Dict with ``title``, ``followup_to``, and output messages/warnings.
+
+    Raises:
+        ItemNotFoundError: When *selector* does not match any backlog item.
+    """
+    out = output or Output()
+    item = find_item(parse_backlog(), selector)
+    if not item:
+        raise ItemNotFoundError(selector)
+    filepath_str = item.file_path
+    if not filepath_str:
+        msg = f"Item {selector!r} has no file_path — cannot persist followup_to"
+        raise BacklogError(msg)
+    update_item_metadata(Path(filepath_str), {"metadata": {"followup_to": followup_to}}, output=out)
+    out.info(f"  Linked follow-up: {item.title} -> {followup_to or '(cleared)'}")
+    return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
+
+
+def list_followups(followup_to: str, output: Output | None = None) -> dict[str, int | list[dict[str, str]] | list[str]]:
+    """List backlog items linked as follow-ups to the given origin.
+
+    Scans all local backlog items and returns those whose
+    ``metadata.followup_to`` exactly matches *followup_to* (case-sensitive).
+
+    Args:
+        followup_to: Logical ID of the originating plan or task
+            (e.g. ``"P1"``, ``"P1/T3"``).
+        output: Optional :class:`Output` collector.
+
+    Returns:
+        Dict with ``items`` (list of dicts with ``title``, ``section``,
+        ``issue``, ``followup_to``), ``count``, and output messages.
+    """
+    out = output or Output()
+    items = parse_backlog()
+    matches = [it for it in items if not it.skip and it.metadata.followup_to == followup_to]
+    result_items = [
+        {"title": it.title, "section": it.section, "issue": it.issue, "followup_to": it.metadata.followup_to}
+        for it in matches
+    ]
     return {"items": result_items, "count": len(result_items), **out.to_dict()}
 
 
@@ -4831,7 +4944,9 @@ def create_sam_task(
     return {"issue_number": issue["number"], "title": issue["title"], "url": "", **out.to_dict()}
 
 
-def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: Output | None = None) -> SamTasksResult:
+def get_sam_tasks(
+    parent_issue_number: int, refresh_cache: bool = True, repo: str = "", output: Output | None = None
+) -> SamTasksResult:
     """Fetch all SAM task sub-issues for a parent story issue.
 
     When GitHub is unavailable, falls back to the local cache file
@@ -4840,6 +4955,7 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
     Args:
         parent_issue_number: Issue number of the parent story (without ``#``).
         refresh_cache: Write cache file after a successful GitHub fetch when ``True``.
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         output: Optional Output collector.
 
     Returns:
@@ -4848,8 +4964,8 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
     """
     out = output or Output()
 
-    repo = try_get_github()
-    if repo is None:
+    gh_repo = try_get_github(repo)
+    if gh_repo is None:
         # Offline fallback: scan cache directory for any matching cache file
         cache_dir = _dh_paths.context_dir()
         cache_files = list(cache_dir.glob("sam-tasks-*.json")) if cache_dir.exists() else []
@@ -4884,7 +5000,7 @@ def get_sam_tasks(parent_issue_number: int, refresh_cache: bool = True, output: 
             "errors": out.errors,
         }
 
-    sub_issues = get_task_issues(repo, parent_issue_number, output=out)
+    sub_issues = get_task_issues(gh_repo, parent_issue_number, output=out)
     tasks = _sub_issues_to_task_dicts(sub_issues)
     if refresh_cache and tasks and not _write_sam_task_cache(tasks, parent_issue_number):
         out.warn("  WARNING: Could not write SAM task cache — no feature slug found in tasks")
@@ -4956,7 +5072,7 @@ def _is_sam_task_ready(task: dict[str, object], status_by_id: dict[str, str]) ->
 
 
 def get_ready_sam_tasks(
-    parent_issue_number: int, output: Output | None = None
+    parent_issue_number: int, repo: str = "", output: Output | None = None
 ) -> dict[str, str | list[dict[str, object]] | int | list[str]]:
     """Return SAM tasks that are ready to execute (not-started with all deps satisfied).
 
@@ -4966,6 +5082,7 @@ def get_ready_sam_tasks(
 
     Args:
         parent_issue_number: Issue number of the parent story (without ``#``).
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         output: Optional Output collector.
 
     Returns:
@@ -4973,7 +5090,7 @@ def get_ready_sam_tasks(
         Each ready task dict contains: ``id``, ``name``, ``agent``, ``skills``, ``issue_number``.
     """
     out = output or Output()
-    tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, output=out)
+    tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, repo=repo, output=out)
     tasks_raw = tasks_result.get("tasks", [])
     tasks: list[dict[str, object]] = tasks_raw if isinstance(tasks_raw, list) else []
     feature_slug = _extract_feature_slug(tasks)

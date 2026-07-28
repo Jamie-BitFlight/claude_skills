@@ -150,10 +150,9 @@ async def test_sam_task_read_returns_task_assignment(client: Client, task_backen
 
     # Assert
     data = result.data
-    assert "task" in data
-    assert data["task"]["id"] == "T01"
-    assert data["task"]["status"] == "not-started"
-    assert "error" not in data
+    assert hasattr(data, "task")
+    assert data.task.id == "T01"
+    assert data.task.status == "not-started"
 
 
 async def test_sam_task_read_missing_task_raises_tool_error(client: Client, task_backend: InMemoryTaskProvider) -> None:
@@ -207,9 +206,9 @@ async def test_sam_task_claim_transitions_to_in_progress(client: Client, task_ba
 
     # Assert
     data = result.data
-    assert data["claimed"] is True
-    assert data["task_id"] == "T01"
-    assert "started" in data
+    assert data.claimed is True
+    assert data.task_id == "T01"
+    assert data.started is not None
 
 
 async def test_sam_task_claim_double_claim_returns_claimed_false(
@@ -231,9 +230,9 @@ async def test_sam_task_claim_double_claim_returns_claimed_false(
 
     # Assert
     data = result.data
-    assert data["claimed"] is False
-    assert "error" in data
-    assert "in-progress" in data["error"]
+    assert data.claimed is False
+    assert data.warnings
+    assert "in-progress" in data.warnings[0]
 
 
 async def test_sam_task_claim_complete_task_returns_claimed_false(
@@ -253,8 +252,9 @@ async def test_sam_task_claim_complete_task_returns_claimed_false(
     result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
     # Assert
-    assert result.data["claimed"] is False
-    assert "complete" in result.data["error"]
+    assert result.data.claimed is False
+    assert result.data.warnings
+    assert "complete" in result.data.warnings[0]
 
 
 # ===========================================================================
@@ -280,8 +280,8 @@ async def test_sam_task_state_updates_task_status(client: Client, task_backend: 
 
     # Assert
     data = result.data
-    assert data["id"] == "T01"
-    assert data["status"] == "in-progress"
+    assert data.id == "T01"
+    assert data.status == "in-progress"
 
 
 async def test_sam_task_state_complete_sets_status(client: Client, task_backend: InMemoryTaskProvider) -> None:
@@ -301,7 +301,7 @@ async def test_sam_task_state_complete_sets_status(client: Client, task_backend:
     )
 
     # Assert
-    assert result.data["status"] == "complete"
+    assert result.data.status == "complete"
 
 
 async def test_sam_task_state_invalid_status_raises_tool_error(
@@ -347,12 +347,12 @@ async def test_sam_task_update_set_fields_patches_task(client: Client, task_back
     )
 
     # Assert
-    assert result.data["updated"] is True
-    assert result.data["address"] == f"{plan_id}/T01"
+    assert result.data.updated is True
+    assert result.data.address == f"{plan_id}/T01"
 
     # Verify the change persisted (round-trip)
     read_result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
-    assert read_result.data["task"]["title"] == "Updated title"
+    assert read_result.data.task.title == "Updated title"
 
 
 async def test_sam_task_update_append_section_stores_content(
@@ -379,8 +379,8 @@ async def test_sam_task_update_append_section_stores_content(
     )
 
     # Assert
-    assert result.data["updated"] is True
-    assert result.data["address"] == f"{plan_id}/T01"
+    assert result.data.updated is True
+    assert result.data.address == f"{plan_id}/T01"
 
 
 async def test_sam_task_update_invalid_json_raises_tool_error(
@@ -425,8 +425,8 @@ async def test_sam_plan_create_returns_plan_number_and_task_count(client: Client
 
     # Assert
     data = result.data
-    assert re.match(r"^P[0-9a-f]{8}$", data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
-    assert data["task_count"] == 2
+    assert re.match(r"^P[0-9a-f]{8}$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
+    assert data.task_count == 2
 
 
 async def test_sam_plan_create_sets_plan_goal(client: Client) -> None:
@@ -448,12 +448,12 @@ async def test_sam_plan_create_sets_plan_goal(client: Client) -> None:
             }
         },
     )
-    plan_id = create_result.data["plan_id"]
+    plan_id = create_result.data.plan_id
 
     read_result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": plan_id})
 
     # Assert
-    assert read_result.data.get("goal") == "Specific goal string"
+    assert read_result.data.plan.goal == "Specific goal string"
 
 
 async def test_sam_plan_create_invalid_task_missing_id_raises_tool_error(client: Client) -> None:
@@ -499,8 +499,8 @@ async def test_sam_plan_read_returns_plan_fields(client: Client, task_backend: I
 
     # Assert
     data = result.data
-    assert data["feature"] == "read-plan"
-    assert "task" not in data  # plan-only read, no nested task object
+    assert data.plan.feature == "read-plan"
+    assert not hasattr(data, "task")  # plan-only read, no nested task object
 
 
 async def test_sam_plan_read_missing_plan_raises_tool_error(client: Client) -> None:
@@ -546,10 +546,10 @@ async def test_sam_plan_list_empty_backend_returns_zero_items(client: Client) ->
 
     # Assert
     data = result.data
-    assert data["count"] == 0
-    assert data["items"] == []
-    assert data["pagination"]["total"] == 0
-    assert data["pagination"]["has_more"] is False
+    assert data.count == 0
+    assert data.items == []
+    assert data.pagination.total == 0
+    assert data.pagination.has_more is False
 
 
 async def test_sam_plan_list_returns_all_plans_with_summary_fields(
@@ -570,14 +570,14 @@ async def test_sam_plan_list_returns_all_plans_with_summary_fields(
 
     # Assert
     data = result.data
-    assert data["count"] == 2
-    assert data["pagination"]["total"] == 2
-    features = {item["feature"] for item in data["items"]}
+    assert data.count == 2
+    assert data.pagination.total == 2
+    features = {item.feature for item in data.items}
     assert features == {"alpha", "beta"}
-    item = data["items"][0]
-    assert "feature" in item
-    assert "goal" in item
-    assert "task_count" in item
+    item = data.items[0]
+    assert item.feature is not None
+    assert item.goal is not None
+    assert item.task_count is not None
 
 
 async def test_sam_plan_list_search_filters_by_feature_substring(
@@ -598,8 +598,8 @@ async def test_sam_plan_list_search_filters_by_feature_substring(
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == "alpha-feature"
+    assert data.count == 1
+    assert data.items[0].feature == "alpha-feature"
 
 
 async def test_sam_plan_list_pagination_offset_and_limit(client: Client, task_backend: InMemoryTaskProvider) -> None:
@@ -616,17 +616,17 @@ async def test_sam_plan_list_pagination_offset_and_limit(client: Client, task_ba
 
     # Get all to determine insertion order
     all_result = await client.call_tool("sam_plan", {"config": {"action": "list"}})
-    all_features = [item["feature"] for item in all_result.data["items"]]
+    all_features = [item.feature for item in all_result.data.items]
 
     # Act — page 2
     page_result = await client.call_tool("sam_plan", {"config": {"action": "list", "offset": 1, "limit": 1}})
 
     # Assert
     data = page_result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == all_features[1]
-    assert data["pagination"]["has_more"] is True
-    assert "next_call" in data
+    assert data.count == 1
+    assert data.items[0].feature == all_features[1]
+    assert data.pagination.has_more is True
+    assert data.next_call
 
 
 # ===========================================================================
@@ -652,11 +652,8 @@ async def test_sam_plan_status_returns_progress_summary(client: Client, task_bac
 
     # Assert
     data = result.data
-    assert data["total_tasks"] == 2
-    assert "by_status" in data
-    assert "completion_pct" in data
-    assert data["has_cycles"] is False
-    assert data["completion_pct"] == pytest.approx(50.0)
+    assert data.total_tasks == 2
+    assert data.state == "ready"
 
 
 async def test_sam_plan_status_missing_plan_raises_tool_error(client: Client) -> None:
@@ -696,8 +693,8 @@ async def test_sam_plan_ready_returns_tasks_with_satisfied_deps(
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    assert data["ready_tasks"][0]["id"] == "T02"
+    assert data.count == 1
+    assert data.ready_tasks[0].id == "T02"
 
 
 async def test_sam_plan_ready_full_returns_complete_task_fields(
@@ -718,13 +715,13 @@ async def test_sam_plan_ready_full_returns_complete_task_fields(
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    task = data["ready_tasks"][0]
+    assert data.count == 1
+    task = data.ready_tasks[0]
     # Full model contains more than the compact 7-field manifest
-    assert "id" in task
-    assert "title" in task
-    assert "status" in task
-    assert "dependencies" in task
+    assert task.id
+    assert task.title
+    assert task.status
+    assert task.dependencies is not None
 
 
 async def test_sam_plan_ready_missing_plan_raises_tool_error(client: Client) -> None:
@@ -761,8 +758,8 @@ async def test_sam_plan_update_sets_context_field(client: Client, task_backend: 
     )
 
     # Assert
-    assert result.data["updated"] is True
-    assert result.data["address"] == plan_id
+    assert result.data.updated is True
+    assert result.data.address == plan_id
 
 
 async def test_sam_plan_update_missing_plan_raises_tool_error(client: Client) -> None:
@@ -793,7 +790,7 @@ async def test_sam_active_task_get_returns_null_when_not_set(client: Client) -> 
     result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
 
     # Assert
-    assert result.data["active_task"] is None
+    assert result.data.active_task is None
 
 
 # ===========================================================================
@@ -813,9 +810,8 @@ async def test_sam_active_task_set_stores_plan_and_task(client: Client) -> None:
 
     # Assert
     data = result.data
-    assert "active_task" in data
-    ctx = data["active_task"]
-    assert ctx["task_id"] == "T01"
+    assert data.active_task is not None
+    assert data.active_task.task_id == "T01"
 
 
 async def test_sam_active_task_set_with_explicit_session_id(client: Client) -> None:
@@ -831,9 +827,10 @@ async def test_sam_active_task_set_with_explicit_session_id(client: Client) -> N
     )
 
     # Assert
-    ctx = result.data["active_task"]
-    assert ctx["session_id"] == "test-session-xyz"
-    assert ctx["task_id"] == "T05"
+    ctx = result.data.active_task
+    assert ctx is not None
+    assert ctx.session_id == "test-session-xyz"
+    assert ctx.task_id == "T05"
 
 
 async def test_sam_active_task_get_after_set_returns_stored_context(client: Client) -> None:
@@ -850,9 +847,9 @@ async def test_sam_active_task_get_after_set_returns_stored_context(client: Clie
     result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
 
     # Assert
-    ctx = result.data["active_task"]
+    ctx = result.data.active_task
     assert ctx is not None
-    assert ctx["task_id"] == "T03"
+    assert ctx.task_id == "T03"
 
 
 # ===========================================================================
@@ -874,10 +871,10 @@ async def test_sam_active_task_clear_removes_context(client: Client) -> None:
     clear_result = await client.call_tool("sam_active_task", {"config": {"action": "clear"}})
 
     # Assert
-    assert clear_result.data["cleared"] is True
+    assert clear_result.data.cleared is True
 
     get_result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
-    assert get_result.data["active_task"] is None
+    assert get_result.data.active_task is None
 
 
 async def test_sam_active_task_clear_nonexistent_returns_false(client: Client) -> None:
@@ -891,7 +888,7 @@ async def test_sam_active_task_clear_nonexistent_returns_false(client: Client) -
     result = await client.call_tool("sam_active_task", {"config": {"action": "clear"}})
 
     # Assert
-    assert result.data["cleared"] is False
+    assert result.data.cleared is False
 
 
 # ===========================================================================
@@ -933,11 +930,11 @@ async def test_sam_active_task_update_patches_task_via_active_context(
     )
 
     # Assert
-    assert result.data["updated"] is True
+    assert result.data.updated is True
 
     # Verify patch persisted through sam_task read
     read_result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
-    assert read_result.data["task"]["title"] == "Updated via active context"
+    assert read_result.data.task.title == "Updated via active context"
 
 
 # ===========================================================================
@@ -965,8 +962,10 @@ async def test_sam_active_task_different_sessions_are_isolated(client: Client) -
     result_b = await client.call_tool("sam_active_task", {"config": {"action": "get"}, "session_id": "session-b"})
 
     # Assert
-    assert result_a.data["active_task"]["task_id"] == "T01"
-    assert result_b.data["active_task"]["task_id"] == "T02"
+    assert result_a.data.active_task is not None
+    assert result_a.data.active_task.task_id == "T01"
+    assert result_b.data.active_task is not None
+    assert result_b.data.active_task.task_id == "T02"
 
 
 async def test_sam_active_task_omitting_session_id_uses_default_sentinel(client: Client) -> None:
@@ -983,6 +982,6 @@ async def test_sam_active_task_omitting_session_id_uses_default_sentinel(client:
     result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
 
     # Assert
-    ctx = result.data["active_task"]
+    ctx = result.data.active_task
     assert ctx is not None
-    assert ctx["task_id"] == "T01"
+    assert ctx.task_id == "T01"

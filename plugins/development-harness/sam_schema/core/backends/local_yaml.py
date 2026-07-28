@@ -1,32 +1,39 @@
 """LocalYamlTaskProvider — TaskBackend implementation wrapping existing YAML I/O.
 
-Wraps the existing YAML I/O stack (yaml_reader.py, yaml_writer.py, query.py)
-behind the TaskBackend Protocol. This is the default backend preserving all
-current single-machine behavior without modifying the underlying modules.
+Wraps the existing YAML I/O stack (readers, writers) behind the TaskBackend
+Protocol. This is the default backend preserving all current single-machine
+behavior without modifying the underlying modules.
 
-All plan/task operations delegate to the query layer. Document operations
-write to ``plan_dir/{plan_id}/documents/`` on the local filesystem.
+All plan/task operations call the reader/writer layers directly. Document
+operations write to ``plan_dir/{plan_id}/documents/`` on the local filesystem.
 """
 
 from __future__ import annotations
 
+import io
 import re
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sam_schema.core import query
+import dh_paths
+
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.backends._utils import validate_appended_task
-from sam_schema.core.exceptions import (
-    DocumentNotFoundError,
-    PlanExistsError,
-    PlanNotFoundError,
-    TaskNotFoundError,
-    TaskValidationError,
+from sam_schema.core.dependencies import DependencyGraph
+from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
+from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
+from sam_schema.readers import detect
+from sam_schema.readers.normalize import normalize_plan
+from sam_schema.writers.yaml_writer import (
+    _atomic_write,
+    _make_yaml,
+    _wrap_multiline,
+    create_plan_file,
+    update_fields,
+    write_plan,
 )
-from sam_schema.core.models import Plan, PlanState, Task, TaskStatus
-from sam_schema.readers.detect import FormatDetectionError
-from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -43,7 +50,42 @@ _TASKS_STEM_RE = re.compile(r"^tasks-(\d+)-")
 _TASK_VALIDATION_RE = re.compile(r"Task at index (\d+) failed validation: (.+)", re.DOTALL)
 
 
-def _plan_id_from_path(path: Path) -> str:
+def _resolve_writable_path(plan_path: Path, task_id: str) -> Path:
+    """Resolve the concrete YAML file path that contains ``task_id``.
+
+    For a single ``.yaml`` file, returns ``plan_path`` directly.
+    For a directory layout, searches ``task-{task_id}.yaml`` inside it.
+
+    Args:
+        plan_path: Plan path as provided by the caller.
+        task_id: Task ID whose file should be located.
+
+    Returns:
+        Path to the ``.yaml`` file containing the task.
+
+    Raises:
+        FileNotFoundError: If the resolved path does not exist.
+        KeyError: If no file containing ``task_id`` can be found in a
+                  directory layout.
+    """
+    if plan_path.is_file():
+        return plan_path
+
+    # Directory layout: look for per-task file first
+    per_task = plan_path / f"task-{task_id}.yaml"
+    if per_task.exists():
+        return per_task
+
+    # Fall back to plan.yaml (tasks embedded in plan file)
+    plan_yaml = plan_path / "plan.yaml"
+    if plan_yaml.exists():
+        return plan_yaml
+
+    msg = f"Cannot find writable file for task '{task_id}' in directory '{plan_path}'"
+    raise KeyError(msg)
+
+
+def plan_id_from_path(path: Path) -> str:
     """Extract the plan_id string (e.g. 'P912') from a plan file path.
 
     Args:
@@ -173,9 +215,10 @@ def _plan_to_plan_data(plan: Plan, plan_id: str) -> PlanData:
 class LocalYamlTaskProvider:
     """TaskBackend implementation wrapping the existing YAML I/O stack.
 
-    All plan and task operations delegate to query.py, which in turn calls
-    yaml_reader.py and yaml_writer.py. Document operations write to the
-    local filesystem under ``plan_dir/{plan_id}/documents/``.
+    All plan and task operations call the reader/writer layers directly
+    (``readers.detect``, ``readers.normalize``, ``writers.yaml_writer``).
+    Document operations write to the local filesystem under
+    ``plan_dir/{plan_id}/documents/``.
 
     This is the default backend that preserves existing single-machine behavior.
 
@@ -190,16 +233,8 @@ class LocalYamlTaskProvider:
         Args:
             plan_dir: Root directory for plan YAML files. When None,
                 resolves via ``dh_paths.plan_dir()``.
-
-        Raises:
-            RuntimeError: If plan_dir is None and dh_paths is not importable.
         """
         if plan_dir is None:
-            try:
-                import dh_paths
-            except ImportError as exc:
-                msg = "plan_dir is None and dh_paths is not importable — install dh_paths or pass plan_dir explicitly"
-                raise RuntimeError(msg) from exc
             plan_dir = dh_paths.plan_dir()
         self._plan_dir: Path = plan_dir
         # Per-plan task-ID cache — avoids repeated YAML parse+deserialize when
@@ -243,6 +278,24 @@ class LocalYamlTaskProvider:
         except (AddressingError, FileNotFoundError) as exc:
             raise PlanNotFoundError(plan_id) from exc
 
+    @staticmethod
+    def _load_plan(path: Path) -> ReadResult:
+        """Load a plan from any supported format via the reader pipeline.
+
+        Delegates to ``readers.detect.read_plan`` for format detection and
+        reading, then normalizes to Pydantic models via
+        ``readers.normalize.normalize_plan``.
+
+        Args:
+            path: Path to a task/plan file or directory.
+
+        Returns:
+            A ``ReadResult`` containing the parsed ``Plan`` and any
+            ``SchemaGap`` records for non-canonical fields.
+        """
+        plan_meta, task_dicts, fmt = detect.read_plan(path)
+        return normalize_plan(plan_meta, task_dicts, fmt, path)
+
     # ------------------------------------------------------------------
     # Plan lifecycle
     # ------------------------------------------------------------------
@@ -259,10 +312,11 @@ class LocalYamlTaskProvider:
     ) -> PlanData:
         """Create a new plan and write it to disk as a YAML file.
 
-        Delegates to ``query.create_plan()``. The ``acceptance_criteria``
-        parameter is accepted for Protocol compatibility but is not written
-        by the underlying query layer; use ``update_plan_fields()`` after
-        creation to set it.
+        Validates each task against the ``Task`` Pydantic model, assigns a
+        UUID-derived plan ID, and writes via ``yaml_writer.create_plan_file``.
+        The ``acceptance_criteria`` parameter is accepted for Protocol
+        compatibility but is not written by this backend; use
+        ``update_plan_fields()`` after creation to set it.
 
         Args:
             slug: Human-readable identifier slug for the plan.
@@ -280,27 +334,50 @@ class LocalYamlTaskProvider:
             PlanExistsError: When a plan with the resolved plan_id already exists.
             TaskValidationError: When any task definition fails validation.
         """
+        MAX_ID_ATTEMPTS = 3
         task_dicts: list[dict[str, Any]] = [t.model_dump(by_alias=False, exclude_none=True) for t in tasks]
-        try:
-            plan = query.create_plan(
-                slug=slug, goal=goal, tasks=task_dicts, plan_dir=self._plan_dir, context=context, issue=issue
+        # Validate task dicts
+        validated_tasks: list[Task] = []
+        for i, raw_task in enumerate(task_dicts):
+            normalized = (
+                {**raw_task, "id": raw_task["task"]} if "task" in raw_task and "id" not in raw_task else raw_task
             )
-        except ValueError as exc:
-            msg = str(exc)
-            if "already exists" in msg:
-                plan_number = str(issue) if issue is not None else slug
-                raise PlanExistsError(f"P{plan_number}") from exc
-            m = _TASK_VALIDATION_RE.search(msg)
-            if m:
-                raise TaskValidationError(int(m.group(1)), m.group(2)) from exc
-            raise TaskValidationError(0, msg) from exc
+            try:
+                validated_tasks.append(Task.model_validate(normalized))
+            except Exception as exc:
+                msg = f"Task at index {i} failed validation: {exc}"
+                m = _TASK_VALIDATION_RE.search(msg)
+                if m:
+                    raise TaskValidationError(int(m.group(1)), m.group(2)) from exc
+                raise TaskValidationError(0, msg) from exc
+
+        # Generate a collision-resistant plan ID
+        for _attempt in range(MAX_ID_ATTEMPTS):
+            plan_id_str = "P" + uuid.uuid4().hex[:8]
+            output_path = self._plan_dir / f"{plan_id_str}-{slug}.yaml"
+            if not output_path.exists():
+                break
+        else:
+            msg = f"UUID collision: failed to generate a unique plan ID after {MAX_ID_ATTEMPTS} attempts"
+            raise OSError(msg)
+
+        plan = Plan(
+            plan_id=plan_id_str,
+            feature=slug,
+            goal=goal,
+            context=context,
+            issue=str(issue) if issue is not None else None,
+            tasks=validated_tasks,
+            source_path=output_path,
+        )
+        create_plan_file(output_path, plan)
 
         if not tasks:
             plan = plan.model_copy(update={"state": PlanState.DRAFTING})
             if plan.source_path is not None:
                 write_plan(plan, plan.source_path, force_single=True)
 
-        plan_id = _plan_id_from_path(plan.source_path) if plan.source_path else slug
+        plan_id = plan_id_from_path(plan.source_path) if plan.source_path else slug
         return _plan_to_plan_data(plan, plan_id)
 
     def read_plan(self, plan_id: str) -> PlanData:
@@ -317,13 +394,18 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            result = query.load_plan(path)
+            result = self._load_plan(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
         # Prefer the plan_id stored in the record; fall back to filename-derived
         # value for backwards compatibility with pre-existing files.
-        effective_plan_id = result.plan.plan_id or _plan_id_from_path(path)
-        return _plan_to_plan_data(result.plan, effective_plan_id)
+        effective_plan_id = result.plan.plan_id or plan_id_from_path(path)
+        plan_data = _plan_to_plan_data(result.plan, effective_plan_id)
+        # Preserve schema gaps from the reader/normalizer pipeline so that
+        # operations.read_plan can surface them in ReadResult for `sam validate`.
+        if result.gaps:
+            plan_data["gaps"] = [g.model_dump() for g in result.gaps]
+        return plan_data
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return lightweight summaries for all plans, optionally filtered.
@@ -343,7 +425,7 @@ class LocalYamlTaskProvider:
         summaries: list[PlanSummary] = []
         for candidate in candidates:
             try:
-                result = query.load_plan(candidate)
+                result = self._load_plan(candidate)
                 plan = result.plan
                 if search is not None:
                     text = f"{plan.feature} {plan.goal or ''} {plan.description}"
@@ -351,7 +433,7 @@ class LocalYamlTaskProvider:
                         continue
                 # Prefer the plan_id stored in the record; fall back to filename-derived
                 # value for backwards compatibility with pre-existing files.
-                plan_id = plan.plan_id or _plan_id_from_path(candidate)
+                plan_id = plan.plan_id or plan_id_from_path(candidate)
                 summary: PlanSummary = {
                     "plan_id": plan_id,
                     "feature": plan.feature,
@@ -365,7 +447,7 @@ class LocalYamlTaskProvider:
                 if plan.backend_ref is not None:
                     summary["backend_ref"] = plan.backend_ref
                 summaries.append(summary)
-            except (FileNotFoundError, FormatDetectionError, ValueError, TypeError):
+            except (FileNotFoundError, detect.FormatDetectionError, ValueError, TypeError):
                 continue
 
         paginated = summaries[offset:]
@@ -387,8 +469,21 @@ class LocalYamlTaskProvider:
             PlanNotFoundError: When plan_id cannot be resolved.
         """
         path = self._resolve_path(plan_id)
+        if context is None and not set_fields:
+            return
         try:
-            query.update_plan_fields(path, context=context, set_fields=set_fields)
+            file_path = _resolve_writable_path(path, "")
+            y = _make_yaml()
+            raw = file_path.read_text(encoding="utf-8")
+            data: dict[str, Any] = y.load(raw)
+            if context is not None:
+                data["context"] = _wrap_multiline(context)
+            if set_fields:
+                for key, value in set_fields.items():
+                    data[key] = _wrap_multiline(value) if isinstance(value, str) else value
+            buf = io.StringIO()
+            y.dump(data, buf)
+            _atomic_write(file_path, buf.getvalue())
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
 
@@ -436,12 +531,24 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            query.claim_task(path, task_id)
+            # Load plan and find the task to check its status
+            result = self._load_plan(path)
+            task: Task | None = None
+            for t in result.plan.tasks:
+                if t.id == task_id:
+                    task = t
+                    break
+            if task is None:
+                raise TaskNotFoundError(plan_id, task_id)
+            if task.status != TaskStatus.NOT_STARTED:
+                return False
+            # Transition to in-progress with started timestamp
+            file_path = _resolve_writable_path(path, task_id)
+            ts = datetime.now(UTC).isoformat()
+            update_fields(file_path, task_id, {"status": str(TaskStatus.IN_PROGRESS), "started": ts})
         except ValueError:
             # Task is not in not-started status — already claimed or terminal.
             return False
-        except KeyError as exc:
-            raise TaskNotFoundError(plan_id, task_id) from exc
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
         return True
@@ -465,7 +572,8 @@ class LocalYamlTaskProvider:
             raise TaskValidationError(0, f"Invalid status value: {status!r}") from exc
         path = self._resolve_path(plan_id)
         try:
-            query.update_status(path, task_id, task_status)
+            file_path = _resolve_writable_path(path, task_id)
+            update_fields(file_path, task_id, {"status": str(task_status)})
         except KeyError as exc:
             raise TaskNotFoundError(plan_id, task_id) from exc
         except FileNotFoundError as exc:
@@ -485,7 +593,8 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            query.update_plan_fields(path, task_id=task_id, set_fields=fields)
+            file_path = _resolve_writable_path(path, task_id)
+            update_fields(file_path, task_id, fields)
         except KeyError as exc:
             raise TaskNotFoundError(plan_id, task_id) from exc
         except FileNotFoundError as exc:
@@ -511,7 +620,7 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            result = query.load_plan(path)
+            result = self._load_plan(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
 
@@ -522,7 +631,7 @@ class LocalYamlTaskProvider:
 
         updated_tasks = [task if t.id == task.id else t for t in plan.tasks]
         updated_plan = plan.model_copy(update={"tasks": updated_tasks})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append markdown content to a named section of a task's context_notes.
@@ -560,7 +669,8 @@ class LocalYamlTaskProvider:
 
         path = self._resolve_path(plan_id)
         try:
-            query.update_plan_fields(path, task_id=task_id, set_fields={"context-notes": new_context})
+            file_path = _resolve_writable_path(path, task_id)
+            update_fields(file_path, task_id, {"context-notes": new_context})
         except KeyError as exc:
             raise TaskNotFoundError(plan_id, task_id) from exc
         except FileNotFoundError as exc:
@@ -584,7 +694,7 @@ class LocalYamlTaskProvider:
             TaskValidationError: When the task ID already exists in the plan.
         """
         path = self._resolve_path(plan_id)
-        result = query.load_plan(path)
+        result = self._load_plan(path)
         plan = result.plan
 
         # Use cache on subsequent calls; populate from plan on first call.
@@ -596,7 +706,7 @@ class LocalYamlTaskProvider:
 
         new_tasks = [*plan.tasks, task]
         updated_plan = plan.model_copy(update={"tasks": new_tasks})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
 
         return {"appended": True, "task_id": task.id}
 
@@ -617,7 +727,7 @@ class LocalYamlTaskProvider:
             PlanNotFoundError: When plan_id cannot be resolved to a file.
         """
         path = self._resolve_path(plan_id)
-        result = query.load_plan(path)
+        result = self._load_plan(path)
         plan = result.plan
 
         # No-op guard: already ready — skip write, return early.
@@ -625,7 +735,7 @@ class LocalYamlTaskProvider:
             return {"finalized": True, "state": PlanState.READY}
 
         updated_plan = plan.model_copy(update={"state": PlanState.READY})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
         # Invalidate task-ID cache so subsequent appends read fresh state.
         self._task_id_cache.pop(plan_id, None)
 
@@ -648,7 +758,9 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            tasks = query.get_ready_tasks(path)
+            result = self._load_plan(path)
+            graph = DependencyGraph(result.plan.tasks)
+            tasks = graph.get_ready_tasks()
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
         return [_task_to_task_data(t) for t in tasks]
@@ -668,10 +780,32 @@ class LocalYamlTaskProvider:
         """
         path = self._resolve_path(plan_id)
         try:
-            result = query.load_plan(path)
-            status = query.get_plan_status(path)
+            result = self._load_plan(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
+        plan = result.plan
+        graph = DependencyGraph(plan.tasks)
+
+        by_status: dict[str, int] = {}
+        for task in plan.tasks:
+            by_status[task.status] = by_status.get(task.status, 0) + 1
+
+        ready_tasks = [t.id for t in graph.get_ready_tasks()]
+        blocked_tasks = [{t.id: missing_deps} for t, missing_deps in graph.get_blocked_tasks()]
+
+        total = len(plan.tasks)
+        complete_count = by_status.get(TaskStatus.COMPLETE, 0)
+        completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+
+        status = PlanStatus(
+            feature=plan.feature,
+            total_tasks=total,
+            by_status=by_status,
+            ready_tasks=ready_tasks,
+            blocked_tasks=blocked_tasks,
+            completion_pct=completion_pct,
+            has_cycles=graph.has_cycles(),
+        )
         return {
             "feature": status.feature,
             "total_tasks": status.total_tasks,
@@ -680,7 +814,7 @@ class LocalYamlTaskProvider:
             "blocked_tasks": list(status.blocked_tasks),
             "completion_pct": status.completion_pct,
             "has_cycles": status.has_cycles,
-            "state": result.plan.state,
+            "state": plan.state,
         }
 
     # ------------------------------------------------------------------

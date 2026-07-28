@@ -47,7 +47,7 @@ class Paginator:
             Non-empty list of Page objects. Returns a single empty page
             for empty text.
         """
-        effective = budget if budget is not None else self._budgeter._default_budget  # noqa: SLF001
+        effective = budget if budget is not None else self._budgeter._default_budget  # ruff: ignore[private-member-access]
         chunks = self._budgeter.split_to_budget(text, effective)
         return _chunks_to_pages(chunks, effective, self._budgeter)
 
@@ -64,7 +64,7 @@ class Paginator:
         Returns:
             Non-empty list of Page objects.
         """
-        effective = budget if budget is not None else self._budgeter._default_budget  # noqa: SLF001
+        effective = budget if budget is not None else self._budgeter._default_budget  # ruff: ignore[private-member-access]
 
         if not blocks:
             return [_make_page("", 1, 1, effective, self._budgeter)]

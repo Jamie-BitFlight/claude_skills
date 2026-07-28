@@ -68,7 +68,7 @@ def _ensure_cl100k_cached() -> bool:
         return True
     try:
         tiktoken.get_encoding("cl100k_base")  # populates ENCODINGS from cache/network
-    except Exception:  # noqa: BLE001 - tiktoken raises undeclared download/network errors when its cache is empty and the network is unreachable; the concrete class is not part of its public API, so seed a deterministic stub to keep server importable offline.
+    except Exception:  # ruff: ignore[blind-except] - tiktoken raises undeclared download/network errors when its cache is empty and the network is unreachable; the concrete class is not part of its public API, so seed a deterministic stub to keep server importable offline.
         tiktoken.registry.ENCODINGS["cl100k_base"] = _StubEncoder()
         return False
     else:

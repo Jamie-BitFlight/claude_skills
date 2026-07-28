@@ -125,7 +125,7 @@ def _parse_skills_value(raw: str) -> list[str]:
     return [p for p in parts if p]
 
 
-def _extract_bold_fields(prose: str) -> dict[str, str | list[str] | int]:  # noqa: PLR0912
+def _extract_bold_fields(prose: str) -> dict[str, str | list[str] | int]:  # ruff: ignore[too-many-branches]
     """Extract ``**FieldName**: value`` patterns from task prose text.
 
     Parses lines matching the bold-field pattern and maps display names to
@@ -441,7 +441,7 @@ def _strip_bold_fields_from_prose(prose: str) -> str:
     return cleaned.strip()
 
 
-def _build_task_dict(  # noqa: C901, PLR0912
+def _build_task_dict(  # ruff: ignore[complex-structure, too-many-branches]
     entry: dict | str | object, prose_by_task: dict[str, str], body_task_blocks: dict[str, dict] | None = None
 ) -> dict | None:
     """Build a raw task dict from a manifest ``tasks:`` entry.

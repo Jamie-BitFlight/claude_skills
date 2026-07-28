@@ -492,7 +492,7 @@ flowchart TD
 
 **start-task internal procedure** (Actor: specialist agent):
 
-1. `sam_read(plan="P{N}", task="T{M}")` — returns `TaskAssignment` JSON
+1. `sam_read(plan="P{N}", task="T{M}")` — returns a `TaskAssignment` model
 2. Optionally discovers plan artifacts via `artifact_list` + `artifact_read`
 3. Selects task (from `--task` argument or first `not-started` with resolved deps)
 4. Loads task-level skills via `Skill(skill="{skill-name}")` for each name in `task.skills`

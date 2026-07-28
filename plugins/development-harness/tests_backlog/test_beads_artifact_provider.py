@@ -83,7 +83,7 @@ class TestGetManifestBd:
 
         result = provider.get_manifest_bd(_ISSUE_ID)
 
-        assert result.issue_number == 0
+        assert result.issue_number == _ISSUE_ID
         assert result.artifacts == []
 
     def test_returns_empty_manifest_when_metadata_has_no_dh_key(
@@ -449,7 +449,7 @@ class TestADR002TypeWidening:
 
         result = provider.get_manifest(_ISSUE_ID)
 
-        assert result.issue_number == 0
+        assert result.issue_number == _ISSUE_ID
         mock_runner.run_json.assert_called_once()
 
     def test_get_manifest_with_int_raises_not_implemented(self, provider: BeadsArtifactProvider) -> None:

@@ -129,7 +129,7 @@ def validate_inputs(groups: dict[str, list[str]], window: int, report_dir: str) 
     errors: list[str] = []
     if len(groups) < MIN_GROUPS:
         errors.append(f"need at least {MIN_GROUPS} groups for overlap denoising, got {len(groups)}")
-    window_ok = groups and 2 <= window < len(groups)  # noqa: PLR2004
+    window_ok = groups and 2 <= window < len(groups)  # ruff: ignore[magic-value-comparison]
     if not window_ok:
         errors.append(f"window must satisfy 2 <= window < n_groups ({len(groups)}); got {window}")
     if any(not rules for rules in groups.values()):

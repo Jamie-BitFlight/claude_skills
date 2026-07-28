@@ -319,7 +319,8 @@ class TestSamCreateOptionalFields:
         read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
-        assert plan_data.get("context") == "Some shared context"
+        # read_plan returns ReadResult; plan fields are nested under "plan".
+        assert plan_data["plan"].get("context") == "Some shared context"
 
     def test_create_with_issue_stores_issue_in_plan(self, plan_dir: Path) -> None:
         """Create with --issue persists the issue number.
@@ -341,7 +342,7 @@ class TestSamCreateOptionalFields:
         read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
-        assert plan_data.get("issue") == "42"
+        assert plan_data["plan"].get("issue") == "42"
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +407,8 @@ class TestSamCreateRoundTrip:
         # Assert
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
-        assert len(plan_data.get("tasks", [])) == 2
+        # read_plan returns ReadResult; tasks are nested under plan.tasks.
+        assert len(plan_data["plan"].get("tasks", [])) == 2
 
     def test_create_then_read_assignment_includes_plan_goal(self, plan_dir: Path) -> None:
         """TaskAssignment from read includes the plan goal set during create.
@@ -429,6 +431,7 @@ class TestSamCreateRoundTrip:
         # Assert
         assert read_result.exit_code == 0, read_result.output
         data = json.loads(read_result.output)
+        # TaskAssignment now serializes with alias field names (by_alias=True).
         assert data.get("plan-goal") == "My specific goal"
 
     def test_create_with_stdin_preserves_task_body_content(self, plan_dir: Path) -> None:
@@ -566,7 +569,7 @@ class TestSamCreateWithIssue:
         read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
-        assert plan_data.get("issue") == "951"
+        assert plan_data["plan"].get("issue") == "951"
 
     def test_two_creates_with_same_issue_produce_distinct_plan_ids(self, plan_dir: Path) -> None:
         """Two creates with the same --issue number produce different UUID plan_ids.

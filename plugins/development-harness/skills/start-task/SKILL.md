@@ -21,7 +21,7 @@ $ARGUMENTS
 
 ---
 
-**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server takes 10–30 seconds to initialize after a session restart. If unavailable or `ToolSearch` reports "still connecting", follow [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) before proceeding.
+**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server initializes in ~1 second after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
 ## Parse Arguments
 
@@ -46,7 +46,7 @@ $ARGUMENTS
    mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "read"})
    ```
 
-   The response is a `TaskAssignment` JSON object containing:
+   The response is a `TaskAssignment` model containing:
    - `plan.goal` — the overall feature goal
    - `plan.context` — plan-level context manifest (architecture decisions, codebase notes)
    - `task` — full task details: title, requirements, constraints, acceptance criteria, verification steps
@@ -56,7 +56,7 @@ $ARGUMENTS
 
 1a. **Discover plan artifacts via manifest** (when issue number is known):
 
-   If the `TaskAssignment` JSON contains a `parent_issue_number` or the plan has an `issue` field, query the artifact manifest to discover available plan artifacts:
+   If the `TaskAssignment` model contains a `parent_issue_number` or the plan has an `issue` field, query the artifact manifest to discover available plan artifacts:
 
    ```text
    mcp__plugin_dh_backlog__artifact_list(item_id=N)
@@ -78,7 +78,7 @@ $ARGUMENTS
    - Else pick the first task where status is `not-started` and all dependencies are resolved (check `task.dependencies` in the TaskAssignment)
 
 2a. **Load task-level skills** (if present):
-   - Read `task.skills` from the `TaskAssignment` JSON (an array of skill names).
+   - Read `task.skills` from the `TaskAssignment` model (an array of skill names).
    - If absent or empty, skip (backward compatible with older task files).
    - For each skill name, invoke: `Skill(skill="{skill-name}")`
    - If a skill fails to load, log a warning and continue. Do not abort task execution.

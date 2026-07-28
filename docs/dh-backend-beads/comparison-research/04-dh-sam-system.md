@@ -113,9 +113,9 @@ Returns plan-level progress summary including autonomy mode.
 sam_plan(plan="P1", config={"action": "status"})
 ```
 
-Response: `{feature, total_tasks, by_status, ready_tasks, blocked_tasks, completion_pct, has_cycles, autonomy}`
+Response: `{feature, total_tasks, by_status, ready_tasks, blocked_tasks, completion_pct, has_cycles, autonomy, state}`
 
-When plan is in `state="drafting"`: returns `{"drafting": true, "state": "drafting"}` instead.
+When plan is in `state="drafting"`: returns a `PlanStatus` model with `state="drafting"` and zeroed/empty progress fields.
 
 #### `ready`
 
@@ -128,9 +128,9 @@ sam_plan(plan="P1", config={"action": "ready", "full": false})
 - `full=false` (default): compact 7-field manifest per task: `{id, task, agent, skills, dependencies, status, priority}`
 - `full=true`: full Task model dump (30+ fields)
 
-When plan is in `state="drafting"`: returns drafting marker instead of task list.
+When plan is in `state="drafting"`: returns a `ReadyTasksResult` model with `state="drafting"` and an empty `ready_tasks` list.
 
-Response (compact): `{ready_tasks: [...], count: N, feature: "...", issue: 42}`
+Response (compact): `{ready_tasks: [...], count: N, feature: "...", issue: 42, state: "ready"}`
 
 #### `update`
 
@@ -619,9 +619,9 @@ Plans have two states defined by `PlanState`:
 **Drafting state** is entered when `sam_plan(action='create', tasks=[])` is called with an empty
 task list. While drafting:
 
-- `sam_plan(action='status')` returns `{"drafting": true, "state": "drafting"}` instead of counts
-- `sam_plan(action='ready')` returns the drafting marker instead of ready tasks
-- `sam_plan(action='read')` returns the plan with drafting marker
+- `sam_plan(action='status')` returns a `PlanStatus` model with `state="drafting"` instead of counts
+- `sam_plan(action='ready')` returns a `ReadyTasksResult` model with `state="drafting"` and an empty `ready_tasks` list
+- `sam_plan(action='read')` returns the plan with `state="drafting"`
 - `sam_plan(action='append_task')` appends tasks one at a time (single-writer only)
 
 **Finalize** (`sam_plan(action='finalize')`) clears drafting state, setting `state="ready"`. After

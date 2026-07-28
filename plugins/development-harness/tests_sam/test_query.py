@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import sam_schema
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
 from sam_schema.core.models import Plan, Task, TaskStatus
 from sam_schema.core.query import (
@@ -17,6 +18,7 @@ from sam_schema.core.query import (
     load_plan,
     update_status,
 )
+from sam_schema.readers.detect import FormatType, detect_format
 from sam_schema.writers.yaml_writer import write_plan
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -27,6 +29,24 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 from tests_sam.conftest import make_task
+
+
+def test_package_reexports_query_reader_and_writer_symbols() -> None:
+    expected = {
+        "claim_task": claim_task,
+        "get_plan_status": get_plan_status,
+        "get_ready_tasks": get_ready_tasks,
+        "get_task": get_task,
+        "list_tasks": list_tasks,
+        "load_plan": load_plan,
+        "update_status": update_status,
+        "FormatType": FormatType,
+        "detect_format": detect_format,
+        "write_plan": write_plan,
+    }
+    for name, symbol in expected.items():
+        assert getattr(sam_schema, name) is symbol
+        assert name in sam_schema.__all__
 
 
 @pytest.fixture
@@ -113,18 +133,6 @@ def test_load_plan_yaml_frontmatter_single_has_task_id_in_result() -> None:
     # Assert
     assert len(result.plan.tasks) > 0
     assert result.source_format == "yaml_frontmatter"
-
-
-def test_load_plan_legacy_markdown_returns_read_result() -> None:
-    # Arrange
-    path = FIXTURES_DIR / "legacy_markdown.md"
-
-    # Act
-    result = load_plan(path)
-
-    # Assert
-    assert len(result.plan.tasks) > 0
-    assert result.source_format == "legacy_markdown"
 
 
 def test_load_plan_global_manifest_returns_read_result() -> None:
@@ -507,13 +515,13 @@ def plan_dir_with_files(tmp_path: Path) -> Path:
     """Create a directory with two task plan files for addressing tests.
 
     Files created:
-      - tasks-1-auth-system.yaml
-      - tasks-2-cache-layer.yaml
+      - P001-auth-system.yaml
+      - P002-cache-layer.yaml
     """
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
-    (plan_dir / "tasks-1-auth-system.yaml").write_text("feature: auth-system\n")
-    (plan_dir / "tasks-2-cache-layer.yaml").write_text("feature: cache-layer\n")
+    (plan_dir / "P001-auth-system.yaml").write_text("feature: auth-system\n")
+    (plan_dir / "P002-cache-layer.yaml").write_text("feature: cache-layer\n")
     return plan_dir
 
 
@@ -522,7 +530,7 @@ def test_resolve_plan_address_numeric_finds_correct_file(plan_dir_with_files: Pa
     result = resolve_plan_address("P1", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-1-auth-system.yaml"
+    assert result.name == "P001-auth-system.yaml"
 
 
 def test_resolve_plan_address_numeric_two_finds_second_file(plan_dir_with_files: Path) -> None:
@@ -530,7 +538,7 @@ def test_resolve_plan_address_numeric_two_finds_second_file(plan_dir_with_files:
     result = resolve_plan_address("P2", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-2-cache-layer.yaml"
+    assert result.name == "P002-cache-layer.yaml"
 
 
 def test_resolve_plan_address_slug_finds_matching_file(plan_dir_with_files: Path) -> None:
@@ -538,20 +546,20 @@ def test_resolve_plan_address_slug_finds_matching_file(plan_dir_with_files: Path
     result = resolve_plan_address("cache-layer", plan_dir_with_files)
 
     # Assert
-    assert result.name == "tasks-2-cache-layer.yaml"
+    assert result.name == "P002-cache-layer.yaml"
 
 
 def test_resolve_plan_address_numeric_takes_precedence_over_slug(tmp_path: Path) -> None:
     # Arrange — create a file where the slug contains a number
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
-    (plan_dir / "tasks-1-step-1-api.yaml").write_text("feature: step-1-api\n")
+    (plan_dir / "P001-step-1-api.yaml").write_text("feature: step-1-api\n")
 
-    # Act — numeric "1" matches tasks-1-* prefix, not slug "1"
+    # Act — numeric "1" matches P001-* prefix, not slug "1"
     result = resolve_plan_address("P1", plan_dir)
 
     # Assert
-    assert result.name == "tasks-1-step-1-api.yaml"
+    assert result.name == "P001-step-1-api.yaml"
 
 
 def test_resolve_plan_address_missing_plan_raises_addressing_error(plan_dir_with_files: Path) -> None:

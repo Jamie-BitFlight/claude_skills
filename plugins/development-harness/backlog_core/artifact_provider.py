@@ -1386,7 +1386,7 @@ def create_artifact_provider(
             root_worktree=root_worktree,
         )
     if resolved in {BackendName.beads, "beads"}:
-        from .backends.beads_artifact_provider import BeadsArtifactProvider  # noqa: PLC0415
+        from .backends.beads_artifact_provider import BeadsArtifactProvider  # ruff: ignore[import-outside-top-level]
 
         return BeadsArtifactProvider()
     if resolved in {BackendName.local, "local"}:

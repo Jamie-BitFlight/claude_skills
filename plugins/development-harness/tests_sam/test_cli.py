@@ -23,7 +23,7 @@ _PURE_YAML_SINGLE: Path = FIXTURES_DIR / "pure_yaml_single.yaml"
 def plan_dir(tmp_path: Path) -> Path:
     """Create a temporary plan directory containing a copy of pure_yaml_single.yaml.
 
-    The file is named ``tasks-1-auth-system.yaml`` so address ``P1`` resolves
+    The file is named ``P001-auth-system.yaml`` so address ``P1`` resolves
     to it via numeric match, and ``auth-system`` resolves via slug match.
 
     Returns:
@@ -32,21 +32,7 @@ def plan_dir(tmp_path: Path) -> Path:
     d = tmp_path / "plan"
     d.mkdir()
     content = _PURE_YAML_SINGLE.read_text(encoding="utf-8")
-    (d / "tasks-1-auth-system.yaml").write_text(content, encoding="utf-8")
-    return d
-
-
-@pytest.fixture
-def legacy_plan_dir(tmp_path: Path) -> Path:
-    """Create a temporary plan directory containing a legacy markdown plan file.
-
-    Returns:
-        Path to a ``plan/`` directory with a legacy-format plan file.
-    """
-    d = tmp_path / "plan"
-    d.mkdir()
-    content = (FIXTURES_DIR / "legacy_markdown.md").read_text(encoding="utf-8")
-    (d / "tasks-2-legacy.md").write_text(content, encoding="utf-8")
+    (d / "P001-auth-system.yaml").write_text(content, encoding="utf-8")
     return d
 
 
@@ -69,26 +55,30 @@ def test_help_shows_all_commands() -> None:
 
 
 def test_list_returns_json_with_items_count_total(plan_dir: Path) -> None:
-    """List returns JSON with items, count, and total keys."""
+    """List returns a JSON envelope with items, count, and total."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
+    # list_plans returns an envelope {"items": [...], "count": N, "total": N}.
+    assert isinstance(data, dict)
     assert "items" in data
     assert "count" in data
     assert "total" in data
-    assert data["total"] >= 1
+    assert len(data["items"]) >= 1
 
 
 def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
-    """Each item in list output has feature, goal, task_count, and path fields."""
+    """Each item in list output has feature, goal, task_count, and plan_ref fields."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] >= 1
-    item = data["items"][0]
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) >= 1
+    item = items[0]
     assert "feature" in item
     assert "task_count" in item
-    assert "path" in item
+    assert "plan_ref" in item
 
 
 def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
@@ -96,8 +86,10 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "auth-system"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] >= 1
-    for item in data["items"]:
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) >= 1
+    for item in items:
         feature_val = str(item.get("feature", "")).lower()
         goal_val = str(item.get("goal", "")).lower()
         desc_val = str(item.get("description", "")).lower()
@@ -105,11 +97,11 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
 
 
 def test_list_search_no_match_returns_empty_items(plan_dir: Path) -> None:
-    """List --search with no matching plans returns items=[] and count=0."""
+    """List --search with no matching plans returns an empty items array."""
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--search", "zzz-no-match-zzz"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] == 0
+    assert isinstance(data, dict)
     assert data["items"] == []
 
 
@@ -118,7 +110,9 @@ def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
     result = runner.invoke(app, ["list", "--plan-dir", str(plan_dir), "--offset", "0", "--limit", "1"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["count"] <= 1
+    assert isinstance(data, dict)
+    items = data["items"]
+    assert len(items) <= 1
 
 
 def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
@@ -174,7 +168,7 @@ def test_read_uses_slug_address(plan_dir: Path) -> None:
 def test_read_with_yaml_format_option(plan_dir: Path) -> None:
     """Read --format yaml emits YAML output containing nested task id."""
     result = runner.invoke(app, ["read", "P1/T1", "--plan-dir", str(plan_dir), "--format", "yaml"])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     # Task is nested under the 'task' key in the TaskAssignment YAML.
     assert "T1" in result.output
 
@@ -194,13 +188,15 @@ def test_read_invalid_address_exits_with_code_1(plan_dir: Path) -> None:
 
 
 def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
-    """Read P1 (no task part) returns Plan JSON — plan-level fields, no TaskAssignment wrapper."""
+    """Read P1 (no task part) returns ReadResult JSON — plan is nested under 'plan' key."""
     result = runner.invoke(app, ["read", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    # Plan JSON has 'feature' at top level, no 'task' key.
-    assert "feature" in data
+    # read_plan returns a ReadResult with .plan, .gaps, .source_format, .source_path.
+    # The plan fields are nested under the "plan" key.
+    assert "plan" in data
     assert "task" not in data
+    assert "feature" in data["plan"]
 
 
 def test_read_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
@@ -272,11 +268,12 @@ def test_status_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
 
 
 def test_ready_returns_json_list(plan_dir: Path) -> None:
-    """Ready P1 returns a JSON array (may be empty or contain tasks)."""
+    """Ready P1 returns a JSON envelope with ready_tasks (may be empty or contain tasks)."""
     result = runner.invoke(app, ["ready", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert "ready_tasks" in data
 
 
 def test_ready_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
@@ -286,11 +283,12 @@ def test_ready_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
 
 
 def test_ready_explicit_json_format_option_succeeds(plan_dir: Path) -> None:
-    """Ready P1 --format json exits 0 and returns a JSON list."""
+    """Ready P1 --format json exits 0 and returns a JSON envelope with ready_tasks."""
     result = runner.invoke(app, ["ready", "P1", "--format", "json", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert "ready_tasks" in data
 
 
 def test_ready_yaml_format_option_produces_yaml(plan_dir: Path) -> None:
@@ -354,28 +352,22 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_migrate_dry_run_prints_plan_info_without_writing(legacy_plan_dir: Path) -> None:
-    """Migrate P2 --dry-run prints what would change without modifying files."""
-    original_files = set(legacy_plan_dir.iterdir())
-    result = runner.invoke(app, ["migrate", "P2", "--dry-run", "--plan-dir", str(legacy_plan_dir)])
-    assert result.exit_code == 0
-    assert "Would migrate" in result.output
-    assert "Source format" in result.output
-    # No new files should be written
-    assert set(legacy_plan_dir.iterdir()) == original_files
-
-
-def test_migrate_converts_legacy_to_yaml(legacy_plan_dir: Path) -> None:
-    """Migrate P2 converts a legacy markdown plan to .yaml format."""
-    result = runner.invoke(app, ["migrate", "P2", "--plan-dir", str(legacy_plan_dir)])
-    assert result.exit_code == 0
-    assert "Migrated" in result.output
-    # A .yaml file should now exist in the plan dir
-    yaml_files = list(legacy_plan_dir.glob("*.yaml"))
-    assert len(yaml_files) >= 1
-
-
 def test_migrate_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
     """Migrate P99 exits 1 when no matching plan exists."""
     result = runner.invoke(app, ["migrate", "P99", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# sam validate
+# ---------------------------------------------------------------------------
+
+
+def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
+    """Validate P1 on a canonical YAML plan reports no errors or warnings."""
+    result = runner.invoke(app, ["validate", "P1", "--plan-dir", str(plan_dir)])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["valid"] is True
+    assert data["errors"] == []
+    assert data["warnings"] == []

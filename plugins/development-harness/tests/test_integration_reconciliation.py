@@ -211,7 +211,7 @@ class TestMCPIncludeClosedPropagation:
     async def test_mcp_list_defaults_include_closed_false(self) -> None:
         """backlog_list MCP tool defaults include_closed to False."""
         op_result = {"items": [], "count": 0}
-        with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+        with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
             await _call_mcp("backlog_list", {})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is False
@@ -219,7 +219,7 @@ class TestMCPIncludeClosedPropagation:
     async def test_mcp_list_forwards_include_closed_true(self) -> None:
         """backlog_list MCP tool forwards include_closed=True to operations."""
         op_result = {"items": [], "count": 0}
-        with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+        with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
             await _call_mcp("backlog_list", {"include_closed": True})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is True
@@ -233,7 +233,7 @@ class TestMCPIncludeClosedPropagation:
             ],
             "count": 2,
         }
-        with patch("backlog_core.operations.list_items", return_value=op_result):
+        with patch("dh_core.operations.list_items", return_value=op_result):
             response = await _call_mcp("backlog_list", {"include_closed": True})
         assert response["count"] == 2
         titles = [it["title"] for it in response["items"]]
@@ -243,7 +243,7 @@ class TestMCPIncludeClosedPropagation:
     async def test_mcp_list_excludes_closed_by_default(self) -> None:
         """backlog_list without include_closed returns only non-terminal items."""
         op_result = {"items": [{"title": "Active", "section": "P1", "issue": "", "plan": ""}], "count": 1}
-        with patch("backlog_core.operations.list_items", return_value=op_result):
+        with patch("dh_core.operations.list_items", return_value=op_result):
             response = await _call_mcp("backlog_list", {})
         assert response["count"] == 1
         assert response["items"][0]["title"] == "Active"
@@ -251,7 +251,7 @@ class TestMCPIncludeClosedPropagation:
     async def test_mcp_list_combines_include_closed_with_other_filters(self) -> None:
         """backlog_list forwards include_closed alongside other filter params."""
         op_result = {"items": [], "count": 0}
-        with patch("backlog_core.operations.list_items", return_value=op_result) as mock_list:
+        with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
             await _call_mcp("backlog_list", {"include_closed": True, "section": "P0"})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is True

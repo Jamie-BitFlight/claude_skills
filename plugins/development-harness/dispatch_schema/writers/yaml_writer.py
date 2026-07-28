@@ -43,7 +43,7 @@ def _snake_to_kebab(value: str) -> str:
     return value.replace("_", "-")
 
 
-def _keys_to_kebab(obj: Any) -> Any:  # noqa: ANN401
+def _keys_to_kebab(obj: Any) -> Any:  # ruff: ignore[any-type]
     """Recursively convert all dict keys from snake_case to kebab-case.
 
     Args:

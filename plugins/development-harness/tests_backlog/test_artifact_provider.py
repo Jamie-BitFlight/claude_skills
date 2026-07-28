@@ -325,7 +325,12 @@ class TestGitHubArtifactProviderGetManifest:
         assert manifest.artifacts == []
 
     def test_returns_parsed_manifest_when_section_present(
-        self, provider: GitHubArtifactProvider, mock_issue: MagicMock, mock_repo: MagicMock, registry: ArtifactRegistry
+        self,
+        provider: GitHubArtifactProvider,
+        mock_issue: MagicMock,
+        mock_repo: MagicMock,
+        registry: ArtifactRegistry,
+        mocker: MockerFixture,
     ) -> None:
         """get_manifest parses and returns the artifact manifest from the issue body.
 
@@ -334,7 +339,17 @@ class TestGitHubArtifactProviderGetManifest:
              call get_manifest; assert the returned manifest contains the expected entry.
         Why: Provider uses GraphQL (_fetch_issue_graphql) to retrieve the issue body.
              The graphql_query mock must return the body in the nested response shape.
+             The legacy inline format triggers lazy migration via _create_and_link_gist,
+             which calls _make_github_client — must be mocked.
         """
+        # Arrange — mock gist creation for the lazy migration path
+        mock_gh_client = mocker.patch("backlog_core.artifact_provider._make_github_client")
+        mock_gist = MagicMock()
+        mock_gist.id = "abc123deadbeef"
+        mock_user = MagicMock(spec=AuthenticatedUser)
+        mock_user.create_gist.return_value = mock_gist
+        mock_gh_client.return_value.get_user.return_value = mock_user
+
         # Arrange — build a body with one registered artifact
         manifest = ArtifactManifest(issue_number=965)
         entry = ArtifactEntry(

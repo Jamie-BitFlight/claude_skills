@@ -236,7 +236,7 @@ logic and are prohibited.
 Resolution order:
 
 1. `BACKLOG_BACKEND` environment variable
-2. `[backend] name` in `backend.toml` (project root, then `~/.dh/`)
+2. `backlog.backend` in `.dh/config.yaml` (project root, then `~/.dh/`)
 3. Default: `github`
 
 Available backends: `github` (default), `sqlite` (local, no credentials), `memory` (test double).

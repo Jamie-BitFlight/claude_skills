@@ -161,7 +161,7 @@ def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
         repo: Explicit ``owner/repo`` slug override.  When ``None``, calls
             :func:`discover_repo` to resolve the slug dynamically.
     """
-    global _config  # noqa: PLW0603
+    global _config  # ruff: ignore[global-statement]
     repo_root = _resolve_repo_root(project_dir)
     backlog_dir = _dh_paths.backlog_dir(repo_root)
     if repo is not None:
@@ -734,6 +734,7 @@ class BacklogItemMetadata(BaseModel):
     layer: str = ""  # SDLC Layer 0 (framework), 1 (language), 2 (stack)
     language: str = ""  # Language plugin identifier (e.g., "python", "typescript")
     stack: str = ""  # Stack profile identifier (e.g., "fastapi", "nextjs")
+    followup_to: str = ""  # Logical ID of the originating plan/task (e.g. "P1", "P1/T3")
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
 

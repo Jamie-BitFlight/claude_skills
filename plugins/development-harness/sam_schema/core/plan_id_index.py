@@ -97,7 +97,7 @@ def _parse_index_yaml(yaml_str: str) -> list[PlanIndexEntry]:
     """
     try:
         data = _yaml.load(yaml_str)
-    except Exception:  # noqa: BLE001 — ruamel raises many internal types
+    except Exception:  # ruff: ignore[blind-except] — ruamel raises many internal types
         _log.warning("PlanIdIndex: failed to parse plan-index YAML — treating as empty index")
         return []
 
@@ -362,7 +362,7 @@ def _load_yaml_file(path: Path) -> dict[str, object] | None:
     yaml_safe = YAML(typ="safe")
     try:
         data = yaml_safe.load(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001 — ruamel raises many internal exception types
+    except Exception as exc:  # ruff: ignore[blind-except] — ruamel raises many internal exception types
         _log.warning("plan_id_index: failed to parse index blob: %s", exc)
         return None
     return data if _is_str_dict(data) else None
@@ -380,7 +380,7 @@ def _config_search_paths() -> list[Path]:
 
     # Project-level config — resolve via dh_paths when available.
     with contextlib.suppress(ImportError, FileNotFoundError, RuntimeError):
-        import dh_paths as _dh_paths  # noqa: PLC0415
+        import dh_paths as _dh_paths  # ruff: ignore[import-outside-top-level]
 
         project_root = _dh_paths.git_project_root()
         project_dh_dir = _dh_paths.project_dh_dir(project_root)

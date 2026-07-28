@@ -1,8 +1,7 @@
 """Tests for sam_schema.core.addressing module.
 
 Covers P{NNN}-{slug} primary resolution, slug-based resolution, collision
-handling, backward-compatible tasks-{N}-{slug} fallback, path traversal
-security, and parse_address parsing.
+handling, path traversal security, and parse_address parsing.
 """
 
 from __future__ import annotations
@@ -190,69 +189,6 @@ def test_resolve_plan_address_slug_no_match_raises_addressing_error(plan_dir_wit
         resolve_plan_address("nonexistent-slug", plan_dir_with_p_files)
 
 
-def test_resolve_plan_address_slug_does_not_match_legacy_p_prefix(plan_dir: Path) -> None:
-    # Arrange — only legacy file exists, not a P{NNN} file
-    (plan_dir / "tasks-3-my-feature.md").touch()
-
-    # slug "my-feature" should fall back to legacy (tested separately)
-    # This test verifies slug resolution does NOT match tasks-* via P-pattern loop
-    # but DOES succeed via the fallback path
-    result = resolve_plan_address("my-feature", plan_dir)
-    assert result.name == "tasks-3-my-feature.md"
-
-
-# ---------------------------------------------------------------------------
-# resolve_plan_address — backward compatibility fallback
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_plan_address_legacy_numeric_fallback_when_no_p_file(plan_dir: Path) -> None:
-    # Arrange — only legacy tasks-5-old-feature.md, no P005-* file
-    (plan_dir / "tasks-5-old-feature.md").touch()
-
-    # Act
-    result = resolve_plan_address("5", plan_dir)
-
-    # Assert — resolves via legacy fallback
-    assert result.name == "tasks-5-old-feature.md"
-
-
-def test_resolve_plan_address_legacy_slug_fallback_when_no_p_file(plan_dir: Path) -> None:
-    # Arrange — only legacy tasks-5-old-feature.md, no P-pattern match
-    (plan_dir / "tasks-5-old-feature.md").touch()
-
-    # Act
-    result = resolve_plan_address("old-feature", plan_dir)
-
-    # Assert
-    assert result.name == "tasks-5-old-feature.md"
-
-
-def test_resolve_plan_address_p_file_takes_precedence_over_legacy(plan_dir: Path) -> None:
-    # Arrange — both P001-old-feature.yaml and tasks-1-old-feature.md exist
-    (plan_dir / "P001-old-feature.yaml").touch()
-    (plan_dir / "tasks-1-old-feature.md").touch()
-
-    # Act
-    result = resolve_plan_address("1", plan_dir)
-
-    # Assert — P-pattern wins
-    assert result.name == "P001-old-feature.yaml"
-
-
-def test_resolve_plan_address_legacy_directory_fallback(plan_dir: Path) -> None:
-    # Arrange — legacy directory-form plan
-    legacy_dir = plan_dir / "tasks-3-legacy-plan"
-    legacy_dir.mkdir()
-
-    # Act
-    result = resolve_plan_address("3", plan_dir)
-
-    # Assert
-    assert result.name == "tasks-3-legacy-plan"
-    assert result.is_dir()
-
-
 # ---------------------------------------------------------------------------
 # resolve_plan_address — path traversal security
 # ---------------------------------------------------------------------------
@@ -396,62 +332,6 @@ def test_parse_address_zero_padded_p_strips_to_digits() -> None:
 
     assert plan_ref == "001"
     assert task_ref == "01"
-
-
-# ---------------------------------------------------------------------------
-# Fix A: Collision warning when canonical P-file shadows a legacy tasks-* file
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_plan_address_collision_warning_emits_to_stderr_when_legacy_shadow_exists(
-    plan_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # Arrange — both P698-research-curator.yaml (canonical) and tasks-698-gates.md (legacy) exist
-    (plan_dir / "P698-research-curator.yaml").touch()
-    (plan_dir / "tasks-698-gates.md").touch()
-
-    # Act — resolves to canonical; warning should be emitted
-    result = resolve_plan_address("698", plan_dir)
-
-    # Assert — canonical wins
-    assert result.name == "P698-research-curator.yaml"
-    # Assert — warning goes to stderr
-    captured = capsys.readouterr()
-    assert "WARNING" in captured.err
-    assert "tasks-698-gates.md" in captured.err
-    assert "sam migrate" in captured.err
-
-
-def test_resolve_plan_address_no_warning_when_no_legacy_shadow_exists(
-    plan_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # Arrange — only canonical file, no legacy shadow
-    (plan_dir / "P001-clean-feature.yaml").touch()
-
-    # Act
-    result = resolve_plan_address("1", plan_dir)
-
-    # Assert — resolves correctly, no warning
-    assert result.name == "P001-clean-feature.yaml"
-    captured = capsys.readouterr()
-    assert captured.err == ""
-
-
-def test_resolve_plan_address_warning_names_all_legacy_shadows(
-    plan_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    # Arrange — two legacy files with the same number as the canonical file
-    (plan_dir / "P010-main.yaml").touch()
-    (plan_dir / "tasks-10-alpha.md").touch()
-    (plan_dir / "tasks-10-beta.md").touch()
-
-    # Act
-    resolve_plan_address("10", plan_dir)
-
-    # Assert — both legacy names appear in the warning
-    captured = capsys.readouterr()
-    assert "tasks-10-alpha.md" in captured.err
-    assert "tasks-10-beta.md" in captured.err
 
 
 # ---------------------------------------------------------------------------

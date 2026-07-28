@@ -58,6 +58,9 @@ class InMemoryContextBackend:
         context = ActiveTaskContext(
             task_file_path=f"{plan_dir}/{plan}.yaml",
             task_id=task,
+            plan=plan,
+            task=task,
+            plan_dir=plan_dir,
             parent_issue_number=parent_issue_number,
             session_id=session_id,
             started_at=datetime.now(tz=UTC).isoformat(),

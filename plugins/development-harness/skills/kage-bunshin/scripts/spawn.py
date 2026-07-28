@@ -463,7 +463,7 @@ def _read_mem_available_bytes() -> int | None:
         if line.startswith("MemAvailable:"):
             parts = line.split()
             # Format: "MemAvailable:   <N> kB"
-            if len(parts) >= 2:  # noqa: PLR2004
+            if len(parts) >= 2:  # ruff: ignore[magic-value-comparison]
                 try:
                     return int(parts[1]) * 1024
                 except ValueError:
@@ -1134,11 +1134,11 @@ def _format_age(seconds: float) -> str:
         Age string like '5m', '2h', '3d', or '45s'.
     """
     seconds = int(seconds)
-    if seconds < 60:  # noqa: PLR2004
+    if seconds < 60:  # ruff: ignore[magic-value-comparison]
         return f"{seconds}s"
-    if seconds < 3600:  # noqa: PLR2004
+    if seconds < 3600:  # ruff: ignore[magic-value-comparison]
         return f"{seconds // 60}m"
-    if seconds < 86400:  # noqa: PLR2004
+    if seconds < 86400:  # ruff: ignore[magic-value-comparison]
         return f"{seconds // 3600}h"
     return f"{seconds // 86400}d"
 

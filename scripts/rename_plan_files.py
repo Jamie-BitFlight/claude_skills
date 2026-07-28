@@ -108,7 +108,7 @@ def _build_plan_to_issue_map(backlog_dir: Path) -> dict[str, int]:
 
         try:
             data = yaml.load(fm_match.group(1))
-        except Exception:  # noqa: BLE001, S112
+        except Exception:  # ruff: ignore[blind-except, try-except-continue]
             continue
 
         if not isinstance(data, dict):
@@ -341,7 +341,7 @@ def _migrate_to_yaml(old_path: Path, slug: str, plan_dir: Path) -> Path | None:
         return None
 
     if old_path.is_dir():
-        import shutil  # noqa: PLC0415 — imported here to avoid top-level cost when unused
+        import shutil  # ruff: ignore[import-outside-top-level] — imported here to avoid top-level cost when unused
 
         shutil.rmtree(old_path)
     else:

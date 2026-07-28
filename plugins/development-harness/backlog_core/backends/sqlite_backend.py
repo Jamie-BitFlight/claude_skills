@@ -1,4 +1,4 @@
-"""SQLite-backed implementation of the BacklogBackend Protocol.
+"""SQLite-backed implementation of the backend Protocols.
 
 Stores all backlog state in a local SQLite database file.  No PyGithub
 dependency — uses only ``sqlite3`` from the standard library.
@@ -17,11 +17,12 @@ Branch operations are not supported; all five branch methods raise
 Usage::
 
     from backlog_core.backends.sqlite_backend import SQLiteBackend
-    from backlog_core.backend_protocol import BacklogBackend, BacklogConfig, set_config
+    from backlog_core.backend_protocol import set_config
+    from backlog_core.backend_types import BacklogConfig, WorkItemBackend
 
     backend = SQLiteBackend(":memory:")
     set_config(BacklogConfig(backend=backend))
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_protocol import BacklogBackend, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
+from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -116,8 +117,8 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-class SQLiteBackend(BacklogBackend):
-    """SQLite-backed BacklogBackend for offline or local-only operation.
+class SQLiteBackend:
+    """SQLite-backed backend for offline or local-only operation.
 
     All state lives in a single SQLite database file.  Every method is
     synchronous and has no network dependencies.  Branch operations are not
@@ -139,6 +140,7 @@ class SQLiteBackend(BacklogBackend):
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
+    supports_branches: bool = False
 
     def __init__(self, db_path: str = ":memory:") -> None:
         """Initialise the SQLite database and create tables if absent.

@@ -661,7 +661,7 @@
           },
           {
             "step_id": "EH-18",
-            "action": "SAM server unavailable: report and wait for initialization (10–30 seconds)",
+            "action": "SAM server unavailable: report and wait for initialization (~1–2 seconds)",
             "source_heading": "EH-18"
           },
           {
@@ -1972,7 +1972,7 @@
         "steps": [
           {
             "step_id": "mcp-availability-check",
-            "action": "Verify mcp__plugin_dh_sam__* tools reachable. SAM server takes 10–30 seconds after session restart. If unavailable: follow mcp-connection-check.md.",
+            "action": "Verify mcp__plugin_dh_sam__* tools reachable. SAM server initializes in ~1 second after session restart. If unavailable: follow mcp-connection-check.md.",
             "source_heading": "mcp-availability-check"
           },
           {

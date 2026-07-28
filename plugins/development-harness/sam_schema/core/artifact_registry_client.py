@@ -65,7 +65,7 @@ def _get_provider() -> ArtifactBackend:
         raise BacklogError(msg)
     return create_artifact_provider(
         repo=repo,
-        root_worktree=_backlog_models._REPO_ROOT,  # noqa: SLF001
+        root_worktree=_backlog_models._REPO_ROOT,  # ruff: ignore[private-member-access]
     )
 
 

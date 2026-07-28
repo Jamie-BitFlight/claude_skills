@@ -157,7 +157,7 @@ def parse_yaml_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         stacklevel=2,
     )
     parts = content.split("---\n", 2)
-    if len(parts) < 3:  # noqa: PLR2004
+    if len(parts) < 3:  # ruff: ignore[magic-value-comparison]
         msg = "Invalid frontmatter format: expected opening and closing '---' delimiters"
         raise ValueError(msg)
 

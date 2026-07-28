@@ -134,7 +134,7 @@ def parse_yaml_frontmatter(lines: list[str]) -> dict[str, Any]:
     try:
         result = _yaml.load(StringIO(yaml_text))
         return result if isinstance(result, dict) else {}
-    except Exception:  # noqa: BLE001 — ruamel raises internal exc types not in public API
+    except Exception:  # ruff: ignore[blind-except] — ruamel raises internal exc types not in public API
         return {}
 
 

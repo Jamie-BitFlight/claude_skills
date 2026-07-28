@@ -162,7 +162,7 @@ async def test_backlog_list_labels_success_returns_merged_result() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.list_labels", return_value=fake_result):
+    with patch("dh_core.operations.list_labels", return_value=fake_result):
         # Act
         result = await _call("backlog_list_labels", {"limit": 50})
 
@@ -183,7 +183,7 @@ async def test_backlog_list_labels_uses_default_limit() -> None:
         captured["limit"] = limit
         return {"labels": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_labels", side_effect=fake_list_labels):
+    with patch("dh_core.operations.list_labels", side_effect=fake_list_labels):
         # Act
         await _call("backlog_list_labels", {})
 
@@ -194,7 +194,7 @@ async def test_backlog_list_labels_uses_default_limit() -> None:
 async def test_backlog_list_labels_backlog_error_returns_error_key() -> None:
     """backlog_list_labels returns dict with error key on BacklogError."""
     # Arrange
-    with patch("backlog_core.operations.list_labels", side_effect=BacklogError("GitHub unavailable")):
+    with patch("dh_core.operations.list_labels", side_effect=BacklogError("GitHub unavailable")):
         # Act
         result = await _call("backlog_list_labels", {})
 
@@ -208,7 +208,7 @@ async def test_backlog_list_labels_empty_repo_returns_zero_count() -> None:
     # Arrange
     fake_result = {"labels": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_labels", return_value=fake_result):
+    with patch("dh_core.operations.list_labels", return_value=fake_result):
         # Act
         result = await _call("backlog_list_labels", {})
 

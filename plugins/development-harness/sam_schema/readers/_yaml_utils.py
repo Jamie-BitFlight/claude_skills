@@ -31,7 +31,7 @@ def make_yaml() -> YAML:
     return _YAML_RT
 
 
-def load_yaml(content: str) -> Any:  # noqa: ANN401
+def load_yaml(content: str) -> Any:  # ruff: ignore[any-type]
     """Parse YAML text using ruamel.yaml round-trip mode.
 
     Args:
@@ -50,7 +50,7 @@ def load_yaml(content: str) -> Any:  # noqa: ANN401
         raise ValueError(msg) from exc
 
 
-def coerce_to_plain(obj: Any) -> Any:  # noqa: ANN401
+def coerce_to_plain(obj: Any) -> Any:  # ruff: ignore[any-type]
     """Recursively coerce ruamel.yaml comment-map/seq objects to plain Python types.
 
     ruamel.yaml round-trip mode returns ``CommentedMap`` and ``CommentedSeq``
@@ -79,7 +79,6 @@ _HEADING_RE = re.compile(r"^(?:#{2,4})\s+(.+)$", re.MULTILINE)
 
 # Map recognised heading names (lowercased) to canonical task field names.
 # frontmatter_reader and manifest_reader both use this identical mapping.
-# legacy_reader uses a separate _PROSE_HEADING_TO_FIELD with different keys.
 HEADING_TO_FIELD: dict[str, str] = {
     "description": "description",
     "context": "description",

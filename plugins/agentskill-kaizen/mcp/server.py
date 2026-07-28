@@ -673,7 +673,7 @@ def open_dashboard() -> dict[str, str | bool]:
     Raises:
         ToolError: If the dashboard is not running.
     """
-    from dashboard import get_dashboard_url  # noqa: PLC0415
+    from dashboard import get_dashboard_url  # ruff: ignore[import-outside-top-level]
 
     url = get_dashboard_url()
     if url is None:

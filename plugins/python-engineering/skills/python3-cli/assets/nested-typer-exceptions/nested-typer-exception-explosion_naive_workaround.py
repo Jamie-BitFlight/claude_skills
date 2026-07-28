@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["typer>=0.21.2"]
 # ///
-# ruff: noqa: TRY300, TRY301
+# ruff: file-ignore[try-consider-else, raise-within-try]
 # mypy: ignore-errors
 """Demonstration of the "naive workaround" to exception chain explosion.
 

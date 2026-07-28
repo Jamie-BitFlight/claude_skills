@@ -76,9 +76,9 @@ single monolithic `create` call:
 
 **Drafting state semantics**: While a plan is in `state="drafting"`:
 
-- `sam_plan(action='read')` returns the plan with the drafting marker (`{state: "drafting"}` or `{drafting: True}`)
-- `sam_plan(action='status')` returns the drafting marker instead of task counts
-- `sam_plan(action='ready')` returns the drafting marker instead of a ready-tasks list
+- `sam_plan(action='read')` returns the plan with `state="drafting"`
+- `sam_plan(action='status')` returns a `PlanStatus` with `state="drafting"` instead of dispatchable task counts
+- `sam_plan(action='ready')` returns a `ReadyTasksResult` with `state="drafting"` and an empty `ready_tasks` list
 
 This prevents partial plans from being dispatched before all tasks have been appended.
 

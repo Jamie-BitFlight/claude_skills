@@ -526,7 +526,8 @@ class TestPassthrough:
         The exact key set is pinned in _PASSTHROUGH_LEGACY_KEYS.  Any deviation
         post-T24 means the PASSTHROUGH code path was inadvertently changed.
         """
-        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
+        # PASSTHROUGH path hits dh_core.operations.view_item (server.py line 25 imports from dh_core)
+        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515"})
@@ -546,7 +547,8 @@ class TestPassthrough:
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
         """Zero-param response must not contain any disclosure-only keys."""
-        mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
+        # PASSTHROUGH path hits dh_core.operations.view_item (server.py line 25 imports from dh_core)
+        mocker.patch("dh_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
             result = await client.call_tool("backlog_view", {"selector": "#2515"})

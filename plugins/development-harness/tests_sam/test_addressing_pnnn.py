@@ -358,83 +358,33 @@ class TestCollisionDetection:
 # ---------------------------------------------------------------------------
 
 
-class TestBackwardCompatFallback:
-    """Test backward-compatible fallback to tasks-{N}-{slug} naming.
+def test_no_match_at_all_raises_addressing_error(plan_dir: Path) -> None:
+    """No matching P{NNN} file raises AddressingError.
 
-    Tests: Legacy file resolution when no P{NNN} match exists.
-    How: Create only tasks-{N}-{slug} files, resolve by number.
-    Why: 64 existing plan files use legacy naming -- must work until migrated.
+    Tests: Total resolution failure.
+    How: Resolve number with no matching files.
+    Why: Clear error when plan does not exist at all.
     """
+    # Arrange -- empty plan_dir
+    # Act / Assert
+    with pytest.raises(AddressingError):
+        resolve_plan_address("999", plan_dir)
 
-    def test_legacy_numeric_fallback(self, plan_dir: Path) -> None:
-        """Number '5' falls back to tasks-5-old-feature.md when no P005 exists.
 
-        Tests: Numeric fallback to legacy naming.
-        How: Create only legacy file, resolve "5".
-        Why: Unmigrated files must remain accessible.
-        """
-        # Arrange
-        (plan_dir / "tasks-5-old-feature.md").touch()
-        # Act
-        result = resolve_plan_address("5", plan_dir)
-        # Assert
-        assert result.name == "tasks-5-old-feature.md"
+def test_p_file_takes_precedence_over_legacy(plan_dir: Path) -> None:
+    """P{NNN} file is preferred over tasks-{N}-{slug} when both exist.
 
-    def test_legacy_slug_fallback(self, plan_dir: Path) -> None:
-        """Slug 'old-feature' falls back to tasks-5-old-feature.md.
-
-        Tests: Slug fallback to legacy naming.
-        How: Create only legacy file, resolve by slug.
-        Why: Slug resolution must work on legacy files too.
-        """
-        # Arrange
-        (plan_dir / "tasks-5-old-feature.md").touch()
-        # Act
-        result = resolve_plan_address("old-feature", plan_dir)
-        # Assert
-        assert result.name == "tasks-5-old-feature.md"
-
-    def test_p_file_takes_precedence_over_legacy(self, plan_dir: Path) -> None:
-        """P{NNN} file is preferred over tasks-{N}-{slug} when both exist.
-
-        Tests: Resolution priority.
-        How: Create both naming styles, resolve by number.
-        Why: P{NNN} is canonical -- legacy is fallback only.
-        """
-        # Arrange
-        (plan_dir / "P005-feature.yaml").touch()
-        (plan_dir / "tasks-5-feature.md").touch()
-        # Act
-        result = resolve_plan_address("5", plan_dir)
-        # Assert
-        assert result.name == "P005-feature.yaml"
-
-    def test_legacy_directory_fallback(self, plan_dir: Path) -> None:
-        """Legacy directory-format plan resolves via numeric fallback.
-
-        Tests: Legacy directory resolution.
-        How: Create tasks-3-plan/ directory, resolve "3".
-        Why: Directory-format legacy plans must also resolve.
-        """
-        # Arrange
-        (plan_dir / "tasks-3-big-plan").mkdir()
-        # Act
-        result = resolve_plan_address("3", plan_dir)
-        # Assert
-        assert result.name == "tasks-3-big-plan"
-        assert result.is_dir()
-
-    def test_no_match_at_all_raises_addressing_error(self, plan_dir: Path) -> None:
-        """Neither P{NNN} nor legacy match raises AddressingError.
-
-        Tests: Total resolution failure.
-        How: Resolve number with no matching files.
-        Why: Clear error when plan does not exist at all.
-        """
-        # Arrange -- empty plan_dir
-        # Act / Assert
-        with pytest.raises(AddressingError):
-            resolve_plan_address("999", plan_dir)
+    Tests: Resolution priority.
+    How: Create both naming styles, resolve by number.
+    Why: P{NNN} is canonical -- legacy is fallback only.
+    """
+    # Arrange
+    (plan_dir / "P005-feature.yaml").touch()
+    (plan_dir / "tasks-5-feature.md").touch()
+    # Act
+    result = resolve_plan_address("5", plan_dir)
+    # Assert
+    assert result.name == "P005-feature.yaml"
 
 
 # ---------------------------------------------------------------------------

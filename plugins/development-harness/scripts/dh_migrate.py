@@ -673,7 +673,7 @@ def _build_slug_index(backlog_dir: Path) -> dict[str, int]:
         Mapping from slug string to positive integer issue number.  Files
         without a parseable issue number are silently skipped.
     """
-    from backlog_core.parsing import title_to_slug  # noqa: PLC0415
+    from backlog_core.parsing import title_to_slug  # ruff: ignore[import-outside-top-level]
 
     index: dict[str, int] = {}
     if not backlog_dir.is_dir():
@@ -925,7 +925,7 @@ def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str
     Returns:
         One of ``"REGISTERED"``, ``"SKIPPED"``, or ``"FAILED"``.
     """
-    from backlog_core.models import (  # noqa: PLC0415
+    from backlog_core.models import (  # ruff: ignore[import-outside-top-level]
         ArtifactEntry,
         ArtifactManifest,
         ArtifactStatus,
@@ -986,8 +986,8 @@ def _execute_registrations(
         Tuple of ``(final_rows, counts)`` where *final_rows* is the updated list and
         *counts* maps status strings to their occurrence count.
     """
-    from backlog_core.artifact_provider import GitHubArtifactProvider  # noqa: PLC0415
-    from backlog_core.models import discover_repo  # noqa: PLC0415
+    from backlog_core.artifact_provider import GitHubArtifactProvider  # ruff: ignore[import-outside-top-level]
+    from backlog_core.models import discover_repo  # ruff: ignore[import-outside-top-level]
 
     try:
         repo_slug = discover_repo()

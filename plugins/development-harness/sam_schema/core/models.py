@@ -473,6 +473,7 @@ class ReadResult(BaseModel):
 
     plan: Plan
     gaps: list[SchemaGap] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     source_format: str  # FormatType value
     source_path: Path
 
@@ -530,6 +531,9 @@ class PlanStatus(BaseModel):
     """Summary of plan execution progress.
 
     Used by the CLI ``sam status`` command and the ``sam_status`` MCP tool.
+    Includes the plan's ``autonomy`` mode so clients can gate dispatch
+    without a separate plan read. The ``state`` field indicates whether the
+    plan is still being drafted or is ready for dispatch.
     """
 
     feature: str
@@ -539,6 +543,195 @@ class PlanStatus(BaseModel):
     blocked_tasks: list[dict[str, list[str]]]  # [{task_id: [missing_dep_ids]}]
     completion_pct: float
     has_cycles: bool
+    issue: str | None = None
+    autonomy: Literal["full_auto", "checkpoint", "per_task"] = "full_auto"
+    state: PlanState = PlanState.READY
+
+
+class ClaimResult(BaseModel):
+    """Result of claiming a task for dispatch.
+
+    Returned by ``operations.claim_task`` so MCP clients receive the
+    ``{"claimed": true, "task_id": ..., "started": ..., "warnings": ...}``
+    envelope directly, without the server having to reconstruct it from a
+    raw ``Task`` model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    claimed: bool = True
+    task_id: str
+    started: str | None = None
+    warnings: list[str] | None = None
+
+
+class StateResult(BaseModel):
+    """Result of updating a task's lifecycle status.
+
+    Returned by ``operations.update_task_status`` so both CLI and MCP
+    callers receive a typed envelope instead of a raw dict.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    status: str
+    skipped_downstream: list[str] | None = None
+
+
+class UpdateTaskResult(BaseModel):
+    """Result of updating fields or appending a section to a task.
+
+    Returned by ``operations.update_task_fields`` so both CLI and MCP
+    callers receive a typed envelope instead of a raw dict.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
+class ReadyTasksResult(BaseModel):
+    """Result of listing tasks ready for dispatch.
+
+    Returned by ``operations.get_ready_tasks`` so MCP clients receive the
+    ``{"feature": ..., "ready_tasks": [...], "count": N, "issue": ...}``
+    envelope directly. The ``state`` field indicates whether the plan is
+    still being drafted or is ready for dispatch.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    feature: str
+    ready_tasks: list[Task]
+    count: int
+    issue: str | None = None
+    state: PlanState = PlanState.READY
+
+
+class PaginationMeta(BaseModel):
+    """Pagination metadata returned by paginated MCP list operations."""
+
+    offset: int
+    limit: int
+    total: int
+    has_more: bool
+
+
+class PlanSummaryModel(BaseModel):
+    """MCP envelope model for plan summary items.
+
+    Mirrors :class:`~sam_schema.core.task_backend_types.PlanSummary` but is a
+    Pydantic model so it can be used in :class:`PaginatedResult.items` without
+    resorting to ``dict[str, Any]``. The backend continues to return the
+    TypedDict; the operations layer converts to this model at the MCP boundary.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    plan_id: str
+    feature: str
+    goal: str
+    description: str
+    task_count: int
+    source_path: str | None = None
+    issue: str | None = None
+    backend_ref: str | None = Field(
+        default=None, validation_alias=AliasChoices("backend-ref", "backend_ref"), serialization_alias="backend-ref"
+    )
+    plan_ref: str | None = None
+
+
+class PaginatedResult(BaseModel):
+    """Paginated response envelope for MCP list operations.
+
+    Replaces the raw ``dict[str, Any]`` return from ``_paginate_results`` so
+    the consolidated ``sam_plan`` tool can expose a fully typed return schema.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[PlanSummaryModel]
+    count: int
+    pagination: PaginationMeta
+    messages: list[str]
+    warnings: list[str]
+    errors: list[str]
+    next_call: str | None = None
+
+
+class CreatePlanResult(BaseModel):
+    """Result of successfully creating a plan.
+
+    Returned by ``operations.create_plan`` on the success path. Carries the
+    backend-assigned plan ID, task count, globally-addressable plan_ref, and
+    optional portability warnings.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    plan_id: str
+    task_count: int
+    plan_ref: str
+    warnings: list[str] | None = None
+
+
+class CreatePlanError(BaseModel):
+    """Structured error returned when plan creation's artifact write fails.
+
+    Returned by ``operations.create_plan`` on the ArtifactWriteError path
+    (ADR-2509-5). The plan may exist on local disk but is NOT durable; callers
+    inspect ``error``/``reason`` to decide retry behaviour.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    error: str
+    reason: str
+    plan_id: str | None = None
+    issue: int | None = None
+    local_path: None = None
+    hint: str
+
+
+class UpdatePlanResult(BaseModel):
+    """Result of updating plan-level context and/or fields.
+
+    Returned by ``operations.update_plan_fields``.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
+class AppendTaskResult(BaseModel):
+    """Result of appending a single task to a plan.
+
+    Returned by ``operations.append_task``, normalizing the backend dict
+    (``{"appended": True, "task_id": ...}``) into a typed model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    appended: bool = True
+    task_id: str
+    github_issue: int | None = None
+
+
+class FinalizePlanResult(BaseModel):
+    """Result of transitioning a plan from drafting to ready state.
+
+    Returned by ``operations.finalize_plan``, normalizing the backend dict
+    (``{"finalized": True, "state": "ready"}``) into a typed model.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    finalized: bool = True
+    state: str
 
 
 class ActiveTaskContext(BaseModel):
@@ -555,6 +748,17 @@ class ActiveTaskContext(BaseModel):
 
     task_file_path: str = Field(description="Absolute path to the plan YAML file containing this task.")
     task_id: str = Field(description="Task identifier within the plan (e.g., 'T3').")
+    plan: str | None = Field(
+        default=None,
+        description="Plan address (e.g., 'P1' or slug). Additive field — existing files without this field are valid.",
+    )
+    task: str | None = Field(
+        default=None, description="Task ID within the plan (structured address, mirrors task_id). Additive field."
+    )
+    plan_dir: str | None = Field(
+        default=None,
+        description="Plan directory sentinel or absolute path. Additive field — existing files without this field are valid.",
+    )
     parent_issue_number: str | int | None = Field(
         default=None,
         description="GitHub issue number (int) or beads nanoid (str, e.g. 'bd-a3f8') for the parent story/feature.",
@@ -601,6 +805,57 @@ class ActiveTaskContext(BaseModel):
         raise TypeError(msg)
 
 
+class ActiveTaskGetResult(BaseModel):
+    """Result of retrieving the active task context for a session.
+
+    Returned by ``operations.get_active_task`` and ``sam_active_task``
+    action="get". Preserves the ``active_task: null`` shape when no
+    context is set.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    active_task: ActiveTaskContext | None
+
+
+class ActiveTaskSetResult(BaseModel):
+    """Result of setting the active task context for a session.
+
+    Returned by ``operations.set_active_task`` and ``sam_active_task``
+    action="set". Mirrors the existing wire shape: a single
+    ``active_task`` field containing the stored context.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    active_task: ActiveTaskContext
+
+
+class ActiveTaskUpdateResult(BaseModel):
+    """Result of updating fields on the active task.
+
+    Returned by ``operations.update_active_task`` and ``sam_active_task``
+    action="update".
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    updated: bool = True
+    address: str
+
+
+class ActiveTaskClearResult(BaseModel):
+    """Result of clearing the active task context for a session.
+
+    Returned by ``operations.clear_active_task`` and ``sam_active_task``
+    action="clear".
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    cleared: bool
+
+
 # Rebuild models that reference TYPE_CHECKING-guarded types (datetime, Path).
 # `from __future__ import annotations` defers annotation evaluation; Pydantic needs
 # to resolve these types at model-build time. Pass the types explicitly so Pydantic
@@ -612,3 +867,4 @@ Task.model_rebuild(_types_namespace={"datetime": _dt.datetime, "Path": _Path})
 Plan.model_rebuild(_types_namespace={"Path": _Path, "Task": Task, "AcceptanceCriterion": AcceptanceCriterion})
 ReadResult.model_rebuild(_types_namespace={"Path": _Path, "Plan": Plan, "SchemaGap": SchemaGap})
 TaskAssignment.model_rebuild(_types_namespace={"Task": Task})
+ReadyTasksResult.model_rebuild(_types_namespace={"Task": Task})

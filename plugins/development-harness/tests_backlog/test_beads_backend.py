@@ -6,20 +6,17 @@ for the design rationale behind which methods are implemented vs. stubbed.
 
 Divergence Notes
 ----------------
-DN-1: Integration-branch methods raise ``NotImplementedError`` (not
-    ``BackendUnavailableError`` as task spec #8 stated).  The actual
-    implementation raises ``NotImplementedError(_ADR_001_NOTE)`` for all
-    GitHub-specific surface.
-
-DN-2: ``sync_issues_graphql`` raises ``NotImplementedError`` (not returning
-    IssueNode-shaped dicts as task spec #9 stated).
-
-DN-4: ``create_issue_for_item`` raises ``NotImplementedError`` (ADR-001);
-    the beads-native creation method is ``create_beads_issue_for_item``.
-
-DN-3: ``create_task_issue`` always raises ``NotImplementedError`` regardless
-    of ``parent_issue_number`` type — the implementation has no branching on
-    type; task spec #11 implied two distinct code paths.
+DN-1: BeadsBackend no longer stubs BranchBackend methods (T-P6-BEADS).  It
+    implements WorkItemBackend only; branch operations are gated on the
+    ``supports_branches`` capability flag, which is ``False``.
+DN-2: ``sync_issues_graphql`` and other GitHubExtras methods are no longer
+    stubbed on BeadsBackend (T-P6-BEADS).  Callers gate on
+    ``isinstance(backend, GitHubExtras)`` before invoking them.
+DN-4: ``create_issue_for_item`` raises ``NotImplementedError`` (ADR-001) —
+    the WorkItemBackend signature returns ``int | None``, but beads IDs are
+    string nanoids; use the beads-native ``create_beads_issue_for_item``.
+DN-3: ``create_task_issue`` is a GitHubExtras method and is no longer
+    stubbed on BeadsBackend (T-P6-BEADS).
 """
 
 from __future__ import annotations
@@ -30,7 +27,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core.backend_protocol import BacklogBackend
+from backlog_core.backend_types import WorkItemBackend
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMetadata, ViewItemResult
@@ -73,15 +70,17 @@ def _make_item(issue: str = "bd-a3f8", title: str = "Fix authentication bug") ->
 
 
 @pytest.mark.unit
-def test_isinstance_satisfies_backlog_backend_protocol() -> None:
-    """BeadsBackend() is an instance of the runtime-checkable BacklogBackend Protocol.
+def test_isinstance_satisfies_work_item_backend_protocol() -> None:
+    """BeadsBackend() is an instance of the runtime-checkable WorkItemBackend Protocol.
 
     Why: isinstance check is the gating mechanism in operations.py — failing
-         this means BeadsBackend is silently ignored by the factory.
+         this means BeadsBackend is silently ignored by the factory.  BeadsBackend
+         implements WorkItemBackend only (not the full BacklogBackend union);
+         GitHub-specific methods live on GitHubExtras and are gated separately.
     """
     runner = _make_runner()
     backend = BeadsBackend(runner=runner)
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 
 
 # ---------------------------------------------------------------------------
@@ -179,12 +178,12 @@ def test_try_get_github_returns_none() -> None:
 
 @pytest.mark.unit
 def test_try_get_github_returns_none_without_raising_and_satisfies_protocol() -> None:
-    """BeadsBackend.try_get_github() returns None, raises no exception, and satisfies BacklogBackend Protocol.
+    """BeadsBackend.try_get_github() returns None, raises no exception, and satisfies WorkItemBackend Protocol.
 
     Guards:
     - try_get_github must return None (not raise) — callers use the optional-connection pattern
-    - isinstance check confirms BeadsBackend satisfies the runtime-checkable Protocol,
-      which is the gating mechanism in operations.py
+    - isinstance check confirms BeadsBackend satisfies the runtime-checkable WorkItemBackend
+      Protocol, which is the gating mechanism in operations.py
     """
     # Arrange
     runner = _make_runner()
@@ -195,98 +194,47 @@ def test_try_get_github_returns_none_without_raising_and_satisfies_protocol() ->
 
     # Assert
     assert result is None
-    assert isinstance(backend, BacklogBackend)
+    assert isinstance(backend, WorkItemBackend)
 
 
 # ---------------------------------------------------------------------------
-# ADR-001 — GraphQL stubs raise NotImplementedError
+# ADR-001/ADR-002 — WorkItemBackend stubs raise NotImplementedError
 # ---------------------------------------------------------------------------
 
-_ADR_001_METHODS = pytest.mark.parametrize(
+# BeadsBackend implements WorkItemBackend only.  Four WorkItemBackend methods
+# are genuinely unimplementable because their signatures assume a PyGithub
+# Repository or int issue numbers; they raise NotImplementedError with an
+# ADR-001/ADR-002 reference.  The 19 GitHubExtras stubs and 5 BranchBackend
+# stubs that previously existed here were removed in T-P6-BEADS — BeadsBackend
+# no longer claims to implement those protocols.
+
+_ADR_STUB_METHODS = pytest.mark.parametrize(
     ("method_name", "kwargs"),
     [
-        pytest.param("_graphql_request", {"repo": MagicMock(), "query": "{ viewer { login } }"}, id="graphql_request"),
-        pytest.param(
-            "_resolve_labels_graphql",
-            {"repo": MagicMock(), "repo_owner": "owner", "repo_name": "repo", "label_names": []},
-            id="resolve_labels_graphql",
-        ),
-        pytest.param(
-            "_fetch_issue_graphql",
-            {"repo": MagicMock(), "owner": "owner", "repo_name": "repo", "issue_number": 1},
-            id="fetch_issue_graphql",
-        ),
-        pytest.param(
-            "_fetch_issues_graphql",
-            {"repo": MagicMock(), "owner": "owner", "repo_name": "repo"},
-            id="fetch_issues_graphql",
-        ),
-        pytest.param(
-            "_update_issue_graphql", {"repo": MagicMock(), "issue_node_id": "MDExOg=="}, id="update_issue_graphql"
-        ),
-        pytest.param(
-            "sync_issues_graphql",
-            {"repo": MagicMock(), "owner": "owner", "repo_name": "repo"},
-            id="sync_issues_graphql",
-        ),
         pytest.param("create_issue_for_item", {"repo": MagicMock(), "item": _make_item()}, id="create_issue_for_item"),
         pytest.param(
             "fetch_github_issue_body", {"repo_obj": MagicMock(), "issue_num": 1}, id="fetch_github_issue_body"
         ),
-        pytest.param(
-            "sync_groomed_to_github_issue",
-            {"repo_obj": MagicMock(), "issue_num": 1, "groomed_content": "content"},
-            id="sync_groomed_to_github_issue",
-        ),
-        pytest.param(
-            "_add_comment_graphql",
-            {"repo": MagicMock(), "issue_node_id": "MDExOg==", "body": "comment"},
-            id="add_comment_graphql",
-        ),
-        pytest.param(
-            "_fetch_issue_comments_graphql",
-            {"repo": MagicMock(), "owner": "owner", "repo_name": "repo", "issue_number": 1},
-            id="fetch_issue_comments_graphql",
-        ),
-        pytest.param(
-            "_fetch_comment_by_id_graphql",
-            {"repo": MagicMock(), "comment_node_id": "MDExOg=="},
-            id="fetch_comment_by_id_graphql",
-        ),
-        pytest.param(
-            "_update_issue_comment_graphql",
-            {"repo": MagicMock(), "comment_node_id": "MDExOg==", "body": "updated"},
-            id="update_issue_comment_graphql",
-        ),
-        pytest.param(
-            "_fetch_milestones_graphql",
-            {"repo": MagicMock(), "owner": "owner", "repo_name": "repo"},
-            id="fetch_milestones_graphql",
-        ),
-        pytest.param("_projects_v2_list_query", {"owner": "owner"}, id="projects_v2_list_query"),
-        pytest.param(
-            "_projects_v2_create_mutation",
-            {"owner_id": "MDExOg==", "title": "My project"},
-            id="projects_v2_create_mutation",
-        ),
-        pytest.param("get_github", {}, id="get_github"),
     ],
 )
 
 
 @pytest.mark.unit
-@_ADR_001_METHODS
-def test_adr001_method_raises_not_implemented(method_name: str, kwargs: dict) -> None:
-    """ADR-001 methods raise NotImplementedError with an ADR-001 reference.
+@_ADR_STUB_METHODS
+def test_adr_stub_method_raises_not_implemented(method_name: str, kwargs: dict) -> None:
+    """WorkItemBackend stubs raise NotImplementedError with an ADR reference.
 
     Why: Protocol callers must get a clear NotImplementedError — swallowing
-         the exception or returning a default silently breaks callers.
+         the exception or returning a default silently breaks callers.  These
+         stubs document a real signature incompatibility (PyGithub Repository
+         or int issue numbers) that will be resolved by a separate
+         issue-number-to-string change.
     """
     runner = _make_runner()
     backend = BeadsBackend(runner=runner)
     method = getattr(backend, method_name)
 
-    with pytest.raises(NotImplementedError, match="ADR-001"):
+    with pytest.raises(NotImplementedError, match=r"ADR-00[12]"):
         method(**kwargs)
 
 
@@ -399,48 +347,6 @@ def test_batch_fetch_statuses_raises_not_implemented() -> None:
         backend.batch_fetch_statuses([item])
 
     runner.run_json.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# Integration-branch methods — NotImplementedError (DN-1)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    ("method_name", "kwargs"),
-    [
-        pytest.param(
-            "create_integration_branch",
-            {"milestone_number": 1, "slug": "auth", "base_branch": "main"},
-            id="create_integration_branch",
-        ),
-        pytest.param(
-            "get_integration_branch_status", {"branch_name": "feature/auth"}, id="get_integration_branch_status"
-        ),
-        pytest.param(
-            "merge_integration_branch",
-            {"head_branch": "feature/auth", "base_branch": "main", "commit_message": "merge"},
-            id="merge_integration_branch",
-        ),
-        pytest.param("delete_integration_branch", {"branch_name": "feature/auth"}, id="delete_integration_branch"),
-        pytest.param("list_integration_branches", {}, id="list_integration_branches"),
-    ],
-)
-def test_integration_branch_raises_not_implemented(method_name: str, kwargs: dict) -> None:
-    """Integration-branch methods raise NotImplementedError (ADR-001).
-
-    Why (DN-1): The original task spec expected BackendUnavailableError, but
-         the actual implementation raises NotImplementedError because these
-         methods require a PyGithub Repository transport that beads cannot
-         provide — they are ADR-001 stubs, not runtime-availability failures.
-    """
-    runner = _make_runner()
-    backend = BeadsBackend(runner=runner)
-    method = getattr(backend, method_name)
-
-    with pytest.raises(NotImplementedError):
-        method(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -576,33 +482,6 @@ def test_resolve_github_issue_calls_bd_close_with_summary_as_reason() -> None:
     backend.resolve_github_issue("bd-a3f8", summary="Authentication fixed")
 
     runner.run_text.assert_called_once_with(["close", "bd-a3f8", "--reason", "Authentication fixed"])
-
-
-# ---------------------------------------------------------------------------
-# create_task_issue — NotImplementedError for all parent_issue_number types (DN-3)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "parent_issue_number", [pytest.param(42, id="int_parent"), pytest.param("bd-a3f8", id="str_parent")]
-)
-def test_create_task_issue_raises_not_implemented(parent_issue_number: int | str) -> None:
-    """create_task_issue raises NotImplementedError regardless of parent type.
-
-    Why (DN-3): Task spec #11 implied two code paths (int vs str), but the
-         implementation raises NotImplementedError for all inputs — beads task
-         issue creation is not implemented (ADR-001).
-    """
-    runner = _make_runner()
-    backend = BeadsBackend(runner=runner)
-
-    with pytest.raises(NotImplementedError):
-        backend.create_task_issue(
-            repo=MagicMock(),  # type: ignore[arg-type]
-            parent_issue_number=parent_issue_number,  # type: ignore[arg-type]
-            task=MagicMock(),
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -752,7 +631,7 @@ def test_issue_to_local_fields_maps_node_to_local_fields() -> None:
     Why: This is a translation utility — wrong field mapping corrupts local
          metadata for items synced from GitHub-shaped data.
     """
-    from backlog_core.backend_protocol import IssueNode
+    from backlog_core.backend_types import IssueNode
 
     runner = _make_runner()
     backend = BeadsBackend(runner=runner)

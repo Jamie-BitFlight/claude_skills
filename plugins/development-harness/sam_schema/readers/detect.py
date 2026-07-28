@@ -24,9 +24,6 @@ class FormatType(StrEnum):
     YAML_FRONTMATTER = "yaml_frontmatter"
     """``.md`` file with ``---`` delimited YAML blocks per task."""
 
-    LEGACY_MARKDOWN = "legacy_markdown"
-    """``.md`` file with ``## Task N:`` headings and ``**Field**: Value`` markers."""
-
     GLOBAL_MANIFEST = "global_manifest"
     """``.md`` file with a global frontmatter header (``feature:`` + ``tasks:`` list)
     and per-task content in ``### T{N}:`` prose sections."""
@@ -54,14 +51,13 @@ class FormatDetectionError(Exception):
 _TASK_FIELD_RE = re.compile(r"^task(?:_id)?\s*:", re.MULTILINE)
 _FEATURE_FIELD_RE = re.compile(r"^(?:feature|slug)\s*:", re.MULTILINE)
 _TASKS_LIST_RE = re.compile(r"^tasks\s*:", re.MULTILINE)
-_LEGACY_HEADING_RE = re.compile(r"^##\s+Task\s+\d", re.MULTILINE)
 
 
 def _classify_frontmatter(frontmatter_text: str) -> FormatType | None:
     """Classify a YAML frontmatter block into a FormatType.
 
     Returns ``None`` when the frontmatter content does not match any known
-    frontmatter-based format (caller falls through to legacy heading check).
+    frontmatter-based format.
 
     Detection order:
     1. ``task:`` or ``task_id:`` field present -> ``YAML_FRONTMATTER`` (single-task)
@@ -109,8 +105,7 @@ def detect_format(path: Path) -> FormatType:
     3. If .md extension:
        a. Read first 20 lines
        b. If starts with ``---``: classify frontmatter via ``_classify_frontmatter``
-       c. If contains ``## Task N:`` headings -> LEGACY_MARKDOWN
-       d. Otherwise -> FormatDetectionError
+       c. Otherwise -> FormatDetectionError
 
     Args:
         path: Path to a task file or directory to inspect.
@@ -151,9 +146,6 @@ def detect_format(path: Path) -> FormatType:
                 if fmt is not None:
                     return fmt
 
-        if _LEGACY_HEADING_RE.search(content):
-            return FormatType.LEGACY_MARKDOWN
-
         raise FormatDetectionError(path, first_20_lines)
 
     raise FormatDetectionError(path, f"Unrecognized file extension: {path.suffix}")
@@ -180,10 +172,9 @@ def read_plan(path: Path) -> tuple[dict, list[dict], FormatType]:
     # Import readers here to avoid circular imports — detect.py is the root
     # module that all readers import from, so top-level imports would create
     # a circular dependency.
-    from sam_schema.readers.frontmatter_reader import read_frontmatter_plan  # noqa: PLC0415
-    from sam_schema.readers.legacy_reader import read_legacy_plan  # noqa: PLC0415
-    from sam_schema.readers.manifest_reader import read_manifest_plan  # noqa: PLC0415
-    from sam_schema.readers.yaml_reader import read_yaml_plan  # noqa: PLC0415
+    from sam_schema.readers.frontmatter_reader import read_frontmatter_plan  # ruff: ignore[import-outside-top-level]
+    from sam_schema.readers.manifest_reader import read_manifest_plan  # ruff: ignore[import-outside-top-level]
+    from sam_schema.readers.yaml_reader import read_yaml_plan  # ruff: ignore[import-outside-top-level]
 
     fmt = detect_format(path)
 
@@ -195,9 +186,6 @@ def read_plan(path: Path) -> tuple[dict, list[dict], FormatType]:
 
     if fmt == FormatType.GLOBAL_MANIFEST:
         return read_manifest_plan(path)
-
-    if fmt == FormatType.LEGACY_MARKDOWN:
-        return read_legacy_plan(path)
 
     # Should never reach here — detect_format raises for unknowns
     raise FormatDetectionError(path, f"Unhandled format type: {fmt}")  # pragma: no cover

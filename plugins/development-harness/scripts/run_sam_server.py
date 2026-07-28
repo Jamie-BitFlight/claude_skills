@@ -25,22 +25,10 @@ _plugin_root = _scripts_dir.parent
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
 
-try:
-    from dh_mcp_preinit import apply_project_dir_from_argv
+from dh_mcp_preinit import apply_project_dir_from_argv
 
-    apply_project_dir_from_argv()
+apply_project_dir_from_argv()
 
-    from sam_schema.server import run_server
-except ImportError:
-    import sys
+from sam_schema.server import run_server
 
-    _script = Path(__file__).resolve()
-    print(
-        f"Error: missing dependencies. Run this script with uv:\n\n"
-        f"    uv run --script {_script}\n\n"
-        f"Do not invoke it directly with python3.",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-else:
-    run_server()
+run_server()

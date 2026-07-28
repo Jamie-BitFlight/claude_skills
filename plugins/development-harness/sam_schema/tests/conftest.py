@@ -6,7 +6,12 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.backends.bd_runner import BdInvocationError, BdNotInstalledError, BdRunner, JsonValue  # noqa: F401
+from backlog_core.backends.bd_runner import (  # ruff: ignore[unused-import]
+    BdInvocationError,
+    BdNotInstalledError,
+    BdRunner,
+    JsonValue,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

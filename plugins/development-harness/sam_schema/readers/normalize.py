@@ -40,7 +40,7 @@ _CANONICAL_FORMATS: frozenset[FormatType] = frozenset({FormatType.PURE_YAML, For
 _VALID_STATUSES: frozenset[str] = frozenset(s.value for s in TaskStatus)
 
 
-def _normalize_status(raw: Any) -> str:  # noqa: ANN401, PLR0911
+def _normalize_status(raw: Any) -> str:  # ruff: ignore[any-type]
     """Normalize a raw status value to a canonical TaskStatus string.
 
     Args:
@@ -64,23 +64,6 @@ def _normalize_status(raw: Any) -> str:  # noqa: ANN401, PLR0911
     # Check this before paying the regex cost for emoji stripping.
     if text_lower in _VALID_STATUSES:
         return text_lower
-
-    # Strip a leading Rich emoji token (e.g., ``:white_check_mark: COMPLETE`` -> ``COMPLETE``)
-    # Legacy markdown stores status as ``**Status**: :emoji_token: LABEL``.
-    emoji_stripped = re.sub(r"^:[A-Za-z0-9_]+:\s*", "", text).strip()
-    if emoji_stripped and emoji_stripped != text:
-        # Recurse with the stripped value so all downstream rules apply
-        return _normalize_status(emoji_stripped)
-
-    # Strip leading Unicode emoji characters (e.g., ``✅ COMPLETE`` -> ``COMPLETE``)
-    # Legacy markdown authored with Unicode emoji instead of Rich colon-tokens.
-    # Ranges covered:
-    #   \u2300-\u27FF — Miscellaneous Technical (⏳ U+23F3), Dingbats (✅ U+2705, ❌ U+274C)
-    #   \u2B00-\u2BFF — Miscellaneous Symbols and Arrows
-    #   \U0001F000-\U0010FFFF — Supplementary emoji blocks (all planes above BMP)
-    unicode_stripped = re.sub(r"^[\u2300-\u27FF\u2B00-\u2BFF\U0001F000-\U0010FFFF]+\s*", "", text).strip()
-    if unicode_stripped and unicode_stripped != text:
-        return _normalize_status(unicode_stripped)
 
     text_upper = text.upper()
 
@@ -165,25 +148,6 @@ def _detect_gaps(raw: dict, task_id: str, source_format: FormatType) -> list[Sch
     return detect_gaps(raw, task_id)
 
 
-_TASK_PREFIX_RE = re.compile(r"^Task\s+", re.IGNORECASE)
-
-
-def _clean_dependency_list(deps: list[str]) -> list[str]:
-    """Strip 'Task N' legacy prefix from dependency IDs.
-
-    Legacy format stores dependencies as 'Task 1', 'Task 2' etc.
-    Strip the 'Task ' prefix to yield bare IDs ('1', '2') that match
-    the task ID validation pattern.
-
-    Args:
-        deps: Raw dependency list from a reader.
-
-    Returns:
-        Dependency list with 'Task ' prefixes stripped.
-    """
-    return [_TASK_PREFIX_RE.sub("", dep) for dep in deps]
-
-
 def normalize_task(raw: dict, source_format: FormatType) -> tuple[Task, list[SchemaGap]]:
     """Convert a raw task dict from any reader into a validated ``Task`` model.
 
@@ -239,11 +203,6 @@ def normalize_task(raw: dict, source_format: FormatType) -> tuple[Task, list[Sch
         if effective_title.startswith(marker):
             normalized["status"] = overridden_status
             break
-
-    # Clean legacy "Task N" prefix from dependency lists (legacy_reader emits raw values)
-    for dep_field in ("dependencies", "blocked-by", "blocked_by"):
-        if dep_field in normalized and isinstance(normalized[dep_field], list):
-            normalized[dep_field] = _clean_dependency_list(normalized[dep_field])
 
     # Coerce task-level str fields that may arrive as YAML lists to newline-joined strings.
     # Plan files authored by agents may write acceptance_criteria and verification_steps as
@@ -371,7 +330,7 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
     )
     raw_structured: list[AcceptanceCriterion] = [AcceptanceCriterion.model_validate(item) for item in raw_ac]
 
-    def _coerce_str(value: Any) -> str | None:  # noqa: ANN401
+    def _coerce_str(value: Any) -> str | None:  # ruff: ignore[any-type]
         """Coerce a YAML value to ``str | None``.
 
         YAML lists (e.g. ``acceptance-criteria`` written as a bullet list) are

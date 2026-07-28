@@ -25,6 +25,7 @@ from sam_schema.core.models import (
     CriterionStatus,
     IssueClassification,
     Plan,
+    PlanState,
     PlanStatus,
     Priority,
     ReadResult,
@@ -673,7 +674,7 @@ class TestReadResultModel:
         """Verify ReadResult includes schema gaps."""
         plan = Plan(feature="test")
         gap = SchemaGap(task_id="T1", field_name="agent", gap_type="missing", expected="Agent")
-        result = ReadResult(plan=plan, gaps=[gap], source_format="legacy_markdown", source_path=Path("/fake"))
+        result = ReadResult(plan=plan, gaps=[gap], source_format="yaml_frontmatter", source_path=Path("/fake"))
         assert len(result.gaps) == 1
 
 
@@ -700,11 +701,13 @@ class TestPlanStatusModel:
             blocked_tasks=[],
             completion_pct=66.7,
             has_cycles=False,
+            state=PlanState.READY,
         )
         assert status.feature == "test"
         assert status.total_tasks == 3
         assert abs(status.completion_pct - 66.7) < 0.1
         assert not status.has_cycles
+        assert status.state == PlanState.READY
 
 
 # ---------------------------------------------------------------------------

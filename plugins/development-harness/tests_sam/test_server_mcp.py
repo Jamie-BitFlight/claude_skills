@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 import pytest
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
-from sam_schema.core.models import Plan, TaskStatus
+from sam_schema.core.models import CreatePlanError, Plan, TaskStatus
 from sam_schema.server import mcp
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -45,7 +45,7 @@ def plan_dir(tmp_path: Path) -> Path:
 
         tmp_path/
         └── plan/
-            └── tasks-1-mcp-test.yaml   (T1 complete, T2 depends on T1)
+            └── P001-mcp-test.yaml   (T1 complete, T2 depends on T1)
 
     Returns:
         Path to the plan directory (``tmp_path/plan``).
@@ -54,7 +54,7 @@ def plan_dir(tmp_path: Path) -> Path:
     p_dir.mkdir()
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="mcp-test", version="1.0", goal="MCP test goal", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-mcp-test.yaml", force_single=True)
+    write_plan(plan, p_dir / "P001-mcp-test.yaml", force_single=True)
     return p_dir
 
 
@@ -113,11 +113,8 @@ async def test_mcp_sam_read_existing_task_returns_task_assignment(plan_dir: Path
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "task" in data
-    assert data["task"]["id"] == "T1"
-    assert data["task"]["status"] == "complete"
+    assert data.task.id == "T1"
+    assert data.task.status == "complete"
 
 
 async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> None:
@@ -135,10 +132,9 @@ async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> Non
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "feature" in data
-    assert "task" not in data
+    assert data.plan.feature == "mcp-test"
+    # plan-only read returns a ReadResult, not a TaskAssignment — no task field
+    assert not hasattr(data, "task")
 
 
 async def test_mcp_sam_read_missing_task_returns_error_dict(plan_dir: Path) -> None:
@@ -183,9 +179,8 @@ async def test_mcp_sam_state_transitions_task_status(plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["status"] == "in-progress"
+    assert data.id == "T2"
+    assert data.status == "in-progress"
 
 
 async def test_mcp_sam_state_invalid_status_returns_error_dict(plan_dir: Path) -> None:
@@ -230,10 +225,8 @@ async def test_mcp_sam_ready_returns_ready_tasks(plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["count"] == 1
-    assert data["ready_tasks"][0]["id"] == "T2"
+    assert data.count == 1
+    assert data.ready_tasks[0].id == "T2"
 
 
 # ---------------------------------------------------------------------------
@@ -256,13 +249,11 @@ async def test_mcp_sam_status_returns_plan_summary(plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["total_tasks"] == 2
-    assert "by_status" in data
-    assert "completion_pct" in data
-    assert "has_cycles" in data
-    assert data["has_cycles"] is False
+    assert data.total_tasks == 2
+    assert hasattr(data, "by_status")
+    assert hasattr(data, "completion_pct")
+    assert hasattr(data, "has_cycles")
+    assert data.has_cycles is False
 
 
 # ---------------------------------------------------------------------------
@@ -306,10 +297,65 @@ async def test_mcp_sam_create_creates_plan_file(tmp_path: Path) -> None:
     data = result.data
     import re
 
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert data["task_count"] == 1
-    assert re.match(r"^P[0-9a-f]{8}$", data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
+    assert data.task_count == 1
+    assert re.match(r"^P[0-9a-f]{8}$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
+
+
+async def test_mcp_sam_create_artifact_write_failure_raises_tool_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """sam_plan create converts CreatePlanError to ToolError at the MCP boundary.
+
+    Tests: artifact-write failure path on the consolidated create action.
+    How: Monkey-patch operations.create_plan to return a CreatePlanError, then
+         call sam_plan create via the in-memory Client.
+    Why: The consolidated tool's return schema should only include
+        CreatePlanResult; failures must surface as ToolError so callers
+        receive a typed error response from FastMCP rather than a success
+        envelope with an error flag.
+    """
+    # Arrange
+    p_dir = tmp_path / "plan"
+    p_dir.mkdir()
+    tasks = [
+        {
+            "id": "T01",
+            "title": "MCP test task",
+            "status": "not-started",
+            "agent": "test-agent",
+            "dependencies": [],
+            "priority": 1,
+            "complexity": "low",
+        }
+    ]
+
+    def _fake_create_plan(*args: object, **kwargs: object) -> CreatePlanError:
+        return CreatePlanError(
+            error="create_plan failed: artifact write to Gist unsuccessful",
+            reason="simulated Gist failure",
+            plan_id=None,
+            issue=None,
+            local_path=None,
+            hint="Check GitHub connectivity and retry.",
+        )
+
+    monkeypatch.setattr("sam_schema.server.operations.create_plan", _fake_create_plan)
+
+    # Act + Assert
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool(
+                "sam_plan",
+                {
+                    "config": {
+                        "action": "create",
+                        "slug": "mcp-create-fail",
+                        "goal": "MCP create goal",
+                        "tasks": tasks,
+                    },
+                    "plan_dir": str(p_dir),
+                },
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +393,7 @@ async def test_mcp_sam_claim_returns_claimed_true(tmp_path: Path) -> None:
                 "plan_dir": str(p_dir),
             },
         )
-        plan_id = create_result.data["plan_id"]
+        plan_id = create_result.data.plan_id
 
         # Act
         result = await client.call_tool(
@@ -356,10 +402,9 @@ async def test_mcp_sam_claim_returns_claimed_true(tmp_path: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert data.get("claimed") is True
-    assert data.get("task_id") == "T01"
-    assert "started" in data
+    assert data.claimed is True
+    assert data.task_id == "T01"
+    assert data.started is not None
 
 
 async def test_mcp_sam_claim_double_claim_returns_claimed_false(tmp_path: Path) -> None:
@@ -392,12 +437,12 @@ async def test_mcp_sam_claim_double_claim_returns_claimed_false(tmp_path: Path) 
                 "plan_dir": str(p_dir),
             },
         )
-        plan_addr = create_result.data["plan_id"]
+        plan_addr = create_result.data.plan_id
 
         first = await client.call_tool(
             "sam_task", {"plan": plan_addr, "task": "T01", "config": {"action": "claim"}, "plan_dir": str(p_dir)}
         )
-        assert first.data.get("claimed") is True
+        assert first.data.claimed is True
 
         # Act
         second = await client.call_tool(
@@ -405,8 +450,9 @@ async def test_mcp_sam_claim_double_claim_returns_claimed_false(tmp_path: Path) 
         )
 
     # Assert
-    assert second.data.get("claimed") is False
-    assert "error" in second.data
+    assert second.data.claimed is False
+    assert second.data.warnings
+    assert "in-progress" in second.data.warnings[0]
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +490,7 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
                 "plan_dir": str(p_dir),
             },
         )
-        plan_addr = create_result.data["plan_id"]
+        plan_addr = create_result.data.plan_id
 
         # Act
         update_result = await client.call_tool(
@@ -458,8 +504,8 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
         )
 
     # Assert
-    assert update_result.data.get("updated") is True
-    assert read_result.data.get("plan-context") == "MCP context text."
+    assert update_result.data.updated is True
+    assert read_result.data.plan_context == "MCP context text."
 
 
 # ---------------------------------------------------------------------------
@@ -475,9 +521,9 @@ def multi_plan_dir(tmp_path: Path) -> Path:
 
         tmp_path/
         └── plan/
-            ├── tasks-1-alpha-feature.yaml   (goal: "Implement alpha")
-            ├── tasks-2-beta-feature.yaml    (goal: "Implement beta")
-            └── tasks-3-gamma-search.yaml    (goal: "Search integration")
+            ├── P001-alpha-feature.yaml   (goal: "Implement alpha")
+            ├── P002-beta-feature.yaml    (goal: "Implement beta")
+            └── P003-gamma-search.yaml     (goal: "Search integration")
 
     Returns:
         Path to the plan directory (``tmp_path/plan``).
@@ -492,7 +538,7 @@ def multi_plan_dir(tmp_path: Path) -> Path:
     ]:
         tasks = [make_task("T1")]
         plan = Plan(feature=feature, version="1.0", goal=goal, tasks=tasks)
-        write_plan(plan, p_dir / f"tasks-{plan_num}-{feature}.yaml", force_single=True)
+        write_plan(plan, p_dir / f"P{plan_num:03d}-{feature}.yaml", force_single=True)
 
     return p_dir
 
@@ -510,17 +556,11 @@ async def test_sam_list_returns_all_plans_with_response_shape(multi_plan_dir: Pa
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "errors" not in data or data["errors"] == []
-    assert "items" in data
-    assert "count" in data
-    assert "pagination" in data
-    assert "messages" in data
-    assert "warnings" in data
-    assert data["count"] == 3
-    assert data["pagination"]["total"] == 3
-    assert data["pagination"]["has_more"] is False
-    assert data["pagination"]["offset"] == 0
+    assert data.errors == []
+    assert data.count == 3
+    assert data.pagination.total == 3
+    assert data.pagination.has_more is False
+    assert data.pagination.offset == 0
 
 
 async def test_sam_list_search_filters_by_feature_substring(multi_plan_dir: Path) -> None:
@@ -538,9 +578,9 @@ async def test_sam_list_search_filters_by_feature_substring(multi_plan_dir: Path
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == "alpha-feature"
-    assert data["pagination"]["total"] == 1
+    assert data.count == 1
+    assert data.items[0].feature == "alpha-feature"
+    assert data.pagination.total == 1
 
 
 async def test_sam_list_search_filters_by_goal_substring(multi_plan_dir: Path) -> None:
@@ -558,8 +598,8 @@ async def test_sam_list_search_filters_by_goal_substring(multi_plan_dir: Path) -
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == "gamma-search"
+    assert data.count == 1
+    assert data.items[0].feature == "gamma-search"
 
 
 async def test_sam_list_search_case_insensitive(multi_plan_dir: Path) -> None:
@@ -577,8 +617,8 @@ async def test_sam_list_search_case_insensitive(multi_plan_dir: Path) -> None:
 
     # Assert
     data = result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == "beta-feature"
+    assert data.count == 1
+    assert data.items[0].feature == "beta-feature"
 
 
 async def test_sam_list_search_no_match_returns_empty_items(multi_plan_dir: Path) -> None:
@@ -596,10 +636,10 @@ async def test_sam_list_search_no_match_returns_empty_items(multi_plan_dir: Path
 
     # Assert
     data = result.data
-    assert data["count"] == 0
-    assert data["items"] == []
-    assert data["pagination"]["total"] == 0
-    assert data["pagination"]["has_more"] is False
+    assert data.count == 0
+    assert data.items == []
+    assert data.pagination.total == 0
+    assert data.pagination.has_more is False
 
 
 async def test_sam_list_offset_and_limit_returns_correct_page(multi_plan_dir: Path) -> None:
@@ -612,7 +652,7 @@ async def test_sam_list_offset_and_limit_returns_correct_page(multi_plan_dir: Pa
     # Arrange — get all items first to know sort order
     async with Client(mcp) as client:
         all_result = await client.call_tool("sam_plan", {"config": {"action": "list"}, "plan_dir": str(multi_plan_dir)})
-        all_features = [item["feature"] for item in all_result.data["items"]]
+        all_features = [item.feature for item in all_result.data.items]
 
         # Act — page 2 (offset=1, limit=1)
         page_result = await client.call_tool(
@@ -621,13 +661,13 @@ async def test_sam_list_offset_and_limit_returns_correct_page(multi_plan_dir: Pa
 
     # Assert
     data = page_result.data
-    assert data["count"] == 1
-    assert data["items"][0]["feature"] == all_features[1]
-    assert data["pagination"]["offset"] == 1
-    assert data["pagination"]["limit"] == 1
-    assert data["pagination"]["total"] == 3
-    assert data["pagination"]["has_more"] is True
-    assert "next_call" in data
+    assert data.count == 1
+    assert data.items[0].feature == all_features[1]
+    assert data.pagination.offset == 1
+    assert data.pagination.limit == 1
+    assert data.pagination.total == 3
+    assert data.pagination.has_more is True
+    assert data.next_call is not None
 
 
 async def test_sam_list_has_more_true_includes_next_call_hint(multi_plan_dir: Path) -> None:
@@ -645,10 +685,10 @@ async def test_sam_list_has_more_true_includes_next_call_hint(multi_plan_dir: Pa
 
     # Assert
     data = result.data
-    assert data["pagination"]["has_more"] is True
-    assert "next_call" in data
-    assert "sam_plan" in data["next_call"]
-    assert "offset=1" in data["next_call"]
+    assert data.pagination.has_more is True
+    assert data.next_call is not None
+    assert "sam_plan" in data.next_call
+    assert "offset=1" in data.next_call
 
 
 async def test_sam_list_nonexistent_plan_dir_returns_error(tmp_path: Path) -> None:
@@ -668,11 +708,10 @@ async def test_sam_list_nonexistent_plan_dir_returns_error(tmp_path: Path) -> No
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert data["count"] == 0
-    assert data["items"] == []
-    assert data["pagination"]["total"] == 0
-    assert data["pagination"]["has_more"] is False
+    assert data.count == 0
+    assert data.items == []
+    assert data.pagination.total == 0
+    assert data.pagination.has_more is False
 
 
 async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Path) -> None:
@@ -687,12 +726,11 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
         result = await client.call_tool("sam_plan", {"config": {"action": "list"}, "plan_dir": str(multi_plan_dir)})
 
     # Assert
-    item = result.data["items"][0]
-    assert "feature" in item
-    assert "goal" in item
-    assert "description" in item
-    assert "task_count" in item
-    assert item["task_count"] == 1
+    item = result.data.items[0]
+    assert item.feature is not None
+    assert item.goal is not None
+    assert item.description is not None
+    assert item.task_count == 1
 
 
 async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
@@ -711,11 +749,10 @@ async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
     # Assert — all items have plan_ref present and matching P-format (no issue in fixture)
     # Plans in this fixture used tasks-{N}-{slug} naming (legacy format), so plan_id is the
     # filename stem's P-prefix portion. Legacy files expose their plan_id from the file stem.
-    items = result.data["items"]
+    items = result.data.items
     assert len(items) > 0
     for item in items:
-        assert "plan_ref" in item
-        plan_ref = item["plan_ref"]
+        plan_ref = item.plan_ref
         assert plan_ref is not None
         assert re.match(r"^P[0-9a-f\d]+", plan_ref), f"Expected P-format plan_ref, got: {plan_ref!r}"
 
@@ -739,7 +776,7 @@ async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
     plan = Plan(
         feature="autonomy-test", version="1.0", goal="Test autonomy surfacing", tasks=tasks, autonomy="checkpoint"
     )
-    write_plan(plan, p_dir / "tasks-1-autonomy-test.yaml", force_single=True)
+    write_plan(plan, p_dir / "P001-autonomy-test.yaml", force_single=True)
 
     # Act
     async with Client(mcp) as client:
@@ -749,10 +786,7 @@ async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "autonomy" in data
-    assert data["autonomy"] == "checkpoint"
+    assert data.autonomy == "checkpoint"
 
 
 async def test_sam_plan_status_autonomy_defaults_to_full_auto(plan_dir: Path) -> None:
@@ -773,10 +807,7 @@ async def test_sam_plan_status_autonomy_defaults_to_full_auto(plan_dir: Path) ->
 
     # Assert
     data = result.data
-    assert isinstance(data, dict)
-    assert "error" not in data
-    assert "autonomy" in data
-    assert data["autonomy"] == "full_auto"
+    assert data.autonomy == "full_auto"
 
 
 def test_plan_model_validate_without_autonomy_defaults_to_full_auto() -> None:

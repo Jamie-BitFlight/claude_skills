@@ -75,4 +75,4 @@ exclude_lines = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["backlog_core", "sam_schema", "dispatch_schema", "agent_profile"]
+packages = ["backlog_core", "sam_schema", "dispatch_schema", "agent_profile", "dh_core"]

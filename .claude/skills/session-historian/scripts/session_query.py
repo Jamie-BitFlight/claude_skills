@@ -38,7 +38,7 @@ if isinstance(sys.stdout, TextIOWrapper):
 if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-import anthropic  # noqa: F401
+import anthropic  # ruff: ignore[unused-import]
 import duckdb
 import typer
 from rich import box

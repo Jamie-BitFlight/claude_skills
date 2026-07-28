@@ -120,6 +120,7 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
             matches the generated input.
     """
     from sam_schema.core.action_models import CreatePlanConfig
+    from sam_schema.core.models import CreatePlanResult
     from sam_schema.server import sam_plan
 
     # Arrange
@@ -128,8 +129,8 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
 
     # Act
     result = sam_plan(config=CreatePlanConfig(slug="large-plan", goal="Large plan goal", tasks=tasks))
-    assert "error" not in result, f"create failed: {result}"
-    plan_id = result["plan_id"]
+    assert isinstance(result, CreatePlanResult), f"create failed: {result}"
+    plan_id = result.plan_id
 
     plan_data = memory_backend.read_plan(plan_id)
     tasks = plan_data["tasks"]
@@ -162,6 +163,7 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
     Assert: both plans have 50 tasks; each task's structural fields are equal.
     """
     from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig
+    from sam_schema.core.models import AppendTaskResult, CreatePlanResult
     from sam_schema.server import sam_plan
 
     n = 50
@@ -170,18 +172,18 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
     mono_result = sam_plan(
         config=CreatePlanConfig(slug="mono-plan", goal="Monolithic reference", tasks=_make_tasks_list(n))
     )
-    assert "error" not in mono_result
-    mono_id = mono_result["plan_id"]
+    assert isinstance(mono_result, CreatePlanResult)
+    mono_id = mono_result.plan_id
 
     # Arrange — incremental subject: create empty, then append 50 tasks
     incr_result = sam_plan(config=CreatePlanConfig(slug="incr-plan", goal="Monolithic reference", tasks=[]))
-    assert "error" not in incr_result
-    incr_id = incr_result["plan_id"]
+    assert isinstance(incr_result, CreatePlanResult)
+    incr_id = incr_result.plan_id
 
     for i in range(1, n + 1):
         task_id = f"T{i:02d}"
         append_result = sam_plan(config=AppendTaskConfig(task=_make_task_def(task_id, i)), plan=incr_id)
-        assert "error" not in append_result, f"append_task failed at T{i:02d}: {append_result}"
+        assert isinstance(append_result, AppendTaskResult), f"append_task failed at T{i:02d}: {append_result}"
 
     # Act — read both plans
     mono_data = memory_backend.read_plan(mono_id)
@@ -216,6 +218,7 @@ def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: I
     Assert: 50 tasks; IDs are T01..T50 in order; all titles and descriptions match.
     """
     from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig
+    from sam_schema.core.models import AppendTaskResult, CreatePlanResult
     from sam_schema.server import sam_plan
 
     initial = 5
@@ -226,14 +229,14 @@ def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: I
     create_result = sam_plan(
         config=CreatePlanConfig(slug="mixed-plan", goal="Mixed create goal", tasks=_make_tasks_list(initial, start=1))
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     # Arrange — append remaining 45 tasks
     for i in range(initial + 1, total + 1):
         task_id = f"T{i:02d}"
         append_result = sam_plan(config=AppendTaskConfig(task=_make_task_def(task_id, i)), plan=plan_id)
-        assert "error" not in append_result, f"append_task failed at T{i:02d}: {append_result}"
+        assert isinstance(append_result, AppendTaskResult), f"append_task failed at T{i:02d}: {append_result}"
 
     # Act
     plan_data = memory_backend.read_plan(plan_id)

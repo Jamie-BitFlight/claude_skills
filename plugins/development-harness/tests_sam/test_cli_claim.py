@@ -198,29 +198,38 @@ class TestSamClaimAlreadyClaimed:
     Why: Double-claiming causes duplicate agent dispatch.
     """
 
-    def test_claim_in_progress_task_exits_1(self, plan_dir: Path) -> None:
-        """Claiming an in-progress task exits 1.
+    def test_claim_in_progress_task_returns_graceful(self, plan_dir: Path) -> None:
+        """Claiming an in-progress task exits 0 with claimed=false.
 
-        Tests: Guard against double-claim.
-        How: Claim T2 (in-progress), check exit code.
-        Why: Non-zero exit tells orchestrator to skip this task.
+        Tests: Guard against double-claim — graceful rejection, not a hard error.
+        How: Claim T2 (in-progress), check exit code 0 and claimed=false in JSON.
+        Why: claim_task returns ClaimResult(claimed=False) with a warning instead
+             of raising; the CLI emits the envelope and exits 0 so the orchestrator
+             can inspect the JSON and skip the task.
         """
         # Arrange / Act
         result = runner.invoke(app, ["claim", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
-        assert result.exit_code == 1
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["claimed"] is False
+        assert payload["task_id"] == "T2"
 
-    def test_claim_complete_task_exits_1(self, plan_dir: Path) -> None:
-        """Claiming a complete task exits 1.
+    def test_claim_complete_task_returns_graceful(self, plan_dir: Path) -> None:
+        """Claiming a complete task exits 0 with claimed=false.
 
-        Tests: Guard against claiming finished tasks.
-        How: Claim T3 (complete), check exit code.
-        Why: Re-claiming completed tasks restarts finished work.
+        Tests: Guard against claiming finished tasks — graceful rejection.
+        How: Claim T3 (complete), check exit code 0 and claimed=false in JSON.
+        Why: Re-claiming completed tasks is rejected via ClaimResult, not an
+             exception, so the orchestrator reads the JSON envelope to decide.
         """
         # Arrange / Act
         result = runner.invoke(app, ["claim", "P1/T3", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
-        assert result.exit_code == 1
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["claimed"] is False
+        assert payload["task_id"] == "T3"
 
     def test_claim_in_progress_task_shows_error_message(self, plan_dir: Path) -> None:
         """Claiming an in-progress task prints an error message to stderr.
@@ -235,21 +244,26 @@ class TestSamClaimAlreadyClaimed:
         combined = result.output or ""
         assert "in-progress" in combined.lower() or "Error" in combined
 
-    def test_double_claim_same_task_exits_1(self, plan_dir: Path) -> None:
-        """Claiming the same task twice -- second attempt exits 1.
+    def test_double_claim_same_task_returns_graceful(self, plan_dir: Path) -> None:
+        """Claiming the same task twice -- second attempt returns claimed=false, exit 0.
 
-        Tests: Sequential double-claim.
-        How: Claim T1 (success), then claim T1 again (failure).
-        Why: Race condition simulation -- must reject second claim.
+        Tests: Sequential double-claim — graceful rejection.
+        How: Claim T1 (success), then claim T1 again (claimed=false, exit 0).
+        Why: Race condition simulation — the second claim is rejected via
+             ClaimResult(claimed=False) rather than an exception, so the
+             orchestrator reads the JSON envelope and skips the task.
         """
         # Arrange -- first claim succeeds
         first = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         assert first.exit_code == 0
 
-        # Act -- second claim fails
+        # Act -- second claim is rejected gracefully
         second = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
-        assert second.exit_code == 1
+        assert second.exit_code == 0, second.output
+        payload = json.loads(second.output)
+        assert payload["claimed"] is False
+        assert payload["task_id"] == "T1"
 
 
 # ---------------------------------------------------------------------------

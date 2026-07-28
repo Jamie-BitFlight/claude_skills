@@ -19,6 +19,7 @@ runner = CliRunner()
 FIXTURES_DIR: Path = Path(__file__).parent / "fixtures"
 _NONSTANDARD_FM: Path = FIXTURES_DIR / "nonstandard_frontmatter_tasks.md"
 _PURE_MD: Path = FIXTURES_DIR / "pure_markdown_checklist.md"
+_YAML_FRONTMATTER_MULTI: Path = FIXTURES_DIR / "yaml_frontmatter_multi.md"
 
 
 # ---------------------------------------------------------------------------
@@ -379,15 +380,15 @@ def test_migrate_all_mixed_standard_and_fallback_files(tmp_path: Path) -> None:
     """--all migrates a mix of canonical and fallback files in a single run.
 
     Tests: Coexistence of canonical-parseable and fallback files in one migration.
-    How: Place one legacy_markdown.md (canonical) and one nonstandard_frontmatter_tasks.md
+    How: Place one yaml_frontmatter_multi.md (standard) and one nonstandard_frontmatter_tasks.md
          (fallback) in the same plan dir. Run --all. Assert both produce .yaml files.
     Why: Real plan directories contain mixed file types; the loop must handle both.
     """
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
 
-    legacy_content = (FIXTURES_DIR / "legacy_markdown.md").read_text(encoding="utf-8")
-    (plan_dir / "tasks-1-canonical.md").write_text(legacy_content, encoding="utf-8")
+    standard_content = _YAML_FRONTMATTER_MULTI.read_text(encoding="utf-8")
+    (plan_dir / "tasks-1-canonical.md").write_text(standard_content, encoding="utf-8")
 
     nonstandard_content = _NONSTANDARD_FM.read_text(encoding="utf-8")
     (plan_dir / "tasks-6-nonstandard.md").write_text(nonstandard_content, encoding="utf-8")

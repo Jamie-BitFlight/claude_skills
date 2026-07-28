@@ -15,7 +15,7 @@ This workflow continues from `add-new-feature`. It executes tasks from a SAM tas
 
 ---
 
-**MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers take 10–30 seconds to initialize after a session restart. If either is unavailable or `ToolSearch` reports "still connecting", follow [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) before proceeding.
+**MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
 ## Resolve Task File
 

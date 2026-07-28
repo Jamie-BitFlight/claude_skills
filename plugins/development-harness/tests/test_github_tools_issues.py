@@ -461,7 +461,7 @@ async def test_backlog_list_issues_success_returns_issues_list() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.list_issues", return_value=fake_result):
+    with patch("dh_core.operations.list_issues", return_value=fake_result):
         # Act
         result = await _call("backlog_list_issues", {})
 
@@ -496,7 +496,7 @@ async def test_backlog_list_issues_passes_params() -> None:
         captured["labels"] = labels
         return {"issues": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_issues", side_effect=fake_list):
+    with patch("dh_core.operations.list_issues", side_effect=fake_list):
         # Act
         await _call("backlog_list_issues", {"state": "closed", "limit": 10, "milestone": "v1.0", "labels": "bug"})
 
@@ -515,7 +515,7 @@ async def test_backlog_list_issues_backlog_error_returns_error_key() -> None:
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.list_issues", side_effect=BacklogError("API unavailable")):
+    with patch("dh_core.operations.list_issues", side_effect=BacklogError("API unavailable")):
         # Act
         result = await _call("backlog_list_issues", {})
 
@@ -534,7 +534,7 @@ async def test_backlog_list_issues_empty_result() -> None:
     # Arrange
     fake_result = {"issues": [], "count": 0, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.list_issues", return_value=fake_result):
+    with patch("dh_core.operations.list_issues", return_value=fake_result):
         # Act
         result = await _call("backlog_list_issues", {})
 
@@ -564,7 +564,7 @@ async def test_backlog_comment_issue_success_returns_comment_fields() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.comment_issue", return_value=fake_result):
+    with patch("dh_core.operations.comment_issue", return_value=fake_result):
         # Act
         result = await _call("backlog_comment_issue", {"issue_number": 42, "body": "LGTM!"})
 
@@ -590,7 +590,7 @@ async def test_backlog_comment_issue_forwards_params() -> None:
         captured["body"] = body
         return {"issue_number": issue_number, "comment_id": 1, "comment_url": "", "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.comment_issue", side_effect=fake_comment):
+    with patch("dh_core.operations.comment_issue", side_effect=fake_comment):
         # Act
         await _call("backlog_comment_issue", {"issue_number": 7, "body": "Hello world"})
 
@@ -607,7 +607,7 @@ async def test_backlog_comment_issue_backlog_error_returns_error_key() -> None:
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.comment_issue", side_effect=BacklogError("Issue not found")):
+    with patch("dh_core.operations.comment_issue", side_effect=BacklogError("Issue not found")):
         # Act
         result = await _call("backlog_comment_issue", {"issue_number": 99, "body": "text"})
 

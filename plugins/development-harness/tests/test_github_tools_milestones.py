@@ -535,7 +535,7 @@ async def test_backlog_list_milestones_success_returns_milestones_list() -> None
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.list_milestones", return_value=fake_result):
+    with patch("dh_core.operations.list_milestones", return_value=fake_result):
         # Act
         result = await _call("backlog_list_milestones", {"state": "open"})
 
@@ -554,7 +554,7 @@ async def test_backlog_list_milestones_backlog_error_returns_error_key() -> None
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.list_milestones", side_effect=BacklogError("API error")):
+    with patch("dh_core.operations.list_milestones", side_effect=BacklogError("API error")):
         # Act
         result = await _call("backlog_list_milestones", {})
 
@@ -590,7 +590,7 @@ async def test_backlog_get_soonest_milestone_returns_milestone_dict() -> None:
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.get_soonest_milestone", return_value=fake_result):
+    with patch("dh_core.operations.get_soonest_milestone", return_value=fake_result):
         # Act
         result = await _call("backlog_get_soonest_milestone", {})
 
@@ -610,7 +610,7 @@ async def test_backlog_get_soonest_milestone_none_when_no_milestones() -> None:
     # Arrange
     fake_result = {"milestone": None, "messages": [], "warnings": []}
 
-    with patch("backlog_core.operations.get_soonest_milestone", return_value=fake_result):
+    with patch("dh_core.operations.get_soonest_milestone", return_value=fake_result):
         # Act
         result = await _call("backlog_get_soonest_milestone", {})
 
@@ -626,7 +626,7 @@ async def test_backlog_get_soonest_milestone_backlog_error_returns_error_key() -
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.get_soonest_milestone", side_effect=BacklogError("GitHub down")):
+    with patch("dh_core.operations.get_soonest_milestone", side_effect=BacklogError("GitHub down")):
         # Act
         result = await _call("backlog_get_soonest_milestone", {})
 
@@ -662,7 +662,7 @@ async def test_backlog_create_milestone_success_returns_milestone_fields() -> No
         "warnings": [],
     }
 
-    with patch("backlog_core.operations.create_milestone", return_value=fake_result):
+    with patch("dh_core.operations.create_milestone", return_value=fake_result):
         # Act
         result = await _call("backlog_create_milestone", {"title": "v3.0", "due_on": "2026-06-30"})
 
@@ -702,7 +702,7 @@ async def test_backlog_create_milestone_forwards_params() -> None:
             "warnings": [],
         }
 
-    with patch("backlog_core.operations.create_milestone", side_effect=fake_create):
+    with patch("dh_core.operations.create_milestone", side_effect=fake_create):
         # Act
         await _call(
             "backlog_create_milestone", {"title": "Sprint 1", "description": "First sprint", "due_on": "2026-04-01"}
@@ -722,7 +722,7 @@ async def test_backlog_create_milestone_backlog_error_returns_error_key() -> Non
     Why: Tool must not raise; MCP requires serialisable error response.
     """
     # Arrange
-    with patch("backlog_core.operations.create_milestone", side_effect=BacklogError("Milestone title already used")):
+    with patch("dh_core.operations.create_milestone", side_effect=BacklogError("Milestone title already used")):
         # Act
         result = await _call("backlog_create_milestone", {"title": "v1.0"})
 

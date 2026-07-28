@@ -249,9 +249,10 @@ class ReadyPlanConfig(_ActionConfigBase):
 
 
 class UpdatePlanConfig(_ActionConfigBase):
-    """Update plan-level fields.
+    """Update plan-level fields or append a section to a task body.
 
-    Applies field patches and/or sets the plan context field.
+    Applies field patches, sets the plan context field, and/or appends a
+    markdown section to a task's body when ``task_id`` is provided.
     """
 
     action: Literal["update"] = "update"
@@ -266,6 +267,22 @@ class UpdatePlanConfig(_ActionConfigBase):
             "Applied via backend.update_plan_fields. "
             'Example: {"goal": "New goal statement", "issue": 42}'
         ),
+    )
+    task_id: str | None = Field(
+        default=None,
+        description=(
+            "Task ID to target for task-level operations (append_section_name, "
+            "section_content, or task-level set_fields). None means plan-level operations only."
+        ),
+    )
+    append_section_name: str | None = Field(
+        default=None,
+        description=(
+            "Heading of the markdown section to append to the task body. Requires task_id and section_content."
+        ),
+    )
+    section_content: str | None = Field(
+        default=None, description="Body text for the appended section. Used with append_section_name and task_id."
     )
 
 
@@ -303,11 +320,12 @@ class FinalizePlanConfig(_ActionConfigBase):
     """Transition a plan out of ``drafting`` state into executable state.
 
     Plans created with an empty ``tasks`` list (the incremental build pattern)
-    start in ``drafting``. ``sam_plan(action='read')`` returns the tasks and a
-    ``drafting`` marker; ``status`` and ``ready`` return a ``drafting`` marker
-    instead of dispatchable task data. ``finalize`` clears ``drafting`` after
-    plan review completes (no-more-changes), making the plan available for
-    execution by ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
+    start in ``drafting``. While ``drafting``, ``sam_plan(action='read')``,
+    ``status``, and ``ready`` return their normal result models with
+    ``state="drafting"`` instead of dispatchable task data. ``finalize`` clears
+    ``drafting`` after plan review completes (no-more-changes), making the plan
+    available for execution by ``sam_plan(action='ready')`` and
+    ``/dh:implement-feature``.
 
     The backend resolves the issue association internally from the plan index —
     no caller-provided issue number is needed at finalize time. Establish the

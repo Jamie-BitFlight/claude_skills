@@ -2,7 +2,7 @@
 
 Tests: sam_task and sam_plan (new consolidated tools).
 How: Write real plan files to tmp_path, create a plan directory with
-     tasks-{N}-{slug}.yaml naming so resolve_plan_address can find them,
+     P{N}-{slug}.yaml naming so resolve_plan_address can find them,
      then call each MCP tool function directly and assert on returned dicts.
 Why: server.py has zero test coverage; the tools are the primary interface
      used by Claude Code agents to query and mutate SAM plans.
@@ -28,7 +28,24 @@ from sam_schema.core.action_models import (
     UpdateTaskConfig,
 )
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
-from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
+from sam_schema.core.models import (
+    AppendTaskResult,
+    ClaimResult,
+    Complexity,
+    CreatePlanResult,
+    FinalizePlanResult,
+    Plan,
+    PlanStatus,
+    Priority,
+    ReadResult,
+    ReadyTasksResult,
+    StateResult,
+    Task,
+    TaskAssignment,
+    TaskStatus,
+    UpdatePlanResult,
+    UpdateTaskResult,
+)
 from sam_schema.server import sam_plan, sam_task
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -54,7 +71,7 @@ def plan_dir(tmp_path: Path) -> Path:
 
         tmp_path/
         └── plan/
-            └── tasks-1-test-feature.yaml   (T1 complete, T2 depends on T1)
+            └── P1-test-feature.yaml   (T1 complete, T2 depends on T1)
 
     Returns:
         Path to the plan directory (``tmp_path/plan``).
@@ -65,7 +82,7 @@ def plan_dir(tmp_path: Path) -> Path:
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="test-feature", version="1.0", tasks=tasks)
 
-    plan_file = p_dir / "tasks-1-test-feature.yaml"
+    plan_file = p_dir / "P1-test-feature.yaml"
     write_plan(plan, plan_file, force_single=True)
     return p_dir
 
@@ -85,19 +102,18 @@ def test_sam_read_existing_task_returns_task_fields(plan_dir: Path, plan_dir_str
     """sam_task(read) returns task fields dict for an existing task.
 
     Tests: sam_task read happy path.
-    How: Address 'P1', task 'T1' on a plan dir with tasks-1-test-feature.yaml.
+    How: Address 'P1', task 'T1' on a plan dir with P1-test-feature.yaml.
     Why: sam_task read is the primary read tool used by agents to inspect task state.
     """
-    # Arrange — plan_dir fixture provides tasks-1-test-feature.yaml
+    # Arrange — plan_dir fixture provides P1-test-feature.yaml
 
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=plan_dir_str)
 
     # Assert — returns TaskAssignment; task fields are under "task" key.
-    assert "error" not in result
-    assert "task" in result
-    assert result["task"]["id"] == "T1"
-    assert result["task"]["status"] == "complete"
+    assert isinstance(result, TaskAssignment)
+    assert result.task.id == "T1"
+    assert result.task.status == "complete"
 
 
 def test_sam_read_returns_dict_with_all_required_fields(plan_dir: Path, plan_dir_str: str) -> None:
@@ -111,11 +127,10 @@ def test_sam_read_returns_dict_with_all_required_fields(plan_dir: Path, plan_dir
     result = sam_task(plan="P1", task="T2", config=ReadTaskConfig(), plan_dir=plan_dir_str)
 
     # Assert — task fields are nested under "task" in the TaskAssignment shape.
-    assert "error" not in result
-    assert "task" in result
-    assert "id" in result["task"]
-    assert "title" in result["task"]
-    assert "status" in result["task"]
+    assert isinstance(result, TaskAssignment)
+    assert result.task.id
+    assert result.task.title
+    assert result.task.status
 
 
 def test_sam_read_missing_task_returns_error_dict(plan_dir: Path, plan_dir_str: str) -> None:
@@ -172,10 +187,10 @@ def test_sam_state_updates_task_status(plan_dir: Path, plan_dir_str: str) -> Non
     # Act
     result = sam_task(plan="P1", task="T2", config=StateTaskConfig(status="in-progress"), plan_dir=plan_dir_str)
 
-    # Assert
-    assert "error" not in result
-    assert result["id"] == "T2"
-    assert result["status"] == "in-progress"
+    # Assert — update_task_status returns a StateResult model.
+    assert isinstance(result, StateResult)
+    assert result.id == "T2"
+    assert result.status == "in-progress"
 
 
 def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str: str) -> None:
@@ -187,8 +202,8 @@ def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str:
     """
     for status_str in ("in-progress", "blocked", "complete", "deferred", "skipped", "failed", "not-started"):
         result = sam_task(plan="P1", task="T2", config=StateTaskConfig(status=status_str), plan_dir=plan_dir_str)
-        assert "error" not in result, f"Unexpected error for status '{status_str}': {result}"
-        assert result["status"] == status_str
+        assert isinstance(result, StateResult), f"Unexpected non-StateResult for status '{status_str}': {result}"
+        assert result.status == status_str
 
 
 def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> None:
@@ -205,22 +220,26 @@ def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> No
             make_task("T3", dependencies=["T2"]),
         ],
     )
-    write_plan(plan, plan_dir / "tasks-1-failed-cascade.yaml", force_single=True)
+    write_plan(plan, plan_dir / "P1-failed-cascade.yaml", force_single=True)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=StateTaskConfig(status="failed"), plan_dir=str(plan_dir))
+    assert isinstance(result, StateResult)
     t2 = sam_task(plan="P1", task="T2", config=ReadTaskConfig(), plan_dir=str(plan_dir))
+    assert isinstance(t2, TaskAssignment)
     t3 = sam_task(plan="P1", task="T3", config=ReadTaskConfig(), plan_dir=str(plan_dir))
+    assert isinstance(t3, TaskAssignment)
     ready = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=str(plan_dir))
+    assert isinstance(ready, ReadyTasksResult)
 
     # Assert
-    assert result["status"] == "failed"
-    assert result["skipped_downstream"] == ["T2", "T3"]
-    assert t2["task"]["status"] == "skipped"
-    assert t3["task"]["status"] == "skipped"
-    assert "skipped: upstream T1 failed" in (t2["task"].get("reason") or "")
-    assert "skipped: upstream T1 failed" in (t3["task"].get("reason") or "")
-    assert ready["count"] == 0
+    assert result.status == "failed"
+    assert result.skipped_downstream == ["T2", "T3"]
+    assert t2.task.status == "skipped"
+    assert t3.task.status == "skipped"
+    assert "skipped: upstream T1 failed" in (t2.task.reason or "")
+    assert "skipped: upstream T1 failed" in (t3.task.reason or "")
+    assert ready.count == 0
 
 
 def test_sam_state_invalid_status_returns_error_dict(plan_dir: Path, plan_dir_str: str) -> None:
@@ -276,13 +295,11 @@ def test_sam_ready_returns_ready_tasks_list(plan_dir: Path, plan_dir_str: str) -
     """
     # Act
     result = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, ReadyTasksResult)
 
     # Assert
-    assert "error" not in result
-    assert "ready_tasks" in result
-    assert "count" in result
-    assert result["count"] == 1
-    assert result["ready_tasks"][0]["id"] == "T2"
+    assert result.count == 1
+    assert result.ready_tasks[0].id == "T2"
 
 
 def test_sam_ready_count_matches_ready_tasks_length(plan_dir: Path, plan_dir_str: str) -> None:
@@ -294,9 +311,10 @@ def test_sam_ready_count_matches_ready_tasks_length(plan_dir: Path, plan_dir_str
     """
     # Act
     result = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, ReadyTasksResult)
 
     # Assert
-    assert result["count"] == len(result["ready_tasks"])
+    assert result.count == len(result.ready_tasks)
 
 
 def test_sam_ready_invalid_plan_address_returns_error_dict(plan_dir: Path, plan_dir_str: str) -> None:
@@ -328,15 +346,15 @@ def test_sam_ready_all_complete_plan_returns_empty_list(tmp_path: Path) -> None:
         make_task("T2", status=TaskStatus.COMPLETE, dependencies=["T1"]),
     ]
     plan = Plan(feature="done-feature", version="1.0", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-done-feature.yaml", force_single=True)
+    write_plan(plan, p_dir / "P1-done-feature.yaml", force_single=True)
 
     # Act
     result = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=str(p_dir))
+    assert isinstance(result, ReadyTasksResult)
 
     # Assert
-    assert "error" not in result
-    assert result["count"] == 0
-    assert result["ready_tasks"] == []
+    assert result.count == 0
+    assert result.ready_tasks == []
 
 
 # ---------------------------------------------------------------------------
@@ -353,14 +371,14 @@ def test_sam_status_returns_plan_summary(plan_dir: Path, plan_dir_str: str) -> N
     """
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, PlanStatus)
 
     # Assert
-    assert "error" not in result
-    assert result["total_tasks"] == 2
-    assert "by_status" in result
-    assert "ready_tasks" in result
-    assert "completion_pct" in result
-    assert "has_cycles" in result
+    assert result.total_tasks == 2
+    assert result.by_status
+    assert result.ready_tasks is not None
+    assert result.completion_pct is not None
+    assert result.has_cycles is not None
 
 
 def test_sam_status_completion_pct_reflects_completed_tasks(plan_dir: Path, plan_dir_str: str) -> None:
@@ -372,9 +390,10 @@ def test_sam_status_completion_pct_reflects_completed_tasks(plan_dir: Path, plan
     """
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, PlanStatus)
 
     # Assert
-    assert result["completion_pct"] == pytest.approx(50.0)
+    assert result.completion_pct == pytest.approx(50.0)
 
 
 def test_sam_status_by_status_contains_complete_and_not_started(plan_dir: Path, plan_dir_str: str) -> None:
@@ -386,9 +405,10 @@ def test_sam_status_by_status_contains_complete_and_not_started(plan_dir: Path, 
     """
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, PlanStatus)
 
     # Assert
-    by_status = result["by_status"]
+    by_status = result.by_status
     assert by_status.get("complete", 0) == 1
     assert by_status.get("not-started", 0) == 1
 
@@ -415,9 +435,10 @@ def test_sam_status_has_cycles_false_for_acyclic_plan(plan_dir: Path, plan_dir_s
     """
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, PlanStatus)
 
     # Assert
-    assert result["has_cycles"] is False
+    assert result.has_cycles is False
 
 
 def test_sam_status_has_cycles_true_for_cyclic_plan(tmp_path: Path) -> None:
@@ -451,14 +472,14 @@ def test_sam_status_has_cycles_true_for_cyclic_plan(tmp_path: Path) -> None:
         ),
     ]
     plan = Plan(feature="cyclic-feature", version="1.0", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-cyclic-feature.yaml", force_single=True)
+    write_plan(plan, p_dir / "P1-cyclic-feature.yaml", force_single=True)
 
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=str(p_dir))
+    assert isinstance(result, PlanStatus)
 
     # Assert
-    assert "error" not in result
-    assert result["has_cycles"] is True
+    assert result.has_cycles is True
 
 
 # ---------------------------------------------------------------------------
@@ -470,11 +491,10 @@ def test_sam_read_with_task_returns_task_assignment_shape(plan_dir_str: str) -> 
     """sam_task(read) with task param returns dict with nested 'task' key (TaskAssignment)."""
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=plan_dir_str)
+    assert isinstance(result, TaskAssignment)
 
     # Assert
-    assert "error" not in result
-    assert "task" in result
-    assert result["task"]["id"] == "T1"
+    assert result.task.id == "T1"
 
 
 def test_sam_read_with_task_includes_plan_goal(tmp_path: Path) -> None:
@@ -484,14 +504,14 @@ def test_sam_read_with_task_includes_plan_goal(tmp_path: Path) -> None:
     p_dir.mkdir()
     tasks = [make_task("T1")]
     plan = Plan(feature="goal-feature", version="1.0", goal="Ship the goal feature", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-goal-feature.yaml", force_single=True)
+    write_plan(plan, p_dir / "P1-goal-feature.yaml", force_single=True)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=str(p_dir))
+    assert isinstance(result, TaskAssignment)
 
     # Assert
-    assert "error" not in result
-    assert result.get("plan-goal") == "Ship the goal feature"
+    assert result.plan_goal == "Ship the goal feature"
 
 
 def test_sam_read_with_task_includes_plan_context(tmp_path: Path) -> None:
@@ -501,25 +521,25 @@ def test_sam_read_with_task_includes_plan_context(tmp_path: Path) -> None:
     p_dir.mkdir()
     tasks = [make_task("T1")]
     plan = Plan(feature="ctx-feature", version="1.0", context="Shared context text here", tasks=tasks)
-    write_plan(plan, p_dir / "tasks-1-ctx-feature.yaml", force_single=True)
+    write_plan(plan, p_dir / "P1-ctx-feature.yaml", force_single=True)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=str(p_dir))
+    assert isinstance(result, TaskAssignment)
 
     # Assert
-    assert "error" not in result
-    assert result.get("plan-context") == "Shared context text here"
+    assert result.plan_context == "Shared context text here"
 
 
 def test_sam_read_without_task_returns_plan_fields(plan_dir_str: str) -> None:
     """sam_plan(read) without task param returns Plan fields with no TaskAssignment wrapper."""
     # Act
     result = sam_plan(config=ReadPlanConfig(), plan="P1", plan_dir=plan_dir_str)
+    assert isinstance(result, ReadResult)
 
     # Assert
-    assert "error" not in result
-    assert "feature" in result
-    assert "task" not in result
+    assert result.plan.feature
+    assert not hasattr(result, "task") or getattr(result, "task", None) is None
 
 
 def test_sam_read_with_missing_task_returns_error(plan_dir_str: str) -> None:
@@ -566,13 +586,13 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
 
     # Act
     result = sam_plan(config=CreatePlanConfig(slug="test-create", goal="Test goal", tasks=[task]), plan_dir=str(p_dir))
+    assert isinstance(result, CreatePlanResult)
 
     import re
 
     # Assert
-    assert "error" not in result
-    assert result["task_count"] == 1
-    assert re.match(r"^P[0-9a-f]{8}$", result["plan_id"]), f"Expected UUID plan_id, got: {result['plan_id']!r}"
+    assert result.task_count == 1
+    assert re.match(r"^P[0-9a-f]{8}$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
 
 
 def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
@@ -597,16 +617,15 @@ def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
     create_result = sam_plan(
         config=CreatePlanConfig(slug="round-trip", goal="Round-trip goal", tasks=[task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
+    assert isinstance(create_result, CreatePlanResult)
 
     # Act — read back the task through sam_task using plan_id from create result
-    plan_id = create_result["plan_id"]
+    plan_id = create_result.plan_id
     read_result = sam_task(plan=plan_id, task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
+    assert isinstance(read_result, TaskAssignment)
 
     # Assert
-    assert "error" not in read_result
-    assert "task" in read_result
-    assert read_result["task"]["title"] == "Round-trip task"
+    assert read_result.task.title == "Round-trip task"
 
 
 def test_sam_create_empty_tasks_creates_drafting_plan(tmp_path: Path) -> None:
@@ -622,13 +641,13 @@ def test_sam_create_empty_tasks_creates_drafting_plan(tmp_path: Path) -> None:
 
     # Act
     result = sam_plan(config=CreatePlanConfig(slug="empty-plan", goal="Drafting goal", tasks=[]), plan_dir=str(p_dir))
+    assert isinstance(result, CreatePlanResult)
 
     # Assert
     import re
 
-    assert "error" not in result
-    assert re.match(r"^P[0-9a-f]{8}$", result["plan_id"]), f"Expected UUID plan_id, got: {result['plan_id']!r}"
-    assert result["task_count"] == 0
+    assert re.match(r"^P[0-9a-f]{8}$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
+    assert result.task_count == 0
 
 
 def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
@@ -649,14 +668,14 @@ def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
 
     # Act
     r1 = sam_plan(config=CreatePlanConfig(slug="first", goal="First", tasks=[minimal_task]), plan_dir=str(p_dir))
+    assert isinstance(r1, CreatePlanResult)
     r2 = sam_plan(config=CreatePlanConfig(slug="second", goal="Second", tasks=[minimal_task]), plan_dir=str(p_dir))
+    assert isinstance(r2, CreatePlanResult)
 
     # Assert
-    assert "error" not in r1
-    assert "error" not in r2
-    assert re.match(r"^P[0-9a-f]{8}$", r1["plan_id"]), f"Expected UUID plan_id, got: {r1['plan_id']!r}"
-    assert re.match(r"^P[0-9a-f]{8}$", r2["plan_id"]), f"Expected UUID plan_id, got: {r2['plan_id']!r}"
-    assert r1["plan_id"] != r2["plan_id"], "Each plan must get a unique plan_id"
+    assert re.match(r"^P[0-9a-f]{8}$", r1.plan_id), f"Expected UUID plan_id, got: {r1.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}$", r2.plan_id), f"Expected UUID plan_id, got: {r2.plan_id!r}"
+    assert r1.plan_id != r2.plan_id, "Each plan must get a unique plan_id"
 
 
 # ---------------------------------------------------------------------------
@@ -681,22 +700,22 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
     create_result = sam_plan(
         config=CreatePlanConfig(slug="update-ctx", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     # Act
     update_result = sam_plan(
         config=UpdatePlanConfig(context="Shared context narrative."), plan=plan_id, plan_dir=str(p_dir)
     )
+    assert isinstance(update_result, UpdatePlanResult)
 
     # Assert
-    assert "error" not in update_result
-    assert update_result.get("updated") is True
+    assert update_result.updated is True
 
     # Verify via sam_task that context is persisted
     read_result = sam_task(plan=plan_id, task="T01", config=ReadTaskConfig(), plan_dir=str(p_dir))
-    assert "error" not in read_result
-    assert read_result.get("plan-context") == "Shared context narrative."
+    assert isinstance(read_result, TaskAssignment)
+    assert read_result.plan_context == "Shared context narrative."
 
 
 def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
@@ -716,8 +735,8 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     create_result = sam_plan(
         config=CreatePlanConfig(slug="append-sec", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
     plan_path = p_dir / f"{plan_id}-append-sec.yaml"
 
     # Act
@@ -727,10 +746,10 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
         config=UpdateTaskConfig(append_section="Divergence Notes", section_content="No divergence observed."),
         plan_dir=str(p_dir),
     )
+    assert isinstance(update_result, UpdateTaskResult)
 
     # Assert
-    assert "error" not in update_result
-    assert update_result.get("updated") is True
+    assert update_result.updated is True
 
     # Verify by reading the raw file — the section should be appended to task body
     raw = plan_path.read_text(encoding="utf-8")
@@ -777,16 +796,17 @@ def test_sam_claim_not_started_task_returns_claimed_true(tmp_path: Path) -> None
     create_result = sam_plan(
         config=CreatePlanConfig(slug="claim-test", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     # Act
     result = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+    assert isinstance(result, ClaimResult)
 
     # Assert
-    assert result.get("claimed") is True
-    assert result.get("task_id") == "T01"
-    assert "started" in result
+    assert result.claimed is True
+    assert result.task_id == "T01"
+    assert result.started is not None or result.claimed  # started may be None on local backend
 
 
 def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None:
@@ -806,18 +826,21 @@ def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None
     create_result = sam_plan(
         config=CreatePlanConfig(slug="double-claim", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     first = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
-    assert first.get("claimed") is True
+    assert isinstance(first, ClaimResult)
+    assert first.claimed is True
 
     # Act — second claim
     second = sam_task(plan=plan_id, task="T01", config=ClaimTaskConfig(), plan_dir=str(p_dir))
+    assert isinstance(second, ClaimResult)
 
     # Assert
-    assert second.get("claimed") is False
-    assert "error" in second
+    assert second.claimed is False
+    assert second.warnings is not None
+    assert "already claimed" in second.warnings[0]
 
 
 def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:
@@ -838,8 +861,8 @@ def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:
     create_result = sam_plan(
         config=CreatePlanConfig(slug="missing-task", goal="Goal", tasks=[minimal_task]), plan_dir=str(p_dir)
     )
-    assert "error" not in create_result
-    plan_id = create_result["plan_id"]
+    assert isinstance(create_result, CreatePlanResult)
+    plan_id = create_result.plan_id
 
     # Act / Assert
     with pytest.raises(TaskNotFoundError, match="T99"):
@@ -886,10 +909,10 @@ def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
 
     # Act
     result = sam_plan(config=CreatePlanConfig(slug="ref-no-issue", goal="Test goal", tasks=[task]), plan_dir=str(p_dir))
+    assert isinstance(result, CreatePlanResult)
 
     # Assert
-    assert "error" not in result
-    assert re.match(r"^P[0-9a-f]{8}$", result["plan_ref"]), f"Expected UUID plan_ref, got: {result['plan_ref']!r}"
+    assert re.match(r"^P[0-9a-f]{8}$", result.plan_ref), f"Expected UUID plan_ref, got: {result.plan_ref!r}"
 
 
 def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
@@ -925,10 +948,10 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
             config=CreatePlanConfig(slug="ref-with-issue", goal="Test goal", tasks=[task], issue=42),
             plan_dir=str(p_dir),
         )
+        assert isinstance(result, CreatePlanResult)
 
     # Assert — plan_ref includes issue number and UUID plan_id
-    assert "error" not in result
-    assert re.match(r"^#42,P[0-9a-f]{8}$", result["plan_ref"]), f"Expected '#42,P<hex8>', got: {result['plan_ref']!r}"
+    assert re.match(r"^#42,P[0-9a-f]{8}$", result.plan_ref), f"Expected '#42,P<hex8>', got: {result.plan_ref!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -996,9 +1019,9 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
 
         # Act
         result = sam_plan(config=AppendTaskConfig(task=task_def), plan="P1")
+        assert isinstance(result, AppendTaskResult)
 
         # Assert — backend.append_task called once
-        assert "error" not in result, f"append_task returned error: {result}"
         mock_backend.append_task.assert_called_once()
         call_args = mock_backend.append_task.call_args
         plan_id_arg = call_args.args[0] if call_args.args else call_args.kwargs.get("plan_id")
@@ -1026,7 +1049,8 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="append-test", goal="Append goal", tasks=[]))
-        plan_id = create_result["plan_id"]
+        assert isinstance(create_result, CreatePlanResult)
+        plan_id = create_result.plan_id
 
         task_def = TaskDefinition(
             id="T1",
@@ -1040,11 +1064,11 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
 
         # Act
         result = sam_plan(config=AppendTaskConfig(task=task_def), plan=plan_id)
+        assert isinstance(result, AppendTaskResult)
 
         # Assert
-        assert "error" not in result, f"Expected success but got error: {result}"
-        success = result.get("appended") is True or result.get("task_id") is not None
-        assert success, f"Expected success indicator in append_task response, got: {result!r}"
+        assert result.appended is True
+        assert result.task_id is not None
     finally:
         reset_task_config()
 
@@ -1096,7 +1120,8 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="dup-task", goal="Goal", tasks=[]))
-        plan_id = create_result["plan_id"]
+        assert isinstance(create_result, CreatePlanResult)
+        plan_id = create_result.plan_id
 
         task_def = TaskDefinition(id="T1", title="Task", agent="a")
 
@@ -1137,9 +1162,9 @@ def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> No
     try:
         # Act
         result = sam_plan(config=FinalizePlanConfig(), plan="P1")
+        assert isinstance(result, FinalizePlanResult)
 
         # Assert — either finalize_plan OR update_plan_fields called to transition state
-        assert "error" not in result, f"Expected success, got: {result!r}"
         state_transitioned = mock_backend.finalize_plan.called or mock_backend.update_plan_fields.called
         assert state_transitioned, (
             "Expected either backend.finalize_plan or backend.update_plan_fields to be called to clear drafting state"

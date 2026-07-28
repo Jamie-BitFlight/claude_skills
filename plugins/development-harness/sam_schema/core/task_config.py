@@ -12,15 +12,32 @@ Resolution order for backend selection:
 
 from __future__ import annotations
 
-import importlib
-import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+from dh_config import DHConfig
+
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.backends.beads import BeadsTaskProvider
+from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+from sam_schema.core.backends.memory import InMemoryTaskProvider
+from sam_schema.core.gist_task_layer import GistTaskLayer
+from sam_schema.core.plan_id_index import create_plan_id_index
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
 
-__all__ = ["TaskConfig", "create_task_backend", "get_task_config", "reset_task_config", "set_task_config"]
+__all__ = [
+    "TaskConfig",
+    "create_task_backend",
+    "get_backend",
+    "get_task_config",
+    "reset_task_config",
+    "set_task_config",
+]
+
+_PLAN_DIR_SENTINEL = "plan"
 
 _VALID_BACKENDS: tuple[str, ...] = ("beads", "local", "github", "memory")
 
@@ -77,7 +94,7 @@ def set_task_config(config: TaskConfig) -> None:
     Args:
         config: TaskConfig instance wrapping the chosen backend implementation.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = config
 
 
@@ -87,7 +104,7 @@ def reset_task_config() -> None:
     Intended for test teardown — call this between tests to force the next
     ``get_task_config()`` call to raise rather than returning a stale config.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = None
 
 
@@ -96,30 +113,14 @@ def reset_task_config() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _load_backend_toml_name() -> str | None:
-    """Read backend name from .dh/config.yaml if present.
-
-    Delegates to DHConfig for YAML-based backend resolution. Returns None
-    when the resolved value matches the subsystem default ("local"), so
-    the caller's resolution chain can continue to the next step.
-
-    Returns:
-        Backend name string when explicitly configured, otherwise ``None``.
-    """
-    from dh_config import DHConfig  # noqa: PLC0415
-
-    result = DHConfig().get_backend(subsystem="task")
-    return result if result != "local" else None
-
-
 def create_task_backend(name: str | None = None) -> TaskBackend:
     """Instantiate and return a TaskBackend by name.
 
-    Resolution order when *name* is ``None``:
-
-    1. ``TASKBACKEND`` environment variable.
-    2. ``task.backend`` in ``.dh/config.yaml`` (project or user home dir, via DHConfig).
-    3. Default: ``"local"``.
+    When *name* is ``None``, resolution is delegated in full to
+    :meth:`dh_config.DHConfig.get_backend`, which implements the complete
+    chain: ``TASKBACKEND`` env var → ``task.backend`` (then global
+    ``backend.name``) in ``.dh/config.yaml`` → ``.beads/dh-backend`` marker
+    auto-detect → default ``"local"``.
 
     Args:
         name: Backend identifier to instantiate. Pass ``None`` to trigger
@@ -134,25 +135,16 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
-    resolved = name or os.environ.get("TASKBACKEND") or _load_backend_toml_name() or "local"
+    resolved = name or DHConfig().get_backend(subsystem="task")
 
     if resolved == "local":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the backends package is created in T03.
-        mod = importlib.import_module("sam_schema.core.backends.local_yaml")
-        return mod.LocalYamlTaskProvider()  # type: ignore[return-value]
+        return LocalYamlTaskProvider()
 
     if resolved == "memory":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the backends package is created in T03.
-        mod = importlib.import_module("sam_schema.core.backends.memory")
-        return mod.InMemoryTaskProvider()  # type: ignore[return-value]
+        return InMemoryTaskProvider()
 
     if resolved == "beads":
-        # importlib.import_module defers resolution to runtime: avoids circular imports
-        # and handles the case where the beads backend module is created in T08.
-        mod = importlib.import_module("sam_schema.core.backends.beads")
-        return mod.BeadsTaskProvider()  # type: ignore[return-value]
+        return BeadsTaskProvider()
 
     if resolved == "github":
         msg = "GitHub backend requires IssueBackend + DocumentBackend (see #984). Use 'local' or 'memory' instead."
@@ -160,3 +152,62 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
     raise ValueError(msg)
+
+
+# ---------------------------------------------------------------------------
+# Shared backend resolution (used by both CLI and MCP server)
+# ---------------------------------------------------------------------------
+
+
+def get_backend(plan_dir: str | None = None, *, wrap_gist: bool = False) -> TaskBackend:
+    """Return the appropriate TaskBackend for the given plan_dir.
+
+    When *plan_dir* is ``None`` or ``"plan"``, returns the module-level
+    configured backend from :func:`get_task_config`, wrapped in
+    :class:`~sam_schema.core.gist_task_layer.GistTaskLayer` when the
+    underlying backend is a ``LocalYamlTaskProvider`` (matching MCP server
+    behaviour — write-through to GitHub Gist).
+
+    When *plan_dir* is a concrete filesystem path, creates a
+    :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider`
+    for that path.  When *wrap_gist* is ``True`` (MCP server), wraps it in
+    ``GistTaskLayer`` to preserve write-through behaviour for explicit
+    plan directories.  When ``False`` (CLI default), returns it directly
+    (local-only — an explicit path means no Gist sync).
+
+    Args:
+        plan_dir: The ``plan_dir`` parameter from the caller.  ``None`` or
+            ``"plan"`` selects the configured backend; any other value is
+            treated as a filesystem path.
+        wrap_gist: When ``True``, wrap explicit-path backends in
+            ``GistTaskLayer`` (MCP server behaviour).  When ``False``
+            (default, CLI behaviour), return bare
+            ``LocalYamlTaskProvider`` for explicit paths.
+
+    Returns:
+        A :class:`~sam_schema.core.task_backend.TaskBackend` instance.
+    """
+    if plan_dir is None or plan_dir == _PLAN_DIR_SENTINEL:
+        return _get_configured_backend()
+
+    local = LocalYamlTaskProvider(Path(plan_dir))
+
+    if not wrap_gist:
+        return local
+
+    # MCP server path: wrap explicit-path backends in GistTaskLayer to
+    # preserve write-through to GitHub Gist (matching pre-refactor behaviour).
+    artifact_client = ArtifactRegistryClient()
+    plan_index = create_plan_id_index(artifact_client)
+    return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
+
+
+def _get_configured_backend() -> TaskBackend:
+    """Return the configured backend, wrapped in GistTaskLayer when applicable."""
+    configured = get_task_config().backend
+    if not isinstance(configured, LocalYamlTaskProvider):
+        return configured
+
+    artifact_client = ArtifactRegistryClient()
+    plan_index = create_plan_id_index(artifact_client)
+    return GistTaskLayer(local_backend=configured, artifact_client=artifact_client, plan_index=plan_index)

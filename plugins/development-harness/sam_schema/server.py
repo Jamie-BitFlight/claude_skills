@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 import tiktoken
+from dh_core import operations
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -38,36 +38,38 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
-from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
-from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import (
-    ArtifactWriteError,
-    ConcurrentClaimUnsupportedError,
-    PlanNotFoundError,
-    SamError,
-    TaskNotFoundError,
+from sam_schema.core.models import (
+    ActiveTaskClearResult,
+    ActiveTaskGetResult,
+    ActiveTaskSetResult,
+    ActiveTaskUpdateResult,
+    AppendTaskResult,
+    ClaimResult,
+    CreatePlanError,
+    CreatePlanResult,
+    FinalizePlanResult,
+    PaginatedResult,
+    PaginationMeta,
+    PlanStatus,
+    PlanSummaryModel,
+    ReadResult,
+    ReadyTasksResult,
+    StateResult,
+    TaskAssignment,
+    UpdatePlanResult,
+    UpdateTaskResult,
 )
-from sam_schema.core.gist_task_layer import GistTaskLayer
-from sam_schema.core.models import Plan, PlanState, Task, TaskAssignment, TaskStatus
-from sam_schema.core.plan_id_index import create_plan_id_index
-from sam_schema.core.task_config import TaskConfig, create_task_backend, get_task_config, set_task_config
+from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
 
 if TYPE_CHECKING:
     from sam_schema.core.task_backend import TaskBackend
 
 _log = logging.getLogger(__name__)
 
-_PLAN_DIR_SENTINEL = "plan"
-
 # Sentinel session key used when session_id is omitted from sam_active_task calls.
 # Single-agent scenarios do not require explicit session isolation.
 _DEFAULT_SESSION_ID = "_default"
-
-# Returned by _sam_plan_status and _sam_plan_ready when the plan is in drafting state.
-# Defined once here to ensure both handlers return an identical shape.
-_DRAFTING_MARKER_RESPONSE: dict[str, object] = {"drafting": True, "state": PlanState.DRAFTING}
 
 # Stem parsing thresholds used in _build_task_assignment.
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
@@ -88,75 +90,24 @@ except RuntimeError:
     set_context_config(ContextConfig(backend=create_context_backend()))
 
 
-def _claim_task_via_backend(backend: TaskBackend, plan_id: str, task_id: str) -> tuple[bool, str | None]:
-    """Claim a task, falling back to the local backend for local-only plans.
-
-    Returns a ``(claimed, warning)`` tuple where *warning* is non-``None`` when
-    the claim fell back to the local backend because the plan has no GitHub issue.
-    ADR-2509-3: exactly-once is provided by serialized dispatch at the caller level.
-
-    Args:
-        backend: Backend to attempt claim through.
-        plan_id: Plan identifier.
-        task_id: Task identifier.
-
-    Returns:
-        ``(True, None)`` on successful Gist-backed claim.
-        ``(True, warning_str)`` when claim fell back to local backend.
-        ``(False, None)`` when task is not claimable.
-    """
-    try:
-        return backend.claim_task(plan_id, task_id), None
-    except ConcurrentClaimUnsupportedError:
-        # Local-only plan (issue=None): fall back to local backend claim.
-        local_backend = backend.local if isinstance(backend, GistTaskLayer) else backend
-        claimed = local_backend.claim_task(plan_id, task_id)
-        warning = (
-            f"Plan '{plan_id}' has no associated GitHub issue — claimed locally only. "
-            "Parallel dispatch is not supported for local-only plans. "
-            "Associate a GitHub issue with this plan for multi-agent dispatch support."
-        )
-        _log.warning("_claim_task_via_backend: %s", warning)
-        return claimed, warning
-
-
 def _get_backend(plan_dir_str: str) -> TaskBackend:
-    """Return a GistTaskLayer wrapping the configured local backend.
+    """Return the appropriate TaskBackend for the given plan_dir.
 
-    When *plan_dir_str* is the default sentinel (``"plan"``), wraps the
-    module-level configured backend in a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`
-    so MCP callers always route through write-through Gist storage.
+    Delegates to the shared :func:`sam_schema.core.task_config.get_backend` so that
+    both the MCP server and the CLI use the same backend-resolution logic.
 
-    When *plan_dir_str* is a concrete filesystem path, creates a
-    :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider` for
-    that path and wraps it in ``GistTaskLayer`` to preserve backward compatibility
-    while still enabling write-through for callers that supply an explicit directory.
-
-    CLI and non-MCP callers that bypass this function continue to use
-    ``LocalYamlTaskProvider`` directly — this wrapper is MCP-server-only.
+    The MCP server always passes ``wrap_gist=True`` so that explicit plan
+    directories are also wrapped in ``GistTaskLayer`` for write-through to
+    GitHub Gist (matching pre-refactor MCP behaviour).
 
     Args:
         plan_dir_str: The ``plan_dir`` parameter from the MCP tool call.
 
     Returns:
         :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
-        this tool call (always a :class:`~sam_schema.core.gist_task_layer.GistTaskLayer`).
+        this tool call.
     """
-    artifact_client = ArtifactRegistryClient()
-    plan_index = create_plan_id_index(artifact_client)
-
-    if plan_dir_str == _PLAN_DIR_SENTINEL:
-        configured = get_task_config().backend
-        # When the configured backend is already a LocalYamlTaskProvider, use it
-        # directly.  When it is another type (e.g. InMemoryTaskProvider for tests),
-        # skip wrapping — GistTaskLayer requires a LocalYamlTaskProvider.
-        if isinstance(configured, LocalYamlTaskProvider):
-            return GistTaskLayer(local_backend=configured, artifact_client=artifact_client, plan_index=plan_index)
-        return configured
-
-    # Non-default plan_dir: create a LocalYamlTaskProvider for that explicit path.
-    local = LocalYamlTaskProvider(Path(plan_dir_str))
-    return GistTaskLayer(local_backend=local, artifact_client=artifact_client, plan_index=plan_index)
+    return get_backend(plan_dir_str, wrap_gist=True)
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
@@ -185,7 +136,7 @@ def run_server() -> None:
 
 
 def _paginate_results(
-    all_items: list[dict[str, Any]],
+    all_items: list[PlanSummaryModel],
     *,
     offset: int,
     limit: int | None,
@@ -193,12 +144,13 @@ def _paginate_results(
     warnings: list[str],
     errors: list[str],
     tool_name: str,
-) -> dict[str, Any]:
-    """Paginate ``all_items`` within the token budget and return the response dict.
+) -> PaginatedResult:
+    """Paginate ``all_items`` within the token budget and return the response envelope.
 
     Returns:
-        Dict with ``items``, ``count``, ``pagination``, ``messages``, ``warnings``, ``errors``,
-        and optionally ``next_call``.
+        :class:`~sam_schema.core.models.PaginatedResult` with ``items``, ``count``,
+        ``pagination``, ``messages``, ``warnings``, ``errors``, and optionally
+        ``next_call``.
     """
     total = len(all_items)
     page_items = all_items[offset:]
@@ -208,8 +160,13 @@ def _paginate_results(
     else:
         effective_limit = len(page_items)
         if page_items:
+            # Pre-serialize to plain dicts once; token counting only needs the
+            # wire representation, and model_dump(mode="json") is idempotent
+            # across binary-search probes.  This preserves the O(N) total
+            # serialization work of the original refactor.
+            serialized_items = [item.model_dump(mode="json") for item in page_items]
             # Binary search for the largest k such that f(k) = len(_enc.encode(
-            # json.dumps(page_items[:k]))) <= _TOKEN_BUDGET.  f is monotonically
+            # json.dumps(serialized_items[:k]))) <= _TOKEN_BUDGET.  f is monotonically
             # non-decreasing, so binary search is valid and evaluates the *same*
             # function as the original loop, preserving exact pagination boundaries.
             # Total serialisation work: O(N) across all probes (N/2 + N/4 + … ≈ N)
@@ -219,7 +176,7 @@ def _paginate_results(
             lo, hi = 1, len(page_items)
             while lo < hi:
                 mid = (lo + hi + 1) // 2
-                if len(_enc.encode(json.dumps(page_items[:mid]))) <= _TOKEN_BUDGET:
+                if len(_enc.encode(json.dumps(serialized_items[:mid]))) <= _TOKEN_BUDGET:
                     lo = mid
                 else:
                     hi = mid - 1
@@ -227,71 +184,18 @@ def _paginate_results(
 
     page = page_items[:effective_limit]
     has_more = (offset + len(page)) < total
-    result: dict[str, Any] = {
-        "items": page,
-        "count": len(page),
-        "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
-        "messages": messages,
-        "warnings": warnings,
-        "errors": errors,
-    }
+    result = PaginatedResult(
+        items=page,
+        count=len(page),
+        pagination=PaginationMeta(offset=offset, limit=effective_limit, total=total, has_more=has_more),
+        messages=messages,
+        warnings=warnings,
+        errors=errors,
+    )
     if has_more:
         next_offset = offset + len(page)
-        result["next_call"] = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
+        result.next_call = f"{tool_name}(offset={next_offset}, limit={effective_limit})"
     return result
-
-
-def _validated_task_patch(backend: TaskBackend, plan_id: str, task_id: str, raw_fields: dict[str, Any]) -> Task:
-    """Validate raw JSON patch fields through the Pydantic Task model.
-
-    Reads the current task, merges *raw_fields* into its data, then passes the
-    merged dict through ``Task.model_validate`` so field validators run (e.g.
-    ``validate_task_id_list`` normalises ``dependencies``).  Returns the
-    fully-validated Task model for the caller to write via ``backend.update_task``.
-
-    Args:
-        backend: Active TaskBackend instance.
-        plan_id: Backend-assigned plan identifier.
-        task_id: Task identifier within the plan.
-        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
-
-    Returns:
-        Fully-validated Task model with the patched fields applied.
-
-    Raises:
-        PlanNotFoundError: When plan_id cannot be resolved by the backend.
-        TaskNotFoundError: When task_id does not exist within the plan.
-        pydantic.ValidationError: When a field value fails Task model validation.
-    """
-    task_data = backend.read_task(plan_id, task_id)
-    current = Task.model_validate(task_data)
-    return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
-
-
-def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
-    """Validate raw JSON patch fields through the Pydantic Plan model.
-
-    Reads the current plan, merges *raw_fields* into its data, then passes the
-    merged dict through ``Plan.model_validate`` so field validators run (e.g.
-    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
-    fully-validated Plan model so callers use normalized field values, not the
-    raw input.
-
-    Args:
-        backend: Active TaskBackend instance.
-        plan_id: Backend-assigned plan identifier.
-        raw_fields: JSON-decoded patch dict from ``set_fields_json``.
-
-    Returns:
-        Fully-validated Plan model with the patched fields applied.
-
-    Raises:
-        PlanNotFoundError: When plan_id cannot be resolved by the backend.
-        pydantic.ValidationError: When a field value fails Plan model validation.
-    """
-    plan_data = backend.read_plan(plan_id)
-    current = Plan.model_validate(plan_data)
-    return Plan.model_validate({**current.model_dump(), **raw_fields})
 
 
 # Actions that require the ``plan`` parameter to be supplied.
@@ -313,85 +217,51 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> dict:
+def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     """Return Plan fields for the given plan address.
 
-    When ``GistTaskLayer`` serves the plan from local cache (``last_read_source == "local"``),
-    a ``warnings`` key is added to the response with the annotated-source warning string
-    (ADR-2509-5).  This surfaces the degraded-source status to the MCP caller without
-    changing the response shape — the ``warnings`` key is additive.
+    Thin adapter: resolves the backend and delegates to dh_core.operations.
+    The operation handles plan retrieval, Plan model conversion, and
+    source-degradation warning surfacing. Returns flat plan fields (feature,
+    goal, context, …) rather than a nested ``ReadResult`` envelope. Warnings
+    are added at the top level when present.
     """
     backend = _get_backend(plan_dir)
-    plan_data = backend.read_plan(plan)
-    plan_dict = {k: v for k, v in plan_data.items() if k != "plan_id"}
-    plan_model = Plan.model_validate(plan_dict)
-    result = plan_model.model_dump(mode="json", by_alias=True, exclude_none=True)
-
-    # Surface source annotation when plan was served from local cache.
-    if isinstance(backend, GistTaskLayer) and backend.last_read_source == "local":
-        result["warnings"] = [
-            f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
-        ]
-
-    return result
+    return operations.read_plan(backend, plan)
 
 
-def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> dict:
+def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResult:
     """Create a new plan from a typed list of task definitions.
 
-    Returns:
-        On success: dict with ``plan_id``, ``plan_ref``, ``task_count``, and optional
-        ``warnings`` keys.  ``plan_ref`` is ``#{issue},{plan_id}`` when an issue is
-        set, or just ``plan_id`` otherwise.
+    Thin adapter: resolves the backend and delegates to dh_core.operations.
+    On artifact write failure, the operations layer returns a
+    :class:`~sam_schema.core.models.CreatePlanError`; this boundary function
+    converts it to :class:`fastmcp.exceptions.ToolError` so the consolidated
+    ``sam_plan`` tool exposes only the success model in its return schema.
 
-        On Gist write failure: dict with ``error``, ``reason``, ``plan_id``, ``issue``,
-        ``local_path``, and ``hint`` keys (structured error — MCP caller sees ``error``
-        key and knows the plan is not portable).
+    Returns:
+        :class:`~sam_schema.core.models.CreatePlanResult` on success.
+
+    Raises:
+        ToolError: When plan creation's artifact write fails. The error
+            message includes ``error``, ``reason``, and ``hint`` from the
+            structured failure model.
     """
     backend = _get_backend(plan_dir)
-    try:
-        plan_data = backend.create_plan(
-            slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
-        )
-    except ArtifactWriteError as exc:
-        # Gist write failed — return structured error (ADR-2509-5).
-        # The plan may exist locally (local_backend wrote it), but it is NOT durable.
-        _log.error("sam_plan create: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
-        return {
-            "error": "sam_plan create failed: artifact write to Gist unsuccessful",
-            "reason": exc.reason,
-            "plan_id": exc.plan_id,
-            "issue": exc.issue,
-            "local_path": None,
-            "hint": ("The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist."),
-        }
-
-    plan_id_str = plan_data["plan_id"]
-    plan_ref: str | None = (
-        (f"#{config.issue},{plan_id_str}" if config.issue is not None else plan_id_str) if plan_id_str else None
+    result = operations.create_plan(
+        backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
     )
-    result: dict[str, Any] = {"plan_id": plan_id_str, "task_count": len(plan_data["tasks"]), "plan_ref": plan_ref}
-
-    # Collect warnings: local-only non-portability + any GistTaskLayer index warnings.
-    warnings: list[str] = []
-    if config.issue is None:
-        warnings.append(
-            f"Plan {plan_id_str} has no associated issue — stored locally only. "
-            "This plan is not portable across environments and cannot be retrieved from CI "
-            "or fresh checkouts. Associate a GitHub issue to enable portability."
-        )
-
-    if isinstance(backend, GistTaskLayer) and backend.last_warnings:
-        warnings.extend(backend.last_warnings)
-
-    if warnings:
-        result["warnings"] = warnings
-
+    if isinstance(result, CreatePlanError):
+        raise ToolError(f"{result.error}: {result.reason} (hint: {result.hint})")
     return result
 
 
-def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
+def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> PaginatedResult:
     """List all plans with optional search and auto-pagination.
+
+    Thin adapter: delegates business logic to ``dh_core.operations.list_plans``
+    via a resolved backend, then applies MCP-specific token-budget
+    pagination via ``_paginate_results``.
 
     Returns:
         Paginated dict with ``items``, ``count``, ``pagination``, ``messages``,
@@ -399,101 +269,73 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> dict:
         ``goal``, ``description``, ``task_count``, ``issue``, and ``plan_ref``.
     """
     backend = _get_backend(plan_dir)
-    summaries = backend.list_plans(search=config.search)
-    all_items: list[dict[str, Any]] = [
-        {
-            "feature": s["feature"],
-            "goal": s["goal"],
-            "description": s["description"],
-            "task_count": s["task_count"],
-            "issue": s.get("issue"),
-            "plan_ref": (f"#{s['issue']},{s['plan_id']}" if s.get("issue") else s.get("plan_id")),
-        }
-        for s in summaries
-    ]
+    # Operations layer returns typed PlanSummaryModel instances; pagination is
+    # deferred to _paginate_results which applies offset/limit + token-budget
+    # paging.
+    all_items = operations.list_plans(backend, search=config.search, offset=0, limit=None)
     return _paginate_results(
         all_items, offset=config.offset, limit=config.limit, messages=[], warnings=[], errors=[], tool_name="sam_plan"
     )
 
 
-def _sam_plan_status(plan: str, plan_dir: str) -> dict:
+def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus:
     """Return plan-level progress summary including autonomy mode.
 
-    Calls ``get_plan_status`` for computed metrics and ``read_plan`` to
-    surface the ``autonomy`` field, which lives on the Plan model and is
-    not part of ``PlanStatus``.  Follows the same pattern as
-    ``_sam_plan_ready``.
+    Thin adapter that resolves the backend via ``_get_backend`` and
+    delegates to ``dh_core.operations.get_plan_status``. The returned
+    model carries ``state`` so callers can detect drafting plans.
     """
     backend = _get_backend(plan_dir)
-    status = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        return dict(_DRAFTING_MARKER_RESPONSE)
-    plan_data = backend.read_plan(plan)
-    result = dict(status)
-    result["autonomy"] = plan_data.get("autonomy", "full_auto")
-    return result
+    return operations.get_plan_status(backend, plan)
 
 
-def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> dict:
+def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyTasksResult:
     """List tasks ready for dispatch.
 
-    Calls ``get_plan_status`` first for the drafting check (single backend call),
-    then ``get_ready_tasks`` only when the plan is not in drafting state.
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.get_ready_tasks``. The operation handles the
+    drafting check and ready-task retrieval, and returns a
+    :class:`~sam_schema.core.models.ReadyTasksResult` envelope.
 
     Returns:
-        Dict with ``ready_tasks``, ``count``, ``feature``, and ``issue`` keys.
+        A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``,
+        ``count``, ``issue``, and ``state`` fields. When the plan is
+        drafting, ``state`` is ``"drafting"`` and
+        ``ready_tasks`` is empty.
     """
     backend = _get_backend(plan_dir)
-    status = backend.get_plan_status(plan)
-    if status.get("state") == PlanState.DRAFTING:
-        return dict(_DRAFTING_MARKER_RESPONSE)
-    tasks_data = backend.get_ready_tasks(plan)
-    plan_data = backend.read_plan(plan)  # needed for plan_data["issue"]
-    if config.full:
-        ready_tasks: list[dict[str, Any]] = [Task.model_validate(t).model_dump(mode="json") for t in tasks_data]
-    else:
-        ready_tasks = [
-            {
-                "id": t["id"],
-                "task": t["title"],
-                "agent": t["agent"],
-                "skills": t["skills"] or [],
-                "dependencies": t["dependencies"] or [],
-                "status": t["status"],
-                "priority": int(t["priority"]),
-            }
-            for t in tasks_data
-        ]
-    feature = status["feature"]
-    if not isinstance(feature, str):
-        raise TypeError(f"get_plan_status must return str for 'feature', got {type(feature).__name__}")
-    return {"ready_tasks": ready_tasks, "count": len(tasks_data), "feature": feature, "issue": plan_data["issue"]}
+    return operations.get_ready_tasks(backend, plan)
 
 
-def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> dict:
+def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult:
     """Update plan-level context and/or fields.
 
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates to
+    ``dh_core.operations.update_plan_fields``. The operation handles raw field
+    validation through the Plan model, backend delegation, and response assembly.
+
     Returns:
-        Dict with ``updated`` (bool) and ``address`` (plan identifier) keys.
+        :class:`~sam_schema.core.models.UpdatePlanResult` with ``updated``
+        (bool) and ``address`` (plan identifier) fields.
     """
     backend = _get_backend(plan_dir)
-    plan_fields: dict[str, Any] | None = None
-    if config.set_fields_json is not None:
-        raw_fields: dict[str, Any] = config.set_fields_json
-        validated = _validated_plan_patch(backend, plan, raw_fields)
-        # by_alias=True: raw_fields uses kebab-case keys (MCP wire convention); alias keys must match
-        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in raw_fields}
-    backend.update_plan_fields(plan, context=config.context, set_fields=plan_fields)
-    return {"updated": True, "address": plan}
+    return operations.update_plan_fields(
+        backend,
+        plan,
+        context=config.context,
+        set_fields=config.set_fields_json,
+        task_id=config.task_id,
+        append_section_name=config.append_section_name,
+        section_content=config.section_content,
+    )
 
 
-def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> dict:
+def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult:
     """Append a single task to an existing plan.
 
-    Converts ``config.task`` (a validated :class:`TaskDefinition` model) to a
-    snake_case dict via ``model_dump`` and delegates to ``backend.append_task``.
-    Pydantic handles alias normalisation (kebab-case → snake_case) at the MCP
-    boundary; no YAML parsing or re-normalisation is required downstream.
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.append_task``. The operation handles
+    ``config.task`` conversion and ``backend.append_task`` delegation.
 
     See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
 
@@ -503,18 +345,23 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         plan_dir: Plan directory path passed through to ``_get_backend``.
 
     Returns:
-        Result dict from ``backend.append_task`` — shape: ``{"appended": True, "task_id": ...}``.
+        :class:`~sam_schema.core.models.AppendTaskResult` — shape:
+        ``appended=True``, ``task_id=...``.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
     """
     backend = _get_backend(plan_dir)
-    return backend.append_task(plan, config.task)
+    return operations.append_task(backend, plan, config.task)
 
 
-def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
+def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
     """Transition a plan from drafting state to ready state.
+
+    Thin adapter: resolves the backend via ``_get_backend`` and delegates
+    to ``dh_core.operations.finalize_plan``. The operation handles the
+    drafting → ready state transition via ``backend.finalize_plan``.
 
     See FinalizePlanConfig and #1770 for the ADR.
 
@@ -522,34 +369,11 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> dict:
     no caller-provided issue is needed at finalize time.
 
     Returns:
-        Result dict from ``backend.finalize_plan`` — shape: ``{"finalized": True, "state": "ready"}``.
+        :class:`~sam_schema.core.models.FinalizePlanResult` — shape:
+        ``finalized=True``, ``state="ready"``.
     """
     backend = _get_backend(plan_dir)
-    return backend.finalize_plan(plan)
-
-
-def _require_plan(plan: str | None, action: str) -> str:
-    """Narrow ``plan: str | None`` to ``str`` for actions that require it.
-
-    The ``_SAM_PLAN_REQUIRED_ACTIONS`` guard in ``sam_plan`` raises ``ToolError``
-    before the match statement when ``plan`` is ``None`` for a required action,
-    so this branch is unreachable in normal execution.  It is retained to satisfy
-    the type checker without using ``cast`` or ``assert``.
-
-    Args:
-        plan: The optional plan address from the tool call.
-        action: Action name, used only in the error message.
-
-    Returns:
-        The validated non-None plan address string.
-
-    Raises:
-        ToolError: If ``plan`` is ``None`` (unreachable after the outer guard).
-    """
-    if plan is None:  # pragma: no cover
-        msg = f"sam_plan: action='{action}' requires the 'plan' parameter (e.g., plan='P1')."
-        raise ToolError(msg)
-    return plan
+    return operations.finalize_plan(backend, plan)
 
 
 @mcp.tool(
@@ -575,7 +399,16 @@ def sam_plan(
             )
         ),
     ] = None,
-) -> dict:
+) -> (
+    CreatePlanResult
+    | PlanStatus
+    | ReadyTasksResult
+    | ReadResult
+    | UpdatePlanResult
+    | AppendTaskResult
+    | FinalizePlanResult
+    | PaginatedResult
+):
     """Consolidated plan-level operations for SAM.
 
     Delegates to the appropriate plan operation based on ``config.action``.
@@ -600,7 +433,7 @@ def sam_plan(
         plan: Plan address component. Required for read, status, ready, update, append_task, finalize actions.
 
     Returns:
-        Response dict whose shape depends on the action (see individual action docs).
+        Response model whose shape depends on the action (see individual action docs).
 
     Raises:
         ToolError: When ``plan`` is None for an action that requires it.
@@ -658,7 +491,7 @@ def sam_task(
         TaskActionConfig, Field(description="Action config. Set 'action' to: read | claim | state | update")
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
-) -> dict:
+) -> TaskAssignment | ClaimResult | StateResult | UpdateTaskResult:
     """Read, claim, update state, or update fields for a specific task.
 
     # TRADE-OFF: readonly annotation loss
@@ -678,80 +511,33 @@ def sam_task(
         plan_dir: Path to the directory containing plan files.
 
     Returns:
-        Action-specific dict. See individual action descriptions.
+        Action-specific Pydantic model. See individual action descriptions.
     """
     backend = _get_backend(plan_dir)
 
     match config.action:
         case "read":
-            plan_data = backend.read_plan(plan)
-            task_data = backend.read_task(plan, task)
-            task_model = Task.model_validate(task_data)
-            assignment = TaskAssignment(
-                plan_number=plan_data.get("plan_id", plan),
-                plan_slug=plan_data.get("feature") or None,
-                plan_goal=plan_data.get("goal") or None,
-                plan_context=plan_data.get("context") or None,
-                plan_acceptance_criteria=plan_data.get("acceptance_criteria")
-                or plan_data.get("acceptance-criteria")
-                or None,
-                task=task_model,
-            )
-            return assignment.model_dump(mode="json", by_alias=True, exclude_none=True)
+            return operations.read_task(backend, plan, task)
 
         case "claim":
-            # ADR-2509-3: GistTaskLayer raises ConcurrentClaimUnsupportedError for
-            # local-only plans.  _claim_task_via_backend falls back to the local
-            # backend for single-agent workflows and returns a warning string.
-            claimed, claim_warning = _claim_task_via_backend(backend, plan, task)
-            if not claimed:
-                try:
-                    task_data = backend.read_task(plan, task)
-                    current_status = task_data["status"]
-                except (PlanNotFoundError, TaskNotFoundError, SamError):
-                    return {
-                        "claimed": False,
-                        "error": f"Cannot claim task '{task}': task is not available for claiming.",
-                    }
-                else:
-                    return {
-                        "claimed": False,
-                        "error": (
-                            f"Cannot claim task '{task}': expected status 'not-started' but found '{current_status}'."
-                        ),
-                    }
-            result: dict[str, object] = {"claimed": True, "task_id": task, "started": datetime.now(UTC).isoformat()}
-            if claim_warning is not None:
-                result["warnings"] = [claim_warning]
-            return result
+            return operations.claim_task(backend, plan, task)
 
         case "state":
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
-            backend.update_task_status(plan, task, config.status)
-            if config.status == TaskStatus.FAILED:
-                plan_data = backend.read_plan(plan)
-                tasks = [Task.model_validate(task_data) for task_data in plan_data.get("tasks", [])]
-                graph = DependencyGraph(tasks)
-                skipped: list[str] = graph.mark_downstream_skipped(task)
-                for skipped_task_id in skipped:
-                    backend.update_task_status(plan, skipped_task_id, TaskStatus.SKIPPED)
-                    backend.update_task_fields(plan, skipped_task_id, {"reason": f"skipped: upstream {task} failed"})
-                return {"id": task, "status": config.status, "skipped_downstream": skipped}
-            return {"id": task, "status": config.status}
+            return operations.update_task_status(backend, plan, task, config.status)
 
         case "update":
             if not isinstance(config, UpdateTaskConfig):
                 raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
-            update_config = config
-            if update_config.set_fields_json is not None:
-                validated_task = _validated_task_patch(backend, plan, task, update_config.set_fields_json)
-                backend.update_task(plan, validated_task)
-            if update_config.append_section is not None:
-                backend.append_task_section(
-                    plan, task, update_config.append_section, update_config.section_content or ""
-                )
-            return {"updated": True, "address": f"{plan}/{task}"}
+            return operations.update_task_fields(
+                backend,
+                plan,
+                task,
+                set_fields_json=config.set_fields_json,
+                append_section=config.append_section,
+                section_content=config.section_content,
+            )
 
         case _:  # pragma: no cover
             msg = f"sam_task: unhandled action '{config.action}'"
@@ -780,7 +566,7 @@ def sam_active_task(
             )
         ),
     ] = None,
-) -> dict:
+) -> ActiveTaskGetResult | ActiveTaskSetResult | ActiveTaskUpdateResult | ActiveTaskClearResult:
     """Session-scoped active task context management.
 
     Parks a task address in session-scoped storage so subsequent operations
@@ -801,7 +587,7 @@ def sam_active_task(
             do not need explicit session isolation).
 
     Returns:
-        Action-specific dict. See individual action descriptions.
+        Action-specific Pydantic model. See individual action descriptions.
 
     Raises:
         ToolError: When ``action="update"`` and no active task has been set.
@@ -811,20 +597,18 @@ def sam_active_task(
 
     match config.action:
         case "get":
-            active = ctx_backend.get_active_task(resolved_session)
-            if active is None:
-                return {"active_task": None}
-            return {"active_task": active.model_dump(mode="json")}
+            return operations.get_active_task(ctx_backend, resolved_session)
 
         case "set":
             if not isinstance(config, SetActiveTaskConfig):
                 raise TypeError(f"Expected SetActiveTaskConfig, got {type(config).__name__}")
-            active = ctx_backend.set_active_task(
-                resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
+            return operations.set_active_task(
+                ctx_backend, resolved_session, config.plan, config.task, config.plan_dir, config.parent_issue_number
             )
-            return {"active_task": active.model_dump(mode="json")}
 
         case "update":
+            if not isinstance(config, UpdateActiveTaskConfig):
+                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
             active = ctx_backend.get_active_task(resolved_session)
             if active is None:
                 msg = (
@@ -832,29 +616,21 @@ def sam_active_task(
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
                 raise ToolError(msg)
-            if not isinstance(config, UpdateActiveTaskConfig):
-                raise TypeError(f"Expected UpdateActiveTaskConfig, got {type(config).__name__}")
-            update_config = config
-            # ActiveTaskContext stores task_file_path and task_id.
-            # Derive plan_id and plan_dir from the path rather than storing them separately.
-            active_plan_dir = str(Path(active.task_file_path).parent)
-            active_plan_id = Path(active.task_file_path).stem.split("-")[0]
-            active_task_id = active.task_id
-            task_backend = _get_backend(active_plan_dir)
-            if update_config.set_fields_json is not None:
-                validated_task = _validated_task_patch(
-                    task_backend, active_plan_id, active_task_id, update_config.set_fields_json
-                )
-                task_backend.update_task(active_plan_id, validated_task)
-            if update_config.append_section is not None:
-                task_backend.append_task_section(
-                    active_plan_id, active_task_id, update_config.append_section, update_config.section_content or ""
-                )
-            return {"updated": True, "address": f"{active_plan_id}/{active_task_id}"}
+            if active.plan_dir is None:
+                task_backend = _get_backend(str(Path(active.task_file_path).parent))
+            else:
+                task_backend = _get_backend(active.plan_dir)
+            return operations.update_active_task(
+                ctx_backend,
+                resolved_session,
+                task_backend,
+                set_fields_json=config.set_fields_json,
+                append_section=config.append_section,
+                section_content=config.section_content,
+            )
 
         case "clear":
-            removed = ctx_backend.clear_active_task(resolved_session)
-            return {"cleared": removed}
+            return operations.clear_active_task(ctx_backend, resolved_session)
 
         case _:  # pragma: no cover
             msg = f"sam_active_task: unhandled action '{config.action}'"

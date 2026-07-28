@@ -175,7 +175,7 @@ def get_sync_state() -> SyncState:
     Returns:
         The module-level ``SyncState`` instance.
     """
-    global _state  # noqa: PLW0603 — intentional module-level singleton
+    global _state  # ruff: ignore[global-statement] — intentional module-level singleton
     if _state is None:
         _state = SyncState()
     return _state
@@ -187,7 +187,7 @@ def reset_sync_state() -> None:
     Intended for tests only.  Must be called from within a running asyncio
     event loop so the new ``asyncio.Lock`` binds to the correct loop.
     """
-    global _state  # noqa: PLW0603 — intentional module-level singleton
+    global _state  # ruff: ignore[global-statement] — intentional module-level singleton
     _state = SyncState()
 
 

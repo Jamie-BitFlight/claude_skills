@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeGuard
 
 import holoviews as hv
-import hvplot.pandas  # noqa: F401
+import hvplot.pandas  # ruff: ignore[unused-import]
 import pandas as pd
 import panel as pn
 import tornado.web
@@ -404,7 +404,7 @@ def _create_app(csv_path: Path) -> pn.template.FastListTemplate:
 
     def _refresh() -> None:
         """Check if the CSV has changed and rebuild the dashboard if so."""
-        global _dashboard_csv_rows  # noqa: PLW0603
+        global _dashboard_csv_rows  # ruff: ignore[global-statement]
         try:
             current_mtime = csv_path.stat().st_mtime if csv_path.exists() else 0.0
         except OSError:
@@ -508,7 +508,7 @@ def _reset_dashboard_state() -> None:
     ``None`` and the ``open_dashboard`` MCP tool reports the dashboard
     as not running.
     """
-    global _dashboard_port, _dashboard_start_time, _dashboard_csv_path, _dashboard_csv_rows  # noqa: PLW0603
+    global _dashboard_port, _dashboard_start_time, _dashboard_csv_path, _dashboard_csv_rows  # ruff: ignore[global-statement]
     with _state_lock:
         _dashboard_port = None
         _dashboard_start_time = None
@@ -623,7 +623,7 @@ def start_dashboard(csv_path: Path | None = None) -> threading.Thread | None:
         The daemon ``threading.Thread`` running the server, or ``None``
         if the dashboard could not be started.
     """
-    global _dashboard_port, _dashboard_start_time, _dashboard_csv_path, _dashboard_csv_rows  # noqa: PLW0603
+    global _dashboard_port, _dashboard_start_time, _dashboard_csv_path, _dashboard_csv_rows  # ruff: ignore[global-statement]
 
     with _state_lock:
         if _dashboard_port is not None:

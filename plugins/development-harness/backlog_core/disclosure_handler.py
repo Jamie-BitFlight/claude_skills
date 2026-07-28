@@ -101,7 +101,7 @@ class DisclosureRequestParser:
     def parse(
         self,
         *,
-        map: bool = False,  # noqa: A002 — shadows builtin; matches MCP parameter name exactly
+        map: bool = False,  # ruff: ignore[builtin-argument-shadowing] — shadows builtin; matches MCP parameter name exactly
         navigate: str | None = None,
         head: int | None = None,
         skip_tokens: int = 0,
