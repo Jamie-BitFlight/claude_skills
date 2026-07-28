@@ -77,22 +77,7 @@ _LIST_TOKEN_BUDGET = 4_400
 # caller can request only the sections it needs.
 _VIEW_TOKEN_BUDGET = 4_000
 _GROOMED_SECTION_TYPE = "groomed"
-_enc: list[tiktoken.Encoding] = []
-
-
-def _get_encoding() -> tiktoken.Encoding:
-    """Lazily initialise the tiktoken encoding on first use.
-
-    Module-level initialisation triggers a network download on fresh CI
-    runners (``openaipublic.blob.core.windows.net``), which the network
-    guard blocks.  Deferring to first call avoids the import-time I/O.
-
-    Returns:
-        The cached ``cl100k_base`` tiktoken encoding.
-    """
-    if not _enc:
-        _enc.append(tiktoken.get_encoding("cl100k_base"))
-    return _enc[0]
+_enc: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
 
 
 def _token_count(serialised: str) -> int:
@@ -104,7 +89,7 @@ def _token_count(serialised: str) -> int:
     Returns:
         Token count as an integer.
     """
-    return len(_get_encoding().encode(serialised))
+    return len(_enc.encode(serialised))
 
 
 def _view_payload_token_count(full_response: dict[str, object]) -> int:
