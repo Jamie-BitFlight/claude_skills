@@ -28,7 +28,7 @@ if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
 import backlog_core.models as _bc_models
-from backlog_core.backend_protocol import set_config as _set_bp_config
+from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
 from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogConfig as _ModelsBacklogConfig
@@ -69,7 +69,7 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
 
 
 @pytest.fixture
-def dh_env(tmp_path: Path) -> dict[str, str]:
+def dh_env(tmp_path: Path):
     """Provide an isolated DH_STATE_HOME with memory backends for both transports.
 
     The CLI subprocess reads BACKLOG_BACKEND/TASKBACKEND env vars.  The
@@ -88,6 +88,7 @@ def dh_env(tmp_path: Path) -> dict[str, str]:
     # don't auto-init a GitHubBackend and hit the network.
     _set_bp_config(_BPBacklogConfig(backend=InMemoryBackend()))
     existing = _bc_models._config
+    saved_bc_config = existing
     _bc_models._config = _ModelsBacklogConfig(
         repo_root=real_root, backlog_dir=bd, default_repo=existing.default_repo if existing is not None else ""
     )
@@ -100,7 +101,10 @@ def dh_env(tmp_path: Path) -> dict[str, str]:
         "GITHUB_TOKEN": "",
         "GH_TOKEN": "",
     })
-    return env
+    yield env
+    # Teardown: reset the singleton so downstream tests get a fresh config
+    _reset_bp_config()
+    _bc_models._config = saved_bc_config
 
 
 # ---------------------------------------------------------------------------
