@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from models import StepDefinition, StepExtension, ValidationRule
 from registry_loader import RegistryLoader
 

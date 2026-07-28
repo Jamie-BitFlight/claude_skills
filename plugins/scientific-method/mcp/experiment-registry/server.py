@@ -23,8 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from models import StepExtension
 from pydantic import Field
+
+from models import StepExtension
 from registry_loader import RegistryLoader
 from state_manager import StateManager
 
