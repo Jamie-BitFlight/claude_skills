@@ -20,13 +20,7 @@ from pathlib import Path
 
 import pytest
 
-# conftest.py lives in the plugin root (same dir as tests/). In CI, pytest
-# runs from the repo root and `from conftest import ...` resolves to the
-# wrong module. Use sys.path to find the plugin-local conftest explicitly.
-_plugin_root = Path(__file__).resolve().parent.parent
-if str(_plugin_root) not in sys.path:
-    sys.path.insert(0, str(_plugin_root))
-from conftest import NetworkBlocked
+from tests.network_blocked import NetworkBlocked
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 

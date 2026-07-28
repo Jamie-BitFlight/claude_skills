@@ -45,13 +45,7 @@ _state = {"allowed": False}
 # without ``# type: ignore`` suppressions.
 _network_patch = pytest.MonkeyPatch()
 
-
-class NetworkBlocked(RuntimeError):
-    """Raised when a test attempts real network I/O.
-
-    The test suite blocks outbound connections at the socket layer. Mock the
-    client at its call boundary instead of reaching the live service.
-    """
+from tests.network_blocked import NetworkBlocked
 
 
 def _is_local(address: _Address) -> bool:
