@@ -45,27 +45,28 @@ _state = {"allowed": False}
 # without ``# type: ignore`` suppressions.
 _network_patch = pytest.MonkeyPatch()
 
-# tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
-# on first use when there's no local cache.  Fresh CI runners have no cache,
-# so the network guard blocks the download and crashes every test that
-# imports backlog_core.server.  Mock get_encoding before any import triggers
-# it so the encoding object exists without hitting the network.
 import tiktoken as _tk
 from tests.network_blocked import NetworkBlocked
 
-_mock_enc = _tk.Encoding(
-    name="cl100k_base",
-    pat_str=r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""",
-    mergeable_ranks={bytes([i]): i for i in range(256)},
-    special_tokens={},
-)
+# tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
+# on first use when there's no local cache.  Fresh CI runners have no cache,
+# so the network guard blocks the download.  Try to load the real encoding
+# first; if that fails (no cache + network blocked), fall back to a byte-level
+# mock that can encode any string without the real BPE tables.
+try:
+    _tk.get_encoding("cl100k_base")
+except OSError:
+    _mock_enc = _tk.Encoding(
+        name="cl100k_base",
+        pat_str=r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""",
+        mergeable_ranks={bytes([i]): i for i in range(256)},
+        special_tokens={},
+    )
 
+    def _mock_get_encoding(name: str, **kwargs: object) -> _tk.Encoding:
+        return _mock_enc
 
-def _mock_get_encoding(name: str, **kwargs: object) -> _tk.Encoding:
-    return _mock_enc
-
-
-_tk.get_encoding = _mock_get_encoding
+    _tk.get_encoding = _mock_get_encoding
 
 
 def _is_local(address: _Address) -> bool:
