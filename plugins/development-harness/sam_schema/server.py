@@ -217,7 +217,7 @@ def _require_plan(plan: str | None, action: str) -> str:
     return plan
 
 
-def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
+def _sam_plan_read(plan: str, plan_dir: str) -> dict[str, object]:
     """Return Plan fields for the given plan address.
 
     Thin adapter: resolves the backend and delegates to dh_core.operations.
@@ -227,7 +227,13 @@ def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     are added at the top level when present.
     """
     backend = _get_backend(plan_dir)
-    return operations.read_plan(backend, plan)
+    result = operations.read_plan(backend, plan)
+    flat: dict[str, object] = result.plan.model_dump(mode="json", exclude_none=True)
+    flat["gaps"] = [gap.model_dump(mode="json") for gap in result.gaps]
+    flat["warnings"] = result.warnings
+    flat["source_format"] = result.source_format
+    flat["source_path"] = str(result.source_path)
+    return flat
 
 
 def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResult:
@@ -408,6 +414,7 @@ def sam_plan(
     | AppendTaskResult
     | FinalizePlanResult
     | PaginatedResult
+    | dict[str, object]
 ):
     """Consolidated plan-level operations for SAM.
 

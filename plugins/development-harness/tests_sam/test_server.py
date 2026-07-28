@@ -37,7 +37,6 @@ from sam_schema.core.models import (
     Plan,
     PlanStatus,
     Priority,
-    ReadResult,
     ReadyTasksResult,
     StateResult,
     Task,
@@ -535,11 +534,11 @@ def test_sam_read_without_task_returns_plan_fields(plan_dir_str: str) -> None:
     """sam_plan(read) without task param returns Plan fields with no TaskAssignment wrapper."""
     # Act
     result = sam_plan(config=ReadPlanConfig(), plan="P1", plan_dir=plan_dir_str)
-    assert isinstance(result, ReadResult)
+    assert isinstance(result, dict)
 
     # Assert
-    assert result.plan.feature
-    assert not hasattr(result, "task") or getattr(result, "task", None) is None
+    assert "feature" in result
+    assert "task" not in result
 
 
 def test_sam_read_with_missing_task_returns_error(plan_dir_str: str) -> None:
