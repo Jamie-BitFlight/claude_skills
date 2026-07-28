@@ -174,8 +174,8 @@ async def test_plan_create_read_parity(dh_env: dict[str, str], tmp_path: Path) -
     mcp_result = await call_mcp_tool(
         _sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id, "plan_dir": plan_dir}
     )
-    assert mcp_result["feature"] == "cli-plan"
-    assert mcp_result["goal"] == "CLI goal"
+    assert mcp_result["plan"]["feature"] == "cli-plan"
+    assert mcp_result["plan"]["goal"] == "CLI goal"
 
     # MCP creates, CLI reads
     mcp_create = await call_mcp_tool(
