@@ -706,7 +706,7 @@ class LocalYamlTaskProvider:
 
         new_tasks = [*plan.tasks, task]
         updated_plan = plan.model_copy(update={"tasks": new_tasks})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
 
         return {"appended": True, "task_id": task.id}
 
@@ -735,7 +735,7 @@ class LocalYamlTaskProvider:
             return {"finalized": True, "state": PlanState.READY}
 
         updated_plan = plan.model_copy(update={"state": PlanState.READY})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != detect.FormatType.DIRECTORY))
         # Invalidate task-ID cache so subsequent appends read fresh state.
         self._task_id_cache.pop(plan_id, None)
 
