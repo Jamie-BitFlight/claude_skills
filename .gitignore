@@ -39,6 +39,10 @@ sessions/.archived/
 # Claude Code scheduled tasks lock
 .claude/scheduled_tasks.lock
 
+# Network guard subprocess probe scratch (test_network_guard.py)
+**/.guard_probes/
+
+
 # Local settings with machine-specific paths
 .claude/settings.local.json
 
