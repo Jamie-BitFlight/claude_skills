@@ -24,7 +24,7 @@ from sam_schema.core.backends._utils import validate_appended_task
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
-from sam_schema.readers.detect import FormatDetectionError, read_plan as _detect_read_plan
+from sam_schema.readers.detect import FormatDetectionError, FormatType, read_plan as _detect_read_plan
 from sam_schema.readers.normalize import normalize_plan
 from sam_schema.writers.yaml_writer import (
     _atomic_write,
@@ -631,7 +631,7 @@ class LocalYamlTaskProvider:
 
         updated_tasks = [task if t.id == task.id else t for t in plan.tasks]
         updated_plan = plan.model_copy(update={"tasks": updated_tasks})
-        write_plan(updated_plan, path, force_single=True)
+        write_plan(updated_plan, path, force_single=(result.source_format != FormatType.DIRECTORY))
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append markdown content to a named section of a task's context_notes.
