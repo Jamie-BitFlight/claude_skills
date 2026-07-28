@@ -30,7 +30,14 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Lint with Ruff
-        run: uv run -q prek run ruff --all-files
+        run: |
+          uv run ruff --version
+          echo '--- pyproject.toml [tool.ruff] ---'
+          uv run python -c "import tomllib, pathlib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); print(tomllib.dumps({'tool': {'ruff': d['tool']['ruff']}}))" || true
+          echo '--- ruff direct check on suspect files ---'
+          uv run ruff check --select I --diff plugins/scientific-method/mcp/experiment-registry/state_manager.py plugins/scientific-method/mcp/experiment-registry/tests/test_complete_step_integration.py plugins/scientific-method/mcp/experiment-registry/tests/test_validators.py || true
+          echo '--- prek ruff with diff ---'
+          uv run -q prek run ruff --all-files --show-diff-on-failure
 
       - name: Check formatting with Ruff
         run: uv run -q prek run ruff-format --all-files
