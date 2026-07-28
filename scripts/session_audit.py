@@ -105,7 +105,7 @@ def _fmt_size(chars: int) -> str:
     return str(chars)
 
 
-def _tool_result_size(content: Any) -> int:  # noqa: ANN401
+def _tool_result_size(content: Any) -> int:  # ruff: ignore[any-type]
     """Compute character size of a tool_result content value.
 
     Returns:
@@ -116,7 +116,7 @@ def _tool_result_size(content: Any) -> int:  # noqa: ANN401
     return len(json.dumps(content))
 
 
-def _input_hash(tool_name: str, input_val: Any) -> str:  # noqa: ANN401
+def _input_hash(tool_name: str, input_val: Any) -> str:  # ruff: ignore[any-type]
     """Canonical hash for duplicate detection using (tool_name, sorted input json).
 
     Returns:
@@ -127,7 +127,7 @@ def _input_hash(tool_name: str, input_val: Any) -> str:  # noqa: ANN401
     else:
         canonical = json.dumps(input_val)
     key = f"{tool_name}:{canonical}"
-    return hashlib.md5(key.encode()).hexdigest()  # noqa: S324
+    return hashlib.md5(key.encode()).hexdigest()  # ruff: ignore[hashlib-insecure-hash-function]
 
 
 def _resolve_project_dir(path_arg: str) -> Path:

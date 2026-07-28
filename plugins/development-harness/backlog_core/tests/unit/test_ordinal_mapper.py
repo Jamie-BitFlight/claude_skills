@@ -62,7 +62,7 @@ def _real_cl100k_available() -> bool:
         return False
     try:
         return len(enc.encode("hello")) == 1
-    except Exception:  # noqa: BLE001 — stub/real encode() surface is narrow
+    except Exception:  # ruff: ignore[blind-except] — stub/real encode() surface is narrow
         return False
 
 

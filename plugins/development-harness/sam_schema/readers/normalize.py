@@ -40,7 +40,7 @@ _CANONICAL_FORMATS: frozenset[FormatType] = frozenset({FormatType.PURE_YAML, For
 _VALID_STATUSES: frozenset[str] = frozenset(s.value for s in TaskStatus)
 
 
-def _normalize_status(raw: Any) -> str:  # noqa: ANN401
+def _normalize_status(raw: Any) -> str:  # ruff: ignore[any-type]
     """Normalize a raw status value to a canonical TaskStatus string.
 
     Args:
@@ -330,7 +330,7 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
     )
     raw_structured: list[AcceptanceCriterion] = [AcceptanceCriterion.model_validate(item) for item in raw_ac]
 
-    def _coerce_str(value: Any) -> str | None:  # noqa: ANN401
+    def _coerce_str(value: Any) -> str | None:  # ruff: ignore[any-type]
         """Coerce a YAML value to ``str | None``.
 
         YAML lists (e.g. ``acceptance-criteria`` written as a bullet list) are

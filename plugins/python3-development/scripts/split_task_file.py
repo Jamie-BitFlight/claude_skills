@@ -223,7 +223,7 @@ def _looks_like_yaml_frontmatter(section: str) -> bool:
         return False
     # Check if most lines look like YAML key: value
     yaml_line_count = sum(1 for line in lines[:5] if re.match(r"^[a-z_-]+\s*:", line))
-    return yaml_line_count >= 2  # noqa: PLR2004
+    return yaml_line_count >= 2  # ruff: ignore[magic-value-comparison]
 
 
 def parse_tasks_with_body(file_path: Path) -> list[TaskWithBody]:

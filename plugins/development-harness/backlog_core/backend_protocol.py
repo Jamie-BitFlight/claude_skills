@@ -106,7 +106,7 @@ def get_config() -> BacklogConfig:
     Raises:
         ValueError: When the resolved backend name is not recognised.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     if _active_config is None:
         _active_config = BacklogConfig(backend=create_backend())
     return _active_config
@@ -118,7 +118,7 @@ def set_config(config: BacklogConfig) -> None:
     Args:
         config: BacklogConfig instance wrapping the chosen backend implementation.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = config
 
 
@@ -128,7 +128,7 @@ def reset_config() -> None:
     Intended for test teardown — call this between tests to force the next
     ``get_config()`` call to re-run backend selection.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = None
 
 

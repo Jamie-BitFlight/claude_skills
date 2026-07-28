@@ -505,7 +505,7 @@ def fetch_checksums(
     checksums: dict[str, str] = {}
     for line in response.text.strip().splitlines():
         parts = line.split()
-        if len(parts) == 2:  # noqa: PLR2004
+        if len(parts) == 2:  # ruff: ignore[magic-value-comparison]
             sha256_hex, filename = parts
             checksums[filename] = sha256_hex
 

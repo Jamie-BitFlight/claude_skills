@@ -376,7 +376,7 @@ class TestImportNoCycles:
 
     def test_importable(self) -> None:
         """github_sync module is importable without errors."""
-        import backlog_core.github_sync  # noqa: F401
+        import backlog_core.github_sync  # ruff: ignore[unused-import]
 
     def test_public_functions_importable(self) -> None:
         """All three public functions are importable from backlog_core.github_sync."""

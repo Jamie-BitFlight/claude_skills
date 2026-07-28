@@ -31,7 +31,7 @@ def make_yaml() -> YAML:
     return _YAML_RT
 
 
-def load_yaml(content: str) -> Any:  # noqa: ANN401
+def load_yaml(content: str) -> Any:  # ruff: ignore[any-type]
     """Parse YAML text using ruamel.yaml round-trip mode.
 
     Args:
@@ -50,7 +50,7 @@ def load_yaml(content: str) -> Any:  # noqa: ANN401
         raise ValueError(msg) from exc
 
 
-def coerce_to_plain(obj: Any) -> Any:  # noqa: ANN401
+def coerce_to_plain(obj: Any) -> Any:  # ruff: ignore[any-type]
     """Recursively coerce ruamel.yaml comment-map/seq objects to plain Python types.
 
     ruamel.yaml round-trip mode returns ``CommentedMap`` and ``CommentedSeq``

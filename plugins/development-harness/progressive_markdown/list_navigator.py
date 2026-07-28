@@ -585,7 +585,7 @@ def paginate_results(
         # Delegate to the shared binary-search kernel.
         # ProgressiveDisclosure uses the module-level TOKEN_BUDGET and cl100k_base.
         pd = ProgressiveDisclosure(page_items, tool_name=tool_name)
-        effective_limit = pd._auto_page_size(page_items)  # noqa: SLF001
+        effective_limit = pd._auto_page_size(page_items)  # ruff: ignore[private-member-access]
 
     page = page_items[:effective_limit]
     has_more = (offset + len(page)) < total

@@ -236,7 +236,7 @@ class BeadsBackend:
             Beads nanoid string (e.g. ``"bd-a3f8"``) on success, or ``None``
             when ``bd`` is unavailable or creation fails.
         """
-        from backlog_core.models import Output  # noqa: PLC0415
+        from backlog_core.models import Output  # ruff: ignore[import-outside-top-level]
 
         out = output or Output()
         bd_type = _beads_type_for_item_type(item.item_type or "task")

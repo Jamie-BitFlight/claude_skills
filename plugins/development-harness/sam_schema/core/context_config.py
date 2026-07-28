@@ -87,7 +87,7 @@ def set_context_config(config: ContextConfig) -> None:
     Args:
         config: ContextConfig instance wrapping the chosen backend implementation.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = config
 
 
@@ -97,7 +97,7 @@ def reset_context_config() -> None:
     Intended for test teardown — call this between tests to force the next
     ``get_context_config()`` call to raise rather than returning a stale config.
     """
-    global _active_config  # noqa: PLW0603
+    global _active_config  # ruff: ignore[global-statement]
     _active_config = None
 
 

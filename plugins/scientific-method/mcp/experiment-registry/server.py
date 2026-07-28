@@ -208,7 +208,7 @@ def start_experiment(
         if first_step_def
         else None,
         "total_steps": len(state.merged_steps),
-        "state_path": str(manager._state_path(state.id)),  # noqa: SLF001
+        "state_path": str(manager._state_path(state.id)),  # ruff: ignore[private-member-access]
     }
 
 
@@ -442,7 +442,7 @@ def get_experiment_summary(
     except ValueError as exc:
         raise ToolError(str(exc)) from exc
 
-    state_path = manager._state_path(experiment_id)  # noqa: SLF001
+    state_path = manager._state_path(experiment_id)  # ruff: ignore[private-member-access]
     return {**summary, "state_file_path": str(state_path)}
 
 

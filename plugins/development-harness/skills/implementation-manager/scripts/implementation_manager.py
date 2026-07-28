@@ -854,8 +854,8 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
         sys.stderr.write("WARNING: backlog_core not found — cannot fetch from GitHub. Falling back to local files.\n")
         return None
 
-    import backlog_core.gh_client as _gh  # noqa: PLC0415
-    import backlog_core.parsing as _parsing  # noqa: PLC0415
+    import backlog_core.gh_client as _gh  # ruff: ignore[import-outside-top-level]
+    import backlog_core.parsing as _parsing  # ruff: ignore[import-outside-top-level]
 
     repo = _gh.try_get_github()
     if repo is None:

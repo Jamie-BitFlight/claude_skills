@@ -90,7 +90,7 @@ def _dh_user_root_path() -> Path:
         Path to the user-level .dh directory.
     """
     try:
-        return _dh_paths._dh_user_root()  # noqa: SLF001
+        return _dh_paths._dh_user_root()  # ruff: ignore[private-member-access]
     except (FileNotFoundError, RuntimeError):
         return Path.home() / ".dh"
 

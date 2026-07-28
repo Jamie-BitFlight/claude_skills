@@ -387,14 +387,14 @@ class GistTaskLayer:
         issue: int | None = None
         try:
             issue = self._plan_index.resolve(plan_id)
-        except Exception:  # noqa: BLE001 — plan_index.resolve delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
+        except Exception:  # ruff: ignore[blind-except] — plan_index.resolve delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
             _log.warning("GistTaskLayer.read_plan: plan_index.resolve failed for %s — falling back to local", plan_id)
 
         # Steps 2-3: Gist-first attempt when issue is known.
         if issue is not None:
             try:
                 yaml_content = self._artifact_client.read(issue)
-            except Exception:  # noqa: BLE001 — artifact_client.read wraps GitHub API calls; requests transport and authentication exceptions are not enumerable from this call site
+            except Exception:  # ruff: ignore[blind-except] — artifact_client.read wraps GitHub API calls; requests transport and authentication exceptions are not enumerable from this call site
                 yaml_content = None
                 _log.warning(
                     "GistTaskLayer.read_plan: artifact_client.read failed for %s (issue #%d) — falling back to local",
@@ -517,7 +517,7 @@ class GistTaskLayer:
         index_entries: list[PlanIndexEntry] = []
         try:
             index_entries = self._plan_index.list_all()
-        except Exception:  # noqa: BLE001 — plan_index.list_all delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
+        except Exception:  # ruff: ignore[blind-except] — plan_index.list_all delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
             _log.warning("GistTaskLayer.list_plans: plan_index.list_all() failed — listing local plans only")
 
         # Step 2: fetch local plans (search+pagination handled after merge).
@@ -591,7 +591,7 @@ class GistTaskLayer:
         """
         try:
             return self._plan_index.resolve(plan_id)
-        except Exception:  # noqa: BLE001 — plan_index.resolve delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
+        except Exception:  # ruff: ignore[blind-except] — plan_index.resolve delegates to ruamel.yaml and Gist API; network and ruamel internal exception types are not enumerable from this call site
             _log.warning(
                 "GistTaskLayer._resolve_issue: plan_index.resolve failed for %s — treating as local-only", plan_id
             )

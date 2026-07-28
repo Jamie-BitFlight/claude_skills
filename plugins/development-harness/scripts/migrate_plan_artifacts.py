@@ -341,7 +341,7 @@ def register_one(
     Returns:
         Human-readable outcome string describing the registration result.
     """
-    assert candidate.issue is not None  # caller must check  # noqa: S101
+    assert candidate.issue is not None  # caller must check  # ruff: ignore[assert]
 
     agent = _AGENT_BY_TYPE.get(candidate.artifact_type, "migration-script")
     entry = ArtifactEntry(
@@ -370,7 +370,7 @@ def register_one(
         raise ValueError(msg)
 
     # Get current manifest, upsert entry, persist
-    assert provider is not None  # noqa: S101 — guarded by dry_run early return above
+    assert provider is not None  # ruff: ignore[assert] — guarded by dry_run early return above
     manifest = provider.get_manifest(candidate.issue)
     updated = registry.register(manifest, entry)
     provider.set_manifest(candidate.issue, updated)
@@ -448,12 +448,12 @@ def _run_registrations(
     failed = 0
     log("--- Registration ---")
     for c in actionable:
-        assert c.issue is not None  # ensured by caller filter  # noqa: S101
+        assert c.issue is not None  # ensured by caller filter  # ruff: ignore[assert]
         try:
             if dry_run:
                 outcome = register_one(None, registry, c, dry_run=True)
             else:
-                assert provider is not None  # noqa: S101
+                assert provider is not None  # ruff: ignore[assert]
                 outcome = register_one(provider, registry, c, dry_run=False)
             log(f"  {c.rel_path}: {outcome}")
             registered += 1

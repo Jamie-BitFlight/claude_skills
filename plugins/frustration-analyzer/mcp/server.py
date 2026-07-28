@@ -37,7 +37,7 @@ import logging
 import pathlib
 import re
 import sys
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
 from datetime import UTC, datetime
 from io import TextIOWrapper
 from typing import TYPE_CHECKING, Any
@@ -733,7 +733,7 @@ def _inject_border_rect(svg_text: str) -> str:
         Modified SVG string with gapless border rect and hidden box glyphs.
     """
     ET.register_namespace("", _SVG_NS)
-    root = ET.fromstring(svg_text)  # noqa: S314
+    root = ET.fromstring(svg_text)  # ruff: ignore[suspicious-xml-element-tree-usage]
 
     outer_g = _find_content_group(root)
     if outer_g is None:
@@ -787,7 +787,7 @@ def _apply_svg_dimensions(svg_text: str, *, width: int, font_size: int) -> str:
         Modified SVG string with updated dimensions.
     """
     ET.register_namespace("", _SVG_NS)
-    root = ET.fromstring(svg_text)  # noqa: S314
+    root = ET.fromstring(svg_text)  # ruff: ignore[suspicious-xml-element-tree-usage]
 
     # Scale width/height proportionally
     old_width_str = root.get("width", "")
@@ -868,7 +868,7 @@ def _render_card(
 
     is_png = out.suffix.lower() == ".png"
     if is_png:
-        import cairosvg  # noqa: PLC0415
+        import cairosvg  # ruff: ignore[import-outside-top-level]
 
         png_bytes: bytes = cairosvg.svg2png(bytestring=svg_text.encode("utf-8"), output_width=width)
         out.write_bytes(png_bytes)

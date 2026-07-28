@@ -161,7 +161,7 @@ def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
         repo: Explicit ``owner/repo`` slug override.  When ``None``, calls
             :func:`discover_repo` to resolve the slug dynamically.
     """
-    global _config  # noqa: PLW0603
+    global _config  # ruff: ignore[global-statement]
     repo_root = _resolve_repo_root(project_dir)
     backlog_dir = _dh_paths.backlog_dir(repo_root)
     if repo is not None:

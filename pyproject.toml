@@ -48,7 +48,7 @@ dev = [
     "python-gitlab>=8.0.0",
     "rich>=14.2.0",
     "ruamel.yaml>=0.18.0",
-    "ruff>=0.15.4",
+    "ruff>=0.16.0",
     "scikit-learn>=1.0",
     "tiktoken>=0.12.0",
     "tomlkit>=0.13.0",
@@ -177,69 +177,71 @@ skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
 extend-select = [
-    "A",     # see: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
-    "ANN",   # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
-    "ASYNC", # see: https://docs.astral.sh/ruff/rules/#flake8-async-async
-    "B",     # see: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
-    "BLE",   # see: https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
-    "C4",    # see: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
-    "C90",   # see: https://docs.astral.sh/ruff/rules/#mccabe-c90
-    "D",     # see: https://docs.astral.sh/ruff/rules/#pydocstyle-d
-    "DOC",   # see: https://docs.astral.sh/ruff/rules/#pydoclint-doc
-    "E",     # see: https://docs.astral.sh/ruff/rules/#error-e
-    "EXE",   # see: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
-    "F",     # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
-    "FA",    # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-fa
-    "FAST",  # see: https://docs.astral.sh/ruff/rules/#fastapi-fast
-    "FLY",   # see: https://docs.astral.sh/ruff/rules/#flynt-fly
-    "FURB",  # see: https://docs.astral.sh/ruff/rules/#refurb-furb
-    "G201",  # see: https://docs.astral.sh/ruff/rules/logging-exc-info/
-    "G202",  # see: https://docs.astral.sh/ruff/rules/logging-redundant-exc-info/
-    "I",     # see: https://docs.astral.sh/ruff/rules/#isort-i
-    "PERF",  # see: https://docs.astral.sh/ruff/rules/#perflint-perf
-    "PGH",   # see: https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
-    "PIE",   # see: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
-    "PL",    # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
-    "PT",    # see: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
-    "PTH",   # see: https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
-    "PYI",   # see: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
-    "Q",     # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
-    "RET",   # see: https://docs.astral.sh/ruff/rules/#flake8-return-ret
-    "RSE",   # see: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
-    "RUF",   # see: https://docs.astral.sh/ruff/rules/#ruff-ruf
-    "S",     # see: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
-    "SIM",   # see: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
-    "SLF",   # see: https://docs.astral.sh/ruff/rules/#flake8-self-slf
-    "SLOT",  # see: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
-    "T10",   # see: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
-    "T20",   # see: https://docs.astral.sh/ruff/rules/#flake8-typing-t20
-    "TC",    # see: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
-    "TID",   # see: https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
-    "TRY",   # see: https://docs.astral.sh/ruff/rules/#tryceratops-try
-    "UP",    # see: https://docs.astral.sh/ruff/rules/#pyupgrade-up
-    "W",     # see: https://docs.astral.sh/ruff/rules/#warning-w
-    "YTT",   # see: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+    "A",                          # see: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+    "ANN",                        # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+    "ASYNC",                      # see: https://docs.astral.sh/ruff/rules/#flake8-async-async
+    "B",                          # see: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    "BLE",                        # see: https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+    "C4",                         # see: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+    "C90",                        # see: https://docs.astral.sh/ruff/rules/#mccabe-c90
+    "D",                          # see: https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    "DOC",                        # see: https://docs.astral.sh/ruff/rules/#pydoclint-doc
+    "E",                          # see: https://docs.astral.sh/ruff/rules/#error-e
+    "EXE",                        # see: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
+    "F",                          # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "FA",                         # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-fa
+    "FAST",                       # see: https://docs.astral.sh/ruff/rules/#fastapi-fast
+    "FLY",                        # see: https://docs.astral.sh/ruff/rules/#flynt-fly
+    "FURB",                       # see: https://docs.astral.sh/ruff/rules/#refurb-furb
+    "I",                          # see: https://docs.astral.sh/ruff/rules/#isort-i
+    "PERF",                       # see: https://docs.astral.sh/ruff/rules/#perflint-perf
+    "PGH",                        # see: https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
+    "PIE",                        # see: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+    "PL",                         # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "PT",                         # see: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+    "PTH",                        # see: https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+    "PYI",                        # see: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
+    "Q",                          # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    "RET",                        # see: https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "RSE",                        # see: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    "RUF",                        # see: https://docs.astral.sh/ruff/rules/#ruff-ruf
+    "S",                          # see: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+    "SIM",                        # see: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+    "SLF",                        # see: https://docs.astral.sh/ruff/rules/#flake8-self-slf
+    "SLOT",                       # see: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
+    "T10",                        # see: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
+    "T20",                        # see: https://docs.astral.sh/ruff/rules/#flake8-typing-t20
+    "TC",                         # see: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+    "TID",                        # see: https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
+    "TRY",                        # see: https://docs.astral.sh/ruff/rules/#tryceratops-try
+    "UP",                         # see: https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "W",                          # see: https://docs.astral.sh/ruff/rules/#warning-w
+    "YTT",                        # see: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+    "logging-exc-info",           # see: https://docs.astral.sh/ruff/rules/logging-exc-info/
+    "logging-redundant-exc-info", # see: https://docs.astral.sh/ruff/rules/logging-redundant-exc-info/
 ]
 ignore = [
-    "DOC501",  # Raised exception {id} missing from docstring
-    "DOC502",  # Raised exception is not explicitly raised
-    "E402",    # Module level import not at top of file
-    "E501",    # Line too long ({width} > {limit})
-    "EXE003",  # Shebang should contain python, pytest, or uv run (doesn't handle global arguments)
-    "PLR0913",
-    "PLR0917",
-    "PLR6301", #
-    "S404",    # subprocess possibly insecure - still need to use subprocess though
-    "S603",    # subprocess without shell=True
-    "S606",    # os.exec* without shell - intentional for privilege elevation (safer than with shell)
-    "T201",    # print() statements are intentional for CI output visibility
-    "TC001",
-    "TC002",
-    "TC003",
-    "TRY003",  # Long error messages are fine
+    "docstring-extraneous-exception",       # Raised exception is not explicitly raised
+    "docstring-missing-exception",          # Raised exception {id} missing from docstring
+    "line-too-long",                        # Line too long ({width} > {limit})
+    "module-import-not-at-top-of-file",     # Module level import not at top of file
+    "no-self-use",                          #
+    "print",                                # print() statements are intentional for CI output visibility
+    "property-docstring-starts-with-verb",  # Existing property docstrings use "Return ..."
+    "raise-vanilla-args",                   # Long error messages are fine
+    "shebang-missing-python",               # Shebang should contain python, pytest, or uv run (doesn't handle global arguments)
+    "start-process-with-no-shell",          # os.exec* without shell - intentional for privilege elevation (safer than with shell)
+    "subprocess-without-shell-equals-true", # subprocess without shell=True
+    "suspicious-subprocess-import",         # subprocess possibly insecure - still need to use subprocess though
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-statements-in-try-clause",    # Would require broad try-block refactoring
+    "typing-only-first-party-import",
+    "typing-only-standard-library-import",
+    "typing-only-third-party-import",
 ]
 preview = true
-unfixable = ["F401"]
+unfixable = ["unused-import"]
 
 [tool.ruff.lint.per-file-ignores]
 # Anti-pattern examples: intentionally incorrect code demonstrating what NOT to do
@@ -257,12 +259,15 @@ unfixable = ["F401"]
     "SLF", # Private-access patterns seeded intentionally
 ]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
-"**/assets/version.py" = ["PLC0415"]
+"**/assets/version.py" = ["import-outside-top-level"]
 # BacklogBackend Protocol must expose all 41 operations from gh_client/github_sync/github_branches
 # PLR0904 limit (20) is not applicable to Protocol classes that define a full backend surface
 # D102 — the WorkItemBackend/GitHubExtras/BranchBackend subset Protocols are structural mirrors
 # of BacklogBackend; their method stubs use `...` and the canonical docstrings live on BacklogBackend.
-"**/backlog_core/backend_types.py" = ["PLR0904", "D102"]
+"**/backlog_core/backend_types.py" = [
+    "too-many-public-methods",
+    "undocumented-public-method",
+]
 # FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
 # parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
 # present in the module's global namespace even with `from __future__ import annotations`.
@@ -270,47 +275,68 @@ unfixable = ["F401"]
 # TC001/TC002 — action model types must be present at runtime for discriminated union dispatch (from __future__ import annotations bypasses this)
 # PLR0911 — match-case action dispatch in sam_plan/sam_task produces one return per case; guard-clause refactoring would obscure intent
 # C901/PLR0912 — discriminated union dispatch with per-arm isinstance type-narrowing guards is intentional; complexity metrics do not apply to inherently branching dispatch patterns
-"**/sam_schema/server.py" = ["PLR0911", "C901", "PLR0912"]
+"**/sam_schema/server.py" = [
+    "too-many-return-statements",
+    "complex-structure",
+    "too-many-branches",
+]
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — protocol surface includes _-prefixed methods that delegate to _-prefixed gh_client functions by design
 # JsonValue is used in parse_* function annotations — must be available at runtime for
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
-"**/backlog_core/backends/github_backend.py" = ["PLR0904", "SLF001"]
+"**/backlog_core/backends/github_backend.py" = [
+    "too-many-public-methods",
+    "private-member-access",
+]
 # GitHubTaskProvider implements every method of TaskBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — BacklogBackend Protocol surface includes _-prefixed GraphQL methods by design (same justification as github_backend.py)
 # DOC201 — single-line docstrings for private helpers already state the return value; formal Returns sections add no information
-"**/sam_schema/core/backends/github_task.py" = ["PLR0904", "SLF001", "DOC201"]
+"**/sam_schema/core/backends/github_task.py" = [
+    "too-many-public-methods",
+    "private-member-access",
+    "docstring-missing-returns",
+]
 # InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
 # DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
-"**/backlog_core/backends/memory_backend.py" = ["DOC201", "PLR0904"]
+"**/backlog_core/backends/memory_backend.py" = [
+    "docstring-missing-returns",
+    "too-many-public-methods",
+]
 # SQLiteBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
 # SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
-"**/backlog_core/backends/sqlite_backend.py" = ["PLR0904", "SLF001"]
+"**/backlog_core/backends/sqlite_backend.py" = [
+    "too-many-public-methods",
+    "private-member-access",
+]
 # BeadsBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
 # SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
 # DOC201 — single-line docstrings for NotImplementedError stubs; Returns sections add no information
-"**/backlog_core/backends/beads_backend.py" = ["PLR0904", "SLF001", "DOC201"]
+"**/backlog_core/backends/beads_backend.py" = [
+    "too-many-public-methods",
+    "private-member-access",
+    "docstring-missing-returns",
+]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
-"**/backlog_core/operations.py" = ["SLF001"]
+"**/backlog_core/operations.py" = ["private-member-access"]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
-"**/backlog_core/server.py" = ["RUF029", "SLF001"]
+"**/backlog_core/server.py" = ["unused-async", "private-member-access"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
-"**/dh_paths.py" = ["S607"]
-"**/kage-bunshin/scripts/spawn.py" = ["S607"]
+"**/dh_paths.py" = ["start-process-with-partial-path"]
+"**/kage-bunshin/scripts/spawn.py" = ["start-process-with-partial-path"]
 "**/skill-creator/**/*.py" = [
     "ANN",
     "ANN",
-    "BLE001",
-    "C901",
-    "C901",
+    "blind-except",
+    "complex-structure",
+    "complex-structure",
     "D",
     "D",
     "DOC",
     "DOC",
-    "F401",
+    "unused-import",
     "FURB",
     "PLR",
     "PLR",
@@ -324,47 +350,51 @@ unfixable = ["F401"]
 ]
 # Test files that live in scripts/ directories (not tests/)
 "**/test_*.py" = [
-    "ANN",  # Type annotations optional for test fixtures/methods
-    "D",    # Docstring requirements relaxed for tests
-    "DOC",  # Docstring content requirements relaxed
-    "E501", # Line length relaxed for test data
-    "EXE",  # Shebang executable check skipped for PEP723 test files
-    "N",    # camelCase in test names acceptable when testing API fields
-    "PLC",  # Local imports acceptable in test helpers
-    "PLR",  # Testing private methods is valid test pattern
-    "S",    # Security checks not needed in tests (S101 assert is expected)
-    "SLF",  # Private name imports acceptable for testing internals
-    "T",    # print() statements are intentional for CI output visibility
+    "ANN",           # Type annotations optional for test fixtures/methods
+    "D",             # Docstring requirements relaxed for tests
+    "DOC",           # Docstring content requirements relaxed
+    "line-too-long", # Line length relaxed for test data
+    "EXE",           # Shebang executable check skipped for PEP723 test files
+    "N",             # camelCase in test names acceptable when testing API fields
+    "PLC",           # Local imports acceptable in test helpers
+    "PLR",           # Testing private methods is valid test pattern
+    "S",             # Security checks not needed in tests (S101 assert is expected)
+    "SLF",           # Private name imports acceptable for testing internals
+    "T",             # print() statements are intentional for CI output visibility
 ]
 "**/tests*/**" = [
-    "ANN",      # Type annotations optional for test fixtures/methods
-    "ASYNC240", # Blocking pathlib I/O in async test methods is acceptable at test scale
-    "D",        # Docstring requirements relaxed for tests
-    "DOC",      # Docstring content requirements relaxed
-    "E501",     # Line length relaxed for test data
-    "EXE",      # Shebang executable check skipped for PEP723 test files
-    "N",        # camelCase in test names acceptable when testing API fields
-    "PLC",      # Local imports acceptable in test helpers
-    "PLR",      # Testing private methods is valid test pattern
-    "RUF029",   # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
-    "S",        # Security checks not needed in tests
-    "SLF",      # Private name imports acceptable for testing internals
-    "T",        # print() statements are intentional for CI output visibility
+    "ANN",                                    # Type annotations optional for test fixtures/methods
+    "blocking-path-method-in-async-function", # Blocking pathlib I/O in async test methods is acceptable at test scale
+    "D",                                      # Docstring requirements relaxed for tests
+    "DOC",                                    # Docstring content requirements relaxed
+    "line-too-long",                          # Line length relaxed for test data
+    "EXE",                                    # Shebang executable check skipped for PEP723 test files
+    "N",                                      # camelCase in test names acceptable when testing API fields
+    "PLC",                                    # Local imports acceptable in test helpers
+    "PLR",                                    # Testing private methods is valid test pattern
+    "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
+    "S",                                      # Security checks not needed in tests
+    "SLF",                                    # Private name imports acceptable for testing internals
+    "T",                                      # print() statements are intentional for CI output visibility
 ]
 # Executable bit is set at runtime via uv run (PEP 723 shebang)
-"plugins/development-harness/scripts/verify_migration_fidelity.py" = ["EXE001"]
+"plugins/development-harness/scripts/verify_migration_fidelity.py" = [
+    "shebang-not-executable",
+]
 # live_validation_step: S105 false-positive (enum value "PASS" ≠ password),
 # S602 shell=True intentional (command run verbatim as manifest declares),
 # PLR0911 exceeds 6-return limit — early-return guard clauses are intentional
 "plugins/development-harness/scripts/live_validation_step.py" = [
-    "S105",
-    "S602",
-    "PLR0911",
+    "hardcoded-password-string",
+    "subprocess-popen-with-shell-equals-true",
+    "too-many-return-statements",
 ]
 # Hyphenated package directory name is required by MCP convention
-"plugins/scientific-method/mcp/experiment-registry/__init__.py" = ["N999"]
+"plugins/scientific-method/mcp/experiment-registry/__init__.py" = [
+    "invalid-module-name",
+]
 # ruamel.yaml returns dynamically typed values; Any is the correct annotation here
-"research/knowledge-explorer.py" = ["ANN401"]
+"research/knowledge-explorer.py" = ["any-type"]
 "typings/**" = ["A", "ANN", "N"]
 
 [tool.ruff.lint.pycodestyle]

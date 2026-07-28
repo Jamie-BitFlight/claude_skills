@@ -172,9 +172,9 @@ def read_plan(path: Path) -> tuple[dict, list[dict], FormatType]:
     # Import readers here to avoid circular imports — detect.py is the root
     # module that all readers import from, so top-level imports would create
     # a circular dependency.
-    from sam_schema.readers.frontmatter_reader import read_frontmatter_plan  # noqa: PLC0415
-    from sam_schema.readers.manifest_reader import read_manifest_plan  # noqa: PLC0415
-    from sam_schema.readers.yaml_reader import read_yaml_plan  # noqa: PLC0415
+    from sam_schema.readers.frontmatter_reader import read_frontmatter_plan  # ruff: ignore[import-outside-top-level]
+    from sam_schema.readers.manifest_reader import read_manifest_plan  # ruff: ignore[import-outside-top-level]
+    from sam_schema.readers.yaml_reader import read_yaml_plan  # ruff: ignore[import-outside-top-level]
 
     fmt = detect_format(path)
 

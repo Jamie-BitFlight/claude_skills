@@ -450,7 +450,7 @@ class InMemoryTaskProvider:
             PlanNotFoundError: When plan_id is not known.
             TaskNotFoundError: When ``task.id`` is not in the plan.
         """
-        from sam_schema.core.backends.local_yaml import _task_to_task_data  # noqa: PLC0415
+        from sam_schema.core.backends.local_yaml import _task_to_task_data  # ruff: ignore[import-outside-top-level]
 
         if plan_id not in self._plans:
             raise PlanNotFoundError(plan_id)

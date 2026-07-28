@@ -1469,15 +1469,15 @@ def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> 
     Returns:
         The configured bool if present, otherwise ``None``.
     """
-    from pathlib import Path as _Path  # noqa: PLC0415
+    from pathlib import Path as _Path  # ruff: ignore[import-outside-top-level]
 
-    from ruamel.yaml import YAML as _YAML  # noqa: PLC0415
+    from ruamel.yaml import YAML as _YAML  # ruff: ignore[import-outside-top-level]
 
     if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, _Path) or not config_path.is_file():
         return None
     try:
         raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 — ruamel.yaml raises various internal exception types
+    except Exception:  # ruff: ignore[blind-except] — ruamel.yaml raises various internal exception types
         return None
     if not isinstance(raw, dict):
         return None
@@ -1552,7 +1552,7 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
     # Guard 2 — re-entry (FastMCP #1115): try_start() is an atomic check-and-set;
     #   if RUNNING is already set (second lifespan entry) we skip create_task so
     #   only one background sync task runs per process lifetime.
-    global _active_startup_sync_task  # noqa: PLW0603
+    global _active_startup_sync_task  # ruff: ignore[global-statement]
     if _startup_sync_enabled() and state.try_start():
         bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
         _register_bg_task(bg_task)
@@ -2443,7 +2443,7 @@ async def backlog_view(
             )
         ),
     ] = None,
-    map: Annotated[  # noqa: A002 — shadows builtin; matches MCP parameter name exactly
+    map: Annotated[  # ruff: ignore[builtin-argument-shadowing] — shadows builtin; matches MCP parameter name exactly
         bool,
         Field(
             description=(
@@ -3142,8 +3142,8 @@ async def backlog_create_sam_task(
     task_type: Annotated[str, Field(description="Task category: research | implement | review | fix | docs")],
     agent: Annotated[str, Field(description="Agent name to execute this task")],
     priority: Annotated[int, Field(description="Priority 1-5 (1=highest)")] = 2,
-    skills: Annotated[list[str], Field(description="Skill names for the executing agent")] = [],  # noqa: B006
-    dependencies: Annotated[list[str], Field(description="Task IDs this task depends on")] = [],  # noqa: B006
+    skills: Annotated[list[str], Field(description="Skill names for the executing agent")] = [],  # ruff: ignore[mutable-argument-default]
+    dependencies: Annotated[list[str], Field(description="Task IDs this task depends on")] = [],  # ruff: ignore[mutable-argument-default]
     description: Annotated[str, Field(description="Human-readable description of the task")] = "",
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
@@ -3273,7 +3273,7 @@ def _get_artifact_provider() -> ArtifactBackend:
         to the local filesystem provider when the remote backend fails to
         initialise.
     """
-    global _artifact_provider, _artifact_provider_warning  # noqa: PLW0603
+    global _artifact_provider, _artifact_provider_warning  # ruff: ignore[global-statement]
     if _artifact_provider is not None:
         return _artifact_provider
     provider: ArtifactBackend
@@ -4387,7 +4387,7 @@ def _dispatch_state_manager() -> _DispatchStateManager:
     Returns:
         Shared ``DispatchStateManager`` instance for this server process.
     """
-    global _dispatch_state_mgr  # noqa: PLW0603
+    global _dispatch_state_mgr  # ruff: ignore[global-statement]
     if _dispatch_state_mgr is None:
         db_path = Path.home() / ".dh" / "projects" / _project_stub() / "dispatch-state.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)

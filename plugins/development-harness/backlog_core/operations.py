@@ -1831,7 +1831,7 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
     """
     backend = get_config().backend
     if backend.issue_id_type == "string":
-        from backlog_core.backends.beads_backend import BeadsBackend  # noqa: PLC0415
+        from backlog_core.backends.beads_backend import BeadsBackend  # ruff: ignore[import-outside-top-level]
 
         if isinstance(backend, BeadsBackend):
             nanoid = backend.create_beads_issue_for_item(item_data, output=out)

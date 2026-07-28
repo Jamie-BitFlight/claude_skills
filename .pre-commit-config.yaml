@@ -69,7 +69,7 @@ repos:
 
   # TOML sorting and formatting
   - repo: https://github.com/bitflight-devops/pyproject-fmt
-    rev: v1.1.5
+    rev: v1.1.11
     hooks:
       - id: pypfmt
         name: Sort and format pyproject.toml with pypfmt
@@ -81,7 +81,7 @@ repos:
 
   # Python formatting and linting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9
+    rev: v0.16.0
     hooks:
       - id: ruff
         name: Lint Python with ruff
@@ -114,7 +114,7 @@ repos:
         exclude: (graphify-out/|^(.*/)?\.claude-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$|dh-workflow-graph\.json$)
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.22.0
+    rev: v0.23.2
     hooks:
       - id: markdownlint-cli2
         exclude: ^(plan/|\.claude/backlog/|\.claude/BACKLOG\.md|.*/graphify-out/)

@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 import pytest
 from dh_core.operations import _validated_task_patch
 from fastmcp.exceptions import ToolError
-from pytest_mock import MockerFixture  # noqa: F401 — available for future use
+from pytest_mock import MockerFixture  # ruff: ignore[unused-import] — available for future use
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 from sam_schema.server import _sam_plan_create, _sam_plan_read, mcp
