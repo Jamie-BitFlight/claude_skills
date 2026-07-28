@@ -228,6 +228,168 @@ async def test_plan_list_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Plan operation parity (ready, update, append_task, finalize)
+# ---------------------------------------------------------------------------
+
+
+async def test_plan_ready_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Ready-for-dispatch tasks are identical through CLI and MCP transports."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "ready-parity", "--goal", "Ready parity goal", "--plan-dir", plan_dir, "--format", "json"],
+        env=dh_env,
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    cli_ready = _run_cli(["ready", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_ready = await call_mcp_tool(
+        _sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+    assert cli_ready["feature"] == mcp_ready["feature"]
+    assert cli_ready["count"] == mcp_ready["count"] == 1
+
+
+async def test_plan_update_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Plan update through CLI and MCP produces equivalent field changes."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    plan_a = plan_b = None
+    for slug in ["update-a", "update-b"]:
+        result = _run_cli(
+            ["create", slug, "--goal", "Update goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+        )
+        pid = result["plan_id"]
+        _run_cli(
+            ["append-task", pid, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+            env=dh_env,
+        )
+        _run_cli(["finalize", pid, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+        if slug == "update-a":
+            plan_a = pid
+        else:
+            plan_b = pid
+    assert plan_a and plan_b
+
+    # CLI update plan_a
+    cli_update = _run_cli(
+        ["update", plan_a, "--plan-dir", plan_dir, "--set", "goal=CLI Updated", "--format", "json"], env=dh_env
+    )
+    assert cli_update["updated"] is True
+
+    # MCP update plan_b
+    mcp_update = await call_mcp_tool(
+        _sam_mcp, "sam_plan",
+        {"config": {"action": "update", "set_fields_json": {"goal": "MCP Updated"}}, "plan": plan_b, "plan_dir": plan_dir},
+    )
+    assert mcp_update["updated"] is True
+
+    # Read both through CLI to verify
+    cli_read_a = _run_cli(["read", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    cli_read_b = _run_cli(["read", plan_b, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert cli_read_a["plan"]["goal"] == "CLI Updated"
+    assert cli_read_b["plan"]["goal"] == "MCP Updated"
+
+
+async def test_plan_append_task_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Task appended via CLI and MCP produces equivalent results."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    plan_a = plan_b = None
+    for slug in ["append-a", "append-b"]:
+        result = _run_cli(
+            ["create", slug, "--goal", "Append goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+        )
+        if slug == "append-a":
+            plan_a = result["plan_id"]
+        else:
+            plan_b = result["plan_id"]
+    assert plan_a and plan_b
+
+    # CLI append to plan_a
+    cli_append = _run_cli(
+        ["append-task", plan_a, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    assert cli_append["appended"] is True
+    assert cli_append["task_id"] == "T01"
+
+    # MCP append to plan_b
+    mcp_append = await call_mcp_tool(
+        _sam_mcp, "sam_plan",
+        {"config": {"action": "append_task", "task": _TASK_DEF}, "plan": plan_b, "plan_dir": plan_dir},
+    )
+    assert mcp_append["appended"] is True
+    assert mcp_append["task_id"] == "T01"
+
+    # Finalize both and read to verify
+    _run_cli(["finalize", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    _run_cli(["finalize", plan_b, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    cli_read_a = _run_cli(["read", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    cli_read_b = _run_cli(["read", plan_b, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert len(cli_read_a["plan"]["tasks"]) == len(cli_read_b["plan"]["tasks"]) == 1
+
+
+async def test_plan_finalize_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Plan finalize through CLI and MCP produces equivalent results."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    plan_a = plan_b = None
+    for slug in ["finalize-a", "finalize-b"]:
+        result = _run_cli(
+            ["create", slug, "--goal", "Finalize goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+        )
+        pid = result["plan_id"]
+        _run_cli(
+            ["append-task", pid, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+            env=dh_env,
+        )
+        if slug == "finalize-a":
+            plan_a = pid
+        else:
+            plan_b = pid
+    assert plan_a and plan_b
+
+    # CLI finalize plan_a
+    cli_finalize = _run_cli(
+        ["finalize", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+    )
+    assert cli_finalize["finalized"] is True
+    assert cli_finalize["state"] == "ready"
+
+    # MCP finalize plan_b
+    mcp_finalize = await call_mcp_tool(
+        _sam_mcp, "sam_plan",
+        {"config": {"action": "finalize"}, "plan": plan_b, "plan_dir": plan_dir},
+    )
+    assert mcp_finalize["finalized"] is True
+    assert mcp_finalize["state"] == "ready"
+
+    # Read both to verify state
+    cli_read_a = _run_cli(["read", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    cli_read_b = _run_cli(["read", plan_b, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    assert cli_read_a["plan"]["state"] == cli_read_b["plan"]["state"] == "ready"
+
+
+# ---------------------------------------------------------------------------
 # Task CRUD parity
 # ---------------------------------------------------------------------------
 
