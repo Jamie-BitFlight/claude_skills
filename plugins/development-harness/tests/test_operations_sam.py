@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, cast
 
 import dh_paths
 import pytest
-from backlog_core.models import GitHubUnavailableError
+from backlog_core.models import GitHubUnavailableError, Output
 from backlog_core.operations import create_sam_task, get_ready_sam_tasks, get_sam_tasks, update_sam_task_status
 
 if TYPE_CHECKING:
@@ -158,6 +158,42 @@ class TestCreateSamTask:
         assert result["url"] == ""  # IssueNode has no url field; implementation returns ""
         assert "messages" in result
         assert "warnings" in result
+
+    def test_create_sam_task_forwards_repo(self, mocker: MockerFixture) -> None:
+        """create_sam_task passes the explicit repository to GitHub lookup."""
+        mock_repo = mocker.Mock()
+        get_github = mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.operations.create_task_issue", return_value={"number": 42, "title": "T1"})
+
+        create_sam_task(
+            parent_issue_number=480,
+            task_id="T1",
+            feature="my-feature",
+            task_type="implement",
+            agent="agent",
+            priority=1,
+            skills=[],
+            dependencies=[],
+            description="Do the thing",
+            repo="acme/project",
+        )
+
+        get_github.assert_called_once_with("acme/project")
+
+    def test_create_sam_task_positional_output_keeps_default_repo(self, mocker: MockerFixture) -> None:
+        """The legacy positional output argument remains output, not repo."""
+        mock_repo = mocker.Mock()
+        get_github = mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
+        create_issue = mocker.patch(
+            "backlog_core.operations.create_task_issue", return_value={"number": 42, "title": "T1"}
+        )
+        output = Output()
+
+        create_sam_task(480, "T1", "my-feature", "implement", "agent", 1, [], [], "Do the thing", None, None, output)
+
+        get_github.assert_called_once_with("")
+        create_issue.assert_called_once()
+        assert create_issue.call_args.kwargs["output"] is output
 
     def test_create_sam_task_github_unavailable(self, mocker: MockerFixture) -> None:
         """create_sam_task raises GitHubUnavailableError when get_github fails.
@@ -393,6 +429,29 @@ class TestUpdateSamTaskStatus:
         assert result["updated"] is True
         assert result["issue_number"] == 101
         assert result["new_status"] == "complete"
+
+    def test_update_sam_task_status_forwards_repo(self, mocker: MockerFixture) -> None:
+        """update_sam_task_status passes the explicit repository to GitHub lookup."""
+        mock_repo = mocker.Mock()
+        get_github = mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.operations.update_task_status", return_value=True)
+
+        update_sam_task_status(issue_number=101, new_status="complete", repo="acme/project")
+
+        get_github.assert_called_once_with("acme/project")
+
+    def test_update_sam_task_status_positional_output_keeps_default_repo(self, mocker: MockerFixture) -> None:
+        """The legacy positional output argument remains output, not repo."""
+        mock_repo = mocker.Mock()
+        get_github = mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
+        update_status = mocker.patch("backlog_core.operations.update_task_status", return_value=True)
+        output = Output()
+
+        update_sam_task_status(101, "complete", output)
+
+        get_github.assert_called_once_with("")
+        update_status.assert_called_once()
+        assert update_status.call_args.kwargs["output"] is output
 
     def test_update_sam_task_status_no_change(self, mocker: MockerFixture) -> None:
         """update_sam_task_status returns updated=False without error when status unchanged.

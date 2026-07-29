@@ -78,6 +78,38 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
     return await call_mcp_tool(mcp, tool_name, params)
 
 
+async def test_backlog_create_sam_task_forwards_repo() -> None:
+    """backlog_create_sam_task forwards repo to the operations layer."""
+    result = {"issue_number": 42, "title": "T1", "url": ""}
+    with patch("backlog_core.server.operations.create_sam_task", return_value=result) as mock_create:
+        response = await _call(
+            "backlog_create_sam_task",
+            {
+                "parent_issue_number": 480,
+                "repo": "acme/project",
+                "task_id": "T1",
+                "feature": "my-feature",
+                "task_type": "implement",
+                "agent": "agent",
+            },
+        )
+
+    assert response["issue_number"] == 42
+    assert mock_create.call_args.kwargs["repo"] == "acme/project"
+
+
+async def test_backlog_update_sam_task_status_forwards_repo() -> None:
+    """backlog_update_sam_task_status forwards repo to the operations layer."""
+    result = {"updated": True, "issue_number": 101, "new_status": "complete"}
+    with patch("backlog_core.server.operations.update_sam_task_status", return_value=result) as mock_update:
+        response = await _call(
+            "backlog_update_sam_task_status", {"issue_number": 101, "new_status": "complete", "repo": "acme/project"}
+        )
+
+    assert response["updated"] is True
+    assert mock_update.call_args.kwargs["repo"] == "acme/project"
+
+
 # ---------------------------------------------------------------------------
 # backlog_add
 # ---------------------------------------------------------------------------

@@ -4900,6 +4900,7 @@ def create_sam_task(
     acceptance_criteria: list[str] | None = None,
     labels: list[str] | None = None,
     output: Output | None = None,
+    repo: str = "",
 ) -> dict[str, str | int | list[str]]:
     """Create a GitHub issue for a SAM task and link it as a sub-issue of a parent story.
 
@@ -4908,6 +4909,7 @@ def create_sam_task(
 
     Args:
         parent_issue_number: Issue number of the parent story (without ``#``).
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         task_id: Feature-scoped sequential ID, e.g. ``"T1"``, ``"T2"``.
         feature: Feature slug, e.g. ``"uv-skill-update"``.
         task_type: Execution category: ``"research"`` | ``"implement"`` | ``"review"`` | ``"fix"`` | ``"docs"``.
@@ -4937,8 +4939,8 @@ def create_sam_task(
         skills=skills,
         dependencies=dependencies,
     )
-    repo = get_github()
-    issue = create_task_issue(repo, parent_issue_number, task, description, acceptance_criteria, labels, output=out)
+    gh_repo = get_github(repo)
+    issue = create_task_issue(gh_repo, parent_issue_number, task, description, acceptance_criteria, labels, output=out)
     if issue is None:
         return {"issue_number": 0, "title": "", "url": "", **out.to_dict()}
     return {"issue_number": issue["number"], "title": issue["title"], "url": "", **out.to_dict()}
@@ -5015,7 +5017,7 @@ def get_sam_tasks(
 
 
 def update_sam_task_status(
-    issue_number: int, new_status: str, output: Output | None = None
+    issue_number: int, new_status: str, output: Output | None = None, repo: str = ""
 ) -> dict[str, bool | int | str | list[str]]:
     """Update the status field in the ``<!-- sam:task ... -->`` block of a task issue body.
 
@@ -5025,6 +5027,7 @@ def update_sam_task_status(
     Args:
         issue_number: Task issue number (without ``#``).
         new_status: Target status string, e.g. ``"in-progress"`` or ``"complete"``.
+        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
         output: Optional Output collector.
 
     Returns:
@@ -5034,8 +5037,8 @@ def update_sam_task_status(
         GitHubUnavailableError: If GITHUB_TOKEN is not set.
     """
     out = output or Output()
-    repo = get_github()
-    updated = update_task_status(repo, issue_number, new_status, output=out)
+    gh_repo = get_github(repo)
+    updated = update_task_status(gh_repo, issue_number, new_status, output=out)
     return {"updated": updated, "issue_number": issue_number, "new_status": new_status, **out.to_dict()}
 
 

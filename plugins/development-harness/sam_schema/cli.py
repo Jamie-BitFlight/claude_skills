@@ -1770,6 +1770,7 @@ def sam_task_create(
         str, typer.Option("--acceptance-criteria-json", help="JSON list of acceptance criteria")
     ] = "[]",
     labels_json: Annotated[str, typer.Option("--labels-json", help="JSON list of labels")] = "[]",
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
 ) -> None:
     """Create a SAM task issue under a parent issue."""
@@ -1782,6 +1783,7 @@ def sam_task_create(
     out = Output()
     result = operations.create_sam_task(
         parent_issue_number=parent_issue,
+        repo=repo,
         task_id=task_id,
         feature=feature,
         task_type=task_type,
@@ -1820,6 +1822,7 @@ def sam_tasks(
 def sam_task_status(
     issue_number: Annotated[int, typer.Argument(help="SAM task issue number")],
     status: Annotated[str, typer.Option("--status", help="New status")] = "",
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     output_format: Annotated[str, typer.Option("--format", help="Output format: json")] = "json",
 ) -> None:
     """Update a SAM task's status."""
@@ -1828,7 +1831,7 @@ def sam_task_status(
     if not status:
         _err("--status is required")
     out = Output()
-    result = operations.update_sam_task_status(issue_number=issue_number, new_status=status, output=out)
+    result = operations.update_sam_task_status(issue_number=issue_number, new_status=status, repo=repo, output=out)
     _output_json(result)
     _print_output_messages(out)
 

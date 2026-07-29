@@ -3147,6 +3147,7 @@ async def backlog_create_sam_task(
     description: Annotated[str, Field(description="Human-readable description of the task")] = "",
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
+    repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
 ) -> dict:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
@@ -3160,6 +3161,7 @@ async def backlog_create_sam_task(
         result = await asyncio.to_thread(
             operations.create_sam_task,
             parent_issue_number=parent_issue_number,
+            repo=repo,
             task_id=task_id,
             feature=feature,
             task_type=task_type,
@@ -3214,6 +3216,7 @@ async def backlog_get_sam_tasks(
 async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (GitHub issue integer)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
+    repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
 ) -> dict:
     """Update the status field in a SAM task sub-issue.
 
@@ -3226,7 +3229,7 @@ async def backlog_update_sam_task_status(
     out = Output()
     try:
         result = await asyncio.to_thread(
-            operations.update_sam_task_status, issue_number=issue_number, new_status=new_status, output=out
+            operations.update_sam_task_status, issue_number=issue_number, new_status=new_status, repo=repo, output=out
         )
         return {**result, **out.to_dict()}
     except BacklogError as e:

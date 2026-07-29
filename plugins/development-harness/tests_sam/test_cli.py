@@ -67,6 +67,43 @@ def test_append_task_accepts_legacy_task_id_alias(plan_dir: Path) -> None:
     assert json.loads(result.output) == {"appended": True, "task_id": "T4"}
 
 
+def test_sam_task_create_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sam-task-create accepts --repo and forwards it to operations."""
+    captured: dict[str, object] = {}
+
+    def fake_create(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"issue_number": 42, "title": "T1", "url": "", "messages": [], "warnings": [], "errors": []}
+
+    monkeypatch.setattr("sam_schema.cli.operations.create_sam_task", fake_create)
+    result = runner.invoke(app, ["sam-task-create", "480", "--repo", "acme/project"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["repo"] == "acme/project"
+
+
+def test_sam_task_status_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sam-task-status accepts --repo and forwards it to operations."""
+    captured: dict[str, object] = {}
+
+    def fake_update(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {
+            "updated": True,
+            "issue_number": 101,
+            "new_status": "complete",
+            "messages": [],
+            "warnings": [],
+            "errors": [],
+        }
+
+    monkeypatch.setattr("sam_schema.cli.operations.update_sam_task_status", fake_update)
+    result = runner.invoke(app, ["sam-task-status", "101", "--status", "complete", "--repo", "acme/project"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["repo"] == "acme/project"
+
+
 # ---------------------------------------------------------------------------
 # sam list
 # ---------------------------------------------------------------------------
