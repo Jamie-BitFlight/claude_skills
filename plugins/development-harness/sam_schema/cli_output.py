@@ -55,7 +55,8 @@ def output_json(data: object, *, exclude_none: bool = True) -> None:
                     if isinstance(item, BaseModel)
                 ],
                 default=str,
+                separators=(",", ":"),
             )
         )
     else:
-        typer.echo(json.dumps(data, default=str))
+        typer.echo(json.dumps(data, default=str, separators=(",", ":")))

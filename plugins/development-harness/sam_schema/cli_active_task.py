@@ -34,7 +34,6 @@ DEFAULT_SESSION_ID = "_default"
 app = typer.Typer(help="Session-scoped active task context.", no_args_is_help=True)
 
 _SESSION_OPTION = typer.Option("--session-id", help="Session identifier (default: '_default')")
-_FORMAT_OPTION = typer.Option("--format", help="Output format: json")
 
 
 def _context_backend() -> ContextBackend:
@@ -67,22 +66,9 @@ def _context_backend() -> ContextBackend:
         return get_context_config().backend
 
 
-def _check_format(output_format: str) -> None:
-    """Reject any output format other than ``json``.
-
-    Args:
-        output_format: The requested ``--format`` value.
-    """
-    if output_format != "json":
-        err(f"Invalid format '{output_format}'. Must be one of: json")
-
-
 @app.command(name="get")
-def active_task_get(
-    session_id: Annotated[str | None, _SESSION_OPTION] = None, output_format: Annotated[str, _FORMAT_OPTION] = "json"
-) -> None:
+def active_task_get(session_id: Annotated[str | None, _SESSION_OPTION] = None) -> None:
     """Show the active task context for a session."""
-    _check_format(output_format)
     result = operations.get_active_task(_context_backend(), session_id or DEFAULT_SESSION_ID)
     # Preserve explicit `active_task: null` when no context is set.
     output_json(result, exclude_none=False)
@@ -90,16 +76,14 @@ def active_task_get(
 
 @app.command(name="set")
 def active_task_set(
-    address: Annotated[str, typer.Argument(help="Task address: P{plan}/T{task}")],
+    address: Annotated[str, typer.Option("--address", help="Task address: P{plan}/T{task}")],
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir", help="Plan directory")] = None,
     parent_issue_number: Annotated[
         str | None, typer.Option("--parent-issue", help="Parent issue number or beads nanoid")
     ] = None,
     session_id: Annotated[str | None, _SESSION_OPTION] = None,
-    output_format: Annotated[str, _FORMAT_OPTION] = "json",
 ) -> None:
     """Park a task address as the active task for a session."""
-    _check_format(output_format)
     try:
         plan_ref, task_id = parse_address(address)
     except AddressingError as exc:
@@ -132,10 +116,8 @@ def active_task_update(
     append_section: Annotated[str | None, typer.Option("--append-section", help="Section name to append to")] = None,
     section_content: Annotated[str | None, typer.Option("--section-content", help="Content for the section")] = None,
     session_id: Annotated[str | None, _SESSION_OPTION] = None,
-    output_format: Annotated[str, _FORMAT_OPTION] = "json",
 ) -> None:
     """Update fields or append a section on the active task."""
-    _check_format(output_format)
     resolved_session = session_id or DEFAULT_SESSION_ID
     ctx_backend = _context_backend()
     active = ctx_backend.get_active_task(resolved_session)
@@ -162,10 +144,7 @@ def active_task_update(
 
 
 @app.command(name="clear")
-def active_task_clear(
-    session_id: Annotated[str | None, _SESSION_OPTION] = None, output_format: Annotated[str, _FORMAT_OPTION] = "json"
-) -> None:
+def active_task_clear(session_id: Annotated[str | None, _SESSION_OPTION] = None) -> None:
     """Clear the active task context for a session."""
-    _check_format(output_format)
     result = operations.clear_active_task(_context_backend(), session_id or DEFAULT_SESSION_ID)
     output_json(result)

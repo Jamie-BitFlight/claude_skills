@@ -409,7 +409,7 @@ What the integration provides:
 - **PR safety**: `backlog_close` and `backlog_resolve` check for open PRs referencing the issue before closing (bypass with `force=True`)
 - **Pull**: `backlog_pull` merges GitHub issue body content into local files, keeping the longer version of each section
 
-GitHub Issues are the source of truth. The local `~/.dh/projects/{slug}/backlog/` files are a read-optimized cache that avoids API saturation during sessions.
+The selected backend provider is the source of truth; local `~/.dh/projects/{slug}/backlog/` files are a read-optimized cache or working representation. The current default is GitHub Issues.
 
 ## Syncing in CI
 

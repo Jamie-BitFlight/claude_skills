@@ -118,7 +118,7 @@ On completion, applies `status:verified` to the GitHub issue.
 
 ### Backlog Management
 
-GitHub Issues are the source of truth. The plugin exposes workflow commands and a full MCP server for managing your backlog with AI assistance.
+The selected backlog backend is the source of truth; the default deployment uses GitHub Issues. The plugin exposes workflow commands and a full MCP server for managing your backlog with AI assistance.
 
 #### `/dh:work-backlog-item`
 

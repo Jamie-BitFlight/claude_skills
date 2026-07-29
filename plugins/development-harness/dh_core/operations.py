@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import dh_paths
 import dispatch_schema as _ds
 from backlog_core.artifact_migration import migrate_dry_run, migrate_live_run
-from backlog_core.artifact_provider import ArtifactBackend, create_artifact_provider
+from backlog_core.artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import get_config
@@ -2111,7 +2111,9 @@ def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | Non
         return {"error": str(exc), **out.to_dict()}
 
 
-def _artifact_migrate_rename(item_id: int, old_artifact_id: str, new_artifact_id: str, out: Output) -> dict[str, Any]:
+def _artifact_migrate_rename(
+    item_id: ItemId, old_artifact_id: str, new_artifact_id: str, out: Output
+) -> dict[str, Any]:
     """Rename a single artifact_id within the manifest for one item.
 
     Returns:
@@ -2137,7 +2139,7 @@ def _artifact_migrate_rename(item_id: int, old_artifact_id: str, new_artifact_id
 
 
 def artifact_migrate(
-    item_id: int | None = None,
+    item_id: ItemId | None = None,
     dry_run: bool = False,
     old_artifact_id: str | None = None,
     new_artifact_id: str | None = None,

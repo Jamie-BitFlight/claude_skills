@@ -21,7 +21,7 @@ This skill routes to the correct entry point for the development lifecycle. Read
 
 ## What This Plugin Provides
 
-The development-harness plugin implements the structured development lifecycle for tracked backlog items. It spans capture through verified closure using a chain of skills backed by GitHub Issues as the source of truth and `~/.dh/projects/{slug}/` as the local state directory.
+The development-harness plugin implements the structured development lifecycle for tracked backlog items. It spans capture through verified closure using a chain of skills backed by the configured backlog backend provider as the source of truth and `~/.dh/projects/{slug}/` as the local state directory. The repository's default configuration currently selects GitHub Issues.
 
 **Skills available:** `/dh:create-backlog-item`, `/dh:groom-backlog-item`, `/dh:work-backlog-item`, `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:gate-push`, `/dh:work-milestone`
 

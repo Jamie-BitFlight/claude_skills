@@ -1,12 +1,12 @@
 ---
 name: backlog
-description: Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items and GitHub Issues — single interface for all backlog CRUD via MCP tools (mcp__plugin_dh_backlog__*). GitHub Issues are the source of truth; direct file edits are bypassed in favour of MCP tool calls.
+description: Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items through the configured backend provider — single interface for all backlog CRUD via MCP tools (mcp__plugin_dh_backlog__*). The selected backend provider is authoritative; direct file edits are bypassed in favour of MCP tool calls.
 ---
 
 # Backlog
 
-MCP tools are the **primary interface** for backlog items and GitHub Issues.
-GitHub Issues are the source of truth; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache.
+MCP tools are the **primary interface** for backlog items through the configured backend provider.
+The selected backend provider is authoritative; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache or working state according to that backend.
 Skills and agents invoke MCP tools or the CLI — no direct `Write`/`Edit` on per-item files.
 
 ## Primary Interface (MCP)
@@ -57,12 +57,12 @@ List open backlog items with optional filters.
 Every response item includes `state` (open/closed) and `status` (workflow status from `status:*` labels).
 Returns `{items: [{title, priority, issue, plan, state, status, milestone}], backend: {...}, messages, warnings}`.
 
-The `backend` dict is always present. It reports GitHub availability status probed on every call,
-regardless of the `from_github` parameter. No automatic sync is triggered.
+The backend dict is always present. It reports availability from the selected backend provider;
+the status is reported on every call regardless of the refresh parameter. No automatic sync is triggered.
 
 | `backend` field | Type | Description |
 |----------------|------|-------------|
-| `name` | `str` | Backend name (`"GitHub"`) |
+| `name` | `str` | Selected backend provider name |
 | `availability` | `str` | `"reachable"` \| `"not_checked"` \| `"needs_authentication"` \| `"rate_limited"` \| `"error"` |
 | `open_count` | `int` | Live open issue count (0 when not reachable) |
 | `total_count` | `int` | Live total issue count (0 when not reachable) |
@@ -253,12 +253,16 @@ GitHub Actions and environments without an MCP client use `fastmcp call` against
 uv run fastmcp call plugins/development-harness/.mcp.json <tool_name> [key=value ...]
 ```
 
-The CLI (`sam_schema/cli.py`, surfaced as the `dh` entry point) mirrors most MCP backlog tools, using kebab-case and sometimes dropping the `backlog_` prefix. Mirrored backlog tools: `backlog_add` (`backlog-add`), `backlog_list` (`backlog-list`), `backlog_view` (`backlog-view`), `backlog_update` (`backlog-update`), `backlog_close` (`backlog-close`), `backlog_resolve` (`backlog-resolve`), `backlog_groom` (`backlog-groom`), `backlog_sync` (`backlog-sync`), `backlog_normalize` (`backlog-normalize`), `backlog_pull` (`backlog-pull`), `backlog_strike_entry` (`backlog-strike`), `backlog_comment_issue` (`comment-issue`), `backlog_list_comments` (`comments`), `backlog_read_comment` (`read-comment`), `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`), `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`). MCP-only (no CLI equivalent): `sync_now` and `sync_status` (server-bound background-sync operations). The full, authoritative CLI-vs-MCP capability list is in [backend-providers.md](../../docs/backend-providers.md) "CLI vs MCP Capability Surface".
+The CLI exposes the provider-neutral `sam backlog` domain group. Its 26 leaves are:
+
+`add`, `list`, `view`, `update`, `close`, `resolve`, `link-followup`, `list-followups`, `groom`, `sync`, `pull`, `pull-all`, `normalize`, `strike`, `refresh`, `labels`, `merged-prs`, `milestones`, `soonest-milestone`, `create-milestone`, `issues`, `comment-issue`, `comments`, `read-comment`, `projects`, and `create-project`.
+
+Use them as `sam backlog <leaf>`. The CLI does not select a provider; backend selection is resolved from project configuration. The full, authoritative CLI-vs-MCP capability list is in [backend-providers.md](../../docs/backend-providers.md) "CLI vs MCP Capability Surface".
 
 ## Environment
 
-- `GITHUB_TOKEN` — Required for all GitHub issue operations (`add`, `sync`, `close`, `resolve`,
-  `update --create-issue`, `pull`). Set in environment before invoking MCP tools or the CLI.
+- `GITHUB_TOKEN` — Required when the selected backend provider is GitHub and the operation reaches
+  GitHub APIs. Set it in the environment before invoking those MCP tools or CLI operations.
 
 ## Integration
 

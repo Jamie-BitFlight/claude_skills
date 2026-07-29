@@ -19,7 +19,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
-from sam_schema.core.models import _BEADS_ID_PATTERN, Task
+from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, Task, TaskStatus
 
 # ---------------------------------------------------------------------------
 # Shared base — eliminates 17x repeated model_config boilerplate
@@ -72,9 +72,8 @@ class TaskDefinition(Task):
     """MCP-input projection of Task.
 
     Inherits all field definitions, alias conventions, and validators from
-    ``sam_schema.core.models.Task``.  The ``extra='ignore'`` config allows
-    callers to submit unknown fields without raising a validation error —
-    unknown fields are silently discarded at the MCP boundary.
+    ``sam_schema.core.models.Task``. Unknown fields are rejected at this shared
+    boundary so CLI and MCP callers receive the same validation contract.
 
     Runtime-only fields (``created``, ``started``, ``completed``,
     ``last_activity``, ``github_issue``) are inherited but default to ``None``;
@@ -87,10 +86,22 @@ class TaskDefinition(Task):
     callers may omit it when submitting a new task.
     """
 
-    model_config = ConfigDict(populate_by_name=True, use_enum_values=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True, extra="forbid")
 
     id: str = Field(..., pattern=r"^[A-Za-z]?\d+(\.\d+)?$", validation_alias=AliasChoices("task", "id"))
-    status: str = Field(default="not-started", description="Task status. Defaults to 'not-started'.")
+    status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Task status. Defaults to 'not-started'.")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: object) -> object:
+        """Normalize documented status aliases before enum validation.
+
+        Returns:
+            A canonical status value for enum validation.
+        """
+        if isinstance(value, str):
+            return STATUS_MAP.get(value, STATUS_MAP.get(value.upper(), value))
+        return value
 
 
 # ---------------------------------------------------------------------------

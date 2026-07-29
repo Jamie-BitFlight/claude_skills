@@ -214,7 +214,7 @@ _MigrateDiscoveryResult = tuple[list[_MigrateCandidate], int]
 
 
 def _migrate_make_candidate(
-    rel: str, atype: ArtifactType, issue: int | None, issue_filter: int | None
+    rel: str, atype: ArtifactType, issue: int | None, issue_filter: ItemId | None
 ) -> _MigrateCandidate | None:
     """Build a candidate tuple, returning ``None`` when the file is filtered out.
 
@@ -241,7 +241,7 @@ def _migrate_make_candidate(
 
 
 def _migrate_scan_codebase_dir(
-    codebase_dir: Path, issue_filter: int | None, backlog_items: list[dict]
+    codebase_dir: Path, issue_filter: ItemId | None, backlog_items: list[dict]
 ) -> _MigrateDiscoveryResult:
     """Scan ``plan/codebase/`` for markdown codebase-analysis files.
 
@@ -270,7 +270,7 @@ def _migrate_scan_codebase_dir(
 
 
 def _migrate_scan_plan_dir(
-    plan_dir: Path, issue_filter: int | None, backlog_items: list[dict]
+    plan_dir: Path, issue_filter: ItemId | None, backlog_items: list[dict]
 ) -> _MigrateDiscoveryResult:
     """Scan ``plan/`` (excluding subdirectories other than ``codebase/``).
 
@@ -308,7 +308,7 @@ def _migrate_scan_plan_dir(
 
 
 def _migrate_discover_candidates(
-    repo_root: Path, issue_filter: int | None, backlog_items: list[dict]
+    repo_root: Path, issue_filter: ItemId | None, backlog_items: list[dict]
 ) -> _MigrateDiscoveryResult:
     """Scan plan/ and research/ for artifact files.
 
@@ -398,7 +398,7 @@ def _migrate_register_one(
 # ---------------------------------------------------------------------------
 
 
-def migrate_dry_run(issue_number: int | None) -> dict:
+def migrate_dry_run(issue_number: ItemId | None) -> dict:
     """Discover candidates and return a preview without making any API calls.
 
     Args:
@@ -480,7 +480,7 @@ def _migrate_queue_manifest_only(
     return result
 
 
-def migrate_live_run(issue_number: int | None, out: Output) -> dict:
+def migrate_live_run(issue_number: ItemId | None, out: Output) -> dict:
     """Execute the live migration against GitHub.
 
     Args:
