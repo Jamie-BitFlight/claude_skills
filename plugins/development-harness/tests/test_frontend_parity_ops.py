@@ -27,6 +27,8 @@ _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
+import contextlib
+
 import backlog_core.models as _bc_models
 from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
 from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
@@ -110,10 +112,8 @@ def dh_env(tmp_path: Path):
     saved_dh_home = os.environ.get("DH_STATE_HOME")
     os.environ["DH_STATE_HOME"] = dh_state
     saved_ctx_config = None
-    try:
+    with contextlib.suppress(RuntimeError):
         saved_ctx_config = get_context_config()
-    except RuntimeError:
-        pass
     set_context_config(ContextConfig(backend=LocalContextBackend()))
 
     yield env
@@ -205,8 +205,15 @@ async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
         ["backlog-add", "Parity CLI Add", "--description", "cli test", "--priority", "P1"], env=dh_env
     )
     mcp_result = await call_mcp_tool(
-        _backlog_mcp, "backlog_add",
-        {"title": "Parity MCP Add", "priority": "P1", "description": "mcp test", "gate_token": gate_token, "force": True},
+        _backlog_mcp,
+        "backlog_add",
+        {
+            "title": "Parity MCP Add",
+            "priority": "P1",
+            "description": "mcp test",
+            "gate_token": gate_token,
+            "force": True,
+        },
     )
 
     assert cli_result["title"] == "Parity CLI Add"
@@ -223,14 +230,11 @@ async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
 
 async def test_backlog_view_parity(dh_env: dict[str, str]) -> None:
     """Backlog item viewed through CLI and MCP returns the same identity fields."""
-    _run_cli(
-        ["backlog-add", "Parity View Item", "--description", "view test", "--priority", "P1"], env=dh_env
-    )
+    _run_cli(["backlog-add", "Parity View Item", "--description", "view test", "--priority", "P1"], env=dh_env)
 
     cli_view = _run_cli(["backlog-view", "Parity View Item"], env=dh_env)
     mcp_view = await call_mcp_tool(
-        _backlog_mcp, "backlog_view",
-        {"selector": "Parity View Item", "summary": False, "include_content": True},
+        _backlog_mcp, "backlog_view", {"selector": "Parity View Item", "summary": False, "include_content": True}
     )
 
     assert cli_view.get("title") == "Parity View Item"
@@ -240,23 +244,18 @@ async def test_backlog_view_parity(dh_env: dict[str, str]) -> None:
 
 async def test_backlog_update_parity(dh_env: dict[str, str]) -> None:
     """Backlog update through CLI and MCP both change the title correctly."""
-    _run_cli(
-        ["backlog-add", "Parity Update CLI", "--description", "update test", "--priority", "P1"], env=dh_env
-    )
+    _run_cli(["backlog-add", "Parity Update CLI", "--description", "update test", "--priority", "P1"], env=dh_env)
     _run_cli(
         ["backlog-add", "Parity Update MCP", "--description", "update test", "--priority", "P1", "--force"], env=dh_env
     )
 
     # CLI update
-    cli_update = _run_cli(
-        ["backlog-update", "Parity Update CLI", "--title", "CLI Updated Title"], env=dh_env
-    )
+    cli_update = _run_cli(["backlog-update", "Parity Update CLI", "--title", "CLI Updated Title"], env=dh_env)
     assert "CLI Updated Title" in str(cli_update)
 
     # MCP update
     mcp_update = await call_mcp_tool(
-        _backlog_mcp, "backlog_update",
-        {"selector": "Parity Update MCP", "title": "MCP Updated Title"},
+        _backlog_mcp, "backlog_update", {"selector": "Parity Update MCP", "title": "MCP Updated Title"}
     )
     assert "MCP Updated Title" in str(mcp_update)
 
@@ -269,24 +268,19 @@ async def test_backlog_update_parity(dh_env: dict[str, str]) -> None:
 
 async def test_backlog_close_parity(dh_env: dict[str, str]) -> None:
     """Backlog close through CLI and MCP both close items correctly."""
-    _run_cli(
-        ["backlog-add", "Parity Close CLI", "--description", "close test", "--priority", "P1"], env=dh_env
-    )
+    _run_cli(["backlog-add", "Parity Close CLI", "--description", "close test", "--priority", "P1"], env=dh_env)
     _run_cli(
         ["backlog-add", "Parity Close MCP", "--description", "close test", "--priority", "P1", "--force"], env=dh_env
     )
 
     # CLI close
-    cli_close = _run_cli(
-        ["backlog-close", "Parity Close CLI", "--reason", "duplicate"], env=dh_env
-    )
+    cli_close = _run_cli(["backlog-close", "Parity Close CLI", "--reason", "duplicate"], env=dh_env)
     assert cli_close.get("title") == "Parity Close CLI"
     assert cli_close.get("closed") is True
 
     # MCP close
     mcp_close = await call_mcp_tool(
-        _backlog_mcp, "backlog_close",
-        {"selector": "Parity Close MCP", "reason": "duplicate"},
+        _backlog_mcp, "backlog_close", {"selector": "Parity Close MCP", "reason": "duplicate"}
     )
     assert mcp_close.get("title") == "Parity Close MCP"
     assert mcp_close.get("closed") is True
@@ -294,24 +288,19 @@ async def test_backlog_close_parity(dh_env: dict[str, str]) -> None:
 
 async def test_backlog_resolve_parity(dh_env: dict[str, str]) -> None:
     """CLI backlog resolve and MCP backlog_close both complete items."""
-    _run_cli(
-        ["backlog-add", "Parity Resolve CLI", "--description", "resolve test", "--priority", "P1"], env=dh_env
-    )
+    _run_cli(["backlog-add", "Parity Resolve CLI", "--description", "resolve test", "--priority", "P1"], env=dh_env)
     _run_cli(
         ["backlog-add", "Parity Close MCP2", "--description", "close test", "--priority", "P1", "--force"], env=dh_env
     )
 
     # CLI resolve
-    cli_resolve = _run_cli(
-        ["backlog-resolve", "Parity Resolve CLI", "--summary", "Done"], env=dh_env
-    )
+    cli_resolve = _run_cli(["backlog-resolve", "Parity Resolve CLI", "--summary", "Done"], env=dh_env)
     assert cli_resolve.get("title") == "Parity Resolve CLI"
     assert cli_resolve.get("resolved") is True
 
     # MCP close
     mcp_close = await call_mcp_tool(
-        _backlog_mcp, "backlog_close",
-        {"selector": "Parity Close MCP2", "reason": "duplicate"},
+        _backlog_mcp, "backlog_close", {"selector": "Parity Close MCP2", "reason": "duplicate"}
     )
     assert mcp_close.get("title") == "Parity Close MCP2"
     assert mcp_close.get("closed") is True
@@ -319,9 +308,7 @@ async def test_backlog_resolve_parity(dh_env: dict[str, str]) -> None:
 
 async def test_backlog_groom_parity(dh_env: dict[str, str]) -> None:
     """Both transports generate identical groomed content for the same section."""
-    _run_cli(
-        ["backlog-add", "Parity Groom CLI", "--description", "groom test", "--priority", "P1"], env=dh_env
-    )
+    _run_cli(["backlog-add", "Parity Groom CLI", "--description", "groom test", "--priority", "P1"], env=dh_env)
     _run_cli(
         ["backlog-add", "Parity Groom MCP", "--description", "groom test", "--priority", "P1", "--force"], env=dh_env
     )
@@ -336,16 +323,14 @@ async def test_backlog_groom_parity(dh_env: dict[str, str]) -> None:
 
     # MCP groom
     mcp_groom = await call_mcp_tool(
-        _backlog_mcp, "backlog_groom",
-        {"selector": "Parity Groom MCP", "section": "Analysis", "content": GROOM_CONTENT},
+        _backlog_mcp, "backlog_groom", {"selector": "Parity Groom MCP", "section": "Analysis", "content": GROOM_CONTENT}
     )
     assert mcp_groom.get("title") == "Parity Groom MCP"
 
     # Verify both items have groomed content via view
     cli_view = _run_cli(["backlog-view", "Parity Groom CLI", "--section", "Analysis"], env=dh_env)
     mcp_view = await call_mcp_tool(
-        _backlog_mcp, "backlog_view",
-        {"selector": "Parity Groom MCP", "summary": False, "section": "Analysis"},
+        _backlog_mcp, "backlog_view", {"selector": "Parity Groom MCP", "summary": False, "section": "Analysis"}
     )
 
     assert "needs investigation" in str(cli_view)
@@ -472,7 +457,8 @@ async def test_plan_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
             plan_a = pid
         else:
             plan_b = pid
-    assert plan_a and plan_b
+    assert plan_a
+    assert plan_b
 
     # CLI update plan_a
     cli_update = _run_cli(
@@ -482,8 +468,13 @@ async def test_plan_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
 
     # MCP update plan_b
     mcp_update = await call_mcp_tool(
-        _sam_mcp, "sam_plan",
-        {"config": {"action": "update", "set_fields_json": {"goal": "MCP Updated"}}, "plan": plan_b, "plan_dir": plan_dir},
+        _sam_mcp,
+        "sam_plan",
+        {
+            "config": {"action": "update", "set_fields_json": {"goal": "MCP Updated"}},
+            "plan": plan_b,
+            "plan_dir": plan_dir,
+        },
     )
     assert mcp_update["updated"] is True
 
@@ -510,7 +501,8 @@ async def test_plan_append_task_parity(dh_env: dict[str, str], tmp_path: Path) -
             plan_a = result["plan_id"]
         else:
             plan_b = result["plan_id"]
-    assert plan_a and plan_b
+    assert plan_a
+    assert plan_b
 
     # CLI append to plan_a
     cli_append = _run_cli(
@@ -522,7 +514,8 @@ async def test_plan_append_task_parity(dh_env: dict[str, str], tmp_path: Path) -
 
     # MCP append to plan_b
     mcp_append = await call_mcp_tool(
-        _sam_mcp, "sam_plan",
+        _sam_mcp,
+        "sam_plan",
         {"config": {"action": "append_task", "task": _TASK_DEF}, "plan": plan_b, "plan_dir": plan_dir},
     )
     assert mcp_append["appended"] is True
@@ -558,19 +551,17 @@ async def test_plan_finalize_parity(dh_env: dict[str, str], tmp_path: Path) -> N
             plan_a = pid
         else:
             plan_b = pid
-    assert plan_a and plan_b
+    assert plan_a
+    assert plan_b
 
     # CLI finalize plan_a
-    cli_finalize = _run_cli(
-        ["finalize", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env
-    )
+    cli_finalize = _run_cli(["finalize", plan_a, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
     assert cli_finalize["finalized"] is True
     assert cli_finalize["state"] == "ready"
 
     # MCP finalize plan_b
     mcp_finalize = await call_mcp_tool(
-        _sam_mcp, "sam_plan",
-        {"config": {"action": "finalize"}, "plan": plan_b, "plan_dir": plan_dir},
+        _sam_mcp, "sam_plan", {"config": {"action": "finalize"}, "plan": plan_b, "plan_dir": plan_dir}
     )
     assert mcp_finalize["finalized"] is True
     assert mcp_finalize["state"] == "ready"
@@ -679,7 +670,10 @@ async def test_task_state_parity(dh_env: dict[str, str], tmp_path: Path) -> None
     _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
 
     # CLI state command (no --format json — just prints status line).
-    result = subprocess.run(
+    import asyncio
+
+    result = await asyncio.to_thread(
+        subprocess.run,
         ["uv", "run", "sam", "state", f"{plan_id}/T01", "complete", "--plan-dir", plan_dir],
         capture_output=True,
         text=True,
@@ -726,6 +720,136 @@ async def test_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
     )
     assert cli_read["task"]["priority"] == 5
     assert mcp_read["task"]["priority"] == 5
+
+
+async def test_task_set_fields_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """CLI ``--set`` and MCP ``set_fields_json`` are mutually consistent across reads."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "set-fields-parity", "--goal", "Set-fields goal", "--plan-dir", plan_dir, "--format", "json"],
+        env=dh_env,
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    # CLI write --set
+    _run_cli(
+        ["update", f"{plan_id}/T01", "--plan-dir", plan_dir, "--set", "priority=5", "--format", "json"], env=dh_env
+    )
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert cli_read["task"]["priority"] == 5
+    assert mcp_read["task"]["priority"] == 5
+
+    # MCP write set_fields_json on a second task
+    TASK_DEF2 = dict(_TASK_DEF, id="T02")
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(TASK_DEF2), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    await call_mcp_tool(
+        _sam_mcp,
+        "sam_task",
+        {
+            "plan": plan_id,
+            "task": "T02",
+            "config": {"action": "update", "set_fields_json": {"priority": 3}},
+            "plan_dir": plan_dir,
+        },
+    )
+    cli_read2 = _run_cli(["read", f"{plan_id}/T02", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read2 = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    assert cli_read2["task"]["priority"] == 3
+    assert mcp_read2["task"]["priority"] == 3
+
+
+async def test_task_append_section_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """CLI ``--append-section`` and MCP ``append_section`` are mutually consistent across reads."""
+    import json
+
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+
+    cli_create = _run_cli(
+        ["create", "append-section-parity", "--goal", "Section goal", "--plan-dir", plan_dir, "--format", "json"],
+        env=dh_env,
+    )
+    plan_id = cli_create["plan_id"]
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    # CLI write --append-section
+    _run_cli(
+        [
+            "update",
+            f"{plan_id}/T01",
+            "--plan-dir",
+            plan_dir,
+            "--append-section",
+            "Notes",
+            "--section-content",
+            "CLI appended note.",
+            "--format",
+            "json",
+        ],
+        env=dh_env,
+    )
+    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    cli_notes = cli_read["task"].get("context-notes", "")
+    mcp_notes = mcp_read["task"].get("context-notes", "")
+    assert "Notes" in cli_notes
+    assert "CLI appended note." in cli_notes
+    assert "Notes" in mcp_notes
+    assert "CLI appended note." in mcp_notes
+
+    # MCP write append_section on a second task
+    TASK_DEF2 = dict(_TASK_DEF, id="T02")
+    _run_cli(
+        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(TASK_DEF2), "--format", "json"],
+        env=dh_env,
+    )
+    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+
+    await call_mcp_tool(
+        _sam_mcp,
+        "sam_task",
+        {
+            "plan": plan_id,
+            "task": "T02",
+            "config": {"action": "update", "append_section": "Decisions", "section_content": "MCP appended decision."},
+            "plan_dir": plan_dir,
+        },
+    )
+    cli_read2 = _run_cli(["read", f"{plan_id}/T02", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    mcp_read2 = await call_mcp_tool(
+        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
+    )
+    cli_notes2 = cli_read2["task"].get("context-notes", "")
+    mcp_notes2 = mcp_read2["task"].get("context-notes", "")
+    assert "Decisions" in cli_notes2
+    assert "MCP appended decision." in cli_notes2
+    assert "Decisions" in mcp_notes2
+    assert "MCP appended decision." in mcp_notes2
 
 
 # ---------------------------------------------------------------------------
@@ -785,8 +909,7 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
 
     # Set active task via MCP (preserves 'T01' prefix that plan file uses)
     await call_mcp_tool(
-        _sam_mcp, "sam_active_task",
-        {"config": {"action": "set", "plan": plan_id, "task": "T01", "plan_dir": plan_dir}},
+        _sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": plan_id, "task": "T01", "plan_dir": plan_dir}}
     )
 
     # CLI update
@@ -808,8 +931,7 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
 
     # MCP update
     mcp_update = await call_mcp_tool(
-        _sam_mcp, "sam_active_task",
-        {"config": {"action": "update", "set_fields_json": {"priority": 9}}},
+        _sam_mcp, "sam_active_task", {"config": {"action": "update", "set_fields_json": {"priority": 9}}}
     )
     assert mcp_update["updated"] is True
 
