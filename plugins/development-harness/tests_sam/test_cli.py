@@ -49,6 +49,24 @@ def test_help_shows_all_commands() -> None:
         assert cmd in result.output
 
 
+def test_append_task_accepts_legacy_task_id_alias(plan_dir: Path) -> None:
+    """append-task accepts the legacy ``task`` key as the task ID."""
+    result = runner.invoke(
+        app,
+        [
+            "append-task",
+            "P1",
+            "--plan-dir",
+            str(plan_dir),
+            "--task-json",
+            json.dumps({"task": "T4", "title": "Legacy task", "status": "not-started"}),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {"appended": True, "task_id": "T4"}
+
+
 # ---------------------------------------------------------------------------
 # sam list
 # ---------------------------------------------------------------------------

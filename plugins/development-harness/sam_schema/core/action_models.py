@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from sam_schema.core.models import _BEADS_ID_PATTERN, Task
 
@@ -89,6 +89,7 @@ class TaskDefinition(Task):
 
     model_config = ConfigDict(populate_by_name=True, use_enum_values=True, extra="ignore")
 
+    id: str = Field(..., pattern=r"^[A-Za-z]?\d+(\.\d+)?$", validation_alias=AliasChoices("task", "id"))
     status: str = Field(default="not-started", description="Task status. Defaults to 'not-started'.")
 
 

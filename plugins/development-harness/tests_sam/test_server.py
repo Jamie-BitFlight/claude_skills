@@ -959,6 +959,17 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_append_task_config_accepts_legacy_task_id_alias() -> None:
+    """MCP input accepts legacy ``task`` as the task ID and serializes ``id``."""
+    from sam_schema.core.action_models import AppendTaskConfig
+
+    config = AppendTaskConfig.model_validate({"action": "append_task", "task": {"task": "T2", "title": "Legacy task"}})
+
+    assert config.task.id == "T2"
+    assert config.task.model_dump(mode="json")["id"] == "T2"
+    assert "task" not in config.task.model_dump(mode="json")
+
+
 def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
