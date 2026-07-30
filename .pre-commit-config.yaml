@@ -176,7 +176,8 @@ repos:
 
       - id: skilllint
         name: Validate and fix plugins, skills, agents, commands
-        entry: uvx skilllint@latest check --fix
+        # Keep the caller's import path from shadowing skilllint's isolated environment.
+        entry: env -u PYTHONPATH uvx skilllint@latest check --fix
         language: system
         stages: [pre-commit]
         pass_filenames: true
