@@ -85,7 +85,7 @@ flowchart TD
         A12["T4 doc-drift-auditor"]
         A13["T5 service-docs-maintainer<br>(SKIPPED if no drift)"]
         A14["T6 context-refinement"]
-        VG["Completion Verification Gate<br>sam_status — all 6 tasks terminal?"]
+        VG["Completion Verification Gate<br>sam_plan status — all 6 tasks terminal?"]
         LABEL["Apply status:verified label"]
         S4 -->|"QG plan not found"| QGC
         QGC --> QGF
@@ -127,7 +127,7 @@ flowchart TD
 
 ### 2.1 sam_plan ready output (ReadyTasksResult)
 
-Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"ready"})` and `backlog_get_ready_sam_tasks(parent_issue_number)`. CLI fallback: `uv run sam ready P{N} --format json`.
+Output of the SAM MCP plan-ready operation or `backlog_get_ready_sam_tasks(parent_issue_number)`. For Beads-native readiness, prefer `bd ready --parent <bead-id> --json`; use the DH CLI adapter only when richer structured readiness is required.
 
 ```json
 {
@@ -149,7 +149,7 @@ Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"ready"})`
 
 ### 2.1a sam_plan status output (PlanStatus + autonomy)
 
-Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"status"})`. CLI fallback: `uv run sam status P{N} --format json`.
+Output of the SAM MCP plan-status operation. For Beads-native status, prefer `bd show <bead-id> --json` or `bd update`; use the DH CLI adapter for structured plan status.
 
 ```json
 {
@@ -172,7 +172,7 @@ Output of `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action":"status"})
 
 ### 2.2 TaskAssignment (sam_task read P{N}/T{M})
 
-Output of `mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"read"})`. CLI fallback: `uv run sam read P{N}/T{M} --format json`.
+Output of the SAM MCP task-read operation. In a Beads workspace, use `bd show <bead-id> --json` for native task reads; use the DH CLI adapter for structured SAM task addresses.
 
 ```json
 {
@@ -266,7 +266,7 @@ Read by `task_status_hook.py` PostToolUse handler.
 
 ### 2.7 sam_task claim output
 
-Output of `mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action":"claim"})`. CLI fallback: `uv run sam claim P{N}/T{M} --format json`.
+Output of the SAM MCP task-claim operation. In a Beads workspace, use `bd update <bead-id> --status in_progress` for native status; use the DH CLI adapter when claiming structured SAM tasks.
 
 ```json
 {
@@ -293,7 +293,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `~/.dh/projects/{slug}/plan/QG{NNN}-qg-{slug}.yaml` | `/complete-implementation` via `build_quality_gate_plan` + `sam_create` | SAM dispatch loop (T1–T6 quality gate tasks) |
 | `~/.dh/projects/{slug}/context/active-task-{sid}.json` | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
-| `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | `sam ready` readiness evaluation |
+| `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | ``plan ready` readiness evaluation |
 | `status: in-progress`, `started` field | `sam_task claim` via `/start-task` | `sam_plan status`, `sam_plan ready` exclusion |
 | Follow-up task files | `code-reviewer` | `/complete-implementation` recursion gate |
 | Context Manifest in task file | `context-gathering`, `context-refinement` | executing agents, future sessions |
@@ -305,16 +305,16 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 
 ```mermaid
 flowchart TD
-    Created([Task created]) -->|"swarm-task-planner via sam create"| NS[not-started]
+    Created([Task created]) -->|"swarm-task-planner via `plan create`"| NS[not-started]
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via sam state P{N}/T{M} complete"| CO[complete]
-    IP -->|"agent or human operator<br>via sam state P{N}/T{M} blocked"| BL[blocked]
-    IP -->|"agent or orchestrator<br>via sam state P{N}/T{M} failed"| FA[failed]
-    NS -->|"orchestrator<br>via sam state P{N}/T{M} deferred"| DE[deferred]
-    NS -->|"orchestrator<br>via sam state P{N}/T{M} skipped"| SK[skipped]
-    NS -->|"orchestrator<br>via sam state P{N}/T{M} failed"| FA
-    IP -->|"orchestrator<br>via sam state P{N}/T{M} deferred"| DE
-    IP -->|"orchestrator<br>via sam state P{N}/T{M} skipped"| SK
+    IP -->|"task_status_hook.py SubagentStop<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status complete"| CO[complete]
+    IP -->|"agent or human operator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status blocked"| BL[blocked]
+    IP -->|"agent or orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status failed"| FA[failed]
+    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status deferred"| DE[deferred]
+    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status skipped"| SK[skipped]
+    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status failed"| FA
+    IP -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status deferred"| DE
+    IP -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status skipped"| SK
     FA -->|"auto-cascade<br>mark downstream tasks skipped"| SK
 ```
 
@@ -369,7 +369,7 @@ flowchart TD
     TF["Task field: github_issue<br>linked sub-issue number"]
     GH --> BI
     BI -->|"backlog_update(selector, plan)"| PF
-    PF -->|"sam claim P{N}/T{M}"| CTX
+    PF -->|"`plan claim --address P{N}/T{M}`"| CTX
     CTX --> HOOK
     TF --> HOOK
 ```
@@ -473,7 +473,7 @@ flowchart TD
 
 ### Skip Whitelist
 
-Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered by the orchestrator via `sam_state` immediately after T4 completes with no drift findings. All other tasks must reach `status: complete`.
+Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered by the orchestrator via `sam_task` with `config={"action":"state","status":"skipped"}` immediately after T4 completes with no drift findings. All other tasks must reach `status: complete`.
 
 ### QG Plan File Location
 
@@ -490,4 +490,5 @@ Read these together to get the full system picture:
 - [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
 - [Task File Format](./TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
+- [Beads and workflow usage](./beads-and-workflow-usage.md) — provider-native versus structured workflow routing
 - [Domain model source](../sam_schema/core/models.py) — authoritative field definitions (`Task` class)

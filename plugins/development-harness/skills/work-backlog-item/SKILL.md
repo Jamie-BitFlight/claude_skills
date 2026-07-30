@@ -98,7 +98,7 @@ See the [Backlog Lifecycle reference](../../docs/backlog-lifecycle.md) for the c
 **Phase separation**: Grooming (Step 3.1) is autonomous research — the agent verifies facts, maps resources, estimates effort, and surfaces blockers. Planning (Step 4.2) is solution design — architecture, tasks, implementation. The human sets priorities and resolves blockers; the agent handles research and fact-checking autonomously.
 
 **SAM** — Stateless Agent Methodology. See [sam-definition.md](./references/workflows/work/sam-definition.md) for what SAM is and how to embody it. SAM lives in `../stateless-agent-methodology/` (or `bitflight-devops/stateless-agent-methodology` on GitHub).
-Primary source of truth is **GitHub Issues** when `backend=github` (labels + milestone = canonical status); when `backend=beads`, the beads issue tracker is the primary source of truth. Agents interact with backlog items exclusively through MCP tools (`backlog_view`, `backlog_update`, `backlog_list`, etc.) regardless of backend.
+The configured backend is authoritative for its native work records. For Beads-backed projects, load `beads-workflow` and use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the provider-neutral CLI for structured plans, dispatch, artifacts, validation, and handoffs that Beads does not provide. Do not describe MCP or CLI as an exclusive proxy layer.
 
 **MCP server availability**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 

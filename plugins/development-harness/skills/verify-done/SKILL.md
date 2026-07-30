@@ -224,7 +224,7 @@ flowchart TD
     Q -->|"Yes"| Gate{"Any item is contextually significant<br>OR was already flagged during the task<br>as needing a bug or backlog entry?"}
     Gate -->|"No — minor, not worth a ticket"| ObsOnly["Record as observation only<br>Include in summary below"]
     Gate -->|"Yes — significant"| Detect{"Which issue system does this project use?"}
-    Detect -->|".beads/dh-backend marker exists"| Beads["bd create --title='...' --description='...' --type=bug --priority=2"]
+    Detect -->|".beads/dh-backend marker exists"| Beads["bd create --title='...' --description='...' --type=bug --priority=2<br>Canonical Beads-native follow-up"]
     Detect -->|"GitHub remote / dh plugin present"| DH["Skill(skill='dh:work-backlog-item', args='create -- \"...\"')"]
     Detect -->|"Other"| Other["Create entry in whatever issue system the project uses"]
     Beads --> Ref["Record issue reference in summary"]
@@ -243,6 +243,10 @@ OBSERVATIONS:
 - Improvements:     [list or "none"]
 - Issues logged:    [issue refs or "none"]
 ```
+
+For a Beads workspace, the `bd create` branch above is canonical for native follow-ups; do not
+route the same CRUD operation through `sam backlog` merely for symmetry. Use DH CLI/MCP only for
+structured plans, dispatch, artifacts, validation, or capabilities Beads does not provide.
 
 ---
 

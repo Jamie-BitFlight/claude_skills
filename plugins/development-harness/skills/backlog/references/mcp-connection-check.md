@@ -54,30 +54,17 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
    before the server finishes starting. The default is sufficient for these
    servers (~1–2 s startup well within the default timeout).
 
-## SAM CLI Fallback
+## Adapter Selection
 
-If the SAM server is unavailable and the task cannot wait, use the `sam` CLI for SAM-only
-operations. It is registered as a console script in the `plugins/development-harness`
-sub-project (`pyproject.toml` — `sam = "sam_schema.cli:app"`), which is a separate uv
-project from the repo root. Running `uv run sam ...` from the repo root fails with
-`error: Failed to spawn: 'sam'` because the root project has no such script. For backlog
-operations there is no CLI equivalent — the MCP server must be available.
+If the configured backend is Beads, use native `bd` first for CRUD, readiness, status, and dependencies; do not route those operations through an adapter. If a structured SAM operation is needed and the SAM server is unavailable, use the validated direct script-path CLI.
 
-From the repo root, use `--project`:
+From the repository root:
 
 ```bash
-uv run --project plugins/development-harness sam list
-uv run --project plugins/development-harness sam status P{N}
-uv run --project plugins/development-harness sam ready P{N}
+CLI="uv run plugins/development-harness/sam_schema/cli.py"
+$CLI plan list
+$CLI plan status --plan-address P{N}
+$CLI plan ready --plan-address P{N}
 ```
 
-Or `cd plugins/development-harness` first and drop `--project`:
-
-```bash
-cd plugins/development-harness
-uv run sam list
-uv run sam status P{N}
-uv run sam ready P{N}
-
-Note: bare `P{N}` is ambiguous when multiple plans share the same number prefix.
-Always use the full `P{N}-{slug}` form (visible in `uv run sam list` output).
+Use named options for addresses and task data. Do not use the retired standalone console script, flat commands, positional addresses, or selectable output-format flags. The MCP composites remain MCP-only and should be called through their connected `mcp__plugin_dh_*` tools.

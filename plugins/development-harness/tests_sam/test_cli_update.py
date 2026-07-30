@@ -141,8 +141,8 @@ class TestSamUpdateContext:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        data = json.loads(result.stdout)
         assert data["updated"] is True
 
         # Verify persistence
@@ -183,7 +183,7 @@ class TestSamUpdateContext:
         )
         # Assert
         assert result.exit_code == 0
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert data["updated"] is True
         assert data["address"] == "1"
 
@@ -349,7 +349,7 @@ class TestSamUpdateAppendSection:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 0, result.stdout
         plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
         context_notes = str(plan_data["tasks"][0].get("context-notes", ""))
         assert "Divergence Notes" in context_notes

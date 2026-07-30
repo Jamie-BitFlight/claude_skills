@@ -46,9 +46,9 @@ This value governs gate behavior throughout the remainder of the Progress Loop f
 Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default),
 so no gate fires and the loop behaves identically to the previous behavior.
 
-2. If tasks remain, query ready tasks **once** and store the result as the current batch:
+2. If tasks remain, query ready tasks **once** and store the result as the current batch. In a Beads workspace, use `bd ready --parent <bead-id> --json` for native dependency readiness; use the SAM/DH adapter only for richer structured plan rules:
 
-If parent story issue number is known (`str | int` — GitHub integer ID such as `42` or beads string ID such as `"bd-a3f8"`), prefer the MCP tool:
+If parent story identifier is known and structured SAM readiness is required (`str | int` — GitHub integer ID such as `42` or beads string ID such as `"bd-a3f8"`), use the adapter tool:
 
 ```text
 backlog_get_ready_sam_tasks(parent_issue_number=N)

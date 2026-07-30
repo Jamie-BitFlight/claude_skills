@@ -1,17 +1,17 @@
 # SAM Task File Format
 
 **Status**: Snapshot (last synced 2026-03-31)
-**Purpose**: Reference for SAM task file structure and the SAM MCP server as the primary interface
+**Purpose**: Reference for SAM task file structure and the configured provider/workflow interfaces
 
-> **Drift warning**: This document drifts from the implementation between updates. The authoritative source for field definitions is `plugins/development-harness/sam_schema/core/models.py` (the `Task` Pydantic model). For planning or implementation work, verify field names, types, and defaults against `models.py` and the generated schema (`uv run sam schema --model Task`). For conceptual discussion, this document is sufficient as a point-in-time snapshot.
+> **Drift warning**: This document drifts from the implementation between updates. The authoritative source for field definitions is `plugins/development-harness/sam_schema/core/models.py` (the `Task` Pydantic model). For planning or implementation work, verify field names, types, and defaults against `models.py` and the generated schema (run the repository's schema generator from the development-harness project when available). For conceptual discussion, this document is sufficient as a point-in-time snapshot.
 
-All task file I/O routes through the SAM MCP server (`mcp__plugin_dh_sam__*`) or the `uv run sam` CLI fallback. No component reads or writes task files directly via Read/Edit/Write tools.
+Use the configured provider's native interface for provider-native state: in a Beads workspace, use `bd` directly for CRUD, readiness, claims/status, and dependencies. Use SAM MCP or the DH CLI for structured plan/task semantics, dispatch, artifacts, and validation that `bd` does not provide. Do not make ad-hoc edits to semantic task files; use the owning interface for the operation.
 
 ---
 
 ## Quick Reference
 
-### SAM MCP Tools (Primary)
+### SAM MCP Tools (Structured Adapter)
 
 Three consolidated tools replace the previous 8-tool interface. Each tool uses a
 discriminated union `config` parameter where `action` selects the operation.
@@ -128,24 +128,11 @@ The following 8 tools are replaced by the 3-tool interface above. They return a
 | `sam_list(...)` | `sam_plan(config={"action":"list",...})` |
 | `sam_create(...)` | `sam_plan(config={"action":"create",...})` |
 
-### CLI Fallback
+### DH CLI Adapter
 
-When MCP is unavailable, use the `uv run sam` CLI:
+When a structured SAM operation is needed outside an MCP host, use the validated DH CLI adapter. In a Beads workspace this is not a proxy for ordinary `bd` operations:
 
-```bash
-uv run sam list                                      # List all plans
-uv run sam list --search "my-feature"                # List with search filter
-echo "$YAML" | uv run sam create {slug} --goal "..." --stdin  # Create plan
-uv run sam read P{id} --format json                  # Read plan summary (e.g. Pc7d8e9f0)
-uv run sam read P{id}/T{M} --format json             # Read task (e.g. Pc7d8e9f0/T04)
-uv run sam update P{id} --context "..."              # Update plan context
-uv run sam state P{id}/T{M} {status}                 # Transition task status
-uv run sam claim P{id}/T{M}                          # Claim a task
-uv run sam ready P{id} --format json                 # List ready tasks
-uv run sam status P{id}                              # Plan progress summary
-uv run sam validate P{id} --format json              # Validate plan (CLI only)
-uv run sam migrate tasks-{N}-{slug}.md               # Migrate legacy format (CLI only)
-```
+Use the grouped script-path examples in the validated guide below. The historical `sam` names in older records are migration references only; do not execute them.
 
 ---
 
@@ -166,7 +153,7 @@ Plan files are stored under the per-project state directory (`~/.dh/projects/{pr
         T02.yaml
 ```
 
-`{id}` is a hex string assigned by `sam create`. `{slug}` is lowercase-hyphenated from the feature name.
+`{id}` is a hex string assigned by `plan create`. `{slug}` is lowercase-hyphenated from the feature name.
 
 ### Addressing
 
@@ -176,11 +163,11 @@ Pc7d8e9f0/T04     -- task T04 in plan Pc7d8e9f0
 my-slug/T1        -- task T1 in plan matching slug "my-slug"
 ```
 
-`sam read Pc7d8e9f0/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan). Plans created by `sam_plan(action='create')` have UUID-hex IDs (8 hex chars, e.g. `Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans created before this naming scheme.
+`plan read --address Pc7d8e9f0/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan). Plans created by `sam_plan(action='create')` have UUID-hex IDs (8 hex chars, e.g. `Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans created before this naming scheme.
 
 ### Legacy Names
 
-Plans created before this specification use `tasks-{N}-{slug}.md` naming (formerly stored in the repo-relative `plan/` directory, now resolved via `dh_paths.plan_dir()`). The addressing module resolves both patterns. Migrate using `sam migrate`. See [Legacy Format Support](#legacy-format-support).
+Plans created before this specification use `tasks-{N}-{slug}.md` naming (formerly stored in the repo-relative `plan/` directory, now resolved via `dh_paths.plan_dir()`). The addressing module resolves both patterns. Migrate using `plan migrate`. See [Legacy Format Support](#legacy-format-support).
 
 ---
 
@@ -218,7 +205,7 @@ tasks:
 
 For the complete field specification:
 
-- [Plan Schema](./plan-schema.json) — generated by `uv run sam schema --model Plan`
+- [Plan Schema](./plan-schema.json) — generated by the schema generator
 
 ---
 
@@ -259,7 +246,7 @@ All timestamps are ISO 8601 strings (e.g., `2026-03-15T13:00:00Z`).
 | Field | Default | Written By |
 |-------|---------|------------|
 | `created` | `null` | `swarm-task-planner` at plan creation |
-| `started` | `null` | `sam claim` via `start-task` skill |
+| `started` | `null` | `plan claim` via `start-task` skill |
 | `completed` | `null` | `task_status_hook.py` SubagentStop handler |
 | `last-activity` | `null` | `task_status_hook.py` PostToolUse handler |
 
@@ -309,12 +296,12 @@ All content fields are stored as YAML multiline scalars. Default is an empty str
 | Status | Description | Written By |
 |--------|-------------|-----------|
 | `not-started` | Default for new tasks | `swarm-task-planner` at creation |
-| `in-progress` | Agent has claimed the task | `sam claim` via `start-task` skill |
+| `in-progress` | Agent has claimed the task | `plan claim` via `start-task` skill |
 | `complete` | Task finished successfully | `task_status_hook.py` SubagentStop handler |
-| `blocked` | Cannot proceed — external dependency | Agent via `sam state` |
+| `blocked` | Cannot proceed — external dependency | Agent via `uv run plugins/development-harness/sam_schema/cli.py plan state --address P{id}/T{M} --new-status blocked` |
 | `deferred` | Postponed to a later session | Orchestrator |
 | `skipped` | Intentionally not executed | Orchestrator |
-| `failed` | Task execution failed; downstream dependents are auto-skipped | Agent or orchestrator via `sam state` |
+| `failed` | Task execution failed; downstream dependents are auto-skipped | Agent or orchestrator via `uv run plugins/development-harness/sam_schema/cli.py plan state --address P{id}/T{M} --new-status failed` |
 
 ### Priority Values
 
@@ -398,254 +385,83 @@ github-issue: 842
 
 For the complete field specification:
 
-- [Task Schema](./task-schema.json) — generated by `uv run sam schema --model Task`
+- [Task Schema](./task-schema.json) — generated by the schema generator
 
 ---
 
 ## Authorized Writers
 
-Task metadata fields are owned by specific components. The SAM MCP server and `sam_schema` API are the primary write interfaces, with the `uv run sam` CLI as fallback. No component writes task fields directly via Edit/Write tools.
+Task metadata fields are owned by specific components. In a Beads workspace, native Beads state is written with `bd`; structured SAM metadata and artifacts use the SAM MCP/DH CLI interfaces. No component writes semantic task fields directly via Edit/Write tools.
 
 | Field | Written By | Via |
 |-------|-----------|-----|
-| All task fields at creation | `swarm-task-planner` agent | `sam create {slug} --goal "..." --stdin` |
-| `status: in-progress`, `started` | `start-task` skill | `sam claim P{id}/T{M}` (e.g. `Pc7d8e9f0/T04`) |
-| `status: complete`, `completed` | `task_status_hook.py` SubagentStop handler | `sam state P{id}/T{M} complete` |
-| `status: blocked` | Agent or human operator | `sam state P{id}/T{M} blocked` |
+| All task fields at creation | `swarm-task-planner` agent | `plan create --slug {slug} --goal "..."` (with repeatable named task options) |
+| `status: in-progress`, `started` | `start-task` skill | `plan claim --address P{id}/T{M}` (e.g. `Pc7d8e9f0/T04`) |
+| `status: complete`, `completed` | `task_status_hook.py` SubagentStop handler | `plan state --address P{id}/T{M} --new-status complete` |
+| `status: blocked` | Agent or human operator | `plan state --address P{id}/T{M} --new-status blocked` |
 | `last-activity` | `task_status_hook.py` PostToolUse handler | `sam_schema` API — skipped if status is `complete` |
-| `context` | `context-gathering` agent | `sam update P{id} --context "..."` |
-| Plan metadata | orchestrator or `add-new-feature` skill | `sam update P{id} --set field=value` |
-| `divergence-notes`, body sections | executing agent via `start-task` skill | `sam update P{id}/T{M} --append-section "..."` |
+| `context` | `context-gathering` agent | `plan update --plan-address P{id} --context "..."` |
+| Plan metadata | orchestrator or `add-new-feature` skill | `plan update --plan-address P{id} --goal "..."`, or another declared typed field |
+| `divergence-notes`, body sections | executing agent via `start-task` skill | `plan update --plan-address P{id} --task-id T{M} --append-section "..." --section-content "..."` |
 
 ### Field Ownership Rules
 
-1. `status: in-progress` and `started` are written only by `sam claim`. Agents in `start-task` must invoke `sam claim` and check exit code. Direct Edit of these fields is an architectural violation.
+1. `status: in-progress` and `started` are written only by `plan claim --address ...` (or the MCP `sam_task` claim action). Agents in `start-task` must invoke the owning interface and check exit code. Direct Edit of these fields is an architectural violation.
 
 2. `status: complete` and `completed` are written only by `task_status_hook.py` SubagentStop handler.
 
 3. `last-activity` is written only by `task_status_hook.py` PostToolUse handler, and only when task status is not `complete`.
 
-4. `divergence-notes` count and `## Divergence Notes` body content are written by the executing agent via `sam update --append-section`.
+4. `divergence-notes` count and `## Divergence Notes` body content are written by the executing agent via `plan update --append-section`.
 
 5. All other fields (`id`, `title`, `agent`, `dependencies`, `priority`, `complexity`, `created`, `skills`, and analytical metadata) are written once at plan creation by `swarm-task-planner`. No component modifies them after creation.
 
 ---
 
-## sam CLI Usage Guide (Fallback Reference)
+## DH CLI Usage Guide (Validated Fallback Reference)
 
-### sam list — List all plans
-
-```bash
-uv run sam list
-# Output: { "items": [...], "count": N, "total": N }
-
-uv run sam list --search "gates"
-# Filters by case-insensitive substring match across feature, description, and goal fields
-
-uv run sam list --offset 10 --limit 5
-# Pagination support
-```
-
-### sam create — Create a new plan
+The direct script-path contract is authoritative. Every data-bearing value is a named option; successful output is compact JSON on stdout and diagnostics are on stderr. `--format` is not supported. In a Beads workspace, use `bd` directly for Beads-native CRUD, status, dependencies, and readiness; use this CLI only for structured plans and workflow operations.
 
 ```bash
-# Pipe YAML task definitions via stdin
-echo "$YAML_CONTENT" | uv run sam create my-feature \
-  --goal "Route all SAM workflow I/O through sam CLI" \
-  --issue 719 \
-  --stdin \
-  --format json
-
-# Output: { "path": "~/.dh/projects/{project-slug}/plan/Pc7d8e9f0-my-feature.yaml", "plan_id": "Pc7d8e9f0", "task_count": 14 }
+CLI="uv run plugins/development-harness/sam_schema/cli.py"
+$CLI plan list
+$CLI plan read --address Pc7d8e9f0
+$CLI plan read --address Pc7d8e9f0/T04
+$CLI plan create --slug my-feature --goal "Route workflow I/O through the DH CLI"
+$CLI plan update --plan-address Pc7d8e9f0 --context "Background context for all tasks"
+$CLI plan update --plan-address Pc7d8e9f0 --task-id T04 --append-section "Divergence Notes" --section-content "### DN-1: Brief title"
+$CLI plan state --address Pc7d8e9f0/T04 --new-status complete
+$CLI plan claim --address Pc7d8e9f0/T04
+$CLI plan ready --plan-address Pc7d8e9f0
+$CLI plan status --plan-address Pc7d8e9f0
+$CLI plan validate --address Pc7d8e9f0
+$CLI plan migrate --plan-address tasks-3-integrate-sam-schema.md
 ```
 
-Stdin YAML structure:
+For a task-bearing plan, repeat the validated named options shown by `plan create --help` (`--task-id`, `--task-title`, `--task-status`, `--task-agent`, `--task-dependency`, `--task-priority`, and `--task-complexity`). For a large plan, create an empty drafting plan, append one task at a time with `plan append-task --plan-address ...` and the same named task fields, then run `plan finalize --plan-address ...`; serialize appends for the same plan.
 
-```yaml
-tasks:
-  - id: T01
-    title: "First task"
-    status: not-started
-    agent: python-cli-architect
-    dependencies: []
-    priority: 1
-    complexity: medium
-    skills: ["python3-development"]
-    body: |
-      ## Objective
-      ...
-acceptance_criteria:
-  - "AC1: criterion one"
-context: "Shared context"
-```
-
-### sam read — Read task or plan
-
-```bash
-# Read a task — returns TaskAssignment (plan context + task details)
-uv run sam read Pc7d8e9f0/T04 --format json
-
-# Read a plan — returns Plan JSON
-uv run sam read Pc7d8e9f0 --format json
-```
-
-TaskAssignment response shape (see [TaskAssignment Schema](./assignment-schema.json)):
-
-```json
-{
-  "plan_id": "Pc7d8e9f0",
-  "plan_slug": "my-feature",
-  "plan_goal": "Route all SAM workflow I/O through sam CLI",
-  "plan_context": "Background context shared across all tasks",
-  "plan_acceptance_criteria": ["AC1: criterion one"],
-  "task": {
-    "id": "T04",
-    "title": "TASK_FILE_FORMAT.md rewrite",
-    "status": "in-progress",
-    "agent": "ai-doc-optimizer",  // content optimization and frontmatter description writing; for quality audit tasks use skill-auditor; for upstream content sync use skill-content-updater
-    "dependencies": [],
-    "priority": 1,
-    "complexity": "medium",
-    "body": "## Objective\n..."
-  }
-}
-```
-
-### sam update — Update plan or task fields
-
-```bash
-# Set plan context
-uv run sam update Pc7d8e9f0 --context "Background context for all tasks"
-
-# Set a specific field
-uv run sam update Pc7d8e9f0 --set acceptance-criteria-structured=true
-
-# Append a section to a task body
-uv run sam update Pc7d8e9f0/T04 \
-  --append-section "Divergence Notes" \
-  --section-content "### DN-1: Brief title\n..."
-```
-
-### set_fields_json — List-Valued Fields
-
-The `set_fields_json` parameter (used in `sam_task`, `sam_plan`, and `sam_active_task` update actions)
-accepts a JSON object whose values are passed directly to the Task or Plan Pydantic model. For
-list-valued fields, the value **must** be a native JSON array — not a string.
-
-**Correct form** — native JSON array:
-
-```json
-{"dependencies": ["T01", "T02"]}
-```
-
-This serializes to valid YAML:
-
-```yaml
-dependencies:
-  - T01
-  - T02
-```
-
-**Incorrect form** — comma-separated string:
-
-```json
-{"dependencies": "T01, T02"}
-```
-
-This stores a string scalar instead of a sequence: `dependencies: "T01, T02"`. Downstream
-consumers that expect a list will fail or silently produce wrong results.
-
-**Incorrect form** — Python repr string (observed in bug reports):
-
-```json
-{"dependencies": "['T01', 'T02']"}
-```
-
-This stores a Python list repr as a YAML string literal, causing parsing failures when the
-field is read back as a list.
-
-**Affected list fields:**
-
-| Field | Model |
-|-------|-------|
-| `dependencies` | Task |
-| `parallelize-with` | Task |
-| `blocked-by` | Task |
-| `skills` | Task |
-| `acceptance_criteria` | Plan |
-
-Pass these as JSON arrays in every `set_fields_json` call. The underlying fix (GitHub #1528)
-ensures correct YAML serialization when a native array is supplied — the behavior for string
-values remains unchanged (strings are stored as strings).
-
-### sam state — Transition task status
-
-```bash
-uv run sam state Pc7d8e9f0/T04 complete
-uv run sam state Pc7d8e9f0/T04 blocked
-# Valid values: not-started | in-progress | complete | blocked | deferred | skipped
-```
-
-### sam claim — Claim a task (mark in-progress)
-
-```bash
-uv run sam claim Pc7d8e9f0/T04 --format json
-# Output: { "claimed": true, "task_id": "T04", "started": "2026-03-15T13:00:00Z" }
-# Exit code 1: already claimed, not found, or status != not-started
-```
-
-### sam ready — List ready tasks
-
-```bash
-uv run sam ready Pc7d8e9f0 --format json
-# Output: { "feature": "my-feature", "ready_tasks": [...], "count": 3 }
-# A task is ready when status=not-started and all dependencies are complete.
-```
-
-### sam status — Plan progress summary
-
-```bash
-uv run sam status Pc7d8e9f0
-# Output: plan progress with task counts by status, blocked tasks, next ready tasks
-```
-
-### sam validate — Validate plan against schema
-
-```bash
-uv run sam validate Pc7d8e9f0 --format json
-# Output: { "valid": true/false, "errors": [...], "warnings": [...] }
-```
-
-### sam migrate — Convert legacy format to pure YAML
-
-```bash
-uv run sam migrate tasks-3-integrate-sam-schema.md
-# Converts YAML frontmatter .md file to pure YAML .yaml file
-# Output: ~/.dh/projects/{project-slug}/plan/Pc7d8e9f0-integrate-sam-schema.yaml
-```
-
----
+The structured MCP composites remain MCP-only transport names (`sam_plan`, `sam_task`, and `sam_active_task`) and are not CLI commands. The CLI exposes their reachable operations under `plan`, `backlog`, `dispatch`, `artifact`, and `active-task`; consult each group's current `--help` before invoking a less common leaf.
 
 ## Legacy Format Support
 
 ### Supported Legacy Patterns (Read-Only)
 
-The `sam` CLI reads but does not write these legacy formats:
+The historical `sam` CLI read but did not write these legacy formats; use the grouped DH CLI commands shown below for current work:
 
 | Pattern | Example | Support |
 |---------|---------|---------|
-| `tasks-{N}-{slug}.md` with YAML frontmatter | `tasks-3-my-feature.md` (under plan_dir()) | Read via `sam read`, `sam ready`, `sam status` |
+| `tasks-{N}-{slug}.md` with YAML frontmatter | `tasks-3-my-feature.md` (under plan_dir()) | Read via `plan read`, `plan ready`, `plan status` |
 | `tasks-{N}-{slug}/` directory with `.md` files | `tasks-3-my-feature/T01.md` (under plan_dir()) | Read only |
-| Bold markdown fields (`**Status**: NOT STARTED`) | legacy `.md` files | Read via `sam migrate` preprocessing |
+| Bold markdown fields (`**Status**: NOT STARTED`) | legacy `.md` files | Read via `plan migrate` preprocessing |
 
 ### Number Collision Warning
 
-When a canonical `P{id}-{slug}.yaml` file and a legacy `tasks-{NNN}-{slug}.md` file share the same identifier (both under `plan_dir()`), the canonical file takes precedence. The `sam` CLI emits a warning to stderr:
+When a canonical `P{id}-{slug}.yaml` file and a legacy `tasks-{NNN}-{slug}.md` file share the same identifier (both under `plan_dir()`), the canonical file takes precedence. The grouped DH CLI emits a warning to stderr:
 
 ```text
 WARNING: Pb5c6d7e8 resolved to 'Pb5c6d7e8-research-curator-code-analysis.yaml' but a legacy file
 also exists with the same slug: tasks-698-gates-subprocess-timeout.md.
-Run 'sam migrate Pb5c6d7e8' to remove the legacy file.
+Run 'uv run plugins/development-harness/sam_schema/cli.py plan migrate --plan-address tasks-698-gates-subprocess-timeout.md' to remove the legacy file.
 ```
 
 To resolve: migrate or rename the legacy file so identifiers are unique.
@@ -661,7 +477,7 @@ Migrate a legacy plan to the canonical format:
 ```bash
 # 1. Migrate format (YAML frontmatter .md -> pure YAML .yaml)
 #    Legacy files are resolved from dh_paths.plan_dir() automatically
-uv run sam migrate tasks-3-my-feature.md
+uv run plugins/development-harness/sam_schema/cli.py plan migrate --plan-address tasks-3-my-feature.md
 
 # 2. Rename to P{id} convention (dry run first)
 uv run python scripts/rename_plan_files.py --dry-run
@@ -703,16 +519,16 @@ Disabled hooks take precedence over profile and exit 0 after consuming stdin (Cl
 
 ## TaskAssignment Schema Reference
 
-- [Plan Schema](./plan-schema.json) — generated by `uv run sam schema --model Plan`
-- [Task Schema](./task-schema.json) — generated by `uv run sam schema --model Task`
-- [TaskAssignment Schema](./assignment-schema.json) — generated by `uv run sam schema --model TaskAssignment`
+- [Plan Schema](./plan-schema.json) — generated by the schema generator
+- [Task Schema](./task-schema.json) — generated by the schema generator
+- [TaskAssignment Schema](./assignment-schema.json) — generated by the schema generator
 
 Generate current schema files:
 
 ```bash
-uv run sam schema --model Plan > plugins/development-harness/docs/plan-schema.json
-uv run sam schema --model Task > plugins/development-harness/docs/task-schema.json
-uv run sam schema --model TaskAssignment > plugins/development-harness/docs/assignment-schema.json
+uv run python -m sam_schema.schema --model Plan > plugins/development-harness/docs/plan-schema.json
+uv run python -m sam_schema.schema --model Task > plugins/development-harness/docs/task-schema.json
+uv run python -m sam_schema.schema --model TaskAssignment > plugins/development-harness/docs/assignment-schema.json
 ```
 
 ---

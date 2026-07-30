@@ -46,7 +46,7 @@ def test_help_shows_all_commands() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     for cmd in ("plan", "backlog", "dispatch", "artifact", "active-task"):
-        assert cmd in result.output
+        assert cmd in result.stdout
 
 
 def test_append_task_uses_typed_options(plan_dir: Path) -> None:
@@ -70,7 +70,7 @@ def test_append_task_uses_typed_options(plan_dir: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert json.loads(result.output) == {"appended": True, "task_id": "T4"}
+    assert json.loads(result.stdout) == {"appended": True, "task_id": "T4"}
 
 
 def test_sam_task_create_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -108,7 +108,7 @@ def test_sam_task_create_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPat
         ],
     )
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
     assert captured["repo"] == "acme/project"
 
 
@@ -132,7 +132,7 @@ def test_sam_task_status_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPat
         app, ["plan", "sam-task-status", "--issue-number", "101", "--new-status", "complete", "--repo", "acme/project"]
     )
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stdout
     assert captured["repo"] == "acme/project"
 
 
@@ -145,7 +145,7 @@ def test_list_returns_json_with_items_count_total(plan_dir: Path) -> None:
     """List returns a JSON envelope with items, count, and total."""
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     # list_plans returns an envelope {"items": [...], "count": N, "total": N}.
     assert isinstance(data, dict)
     assert "items" in data
@@ -158,7 +158,7 @@ def test_list_items_contain_expected_fields(plan_dir: Path) -> None:
     """Each item in list output has feature, goal, task_count, and plan_ref fields."""
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert isinstance(data, dict)
     items = data["items"]
     assert len(items) >= 1
@@ -172,7 +172,7 @@ def test_list_search_filters_by_feature_name(plan_dir: Path) -> None:
     """List --search auth-system returns only matching plans."""
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(plan_dir), "--search", "auth-system"])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert isinstance(data, dict)
     items = data["items"]
     assert len(items) >= 1
@@ -187,7 +187,7 @@ def test_list_search_no_match_returns_empty_items(plan_dir: Path) -> None:
     """List --search with no matching plans returns an empty items array."""
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(plan_dir), "--search", "zzz-no-match-zzz"])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert isinstance(data, dict)
     assert data["items"] == []
 
@@ -196,7 +196,7 @@ def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
     """List --offset 0 --limit 1 returns at most one item."""
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(plan_dir), "--offset", "0", "--limit", "1"])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert isinstance(data, dict)
     items = data["items"]
     assert len(items) <= 1
@@ -207,7 +207,8 @@ def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
     missing = tmp_path / "no-such-dir"
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(missing)])
     assert result.exit_code == 1
-    assert "Error:" in result.output
+    assert not result.stdout
+    assert "Error:" in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +220,7 @@ def test_read_returns_task_assignment_json_with_task_address(plan_dir: Path) -> 
     """Read P1/T1 returns TaskAssignment JSON with plan context + nested task."""
     result = runner.invoke(app, ["plan", "read", "--address", "P1/T1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     # TaskAssignment wraps the task inside a "task" field.
     assert "task" in data
     assert data["task"]["id"] == "T1"
@@ -230,7 +231,7 @@ def test_read_task_assignment_includes_plan_fields(plan_dir: Path) -> None:
     """Read P1/T1 returns plan-level fields alongside the task."""
     result = runner.invoke(app, ["plan", "read", "--address", "P1/T1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     # Plan-level fields are present at top level (may be None if not set in fixture).
     assert "task" in data
     # plan_number and plan_slug are derived from filename when source_path is set.
@@ -241,7 +242,7 @@ def test_read_uses_slug_address(plan_dir: Path) -> None:
     """Read Pauth-system/T2 resolves via slug match and returns TaskAssignment."""
     result = runner.invoke(app, ["plan", "read", "--address", "Pauth-system/T2", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert data["task"]["id"] == "T2"
 
 
@@ -249,14 +250,15 @@ def test_read_invalid_address_exits_with_code_1(plan_dir: Path) -> None:
     """Read with completely invalid address exits 1 with error message."""
     result = runner.invoke(app, ["plan", "read", "--address", "INVALID", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 1
-    assert "Error:" in result.output
+    assert not result.stdout
+    assert "Error:" in result.stderr
 
 
 def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
     """Read P1 (no task part) returns ReadResult JSON — plan is nested under 'plan' key."""
     result = runner.invoke(app, ["plan", "read", "--address", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     # read_plan returns a ReadResult with .plan, .gaps, .source_format, .source_path.
     # The plan fields are nested under the "plan" key.
     assert "plan" in data
@@ -292,7 +294,7 @@ def test_status_returns_json_summary(plan_dir: Path) -> None:
     """Status P1 returns JSON with feature, total_tasks, and by_status."""
     result = runner.invoke(app, ["plan", "status", "--plan-address", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert data["feature"] == "auth-system"
     assert "total_tasks" in data
     assert "by_status" in data
@@ -322,7 +324,7 @@ def test_ready_returns_json_list(plan_dir: Path) -> None:
     """Ready P1 returns a JSON envelope with ready_tasks (may be empty or contain tasks)."""
     result = runner.invoke(app, ["plan", "ready", "--plan-address", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert isinstance(data, dict)
     assert "ready_tasks" in data
 
@@ -344,8 +346,8 @@ def test_state_updates_task_status_and_prints_confirmation(plan_dir: Path) -> No
         app, ["plan", "state", "--address", "P1/T3", "--new-status", "in-progress", "--plan-dir", str(plan_dir)]
     )
     assert result.exit_code == 0
-    assert "T3" in result.output
-    assert "in-progress" in result.output
+    assert "T3" in result.stdout
+    assert "in-progress" in result.stdout
 
 
 def test_state_invalid_status_value_is_rejected_by_typer(plan_dir: Path) -> None:
@@ -403,7 +405,7 @@ def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
     """Validate P1 on a canonical YAML plan reports no errors or warnings."""
     result = runner.invoke(app, ["plan", "validate", "--address", "P1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
-    data = json.loads(result.output)
+    data = json.loads(result.stdout)
     assert data["valid"] is True
     assert data["errors"] == []
     assert data["warnings"] == []

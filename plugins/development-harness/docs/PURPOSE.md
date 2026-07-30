@@ -54,10 +54,13 @@ CLI and MCP should expose stable logical CRUD and workflow operations for:
 - assigning sequence and ownership; and
 - querying by logical ID, relationship, status, capability, and provenance.
 
-The target frontend contract treats CLI and MCP as interchangeable transports:
-both expose logical operations rather than a provider's files, issue objects, or
-API-specific addresses. Both surfaces remain supported; this document makes no
-retirement or deprecation claim about either one.
+The target frontend contract treats CLI and MCP as interchangeable structured
+transports for the logical operations they expose. They are not required to
+proxy every provider-native capability. Skills and agents may use an existing
+backend tool directly when it is the authoritative and capable interface (for
+example, `bd` for Beads issue graphs and readiness). Both structured surfaces
+remain supported; this document makes no retirement or deprecation claim about
+either one.
 
 The frontend contract must not depend on a selected provider's object model or
 addressing scheme.
@@ -79,11 +82,14 @@ MCP commands or workflow behavior.
 The preceding sections describe the target contract, not fully implemented
 behavior today.
 
-- MCP is currently the primary interface; the CLI does not expose every MCP
-  capability surface. The authoritative list of MCP-only operations is in
-  [backend-providers.md](./backend-providers.md) "CLI vs MCP Capability
-  Surface". Close/resolve satisfies the "delete" CRUD verb per DEC-1; no
-  destructive delete is planned.
+- MCP is currently the primary structured interface for many operations; the
+  CLI does not expose every MCP capability surface, and neither surface proxies
+  every provider-native tool. The authoritative list of MCP-only operations is
+  in [backend-providers.md](./backend-providers.md) "CLI vs MCP Capability
+  Surface". In Beads-backed projects, `bd` is the native interface for issue
+  graph, status, dependency, readiness, label, notes, and metadata operations.
+  Close/resolve satisfies the "delete" CRUD verb per DEC-1; no destructive
+  delete is planned.
 - CLI and MCP durability differs: MCP plan paths use Gist write-through, while
   CLI and direct paths can remain local-only. The backlog persistence boundary
   (GitHub Issues source of truth for the default backend; only `GitHubBackend`

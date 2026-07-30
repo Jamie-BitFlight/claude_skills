@@ -10,7 +10,7 @@ disable-model-invocation: false
 ## Current Task Context
 
 **Available features (if in project with plan/ directory):**
-!`uv run sam list 2>/dev/null || echo '{"features": [], "count": 0, "message": "Not in a project with task files"}'`
+!`uv run plugins/development-harness/sam_schema/cli.py plan list 2>/dev/null || echo '{"features": [], "count": 0, "message": "Not in a project with task files"}'`
 
 **Active task context (if any):**
 !`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
@@ -19,9 +19,9 @@ A skill for querying and managing feature implementation task files. Provides pr
 
 ## SAM MCP Tool Usage
 
-The SAM MCP server (`mcp__plugin_dh_sam__*`) is the primary interface for all SAM task file operations. The `uv run sam` CLI is available as fallback when MCP is unavailable.
+Use the configured provider's native interface for native state. In a Beads workspace, use `bd` directly for CRUD, readiness, claims/status, and dependencies. Use SAM MCP or the DH CLI adapter for structured SAM plans, task metadata, artifacts, dispatch, and validation that `bd` does not provide. See [Beads and workflow usage](../../docs/beads-and-workflow-usage.md).
 
-### Commands
+### Structured SAM Commands
 
 #### list
 

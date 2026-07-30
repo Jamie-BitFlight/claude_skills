@@ -65,8 +65,8 @@ class TestSamCreateBasic:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        data = json.loads(result.stdout)
         assert "plan_id" in data
         assert "task_count" in data
         assert data["task_count"] == 0
@@ -87,7 +87,7 @@ class TestSamCreateBasic:
         )
         # Assert
         assert result.exit_code == 0
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert _UUID_PLAN_ID_RE.match(data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
 
     def test_create_writes_file_to_disk(self, plan_dir: Path) -> None:
@@ -106,7 +106,7 @@ class TestSamCreateBasic:
         )
         # Assert
         assert result.exit_code == 0
-        json.loads(result.output)
+        json.loads(result.stdout)
         assert len(list(plan_dir.glob("*.yaml"))) == 1
 
     def test_create_file_has_yaml_extension(self, plan_dir: Path) -> None:
@@ -124,7 +124,7 @@ class TestSamCreateBasic:
         )
         # Assert
         assert result.exit_code == 0
-        json.loads(result.output)
+        json.loads(result.stdout)
         assert next(plan_dir.glob("*.yaml")).suffix == ".yaml"
 
     def test_create_assigns_unique_plan_ids(self, plan_dir: Path) -> None:
@@ -149,8 +149,8 @@ class TestSamCreateBasic:
         # Assert
         assert r1.exit_code == 0
         assert r2.exit_code == 0
-        id1 = json.loads(r1.output)["plan_id"]
-        id2 = json.loads(r2.output)["plan_id"]
+        id1 = json.loads(r1.stdout)["plan_id"]
+        id2 = json.loads(r2.stdout)["plan_id"]
         assert _UUID_PLAN_ID_RE.match(id1), f"Expected UUID plan_id, got: {id1!r}"
         assert _UUID_PLAN_ID_RE.match(id2), f"Expected UUID plan_id, got: {id2!r}"
         assert id1 != id2, "Two consecutive creates should produce distinct plan_ids"
@@ -194,7 +194,7 @@ class TestSamCreateTypedTask:
             ],
             env={"NO_COLOR": "1"},
         )
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 0, result.stdout
         assert ": " not in result.stdout
         assert ", " not in result.stdout
         data = json.loads(result.stdout)
@@ -204,7 +204,7 @@ class TestSamCreateTypedTask:
             ["plan", "read", "--address", f"{data['plan_id']}/T1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        assert read_result.exit_code == 0, read_result.output
+        assert read_result.exit_code == 0, read_result.stdout
         task = json.loads(read_result.stdout)["task"]
         assert task["id"] == "T1"
         assert task["title"] == "First task"
@@ -229,6 +229,34 @@ class TestSamCreateTypedTask:
             app,
             ["plan", "create", "--slug", "bad-task", "--goal", "Goal", "--task-id", "T1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
+        )
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert result.stderr
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["plan", "create", "rejected", "--goal", "Goal", "--plan-dir", "PLACEHOLDER"],
+            [
+                "plan",
+                "create",
+                "--slug",
+                "rejected",
+                "--goal",
+                "Goal",
+                "--unknown-option",
+                "x",
+                "--plan-dir",
+                "PLACEHOLDER",
+            ],
+        ],
+        ids=["positional-slug", "unknown-option"],
+    )
+    def test_create_parser_rejects_positional_and_unknown_options(self, plan_dir: Path, args: list[str]) -> None:
+        """Create keeps data values named and reports parser errors on stderr."""
+        result = runner.invoke(
+            app, [str(plan_dir) if arg == "PLACEHOLDER" else arg for arg in args], env={"NO_COLOR": "1"}
         )
         assert result.exit_code != 0
         assert result.stdout == ""
@@ -273,13 +301,13 @@ class TestSamCreateOptionalFields:
         )
         # Assert
         assert result.exit_code == 0
-        plan_id = json.loads(result.output)["plan_id"]
+        plan_id = json.loads(result.stdout)["plan_id"]
         # Verify by reading back using the UUID plan_id
         read_result = runner.invoke(
             app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
-        assert read_result.exit_code == 0, read_result.output
-        plan_data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        plan_data = json.loads(read_result.stdout)
         # read_plan returns ReadResult; plan fields are nested under "plan".
         assert plan_data["plan"].get("context") == "Some shared context"
 
@@ -298,13 +326,13 @@ class TestSamCreateOptionalFields:
         )
         # Assert
         assert result.exit_code == 0
-        plan_id = json.loads(result.output)["plan_id"]
+        plan_id = json.loads(result.stdout)["plan_id"]
         # Read back using the UUID plan_id
         read_result = runner.invoke(
             app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
-        assert read_result.exit_code == 0, read_result.output
-        plan_data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        plan_data = json.loads(read_result.stdout)
         assert plan_data["plan"].get("issue") == "42"
 
 
@@ -355,16 +383,16 @@ class TestSamCreateRoundTrip:
             ],
             env={"NO_COLOR": "1"},
         )
-        assert create_result.exit_code == 0, create_result.output
-        plan_id = json.loads(create_result.output)["plan_id"]
+        assert create_result.exit_code == 0, create_result.stdout
+        plan_id = json.loads(create_result.stdout)["plan_id"]
 
         # Act -- read back
         read_result = runner.invoke(
             app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert read_result.exit_code == 0, read_result.output
-        data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        data = json.loads(read_result.stdout)
         task = data["task"]
         assert task["id"] == "T1"
         assert task["title"] == "First task"
@@ -404,16 +432,16 @@ class TestSamCreateRoundTrip:
             ],
             env={"NO_COLOR": "1"},
         )
-        assert create_result.exit_code == 0, create_result.output
-        plan_id = json.loads(create_result.output)["plan_id"]
+        assert create_result.exit_code == 0, create_result.stdout
+        plan_id = json.loads(create_result.stdout)["plan_id"]
 
         # Act -- read plan-level
         read_result = runner.invoke(
             app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert read_result.exit_code == 0, read_result.output
-        plan_data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        plan_data = json.loads(read_result.stdout)
         # read_plan returns ReadResult; tasks are nested under plan.tasks.
         assert len(plan_data["plan"].get("tasks", [])) == 1
 
@@ -451,15 +479,15 @@ class TestSamCreateRoundTrip:
             ],
             env={"NO_COLOR": "1"},
         )
-        assert create_result.exit_code == 0, create_result.output
-        plan_id = json.loads(create_result.output)["plan_id"]
+        assert create_result.exit_code == 0, create_result.stdout
+        plan_id = json.loads(create_result.stdout)["plan_id"]
 
         read_result = runner.invoke(
             app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert read_result.exit_code == 0, read_result.output
-        data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        data = json.loads(read_result.stdout)
         # TaskAssignment now serializes with alias field names (by_alias=True).
         assert data.get("plan-goal") == "My specific goal"
 
@@ -497,16 +525,16 @@ class TestSamCreateRoundTrip:
             ],
             env={"NO_COLOR": "1"},
         )
-        assert create_result.exit_code == 0, create_result.output
-        plan_id = json.loads(create_result.output)["plan_id"]
+        assert create_result.exit_code == 0, create_result.stdout
+        plan_id = json.loads(create_result.stdout)["plan_id"]
 
         # Act -- read back
         read_result = runner.invoke(
             app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert read_result.exit_code == 0, read_result.output
-        data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        data = json.loads(read_result.stdout)
         task = data["task"]
         assert task["title"] == "Body preservation test"
         assert task["agent"] == "python-cli-architect"
@@ -560,8 +588,8 @@ class TestSamCreateWithIssue:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        data = json.loads(result.stdout)
         assert _UUID_PLAN_ID_RE.match(data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
         assert len(list(plan_dir.glob("*.yaml"))) == 1
 
@@ -579,8 +607,8 @@ class TestSamCreateWithIssue:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        json.loads(result.stdout)
         assert len(list(plan_dir.glob("*.yaml"))) == 1
 
     def test_create_with_issue_stores_issue_in_plan(self, plan_dir: Path) -> None:
@@ -596,15 +624,15 @@ class TestSamCreateWithIssue:
             ["plan", "create", "--slug", "with-issue", "--goal", "Test", "--issue", "951", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        assert result.exit_code == 0, result.output
-        plan_id = json.loads(result.output)["plan_id"]
+        assert result.exit_code == 0, result.stdout
+        plan_id = json.loads(result.stdout)["plan_id"]
 
         # Act -- read back
         read_result = runner.invoke(
             app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
-        assert read_result.exit_code == 0, read_result.output
-        plan_data = json.loads(read_result.output)
+        assert read_result.exit_code == 0, read_result.stdout
+        plan_data = json.loads(read_result.stdout)
         assert plan_data["plan"].get("issue") == "951"
 
     def test_two_creates_with_same_issue_produce_distinct_plan_ids(self, plan_dir: Path) -> None:
@@ -625,10 +653,10 @@ class TestSamCreateWithIssue:
             ["plan", "create", "--slug", "second", "--goal", "Second", "--issue", "500", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        assert r1.exit_code == 0, r1.output
-        assert r2.exit_code == 0, r2.output
-        id1 = json.loads(r1.output)["plan_id"]
-        id2 = json.loads(r2.output)["plan_id"]
+        assert r1.exit_code == 0, r1.stdout
+        assert r2.exit_code == 0, r2.stdout
+        id1 = json.loads(r1.stdout)["plan_id"]
+        id2 = json.loads(r2.stdout)["plan_id"]
         assert _UUID_PLAN_ID_RE.match(id1), f"Expected UUID plan_id, got: {id1!r}"
         assert _UUID_PLAN_ID_RE.match(id2), f"Expected UUID plan_id, got: {id2!r}"
         assert id1 != id2, "Same issue should produce distinct UUID plan_ids"

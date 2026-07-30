@@ -8,7 +8,7 @@ argument-hint: <gap-description>
 
 # Backlog Tools Administrator
 
-Close capability gaps in the backlog tooling ecosystem instead of bypassing the backlog tools (MCP or CLI) with direct file edits or `gh` commands.
+Close capability gaps in the structured backlog tooling ecosystem instead of editing derived files or using an unrelated provider tool. For Beads-native issue, dependency, readiness, status, notes, and metadata operations, use `bd` directly; use MCP or the provider-neutral CLI for structured operations they own.
 
 ## Arguments
 

@@ -340,7 +340,7 @@ acceptance_criteria:
 context: ""
 ```
 
-Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering. `sam create` validates required fields and writes the plan file atomically.
+Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering. `plan create` (or MCP `sam_plan`) validates required fields and writes the plan atomically.
 
 ## Bookend Task Generation
 

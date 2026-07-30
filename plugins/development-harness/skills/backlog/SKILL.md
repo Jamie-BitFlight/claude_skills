@@ -1,13 +1,13 @@
 ---
 name: backlog
-description: Use when creating, listing, viewing, updating, closing, resolving, grooming, or syncing backlog items through the configured backend provider — single interface for all backlog CRUD via MCP tools (mcp__plugin_dh_backlog__*). The selected backend provider is authoritative; direct file edits are bypassed in favour of MCP tool calls.
+description: Use when structured backlog operations are needed through MCP or the provider-neutral CLI. For Beads-native issue and dependency work, use the beads-workflow skill and bd directly.
 ---
 
 # Backlog
 
-MCP tools are the **primary interface** for backlog items through the configured backend provider.
+MCP tools are the primary structured interface for provider-neutral backlog operations. They are not a universal proxy for backend-native tools.
 The selected backend provider is authoritative; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache or working state according to that backend.
-Skills and agents invoke MCP tools or the CLI — no direct `Write`/`Edit` on per-item files.
+For Beads-backed projects, load `beads-workflow` and use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the CLI for structured plans, artifacts, dispatch, validation, and other operations Beads does not provide. Do not edit derived per-item files directly.
 
 ## Primary Interface (MCP)
 
@@ -71,7 +71,7 @@ the status is reported on every call regardless of the refresh parameter. No aut
 | `last_sync` | `str` | ISO timestamp of most recent sync, empty string if never synced |
 | `error` | `str` | Error detail when availability is not `"reachable"`, otherwise `""` |
 
-Note — the CLI `--format text|json` flag has no MCP equivalent. MCP tools always return
+Note — the CLI has no selectable format flag; compact JSON is always emitted and has no MCP equivalent. MCP tools always return
 structured dicts (equivalent to JSON). Use `backlog_view` for detailed single-item output.
 
 ### `backlog_view`

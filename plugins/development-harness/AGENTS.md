@@ -543,7 +543,7 @@ The SAM MCP server uses a `TaskBackend` Protocol (`sam_schema/core/task_backend.
 - `local` (default) — wraps existing YAML I/O stack. **In the MCP server context**, `local` resolves to `GistTaskLayer(LocalYamlTaskProvider)` — plans with an associated GitHub issue are written through to Gist and are portable across environments (CI, worktrees, fresh checkouts). Plans without an issue (`issue=None`) are local-only and emit a non-portability warning. CLI/direct callers that instantiate `LocalYamlTaskProvider` directly do NOT get GistTaskLayer wrapping and remain single-machine only.
 - `github` — maps plans to GitHub Issues, tasks to sub-issues with `sam:{status}` labels. Requires IssueBackend + DocumentBackend (#984).
 - `memory` — in-memory test double. No persistence.
-- `beads` — maps plans to beads epics, tasks to child issues with `--parent` links. Context persisted via `bd remember`.
+- `beads` — maps plans to beads epics and tasks to child issues with `--parent` links for structured consumers. Beads-native issue, dependency, readiness, status, notes, and metadata operations use `bd` directly; adapter-only indexes/context may use `bd remember`.
 
 Select via `TASKBACKEND` env var or subsystem override in `.dh/config.yaml`. Default is `local` when neither is set — existing deployments require no changes.
 

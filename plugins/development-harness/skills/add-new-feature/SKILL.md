@@ -11,7 +11,7 @@ metadata:
 
 # Add New Feature (SAM Workflow)
 
-You MUST convert the user's request into **durable SAM artifacts** registered via MCP artifact and SAM tools:
+You MUST convert the user's request into **durable SAM artifacts** registered via the structured artifact and SAM interfaces (MCP or DH CLI adapter):
 
 - `feature-context-{slug}.md` (discovery)
 - `codebase/{FOCUS}.md` (optional, analysis)
@@ -26,7 +26,7 @@ $ARGUMENTS
 
 ## Artifact Discovery (Pre-Phase)
 
-Before starting any phase, check whether the feature request references a tracked issue — either a GitHub Issue (`#N`) or a beads issue ID (e.g. `bd-a3f8`). If an issue selector is present, discover existing artifacts registered on that issue.
+Before starting any phase, check whether the feature request references a tracked item — either a GitHub Issue (`#N`) or a Beads issue ID (e.g. `bd-a3f8`). In a Beads workspace, use `bd show <id> --json` for native item lookup; use the artifact adapter only to discover registered structured artifacts.
 
 ```mermaid
 flowchart TD
@@ -424,7 +424,7 @@ is that agents own their artifact storage.
 
 Delegate to `@dh:swarm-task-planner` to:
 
-- create `plan/P{id}-{slug}.yaml` (via `sam create`)
+- create the structured plan via `plan create` (or MCP `sam_plan`); use the returned plan address
 - ensure every task has:
   - **Status**, **Dependencies**, **Priority**, **Complexity**, **Agent**
   - Acceptance Criteria (3+)
@@ -537,8 +537,9 @@ Fill these values before constructing each delegation prompt. All values come fr
 
 | Variable | Source |
 |---|---|
-| `{issue}` | Issue selector — GitHub issue number (int) or beads ID string (e.g. `bd-a3f8`); no type coercion |
-| `{title}` | GitHub issue title from `backlog_view(selector="#{issue}")` |
+| `{item_ref}` | Provider-native item selector — GitHub issue number (int) or Beads ID string (e.g. `bd-a3f8`) |
+| `{issue}` | Legacy/template alias for the structured artifact adapter's item identifier; preserve its provider-native type |
+| `{title}` | Provider-native item title from `bd show` in Beads workspaces, or `backlog_view` for GitHub-backed workflows |
 | `{slug}` | Kebab-case identifier derived from the issue title (e.g., `agent-profile-mcp-tool`) |
 | `{work_type}` | "production of the feature" for new features; "fixing of an issue in" for bug fixes |
 | `{feature_name}` | Human-readable feature name from the issue title |

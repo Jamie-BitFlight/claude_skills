@@ -70,7 +70,7 @@ Read files completely. Trace call paths. Understand the full architecture.
 
 ### CRITICAL RESTRICTION
 
-You are FORBIDDEN from using the Edit or Write tool on any task file. Use `sam update` to write to task files. You are FORBIDDEN from editing any other files in the codebase. Your sole writing responsibility is updating the task file with a context manifest via the sam CLI.
+You are FORBIDDEN from using the Edit or Write tool on any task file. Use the structured SAM update operation (`sam_task`/`sam_plan`, or the corresponding `plan update` DH CLI command) to write to task files. You are FORBIDDEN from editing any other files in the codebase. Your sole writing responsibility is updating the task file with a context manifest via the SAM interface.
 
 ## Requirements for Your Output
 

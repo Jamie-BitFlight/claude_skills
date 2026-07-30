@@ -19,7 +19,9 @@ Last updated: 2026-03-01
 
 ## Primary Script
 
-The sole interface for all backlog and GitHub Issue CRUD:
+The provider-native interface is authoritative for native CRUD. In Beads workspaces, use `bd`
+directly for issue CRUD, readiness, status, and dependencies. DH CLI/MCP adapters cover structured
+workflow operations and provider-specific capabilities; they must not proxy ordinary `bd` commands.
 
 - `.claude/skills/backlog/scripts/backlog.py` — Typer CLI with subcommands: add, list, sync, close, resolve, update, groom, view
 
@@ -90,20 +92,19 @@ The sole interface for all backlog and GitHub Issue CRUD:
 ## Architectural Relationships
 
 ```text
-backlog.py (primary CLI — sole CRUD interface)
-  |-- invoked by: create-backlog-item, work-backlog-item, groom-backlog-item skills
-  |-- reads/writes: .claude/backlog/*.md (per-item files — local cache)
-  |-- syncs with: GitHub Issues (source of truth)
+provider-native CRUD (for Beads: `bd`; for GitHub-backed workflows: configured provider adapter)
+  |-- invoked by: provider-specific workflow skills
+  |-- structured workflow: DH CLI/MCP for plans, dispatch, artifacts, validation
   '-- schema: item-schema.md, state-machine.md
 
 backlog-item-groomer agent
   |-- invoked by: groom-backlog-item skill
-  '-- writes via: backlog.py groom subcommand
+  '-- writes via the configured provider/adapter operation
 
 hooks/
   |-- session-start-backlog.cjs -> prompts user on session start
   '-- stop-backlog-reminder.cjs -> reminder on session end
 
 CLAUDE.md ## Backlog Operations
-  '-- rule: "Use backlog.py for all CRUD — no direct edits"
+  '-- rule: "Use the provider-native interface for native CRUD; use adapters for structured operations"
 ```

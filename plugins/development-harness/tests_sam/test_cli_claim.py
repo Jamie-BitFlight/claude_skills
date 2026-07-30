@@ -104,7 +104,7 @@ class TestSamClaimSuccess:
             app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 0, result.stdout
 
     def test_claim_returns_json_with_claimed_true(self, plan_dir: Path) -> None:
         """Successful claim returns JSON with ``claimed: true``.
@@ -118,7 +118,7 @@ class TestSamClaimSuccess:
             app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert data["claimed"] is True
 
     def test_claim_returns_task_id_in_output(self, plan_dir: Path) -> None:
@@ -133,7 +133,7 @@ class TestSamClaimSuccess:
             app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert data["task_id"] == "T1"
 
     def test_claim_returns_started_timestamp(self, plan_dir: Path) -> None:
@@ -148,7 +148,7 @@ class TestSamClaimSuccess:
             app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        data = json.loads(result.output)
+        data = json.loads(result.stdout)
         assert data["started"] is not None
         assert "T" in data["started"]  # ISO format contains T separator
 
@@ -220,8 +220,8 @@ class TestSamClaimAlreadyClaimed:
             app, ["plan", "claim", "--address", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        payload = json.loads(result.stdout)
         assert payload["claimed"] is False
         assert payload["task_id"] == "T2"
 
@@ -238,8 +238,8 @@ class TestSamClaimAlreadyClaimed:
             app, ["plan", "claim", "--address", "P1/T3", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert result.exit_code == 0, result.output
-        payload = json.loads(result.output)
+        assert result.exit_code == 0, result.stdout
+        payload = json.loads(result.stdout)
         assert payload["claimed"] is False
         assert payload["task_id"] == "T3"
 
@@ -279,8 +279,8 @@ class TestSamClaimAlreadyClaimed:
             app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
-        assert second.exit_code == 0, second.output
-        payload = json.loads(second.output)
+        assert second.exit_code == 0, second.stdout
+        payload = json.loads(second.stdout)
         assert payload["claimed"] is False
         assert payload["task_id"] == "T1"
 

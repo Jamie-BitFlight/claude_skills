@@ -4,7 +4,9 @@
 
 # Backlog Skill
 
-A unified interface for managing backlog items and GitHub Issues from inside Claude Code sessions. Every item lives in two places at once: a local Markdown file in `~/.dh/projects/{slug}/backlog/` that Claude can read instantly, and a GitHub Issue that humans can browse, comment on, and track. The skill keeps them in sync automatically.
+A provider-neutral interface for managing backlog items from inside Claude Code sessions. The configured provider is authoritative. In a Beads workspace, use `bd` directly for native CRUD, readiness, status, and dependencies; DH files and adapters provide structured workflow state only where needed. GitHub issue/comment behavior remains provider-specific.
+
+See [Beads and workflow usage](../../docs/beads-and-workflow-usage.md) for the routing boundary.
 
 ## Why Use This?
 
@@ -41,9 +43,9 @@ Priority tiers map directly to file prefixes:
 | `p2-` | P2 | Could-have — lower urgency |
 | `ideas-` | Ideas | Exploratory — not yet assessed |
 
-### The MCP Interface (Primary)
+### The MCP Interface (Adapter)
 
-Twelve MCP tools are available to Claude in orchestrator sessions via the `mcp__plugin_dh_backlog__` prefix. These are the normal way Claude interacts with the backlog during a session.
+Twelve MCP tools are available to Claude in orchestrator sessions via the `mcp__plugin_dh_backlog__` prefix. Use them when the host requires MCP or the operation needs the structured adapter contract; they are not a universal proxy for native provider commands.
 
 | Tool | What it does |
 |------|-------------|
@@ -62,9 +64,9 @@ Twelve MCP tools are available to Claude in orchestrator sessions via the `mcp__
 
 The MCP server also exposes `artifact_*` tools for plan artifact management and `dispatch_*` tools for milestone wave orchestration. See `/dh:backlog` for the complete reference.
 
-### The CI/CLI Interface (Fallback)
+### The CI/CLI Interface (Adapter)
 
-GitHub Actions and environments without an MCP client use `fastmcp call` against the server script directly:
+GitHub Actions and environments that need the adapter without an MCP client can use `fastmcp call` against the server script directly. This is an adapter transport, not a fallback hierarchy:
 
 ```bash
 FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false \

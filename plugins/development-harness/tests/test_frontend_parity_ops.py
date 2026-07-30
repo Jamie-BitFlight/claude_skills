@@ -52,18 +52,20 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
     import json
     import subprocess
 
-    repo_root = _plugin_root.parent.parent
     result = subprocess.run(
-        ["uv", "run", "--project", str(repo_root), str(_plugin_root / "sam_schema" / "cli.py"), *args],
+        ["uv", "run", str(_plugin_root / "sam_schema" / "cli.py"), *args],
         capture_output=True,
         text=True,
         timeout=30,
-        cwd=str(repo_root),
         env=env,
         check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:5000]}")
+    assert result.stdout.endswith("\n")
+    assert result.stdout.count("\n") == 1
+    assert '": "' not in result.stdout
+    assert '", "' not in result.stdout
     return json.loads(result.stdout)
 
 

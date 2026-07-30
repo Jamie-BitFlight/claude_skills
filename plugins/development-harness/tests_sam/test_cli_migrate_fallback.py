@@ -422,3 +422,18 @@ def test_migrate_all_mixed_standard_and_fallback_files(tmp_path: Path) -> None:
     assert "P001-canonical.yaml" in yaml_files
     assert "P006-nonstandard.yaml" in yaml_files
     assert "Migrated (fallback)" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["plan", "migrate", "P1"], ["plan", "migrate", "--unknown-option"]],
+    ids=["positional-address", "unknown-option"],
+)
+def test_migrate_parser_rejects_positional_and_unknown_options(tmp_path: Path, args: list[str]) -> None:
+    """Migration data and options use the grouped named-only CLI contract."""
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    result = runner.invoke(app, [*args, "--plan-dir", str(plan_dir)])
+    assert result.exit_code != 0
+    assert result.stdout == ""
+    assert result.stderr

@@ -103,22 +103,28 @@ The development harness uses three subsystems. The backlog MCP now uses a plugga
 
 ## CLI vs MCP Capability Surface
 
-MCP is the primary interface for the development harness; the CLI (`sam_schema/cli.py`, a Typer app surfaced as the `dh` entry point) mirrors most MCP operations. This section is the authoritative list of the current capability gap so consumers do not infer CLI parity where it does not exist. The gap is a documented current-state boundary, not a target; see [PURPOSE.md](./PURPOSE.md) "Target Frontend Contract" for the interchangeable-transports target.
+MCP is one structured transport for the development harness; the CLI (`sam_schema/cli.py`, a Typer app surfaced as the `dh` entry point) exposes selected provider-neutral workflow operations. Neither surface proxies every provider-native capability. In a Beads workspace, use `bd` directly for native issue, status, dependency, readiness, notes, and metadata operations. This section is the authoritative capability inventory so consumers do not infer parity where it does not exist; see [PURPOSE.md](./PURPOSE.md) "Target Frontend Contract" for the structured transport contract.
 
 Both surfaces delegate the operations they share to the same `backlog_core.operations` / `sam_schema.core` paths — there is no parallel CLI implementation. The gap is missing CLI commands, not divergent behaviour.
 
 ### Operations exposed on both surfaces
 
-The CLI mirrors these MCP tools. The CLI uses kebab-case and sometimes drops the `backlog_`/`sam_` prefix; the mapping below is semantic.
+The CLI and MCP expose selected provider-neutral structured operations. They are
+optional transports, not a proxy for every backend-native tool. In a Beads
+workspace, skills and agents use `bd` directly for issue graph, status,
+dependency, readiness, label, notes, and metadata operations. The mapping below
+lists shared structured operations only; see
+[`beads-and-workflow-usage.md`](./beads-and-workflow-usage.md) for side-by-side
+routing.
 
-- **Backlog CRUD**: `backlog_add` (`backlog-add`), `backlog_list` (`backlog-list`), `backlog_view` (`backlog-view`), `backlog_update` (`backlog-update`), `backlog_close` (`backlog-close`), `backlog_resolve` (`backlog-resolve`), `backlog_groom` (`backlog-groom`), `backlog_sync` (`backlog-sync`), `backlog_normalize` (`backlog-normalize`), `backlog_pull` (`backlog-pull`), `backlog_strike_entry` (`backlog-strike`).
+- **Backlog CRUD**: `backlog_add` (`backlog add`), `backlog_list` (`backlog list`), `backlog_view` (`backlog view`), `backlog_update` (`backlog update`), `backlog_close` (`backlog close`), `backlog_resolve` (`backlog resolve`), `backlog_groom` (`backlog groom`), `backlog_sync` (`backlog sync`), `backlog_normalize` (`backlog normalize`), `backlog_pull` (`backlog pull`), `backlog_strike_entry` (`backlog strike`).
 - **Comments**: `backlog_comment_issue` (`comment-issue`), `backlog_list_comments` (`comments`), `backlog_read_comment` (`read-comment`).
 - **GitHub metadata**: `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`).
 - **SAM task bridges**: `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`).
-- **Artifacts**: `artifact_register` (`artifact-register`), `artifact_list` (`artifact-list`), `artifact_get` (`artifact-get`), `artifact_read` (`artifact-read`), `artifact_migrate` (`artifact-migrate`).
+- **Artifacts**: `artifact_register` (`artifact register`), `artifact_list` (`artifact list`), `artifact_get` (`artifact get`), `artifact_read` (`artifact read`), `artifact_migrate` (`artifact migrate`).
 - **SAM plan/task sub-operations**: the MCP composites `sam_plan` (actions: read, create, list, status, ready, update, append_task, finalize) and `sam_task` (actions: read, claim, state, update) are exposed on the CLI as individual sub-commands (`create`, `read`, `list`, `state`, `ready`, `status`, `update`, `claim`, `append-task`, `finalize`). The CLI does not expose the composite `sam_plan`/`sam_task` verbs themselves, but every composite sub-operation is reachable. The CLI also has a standalone `validate` command (plan-schema validation) that is not a sub-action of either composite.
 - **Active task**: `sam_active_task` (actions: get, set, update, clear) is mirrored by the CLI `active-task` command group (`active-task get`, `active-task set`, `active-task update`, `active-task clear`). Both transports resolve a `ContextBackend` through the same chain (`CONTEXTBACKEND` env var → `context.backend` in `.dh/config.yaml` → default `local`) and delegate to the same `dh_core.operations` functions, so the CLI is backend-agnostic rather than local-only and a task parked by one surface is visible to the other. Caveat: the `memory` backend is per-process, so it is not meaningful across separate CLI invocations — `local` (writes `active-task-{session_id}.json` under `dh_paths.context_dir()`) and `beads` (`bd remember` under `dh.active-task.<session_id>`) are the durable choices; `github` raises `NotImplementedError` pending T02. Added by T-P5-ACTIVE-TASK; parity covered by `tests/test_cli_active_task.py`.
-- **Dispatch**: `dispatch_read` (`dispatch-read`), `dispatch_validate` (`dispatch-validate`), `dispatch_stale_check` (`dispatch-stale-check`), `dispatch_create_plan` (`dispatch-create-plan`), `dispatch_conflicts` (`dispatch-conflicts`), `dispatch_spawn` (`dispatch-spawn`), `dispatch_wave_start` (`dispatch-wave-start`), `dispatch_wave_status` (`dispatch-wave-status`), `dispatch_item_status` (`dispatch-item-status`).
+- **Dispatch**: `dispatch_read` (`dispatch read`), `dispatch_validate` (`dispatch validate`), `dispatch_create_plan` (`dispatch create-plan`), `dispatch_spawn` (`dispatch spawn`), `dispatch_wave_start` (`dispatch wave-start`), `dispatch_wave_status` (`dispatch wave-status`), `dispatch_item_status` (`dispatch item-status`). `dispatch_stale_check` and `dispatch_conflicts` remain MCP-only/provider-specific blockers and have no CLI leaf.
 
 ### MCP-only operations (no CLI equivalent)
 
@@ -126,10 +132,10 @@ Two MCP tools have no CLI command today. The audit's B1 verdict named four (`sam
 
 | MCP tool | Surface | Notes |
 |----------|---------|-------|
-| `sync_now` | backlog | Trigger an immediate background backlog sync. The CLI `backlog-sync` command does a synchronous sync; `sync_now` triggers the MCP server's background sync singleton. |
+| `sync_now` | backlog | Trigger an immediate background backlog sync. The CLI `backlog sync` command does a synchronous sync; `sync_now` triggers the MCP server's background sync singleton. |
 | `sync_status` | backlog | Report the MCP server's background sync state. The CLI has no equivalent because it does not run a long-lived server with background sync state. |
 
-`sync_now`/`sync_status` are inherently MCP-server-bound: they manage a background sync loop that only exists inside the long-running MCP server process. A CLI invocation cannot observe or trigger that loop in-process; a CLI equivalent would have to call the MCP server over transport, which adds no value over `backlog-sync`. The audit's interchangeable-transports claim (P5) is therefore interpreted as covering logical CRUD/workflow operations; server-process state operations are out of scope by design.
+`sync_now`/`sync_status` are inherently MCP-server-bound: they manage a background sync loop that only exists inside the long-running MCP server process. A CLI invocation cannot observe or trigger that loop in-process; a CLI equivalent would have to call the MCP server over transport, which adds no value over `backlog sync`. The audit's interchangeable-transports claim (P5) is therefore interpreted as covering logical CRUD/workflow operations; server-process state operations are out of scope by design.
 
 ### "Delete" CRUD verb
 
@@ -755,7 +761,7 @@ class TaskBackend(Protocol):
 | `LocalYamlTaskProvider` | `local` | `sam_schema.core.backends.local_yaml` | Default. Wraps existing YAML I/O stack (yaml_reader, yaml_writer, query). **In the MCP server context**, wrapped by `GistTaskLayer` (`sam_schema.core.gist_task_layer`) — issue-backed plans write through to Gist and are portable. CLI/direct use without GistTaskLayer is single-machine only. |
 | `GitHubTaskProvider` | `github` | `sam_schema.core.backends.github_task` | Maps plans → GitHub Issues (`sam:plan` label), tasks → sub-issues (`sam:{status}` labels). Constructor: `GitHubTaskProvider(issue_backend: BacklogBackend, doc_backend: DocumentBackend)`. `BacklogBackend` is from `backlog_core.backend_protocol`; `DocumentBackend` is a stub in `github_task.py` pending #984. |
 | `InMemoryTaskProvider` | `memory` | `sam_schema.core.backends.memory` | In-memory test double. No persistence. Use in tests and CI. |
-| `BeadsTaskProvider` | `beads` | `sam_schema.core.backends.beads_task` | Maps plans → beads epics, tasks → child issues with `--parent` links. Context persistence via `bd remember` under `dh.active-task.<session_id>` keys. Artifacts stored as JSON blob in `bd update --metadata dh.artifacts={...}`. |
+| `BeadsTaskProvider` | `beads` | `sam_schema.core.backends.beads_task` | Structured adapter mapping plans → Beads epics and tasks → child issues with `--parent` links. Native Beads operations remain direct `bd` usage. Adapter context/index persistence may use `bd remember` under `dh.active-task.<session_id>` keys; artifacts use structured metadata. |
 
 #### Configuration
 
