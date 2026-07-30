@@ -5,7 +5,7 @@ identical structured output. This is the primary validation gate for
 the unified backend extraction.
 
 Strategy:
-  - CLI path: subprocess `uv run sam <cmd> --format json`
+  - CLI path: subprocess `uv run sam <group> <command>` (JSON is the default)
   - MCP path: call the internal server function directly with a test backend
   - Both paths should delegate to the same dh_core.operations function.
   - Once delegation is in place, parity is structural — both call the same
@@ -46,10 +46,10 @@ def _get_project_slug() -> str:
 
 
 def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None) -> dict[str, Any]:
-    """Run `uv run sam <args> --format json` and return parsed JSON output.
+    """Run `uv run sam <args>` and return parsed JSON output.
 
     Args:
-        args: CLI arguments after `sam` (e.g. ["list", "--limit", "1"]).
+        args: CLI arguments after `sam` (e.g. ["plan", "list", "--limit", "1"]).
         timeout: Maximum seconds to wait for the subprocess.
         env: Optional environment variable overrides merged onto os.environ.
 
@@ -65,7 +65,7 @@ def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = 
     if env:
         run_env.update(env)
     result = subprocess.run(
-        ["uv", "run", "sam", *args, "--format", "json"],
+        ["uv", "run", "sam", *args],
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -99,10 +99,10 @@ def dh_state_home(tmp_path: Path) -> tuple[Path, dict[str, str]]:
 class TestParityInfrastructure:
     """Verify the test harness itself works before adding operation tests."""
 
-    def test_cli_list_returns_json(self, dh_state_home: tuple[Path, dict[str, str]]) -> None:
-        """The CLI `list` command must return valid JSON — an envelope with items."""
+    def test_cli_plan_list_returns_json(self, dh_state_home: tuple[Path, dict[str, str]]) -> None:
+        """The grouped plan-list CLI command returns an envelope with items."""
         _, env = dh_state_home
-        result = run_cli(["list", "--limit", "1"], env=env)
+        result = run_cli(["plan", "list", "--limit", "1"], env=env)
         # list_plans returns an envelope {"items": [...], "count": N, "total": N}.
         assert isinstance(result, dict)
         assert "items" in result

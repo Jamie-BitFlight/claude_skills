@@ -69,13 +69,13 @@ async def reset_state() -> None:
 
 @pytest.fixture
 def mock_list_items_empty(mocker: MockerFixture) -> None:
-    """Patch operations.list_items to return an empty cache."""
-    mocker.patch("backlog_core.operations.list_items", return_value=_make_list_items_result([]))
+    """Patch the server-bound list operation to return an empty cache."""
+    mocker.patch("dh_core.operations.list_items", return_value=_make_list_items_result([]))
 
 
 @pytest.fixture
 def mock_list_items_populated(mocker: MockerFixture) -> None:
-    """Patch operations.list_items to return a non-empty cache (3 items)."""
+    """Patch the server-bound list operation to return a non-empty cache (3 items)."""
     items: list[BacklogListItem] = [
         {
             "issue": "#1",
@@ -105,7 +105,7 @@ def mock_list_items_populated(mocker: MockerFixture) -> None:
             "topic": "",
         },
     ]
-    mocker.patch("backlog_core.operations.list_items", return_value=_make_list_items_result(items))
+    mocker.patch("dh_core.operations.list_items", return_value=_make_list_items_result(items))
 
 
 @pytest.fixture
