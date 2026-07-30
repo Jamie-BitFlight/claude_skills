@@ -16,10 +16,12 @@ forces GistTaskLayer to fall back to local cache for read/status/list.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
@@ -35,9 +37,12 @@ from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogConfig as _ModelsBacklogConfig
 from backlog_core.server import mcp as _backlog_mcp
+from sam_schema import artifacts, dispatch
+from sam_schema.cli import app
 from sam_schema.core.backends.local_context_backend import LocalContextBackend
 from sam_schema.core.context_config import ContextConfig, get_context_config, reset_context_config, set_context_config
 from sam_schema.server import mcp as _sam_mcp
+from typer.testing import CliRunner
 
 from tests.helpers import call_mcp_tool
 
@@ -1030,3 +1035,278 @@ async def test_active_task_clear_parity(dh_env: dict[str, str]) -> None:
 
     cli_get = _run_cli(["active-task", "get"], env=dh_env)
     assert cli_get["active_task"] is None
+
+
+# ---------------------------------------------------------------------------
+# Dispatch/artifact CLI forwarding parity (provider-neutral)
+# ---------------------------------------------------------------------------
+
+
+_runner = CliRunner()
+
+
+def _assert_compact_result(result: Any, expected: dict[str, Any]) -> None:
+    assert result.exit_code == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout.endswith("\n")
+    assert result.stdout.count("\n") == 1
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
+    assert json.loads(result.stdout) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "operation", "args", "kwargs", "payload"),
+    [
+        (
+            "read",
+            "dispatch_read_plan",
+            ["--milestone-number", "10"],
+            {"milestone_number": 10},
+            {"milestone_number": 10},
+        ),
+        (
+            "validate",
+            "dispatch_validate_plan",
+            ["--milestone-number", "10"],
+            {"milestone_number": 10},
+            {"milestone_number": 10},
+        ),
+        (
+            "create-plan",
+            "dispatch_create_plan",
+            [
+                "--milestone-number",
+                "10",
+                "--milestone-title",
+                "Milestone",
+                "--integration-branch",
+                "main",
+                "--wave-item",
+                "wave=1;issue=101;title=Feature A;priority=P1",
+                "--wave-item",
+                "wave=2;issue=102;title=Feature B;priority=P2;depends_on=101",
+            ],
+            {
+                "milestone_number": 10,
+                "plan": {
+                    "milestone": {"number": 10, "title": "Milestone", "integration_branch": "main"},
+                    "conflict_groups": [],
+                    "waves": [
+                        {
+                            "wave": 1,
+                            "parallel": True,
+                            "items": [
+                                {
+                                    "title": "Feature A",
+                                    "issue": 101,
+                                    "priority": "P1",
+                                    "conflict_group": None,
+                                    "depends_on": [],
+                                    "status": "pending",
+                                }
+                            ],
+                        },
+                        {
+                            "wave": 2,
+                            "parallel": True,
+                            "items": [
+                                {
+                                    "title": "Feature B",
+                                    "issue": 102,
+                                    "priority": "P2",
+                                    "conflict_group": None,
+                                    "depends_on": [101],
+                                    "status": "pending",
+                                }
+                            ],
+                        },
+                    ],
+                    "quality_gates": {"pre_merge": [], "post_merge": []},
+                },
+                "overwrite": False,
+                "validate": True,
+            },
+            {"milestone_number": 10, "wave_count": 2},
+        ),
+        (
+            "wave-start",
+            "dispatch_wave_start",
+            [
+                "--milestone-number",
+                "10",
+                "--wave-number",
+                "1",
+                "--item",
+                "issue=101;title=Feature A",
+                "--item",
+                "issue=102;title=Feature B",
+            ],
+            {
+                "milestone": 10,
+                "wave_num": 1,
+                "items": [{"issue": 101, "title": "Feature A"}, {"issue": 102, "title": "Feature B"}],
+            },
+            {"milestone": 10, "wave_num": 1},
+        ),
+        (
+            "item-status",
+            "dispatch_item_status",
+            [
+                "--milestone-number",
+                "10",
+                "--issue-number",
+                "101",
+                "--status",
+                "complete",
+                "--result",
+                "ok",
+                "--cost",
+                "1.25",
+            ],
+            {"milestone": 10, "issue": 101, "status": "complete", "result": "ok", "error": "", "cost": 1.25},
+            {"milestone": 10, "issue": 101},
+        ),
+        (
+            "wave-status",
+            "dispatch_wave_status",
+            ["--milestone-number", "10", "--wave-number", "1"],
+            {"milestone": 10, "wave_num": 1},
+            {"milestone": 10, "wave_num": 1},
+        ),
+        (
+            "spawn",
+            "dispatch_spawn",
+            [
+                "--milestone-number",
+                "10",
+                "--wave-number",
+                "1",
+                "--max-concurrent",
+                "2",
+                "--model",
+                "sonnet",
+                "--phase",
+                "groom",
+                "--effort",
+                "high",
+            ],
+            {
+                "milestone": 10,
+                "wave_num": 1,
+                "max_concurrent": 2,
+                "model": "sonnet",
+                "phase": "groom",
+                "effort": "high",
+            },
+            {"accepted": True},
+        ),
+    ],
+)
+def test_dispatch_cli_forwards_named_options(
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    operation: str,
+    args: list[str],
+    kwargs: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    mock_operation = Mock(return_value=payload)
+    monkeypatch.setattr(dispatch.operations, operation, mock_operation)
+    result = _runner.invoke(app, ["dispatch", command, *args])
+    _assert_compact_result(result, payload)
+    mock_operation.assert_called_once_with(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("command", "operation", "args", "kwargs", "payload"),
+    [
+        (
+            "register",
+            "artifact_register",
+            [
+                "--item-id",
+                "42",
+                "--artifact-type",
+                "research",
+                "--artifact-id",
+                "plan/research.md",
+                "--status",
+                "current",
+                "--agent",
+                "worker",
+                "--content",
+                "# Research",
+            ],
+            {
+                "item_id": "42",
+                "artifact_type": "research",
+                "artifact_id": "plan/research.md",
+                "status": "current",
+                "agent": "worker",
+                "content": "# Research",
+            },
+            {"registered": True},
+        ),
+        (
+            "list",
+            "artifact_list",
+            ["--item-id", "42", "--artifact-type", "research"],
+            {"item_id": "42", "artifact_type": "research"},
+            {"artifacts": [], "count": 0},
+        ),
+        (
+            "get",
+            "artifact_get",
+            ["--item-id", "42", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            {"item_id": "42", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"artifacts": [], "count": 0},
+        ),
+        (
+            "read",
+            "artifact_read",
+            ["--item-id", "42", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            {"item_id": "42", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"artifact_type": "research", "path": "plan/research.md", "content": "# Research", "status": "current"},
+        ),
+        (
+            "migrate",
+            "artifact_migrate",
+            ["--item-id", "42", "--old-artifact-id", "plan/old.md", "--new-artifact-id", "plan/new.md"],
+            {"item_id": "42", "dry_run": False, "old_artifact_id": "plan/old.md", "new_artifact_id": "plan/new.md"},
+            {"migrated": 1},
+        ),
+    ],
+)
+def test_artifact_cli_forwards_named_options(
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    operation: str,
+    args: list[str],
+    kwargs: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    mock_operation = Mock(return_value=payload)
+    monkeypatch.setattr(artifacts.operations, operation, mock_operation)
+    result = _runner.invoke(app, ["artifact", command, *args])
+    _assert_compact_result(result, payload)
+    mock_operation.assert_called_once_with(**kwargs)
+
+
+def test_forwarding_diagnostics_are_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        dispatch.operations,
+        "dispatch_wave_status",
+        Mock(return_value={"status": "pending", "messages": ["using mocked state"], "warnings": ["demo warning"]}),
+    )
+    result = _runner.invoke(app, ["dispatch", "wave-status", "--milestone-number", "10", "--wave-number", "1"])
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {
+        "status": "pending",
+        "messages": ["using mocked state"],
+        "warnings": ["demo warning"],
+    }
+    assert "using mocked state" in result.stderr
+    assert "demo warning" in result.stderr
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
