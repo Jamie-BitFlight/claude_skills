@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 from pydantic import ValidationError
 
@@ -14,7 +12,6 @@ from sam_schema.cli_inputs import (
     PlanUpdateInput,
     TaskUpdateFields,
     TaskUpdateInput,
-    compact_json,
 )
 from sam_schema.core.action_models import TaskDefinition
 
@@ -60,13 +57,3 @@ def test_update_adapters_reject_incomplete_sections_and_empty_patches() -> None:
         )
     with pytest.raises(ValidationError, match="at least one plan update field"):
         PlanUpdateInput(plan_address="P1")
-
-
-def test_compact_json_uses_aliases_and_omits_unset_values() -> None:
-    """Boundary models provide compact JSON suitable for stdout."""
-    payload = json.loads(compact_json(TaskDefinition(id="T1", title="Implement")))
-
-    assert payload["id"] == "T1"
-    assert payload["title"] == "Implement"
-    assert "github-issue" not in payload
-    assert " " not in compact_json(TaskDefinition(id="T1", title="Implement"))

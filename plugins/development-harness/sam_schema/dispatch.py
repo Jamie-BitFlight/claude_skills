@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Annotated, Literal, TypeGuard
+from typing import Annotated, Literal
 
 import typer
 from dh_core import operations
 from dispatch_schema import DispatchPlan, ItemPriority, MilestoneHeader, QualityGates, Wave, WaveItem
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from sam_schema.cli_output import err, output_json
+from sam_schema.cli_output import emit_result, err
 
 app = typer.Typer(help="Dispatch workflow operations.", no_args_is_help=True)
 
@@ -109,38 +109,16 @@ def _group_plan_items(values: list[str]) -> dict[int, list[WaveItem]]:
     return grouped
 
 
-def _is_result_mapping(value: object) -> TypeGuard[dict[str, object]]:
-    """Narrow an operation result to its JSON mapping shape.
-
-    Returns:
-        Whether ``value`` is a string-keyed result mapping.
-    """
-    return isinstance(value, dict)
-
-
-def _emit(result: object) -> None:
-    """Emit operation results, keeping diagnostics off stdout."""
-    if _is_result_mapping(result) and "error" in result:
-        err(str(result["error"]))
-    if _is_result_mapping(result):
-        for key in ("messages", "warnings", "errors"):
-            values = result.get(key, [])
-            if isinstance(values, list):
-                for value in values:
-                    typer.echo(str(value), err=True)
-    output_json(result)
-
-
 @app.command("read")
 def read(milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)]) -> None:
     """Read a dispatch plan."""
-    _emit(operations.dispatch_read_plan(milestone_number=milestone_number))
+    emit_result(operations.dispatch_read_plan(milestone_number=milestone_number))
 
 
 @app.command("validate")
 def validate(milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)]) -> None:
     """Validate a dispatch plan's structure."""
-    _emit(operations.dispatch_validate_plan(milestone_number=milestone_number))
+    emit_result(operations.dispatch_validate_plan(milestone_number=milestone_number))
 
 
 @app.command("create-plan")
@@ -164,7 +142,7 @@ def create_plan(
         )
     except (ValidationError, ValueError) as exc:
         err(f"Invalid dispatch plan input: {exc}")
-    _emit(
+    emit_result(
         operations.dispatch_create_plan(
             milestone_number=milestone_number,
             plan=plan.model_dump(mode="json", by_alias=True),
@@ -187,7 +165,7 @@ def wave_start(
         ]
     except (ValidationError, ValueError) as exc:
         err(f"Invalid wave item: {exc}")
-    _emit(operations.dispatch_wave_start(milestone=milestone_number, wave_num=wave_number, items=items))
+    emit_result(operations.dispatch_wave_start(milestone=milestone_number, wave_num=wave_number, items=items))
 
 
 @app.command("item-status")
@@ -200,7 +178,7 @@ def item_status(
     cost: Annotated[float | None, typer.Option("--cost")] = None,
 ) -> None:
     """Record completion or failure of a dispatch item."""
-    _emit(
+    emit_result(
         operations.dispatch_item_status(
             milestone=milestone_number, issue=issue_number, status=status, result=result, error=error, cost=cost
         )
@@ -213,7 +191,7 @@ def wave_status(
     wave_number: Annotated[int, typer.Option("--wave-number", min=1)],
 ) -> None:
     """Query dispatch wave status."""
-    _emit(operations.dispatch_wave_status(milestone=milestone_number, wave_num=wave_number))
+    emit_result(operations.dispatch_wave_status(milestone=milestone_number, wave_num=wave_number))
 
 
 @app.command("spawn")
@@ -226,7 +204,7 @@ def spawn(
     effort: Annotated[Literal["low", "medium", "high", "max"] | None, typer.Option("--effort")] = None,
 ) -> None:
     """Spawn and monitor sessions for a dispatch wave."""
-    _emit(
+    emit_result(
         operations.dispatch_spawn(
             milestone=milestone_number,
             wave_num=wave_number,

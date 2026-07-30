@@ -7,11 +7,13 @@ parse into the canonical schema.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from ruamel.yaml import YAML
-from sam_schema.cli import _migrate_one, _migrate_one_fallback, app
+from sam_schema.cli import app
+from sam_schema.sam_plan import _migrate_one, _migrate_one_fallback
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -312,9 +314,13 @@ def test_migrate_all_migrates_nonstandard_frontmatter_files(tmp_path: Path) -> N
     """
     plan_dir = _make_nonstandard_plan_dir(tmp_path)
 
-    result = runner.invoke(app, ["migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["migrated"] == 1
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
     yaml_files = list(plan_dir.glob("*.yaml"))
     assert len(yaml_files) == 1
     assert yaml_files[0].name == "P006-enhance-skill-research.yaml"
@@ -330,9 +336,13 @@ def test_migrate_all_migrates_pure_markdown_files(tmp_path: Path) -> None:
     """
     plan_dir = _make_pure_markdown_plan_dir(tmp_path)
 
-    result = runner.invoke(app, ["migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["migrated"] == 1
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
     yaml_files = list(plan_dir.glob("*.yaml"))
     assert len(yaml_files) == 1
 
@@ -350,9 +360,13 @@ def test_migrate_all_preserves_content_for_fallback_migrated_files(tmp_path: Pat
     src = plan_dir / "tasks-7-data-check.md"
     src.write_text(f"# Data Check\n\n**Issue**: #7\n\n{unique_marker}\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["migrated"] == 1
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
     output = plan_dir / "P007-data-check.yaml"
     assert output.exists()
     data = _load_yaml(output)
@@ -369,10 +383,14 @@ def test_migrate_all_dry_run_shows_fallback_files_as_would_migrate(tmp_path: Pat
     plan_dir = _make_nonstandard_plan_dir(tmp_path)
     original_files = set(plan_dir.iterdir())
 
-    result = runner.invoke(app, ["migrate", "--all", "--dry-run", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--dry-run", "--plan-dir", str(plan_dir)])
 
-    assert result.exit_code == 0, result.output
-    assert "Would migrate" in result.output
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["dry_run"] is True
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
+    assert "Would migrate" in result.stderr
     assert set(plan_dir.iterdir()) == original_files
 
 
@@ -393,10 +411,14 @@ def test_migrate_all_mixed_standard_and_fallback_files(tmp_path: Path) -> None:
     nonstandard_content = _NONSTANDARD_FM.read_text(encoding="utf-8")
     (plan_dir / "tasks-6-nonstandard.md").write_text(nonstandard_content, encoding="utf-8")
 
-    result = runner.invoke(app, ["migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["migrated"] == 2
+    assert ": " not in result.stdout
+    assert ", " not in result.stdout
     yaml_files = {p.name for p in plan_dir.glob("*.yaml")}
     assert "P001-canonical.yaml" in yaml_files
     assert "P006-nonstandard.yaml" in yaml_files
-    assert "Migration complete" in result.output
+    assert "Migrated (fallback)" in result.stderr

@@ -242,15 +242,6 @@ class PlanUpdateInput(_CliInput):
         return self
 
 
-def compact_json(model: BaseModel) -> str:
-    """Serialize a validated model as compact aliased JSON without nulls.
-
-    Returns:
-        Compact JSON representation of ``model``.
-    """
-    return model.model_dump_json(by_alias=True, exclude_none=True, exclude_unset=True)
-
-
 __all__ = [
     "AppendTaskInput",
     "CreatePlanInput",
@@ -258,5 +249,4 @@ __all__ = [
     "PlanUpdateInput",
     "TaskUpdateFields",
     "TaskUpdateInput",
-    "compact_json",
 ]

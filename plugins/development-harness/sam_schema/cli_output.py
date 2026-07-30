@@ -8,12 +8,12 @@ emitters without importing ``cli`` itself, which would be circular.
 from __future__ import annotations
 
 import json
-from typing import NoReturn
+from typing import NoReturn, TypeGuard
 
 import typer
 from pydantic import BaseModel
 
-__all__ = ["err", "output_json"]
+__all__ = ["emit_result", "err", "output_json"]
 
 
 def err(msg: str, exit_code: int = 1) -> NoReturn:
@@ -60,3 +60,25 @@ def output_json(data: object, *, exclude_none: bool = True) -> None:
         )
     else:
         typer.echo(json.dumps(data, default=str, separators=(",", ":")))
+
+
+def _is_result_mapping(value: object) -> TypeGuard[dict[str, object]]:
+    """Narrow operation results to the mapping shape used for diagnostics.
+
+    Returns:
+        Whether ``value`` is a string-keyed result mapping.
+    """
+    return isinstance(value, dict)
+
+
+def emit_result(result: object) -> None:
+    """Emit an operation result, keeping diagnostics off stdout."""
+    if _is_result_mapping(result) and "error" in result:
+        err(str(result["error"]))
+    if _is_result_mapping(result):
+        for key in ("messages", "warnings", "errors"):
+            values = result.get(key, [])
+            if isinstance(values, list):
+                for value in values:
+                    typer.echo(str(value), err=True)
+    output_json(result)

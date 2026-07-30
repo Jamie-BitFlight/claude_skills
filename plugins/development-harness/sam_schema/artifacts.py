@@ -2,37 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, TypeGuard
+from typing import Annotated
 
 import typer
 from backlog_core.models import ArtifactStatus, ArtifactType
 from dh_core import operations
 
-from sam_schema.cli_output import err, output_json
+from sam_schema.cli_output import emit_result, err
 
 app = typer.Typer(help="Artifact manifest operations.", no_args_is_help=True)
-
-
-def _is_result_mapping(value: object) -> TypeGuard[dict[str, object]]:
-    """Narrow an operation result to its JSON mapping shape.
-
-    Returns:
-        Whether ``value`` is a string-keyed result mapping.
-    """
-    return isinstance(value, dict)
-
-
-def _emit(result: object) -> None:
-    """Emit operation results, keeping diagnostics off stdout."""
-    if _is_result_mapping(result) and "error" in result:
-        err(str(result["error"]))
-    if _is_result_mapping(result):
-        for key in ("messages", "warnings", "errors"):
-            values = result.get(key, [])
-            if isinstance(values, list):
-                for value in values:
-                    typer.echo(str(value), err=True)
-    output_json(result)
 
 
 @app.command("register")
@@ -45,7 +23,7 @@ def register(
     content: Annotated[str | None, typer.Option("--content")] = None,
 ) -> None:
     """Register or update an artifact."""
-    _emit(
+    emit_result(
         operations.artifact_register(
             item_id=item_id,
             artifact_type=artifact_type.value,
@@ -63,7 +41,7 @@ def list_artifacts(
     artifact_type: Annotated[ArtifactType | None, typer.Option("--artifact-type")] = None,
 ) -> None:
     """List artifacts registered for an item."""
-    _emit(
+    emit_result(
         operations.artifact_list(
             item_id=item_id, artifact_type=artifact_type.value if artifact_type is not None else None
         )
@@ -77,7 +55,7 @@ def get(
     artifact_id: Annotated[str | None, typer.Option("--artifact-id")] = None,
 ) -> None:
     """Get artifact metadata."""
-    _emit(operations.artifact_get(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
+    emit_result(operations.artifact_get(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
 
 
 @app.command("read")
@@ -87,7 +65,7 @@ def read(
     artifact_id: Annotated[str | None, typer.Option("--artifact-id")] = None,
 ) -> None:
     """Read artifact content."""
-    _emit(operations.artifact_read(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
+    emit_result(operations.artifact_read(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
 
 
 @app.command("migrate")
@@ -102,7 +80,7 @@ def migrate(
         err("--old-artifact-id and --new-artifact-id must be provided together")
     if old_artifact_id is not None and item_id is None:
         err("--item-id is required when renaming an artifact")
-    _emit(
+    emit_result(
         operations.artifact_migrate(
             item_id=item_id, dry_run=dry_run, old_artifact_id=old_artifact_id, new_artifact_id=new_artifact_id
         )
