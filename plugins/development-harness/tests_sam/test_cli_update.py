@@ -1,7 +1,7 @@
 """Tests for sam CLI ``update`` command.
 
-Tests: Plan and task field updates via --set, --context, and --append-section.
-How: Create a plan, invoke ``sam update`` with various flags, verify persistence.
+Tests: Plan and task field updates via typed field options, --context, and --append-section.
+How: Create a plan, invoke ``sam plan update`` with various flags, verify persistence.
 Why: ``update`` is the primary write interface for agents modifying plan state
 during execution -- field corruption here causes cascading failures.
 """
@@ -27,9 +27,15 @@ runner = CliRunner()
 # ---------------------------------------------------------------------------
 
 _PLAN_YAML = """\
+plan-id: P1
 feature: update-test
+version: "1.0"
+description: Update test plan
+state: ready
+autonomy: checkpoint
 goal: Test update functionality
 context: Original context
+acceptance_criteria: Update fields persist
 issue: "99"
 tasks:
   - id: T1
@@ -37,49 +43,79 @@ tasks:
     status: not-started
     agent: test-agent
     dependencies: []
+    blocked_by: []
+    parallelize_with: []
+    skills: []
     priority: 3
     complexity: medium
+    created: null
+    started: null
+    completed: null
+    last_activity: null
+    body: First task body
+    description: First task description
   - id: T2
     title: Second task
     status: not-started
     agent: test-agent
     dependencies:
       - T1
+    blocked_by: []
+    parallelize_with: []
+    skills: []
     priority: 2
     complexity: high
+    created: null
+    started: null
+    completed: null
+    last_activity: null
+    body: Second task body
+    description: Second task description
 """
 
 
 @pytest.fixture
 def plan_dir(tmp_path: Path) -> Path:
-    """Create a plan directory with one plan file for update tests.
-
-    Returns:
-        Path to a ``plan/`` directory with ``P001-update-test.yaml``.
-    """
+    """Create a directory-layout plan for update tests."""
     d = tmp_path / "plan"
     d.mkdir()
-    (d / "P001-update-test.yaml").write_text(_PLAN_YAML, encoding="utf-8")
+    plan = d / "P001-update-test.yaml"
+    plan.mkdir()
+    data = YAML(typ="safe").load(_PLAN_YAML)
+    tasks = data.pop("tasks")
+    data["task_files"] = [f"task-{task['id']}.yaml" for task in tasks]
+    y = YAML()
+    y.dump(data, (plan / "plan.yaml").open("w", encoding="utf-8"))
+    for task in tasks:
+        y.dump(task, (plan / f"task-{task['id']}.yaml").open("w", encoding="utf-8"))
     return d
 
 
 def _load_yaml(path: Path) -> dict:
-    """Load a YAML file and return its contents."""
+    """Load a canonical YAML plan file or directory."""
     y = YAML(typ="rt")
+    if not path.exists() and path.suffix == ".yaml":
+        path = path.with_suffix("")
+    if path.is_dir():
+        data = y.load((path / "plan.yaml").read_text(encoding="utf-8"))
+        data["tasks"] = [
+            y.load(task_path.read_text(encoding="utf-8")) for task_path in sorted(path.glob("task-*.yaml"))
+        ]
+        return data
     return y.load(path.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
-# sam update -- plan-level context
+# sam plan update -- plan-level context
 # ---------------------------------------------------------------------------
 
 
 class TestSamUpdateContext:
-    """Test ``sam update`` with --context flag for plan-level context.
+    """Test ``sam plan update`` with --context flag for plan-level context.
 
     Tests: Plan-level context field update.
     How: Invoke update --context, read back and verify.
-    Why: AC6 -- sam update sets context on plan.
+    Why: AC6 -- sam plan update sets context on plan.
     """
 
     def test_update_context_changes_plan_context(self, plan_dir: Path) -> None:
@@ -92,7 +128,16 @@ class TestSamUpdateContext:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["update", "P1", "--context", "Updated context text", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                "P1",
+                "--context",
+                "Updated context text",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
@@ -113,7 +158,9 @@ class TestSamUpdateContext:
         """
         # Arrange / Act
         runner.invoke(
-            app, ["update", "P1", "--context", "New context", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1", "--context", "New context", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
@@ -130,30 +177,32 @@ class TestSamUpdateContext:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1", "--context", "ctx", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1", "--context", "ctx", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["updated"] is True
-        assert data["address"] == "P1"
+        assert data["address"] == "1"
 
 
 # ---------------------------------------------------------------------------
-# sam update -- task-level field updates
+# sam plan update -- task-level field updates
 # ---------------------------------------------------------------------------
 
 
 class TestSamUpdateSetField:
-    """Test ``sam update`` with --set flag for arbitrary field updates.
+    """Test ``sam plan update`` with typed field options flag for arbitrary field updates.
 
-    Tests: Task-level field updates via --set field=value.
-    How: Invoke update P1/T1 --set priority=1, verify task field changed.
+    Tests: Task-level field updates via typed field options field=value.
+    How: Invoke update P1/T1 typed field options priority=1, verify task field changed.
     Why: Agents need to update arbitrary task fields during execution.
     """
 
     def test_update_set_task_priority(self, plan_dir: Path) -> None:
-        """Update --set priority=1 on a task changes priority value.
+        """Update typed field options priority=1 on a task changes priority value.
 
         Tests: Single field update on task.
         How: Update T1 priority, read back.
@@ -161,24 +210,28 @@ class TestSamUpdateSetField:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1/T1", "--set", "priority=1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
         plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
-        # --set passes values as strings; ruamel.yaml may store as str or int
+        # typed field options passes values as strings; ruamel.yaml may store as str or int
         assert str(plan_data["tasks"][0]["priority"]) == "1"
 
     def test_update_set_task_status(self, plan_dir: Path) -> None:
-        """Update --set status=in-progress changes the task status.
+        """Update typed field options status=in-progress changes the task status.
 
-        Tests: Status field update via --set.
+        Tests: Status field update via typed field options.
         How: Set T1 status, read back and verify.
         Why: Status is the most frequently updated field.
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1/T1", "--set", "status=in-progress", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--task-status", "in-progress", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
@@ -186,7 +239,7 @@ class TestSamUpdateSetField:
         assert plan_data["tasks"][0]["status"] == "in-progress"
 
     def test_update_set_preserves_other_task_fields(self, plan_dir: Path) -> None:
-        """Update --set on one field does not alter other task fields.
+        """Update typed field options on one field does not alter other task fields.
 
         Tests: Field isolation during task update.
         How: Update priority, verify title and agent unchanged.
@@ -194,7 +247,9 @@ class TestSamUpdateSetField:
         """
         # Arrange / Act
         runner.invoke(
-            app, ["update", "P1/T1", "--set", "priority=1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
@@ -202,7 +257,7 @@ class TestSamUpdateSetField:
         assert plan_data["tasks"][0]["agent"] == "test-agent"
 
     def test_update_set_targets_correct_task(self, plan_dir: Path) -> None:
-        """Update P1/T2 --set priority=1 only updates T2, not T1.
+        """Update P1/T2 typed field options priority=1 only updates T2, not T1.
 
         Tests: Task targeting accuracy.
         How: Update T2, verify T1 is unchanged.
@@ -210,35 +265,59 @@ class TestSamUpdateSetField:
         """
         # Arrange / Act
         runner.invoke(
-            app, ["update", "P1/T2", "--set", "priority=1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T2", "--priority", "1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
         assert plan_data["tasks"][0]["priority"] == 3  # T1 unchanged
         assert str(plan_data["tasks"][1]["priority"]) == "1"  # T2 updated
 
-    def test_update_set_invalid_format_exits_1(self, plan_dir: Path) -> None:
-        """Update --set without '=' separator exits 1 with error.
+    def test_update_removed_set_option_is_rejected(self, plan_dir: Path) -> None:
+        """The obsolete --set syntax is rejected by the grouped command.
 
-        Tests: --set format validation.
-        How: Pass "priority1" (no =), expect exit 1.
-        Why: Malformed --set must produce clear error.
+        Tests: Removed arbitrary field syntax.
+        How: Pass the former --set option, expect parser rejection.
+        Why: Updates must use typed field options.
         """
-        # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1/T1", "--set", "priority1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--set", "priority1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
-        # Assert
-        assert result.exit_code == 1
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert "--set" in result.stderr
+
+    def test_update_positional_address_is_rejected(self, plan_dir: Path) -> None:
+        """A positional plan address is rejected by ``plan update``."""
+        result = runner.invoke(
+            app, ["plan", "update", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert "plan-address" in result.stderr
+
+    def test_update_unknown_option_is_rejected(self, plan_dir: Path) -> None:
+        """Unknown update options fail before plan mutation."""
+        result = runner.invoke(
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--unknown", "value", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
+        )
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert "--unknown" in result.stderr
 
 
 # ---------------------------------------------------------------------------
-# sam update -- append-section
+# sam plan update -- append-section
 # ---------------------------------------------------------------------------
 
 
 class TestSamUpdateAppendSection:
-    """Test ``sam update`` with --append-section and --section-content.
+    """Test ``sam plan update`` with --append-section and --section-content.
 
     Tests: Markdown section appending to task body.
     How: Invoke update with section flags, verify content in task file.
@@ -256,7 +335,9 @@ class TestSamUpdateAppendSection:
         result = runner.invoke(
             app,
             [
+                "plan",
                 "update",
+                "--plan-address",
                 "P1/T1",
                 "--append-section",
                 "Divergence Notes",
@@ -285,7 +366,9 @@ class TestSamUpdateAppendSection:
         runner.invoke(
             app,
             [
+                "plan",
                 "update",
+                "--plan-address",
                 "P1/T1",
                 "--append-section",
                 "Notes",
@@ -300,7 +383,9 @@ class TestSamUpdateAppendSection:
         runner.invoke(
             app,
             [
+                "plan",
                 "update",
+                "--plan-address",
                 "P1/T1",
                 "--append-section",
                 "More Notes",
@@ -327,7 +412,18 @@ class TestSamUpdateAppendSection:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["update", "P1", "--append-section", "Notes", "--section-content", "Content.", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                "P1",
+                "--append-section",
+                "Notes",
+                "--section-content",
+                "Content.",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
@@ -342,19 +438,21 @@ class TestSamUpdateAppendSection:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1/T1", "--append-section", "Notes", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T1", "--append-section", "Notes", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 1
 
 
 # ---------------------------------------------------------------------------
-# sam update -- error handling
+# sam plan update -- error handling
 # ---------------------------------------------------------------------------
 
 
 class TestSamUpdateErrors:
-    """Test ``sam update`` error handling.
+    """Test ``sam plan update`` error handling.
 
     Tests: Error cases for invalid addresses, missing plans, no-op invocations.
     How: Invoke with various invalid inputs, verify exit codes and error messages.
@@ -362,14 +460,16 @@ class TestSamUpdateErrors:
     """
 
     def test_update_no_operation_flags_exits_1(self, plan_dir: Path) -> None:
-        """Update with no --set, --context, or --append-section exits 1.
+        """Update with no typed field options, --context, or --append-section exits 1.
 
         Tests: No-op rejection.
         How: Invoke with just an address and no update flags.
         Why: No-op updates indicate caller error.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["update", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "update", "--plan-address", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 1
 
@@ -382,7 +482,9 @@ class TestSamUpdateErrors:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P99", "--context", "ctx", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P99", "--context", "ctx", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 1
@@ -396,7 +498,9 @@ class TestSamUpdateErrors:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["update", "P1/T99", "--set", "status=complete", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", "--plan-address", "P1/T99", "--task-status", "complete", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 1

@@ -294,14 +294,21 @@ def update(
     target_task = task_id or (f"T{task_ref}" if task_ref and task_ref.isdigit() else task_ref)
     if target_task:
         try:
-            fields = TaskUpdateFields(
-                title=title,
-                status=task_status,
-                agent=agent,
-                priority=priority,
-                complexity=complexity,
-                dependencies=dependency,
-                skills=skill,
+            has_task_fields = any(
+                value is not None for value in (title, task_status, agent, priority, complexity, dependency, skill)
+            )
+            fields = (
+                TaskUpdateFields(
+                    title=title,
+                    status=task_status,
+                    agent=agent,
+                    priority=priority,
+                    complexity=complexity,
+                    dependencies=dependency,
+                    skills=skill,
+                )
+                if has_task_fields
+                else None
             )
             request = TaskUpdateInput(
                 plan_address=plan_ref,
@@ -310,7 +317,7 @@ def update(
                 append_section=append_section,
                 section_content=section_content,
             )
-            values = request.fields.as_operation_fields()
+            values = request.fields.as_operation_fields() if request.fields is not None else None
         except ValidationError as exc:
             _error(str(exc))
     else:

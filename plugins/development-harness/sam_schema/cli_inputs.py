@@ -144,13 +144,13 @@ class TaskUpdateFields(_CliInput):
         Returns:
             The validated update fields.
         """
-        if not self.model_fields_set:
+        if not any(value is not None for value in self.model_dump().values()):
             raise ValueError("at least one task update field is required")
         return self
 
     def as_operation_fields(self) -> dict[str, object]:
         """Return only explicitly supplied fields using wire aliases."""
-        return self.model_dump(by_alias=True, mode="json", exclude_unset=True)
+        return self.model_dump(by_alias=True, mode="json", exclude_unset=True, exclude_none=True)
 
 
 class PlanUpdateFields(_CliInput):
@@ -188,13 +188,13 @@ class PlanUpdateFields(_CliInput):
         Returns:
             The validated update fields.
         """
-        if not self.model_fields_set:
+        if not any(value is not None for value in self.model_dump().values()):
             raise ValueError("at least one plan update field is required")
         return self
 
     def as_operation_fields(self) -> dict[str, object]:
         """Return only explicitly supplied fields using wire aliases."""
-        return self.model_dump(by_alias=True, mode="json", exclude_unset=True)
+        return self.model_dump(by_alias=True, mode="json", exclude_unset=True, exclude_none=True)
 
 
 class TaskUpdateInput(_CliInput):
@@ -202,7 +202,7 @@ class TaskUpdateInput(_CliInput):
 
     plan_address: str = Field(..., min_length=1)
     task_id: str = Field(..., min_length=1)
-    fields: TaskUpdateFields
+    fields: TaskUpdateFields | None = None
     append_section: str | None = None
     section_content: str | None = None
 
@@ -215,6 +215,8 @@ class TaskUpdateInput(_CliInput):
         """
         if (self.append_section is None) != (self.section_content is None):
             raise ValueError("append_section and section_content must be provided together")
+        if self.fields is None and self.append_section is None:
+            raise ValueError("at least one task update field or a section append is required")
         return self
 
 
